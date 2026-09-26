@@ -604,6 +604,64 @@ async def _canonical_replay_turn(
     }
 
 
+async def _canonical_history_turn_rows(
+    session_id: str,
+    *,
+    limit: int,
+) -> tuple[List[Dict[str, Any]], str]:
+    from skeleton.contracts.conversation import ConversationAuthorType
+
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    messages = await authority.active_transcript(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    by_id = {message.message_id: message for message in messages}
+    rows: List[Dict[str, Any]] = []
+    for message in messages:
+        if message.author_type is not ConversationAuthorType.ASSISTANT:
+            continue
+        causal_id = message.causal_user_message_id
+        causal = by_id.get(causal_id) if causal_id else None
+        if (
+            causal is None
+            or causal.author_type is not ConversationAuthorType.USER
+        ):
+            continue
+        user_key = causal.idempotency_key
+        client_message_id = (
+            user_key[len("jeeves-user:") :]
+            if user_key.startswith("jeeves-user:")
+            else user_key
+        )
+        ai_result_id = str(message.ai_result_id or "")
+        execution_id = (
+            ai_result_id[len("engine-result:") :]
+            if ai_result_id.startswith("engine-result:")
+            else None
+        )
+        rows.append(
+            {
+                "session_id": session_id,
+                "client_message_id": client_message_id,
+                "role_user": causal.content,
+                "role_jeeves": message.content,
+                "status": "complete",
+                "ts": message.created_at.timestamp(),
+                "operation_id": message.operation_id,
+                "ai_result_id": message.ai_result_id,
+                "engine_execution_id": execution_id,
+                "canonical_thread_id": thread.thread_id,
+                "canonical_user_message_id": causal.message_id,
+                "canonical_assistant_message_id": message.message_id,
+            }
+        )
+    return rows[-limit:], thread.thread_id
+
+
 _MAX_SERVER_HISTORY_MESSAGES = 20
 
 
@@ -977,16 +1035,46 @@ async def chat(req: ChatReq):
 
 
 @router.get("/chat/{session_id}")
-async def chat_history(session_id: str, limit: Annotated[int, Query(ge=1, le=100)] = 50):
+async def chat_history(
+    session_id: str,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+):
     available = True
-    try:
-        rows = await _chat_col().find({"session_id": session_id}, {"_id": 0}).sort("ts", -1).to_list(int(limit))
-        rows.reverse()
-    except Exception:  # noqa: BLE001
-        rows = []
-        available = False
-    return {"ok": available, "session_id": session_id, "turns": rows, "count": len(rows),
-            "available": available}
+    canonical_thread_id = None
+    if _canonical_chat_enabled():
+        try:
+            rows, canonical_thread_id = await _canonical_history_turn_rows(
+                session_id,
+                limit=int(limit),
+            )
+        except Exception:  # noqa: BLE001
+            rows = []
+            available = False
+    else:
+        try:
+            rows = await (
+                _chat_col()
+                .find({"session_id": session_id}, {"_id": 0})
+                .sort("ts", -1)
+                .to_list(int(limit))
+            )
+            rows.reverse()
+        except Exception:  # noqa: BLE001
+            rows = []
+            available = False
+    return {
+        "ok": available,
+        "session_id": session_id,
+        "turns": rows,
+        "count": len(rows),
+        "available": available,
+        "history_source": (
+            "canonical"
+            if _canonical_chat_enabled()
+            else "legacy-compatibility"
+        ),
+        "canonical_thread_id": canonical_thread_id,
+    }
 
 
 @router.get("/free-tier")
