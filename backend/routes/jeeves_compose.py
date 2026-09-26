@@ -12,7 +12,6 @@ routes/jeeves_compose.py — Jeeves SOTA composer + chat (/api/jeeves).
 from __future__ import annotations
 
 import hashlib
-import os
 import time
 import uuid
 from typing import Annotated, Any, Dict, List, Optional
@@ -206,13 +205,6 @@ async def compose(req: ComposeReq):
 def _chat_col():
     from core.databases import core_db
     return core_db["jeeves_chat"]
-
-
-def _canonical_chat_enabled() -> bool:
-    return os.getenv(
-        "SKL_JEEVES_CANONICAL_CONVERSATIONS",
-        "",
-    ).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _canonical_authority():
@@ -687,181 +679,111 @@ def _history_from_turn_rows(
 async def _load_server_history(
     session_id: str,
 ) -> tuple[List[HistoryMessage], bool]:
-    """Load the server-owned transcript projection for one compatibility session.
+    """Load the canonical transcript, importing legacy rows only once.
 
-    Canonical mode reads ConversationThread/ConversationMessage authority and
-    uses legacy rows only as one-way migration input. Caller history is never
-    accepted as conversation authority.
+    The legacy jeeves_chat collection is migration input only. New turn
+    authority, idempotency and replay all live in ConversationThread and
+    ConversationMessage.
     """
 
-    if _canonical_chat_enabled():
-        return await _load_canonical_history(session_id)
-
-    try:
-        collection = _chat_col()
-        cursor = collection.find(
-            {
-                "session_id": session_id,
-                "$or": [
-                    {"status": "complete"},
-                    {"status": {"$exists": False}},
-                ],
-            },
-            {
-                "_id": 0,
-                "role_user": 1,
-                "role_jeeves": 1,
-                "ts": 1,
-            },
-        ).sort("ts", -1)
-        rows = await cursor.to_list(_MAX_SERVER_HISTORY_MESSAGES // 2)
-        rows.reverse()
-
-        return _history_from_turn_rows(rows), True
-    except Exception:
-        return [], False
+    return await _load_canonical_history(session_id)
 
 
-async def _existing_idempotent_turn(
+async def _canonical_existing_turn(
     session_id: str,
     client_message_id: str,
     user_message: str,
 ) -> Dict[str, Any] | None:
-    turn_key = _turn_id(session_id, client_message_id)
-    try:
-        existing = await _chat_col().find_one({"_id": turn_key})
-    except Exception:
+    """Resolve a retry entirely from canonical conversation authority."""
+
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    messages = await authority.active_transcript(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    user_key = _canonical_user_idempotency(client_message_id)
+    canonical_user = next(
+        (
+            message
+            for message in messages
+            if message.idempotency_key == user_key
+        ),
+        None,
+    )
+    if canonical_user is None:
         return None
-    if not isinstance(existing, dict):
-        return None
-    if existing.get("role_user") != user_message:
+    if canonical_user.content != user_message:
         raise HTTPException(
             status_code=409,
             detail="client_message_id was already used for different content",
         )
-    return existing
 
-
-def _replay_turn(turn: Dict[str, Any]) -> Dict[str, Any]:
-    if turn.get("status") != "complete" or not isinstance(turn.get("role_jeeves"), str):
+    assistant_key = "jeeves-assistant:" + client_message_id
+    canonical_assistant = next(
+        (
+            message
+            for message in messages
+            if message.idempotency_key == assistant_key
+            and message.causal_user_message_id
+            == canonical_user.message_id
+        ),
+        None,
+    )
+    if canonical_assistant is None:
         raise HTTPException(
             status_code=409,
             detail="this message is already being processed; retry after it completes",
         )
+
+    ai_result_id = str(canonical_assistant.ai_result_id or "")
     return {
         "ok": True,
-        "session_id": str(turn.get("session_id") or ""),
-        "reply": turn["role_jeeves"],
-        "forms": list(turn.get("forms") or ["text"]),
-        "tier": str(turn.get("tier") or "unknown"),
-        "model": str(turn.get("model") or "unknown"),
-        "modalities": list(turn.get("modalities") or ["text"]),
+        "session_id": session_id,
+        "reply": canonical_assistant.content,
+        "forms": ["text"],
+        "tier": "canonical",
+        "model": (
+            "skeleton-engine"
+            if ai_result_id.startswith("engine-result:")
+            else "canonical-jeeves"
+        ),
+        "modalities": ["text"],
         "artifacts": [],
-        "artifact_count": int(turn.get("artifact_count") or 0),
-        "grounded_in": int(turn.get("grounded_in") or 0),
+        "artifact_count": len(canonical_assistant.artifact_refs),
+        "grounded_in": len(canonical_assistant.citation_refs),
         "persisted": True,
-        "history_messages_used": int(turn.get("history_messages_used") or 0),
-        "history_source": str(turn.get("history_source") or "server"),
+        "history_messages_used": max(0, len(messages) - 2),
+        "history_source": "canonical",
         "replayed": True,
+        "operation_id": canonical_assistant.operation_id,
+        "ai_result_id": canonical_assistant.ai_result_id,
+        "canonical_thread_id": thread.thread_id,
+        "canonical_message_id": canonical_assistant.message_id,
     }
 
 
 async def _claim_idempotent_turn(
     req: ChatReq,
     session_id: str,
-) -> tuple[str | None, Dict[str, Any] | None]:
+) -> Dict[str, Any] | None:
     if req.client_message_id is None:
-        return None, None
-
-    existing = await _existing_idempotent_turn(
-        session_id,
-        req.client_message_id,
-        req.message,
-    )
-    if existing is not None:
-        if _canonical_chat_enabled():
-            try:
-                return None, await _canonical_replay_turn(
-                    session_id,
-                    req.client_message_id,
-                    req.message,
-                    existing,
-                )
-            except HTTPException:
-                raise
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "canonical conversation replay is unavailable; "
-                        "retry later"
-                    ),
-                ) from exc
-        return None, _replay_turn(existing)
-
-    turn_key = _turn_id(session_id, req.client_message_id)
-    pending = {
-        "_id": turn_key,
-        "session_id": session_id,
-        "client_message_id": req.client_message_id,
-        "role_user": req.message,
-        "status": "pending",
-        "ts": time.time(),
-    }
+        return None
     try:
-        await _chat_col().insert_one(dict(pending))
-        return turn_key, None
-    except Exception as exc:
-        existing = await _existing_idempotent_turn(
+        return await _canonical_existing_turn(
             session_id,
             req.client_message_id,
             req.message,
         )
-        if existing is not None:
-            if _canonical_chat_enabled():
-                try:
-                    return None, await _canonical_replay_turn(
-                        session_id,
-                        req.client_message_id,
-                        req.message,
-                        existing,
-                    )
-                except HTTPException:
-                    raise
-                except Exception as replay_exc:
-                    raise HTTPException(
-                        status_code=503,
-                        detail=(
-                            "canonical conversation replay is unavailable; "
-                            "retry later"
-                        ),
-                    ) from replay_exc
-            return None, _replay_turn(existing)
-        raise HTTPException(
-            status_code=503,
-            detail="conversation storage is unavailable; retry later",
-        ) from exc
-
-
-async def _finalize_claim(
-    turn_key: str,
-    turn: Dict[str, Any],
-) -> None:
-    try:
-        result = await _chat_col().update_one(
-            {"_id": turn_key, "status": "pending"},
-            {"$set": dict(turn)},
-        )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="conversation result could not be committed; retry later",
+            detail="canonical conversation replay is unavailable; retry later",
         ) from exc
-    if int(getattr(result, "matched_count", 0)) != 1:
-        raise HTTPException(
-            status_code=409,
-            detail="conversation turn changed before completion",
-        )
 
 
 @router.post("/chat")
@@ -869,7 +791,7 @@ async def chat(req: ChatReq):
     """Execute one server-authoritative Jeeves conversation turn."""
     sid = req.session_id or uuid.uuid4().hex[:16]
 
-    claim_key, replay = await _claim_idempotent_turn(req, sid)
+    replay = await _claim_idempotent_turn(req, sid)
     if replay is not None:
         return replay
 
@@ -892,21 +814,19 @@ async def chat(req: ChatReq):
             else "unavailable"
         )
 
-    canonical_turn = None
-    if _canonical_chat_enabled():
-        try:
-            canonical_turn = await _append_canonical_user_turn(
-                req,
-                sid,
-            )
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "canonical conversation authority is unavailable; "
-                    "retry later"
-                ),
-            ) from exc
+    try:
+        canonical_turn = await _append_canonical_user_turn(
+            req,
+            sid,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "canonical conversation authority is unavailable; "
+                "retry later"
+            ),
+        ) from exc
 
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
@@ -948,36 +868,34 @@ async def chat(req: ChatReq):
         if artifact_forms else []
     )
 
-    canonical_assistant = None
-    if canonical_turn is not None:
-        (
-            canonical_authority,
-            canonical_thread,
-            canonical_user,
-            canonical_tenant,
-            canonical_owner,
-        ) = canonical_turn
-        try:
-            canonical_thread, canonical_assistant = (
-                await _commit_canonical_assistant_turn(
-                    authority=canonical_authority,
-                    thread=canonical_thread,
-                    user_message=canonical_user,
-                    tenant_id=canonical_tenant,
-                    owner_id=canonical_owner,
-                    session_id=sid,
-                    client_message_id=req.client_message_id,
-                    generated=gen,
-                )
+    (
+        canonical_authority,
+        canonical_thread,
+        canonical_user,
+        canonical_tenant,
+        canonical_owner,
+    ) = canonical_turn
+    try:
+        canonical_thread, canonical_assistant = (
+            await _commit_canonical_assistant_turn(
+                authority=canonical_authority,
+                thread=canonical_thread,
+                user_message=canonical_user,
+                tenant_id=canonical_tenant,
+                owner_id=canonical_owner,
+                session_id=sid,
+                client_message_id=req.client_message_id,
+                generated=gen,
             )
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "canonical conversation result could not be committed; "
-                    "retry later"
-                ),
-            ) from exc
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "canonical conversation result could not be committed; "
+                "retry later"
+            ),
+        ) from exc
 
     turn = {
         "session_id": sid,
@@ -998,18 +916,10 @@ async def chat(req: ChatReq):
         "status": "complete",
         "ts": time.time(),
     }
+    # Canonical ConversationThread/ConversationMessage is the only mutable
+    # transcript authority. The legacy jeeves_chat collection is never written
+    # by new requests and exists solely as one-time migration input.
     persisted = True
-    if claim_key is not None:
-        try:
-            await _finalize_claim(claim_key, turn)
-        except HTTPException:
-            if canonical_assistant is None:
-                raise
-    elif not _canonical_chat_enabled():
-        try:
-            await _chat_col().insert_one(dict(turn))
-        except Exception:
-            persisted = False
 
     return {
         "ok": True,
@@ -1063,38 +973,26 @@ async def chat_history(
 ):
     available = True
     canonical_thread_id = None
-    if _canonical_chat_enabled():
-        try:
-            rows, canonical_thread_id = await _canonical_history_turn_rows(
-                session_id,
-                limit=int(limit),
-            )
-        except Exception:  # noqa: BLE001
-            rows = []
-            available = False
-    else:
-        try:
-            rows = await (
-                _chat_col()
-                .find({"session_id": session_id}, {"_id": 0})
-                .sort("ts", -1)
-                .to_list(int(limit))
-            )
-            rows.reverse()
-        except Exception:  # noqa: BLE001
-            rows = []
-            available = False
+    try:
+        history, history_available = await _load_canonical_history(
+            session_id
+        )
+        if not history_available:
+            raise RuntimeError("canonical history unavailable")
+        rows, canonical_thread_id = await _canonical_history_turn_rows(
+            session_id,
+            limit=int(limit),
+        )
+    except Exception:  # noqa: BLE001
+        rows = []
+        available = False
     return {
         "ok": available,
         "session_id": session_id,
         "turns": rows,
         "count": len(rows),
         "available": available,
-        "history_source": (
-            "canonical"
-            if _canonical_chat_enabled()
-            else "legacy-compatibility"
-        ),
+        "history_source": "canonical",
         "canonical_thread_id": canonical_thread_id,
     }
 
