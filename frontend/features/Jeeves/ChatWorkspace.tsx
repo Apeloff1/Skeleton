@@ -13,7 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
-import type { ChatResponse } from './WorkspaceController';
+import type { ChatHistoryResponse, ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
 import { exportTranscript, MAX_ATTACHMENT_BYTES, saveArtifact, validateAttachment } from './chatFiles';
@@ -123,19 +123,36 @@ function Library({ controller, close }: { controller: WorkspaceController; close
 export default function ChatWorkspace() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [controller] = useState(() => new WorkspaceController(AsyncStorage, async (body, signal) => {
-    const result = await api.post<ChatResponse>('/api/jeeves/chat', body, { signal, timeoutMs: 60000, retries: 0 });
-    if (!result.ok || !result.data) {
-      const message = result.status === 429 ? 'Jeeves is busy. Wait a moment and retry.'
-        : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
-          : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
-            : result.status === 413 ? 'This attachment is too large.'
-              : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
-                : 'The connection to Jeeves was interrupted. Check your connection and retry.';
-      throw new Error(message);
-    }
-    return result.data;
-  }));
+  const [controller] = useState(() => new WorkspaceController(
+    AsyncStorage,
+    async (body, signal) => {
+      const result = await api.post<ChatResponse>(
+        '/api/jeeves/chat',
+        body,
+        { signal, timeoutMs: 60000, retries: 0 },
+      );
+      if (!result.ok || !result.data) {
+        const message = result.status === 429 ? 'Jeeves is busy. Wait a moment and retry.'
+          : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
+            : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
+              : result.status === 413 ? 'This attachment is too large.'
+                : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
+                  : 'The connection to Jeeves was interrupted. Check your connection and retry.';
+        throw new Error(message);
+      }
+      return result.data;
+    },
+    async sessionId => {
+      const result = await api.get<ChatHistoryResponse>(
+        '/api/jeeves/chat/' + encodeURIComponent(sessionId) + '?limit=50',
+        { timeoutMs: 20000, retries: 1 },
+      );
+      if (!result.ok || !result.data) {
+        throw new Error('Canonical Jeeves history is unavailable.');
+      }
+      return result.data;
+    },
+  ));
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const conversation = controller.active;
   const busy = snapshot.busyId !== null;
