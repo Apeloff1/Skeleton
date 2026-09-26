@@ -543,7 +543,15 @@
         "backend/core/engine_client.py derives EngineContextHandoff instructions/prompt/history from project_provider_context(ContextEnvelope) whenever canonical projection content exists",
         "backend/core/engine_client.py prevents legacy caller text/history from overriding projected ContextEnvelope content",
         "backend/routes/ai.py binds compatibility prompts as USER_MESSAGE ContextSegments so prompt content participates in context_digest",
-        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context"
+        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context",
+        "skeleton/context/compaction.py provides deterministic single-segment evidence compaction with hard token bounds",
+        "context compaction preserves tenant, purpose, data class, retention class, source content digest and derived_from lineage",
+        "trusted-control and mandatory context cannot enter the compaction path",
+        "skeleton/context/compiler.py optionally compacts oversized eligible evidence while preserving the original source_snapshot",
+        "compiler omission_reasons record compacted_to:<derived-segment-id> for replay/audit",
+        "skeleton/testing/test_context_compiler.py covers compaction lineage, trust downgrade, hard token bounds, control refusal and compiler admission",
+        "backend/services/ai_assistant_svc.py delegates model execution through EngineTextRequest/execute_engine_text and owns no provider transport or credentials",
+        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary"
       ],
       "closure_evidence_required": [
         "deterministic context snapshot/digest tests",
@@ -559,10 +567,9 @@
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
-        "summary/compaction provenance tests",
-        "citation/source ids survive context projection across compaction",
-        "remaining legacy direct-provider/direct-prompt surfaces are migrated or compatibility-only",
-        "legacy control-prompt source scan and compatibility prompt-parity tests",
+        "semantic/multi-segment summary provenance tests where extractive compaction is insufficient",
+        "repository-wide source scan proving remaining model turns cannot bypass ContextCompiler/digest-bound handoff",
+        "legacy control-prompt ownership/parity tests",
         "fresh exact-head context compiler/App Assembly/runtime validation",
         "declared dependency-gap closure and independent verification"
       ],
