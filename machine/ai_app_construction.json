@@ -2175,7 +2175,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed SQLite/Mongo memory-write admission boundaries, authoritative Mongo conversation persistence admission, and aggregate estimate-vs-actual telemetry now share one contract. Remaining implementation work is live Mongo memory writer binding, material retrieval/index rebuild admission, and exact-head/independent verification.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed production Mongo memory writes, admitted authoritative Mongo conversation persistence, and aggregate estimate-vs-actual telemetry now share one contract. Remaining implementation work is material retrieval/index rebuild admission plus exact-head and independent verification.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2189,12 +2189,16 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "shared AdmissionRuntime covers provider/media, tool, artifact/storage, engine execution persistence and governed memory write boundaries; backend conversation thread/message/state writes cross the authenticated engine storage-admission boundary before Mongo mutation; live production Mongo memory writer binding plus material retrieval/index rebuild admission remain",
+      "status_detail": "shared AdmissionRuntime covers provider/media, tool, artifact/storage, engine execution persistence, live canonical Mongo memory writes and backend conversation writes; material retrieval/index rebuild admission remains before final exact-head/independent closure",
       "evidence_present": [
         "backend/core/conversations.py admits thread/message/state writes through EngineClient.admit_storage_write before Mongo mutation",
         "backend/core/engine_client.py authenticated bounded /admission/storage client boundary",
         "skeleton/api/engine_routes.py engine storage-admission route delegates to canonical EngineExecutionService",
-        "backend/tests/test_conversation_storage_admission.py proves fail-closed create, replay-stable append admission and under-accounting rejection"
+        "backend/tests/test_conversation_storage_admission.py proves fail-closed create, replay-stable append admission and under-accounting rejection",
+        "skeleton/api/server.py binds one canonical MongoMemoryRepository + AsyncGovernedMemoryWriter from SKL_MONGO_URI/SKL_MONGO_DATABASE at configured runtime startup",
+        "skeleton/testing/test_governance_runtime_binding.py proves injected live Mongo writer reuses canonical governance/admission owners and bootstraps repository indexes",
+        "pyproject.toml declares Motor/PyMongo for the Skeleton production image",
+        "skeleton/ai/runtime/api/server.py byte-identical canonical AI runtime mirror"
       ]
     },
     {
@@ -7389,7 +7393,10 @@
       "engine execution/submission/checkpoint/turn/finalization/result persistence is metered through operation-level storage admission",
       "storage write identities are deterministic so restart replay does not double-charge durable usage",
       "governed SQLite and Mongo memory writers meter source-operation storage before canonical commit",
-      "memory governance failure tombstones canonical memory fail-closed after admitted write"
+      "memory governance failure tombstones canonical memory fail-closed after admitted write",
+      "ServerState production startup binds AsyncGovernedMemoryWriter to canonical MongoMemoryRepository using the existing execution AdmissionRuntime and GovernanceRegistry",
+      "canonical Mongo memory runtime binding is explicit-config only for network-free local/unit startup and testable with injected database",
+      "Skeleton production package declares Motor/PyMongo required by the canonical Mongo memory owner"
     ]
   },
   "provider_surface_convergence_blueprint": {
