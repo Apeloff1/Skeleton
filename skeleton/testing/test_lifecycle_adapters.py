@@ -483,4 +483,3 @@ async def test_governed_retrieval_retention_physically_deletes_index_record() ->
     assert len(results) == 1
     assert lifecycle.get(record.record_id)["state"] == "deleted"
     assert retrieval.size("tenant-a") == 0
-
