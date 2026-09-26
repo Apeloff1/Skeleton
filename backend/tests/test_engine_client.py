@@ -1561,3 +1561,80 @@ async def test_governance_write_client_rejects_malformed_lists_before_io() -> No
         )
 
     assert called is False
+
+
+def test_command_from_context_binds_explicit_verified_memory_intent() -> None:
+    context = _context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="memory-intent",
+        instructions="ignored legacy instruction",
+        prompt="remember this verified outcome",
+        verification_profile="assistant_proposal",
+        memory_write_intent={
+            "subject_id": "user-a",
+            "namespace": "assistant",
+            "kind": "semantic",
+            "content_from": "verified_final_output",
+            "data_class": "confidential",
+            "provenance_refs": ["conversation:thread-a"],
+        },
+    )
+
+    intent = command.execution_request.context_policy[
+        "memory_write_intent"
+    ]
+    assert intent == {
+        "subject_id": "user-a",
+        "namespace": "assistant",
+        "kind": "semantic",
+        "data_class": "confidential",
+        "content_from": "verified_final_output",
+        "provenance_refs": ["conversation:thread-a"],
+    }
+    assert "engine:memory" in command.delegated_authority.scopes
+
+
+def test_command_from_context_rejects_unverified_memory_content_source() -> None:
+    context = _context()
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="only persist verified_final_output",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="memory-intent-invalid",
+            instructions="canonical",
+            prompt="hello",
+            verification_profile="assistant_proposal",
+            memory_write_intent={
+                "subject_id": "user-a",
+                "kind": "semantic",
+                "content_from": "raw_model_output",
+            },
+        )
+
+
+def test_command_without_memory_intent_does_not_delegate_memory_scope() -> None:
+    context = _context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="no-memory-intent",
+        instructions="canonical",
+        prompt="hello",
+        verification_profile="assistant_proposal",
+    )
+
+    assert "memory_write_intent" not in (
+        command.execution_request.context_policy
+    )
+    assert "engine:memory" not in command.delegated_authority.scopes
