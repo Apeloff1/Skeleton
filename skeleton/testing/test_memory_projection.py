@@ -736,4 +736,3 @@ def test_governed_vector_projection_acknowledges_only_after_physical_delete() ->
     assert len(receipts) == 1
     assert receipts[0].target == "retrieval"
     assert receipts[0].record_id == retrieval_record["record_id"]
-
