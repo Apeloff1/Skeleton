@@ -242,7 +242,7 @@
       ]
     },
     {
-      "id": "cognitive-execution-unbound",
+      "id": "verification-evidence-unbound",
       "technology": "planned durable verification claim/postcondition repository; production binding not yet materialized",
       "runtime_service": null,
       "compose_file": null,
@@ -774,7 +774,7 @@
     {
       "id": "verification-receipt-ledger",
       "owner_plane": "reasoning-verification",
-      "physical_store": "cognitive-execution-unbound",
+      "physical_store": "verification-evidence-unbound",
       "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
       "authority": "authoritative-unbound",
       "source_of_truth": true,
