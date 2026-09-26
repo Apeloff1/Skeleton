@@ -266,6 +266,25 @@ def _canonical_user_idempotency(client_message_id: str | None) -> str:
     return "jeeves-user:" + uuid.uuid4().hex
 
 
+def _canonical_request_refs(req: ChatReq) -> tuple[str, ...]:
+    refs: list[str] = []
+    for label, value in (
+        ("context", req.context),
+        ("image", req.image_base64),
+        ("pdf", req.pdf_base64),
+    ):
+        if value:
+            refs.append(
+                "jeeves-"
+                + label
+                + "-sha256:"
+                + hashlib.sha256(value.encode("utf-8")).hexdigest()
+            )
+    if req.force_all_forms:
+        refs.append("jeeves-force-all-forms:true")
+    return tuple(refs)
+
+
 async def _ensure_canonical_thread(session_id: str):
     from skeleton.persistence.conversation_repository import (
         ConversationConflict,
@@ -474,6 +493,7 @@ async def _append_canonical_user_turn(
     user_idempotency_key = _canonical_user_idempotency(
         req.client_message_id
     )
+    request_refs = _canonical_request_refs(req)
     if (
         transcript
         and transcript[-1].author_type is ConversationAuthorType.USER
@@ -483,13 +503,17 @@ async def _append_canonical_user_turn(
             same_pending_turn = (
                 pending.idempotency_key == user_idempotency_key
                 and pending.content == req.message
+                and pending.attachment_refs == request_refs
             )
         else:
             # Without a caller turn ID, the only safe resumable case is the
             # exact pending user content already committed for this session.
             # Reuse its server-assigned idempotency key; do not manufacture a
             # new key that would strand the prior turn.
-            same_pending_turn = pending.content == req.message
+            same_pending_turn = (
+                pending.content == req.message
+                and pending.attachment_refs == request_refs
+            )
             if same_pending_turn:
                 user_idempotency_key = pending.idempotency_key
         if not same_pending_turn:
@@ -509,6 +533,7 @@ async def _append_canonical_user_turn(
         content=req.message,
         idempotency_key=user_idempotency_key,
         expected_thread_version=thread.version,
+        attachment_refs=request_refs,
         data_class="internal",
     )
     created = message.sequence > prior_sequence
@@ -860,16 +885,27 @@ async def chat(req: ChatReq):
         )
 
     modalities = ["text"]
-    try:
-        from gameforge.omega import delta_memory as _dm
-        if req.image_base64:
-            _dm.write(f"chat:{sid}", req.image_base64, modality="image")
-            modalities.append("image")
-        if req.pdf_base64:
-            _dm.write(f"chat:{sid}", req.pdf_base64, modality="pdf")
-            modalities.append("pdf")
-    except Exception:
-        pass
+    if req.image_base64:
+        modalities.append("image")
+    if req.pdf_base64:
+        modalities.append("pdf")
+    if canonical_turn[-1]:
+        try:
+            from gameforge.omega import delta_memory as _dm
+            if req.image_base64:
+                _dm.write(
+                    f"chat:{sid}",
+                    req.image_base64,
+                    modality="image",
+                )
+            if req.pdf_base64:
+                _dm.write(
+                    f"chat:{sid}",
+                    req.pdf_base64,
+                    modality="pdf",
+                )
+        except Exception:
+            pass
 
     needs_reasoning = len(req.message.split()) > 4 or bool(req.image_base64)
     execution_scope = (
