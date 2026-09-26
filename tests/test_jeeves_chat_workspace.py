@@ -192,7 +192,12 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
 
     async def execute(request):
         seen["request"] = request
-        return SimpleNamespace(text="engine answer")
+        return SimpleNamespace(
+            text="engine answer",
+            execution_id="engine-exec-jeeves-1",
+            verification="verification:jeeves",
+            evidence_refs=("evidence:jeeves",),
+        )
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
     monkeypatch.setattr(route, "execute_engine_text", execute)
@@ -215,6 +220,9 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
     assert result["text"] == "engine answer"
     assert result["tier"] == "paid"
     assert result["model"] == "skeleton-engine"
+    assert result["engine_execution_id"] == "engine-exec-jeeves-1"
+    assert result["engine_verification"] == "verification:jeeves"
+    assert result["engine_evidence_refs"] == ["evidence:jeeves"]
 
 
 
