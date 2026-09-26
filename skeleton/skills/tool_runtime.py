@@ -276,7 +276,7 @@ class ToolRuntime:
             previous_fingerprint = self._request_fingerprints.get(key)
             if previous_fingerprint is not None and previous_fingerprint != fingerprint:
                 raise ToolExecutionConflict(
-                    "idempotency_key replayed with different tool, arguments, lineage, or privacy context"
+                    "idempotency_key replayed with different tool or arguments, lineage, or privacy context"
                 )
             existing = self._receipts.get(key)
             if existing is not None:
@@ -717,7 +717,7 @@ class AsyncToolRuntime:
             previous = self._request_fingerprints.get(key)
             if previous is not None and previous != fingerprint:
                 raise ToolExecutionConflict(
-                    "idempotency_key replayed with different tool, arguments, lineage, or privacy context"
+                    "idempotency_key replayed with different tool or arguments, lineage, or privacy context"
                 )
             existing = self._receipts.get(key)
             if existing is not None:
