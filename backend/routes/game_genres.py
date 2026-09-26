@@ -5,6 +5,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
@@ -436,9 +437,15 @@ async def create_game_project(request: GameProjectRequest):
     # AI-enhanced project generation
     if LLM_AVAILABLE:
         try:
-            llm = EngineChat(model="gpt-4o")
-            llm.add_message("system", """You are an expert game designer and technical director.
-            Create comprehensive game project specifications with detailed technical requirements.""")
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.game-genres.project-spec",
+                    version="1",
+                    instructions="""You are an expert game designer and technical director.
+            Create comprehensive game project specifications with detailed technical requirements.""",
+                ),
+            )
             llm.add_message("user", f"""Create a detailed game project specification for:
             
             Name: {request.name}
