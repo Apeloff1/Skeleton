@@ -520,6 +520,8 @@ class ToolExecutionRequest:
     call_id: str | None = None
     approval_ref: str | None = None
     delegated_authority_ref: str | None = None
+    data_class: str = "internal"
+    transfer_purpose: str = "tool-execution"
     schema_version: int = TOOL_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -549,6 +551,22 @@ class ToolExecutionRequest:
                 "delegated_authority_ref",
                 max_length=1024,
             )
+        data_class = _text(
+            self.data_class,
+            "data_class",
+            max_length=64,
+        ).lower()
+        transfer_purpose = _text(
+            self.transfer_purpose,
+            "transfer_purpose",
+            max_length=128,
+        ).lower()
+        object.__setattr__(self, "data_class", data_class)
+        object.__setattr__(
+            self,
+            "transfer_purpose",
+            transfer_purpose,
+        )
         if self.schema_version != TOOL_CONTRACT_SCHEMA_VERSION:
             raise ToolContractError("unsupported tool contract schema version")
 
@@ -568,6 +586,11 @@ def approval_ref_for_request(request: ToolExecutionRequest) -> str:
             (request.execution_id, request.turn_id or "", request.call_id or "")
         )
     parts.extend((request.tenant_id, request.tool_id, request.arguments_digest))
+    if (
+        request.data_class != "internal"
+        or request.transfer_purpose != "tool-execution"
+    ):
+        parts.extend((request.data_class, request.transfer_purpose))
     material = "\x1f".join(parts).encode("utf-8")
     return "approval:" + hashlib.sha256(material).hexdigest()
 
@@ -591,6 +614,9 @@ class ToolExecutionReceipt:
     error_code: str | None = None
     approval_ref: str | None = None
     compensation_ref: str | None = None
+    data_class: str = "internal"
+    transfer_purpose: str = "tool-execution"
+    governance_decision_ref: str | None = None
     metered_tool_calls: int = 1
     schema_version: int = TOOL_CONTRACT_SCHEMA_VERSION
 
@@ -636,6 +662,26 @@ class ToolExecutionReceipt:
             _text(self.approval_ref, "approval_ref", max_length=1024)
         if self.compensation_ref is not None:
             _text(self.compensation_ref, "compensation_ref", max_length=1024)
+        object.__setattr__(
+            self,
+            "data_class",
+            _text(self.data_class, "data_class", max_length=64).lower(),
+        )
+        object.__setattr__(
+            self,
+            "transfer_purpose",
+            _text(
+                self.transfer_purpose,
+                "transfer_purpose",
+                max_length=128,
+            ).lower(),
+        )
+        if self.governance_decision_ref is not None:
+            _text(
+                self.governance_decision_ref,
+                "governance_decision_ref",
+                max_length=256,
+            )
         if (
             isinstance(self.metered_tool_calls, bool)
             or not isinstance(self.metered_tool_calls, int)
@@ -665,6 +711,9 @@ class ToolExecutionReceipt:
             "error_code": self.error_code,
             "approval_ref": self.approval_ref,
             "compensation_ref": self.compensation_ref,
+            "data_class": self.data_class,
+            "transfer_purpose": self.transfer_purpose,
+            "governance_decision_ref": self.governance_decision_ref,
             "metered_tool_calls": self.metered_tool_calls,
         }
 
