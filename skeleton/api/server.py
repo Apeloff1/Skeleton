@@ -315,6 +315,161 @@ class ServerState:
         )
         return writer
 
+    async def bind_verified_memory_finalization(
+        self,
+        request: Any,
+        candidate: str,
+        payload: Any,
+    ) -> Any:
+        """Commit only explicit verified-final-output memory intents."""
+
+        from datetime import datetime, timezone
+        from uuid import NAMESPACE_URL, UUID, uuid5
+
+        from skeleton.contracts.memory_record import (
+            MemoryKind,
+            MemoryWriteProposal,
+        )
+        from skeleton.intelligence.execution_runtime import (
+            ExecutionFinalizationBindings,
+        )
+
+        context_policy = dict(request.context_policy)
+        raw_intent = context_policy.get("memory_write_intent")
+        if raw_intent is None:
+            return ExecutionFinalizationBindings()
+        if not isinstance(raw_intent, dict):
+            raise RuntimeError(
+                "memory_write_intent must be a normalized object"
+            )
+        writer = self.canonical_memory_writer
+        if writer is None:
+            raise RuntimeError(
+                "canonical memory authority is required by execution intent"
+            )
+
+        tenant_id = str(context_policy.get("tenant_id") or "").strip()
+        subject_id = str(raw_intent.get("subject_id") or "").strip()
+        namespace = str(
+            raw_intent.get("namespace") or "assistant"
+        ).strip()
+        if not tenant_id or not subject_id or not namespace:
+            raise RuntimeError(
+                "memory finalization authority scope is invalid"
+            )
+        try:
+            kind = MemoryKind(str(raw_intent.get("kind") or ""))
+        except ValueError as exc:
+            raise RuntimeError(
+                "memory finalization kind is invalid"
+            ) from exc
+        if raw_intent.get("content_from") != "verified_final_output":
+            raise RuntimeError(
+                "memory finalization may only persist verified final output"
+            )
+
+        proposed_at = datetime.now(timezone.utc)
+        expires_at = None
+        raw_expiry = raw_intent.get("expires_at")
+        if raw_expiry is not None:
+            try:
+                expires_at = datetime.fromisoformat(str(raw_expiry))
+            except ValueError as exc:
+                raise RuntimeError(
+                    "memory finalization expiry is invalid"
+                ) from exc
+            if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+                raise RuntimeError(
+                    "memory finalization expiry must be timezone-aware"
+                )
+            expires_at = expires_at.astimezone(timezone.utc)
+            if expires_at <= proposed_at:
+                raise RuntimeError(
+                    "memory finalization expiry has elapsed"
+                )
+
+        try:
+            source_operation_id = str(UUID(str(request.operation_id)))
+        except (ValueError, AttributeError):
+            source_operation_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "skeleton-operation:" + str(request.operation_id),
+                )
+            )
+
+        provenance_refs = [
+            "execution:" + str(request.execution_id),
+            "context:" + str(
+                context_policy.get("context_digest") or "unknown"
+            ),
+            "verified-final-output",
+        ]
+        if isinstance(payload, dict):
+            for field, prefix in (
+                ("provider_receipts", "provider:"),
+                ("tool_receipts", "tool:"),
+            ):
+                values = payload.get(field, [])
+                if not isinstance(values, list):
+                    continue
+                for raw in values:
+                    value = str(raw).strip()
+                    if value:
+                        ref = prefix + value
+                        if ref not in provenance_refs:
+                            provenance_refs.append(ref)
+        raw_refs = raw_intent.get("provenance_refs", [])
+        if isinstance(raw_refs, list):
+            for raw in raw_refs:
+                value = str(raw).strip()
+                if value and value not in provenance_refs:
+                    provenance_refs.append(value)
+
+        idempotency_key = str(
+            raw_intent.get("idempotency_key")
+            or (
+                "execution-memory:"
+                + str(request.execution_id)
+                + ":verified-final-output"
+            )
+        ).strip()
+        proposal_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-memory-finalization:"
+                + str(request.execution_id)
+                + ":"
+                + idempotency_key,
+            )
+        )
+        proposal = MemoryWriteProposal(
+            proposal_id=proposal_id,
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            kind=kind,
+            idempotency_key=idempotency_key,
+            proposed_at=proposed_at,
+            content=str(candidate).strip(),
+            provenance_refs=tuple(provenance_refs),
+            source_operation_id=source_operation_id,
+            expires_at=expires_at,
+            data_class=str(
+                raw_intent.get("data_class")
+                or context_policy.get("data_class")
+                or "confidential"
+            ),
+        )
+        writer.stage(proposal)
+        record = await writer.commit(
+            proposal.proposal_id,
+            now=proposed_at,
+        )
+        return ExecutionFinalizationBindings(
+            memory_refs=("memory:" + record.memory_id,),
+        )
+
     async def close_canonical_memory_writer(self) -> None:
         client = self.canonical_memory_mongo_client
         self.canonical_memory_writer = None
@@ -566,6 +721,7 @@ class ServerState:
                             "engine:media",
                             "engine:admission",
                             "engine:governance",
+                            "engine:memory",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
@@ -655,6 +811,9 @@ class ServerState:
         coordinator = EngineExecutionCoordinator(
             service,
             provider_registry=provider_registry,
+            finalization_binding_hook=(
+                self.bind_verified_memory_finalization
+            ),
             tool_runtime=build_engine_tool_runtime(
                 admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
