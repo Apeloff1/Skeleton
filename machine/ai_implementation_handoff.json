@@ -701,7 +701,7 @@
       ],
       "work_package": "WP-P0-PROVIDER-PROTOCOL",
       "blueprint": "provider_interaction_protocol",
-      "implementation_status": "planned",
+      "implementation_status": "implemented",
       "objective": "Extend the single canonical provider owner from text/media transport into a complete provider-neutral interaction protocol for structured outputs and governed tool calling.",
       "target_files": {
         "contracts": [
@@ -717,9 +717,9 @@
           "skeleton/intelligence"
         ],
         "tests": [
-          "skeleton/testing/test_provider_structured_output.py",
-          "skeleton/testing/test_provider_tool_calls.py",
-          "skeleton/testing/test_provider_stream_deltas.py"
+          "skeleton/testing/test_provider_contract.py",
+          "skeleton/testing/test_execution_runtime.py",
+          "tests/test_provider_runtime_boundary.py"
         ]
       },
       "ordered_steps": [
@@ -749,8 +749,26 @@
         "native type isolation"
       ],
       "closure_gate": "the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
+        "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
+        "skeleton/provider_runtime.py accepts neutral tool definitions, structured_output_schema, tool_choice, specific_tool_id and deadline on ProviderRequest",
+        "skeleton/provider_runtime.py normalizes provider-native tool calls, structured output, usage and finish reasons before returning ProviderResponse",
+        "skeleton/provider_runtime.py rejects provider tool calls that were not offered by the admitted request",
+        "skeleton/provider_runtime.py converts normalized responses into ordered provider-neutral deltas via provider_response_deltas",
+        "ProviderAdapter.stream exposes the neutral delta contract even when the provider transport is non-streaming",
+        "skeleton/testing/test_provider_contract.py covers canonical tool-call digest validation and unknown usage semantics",
+        "skeleton/testing/test_provider_contract.py covers sync tool-only normalization, unoffered-tool denial and structured output projection",
+        "skeleton/testing/test_provider_contract.py covers sync and async deadline rejection/clamping before provider I/O",
+        "skeleton/testing/test_provider_contract.py covers neutral delta ordering and default stream finalization",
+        "skeleton/testing/test_provider_contract.py covers async provider transport normalization and admission reconciliation",
+        "skeleton/intelligence/execution_runtime.py projects only admitted minimal ProviderToolDefinition values and consumes neutral provider tool/structured outputs"
+      ],
+      "remaining": [
+        "collect fresh exact-head provider protocol/provider-boundary validation",
+        "close declared lower-stage dependencies",
+        "obtain independent signoff before canonical closure"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
