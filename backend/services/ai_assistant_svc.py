@@ -18,11 +18,8 @@ import re
 from fastapi import HTTPException
 
 from core.engine_client import EngineClient, EngineClientError
-from core.engine_text import (
-    EngineTextError,
-    EngineTextRequest,
-    execute_engine_text,
-)
+from core.engine_chat import EngineChat, EngineTextError, UserMessage
+from core.engine_text import execute_engine_text
 from skeleton.context.instruction_policy import InstructionPolicy
 
 
@@ -214,17 +211,15 @@ Please provide a detailed, well-structured response."""
         ).hexdigest()
 
         try:
-            response = await self._engine_executor(
-                EngineTextRequest(
-                    instructions=policy.instructions,
-                    prompt=user_message,
-                    idempotency_key="legacy-ai-assistant:" + identity,
-                    instruction_policy_id=policy.policy_id,
-                    instruction_policy_version=policy.version,
-                    actor_id="legacy-ai-assistant",
-                    capability="assistant.compat",
-                    max_output_tokens=8_192,
-                )
+            chat = EngineChat(
+                session_id="legacy-ai-assistant:" + identity,
+                instruction_policy=policy,
+                actor_id="legacy-ai-assistant",
+                capability="assistant.compat",
+                engine_executor=self._engine_executor,
+            ).with_max_tokens(8_192)
+            response = await chat.send_message(
+                UserMessage(text=user_message)
             )
             suggestion = response.text
             code_blocks = [
