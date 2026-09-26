@@ -190,7 +190,10 @@
         "backend/routes/gameforge_build.py tenant-scoped governed artifact download/list/build and bounded retention",
         "backend/tests/test_gameforge_artifact_builder.py governed artifact production regressions",
         "skeleton/testing/test_governance_runtime_binding.py physical artifact retention expiry through production lifecycle adapters",
-        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes",
+        "scripts/verify_governance_closure.py independent source-only governance blueprint/state-topology/boundary/mirror verifier",
+        "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
+        ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -201,12 +204,12 @@
       "outstanding_evidence": [
         "fresh exact-head Governance Closure Gate",
         "fresh exact-head Stage-0/App Assembly governance verification",
-        "independent governance closure verification"
+        "fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
       "blockers": [
         "fresh exact-head Governance Closure Gate",
         "fresh exact-head Stage-0/App Assembly governance verification",
-        "independent governance closure verification"
+        "fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
