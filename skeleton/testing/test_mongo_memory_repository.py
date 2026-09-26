@@ -954,4 +954,3 @@ async def test_async_governed_writer_tombstones_on_governance_failure(
     )
     assert len(rows) == 1
     assert rows[0].state is MemoryState.TOMBSTONED
-
