@@ -2308,6 +2308,25 @@ class EngineExecutionService:
             for item in pending_ids
             if isinstance(item, str) and item.strip()
         }
+        tool_data_class = payload.get(
+            "tool_data_class",
+            "internal",
+        )
+        tool_purpose = payload.get(
+            "tool_purpose",
+            "tool-execution",
+        )
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+            or not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+        ):
+            raise EngineServiceError(
+                "durable approval checkpoint privacy context is malformed"
+            )
+        tool_data_class = tool_data_class.strip().lower()
+        tool_purpose = tool_purpose.strip().lower()
         last_provider = payload.get("last_provider")
         turn_id: str | None = None
         if last_provider is not None:
@@ -2389,6 +2408,8 @@ class EngineExecutionService:
                     + ":provider-call:"
                     + call_id
                 ),
+                data_class=tool_data_class,
+                transfer_purpose=tool_purpose,
                 **lineage,
             )
             rows.append(
