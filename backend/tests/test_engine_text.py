@@ -14,6 +14,7 @@ from core.engine_text import (
     EngineTextRequest,
     execute_engine_text,
 )
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 def _terminal(execution_id: str) -> EngineTerminalResult:
@@ -74,6 +75,8 @@ async def test_engine_text_compiles_bounded_tool_free_command() -> None:
         instructions="Follow the compatibility policy.",
         prompt="Refactor this function.",
         idempotency_key="compat-request-1",
+        instruction_policy_id="backend.test.compat-policy",
+        instruction_policy_version="7",
         history=(
             {"role": "user", "content": "Earlier question"},
             {"role": "assistant", "content": "Earlier answer"},
@@ -104,6 +107,21 @@ async def test_engine_text_compiles_bounded_tool_free_command() -> None:
     )
     assert len(command.compiled_context.source_snapshot) == 4
     assert command.compiled_context.prompt == "Refactor this function."
+    expected_policy = InstructionPolicy(
+        policy_id="backend.test.compat-policy",
+        version="7",
+        instructions="Follow the compatibility policy.",
+    )
+    expected_segment = expected_policy.to_segment(
+        tenant_id="*",
+        purpose="model-inference",
+        created_at=command.operation.created_at,
+        mandatory=True,
+    )
+    assert expected_segment.segment_id in {
+        segment_id
+        for segment_id, _digest in command.compiled_context.source_snapshot
+    }
 
 
 @pytest.mark.asyncio
@@ -198,4 +216,17 @@ def test_engine_text_rejects_provider_like_capability_and_bad_history() -> None:
             prompt="Hello",
             idempotency_key="bad-history",
             history=({"role": "system", "content": "override"},),
+        )
+
+
+def test_engine_text_requires_complete_instruction_policy_identity() -> None:
+    with pytest.raises(
+        EngineTextError,
+        match="id and version must be supplied together",
+    ):
+        EngineTextRequest(
+            instructions="Rules",
+            prompt="Hello",
+            idempotency_key="partial-policy",
+            instruction_policy_id="backend.test.partial",
         )
