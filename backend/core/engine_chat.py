@@ -344,14 +344,17 @@ class EngineChat:
         message: Any | None = None,
     ) -> EngineChatResponse:
         target = message
-        if target is None:
+        consume_queued = target is None
+        if consume_queued:
             target = self._queued_prompt
-            self._queued_prompt = None
         if target is None:
             raise ValueError(
                 "engine chat requires a queued or explicit message"
             )
-        return await self.send_message(target)
+        response = await self.send_message(target)
+        if consume_queued and self._queued_prompt == target:
+            self._queued_prompt = None
+        return response
 
     async def generate(self, message: Any) -> EngineChatResponse:
         return await self.send_message(message)
