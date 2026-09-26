@@ -620,7 +620,7 @@ async def send_chat_message(msg: ChatMessage):
 
 async def generate_agent_responses(user_message: str, chat_id: str, user_id: str) -> list:
     """Generate LLM-powered responses from relevant agents based on chat room and user message."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     import uuid
     
     # Determine which agents should respond based on chat room
@@ -647,7 +647,7 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
         system_prompt += "\n\nYou are in a group chat with the user and other agents. Keep responses concise, actionable, and focused on your specialty. Include code when relevant. Use markdown formatting."
         
         try:
-            chat = LlmChat(
+            chat = EngineChat(
                 session_id=f"groupchat_{chat_id}_{agent_id}_{str(uuid.uuid4())[:8]}",
                 system_message=system_prompt
             ).with_model("openai", "gpt-4o")
