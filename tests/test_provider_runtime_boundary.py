@@ -200,6 +200,7 @@ def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
     assert "UserMessage" in source
     assert "LAFS_JEEVES_POLICY" in source
     assert 'verification_profile="evidence_required"' in source
+    assert "session_id=" not in source
 
     discovered = discover_provider_surfaces(ROOT)
     assert relative not in discovered
