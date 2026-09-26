@@ -755,7 +755,7 @@
       "plane": "orchestration",
       "stage": 4,
       "gap_status": "open",
-      "implementation_state": "architecture-detailed",
+      "implementation_state": "implementation-complete",
       "closure_decision": "open",
       "evidence_present": [
         "canonical execution loop ownership selected",
@@ -765,7 +765,20 @@
         "memory writeback policy defined",
         "verification and finalization protocol defined",
         "usage and observability contract defined",
-        "implementation slices ordered"
+        "implementation slices ordered",
+        "skeleton/contracts/ai_execution.py materializes AIExecutionRequest, AgentTurn, ExecutionCheckpoint, ExecutionFinalizationIntent and AIExecutionResult",
+        "skeleton/persistence/execution_repository.py provides restart-safe execution, turn, checkpoint, staged finalization, result and outbox authority",
+        "skeleton/intelligence/execution_runtime.py owns the bounded canonical model->tool->model loop",
+        "skeleton/intelligence/execution_runtime.py supports waiting_for_user approval suspension and durable resume",
+        "skeleton/intelligence/execution_runtime.py enforces bounded model/tool/deadline/cancellation flow and verification before terminal result",
+        "skeleton/skills/tool_runtime.py plus durable receipt store bind governed tool authority, lineage and idempotency",
+        "skeleton/api/engine_service.py binds operation-level execution admission, approval and metered durable execution/submission writes",
+        "skeleton/api/engine_runtime.py binds engine-owned provider/tool execution to CognitiveExecutionRuntime",
+        "skeleton/testing/test_execution_runtime.py covers prompt/tool loops, approval, lineage, verification, finalization and restart paths",
+        "skeleton/testing/test_execution_repository.py covers durable checkpoint/turn/finalization/recovery contracts",
+        "skeleton/testing/test_engine_execution_service.py and test_engine_execution_coordinator.py cover engine admission/approval/recovery integration",
+        "scripts/verify_cognitive_execution_closure.py independently verifies ownership, mirror parity and dependency graph",
+        ".github/workflows/cognitive-execution-closure.yml binds exact-head runtime and independent verification"
       ],
       "closure_evidence_required": [
         "prompt-only execution reaches completed with one bound result receipt",
@@ -781,13 +794,16 @@
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
       "outstanding_evidence": [
-        "materialize contract modules",
-        "bind durable repositories",
-        "extend provider structured/tool output boundary",
-        "implement governed tool runtime integration",
-        "implement execution loop",
-        "implement frontend/backend transport integration",
-        "prove fault and golden-journey evidence"
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission",
+        "dependency must close: gap-conversation-state-authority",
+        "dependency must close: gap-memory-durable-authority",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-context-compiler-convergence",
+        "dependency must close: gap-provider-interaction-protocol",
+        "dependency must close: gap-verification-evidence-contract",
+        "fresh exact-head Cognitive Execution Closure Gate"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -799,13 +815,7 @@
         "dependency must close: gap-context-compiler-convergence",
         "dependency must close: gap-provider-interaction-protocol",
         "dependency must close: gap-verification-evidence-contract",
-        "materialize contract modules",
-        "bind durable repositories",
-        "extend provider structured/tool output boundary",
-        "implement governed tool runtime integration",
-        "implement execution loop",
-        "implement frontend/backend transport integration",
-        "prove fault and golden-journey evidence"
+        "fresh exact-head Cognitive Execution Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
