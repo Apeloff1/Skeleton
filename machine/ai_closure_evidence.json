@@ -93,7 +93,11 @@
         "skeleton/api/server.py production-configured startup binds AsyncGovernedMemoryWriter to existing execution admission and governance owners",
         "skeleton/testing/test_governance_runtime_binding.py injected-database canonical Mongo memory binding regression",
         "pyproject.toml Motor/PyMongo runtime dependency declaration",
-        "skeleton/ai/runtime/api/server.py canonical mirror"
+        "skeleton/ai/runtime/api/server.py canonical mirror",
+        "skeleton/memory/projection.py admitted sync/async material rebuild boundary",
+        "skeleton/testing/test_memory_projection.py pre-mutation denial and successful reconciliation regressions",
+        "skeleton/api/server.py live admitted AsyncMemoryProjectionCoordinator composition",
+        "skeleton/ai/runtime/memory/projection.py canonical mirror"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -102,14 +106,12 @@
         "cost telemetry test"
       ],
       "outstanding_evidence": [
-        "admission at every expensive non-provider action",
         "fresh exact-head validation of metered durable engine/cognitive storage writes",
-        "admission at expensive derived retrieval/index rebuild boundaries where allocation is material",
-        "fresh exact-head validation of live canonical Mongo memory composition"
+        "fresh exact-head validation of live canonical Mongo memory composition",
+        "fresh exact-head validation of canonical cost/admission implementation",
+        "independent verification before gap closure"
       ],
-      "blockers": [
-        "admission at every expensive non-provider action"
-      ],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
