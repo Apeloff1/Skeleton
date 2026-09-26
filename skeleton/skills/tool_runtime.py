@@ -276,7 +276,7 @@ class ToolRuntime:
             previous_fingerprint = self._request_fingerprints.get(key)
             if previous_fingerprint is not None and previous_fingerprint != fingerprint:
                 raise ToolExecutionConflict(
-                    "idempotency_key replayed with different tool or arguments or lineage"
+                    "idempotency_key replayed with different tool, arguments, lineage, or privacy context"
                 )
             existing = self._receipts.get(key)
             if existing is not None:
@@ -588,7 +588,15 @@ class AsyncToolRuntime:
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
         self._request_fingerprints: dict[
             tuple[str, str, str],
-            tuple[str, str, str | None, str | None, str | None],
+            tuple[
+                str,
+                str,
+                str | None,
+                str | None,
+                str | None,
+                str,
+                str,
+            ],
         ] = {}
         self._inflight: dict[
             tuple[str, str, str], asyncio.Future[ToolExecutionReceipt]
@@ -674,6 +682,8 @@ class AsyncToolRuntime:
                 durable.receipt.execution_id,
                 durable.receipt.turn_id,
                 durable.receipt.call_id,
+                durable.receipt.data_class,
+                durable.receipt.transfer_purpose,
             )
             return durable.receipt
 
@@ -693,6 +703,8 @@ class AsyncToolRuntime:
             request.execution_id,
             request.turn_id,
             request.call_id,
+            request.data_class,
+            request.transfer_purpose,
         )
         owner = False
         governance_decision_ref: str | None = None
@@ -705,7 +717,7 @@ class AsyncToolRuntime:
             previous = self._request_fingerprints.get(key)
             if previous is not None and previous != fingerprint:
                 raise ToolExecutionConflict(
-                    "idempotency_key replayed with different tool or arguments or lineage"
+                    "idempotency_key replayed with different tool, arguments, lineage, or privacy context"
                 )
             existing = self._receipts.get(key)
             if existing is not None:
@@ -782,7 +794,8 @@ class AsyncToolRuntime:
                         started_at=started,
                         finished_at=started,
                         error_code=error_code,
-                        approval_ref=request.approval_ref,                        data_class=request.data_class,
+                        approval_ref=request.approval_ref,
+                        data_class=request.data_class,
                         transfer_purpose=request.transfer_purpose,
                         governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
