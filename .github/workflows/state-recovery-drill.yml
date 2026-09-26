@@ -265,4 +265,3 @@ jobs:
           print("independent-state-authority: exact-head receipt OK")
           print("authority digest:", receipt["authority_digest"])
           PY
-
