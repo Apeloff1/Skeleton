@@ -1918,7 +1918,7 @@
       "id": "gap-verification-evidence-contract",
       "plane": "reasoning-verification",
       "priority": "P0",
-      "status": "in-progress",
+      "status": "open",
       "gap": "Canonical verification contracts, deterministic claim/evidence grounding, risk-selected policy, tool postcondition adapters, bounded semantic verifier/repair logic and durable observable VerificationReceipt persistence are implemented. The cognitive execution runtime already materializes and persists canonical receipts before terminal finalization. Remaining convergence is production wiring of evidence materialization plus SemanticVerificationRuntime for policy-selected independent verification, production action-postcondition aggregation, and end-to-end repair/qualified/block publication semantics through the execution finalizer.",
       "construction": [
         "define VerificationRequest, VerificationReceipt, ClaimRecord, EvidenceReference and PostconditionCheck contracts",
