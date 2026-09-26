@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts/check_provider_bootstrap.py"
@@ -134,6 +136,46 @@ def test_application_provider_surfaces_are_delegation_only() -> None:
 
         assert not edges.intersection(item["forbidden_edge_classes"])
 
+
+
+def test_validator_rejects_forbidden_sdk_edge_on_application_surface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _checker()
+    contract = json.loads(
+        (ROOT / "machine/ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    isolation = contract["provider_surface_convergence_blueprint"][
+        "application_isolation_surfaces"
+    ]
+    surface = next(
+        item
+        for item in isolation
+        if "sdk_client" in item["forbidden_edge_classes"]
+    )
+    target = (ROOT / surface["path"]).resolve()
+    original_read_text = Path.read_text
+
+    def injected_read_text(path: Path, *args, **kwargs) -> str:
+        source = original_read_text(path, *args, **kwargs)
+        if path.resolve() == target:
+            return source + "\nfrom openai import AsyncOpenAI\n"
+        return source
+
+    monkeypatch.setattr(Path, "read_text", injected_read_text)
+    module._cached_python_tree.cache_clear()
+    module._cached_source.cache_clear()
+
+    errors = module.validate_provider_bootstrap(ROOT)
+
+    assert any(
+        error.startswith(
+            "provider application surface owns forbidden provider edges: "
+            + surface["path"]
+        )
+        and "sdk_client" in error
+        for error in errors
+    )
 
 def test_provider_surface_evidence_receipt_is_current_head_and_secret_free() -> None:
     module = _checker()
