@@ -15,6 +15,8 @@ from .tool_contract import (
     ToolExecutionReceipt,
     ToolExecutionStatus,
     ToolManifest,
+    validate_json_schema,
+    validate_json_value,
 )
 from .tool_receipt_store import (
     SQLiteToolReceiptStore,
@@ -53,6 +55,8 @@ __all__ = [
     "ToolExecutionReceipt",
     "ToolExecutionStatus",
     "ToolManifest",
+    "validate_json_schema",
+    "validate_json_value",
     "AsyncToolRuntime",
     "ToolExecutionConflict",
     "ToolNotFound",
