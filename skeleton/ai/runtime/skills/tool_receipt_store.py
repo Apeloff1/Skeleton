@@ -59,6 +59,9 @@ def _receipt_from_json(raw: object) -> ToolExecutionReceipt:
         raise ToolReceiptStoreError("receipt_json is invalid") from exc
     if not isinstance(payload, dict):
         raise ToolReceiptStoreError("receipt_json must be an object")
+    postcondition_verified = payload.get("postcondition_verified", False)
+    if not isinstance(postcondition_verified, bool):
+        raise ToolReceiptStoreError("postcondition_verified must be boolean")
     return ToolExecutionReceipt(
         receipt_id=payload["receipt_id"],
         request_id=payload["request_id"],
@@ -85,6 +88,7 @@ def _receipt_from_json(raw: object) -> ToolExecutionReceipt:
         governance_decision_ref=payload.get(
             "governance_decision_ref"
         ),
+        postcondition_verified=postcondition_verified,
         metered_tool_calls=int(payload.get("metered_tool_calls", 1)),
         schema_version=int(payload.get("schema_version", 1)),
     )
