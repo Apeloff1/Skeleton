@@ -563,4 +563,3 @@ def test_knowledge_content_is_digest_bound_without_embedding_content() -> None:
     }
     assert baseline_decision.knowledge_digest != changed_decision.knowledge_digest
     assert baseline_decision.decision_digest != changed_decision.decision_digest
-
