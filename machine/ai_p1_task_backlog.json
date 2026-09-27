@@ -113,7 +113,10 @@
       "acceptance": [
         "Candidate promotions are explainable, reversible and cannot mutate signed maturity state.",
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
-        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity.",
+        "Generic lifecycle terminals cannot be interpreted as implementation or production maturity.",
+        "Reconciliation reports bind masterplan, accountability, P1 map, engine contract and engine runner digests.",
+        "Masterplan status and implementation_status are reconciled as distinct non-mutating claims."
       ],
       "evidence_refs": [],
       "accountability_ref": "ACC-P1-EVID-02",
@@ -139,7 +142,12 @@
         "machine",
         "docs/plan",
         "scripts",
-        "skeleton/testing"
+        "skeleton/testing",
+        "skeleton/contracts/maturity_reconciliation.py",
+        "skeleton/ai/runtime/contracts/maturity_reconciliation.py",
+        "scripts/reconcile_p1_maturity.py",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml"
       ],
       "test_targets": [
         "scripts/check_ai_master_plan.py",
@@ -147,7 +155,9 @@
         "planned:skeleton/testing/test_gap_ledger.py",
         "planned:skeleton/testing/test_gap_closure.py",
         "planned:skeleton/testing/test_test_architecture.py",
-        "planned:skeleton/testing/test_fixture_policy.py"
+        "planned:skeleton/testing/test_fixture_policy.py",
+        "skeleton/testing/test_maturity_reconciliation.py",
+        "tests/test_p1_maturity_reconciliation.py"
       ],
       "evidence_modes": [
         "contract",
