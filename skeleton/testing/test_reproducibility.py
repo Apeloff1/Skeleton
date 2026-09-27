@@ -186,6 +186,32 @@ def test_failed_replay_is_not_misreported_as_incompatibility() -> None:
     assert evaluation.failure_digest == "9" * 64
 
 
+
+
+def test_failed_replay_with_infrastructure_drift_is_incompatible() -> None:
+    replay = ReplayObservation(
+        runner_id="different-runner",
+        runner_digest="5" * 64,
+        budget_id="different-budget",
+        budget_digest="6" * 64,
+        source_date_epoch=EPOCH + 1,
+        failure_digest="9" * 64,
+    )
+
+    evaluation = evaluate_replay(_bundle(), replay)
+
+    assert evaluation.disposition is ReplayDisposition.INCOMPATIBLE
+    assert evaluation.compatible is False
+    assert evaluation.reproduced is False
+    assert evaluation.failure_digest == "9" * 64
+    assert any("runner_id mismatch" in item for item in evaluation.incompatibilities)
+    assert any("budget_id mismatch" in item for item in evaluation.incompatibilities)
+    assert any(
+        "source_date_epoch mismatch" in item
+        for item in evaluation.incompatibilities
+    )
+
+
 def test_bundle_input_order_and_duplicates_are_canonicalized() -> None:
     receipt = _receipt()
     first = EvidenceRef(
