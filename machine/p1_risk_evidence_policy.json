@@ -56,5 +56,12 @@
     "unclassified_risks_must_equal": 0,
     "strict_mode_required_for_terminal_promotion": true,
     "report_cannot_self_promote": true
+  },
+  "inventory_expectations": {
+    "p1_primary_volume_count": 107,
+    "volume_risk_count": 281,
+    "volume_gap_count": 214,
+    "applicable_adversarial_axis_count": 24,
+    "total_obligation_count": 519
   }
 }
