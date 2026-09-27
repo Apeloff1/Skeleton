@@ -672,9 +672,9 @@
       "gap": "gap-verification-evidence-contract",
       "plane": "reasoning-verification",
       "stage": 3,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
         "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
@@ -721,16 +721,8 @@
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
         ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Verification Evidence Closure Gate",
-        "fresh exact-head Cognitive Execution Closure Gate",
-        "declared lower-stage dependency closure and independent signoff"
-      ],
-      "blockers": [
-        "fresh exact-head Verification Evidence Closure Gate",
-        "fresh exact-head Cognitive Execution Closure Gate",
-        "declared lower-stage dependency closure and independent signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -749,9 +741,9 @@
       "gap": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "stage": 4,
-      "gap_status": "open",
-      "implementation_state": "implementation-complete",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical execution loop ownership selected",
         "execution/turn/result envelope fields defined",
@@ -788,30 +780,8 @@
         "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
-      "outstanding_evidence": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "fresh exact-head Cognitive Execution Closure Gate"
-      ],
-      "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "fresh exact-head Cognitive Execution Closure Gate"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
