@@ -2080,7 +2080,7 @@
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Shared-network operation/stream authorities and production browser reconnect/resync/cancel session semantics are implemented. Remaining work is exact-head assembled validation and independent closure signoff.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
@@ -2102,7 +2102,14 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "implemented-pending-exact-head-closure"
+      "verification_state": "implemented-pending-exact-head-closure",
+      "status_detail": "closed by Stage-6 exact-head streaming candidate; reopen on replay, reconnect, Mongo authority, App Assembly, browser-session, or dependency regression",
+      "evidence_present": [
+        ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+        "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+        "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
+      ],
+      "outstanding_evidence": []
     },
     {
       "id": "gap-governance-registry",
@@ -6567,7 +6574,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
@@ -6692,7 +6699,13 @@
       "browser-session compacted slow-client authoritative resync journey",
       "browser-session cancel-complete terminal race journey",
       "authoritative terminal snapshot canonical-result reconciliation"
-    ]
+    ],
+    "current_evidence": [
+      ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+      "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+      "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
+    ],
+    "remaining": []
   },
   "golden_journey_blueprint": {
     "schema_version": 1,
