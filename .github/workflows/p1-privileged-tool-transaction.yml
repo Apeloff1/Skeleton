@@ -79,12 +79,14 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<2"
           "pydantic[email]>=2.13.5"
           "pydantic-settings>=2.15.0"
 
       - name: Run privileged transaction regressions
         run: >-
           python -m pytest -q --noconftest
+          -p pytest_asyncio.plugin
           skeleton/testing/test_privileged_tool_transaction.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
