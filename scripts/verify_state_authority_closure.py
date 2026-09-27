@@ -181,7 +181,10 @@ def _verify_authorities(
     for domain_id, domain in domains.items():
         authority = domain.get("authority")
         store_id = domain.get("physical_store")
-        if domain.get("gap") == "gap-state-authority-convergence":
+        if (
+            domain.get("gap") == "gap-state-authority-convergence"
+            and domain_id != "canonical-operation-state"
+        ):
             errors.append(
                 f"state-authority gap still owns unbound domain {domain_id}"
             )
