@@ -132,6 +132,31 @@ class MongoOperationEventStore:
             name="operation_stream_projection_lease",
         )
 
+    def validate_transaction_capability(self) -> None:
+        """Fail closed unless Mongo can execute an actual transaction.
+
+        Session creation is insufficient because standalone Mongo accepts
+        sessions while rejecting transactional commands. Probe a read-only
+        transaction so authority selection fails at startup rather than after
+        the first durable append.
+        """
+
+        try:
+            with self._transaction() as session:
+                with session.start_transaction():
+                    self.heads.find_one(
+                        {
+                            "namespace": self.namespace,
+                            "operation_id": "__transaction-capability-probe__",
+                        },
+                        {"_id": 1},
+                        session=session,
+                    )
+        except Exception as exc:
+            raise StreamContractError(
+                "Mongo stream authority requires transaction-capable deployment"
+            ) from exc
+
     def _head_filter(self, operation_id: str) -> dict[str, Any]:
         OperationEventLog(operation_id, capacity=1)
         return {

@@ -384,3 +384,51 @@ test('terminal authoritative resync snapshot reconciles canonical output before 
   assert.equal(transport.resyncCalls, 1);
   assert.deepEqual(cursors.writes, [5]);
 });
+
+
+test('browser terminal artifact result linkage survives reconnect', async () => {
+  const cursors = new MemoryCursorStore();
+  await cursors.save('op-browser', 'artifact-browser', 1);
+  const transport = new ScriptedTransport({
+    replay(afterSequence) {
+      assert.equal(afterSequence, 1);
+      return {
+        ok: true,
+        payload: {
+          ok: true,
+          operation: snapshot('completed', 2),
+          events: [
+            event(2, 'operation.completed', {
+              state: 'completed',
+              final_output: 'artifact ready',
+              result_ref: 'artifact:stage7-output',
+              message_id: 'message:stage7-output',
+            }),
+          ],
+          after_sequence: 1,
+          latest_sequence: 2,
+          stream_latest_sequence: 2,
+          has_more: false,
+          terminal: true,
+        },
+      };
+    },
+  });
+
+  const session = new OperationBrowserSession(
+    'op-browser',
+    transport,
+    cursors,
+    { consumerId: 'artifact-browser' },
+  );
+  const terminal = await session.resume();
+
+  assert.equal(terminal.terminal, true);
+  assert.equal(terminal.displayedAssistantContent, 'artifact ready');
+  assert.equal(terminal.terminalResultRef, 'artifact:stage7-output');
+  assert.equal(terminal.terminalMessageId, 'message:stage7-output');
+  assert.equal(
+    await cursors.load('op-browser', 'artifact-browser'),
+    2,
+  );
+});
