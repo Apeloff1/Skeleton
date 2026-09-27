@@ -1037,7 +1037,7 @@
       ],
       "work_package": "WP-P0-COGNITIVE-LOOP",
       "blueprint": "cognitive_runtime_blueprint",
-      "implementation_status": "implementation-complete",
+      "implementation_status": "closed",
       "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
       "target_files": {
         "contracts": [
@@ -1111,18 +1111,7 @@
         "scripts/verify_cognitive_execution_closure.py independent closure verifier",
         ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
       ],
-      "remaining": [
-        "close gap-state-authority-convergence",
-        "close gap-governance-registry",
-        "close gap-cost-admission",
-        "close gap-conversation-state-authority",
-        "close gap-memory-durable-authority",
-        "close gap-tool-runtime-convergence",
-        "close gap-context-compiler-convergence",
-        "close gap-provider-interaction-protocol",
-        "close gap-verification-evidence-contract",
-        "collect fresh exact-head Cognitive Execution Closure Gate evidence"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
