@@ -38,21 +38,48 @@ def _map(root: Path, scripts: list[str]) -> None:
     )
 
 
-def test_runner_executes_every_declared_verifier_with_exact_head(
+def _receipt_verifier(
+    *,
+    gap_id: str,
+    head: str = "abc123",
+    valid: bool = True,
+    exit_code: int = 0,
+) -> str:
+    return (
+        "import argparse\n"
+        "import json\n"
+        "import os\n"
+        "from pathlib import Path\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--evidence-out', required=True)\n"
+        "args = parser.parse_args()\n"
+        f"assert os.environ['GITHUB_SHA'] == 'abc123'\n"
+        f"assert os.environ['EVIDENCE_HEAD_SHA'] == 'abc123'\n"
+        f"assert os.environ['ACCOUNTABILITY_HEAD_SHA'] == 'abc123'\n"
+        "Path(args.evidence_out).write_text(json.dumps({\n"
+        "    'schema_version': 1,\n"
+        "    'verifier': 'fixture-verifier-v1',\n"
+        f"    'gap_id': {gap_id!r},\n"
+        f"    'head_sha': {head!r},\n"
+        f"    'valid': {valid!r},\n"
+        f"    'errors': {[] if valid else ['fixture rejection']!r},\n"
+        "}), encoding='utf-8')\n"
+        f"raise SystemExit({exit_code})\n"
+    )
+
+
+def test_runner_executes_every_declared_verifier_with_exact_head_receipts(
     tmp_path: Path,
 ) -> None:
     _write(
         tmp_path,
         "scripts/a.py",
-        "import os\n"
-        "assert os.environ['GITHUB_SHA'] == 'abc123'\n"
-        "assert os.environ['EVIDENCE_HEAD_SHA'] == 'abc123'\n",
+        _receipt_verifier(gap_id="gap-0"),
     )
     _write(
         tmp_path,
         "scripts/b.py",
-        "import os\n"
-        "assert os.environ['ACCOUNTABILITY_HEAD_SHA'] == 'abc123'\n",
+        _receipt_verifier(gap_id="gap-1"),
     )
     _map(tmp_path, ["scripts/a.py", "scripts/b.py"])
 
@@ -62,11 +89,21 @@ def test_runner_executes_every_declared_verifier_with_exact_head(
     assert receipt["verifier_count"] == 2
     assert receipt["passed_count"] == 2
     assert receipt["failures"] == []
+    assert all(result["receipt_head_sha"] == "abc123" for result in receipt["results"])
+    assert all(result["receipt_digest"] for result in receipt["results"])
 
 
 def test_runner_fails_closed_when_one_verifier_rejects(tmp_path: Path) -> None:
-    _write(tmp_path, "scripts/a.py", "raise SystemExit(0)\n")
-    _write(tmp_path, "scripts/b.py", "raise SystemExit(7)\n")
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0"),
+    )
+    _write(
+        tmp_path,
+        "scripts/b.py",
+        _receipt_verifier(gap_id="gap-1", exit_code=7),
+    )
     _map(tmp_path, ["scripts/a.py", "scripts/b.py"])
 
     receipt = run_verifiers(tmp_path, head_sha="abc123")
@@ -77,6 +114,61 @@ def test_runner_fails_closed_when_one_verifier_rejects(tmp_path: Path) -> None:
     assert receipt["results"][1]["returncode"] == 7
 
 
+def test_runner_rejects_successful_verifier_with_wrong_head_receipt(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0", head="different-head"),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["failures"] == ["G0"]
+    assert receipt["results"][0]["receipt_error"] == (
+        "verifier receipt is not exact-head"
+    )
+
+
+def test_runner_rejects_successful_verifier_with_invalid_receipt(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0", valid=False),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["failures"] == ["G0"]
+    assert receipt["results"][0]["receipt_error"] == (
+        "verifier receipt reports invalid evidence"
+    )
+
+
+def test_runner_rejects_receipt_bound_to_wrong_gap(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-wrong"),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["failures"] == ["G0"]
+    assert receipt["results"][0]["receipt_error"] == (
+        "verifier receipt gap binding mismatch"
+    )
+
+
 def test_runner_rejects_verifier_path_escape(tmp_path: Path) -> None:
     _map(tmp_path, ["../outside.py"])
 
@@ -85,7 +177,11 @@ def test_runner_rejects_verifier_path_escape(tmp_path: Path) -> None:
 
 
 def test_runner_rejects_duplicate_verifier_reuse(tmp_path: Path) -> None:
-    _write(tmp_path, "scripts/a.py", "raise SystemExit(0)\n")
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0"),
+    )
     _map(tmp_path, ["scripts/a.py", "scripts/a.py"])
 
     with pytest.raises(RunnerError, match="reused by multiple groups"):
