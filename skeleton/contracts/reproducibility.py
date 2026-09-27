@@ -330,6 +330,34 @@ def evaluate_replay(
     if not isinstance(replay, ReplayObservation):
         raise ReproducibilityError("replay must be ReplayObservation")
 
+    mismatches: list[str] = []
+    infrastructure_pairs = (
+        ("runner_id", replay.runner_id, bundle.runner_id),
+        ("runner_digest", replay.runner_digest, bundle.runner_digest),
+        ("budget_id", replay.budget_id, bundle.budget_id),
+        ("budget_digest", replay.budget_digest, bundle.budget_digest),
+        (
+            "source_date_epoch",
+            str(replay.source_date_epoch),
+            str(bundle.source_date_epoch),
+        ),
+    )
+    for field, actual, expected in infrastructure_pairs:
+        if actual != expected:
+            mismatches.append(
+                f"{field} mismatch: expected={expected} actual={actual}"
+            )
+
+    if mismatches:
+        return ReproducibilityEvaluation(
+            bundle_digest=bundle.bundle_digest,
+            disposition=ReplayDisposition.INCOMPATIBLE,
+            compatible=False,
+            reproduced=False,
+            incompatibilities=tuple(mismatches),
+            failure_digest=replay.failure_digest,
+        )
+
     if replay.receipt is None:
         return ReproducibilityEvaluation(
             bundle_digest=bundle.bundle_digest,
@@ -341,17 +369,7 @@ def evaluate_replay(
         )
 
     receipt = replay.receipt
-    mismatches: list[str] = []
     pairs = (
-        ("runner_id", replay.runner_id, bundle.runner_id),
-        ("runner_digest", replay.runner_digest, bundle.runner_digest),
-        ("budget_id", replay.budget_id, bundle.budget_id),
-        ("budget_digest", replay.budget_digest, bundle.budget_digest),
-        (
-            "source_date_epoch",
-            str(replay.source_date_epoch),
-            str(bundle.source_date_epoch),
-        ),
         ("repository", receipt.repository, bundle.repository),
         ("commit_sha", receipt.commit_sha, bundle.commit_sha),
         ("task_id", receipt.task_id, bundle.task_id),
