@@ -26,7 +26,9 @@ REQUIRED_BOUNDARIES: dict[str, tuple[str, ...]] = {
         "class EngineClientConfig",
         "SKL_ENGINE_SERVICE_TOKEN",
         "class EngineClient",
-        "submission_digest",
+        "command_from_context",
+        "_recover_ambiguous_submit",
+        "idempotency_key",
     ),
     "skeleton/api/engine_routes.py": (
         '@router.post("/executions"',
