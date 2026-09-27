@@ -32,7 +32,8 @@ def _observation(
     run_attempt: int = 1,
     event: str = "pull_request",
     status: str = "completed",
-    conclusion: str = "success",
+    conclusion: str | None = "success",
+    completed_at: datetime | None = NOW,
 ) -> GateObservation:
     return GateObservation(
         workflow_name=workflow_name,
@@ -42,7 +43,7 @@ def _observation(
         event=event,
         status=status,
         conclusion=conclusion,
-        completed_at=NOW,
+        completed_at=completed_at,
     )
 
 
@@ -110,8 +111,8 @@ def test_only_stale_observation_fails_closed() -> None:
 @pytest.mark.parametrize(
     ("status", "conclusion", "bucket"),
     (
-        ("queued", "success", "nonterminal"),
-        ("in_progress", "success", "nonterminal"),
+        ("queued", None, "nonterminal"),
+        ("in_progress", None, "nonterminal"),
         ("completed", "failure", "rejected"),
         ("completed", "cancelled", "rejected"),
         ("completed", "skipped", "rejected"),
@@ -262,3 +263,32 @@ def test_only_accepted_decision_can_materialize_promotion_evidence() -> None:
     with pytest.raises(PromotionGateError, match="cannot become promotion evidence"):
         rejected.accepted_evidence_ref()
 
+
+
+def test_nonterminal_observation_allows_missing_completion_metadata() -> None:
+    authority = _authority()
+    observations = list(_passing_observations(authority))
+    target = observations[0].workflow_name
+    observations[0] = _observation(
+        target,
+        status="in_progress",
+        conclusion=None,
+        completed_at=None,
+    )
+
+    decision = evaluate_required_gates(
+        authority,
+        observations,
+        target_sha=HEAD,
+    )
+
+    assert decision.accepted is False
+    assert decision.nonterminal == (target,)
+
+
+def test_completed_observation_requires_terminal_metadata() -> None:
+    with pytest.raises(PromotionGateError, match="requires conclusion"):
+        _observation("Gate", conclusion=None)
+
+    with pytest.raises(PromotionGateError, match="requires completed_at"):
+        _observation("Gate", completed_at=None)
