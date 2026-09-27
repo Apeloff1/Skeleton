@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import glob
 import json
 from pathlib import Path
 import sys
@@ -49,6 +50,24 @@ def _canonical_digest(value: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _repository_reference_exists(
+    root: Path,
+    field: str,
+    reference: str,
+) -> bool:
+    if field not in {"implementation_paths", "tests"}:
+        return True
+    if not reference or reference.startswith("planned:"):
+        return False
+    candidate = Path(reference)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    if glob.has_magic(reference):
+        return any(root.glob(reference))
+    path = root / candidate
+    return path.is_file() or path.is_dir()
 
 
 def reconcile_repository(
@@ -157,6 +176,9 @@ def reconcile_repository(
                 record,
                 policy,
                 target_floor=lane["target_maturity"],
+                reference_validator=lambda field, reference: (
+                    _repository_reference_exists(root, field, reference)
+                ),
             )
         except MaturityReconciliationError as exc:
             raise ReconciliationError(str(exc)) from exc
