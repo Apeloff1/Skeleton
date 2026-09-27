@@ -766,7 +766,12 @@
         ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
         "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
-        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt",
+        "skeleton/intelligence/execution_runtime.py materializes authorized durable tool evidence and postcondition observations into Stage-3 verification",
+        "skeleton/provider_runtime.py provides a separately configured AI_VERIFICATION_MODEL role and rejects same provider+model identity as independent",
+        "skeleton/api/engine_runtime.py injects the isolated semantic verifier into the canonical execution runtime",
+        "skeleton/testing/test_execution_runtime.py covers evidence-backed publication and fail-closed reversible action verification",
+        "skeleton/testing/test_provider_contract.py covers verifier identity separation"
       ],
       "outstanding_evidence": [
         "fresh exact-head Verification Evidence Closure Gate",
@@ -1006,7 +1011,10 @@
         "disconnect/reconnect browser/API test",
         "duplicate/out-of-order client reducer test",
         "cancel race test",
-        "slow-client/backpressure test"
+        "slow-client/backpressure test",
+        "MongoOperationStore and MongoOperationEventStore provide shared-network authority",
+        "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
+        "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
       "outstanding_evidence": [
         "fresh exact-head frontend typecheck/test:operation-stream",
