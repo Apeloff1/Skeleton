@@ -431,7 +431,7 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:application-api->retrieval",
@@ -1330,7 +1330,7 @@
         "child budget/authority/depth tests",
         "interactive interrupt/replace tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:engine-api->retrieval",
@@ -2460,7 +2460,7 @@
         "no heavy imports in skeleton/__init__.py",
         "capability manifest serialization/compatibility"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:orchestration->memory",
@@ -2513,7 +2513,7 @@
         "write-policy provenance test",
         "delete/export/retention propagation test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:orchestration->model-routing",
@@ -2562,7 +2562,7 @@
         "fallback ceiling preservation",
         "deterministic no-route behavior"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:orchestration->prompt-context",
@@ -2617,7 +2617,7 @@
         "instruction policy activation/rollback",
         "context digest policy binding"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:orchestration->tool-runtime",
@@ -2671,7 +2671,7 @@
         "network/database scope tests",
         "durable tool receipt lineage test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:product-experience->application-api",
