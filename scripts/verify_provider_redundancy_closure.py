@@ -43,6 +43,7 @@ REQUIRED_TEST_TOKENS = (
     "test_provider_registry_returns_failover_adapter_and_exposes_routing",
     "test_provider_registry_readiness_fails_closed_on_invalid_fallback_receipt",
     "test_provider_registry_readiness_fails_closed_on_invalid_active_receipt",
+    "test_provider_registry_status_suppresses_invalid_receipt_availability",
     "test_provider_registry_secondary_configuration_fails_closed_when_partial",
     "test_provider_registry_rejects_secondary_on_primary_hostname",
     "test_declared_secondary_adapter_denies_undeclared_media_capabilities",
