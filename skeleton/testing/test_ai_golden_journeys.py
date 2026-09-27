@@ -439,7 +439,13 @@ async def test_stage7_multi_turn_journey_preserves_canonical_history_and_trace(
     assert tuple((item.role, item.content) for item in request.history) == history
     assert request.operation_id == operation.operation_id
     assert request.execution_id == command.execution_request.execution_id
-    assert request.turn_id == command.compiled_context.turn_id
+    # Provider turns have their own deterministic execution-turn identity.
+    # The compiled context turn is an input lineage identity, not the provider
+    # call's turn id; context identity/digest/snapshot bind that lineage.
+    assert request.turn_id
+    assert request.turn_id != command.compiled_context.turn_id
+    assert request.context_id == command.compiled_context.context_id
+    assert request.context_digest == command.compiled_context.context_digest
     assert request.context_source_snapshot == command.compiled_context.source_snapshot
     assert result.stream_terminal_event is not None
 
