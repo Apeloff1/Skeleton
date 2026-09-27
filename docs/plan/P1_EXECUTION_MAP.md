@@ -1,13 +1,13 @@
 # P1 Trustworthy Autonomous Production Execution Map
 
-Machine authority: [`machine/ai_p1_execution_map.json`](../../machine/ai_p1_execution_map.json)  
+Machine authority: [`machine/ai_p1_execution_map.json`](../../machine/ai_p1_execution_map.json)
 Task DAG: [`machine/ai_p1_task_backlog.json`](../../machine/ai_p1_task_backlog.json)
 
-Map version: **1.1.0**  
-Baseline merge: `6aacc56676f5a77e9f68d3a1a7b691a7039e9662` (PR #2091)  
-Breadth freeze: **VOL-000..420; no new top-level volume without ADR**  
-Primary P1 frontier: **107 volumes**  
-Explicitly deferred: **314 volumes**  
+Map version: **1.1.0**
+Baseline merge: `6aacc56676f5a77e9f68d3a1a7b691a7039e9662` (PR #2091)
+Breadth freeze: **VOL-000..420; no new top-level volume without ADR**
+Primary P1 frontier: **107 volumes**
+Explicitly deferred: **314 volumes**
 Executable P1 tasks: **44**
 
 ## 1. What P1 means
@@ -75,7 +75,7 @@ P1 resolves this by promoting **bounded slices of implemented reality into signe
 
 **Objective.** Turn exact-head CI, observability, evaluation, verification, provenance, risk/gap ledgers and scope control into one promotion authority before later P1 lanes make production claims.
 
-**Dependency position.** Root P1 lane. 
+**Dependency position.** Root P1 lane.
 
 **Primary volume ownership (13).** VOL-000, VOL-034, VOL-035, VOL-036, VOL-037, VOL-038, VOL-056, VOL-057, VOL-059, VOL-078, VOL-079, VOL-080, VOL-420
 
@@ -369,7 +369,7 @@ P1 resolves this by promoting **bounded slices of implemented reality into signe
 
 **Objective.** Convert feedback, research and experiments into bounded candidates whose improvement claims survive reproducible, adversarial and champion/challenger evaluation before release.
 
-**Dependency position.** Depends on P1-L0, P1-L1, P1-L2, P1-L3. 
+**Dependency position.** Depends on P1-L0, P1-L1, P1-L2, P1-L3.
 
 **Primary volume ownership (8).** VOL-023, VOL-024, VOL-077, VOL-082, VOL-083, VOL-414, VOL-415, VOL-419
 
@@ -589,7 +589,7 @@ P1 resolves this by promoting **bounded slices of implemented reality into signe
 
 **Objective.** Assemble lane evidence into one exact-head, independently verified production-promotion decision without converting unresolved work into checkbox completion.
 
-**Dependency position.** Depends on P1-L0, P1-L1, P1-L2, P1-L3, P1-L4, P1-L5, P1-L6. 
+**Dependency position.** Depends on P1-L0, P1-L1, P1-L2, P1-L3, P1-L4, P1-L5, P1-L6.
 
 **Primary volume ownership (0).** None; terminal aggregation only.
 
