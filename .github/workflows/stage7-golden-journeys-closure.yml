@@ -16,6 +16,7 @@ on:
       - "backend/tests/test_engine_cross_service_closure.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_operation_stream_mongo_stage7.py"
+      - "backend/tests/test_operation_stream_mongo_integration.py"
       - "backend/core/operation_stream_transport.py"
       - "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
       - "skeleton/frontier/operation_stream_store_mongo.py"
@@ -277,10 +278,11 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_operation_stream_store_mongo.py
 
-      - name: Run shared-authority transient-failure journey
+      - name: Run shared-authority transient-failure and cross-worker journeys
         run: >-
           python -m pytest -q --noconftest
           backend/tests/test_operation_stream_mongo_stage7.py
+          backend/tests/test_operation_stream_mongo_integration.py
 
       - name: Print Mongo logs on failure
         if: failure()
