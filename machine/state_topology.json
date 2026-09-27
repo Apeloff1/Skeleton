@@ -776,11 +776,11 @@
     {
       "id": "verification-receipt-ledger",
       "owner_plane": "reasoning-verification",
-      "physical_store": "verification-evidence-unbound",
-      "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; ai_verification_receipt",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -788,15 +788,19 @@
       "transaction_scope": "immutable verification receipt commit per candidate/turn with bounded repair lineage",
       "consistency": "one receipt version is immutable; later repair creates a new turn/receipt; final result references the selected terminal receipt",
       "retention": "operation/evaluation/governance policy controlled; raw hidden reasoning is not retained",
-      "backup_restore": "required after durable repository binding because finalization/evaluation can depend on receipt identity",
-      "migration": "preserve verification id, operation/execution/turn/candidate lineage, outcome/reason codes, claim/postcondition checks and evidence refs",
+      "backup_restore": "restore engine_execution.sqlite before resumed/finalized execution; verification receipts are durable authoritative state and must retain receipt/execution/operation/result lineage",
+      "migration": "preserve verification receipt identity, claim/execution/operation/result lineage, digest, outcome/reason codes, evidence/postcondition checks and verified timestamp",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-verification-evidence-contract",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/intelligence/verification.py",
-        "skeleton/intelligence/verifier.py"
+        "skeleton/contracts/verification.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "docker-compose.yml",
+        "machine/state_backup_policy.json"
       ]
     },
     {
