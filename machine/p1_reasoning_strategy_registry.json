@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "registry_id": "skeleton.p1.reasoning_strategy_registry",
+  "registry_version": "1.0.0",
+  "task_id": "P1-INTEL-03",
+  "accountability_ref": "ACC-P1-INTEL-03",
+  "selection_policy": {
+    "order": "lowest_priority_then_id",
+    "required_capabilities_must_be_subset": true,
+    "request_budget_is_hard_ceiling": true,
+    "registry_limits_are_hard_ceiling": true,
+    "no_eligible_strategy": "abstain",
+    "model_self_confidence_is_not_authority": true
+  },
+  "stop_policy": {
+    "over_budget": "policy_violation",
+    "verified_completion": "stop_success",
+    "unverified_completion": "abstain_unverified",
+    "hard_limit_reached": "stop_budget",
+    "low_evidence_gain_and_low_value_of_information": "stop_diminishing_returns",
+    "high_uncertainty_without_evidence_gain": "abstain_uncertain",
+    "otherwise": "continue"
+  },
+  "strategies": [
+    {
+      "id": "direct_verified",
+      "priority": 10,
+      "capabilities": [
+        "direct",
+        "verification"
+      ],
+      "description": "Single-pass bounded reasoning followed by explicit verification.",
+      "limits": {
+        "iterations": 1,
+        "candidates": 1,
+        "retrieval_rounds": 0,
+        "tool_calls": 0,
+        "cost": 0.25,
+        "wall_seconds": 15
+      },
+      "stop": {
+        "min_evidence_gain": 0,
+        "min_value_of_information": 0,
+        "abstain_uncertainty": 0.85
+      }
+    },
+    {
+      "id": "retrieve_then_reason",
+      "priority": 20,
+      "capabilities": [
+        "retrieval",
+        "verification"
+      ],
+      "description": "Bounded retrieval followed by evidence-aware reasoning and verification.",
+      "limits": {
+        "iterations": 4,
+        "candidates": 4,
+        "retrieval_rounds": 2,
+        "tool_calls": 0,
+        "cost": 1,
+        "wall_seconds": 60
+      },
+      "stop": {
+        "min_evidence_gain": 0.05,
+        "min_value_of_information": 0.02,
+        "abstain_uncertainty": 0.8
+      }
+    },
+    {
+      "id": "bounded_search",
+      "priority": 30,
+      "capabilities": [
+        "search",
+        "verification"
+      ],
+      "description": "Bounded candidate search with explicit diminishing-return stopping.",
+      "limits": {
+        "iterations": 8,
+        "candidates": 16,
+        "retrieval_rounds": 0,
+        "tool_calls": 0,
+        "cost": 2,
+        "wall_seconds": 120
+      },
+      "stop": {
+        "min_evidence_gain": 0.04,
+        "min_value_of_information": 0.03,
+        "abstain_uncertainty": 0.8
+      }
+    },
+    {
+      "id": "plan_then_verify",
+      "priority": 40,
+      "capabilities": [
+        "planning",
+        "verification"
+      ],
+      "description": "Generate a bounded plan candidate set and stop only under explicit verification or policy stop.",
+      "limits": {
+        "iterations": 6,
+        "candidates": 8,
+        "retrieval_rounds": 1,
+        "tool_calls": 0,
+        "cost": 2,
+        "wall_seconds": 120
+      },
+      "stop": {
+        "min_evidence_gain": 0.05,
+        "min_value_of_information": 0.03,
+        "abstain_uncertainty": 0.75
+      }
+    },
+    {
+      "id": "ensemble_then_abstain",
+      "priority": 50,
+      "capabilities": [
+        "ensemble",
+        "verification"
+      ],
+      "description": "Bounded multi-candidate comparison with explicit abstention under unresolved uncertainty.",
+      "limits": {
+        "iterations": 3,
+        "candidates": 8,
+        "retrieval_rounds": 0,
+        "tool_calls": 0,
+        "cost": 3,
+        "wall_seconds": 90
+      },
+      "stop": {
+        "min_evidence_gain": 0.05,
+        "min_value_of_information": 0.02,
+        "abstain_uncertainty": 0.7
+      }
+    }
+  ]
+}
