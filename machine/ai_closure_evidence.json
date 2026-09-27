@@ -955,9 +955,9 @@
       "gap": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "stage": 7,
-      "gap_status": "open",
-      "implementation_state": "implementation-complete",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
@@ -980,29 +980,8 @@
         "artifact/result assertions",
         "degraded-mode assertions"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "blockers": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
