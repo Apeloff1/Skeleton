@@ -1073,7 +1073,8 @@
         "cross-plane governance artifact/retrieval export and physical deletion journey",
         "configured engine-outage fail-closed regression without backend provider fallback",
         "Stage-6 production browser-session reconnect/backpressure/cancel-race journeys",
-        "independent Stage-7 source verifier and exact-head closure workflow"
+        "independent Stage-7 source verifier and exact-head closure workflow",
+        "real pinned Mongo replica-set shared-authority journey injects one retryable update failure and proves unchanged canonical state/outbox before successful retry"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -1084,14 +1085,12 @@
       "outstanding_evidence": [
         "fresh exact-head Stage-7 Golden Journeys Closure Gate",
         "fresh exact-head App Assembly",
-        "transaction-capable Mongo replica-set and transient-failure journey",
         "provider-response-before-checkpoint and remaining process/database restart fault journeys",
         "all declared lower-stage dependency gaps closed and independent signoff"
       ],
       "blockers": [
         "fresh exact-head Stage-7 Golden Journeys Closure Gate",
         "fresh exact-head App Assembly",
-        "transaction-capable Mongo replica-set and transient-failure journey",
         "provider-response-before-checkpoint and remaining process/database restart fault journeys",
         "all declared lower-stage dependency gaps closed and independent signoff",
         "dependency must close: gap-state-authority-convergence",
