@@ -1367,7 +1367,7 @@
       ],
       "work_package": "WP-P0-GOLDEN-JOURNEYS",
       "blueprint": "golden_journey_blueprint",
-      "implementation_status": "implementation-complete",
+      "implementation_status": "closed",
       "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
       "target_files": {
         "contracts": [
@@ -1434,12 +1434,9 @@
         "skeleton/testing/test_execution_runtime.py proves provider-response-before-checkpoint crash recovery fails closed without a second provider call",
         "Stage-7 gate runs canonical engine process restart, approval restart, admission rehydration, execution database reopen, staged-finalization replay and governance audit restart journeys"
       ],
-      "remaining": [
-        "collect fresh exact-head Stage-7 Golden Journeys Closure Gate evidence",
-        "collect fresh exact-head App Assembly evidence",
-        "close all declared lower-stage dependencies and obtain independent signoff"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     }
   ],
   "definition_of_handoff_complete": [
