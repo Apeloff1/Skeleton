@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "masterplan/p1-provider-redundancy-close-20260927-clean3"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_app_construction.json"
