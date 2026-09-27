@@ -1227,7 +1227,7 @@
       ],
       "work_package": "WP-P0-STREAM",
       "blueprint": "realtime_delivery_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
@@ -1342,11 +1342,10 @@
         "frontend/scripts/test-operation-stream-session.mjs executes disconnect/reconnect, compaction-gap recovery and cancel/complete race journeys",
         "frontend/package.json includes browser-session journeys in test:operation-stream"
       ],
-      "remaining": [
-        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence",
-        "obtain independent signoff before changing canonical gap status to closed"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-e2e-golden-journeys",
