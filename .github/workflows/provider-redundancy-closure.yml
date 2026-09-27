@@ -1,0 +1,123 @@
+name: Provider Redundancy Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "masterplan/closure-stage7-final-20260927-clean2"
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "machine/ai_app_construction.json"
+      - "scripts/verify_provider_redundancy_closure.py"
+      - "tests/test_provider_redundancy_independent_verifier.py"
+      - ".github/workflows/provider-redundancy-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-redundancy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-redundancy-contracts:
+    name: Provider redundancy contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused provider dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+
+      - name: Run provider failover and routing contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_provider_contract.py
+
+      - name: Assert canonical AI provider runtime mirror
+        run: cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
+
+  provider-redundancy-independent:
+    name: Independent provider redundancy verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+
+      - name: Run verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_provider_redundancy_independent_verifier.py
+
+      - name: Verify exact-head redundancy surfaces
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_provider_redundancy_closure.py
+          --evidence-out .provider-redundancy.json
+          --print-evidence
+
+      - name: Assert exact-head verifier receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".provider-redundancy.json").read_text(encoding="utf-8")
+          )
+          if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
+              raise SystemExit("provider redundancy receipt head mismatch")
+          if receipt.get("verifier") != "independent-provider-redundancy-v1":
+              raise SystemExit("unexpected provider redundancy verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("provider redundancy verification failed")
+          if receipt.get("runtime_digest") != receipt.get("mirror_digest"):
+              raise SystemExit("provider runtime mirror digest mismatch")
+          if receipt.get("declared_secondary") is not True:
+              raise SystemExit("secondary provider declaration is missing")
+          print(
+              "provider redundancy exact-head receipt:",
+              receipt["head_sha"],
+              receipt["gap_status"],
+          )
+          PY
