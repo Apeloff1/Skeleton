@@ -1013,7 +1013,12 @@
         "backend/tests/test_operation_stream_route.py cross-worker reconnect and slow-client API journeys",
         "fenced expiring projection lease with generation-based stale-worker fencing",
         "cross-worker API reconnect journey over shared durable cursor state",
-        "operation-local slow-client replay isolation"
+        "operation-local slow-client replay isolation",
+        "Mongo shared-network operation authority with atomic state/outbox mutation merged in PR #2030",
+        "Mongo transactional operation-event authority with replay/consumer/lease/compaction semantics merged in PR #2030",
+        "environment-selectable SQLite or Mongo operation authority with fail-closed backend validation",
+        "injectable production browser operation session bound to authenticated API and per-consumer AsyncStorage cursor",
+        "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -1025,21 +1030,20 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
-        "browser-level disconnect/reconnect automation against assembled topology",
-        "browser-level slow-client/backpressure automation against assembled topology",
-        "browser-level cancel-complete automation against assembled topology"
+        "fresh exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
+        "transaction-capable Mongo replica-set integration evidence",
+        "assembled backend+frontend disconnect/reconnect journey evidence",
+        "assembled backend+frontend slow-client/backpressure journey evidence",
+        "assembled backend+frontend cancel-complete race journey evidence",
+        "declared dependency closure and independent signoff"
       ],
       "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-state-authority-convergence",
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
-        "browser-level disconnect/reconnect automation against assembled topology",
-        "browser-level slow-client/backpressure automation against assembled topology",
-        "browser-level cancel-complete automation against assembled topology"
+        "fresh exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
+        "transaction-capable Mongo replica-set integration evidence",
+        "assembled backend+frontend disconnect/reconnect journey evidence",
+        "assembled backend+frontend slow-client/backpressure journey evidence",
+        "assembled backend+frontend cancel-complete race journey evidence",
+        "declared dependency closure and independent signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
