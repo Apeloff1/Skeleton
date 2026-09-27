@@ -295,6 +295,7 @@ class HandoffPacket:
 class DelegationGrant:
     delegation_id: str
     lease_task_id: str
+    parent_authority_digest: str
     parent: AgentIdentity
     child: AgentIdentity
     parent_budget: DelegationBudget
@@ -317,6 +318,11 @@ class DelegationGrant:
             self,
             "lease_task_id",
             _identifier(self.lease_task_id, "lease_task_id"),
+        )
+        object.__setattr__(
+            self,
+            "parent_authority_digest",
+            _sha256(self.parent_authority_digest, "parent_authority_digest"),
         )
         if not isinstance(self.parent, AgentIdentity) or not isinstance(
             self.child, AgentIdentity
@@ -373,6 +379,7 @@ class DelegationGrant:
             "schema_version": DELEGATION_SCHEMA_VERSION,
             "delegation_id": self.delegation_id,
             "lease_task_id": self.lease_task_id,
+            "parent_authority_digest": self.parent_authority_digest,
             "parent": self.parent.as_dict(),
             "child": self.child.as_dict(),
             "parent_budget": self.parent_budget.as_dict(),
@@ -471,6 +478,7 @@ def derive_child_grant(
     return DelegationGrant(
         delegation_id=delegation_id,
         lease_task_id=lease_task_id,
+        parent_authority_digest=parent_grant.digest,
         parent=parent_grant.child,
         child=child,
         parent_budget=parent_grant.budget,
