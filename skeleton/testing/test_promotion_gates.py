@@ -231,3 +231,28 @@ def test_malformed_observation_fails_during_construction() -> None:
 
     with pytest.raises(PromotionGateError, match="run_attempt"):
         _observation("Gate", run_attempt=0)
+
+def test_only_accepted_decision_can_materialize_promotion_evidence() -> None:
+    authority = _authority()
+    accepted = evaluate_required_gates(
+        authority,
+        _passing_observations(authority),
+        target_sha=HEAD,
+    )
+    evidence = accepted.accepted_evidence_ref()
+
+    assert evidence.category == "promotion_gate_authority"
+    assert evidence.digest == accepted.decision_digest
+    assert len(evidence.digest) == 64
+    assert accepted.as_dict()["decision_digest"] == accepted.decision_digest
+
+    rejected_observations = list(_passing_observations(authority))
+    rejected_observations.pop()
+    rejected = evaluate_required_gates(
+        authority,
+        rejected_observations,
+        target_sha=HEAD,
+    )
+    with pytest.raises(PromotionGateError, match="cannot become promotion evidence"):
+        rejected.accepted_evidence_ref()
+
