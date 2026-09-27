@@ -7,7 +7,10 @@
   "breadth_freeze": {
     "enabled": true,
     "last_top_level_volume": 420,
-    "rule": "New top-level domains require an ADR proving existing volumes cannot represent the requirement."
+    "rule": "New top-level domains require an ADR proving existing volumes cannot represent the requirement.",
+    "exception_register": "machine/ai_scope_freeze_adrs.json",
+    "p1_application_policy": "forbid",
+    "exception_rule": "During active P1, ADRs may be proposed or approved for future plan evolution but no top-level expansion may be applied."
   },
   "authority": {
     "current_runtime_truth": [
@@ -31,7 +34,8 @@
     "p1_task_backlog": "machine/ai_p1_task_backlog.json",
     "p1_required_gate_authority": "machine/p1_required_gate_authority.json",
     "p1_maturity_reconciliation_engine": "scripts/reconcile_p1_maturity.py",
-    "p1_maturity_reconciliation_contract": "skeleton/contracts/maturity_reconciliation.py"
+    "p1_maturity_reconciliation_contract": "skeleton/contracts/maturity_reconciliation.py",
+    "p1_scope_freeze_adr_register": "machine/ai_scope_freeze_adrs.json"
   },
   "laws": [
     "durable governed state is authoritative",
