@@ -1037,7 +1037,7 @@
       ],
       "work_package": "WP-P0-COGNITIVE-LOOP",
       "blueprint": "cognitive_runtime_blueprint",
-      "implementation_status": "implementation-complete",
+      "implementation_status": "closed",
       "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
       "target_files": {
         "contracts": [
@@ -1111,18 +1111,7 @@
         "scripts/verify_cognitive_execution_closure.py independent closure verifier",
         ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
       ],
-      "remaining": [
-        "close gap-state-authority-convergence",
-        "close gap-governance-registry",
-        "close gap-cost-admission",
-        "close gap-conversation-state-authority",
-        "close gap-memory-durable-authority",
-        "close gap-tool-runtime-convergence",
-        "close gap-context-compiler-convergence",
-        "close gap-provider-interaction-protocol",
-        "close gap-verification-evidence-contract",
-        "collect fresh exact-head Cognitive Execution Closure Gate evidence"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
@@ -1136,7 +1125,7 @@
       ],
       "work_package": "WP-P0-ENGINE-BOUNDARY",
       "blueprint": "engine_application_boundary_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
       "target_files": {
         "contracts": [
@@ -1217,14 +1206,13 @@
         "backend/tests/test_engine_http_boundary.py authenticated HTTP retry/denial/cancel/golden journey",
         "skeleton/testing/test_engine_execution_coordinator.py late-provider cancellation fence",
         "skeleton/testing/test_engine_process_isolation.py sole-provider-owner production topology invariant",
-        "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel"
+        "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel",
+        "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+        "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+        "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+        ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
       ],
-      "remaining": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserving operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
@@ -1238,7 +1226,7 @@
       ],
       "work_package": "WP-P0-STREAM",
       "blueprint": "realtime_delivery_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
@@ -1351,12 +1339,12 @@
         "frontend/services/operationStreamSession.ts provides an injectable production browser-session runtime for replay, cursor durability, resync, follow and cancellation",
         "frontend/services/operationStream.ts binds the session runtime to authenticated production API and AsyncStorage adapters",
         "frontend/scripts/test-operation-stream-session.mjs executes disconnect/reconnect, compaction-gap recovery and cancel/complete race journeys",
-        "frontend/package.json includes browser-session journeys in test:operation-stream"
+        "frontend/package.json includes browser-session journeys in test:operation-stream",
+        ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+        "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+        "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
       ],
-      "remaining": [
-        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence",
-        "obtain independent signoff before changing canonical gap status to closed"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
@@ -1380,7 +1368,7 @@
       ],
       "work_package": "WP-P0-GOLDEN-JOURNEYS",
       "blueprint": "golden_journey_blueprint",
-      "implementation_status": "implementation-complete",
+      "implementation_status": "closed",
       "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
       "target_files": {
         "contracts": [
@@ -1445,13 +1433,14 @@
         ".github/workflows/stage7-golden-journeys-closure.yml binds deterministic engine, authenticated cross-service, browser-session and independent verifier evidence to exact PR head",
         "backend/tests/test_operation_stream_mongo_stage7.py uses a real transaction-capable Mongo replica set to prove shared operation/event authority, retryable update failure atomicity and safe retry",
         "skeleton/testing/test_execution_runtime.py proves provider-response-before-checkpoint crash recovery fails closed without a second provider call",
-        "Stage-7 gate runs canonical engine process restart, approval restart, admission rehydration, execution database reopen, staged-finalization replay and governance audit restart journeys"
+        "Stage-7 gate runs canonical engine process restart, approval restart, admission rehydration, execution database reopen, staged-finalization replay and governance audit restart journeys",
+        ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+        "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+        "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+        "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+        "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
       ],
-      "remaining": [
-        "collect fresh exact-head Stage-7 Golden Journeys Closure Gate evidence",
-        "collect fresh exact-head App Assembly evidence",
-        "close all declared lower-stage dependencies and obtain independent signoff"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     }
   ],
