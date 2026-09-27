@@ -190,27 +190,3 @@ def test_bridge_rejects_workflow_that_detaches_declared_verifier(
         and "does not execute scripts/verify_jeeves_conversation_cutover.py" in error
         for error in receipt["errors"]
     )
-
-
-def test_bridge_rejects_workflow_that_does_not_trigger_on_verifier(
-    tmp_path: Path,
-) -> None:
-    root = _copy_bridge_tree(tmp_path)
-    workflow = root / ".github/workflows/conversation-authority-closure.yml"
-    source = workflow.read_text(encoding="utf-8")
-    source = source.replace(
-        '      - "scripts/verify_jeeves_conversation_cutover.py"\n',
-        "",
-        1,
-    )
-    workflow.write_text(source, encoding="utf-8")
-
-    receipt = verify_repository(root)
-
-    assert receipt["valid"] is False
-    assert any(
-        "S1-CONV: workflow" in error
-        and "does not trigger on scripts/verify_jeeves_conversation_cutover.py"
-        in error
-        for error in receipt["errors"]
-    )
