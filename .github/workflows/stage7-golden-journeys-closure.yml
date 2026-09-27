@@ -188,7 +188,7 @@ jobs:
               raise SystemExit("independent Stage-7 verification failed")
           if len(receipt.get("boundary_digests") or {}) < 6:
               raise SystemExit("Stage-7 boundary coverage is incomplete")
-          if len(receipt.get("mirror_pairs") or []) < 1:
+          if len(receipt.get("mirror_pairs") or []) < 3:
               raise SystemExit("Stage-7 mirror coverage is incomplete")
           if set(receipt.get("dependency_graph") or []) != {
               "gap-state-authority-convergence",
