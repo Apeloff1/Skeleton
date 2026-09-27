@@ -2386,6 +2386,55 @@ class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
             admission_runtime=admission_runtime,
         )
 
+    async def generate_image(
+        self,
+        request: ProviderImageRequest,
+    ) -> ProviderImageResponse:
+        del request
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-generation"
+        )
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        count: int = 1,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, count, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-variation"
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-editing"
+        )
+
+    async def synthesize_speech(
+        self,
+        request: ProviderSpeechRequest,
+    ) -> ProviderSpeechResponse:
+        del request
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: speech-synthesis"
+        )
+
 
 class OpenAISyncProviderAdapter:
     """Dependency-free synchronous OpenAI Responses API adapter.
@@ -2680,8 +2729,11 @@ class ProviderRegistry:
         fallback_ids: Sequence[str] = (),
         architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
     ) -> None:
-        self._adapters = {adapter.provider_id: adapter for adapter in adapters}
-        if len(self._adapters) != len(tuple(adapters)):
+        normalized_adapters = tuple(adapters)
+        self._adapters = {
+            adapter.provider_id: adapter for adapter in normalized_adapters
+        }
+        if len(self._adapters) != len(normalized_adapters):
             raise ValueError("provider ids must be unique")
         self.active_id = active.strip().lower()
         normalized_fallbacks = tuple(
