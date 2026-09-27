@@ -493,3 +493,11 @@ def test_terminal_decision_identity_changes_with_policy_or_history() -> None:
 
     assert baseline.decision_digest != changed_policy.decision_digest
     assert baseline.decision_digest != changed_history.decision_digest
+
+def test_high_risk_verification_cannot_be_disabled() -> None:
+    with pytest.raises(
+        ReasoningPolicyError,
+        match="high-risk verification cannot be disabled",
+    ):
+        _policy(require_verification_for_high_risk=False)
+
