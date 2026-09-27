@@ -56,8 +56,6 @@ P1 resolves this by promoting **bounded slices of implemented reality into signe
 | P1-PH3 | Release & Distributed Hardening | P1-L5, P1-L6 | Prove reversible release/recovery and predictable distributed execution under resource/cost pressure. |
 | P1-PH4 | Terminal Qualification | P1-L7 | Aggregate exact-head lane evidence into one independent promotion decision. |
 
-The phase law is simple: prototyping may overlap when task dependencies permit, but maturity promotion may not jump across unmet dependencies.
-
 ## 4. Lane summary
 
 | Lane | Domain | Depends on | Primary volumes | Target maturity | Tasks |
@@ -68,7 +66,7 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 | P1-L3 | Product Truth & Operator Surfaces | P1-L0 | 7 | verified | 5 |
 | P1-L4 | Controlled Learning, Evaluation & Failure Knowledge | P1-L0, P1-L1, P1-L2, P1-L3 | 8 | hardened | 6 |
 | P1-L5 | Release, Installation, Recovery & Operational Qualification | P1-L2, P1-L3, P1-L4 | 14 | production | 6 |
-| P1-L6 | Distributed Runtime, Capacity & Economics | P1-L1, P1-L2, P1-L3, P1-L4 | 20 | hardened | 6 |
+| P1-L6 | Distributed Runtime, Capacity & Economics | P1-L1, P1-L2, P1-L3 | 20 | hardened | 6 |
 | P1-L7 | Terminal P1 Trustworthy-Production Promotion | P1-L0, P1-L1, P1-L2, P1-L3, P1-L4, P1-L5, P1-L6 | 0 | production | 3 |
 
 ## 5. Detailed lane plans
@@ -435,7 +433,7 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 | P1-LEARN-01 — Experiment registry | blocked | P1-EVID-01, P1-INTEL-01 | VOL-077 | maturity_candidate |
 | P1-LEARN-02 — Benchmark registry and contamination controls | blocked | P1-LEARN-01, P1-EVID-05, P1-INTEL-06 | VOL-082, VOL-035 | maturity_candidate |
 | P1-LEARN-03 — Candidate and champion/challenger registry | blocked | P1-LEARN-01, P1-LEARN-02 | VOL-023, VOL-415 | maturity_candidate |
-| P1-LEARN-04 — Shadow traffic isolation | blocked | P1-LEARN-03, P1-AUTO-05 | VOL-414 | maturity_candidate |
+| P1-LEARN-04 — Shadow traffic isolation | blocked | P1-LEARN-03, P1-AUTO-05, P1-PROD-02 | VOL-414 | maturity_candidate |
 | P1-LEARN-05 — Specification and reasoning regression corpus | blocked | P1-LEARN-02, P1-EVID-04 | VOL-324, VOL-369, VOL-083 | maturity_candidate |
 | P1-LEARN-06 — Failure knowledge pipeline | blocked | P1-LEARN-05 | VOL-419, VOL-024 | maturity_candidate |
 
@@ -507,7 +505,7 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 | --- | --- | --- | --- | --- |
 | P1-REL-01 — Release evidence bundle | blocked | P1-EVID-05, P1-PROD-05, P1-LEARN-03, P1-AUTO-06 | VOL-060, VOL-075, VOL-076 | maturity_candidate |
 | P1-REL-02 — Installer/update/repair lifecycle | blocked | P1-REL-01 | VOL-047, VOL-048, VOL-049, VOL-050 | maturity_candidate |
-| P1-REL-03 — Migration and rollback compatibility | blocked | P1-REL-01, P1-REL-02 | VOL-048, VOL-061, VOL-063 | maturity_candidate |
+| P1-REL-03 — Migration and rollback compatibility | blocked | P1-REL-01, P1-REL-02 | VOL-048, VOL-061, VOL-063, VOL-062 | maturity_candidate |
 | P1-REL-04 — Backup and restore qualification | blocked | P1-REL-03 | VOL-064, VOL-065 | maturity_candidate |
 | P1-REL-05 — Disaster recovery and incident feedback | blocked | P1-REL-04, P1-LEARN-06 | VOL-065, VOL-066 | maturity_candidate |
 | P1-REL-06 — Attribution and release notices | blocked | P1-REL-01 | VOL-409 | maturity_candidate |
@@ -517,7 +515,7 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 
 **Objective.** Make distributed execution predictable under saturation, partition, failover and cost pressure with explicit resource topology, quotas, budgets and worker trust.
 
-**Dependency position.** Depends on P1-L1, P1-L2, P1-L3, P1-L4. May overlap with P1-L5 when task dependencies are satisfied.
+**Dependency position.** Depends on P1-L1, P1-L2, P1-L3. May overlap with P1-L5 when task dependencies are satisfied.
 
 **Primary volume ownership (20).** VOL-029, VOL-030, VOL-031, VOL-067, VOL-068, VOL-069, VOL-381, VOL-382, VOL-385, VOL-386, VOL-390, VOL-391, VOL-392, VOL-397, VOL-398, VOL-399, VOL-403, VOL-404, VOL-405, VOL-406
 
@@ -582,7 +580,7 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 | P1-DIST-01 — Remote execution and worker trust | blocked | P1-EVID-03, P1-PROD-05, P1-AUTO-06 | VOL-030, VOL-398, VOL-399 | maturity_candidate |
 | P1-DIST-02 — Topology-aware model placement and warming | blocked | P1-DIST-01 | VOL-031, VOL-381, VOL-382, VOL-385, VOL-392, VOL-397 | maturity_candidate |
 | P1-DIST-03 — Batching and autoscaling controller | blocked | P1-DIST-02 | VOL-386, VOL-390 | maturity_candidate |
-| P1-DIST-04 — Load and capacity qualification | blocked | P1-DIST-03 | VOL-067, VOL-068, VOL-391 | maturity_candidate |
+| P1-DIST-04 — Load and capacity qualification | blocked | P1-DIST-03 | VOL-067, VOL-068, VOL-391, VOL-029 | maturity_candidate |
 | P1-DIST-05 — Quota and budget accounting ledger | blocked | P1-DIST-01, P1-EVID-01 | VOL-069, VOL-403, VOL-404 | maturity_candidate |
 | P1-DIST-06 — Forecasting and cost anomaly loop | blocked | P1-DIST-04, P1-DIST-05 | VOL-405, VOL-406 | maturity_candidate |
 
@@ -657,68 +655,43 @@ The phase law is simple: prototyping may overlap when task dependencies permit, 
 
 ## 6. Task execution contract
 
-Every P1 task carries:
-
-- lane ownership and work-package lineage;
-- exact volume scope;
-- explicit dependencies;
-- implementation paths;
-- test targets;
-- evidence modes;
-- multiple acceptance checks;
-- known failure modes;
-- rollback/recovery behavior;
-- a planned accountability identity;
-- an explicit maturity effect.
+Every P1 task carries lane ownership, work-package lineage, exact volume scope, explicit dependencies, implementation paths, test targets, evidence modes, multiple acceptance checks, known failure modes, rollback/recovery behavior, a planned accountability identity, and an explicit maturity effect.
 
 A task becoming `done` does **not** itself promote a masterplan volume. It only makes the task eligible to contribute evidence to a separate signed maturity decision.
 
 The only initially ready task is `P1-EVID-01`. All other tasks are blocked by the DAG until their prerequisites are complete.
 
-### Immediate critical path
+## 7. Critical path
 
 ```text
-P1-EVID-01 canonical evidence identity
-  -> P1-EVID-03 required-gate authority
-  -> P1-EVID-04 risk/gap evidence binding
-  -> P1-EVID-05 reproducibility bundle
+P1-L0 evidence authority
+  -> P1-L1 core intelligence quality
+  -> P1-L2 safe autonomy / human control
+  -> P1-L3 product truth
 
+Product truth + intelligence + autonomy
+  -> P1-L4 controlled learning
+  -> P1-L5 release / recovery
+  -> P1-L6 distributed capacity / economics
+  -> P1-L7 terminal promotion
+
+Task anchors:
 P1-EVID-01
-  -> P1-INTEL-01
-     -> memory/retrieval quality
-     -> reasoning/search/stopping
-     -> quality pipelines + plan verifier
-     -> P1-INTEL-06 intelligence qualification
-
-P1-EVID-03
-  -> P1-AUTO-01 tool transaction/sandbox
-     -> agent identity/handoff/delegation
-     -> autonomy/de-escalation
-     -> human override + adversarial alignment
-     -> P1-AUTO-06 safe-autonomy qualification
-
-Evidence + intelligence + autonomy
-  -> product truth and controlled learning
-  -> release/recovery + distributed capacity
-  -> exact-head aggregate evidence
-  -> terminal failure journeys
-  -> independent signed promotion/rejection
+  -> P1-INTEL-01 ... P1-INTEL-06
+  -> P1-AUTO-01 ... P1-AUTO-06
+  -> P1-PROD-02
+  -> P1-LEARN-04 shadow traffic
+  -> release/distributed qualification
+  -> P1-PROM-01 -> P1-PROM-02 -> P1-PROM-03
 ```
 
-## 7. Evidence and promotion semantics
+## 8. Evidence and promotion semantics
 
-P1 evidence must be:
+P1 evidence must be exact-head, configuration/environment/verifier-bound, reproducible where applicable, attributable to task/lane/accountability identity, independently verifiable for high-impact maturity promotion, and unable to self-sign its own promotion.
 
-1. bound to the exact Git head;
-2. bound to configuration/environment/verifier identity;
-3. reproducible or explicitly non-reproducible with reason;
-4. attributable to the task/lane/accountability identity;
-5. independently verifiable for high-impact maturity promotion;
-6. unable to self-sign its own promotion.
+Merged code, planned tests, documentation, model confidence, or a green aggregate status hiding a known blocker are never sufficient by themselves.
 
-The following are never sufficient by themselves: merged code, passing unit tests without integration evidence, a planned test name, documentation, model confidence, benchmark score without contamination metadata, or a green aggregate status hiding a known blocker.
-
-## 8. Maturity floors
+## 9. Maturity floors
 
 - Evidence spine: **verified**
 - Core intelligence: **hardened**
@@ -729,9 +702,7 @@ The following are never sufficient by themselves: merged code, passing unit test
 - Distributed capacity/economics: **hardened**
 - Terminal promotion: **production decision**, independently signed or explicitly rejected
 
-Promotion is monotonic only while evidence remains current. A regression may demote evidence or reopen work without pretending prior proof never existed.
-
-## 9. Global failure-journey program
+## 10. Global failure-journey program
 
 - restart/crash
 - partial commit
@@ -750,9 +721,7 @@ Promotion is monotonic only while evidence remains current. A regression may dem
 - duplicate external side effect
 - human interrupt during autonomous execution
 
-Terminal qualification combines these into cross-condition journeys rather than testing each dimension in isolation. Examples include stale evidence during rollback, human interrupt during a provider outage, capacity exhaustion during stream reconnect, and agent lease expiry after a side effect but before receipt persistence.
-
-## 10. Explicit deferred scope
+## 11. Explicit deferred scope
 
 P1 deliberately leaves **314 volumes** outside primary ownership.
 
@@ -789,11 +758,9 @@ Deep GPU/cache/topology/farm optimization beyond the P1 distributed capacity min
 Examples: VOL-383, VOL-387, VOL-393, VOL-400, VOL-401.
 
 
-The complete deferred set is machine-enforced as the exact complement of the 107 primary volumes. This prevents silent scope creep and prevents later work from disappearing.
+The complete deferred set is machine-enforced as the exact complement of the 107 primary volumes.
 
-## 11. Operating cadence
-
-A useful execution cadence for P1 is:
+## 12. Operating cadence
 
 1. choose the highest-priority ready task whose dependencies are satisfied;
 2. materialize its accountability record/start event before `in_progress`;
@@ -806,20 +773,18 @@ A useful execution cadence for P1 is:
 9. separately evaluate affected volume maturity;
 10. only then unlock dependent tasks.
 
-Parallel work is allowed only when canonical authority contracts do not collide. Shared authority files should use one integration owner even when implementation work is parallel.
+## 13. First implementation wave
 
-## 12. First implementation wave
+The first deep P1 pass should concentrate on:
 
-The first deep P1 pass should concentrate on the evidence spine and two quality anchors:
+- `P1-EVID-01` canonical evidence identity;
+- `P1-EVID-03` required-gate authority map;
+- `P1-INTEL-01` quality/routing/context receipt spine;
+- `P1-AUTO-01` canonical privileged tool transaction/sandbox.
 
-- `P1-EVID-01`: canonical evidence identity;
-- `P1-EVID-03`: required-gate authority map;
-- `P1-INTEL-01`: quality/routing/context receipt spine;
-- `P1-AUTO-01`: canonical privileged tool transaction/sandbox.
+These create the proof, quality and authority substrate for later P1 lanes.
 
-These four tasks create the proof and safety substrate for nearly every later lane. They should be preferred over broad feature expansion.
-
-## 13. Terminal definition
+## 14. Terminal definition
 
 P1 is terminal only when:
 
@@ -832,12 +797,6 @@ P1 is terminal only when:
 - ARM64 and supported platform/install paths are validated
 - all P1 lane-specific evidence is bound into the signed accountability graph
 
-And all of the following remain true:
+Additionally, every primary volume must be touched by at least one executable task, all critical/high blockers must carry passing evidence or signed accepted-risk disposition, the original P0/P1 construction gaps remain closed, and deferred volumes remain explicitly represented as later work.
 
-- every one of the 107 primary volumes meets its lane floor;
-- every critical/high P1 blocker has passing evidence or a signed accepted-risk disposition;
-- the original P0 and canonical P1 construction gaps remain closed;
-- no terminal evidence is stale relative to the promotion head;
-- the 314 deferred volumes remain explicitly represented as later work.
-
-A failed terminal review is a valid P1 outcome: the system stays unpromoted and the rejection becomes durable evidence for the next repair cycle.
+A failed terminal review is a valid outcome: the system remains unpromoted and the rejection becomes durable evidence for the next repair cycle.
