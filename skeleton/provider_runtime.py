@@ -89,6 +89,10 @@ class ProviderInvocationError(ProviderError):
     """Raised when a configured provider fails to return usable output."""
 
 
+class ProviderProtocolViolationError(ProviderInvocationError):
+    """Raised when provider output violates the normalized protocol contract."""
+
+
 class ProviderPolicyError(ProviderError):
     """Raised when governance or admission denies provider-bound work."""
 
@@ -98,15 +102,19 @@ def _read_provider_json(response: Any) -> Mapping[str, Any]:
 
     raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
     if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
-        raise ProviderInvocationError("model provider response exceeded size limit")
+        raise ProviderProtocolViolationError(
+            "model provider response exceeded size limit"
+        )
     try:
         payload = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned malformed JSON"
         ) from exc
     if not isinstance(payload, Mapping):
-        raise ProviderInvocationError("model provider returned malformed JSON")
+        raise ProviderProtocolViolationError(
+            "model provider returned malformed JSON"
+        )
     return payload
 
 
@@ -559,6 +567,10 @@ class FailoverProviderAdapter(ProviderAdapter):
                 self._telemetry.policy_denials += 1
                 self._telemetry.last_failure_kind = "policy"
                 raise
+            except ProviderProtocolViolationError:
+                self._telemetry.provider_failures += 1
+                self._telemetry.last_failure_kind = "protocol"
+                raise
             except ProviderUnavailableError as exc:
                 self._telemetry.provider_failures += 1
                 self._telemetry.last_failure_kind = "unavailable"
@@ -945,7 +957,7 @@ def _provider_tool_call_from_item(
             arguments=dict(parsed_arguments),
         )
     except ProviderProtocolError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned invalid normalized tool call"
         ) from exc
 
@@ -1066,7 +1078,7 @@ def _normalized_provider_usage(
             usage_source=source,
         )
     except ProviderProtocolError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned invalid usage metadata"
         ) from exc
 
@@ -2515,7 +2527,9 @@ class OpenAISyncProviderAdapter:
 
         output = payload.get("output")
         if not isinstance(output, list):
-            raise ProviderInvocationError("model provider returned malformed response")
+            raise ProviderProtocolViolationError(
+                "model provider returned malformed response"
+            )
 
         fragments: list[str] = []
         for item in output:
@@ -3024,6 +3038,7 @@ __all__ = [
     "ProviderImageRequest",
     "ProviderImageResponse",
     "ProviderInvocationError",
+    "ProviderProtocolViolationError",
     "ProviderPolicyError",
     "ProviderRegistry",
     "ProviderRequest",
