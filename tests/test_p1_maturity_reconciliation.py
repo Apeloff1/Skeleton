@@ -136,4 +136,3 @@ def test_report_binds_reconciliation_engine_sources() -> None:
         len(value) == 64
         for value in report["source_digests"].values()
     )
-
