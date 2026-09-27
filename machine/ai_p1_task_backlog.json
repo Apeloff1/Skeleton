@@ -275,7 +275,11 @@
       "acceptance": [
         "Every blocking P1 risk has executable evidence or a signed, time-bounded accepted-risk record.",
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
-        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity.",
+        "P1 primary risk/gap scope is deterministically derived from reviewed canonical authorities and inventory drift fails closed.",
+        "Risk/gap binding reconciliation is non-authoritative and never mutates masterplan, accountability, closure or risk registry state.",
+        "Unclassified risks remain unresolved; blocking gaps/adversarial obligations cannot be downgraded to non-blocking metadata.",
+        "High/critical accepted-risk dispositions require a human identity and canonical identity-bound signature method."
       ],
       "evidence_refs": [],
       "accountability_ref": "ACC-P1-EVID-04",
@@ -299,7 +303,13 @@
         "planned:skeleton/evaluation/adversarial",
         "machine",
         "docs/plan",
-        "scripts"
+        "scripts",
+        "machine/p1_risk_evidence_policy.json",
+        "machine/p1_risk_evidence_bindings.json",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/ai/runtime/contracts/risk_evidence.py",
+        "scripts/reconcile_p1_risk_evidence.py",
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
       "test_targets": [
         "tests/test_adversarial_judge_isolation.py",
@@ -307,7 +317,9 @@
         "planned:skeleton/testing/test_gap_ledger.py",
         "planned:skeleton/testing/test_gap_closure.py",
         "planned:skeleton/testing/test_risk_register.py",
-        "planned:skeleton/testing/test_risk_acceptance.py"
+        "planned:skeleton/testing/test_risk_acceptance.py",
+        "skeleton/testing/test_risk_evidence.py",
+        "tests/test_p1_risk_evidence_reconciliation.py"
       ],
       "evidence_modes": [
         "contract",
