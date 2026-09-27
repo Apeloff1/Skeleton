@@ -2389,7 +2389,10 @@
         "frontend browser-session reconnect, slow-client resync and cancel/complete race journeys",
         "identity-stable expired write-tool approval renewal with restart persistence",
         "governed conversation export/delete journey evidence",
-        "exact-head Golden Journey Closure Gate and independent verifier implementation"
+        "exact-head Golden Journey Closure Gate and independent verifier implementation",
+        "frontend conversation projection reconstructs canonical multi-turn order after refresh/reconnect",
+        "browser terminal journey preserves canonical artifact/result/message linkage",
+        "configured backend engine outage returns stable engine_unavailable without local provider fallback"
       ],
       "outstanding_evidence": [
         "exact-head Golden Journey Closure Gate",
@@ -6868,7 +6871,10 @@
       "skeleton/testing/test_engine_execution_service.py approval expiry renewal",
       "backend/tests/test_conversation_governance.py governed export/delete",
       ".github/workflows/golden-journey-closure.yml exact-head Stage-7 gate",
-      "scripts/verify_golden_journey_closure.py independent journey/dependency verifier"
+      "scripts/verify_golden_journey_closure.py independent journey/dependency verifier",
+      "frontend/scripts/test-conversation-projection.mjs canonical multi-turn refresh reconstruction",
+      "frontend browser terminal artifact/result/message linkage journey",
+      "backend/tests/test_ai_chat_engine_cutover.py engine outage no-local-fallback journey"
     ],
     "remaining": [
       "fresh exact-head Golden Journey Closure and App Assembly evidence",
