@@ -63,6 +63,15 @@ def _token(value: object, field: str) -> str:
     return value
 
 
+def _text(value: object, field: str, *, max_length: int = 2048) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ReasoningPolicyError(f"{field} must be non-empty")
+    normalized = value.strip()
+    if value != normalized or len(normalized) > max_length:
+        raise ReasoningPolicyError(f"{field} must be normalized")
+    return normalized
+
+
 def _positive_int(value: object, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ReasoningPolicyError(f"{field} must be a positive integer")
@@ -200,6 +209,14 @@ class ReasoningPolicy:
             "max_stall_steps",
             _positive_int(self.max_stall_steps, "max_stall_steps"),
         )
+        if self.max_stall_steps < 2:
+            raise ReasoningPolicyError(
+                "max_stall_steps must be at least two"
+            )
+        if self.max_stall_steps > self.max_steps:
+            raise ReasoningPolicyError(
+                "max_stall_steps cannot exceed max_steps"
+            )
         if not isinstance(self.require_verification_for_high_risk, bool):
             raise ReasoningPolicyError(
                 "require_verification_for_high_risk must be boolean"
@@ -501,7 +518,7 @@ class StoppingDecision:
                 "continue decision is not terminal promotion evidence"
             )
         return EvidenceRef(
-            source=source,
+            source=_text(source, "source"),
             digest=self.decision_digest,
             category="reasoning_stop_policy",
         )
@@ -709,6 +726,13 @@ def evaluate_stopping(
         or not policy.require_verification_for_high_risk
         or latest.verification_passed
     )
+
+    if latest.uncertainty > policy.max_uncertainty:
+        return decision(
+            StopDisposition.ESCALATE,
+            "uncertainty-exceeds-policy",
+        )
+
     if (
         latest.confidence >= policy.completion_confidence
         and verified_enough
@@ -718,10 +742,16 @@ def evaluate_stopping(
             "completion-confidence-and-verification-satisfied",
         )
 
-    if latest.uncertainty > policy.max_uncertainty:
+    if (
+        high_risk
+        and policy.require_verification_for_high_risk
+        and latest.confidence >= policy.completion_confidence
+        and not latest.verification_passed
+        and latest.value_of_information < policy.min_value_of_information
+    ):
         return decision(
-            StopDisposition.ESCALATE,
-            "uncertainty-exceeds-policy",
+            StopDisposition.ABSTAIN,
+            "verification-required-without-remaining-information-value",
         )
 
     if latest.value_of_information < policy.min_value_of_information:
