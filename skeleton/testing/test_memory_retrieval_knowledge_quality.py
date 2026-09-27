@@ -563,3 +563,33 @@ def test_knowledge_content_is_digest_bound_without_embedding_content() -> None:
     }
     assert baseline_decision.knowledge_digest != changed_decision.knowledge_digest
     assert baseline_decision.decision_digest != changed_decision.decision_digest
+
+def test_future_dated_knowledge_fails_closed_beyond_clock_skew() -> None:
+    tolerated = _evaluate(
+        knowledge=(_knowledge(updated_at=NOW + 300.0),),
+    )
+    assert tolerated.accepted is True
+
+    future = _evaluate(
+        knowledge=(_knowledge(updated_at=NOW + 301.0),),
+    )
+    assert future.accepted is False
+    assert "knowledge-future-dated:claim-1" in future.reasons
+
+
+def test_future_knowledge_skew_policy_is_validated_and_digest_bound() -> None:
+    baseline = _evaluate()
+    relaxed = _evaluate(
+        policy=IntelligenceQualityPolicy(
+            max_future_knowledge_skew_s=600.0,
+        )
+    )
+
+    assert baseline.policy_digest != relaxed.policy_digest
+
+    with pytest.raises(
+        IntelligenceQualityError,
+        match="max_future_knowledge_skew_s must be non-negative",
+    ):
+        IntelligenceQualityPolicy(max_future_knowledge_skew_s=-1.0)
+
