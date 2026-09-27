@@ -5,6 +5,7 @@ from .canonical import (
     CanonicalEnvelope,
     EvidenceRef,
     Identity,
+    evidence_ref_identity,
 )
 from .ai_execution import (
     AI_EXECUTION_SCHEMA_VERSION,
@@ -48,6 +49,14 @@ from .memory_record import (
     MemoryWriteProposal,
     memory_payload_digest,
 )
+from .promotion_evidence import (
+    MAX_PROMOTION_EVIDENCE_BYTES,
+    MAX_PROMOTION_EVIDENCE_REFS,
+    PROMOTION_EVIDENCE_SCHEMA_ID,
+    PROMOTION_EVIDENCE_SCHEMA_VERSION,
+    PromotionEvidenceError,
+    PromotionEvidenceReceipt,
+)
 from .operation import (
     OperationContractError,
     OperationEnvelope,
@@ -72,6 +81,13 @@ __all__ = [
     "CanonicalEnvelope",
     "EvidenceRef",
     "Identity",
+    "evidence_ref_identity",
+    "MAX_PROMOTION_EVIDENCE_BYTES",
+    "MAX_PROMOTION_EVIDENCE_REFS",
+    "PROMOTION_EVIDENCE_SCHEMA_ID",
+    "PROMOTION_EVIDENCE_SCHEMA_VERSION",
+    "PromotionEvidenceError",
+    "PromotionEvidenceReceipt",
     "CONTEXT_SCHEMA_VERSION",
     "ContextBudget",
     "ContextContractError",

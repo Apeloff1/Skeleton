@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "machine" / "ai_build_accountability.json"
 MASTER = ROOT / "machine" / "ai_master_plan.json"
 QUEUE = ROOT / "machine" / "ai_build_queue.json"
+P1 = ROOT / "machine" / "ai_p1_task_backlog.json"
 CATALOG = ROOT / "machine" / "ai_edge_case_catalog.json"
 PRIORITY = ROOT / "machine" / "ai_edge_case_priority_queue.json"
 HUMAN = ROOT / "docs" / "plan" / "BUILD_ACCOUNTABILITY_LEDGER.md"
@@ -107,15 +108,15 @@ def type_status(record: dict[str, Any], phase: str) -> str:
     if phase == "start":
         return "in_progress"
     if phase == "implementation":
-        return "evidence_pending" if typ in {"queue_task", "catalog_entry"} else "implemented"
+        return "evidence_pending" if typ in {"queue_task", "p1_task", "catalog_entry"} else "implemented"
     if phase == "verification":
         if typ == "catalog_entry":
             return "passing"
-        if typ == "queue_task":
+        if typ in {"queue_task", "p1_task"}:
             return "evidence_pending"
         return "verified"
     if phase == "complete":
-        if typ == "queue_task":
+        if typ in {"queue_task", "p1_task"}:
             return "done"
         if typ == "catalog_entry":
             return "closed"
@@ -131,6 +132,7 @@ def sync_mirrors(
     record: dict[str, Any],
     master: dict[str, Any],
     queue: dict[str, Any],
+    p1: dict[str, Any],
     catalog: dict[str, Any],
     priority: dict[str, Any],
 ) -> None:
@@ -138,6 +140,14 @@ def sync_mirrors(
     for task in queue["tasks"]:
         if task.get("accountability_id") == rid:
             task["status"] = record["status"]
+            task["completion_checkbox"] = record["checkbox"]
+            task["completion_checkbox_mark"] = record["checkbox_mark"]
+            task["implementation_signed"] = record["implementation_signoff"]["signed"]
+            task["verification_signed"] = record["verification_signoff"]["signed"]
+
+    for task in p1["tasks"]:
+        if task.get("accountability_ref") == rid:
+            task["accountability_status"] = record["status"]
             task["completion_checkbox"] = record["checkbox"]
             task["completion_checkbox_mark"] = record["checkbox_mark"]
             task["implementation_signed"] = record["implementation_signoff"]["signed"]
@@ -176,7 +186,8 @@ def render(ledger: dict[str, Any]) -> str:
         "",
         (
             "Tracked items: **{total}** ({volumes} volumes, {work_packages} work packages, "
-            "{queue_tasks} AIQ tasks, {vertical_slices} vertical slices, "
+            "{queue_tasks} AIQ tasks, {p1_tasks} P1 tasks, "
+            "{vertical_slices} vertical slices, "
             "{catalog_entries} historical/edge/obscure obligations)."
         ).format(**counts),
         "",
@@ -223,6 +234,7 @@ def render(ledger: dict[str, Any]) -> str:
     section("Volumes 000–420", [r for r in records if r["type"] == "volume"])
     section("Work Packages W00–W30", [r for r in records if r["type"] == "work_package"])
     section("Atomic AI Build Queue", [r for r in records if r["type"] == "queue_task"])
+    section("P1 Trustworthy-Production Tasks", [r for r in records if r["type"] == "p1_task"])
     section("Vertical Slices", [r for r in records if r["type"] == "vertical_slice"])
     section("Historical / Edge / Obscure Catalogue", [r for r in records if r["type"] == "catalog_entry"])
     lines.extend(
@@ -242,12 +254,14 @@ def persist(
     ledger: dict[str, Any],
     master: dict[str, Any],
     queue: dict[str, Any],
+    p1: dict[str, Any],
     catalog: dict[str, Any],
     priority: dict[str, Any],
 ) -> None:
     LEDGER.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")
     MASTER.write_text(json.dumps(master, indent=2) + "\n", encoding="utf-8")
     QUEUE.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
+    P1.write_text(json.dumps(p1, indent=2) + "\n", encoding="utf-8")
     CATALOG.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     PRIORITY.write_text(json.dumps(priority, indent=2) + "\n", encoding="utf-8")
     HUMAN.write_text(render(ledger), encoding="utf-8")
@@ -283,6 +297,7 @@ def main() -> int:
     ledger = load(LEDGER)
     master = load(MASTER)
     queue = load(QUEUE)
+    p1 = load(P1)
     catalog = load(CATALOG)
     priority = load(PRIORITY)
     records = {record["id"]: record for record in ledger["records"]}
@@ -365,13 +380,13 @@ def main() -> int:
         record["history"].append(history_event(record, args, "status_changed", previous, target, at, sha))
 
     record["last_event_at_utc"] = at
-    sync_mirrors(record, master, queue, catalog, priority)
+    sync_mirrors(record, master, queue, p1, catalog, priority)
 
     if args.dry_run:
         print(json.dumps(record, indent=2))
         return 0
 
-    persist(ledger, master, queue, catalog, priority)
+    persist(ledger, master, queue, p1, catalog, priority)
     result = subprocess.run([sys.executable, str(VALIDATOR)], cwd=ROOT)
     return result.returncode
 

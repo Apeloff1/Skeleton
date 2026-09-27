@@ -6,7 +6,7 @@ Machine authority: [`machine/ai_build_accountability.json`](../../machine/ai_bui
 
 ## Mandatory accountability protocol
 
-Tracked items: **742** (421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, 240 historical/edge/obscure obligations).
+Tracked items: **786** (421 volumes, 31 work packages, 42 AIQ tasks, 44 P1 tasks, 8 vertical slices, 240 historical/edge/obscure obligations).
 
 Every tracked item has a completion checkbox. The checkbox is derived machine state and may not be hand-edited.
 
@@ -532,6 +532,53 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-AIQ-S7-E2E-01` — AIQ-S7-E2E-01 Build deterministic full-stack provider/tool/retrieval harness without live provider secrets. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S7-E2E-02` — AIQ-S7-E2E-02 Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S7-E2E-03` — AIQ-S7-E2E-03 Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+
+## P1 Trustworthy-Production Tasks
+
+- [ ] `ACC-P1-EVID-01` — P1-EVID-01 Canonical evidence identity — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-02` — P1-EVID-02 Maturity reconciliation engine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-03` — P1-EVID-03 Required-gate authority map — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-04` — P1-EVID-04 Risk/gap evidence binding — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-05` — P1-EVID-05 Reproducibility bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-06` — P1-EVID-06 Scope-freeze and ADR enforcement — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-01` — P1-INTEL-01 Quality measurement and routing/context receipt spine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-02` — P1-INTEL-02 Memory, retrieval and knowledge quality authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-03` — P1-INTEL-03 Reasoning, search and stopping policy registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-04` — P1-INTEL-04 Answer and artifact quality pipeline — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-05` — P1-INTEL-05 Plan verifier and static analysis — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-INTEL-06` — P1-INTEL-06 Core intelligence qualification bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-01` — P1-AUTO-01 Canonical privileged tool transaction and sandbox — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-02` — P1-AUTO-02 Agent identity, handoff and delegation budgets — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-03` — P1-AUTO-03 Autonomy levels and de-escalation state machine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-04` — P1-AUTO-04 Human override, interrupt and approval receipts — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-05` — P1-AUTO-05 Blast radius, reversibility and adversarial alignment — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-AUTO-06` — P1-AUTO-06 Safe autonomy qualification bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROD-01` — P1-PROD-01 API schema and compatibility registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROD-02` — P1-PROD-02 Streaming projection authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROD-03` — P1-PROD-03 Workspace and product projection contract — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROD-04` — P1-PROD-04 Operator controls projection — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROD-05` — P1-PROD-05 Web/desktop tenant and storage boundary — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-01` — P1-LEARN-01 Experiment registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-02` — P1-LEARN-02 Benchmark registry and contamination controls — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-03` — P1-LEARN-03 Candidate and champion/challenger registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-04` — P1-LEARN-04 Shadow traffic isolation — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-05` — P1-LEARN-05 Specification and reasoning regression corpus — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-LEARN-06` — P1-LEARN-06 Failure knowledge pipeline — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-01` — P1-REL-01 Release evidence bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-02` — P1-REL-02 Installer/update/repair lifecycle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-03` — P1-REL-03 Migration and rollback compatibility — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-04` — P1-REL-04 Backup and restore qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-05` — P1-REL-05 Disaster recovery and incident feedback — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-REL-06` — P1-REL-06 Attribution and release notices — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-01` — P1-DIST-01 Remote execution and worker trust — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-02` — P1-DIST-02 Topology-aware model placement and warming — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-03` — P1-DIST-03 Batching and autoscaling controller — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-04` — P1-DIST-04 Load and capacity qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-05` — P1-DIST-05 Quota and budget accounting ledger — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-DIST-06` — P1-DIST-06 Forecasting and cost anomaly loop — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROM-01` — P1-PROM-01 Aggregate exact-head P1 evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROM-02` — P1-PROM-02 Terminal failure-journey qualification — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-PROM-03` — P1-PROM-03 Independent signed P1 promotion decision — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
 ## Vertical Slices
 

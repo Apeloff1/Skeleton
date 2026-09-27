@@ -12,6 +12,7 @@ LEDGER = ROOT / "machine" / "ai_build_accountability.json"
 HUMAN = ROOT / "docs" / "plan" / "BUILD_ACCOUNTABILITY_LEDGER.md"
 MASTER = ROOT / "machine" / "ai_master_plan.json"
 QUEUE = ROOT / "machine" / "ai_build_queue.json"
+P1 = ROOT / "machine" / "ai_p1_task_backlog.json"
 CATALOG = ROOT / "machine" / "ai_edge_case_catalog.json"
 PRIORITY = ROOT / "machine" / "ai_edge_case_priority_queue.json"
 
@@ -102,7 +103,7 @@ def _exception_errors(record_id: str, exc: object) -> list[str]:
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (LEDGER, HUMAN, MASTER, QUEUE, CATALOG, PRIORITY):
+    for path in (LEDGER, HUMAN, MASTER, QUEUE, P1, CATALOG, PRIORITY):
         if not path.is_file():
             errors.append(f"missing {path.relative_to(ROOT)}")
     if errors:
@@ -111,6 +112,7 @@ def validate() -> list[str]:
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     master = json.loads(MASTER.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
+    p1 = json.loads(P1.read_text(encoding="utf-8"))
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     priority = json.loads(PRIORITY.read_text(encoding="utf-8"))
     records = ledger.get("records")
@@ -121,6 +123,7 @@ def validate() -> list[str]:
         [f"ACC-{v['key']}" for v in master["volumes"]]
         + [f"ACC-WP-W{i:02d}" for i in range(31)]
         + [f"ACC-{task['task_id']}" for task in queue["tasks"]]
+        + [task["accountability_ref"] for task in p1["tasks"]]
         + [f"ACC-{vs}" for vs in master["vertical_slices"]]
         + [f"ACC-{entry['id']}" for entry in catalog["entries"]]
     )
@@ -137,6 +140,8 @@ def validate() -> list[str]:
         errors.append("tracked_counts.work_packages must equal 31")
     if counts.get("queue_tasks") != len(queue["tasks"]):
         errors.append("tracked_counts.queue_tasks is stale")
+    if counts.get("p1_tasks") != len(p1["tasks"]):
+        errors.append("tracked_counts.p1_tasks is stale")
     if counts.get("vertical_slices") != len(master["vertical_slices"]):
         errors.append("tracked_counts.vertical_slices is stale")
     if counts.get("catalog_entries") != len(catalog["entries"]):
@@ -264,6 +269,30 @@ def validate() -> list[str]:
             errors.append(f"{task['task_id']}: queue implementation_signed disagrees with ledger")
         if task.get("verification_signed") != bool(rec["verification_signoff"].get("signed")):
             errors.append(f"{task['task_id']}: queue verification_signed disagrees with ledger")
+
+    for task in p1["tasks"]:
+        rid = task.get("accountability_ref")
+        expected_rid = f"ACC-{task.get('task_id', '')}"
+        if rid != expected_rid:
+            errors.append(f"{task.get('task_id', '?')}: accountability_ref must equal {expected_rid}")
+        rec = record_by_id.get(rid)
+        if rec is None:
+            errors.append(f"{task.get('task_id', '?')}: missing P1 accountability record")
+            continue
+        if rec.get("type") != "p1_task":
+            errors.append(f"{task.get('task_id', '?')}: accountability record type must be p1_task")
+        if task.get("accountability_required") is not True:
+            errors.append(f"{task.get('task_id', '?')}: accountability_required must be true")
+        if str(task.get("accountability_status", "")).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{task.get('task_id', '?')}: P1 accountability status disagrees with ledger")
+        if task.get("completion_checkbox") != rec.get("checkbox"):
+            errors.append(f"{task.get('task_id', '?')}: P1 checkbox disagrees with ledger")
+        if task.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
+            errors.append(f"{task.get('task_id', '?')}: P1 checkbox mark disagrees with ledger")
+        if task.get("implementation_signed") != bool(rec["implementation_signoff"].get("signed")):
+            errors.append(f"{task.get('task_id', '?')}: P1 implementation_signed disagrees with ledger")
+        if task.get("verification_signed") != bool(rec["verification_signoff"].get("signed")):
+            errors.append(f"{task.get('task_id', '?')}: P1 verification_signed disagrees with ledger")
 
     for volume in master["volumes"]:
         rec = record_by_id.get(volume.get("accountability_id"))
