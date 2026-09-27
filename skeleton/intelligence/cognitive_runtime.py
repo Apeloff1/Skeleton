@@ -293,7 +293,7 @@ def evaluate_reasoning_progress(
     reached = tuple(
         name
         for name, used in _usage_dimensions(progress)
-        if abs(used - limits[name]) <= 1e-12
+        if limits[name] > 0.0 and abs(used - limits[name]) <= 1e-12
     )
 
     if exceeded:
@@ -335,7 +335,7 @@ def evaluate_reasoning_progress(
     stop = strategy.stop_policy
     if (
         progress.uncertainty >= stop.abstain_uncertainty
-        and progress.evidence_gain < stop.min_evidence_gain
+        and progress.evidence_gain <= stop.min_evidence_gain
     ):
         return StopDecision(
             request_id=progress.request_id,
@@ -346,7 +346,7 @@ def evaluate_reasoning_progress(
 
     if (
         progress.iterations > 0
-        and progress.evidence_gain < stop.min_evidence_gain
+        and progress.evidence_gain <= stop.min_evidence_gain
         and progress.value_of_information
         <= stop.min_value_of_information
     ):
