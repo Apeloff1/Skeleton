@@ -59,7 +59,7 @@ def test_repository_required_gate_authority_is_valid() -> None:
 
     assert errors == []
     assert summary["valid"] is True
-    assert summary["required_gate_count"] == 23
+    assert summary["required_gate_count"] == 25
     assert summary["group_count"] == 10
     assert len(summary["authority_digest"]) == 64
 
@@ -248,8 +248,8 @@ def test_observation_evaluator_accepts_exact_complete_set(tmp_path: Path) -> Non
 
     decision = payload["decision"]
     assert decision["accepted"] is True
-    assert decision["required_gate_count"] == 23
-    assert decision["passing_gate_count"] == 23
+    assert decision["required_gate_count"] == 25
+    assert decision["passing_gate_count"] == 25
     assert len(decision["decision_digest"]) == 64
 
 
@@ -417,3 +417,27 @@ def test_risk_evidence_gate_is_terminal_required() -> None:
         row for row in authority["groups"] if row["name"] == "evidence"
     )
     assert "GATE-P1-RISK-EVIDENCE" in evidence_group["gate_ids"]
+
+def test_reproducibility_gate_is_terminal_required() -> None:
+    authority = json.loads(AUTHORITY.read_text(encoding="utf-8"))
+    gate = next(row for row in authority["gates"] if row["id"] == "GATE-P1-REPRODUCIBILITY")
+    assert gate["workflow_name"] == "P1 Reproducibility Bundle Gate"
+    assert gate["workflow_file"] == ".github/workflows/p1-reproducibility-bundle.yml"
+    assert gate["group"] == "evidence"
+    assert gate["required_for_terminal_p1_promotion"] is True
+    assert gate["accepted_statuses"] == ["completed"]
+    assert gate["accepted_conclusions"] == ["success"]
+
+
+def test_scope_freeze_gate_is_terminal_required() -> None:
+    authority = json.loads(AUTHORITY.read_text(encoding="utf-8"))
+    gate = next(row for row in authority["gates"] if row["id"] == "GATE-P1-SCOPE-FREEZE")
+    assert gate["workflow_name"] == "P1 Scope Freeze Gate"
+    assert gate["workflow_file"] == ".github/workflows/p1-scope-freeze.yml"
+    assert gate["group"] == "evidence"
+    assert gate["required_for_terminal_p1_promotion"] is True
+    assert gate["accepted_statuses"] == ["completed"]
+    assert gate["accepted_conclusions"] == ["success"]
+    evidence_group = next(row for row in authority["groups"] if row["name"] == "evidence")
+    assert "GATE-P1-REPRODUCIBILITY" in evidence_group["gate_ids"]
+    assert "GATE-P1-SCOPE-FREEZE" in evidence_group["gate_ids"]
