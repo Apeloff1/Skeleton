@@ -1210,7 +1210,8 @@
         "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel",
         ".github/workflows/engine-container-boundary.yml runs both fail-closed production topology smoke and successful deterministic provider->tool->verification->result lineage inside the exact built Skeleton image",
         "skeleton/testing/live_engine_process_app.py exposes an opt-in test-only deterministic coordinator without changing production provider bootstrap",
-        "scripts/check_engine_container_boundary.py success mode asserts operation/execution identity, provider receipts, tool receipt, verification receipt, usage and unique terminal result event"
+        "scripts/check_engine_container_boundary.py success mode asserts operation/execution identity, provider receipts, tool receipt, verification receipt, usage and unique terminal result event",
+        "Stage-4 cognitive execution gap closed on main at 9889f950f99e70c7eabefee8d3e8e8452940a25b before Stage-5 exact-head validation"
       ],
       "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
