@@ -536,7 +536,9 @@
         "backend/tests/test_conversation_regeneration_route.py engine-routed regeneration ordering"
       ],
       "remaining": [],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-memory-durable-authority",
@@ -633,7 +635,9 @@
         "backend/tests/test_ai_chat_memory_policy.py end-to-end delegated engine memory policy and fail-closed no-engine behavior"
       ],
       "remaining": [],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-tool-runtime-convergence",
@@ -728,7 +732,9 @@
         "closure gate covers canonical runtime, durable receipt, scoped adapters, backend delegation and cognitive lineage/minimal projection"
       ],
       "remaining": [],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-context-compiler-convergence",
