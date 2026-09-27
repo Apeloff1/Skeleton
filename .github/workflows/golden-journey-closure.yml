@@ -24,6 +24,7 @@ on:
       - "skeleton/testing/test_operation_stream_store_mongo.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_engine_live_process_boundary.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_conversation_governance.py"
       - "scripts/verify_golden_journey_closure.py"
@@ -133,6 +134,12 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_engine_cross_service_closure.py
+
+      - name: Run real engine process restart durability journey
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_engine_live_process_boundary.py
+          -k "state_survives_real_process_restart"
 
       - name: Run backend engine outage no-fallback journey
         run: >-
