@@ -541,7 +541,8 @@
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
         "skeleton/intelligence/quality.py",
-        "skeleton/observability"
+        "skeleton/observability",
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
       "test_targets": [
         "skeleton/testing/test_routing_context_receipt.py",
