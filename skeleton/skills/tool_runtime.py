@@ -1068,6 +1068,9 @@ class AsyncToolRuntime:
                 data_class=request.data_class,
                 transfer_purpose=request.transfer_purpose,
                 governance_decision_ref=governance_decision_ref,
+                postcondition_verified=(
+                    registered.postcondition is not None and postcondition_ok
+                ),
                 metered_tool_calls=1,
             )
         except Exception as exc:
