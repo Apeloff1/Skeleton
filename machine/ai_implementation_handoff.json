@@ -959,7 +959,7 @@
       ],
       "work_package": "WP-P0-VERIFICATION",
       "blueprint": "verification_runtime_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Converge deterministic, evidence-grounded, action-postcondition and model-assisted verification into one observable receipt contract used by finalization.",
       "target_files": {
         "contracts": [
@@ -1031,14 +1031,20 @@
         ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
         "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
-        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt",
+        "skeleton/intelligence/execution_runtime.py materializes durable tool results into EvidenceReference values before finalization",
+        "skeleton/intelligence/execution_runtime.py converts observed tool postconditions into canonical PostconditionObservation values",
+        "skeleton/intelligence/execution_runtime.py maps publish/qualified/abstain/block dispositions into terminal execution semantics",
+        "skeleton/provider_runtime.py configures a distinct AI_VERIFICATION_MODEL semantic verifier and rejects same provider+model identity as independent",
+        "skeleton/api/engine_runtime.py injects the isolated semantic verifier into canonical cognitive execution",
+        "skeleton/testing/test_execution_runtime.py covers evidence-backed read-tool publication and fail-closed reversible actions",
+        "skeleton/testing/test_provider_contract.py covers semantic verifier identity separation",
+        "scripts/verify_verification_evidence_closure.py independently audits evidence materialization, verifier isolation, engine binding and mirror parity"
       ],
       "remaining": [
-        "materialize authorized execution evidence into EvidenceReference values in production finalization",
-        "wire SemanticVerificationRuntime through the canonical production provider adapter when policy requires independent semantic verification",
-        "bind durable tool receipts and postcondition observations into production action verification",
-        "integrate qualified/abstain/repair/block disposition handling into execution finalization",
-        "collect fresh exact-head Verification Evidence/Cognitive Execution closure evidence and close lower-stage dependencies"
+        "close declared lower-stage dependency gaps",
+        "collect fresh exact-head Verification Evidence Closure and Cognitive Execution Closure evidence",
+        "obtain independent signoff before changing canonical gap status to closed"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },

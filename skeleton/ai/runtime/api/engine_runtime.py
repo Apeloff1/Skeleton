@@ -208,6 +208,9 @@ class EngineExecutionCoordinator:
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
+            semantic_verification_adapter=(
+                self.provider_registry.verification_adapter_for(provider)
+            ),
             finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (

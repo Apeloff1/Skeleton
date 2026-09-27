@@ -744,7 +744,7 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
@@ -759,7 +759,13 @@
         ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
         "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
-        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt",
+        "durable tool results are materialized into canonical EvidenceReference values before verification",
+        "successful explicit tool postconditions become canonical PostconditionObservation values",
+        "semantic verifier role is separately configured through AI_VERIFICATION_MODEL and same provider+model identity is rejected as independent",
+        "canonical engine injects the isolated semantic verifier into cognitive execution",
+        "publish/qualified/abstain/block finalization dispositions are enforced in execution finalization",
+        "independent closure verifier audits evidence materialization, semantic isolation, engine binding and canonical AI mirror parity"
       ],
       "closure_evidence_required": [
         "structural verification tests",
@@ -787,22 +793,14 @@
         ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
       "outstanding_evidence": [
-        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
-        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
-        "production action verification consumes durable tool receipts and explicit postcondition observations",
-        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass",
-        "fresh exact-head Cognitive Execution Closure Gate including semantic verification regressions",
-        "fresh exact-head Verification Evidence Closure Gate receipt",
-        "declared dependency-gap closure"
+        "fresh exact-head Verification Evidence Closure Gate",
+        "fresh exact-head Cognitive Execution Closure Gate",
+        "declared lower-stage dependency closure and independent signoff"
       ],
       "blockers": [
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
-        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
-        "production action verification consumes durable tool receipts and explicit postcondition observations",
-        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass"
+        "fresh exact-head Verification Evidence Closure Gate",
+        "fresh exact-head Cognitive Execution Closure Gate",
+        "declared lower-stage dependency closure and independent signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",

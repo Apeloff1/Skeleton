@@ -2452,10 +2452,12 @@ class ProviderRegistry:
         adapters: Sequence[ProviderAdapter],
         *,
         active: str,
+        verification_adapter: ProviderAdapter | None = None,
         architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
     ) -> None:
         self._adapters = {adapter.provider_id: adapter for adapter in adapters}
         self.active_id = active.strip().lower()
+        self._verification_adapter = verification_adapter
         self._architecture_loader = architecture_loader
         self._architecture_receipts: dict[str, ProviderArchitectureReceipt] = {}
 
@@ -2473,7 +2475,25 @@ class ProviderRegistry:
             max_retries=retries,
             admission_runtime=admission_runtime,
         )
-        return cls([adapter], active=active)
+        verification_model = os.getenv(
+            "AI_VERIFICATION_MODEL",
+            "",
+        ).strip()
+        verification_adapter = None
+        if verification_model and verification_model != adapter.model:
+            verification_adapter = OpenAIProviderAdapter(
+                api_key=adapter.api_key,
+                model=verification_model,
+                base_url=adapter.base_url,
+                timeout_seconds=timeout,
+                max_retries=retries,
+                admission_runtime=admission_runtime,
+            )
+        return cls(
+            [adapter],
+            active=active,
+            verification_adapter=verification_adapter,
+        )
 
     @property
     def active(self) -> ProviderAdapter | None:
@@ -2516,6 +2536,35 @@ class ProviderRegistry:
             raise ProviderUnavailableError(f"AI provider is not configured: {self.active_id}")
         return adapter
 
+    def verification_adapter_for(
+        self,
+        generator: ProviderAdapter,
+    ) -> ProviderAdapter | None:
+        """Return a separately configured semantic verifier or fail closed.
+
+        The verifier must differ from the generator by provider or model. This
+        prevents the production coordinator from silently calling the same
+        model instance an independent verifier.
+        """
+
+        adapter = self._verification_adapter
+        if adapter is None:
+            return None
+        if not isinstance(generator, ProviderAdapter):
+            raise TypeError("generator must implement ProviderAdapter")
+        if not adapter.available:
+            return None
+        self._architecture_receipt(adapter.provider_id)
+        same_provider = adapter.provider_id == generator.provider_id
+        same_model = getattr(adapter, "model", None) == getattr(
+            generator,
+            "model",
+            None,
+        )
+        if same_provider and same_model:
+            return None
+        return adapter
+
     def architecture_receipt(self, provider_id: str | None = None) -> dict[str, Any]:
         target = (provider_id or self.active_id).strip().lower()
         if target not in self._adapters:
@@ -2527,6 +2576,13 @@ class ProviderRegistry:
         for provider_id, adapter in sorted(self._adapters.items()):
             status = adapter.status()
             status["active"] = provider_id == self.active_id
+            verifier = self._verification_adapter
+            status["semantic_verifier_configured"] = bool(
+                verifier is not None
+                and verifier.provider_id == provider_id
+                and getattr(verifier, "model", None)
+                != getattr(adapter, "model", None)
+            )
             try:
                 receipt = self._architecture_receipt(provider_id)
             except ProviderUnavailableError:
