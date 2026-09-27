@@ -11,6 +11,10 @@ from skeleton.agents.delegation_qualification import (
     qualify_agent_delegation,
 )
 from skeleton.agents.swarm_fencing import LeaseFence
+from skeleton.agents.swarm_runtime import (
+    SwarmTask,
+    TaskState as RuntimeTaskState,
+)
 from skeleton.swarm.handoff import TaskEnvelope, TaskState
 
 
@@ -98,12 +102,28 @@ def _fence(**overrides: object) -> LeaseFence:
     return LeaseFence(**values)
 
 
+
+def _live_task(**overrides: object) -> SwarmTask:
+    values: dict[str, object] = {
+        "id": "task-1",
+        "payload": {"suite": "unit", "shard": 1},
+        "required_capabilities": frozenset({"tests.run"}),
+        "state": RuntimeTaskState.LEASED,
+        "attempts": 1,
+        "leased_to": "worker-1",
+        "lease_deadline": NOW + 60.0,
+    }
+    values.update(overrides)
+    return SwarmTask(**values)
+
+
 def _qualify(**overrides):
     values = {
         "parent": _parent(),
         "child": _child(),
         "envelope": _envelope(),
         "fence": _fence(),
+        "live_task": _live_task(),
         "observed_at": NOW,
     }
     values.update(overrides)
@@ -345,3 +365,56 @@ def test_parent_and_child_digests_bind_budget_and_authority() -> None:
     assert tighter.accepted is True
     assert baseline.child_authority_digest != tighter.child_authority_digest
     assert baseline.decision_digest != tighter.decision_digest
+
+@pytest.mark.parametrize(
+    ("live_task", "reason"),
+    (
+        (
+            _live_task(id="other-task"),
+            "live-lease-task-mismatch",
+        ),
+        (
+            _live_task(state=RuntimeTaskState.QUEUED),
+            "live-lease-not-leased",
+        ),
+        (
+            _live_task(leased_to="other-worker"),
+            "live-lease-worker-mismatch",
+        ),
+        (
+            _live_task(attempts=2),
+            "live-lease-attempt-mismatch",
+        ),
+        (
+            _live_task(lease_deadline=NOW + 120.0),
+            "live-lease-deadline-mismatch",
+        ),
+        (
+            _live_task(required_capabilities=frozenset({"repo.read"})),
+            "live-task-capability-mismatch",
+        ),
+    ),
+)
+def test_live_lease_snapshot_prevents_stale_fence_reuse(
+    live_task: SwarmTask,
+    reason: str,
+) -> None:
+    decision = _qualify(live_task=live_task)
+
+    assert decision.accepted is False
+    assert reason in decision.reasons
+
+
+def test_live_lease_identity_is_digest_bound() -> None:
+    baseline = _qualify()
+    changed = _qualify(
+        live_task=_live_task(
+            required_capabilities=frozenset({"tests.run", "repo.read"})
+        )
+    )
+
+    assert baseline.accepted is True
+    assert changed.accepted is True
+    assert baseline.live_lease_digest != changed.live_lease_digest
+    assert baseline.decision_digest != changed.decision_digest
+
