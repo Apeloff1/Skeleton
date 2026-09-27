@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+from types import ModuleType
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts/check_p1_required_gate_authority.py"
+AUTHORITY = ROOT / "machine/p1_required_gate_authority.json"
+
+
+def _module() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "check_p1_required_gate_authority",
+        SCRIPT,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _copy_contract(tmp_path: Path) -> Path:
+    authority = json.loads(AUTHORITY.read_text(encoding="utf-8"))
+    target = tmp_path / "machine/p1_required_gate_authority.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(authority, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    for gate in authority["gates"]:
+        source = ROOT / gate["workflow_file"]
+        dest = tmp_path / gate["workflow_file"]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
+
+
+def _mutate_authority(tmp_path: Path, mutation) -> Path:
+    path = _copy_contract(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    mutation(payload)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def test_repository_required_gate_authority_is_valid() -> None:
+    module = _module()
+
+    errors, summary = module.validate_authority(ROOT)
+
+    assert errors == []
+    assert summary["valid"] is True
+    assert summary["required_gate_count"] == 21
+    assert summary["group_count"] == 10
+    assert len(summary["authority_digest"]) == 64
+
+
+def test_authority_rejects_missing_gate(tmp_path: Path) -> None:
+    module = _module()
+    path = _mutate_authority(
+        tmp_path,
+        lambda payload: payload["gates"].pop(),
+    )
+
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any("required gate count drift" in error for error in errors)
+    assert any("membership drift" in error for error in errors)
+
+
+def test_authority_rejects_workflow_name_drift(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["gates"][0]["workflow_name"] = "Renamed Merge Gate"
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any("workflow name mismatch" in error for error in errors)
+
+
+def test_authority_rejects_missing_workflow_file(tmp_path: Path) -> None:
+    module = _module()
+    path = _copy_contract(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    workflow = tmp_path / payload["gates"][0]["workflow_file"]
+    workflow.unlink()
+
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any("workflow file missing" in error for error in errors)
+
+
+def test_authority_rejects_non_success_acceptance(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["gates"][0]["accepted_conclusions"] = ["success", "neutral"]
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any(
+        "accepted_conclusions must be success-only" in error
+        for error in errors
+    )
+
+
+def test_authority_rejects_nonterminal_acceptance(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["gates"][0]["accepted_statuses"] = ["completed", "in_progress"]
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any(
+        "accepted_statuses must be completed-only" in error
+        for error in errors
+    )
+
+
+def test_authority_rejects_group_membership_drift(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["groups"][0]["gate_ids"].append(
+            payload["groups"][1]["gate_ids"][0]
+        )
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any("membership drift" in error for error in errors)
+
+
+def test_authority_rejects_fail_closed_policy_drift(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["fail_closed_rules"]["cancelled_conclusion"] = "warn"
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert "authority fail_closed_rules drift" in errors
+
+
+def test_authority_rejects_terminal_policy_drift(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["terminal_policy"]["all_required_gates_must_pass"] = False
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any(
+        "terminal_policy all_required_gates_must_pass drift" in error
+        for error in errors
+    )
