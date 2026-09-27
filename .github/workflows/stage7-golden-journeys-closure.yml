@@ -11,6 +11,7 @@ on:
       - "skeleton/ai/runtime/api/engine_service.py"
       - "backend/tests/test_engine_cross_service_closure.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_operation_stream_mongo_stage7.py"
       - "frontend/services/operationStreamSession.ts"
       - "frontend/services/operationStream.ts"
       - "frontend/scripts/test-operation-stream-session.mjs"
@@ -186,3 +187,69 @@ jobs:
               len(receipt["boundary_digests"]),
           )
           PY
+
+
+  stage7-mongo-authority:
+    name: Stage 7 Mongo shared authority fault journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      STAGE7_MONGO_URI: "mongodb://localhost:27017/?replicaSet=rs0"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused Mongo journey dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+
+      - name: Start pinned transaction-capable Mongo replica set
+        run: |
+          docker run -d --name stage7-mongo -p 27017:27017 \
+            mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0 \
+            --replSet rs0 --bind_ip_all --setParameter enableTestCommands=1
+          for attempt in $(seq 1 40); do
+            if docker exec stage7-mongo mongosh --quiet \
+              --eval 'db.adminCommand({ping:1}).ok' | grep -q 1; then
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker logs stage7-mongo
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec stage7-mongo mongosh --quiet --eval \
+            'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          for attempt in $(seq 1 40); do
+            if docker exec stage7-mongo mongosh --quiet \
+              --eval 'db.hello().isWritablePrimary' | grep -q true; then
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker logs stage7-mongo
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run shared-authority transient-failure journey
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_operation_stream_mongo_stage7.py
+
+      - name: Print Mongo logs on failure
+        if: failure()
+        run: docker logs stage7-mongo
