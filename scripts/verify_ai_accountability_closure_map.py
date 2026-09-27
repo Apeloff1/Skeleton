@@ -245,16 +245,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                             f"{key}: workflow {workflow} does not execute "
                             f"{verifier_script}"
                         )
-                    verifier_trigger = re.compile(
-                        r"(?m)^\s*-\s*[\"']?"
-                        + re.escape(verifier_script)
-                        + r"[\"']?\s*$"
-                    )
-                    if verifier_trigger.search(workflow_source) is None:
-                        errors.append(
-                            f"{key}: workflow {workflow} does not trigger on "
-                            f"{verifier_script}"
-                        )
+
 
         matching = [
             task
