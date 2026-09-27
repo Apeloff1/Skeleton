@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "registry_id": "skeleton.p1.risk_gap_evidence_bindings",
+  "registry_version": "1.0.0",
+  "status": "active",
+  "task_id": "P1-EVID-04",
+  "accountability_ref": "ACC-P1-EVID-04",
+  "records": [],
+  "note": "Bindings are intentionally empty at engine introduction. Reconciliation reports unresolved obligations; records are added only with real evidence or signed, time-bounded accepted-risk dispositions."
+}
