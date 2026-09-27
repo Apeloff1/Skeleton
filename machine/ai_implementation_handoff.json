@@ -1345,7 +1345,8 @@
         "scripts/verify_streaming_protocol_closure.py independent source/mirror/dependency verifier"
       ],
       "remaining": [],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     },
     {
       "gap": "gap-e2e-golden-journeys",
