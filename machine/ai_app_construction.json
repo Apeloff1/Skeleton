@@ -393,7 +393,7 @@
     {
       "id": "orchestration",
       "owner": "skeleton/intelligence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Task decomposition, plan execution, agent coordination and workflow state transitions.",
       "depends_on": [
         "foundation",
@@ -4496,7 +4496,7 @@
   "cognitive_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-cognitive-execution-loop",
     "objective": "Specify the exact runtime, state, contracts, recovery, safety and evidence semantics required for one fully functional AI execution path without introducing a second orchestration framework.",
     "target_modules": {
