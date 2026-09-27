@@ -2395,6 +2395,7 @@
         "skeleton/provider_runtime.py OpenAICompatibleSecondaryAdapter is the declared optional secondary provider",
         "ProviderRegistry.from_env fails closed on partial secondary configuration and requires a distinct provider hostname",
         "ProviderRegistry.available fails closed when any declared route loses its mandatory architecture receipt, matching require_active activation semantics",
+        "ProviderRegistry.statuses suppresses available=true when registry-level architecture acknowledgement fails",
         "ProviderRegistry.redundancy_status exposes identity-free primary/fallback routing counters",
         "skeleton/testing/test_provider_contract.py covers primary success, outage failover, unavailable skip, policy-denial fencing, explicit-model no-remap, registry routing and fail-closed configuration"
       ],
