@@ -534,20 +534,19 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "planned:skeleton/routing",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
+        "skeleton/frontier/model_routing.py",
         "skeleton/intelligence/admission.py",
-        "skeleton/intelligence/quota.py",
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
-        "skeleton/context/sources",
-        "skeleton/observability",
-        "tests/test_observability.py"
+        "skeleton/intelligence/quality.py",
+        "skeleton/observability"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_model_routing.py",
-        "planned:skeleton/testing/test_routing_privacy.py",
+        "skeleton/testing/test_routing_context_receipt.py",
+        "tests/test_model_routing.py",
         "skeleton/testing/test_context_compiler.py",
-        "planned:skeleton/testing/test_context_trust_geometry.py",
         "skeleton/testing/test_frontier_observability_correlation.py",
         "tests/test_orchestration_error_redaction.py"
       ],
@@ -558,9 +557,12 @@
         "replay"
       ],
       "failure_modes": [
-        "stale/poisoned intelligence state",
-        "unbounded reasoning/search",
-        "unsupported quality promotion"
+        "route/context identity mismatch",
+        "context trust or data-class policy violation",
+        "route budget or deadline violation",
+        "quality floor or independent quality rejection",
+        "route plan/result provider-order drift",
+        "nondeterministic telemetry contaminating evidence identity"
       ],
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
