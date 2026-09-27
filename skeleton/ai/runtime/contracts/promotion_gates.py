@@ -286,9 +286,17 @@ def evaluate_required_gates(
             for item in observations_for_gate
             if item.head_sha == target
         ]
+        stale_for_gate = [
+            item
+            for item in observations_for_gate
+            if item.head_sha != target
+        ]
 
         if not observations_for_gate:
             missing.append(name)
+            continue
+        if stale_for_gate:
+            stale.append(name)
             continue
         if not exact:
             stale.append(name)
