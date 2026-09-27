@@ -59,7 +59,7 @@ def test_repository_required_gate_authority_is_valid() -> None:
 
     assert errors == []
     assert summary["valid"] is True
-    assert summary["required_gate_count"] == 22
+    assert summary["required_gate_count"] == 23
     assert summary["group_count"] == 10
     assert len(summary["authority_digest"]) == 64
 
@@ -248,8 +248,8 @@ def test_observation_evaluator_accepts_exact_complete_set(tmp_path: Path) -> Non
 
     decision = payload["decision"]
     assert decision["accepted"] is True
-    assert decision["required_gate_count"] == 22
-    assert decision["passing_gate_count"] == 22
+    assert decision["required_gate_count"] == 23
+    assert decision["passing_gate_count"] == 23
     assert len(decision["decision_digest"]) == 64
 
 
