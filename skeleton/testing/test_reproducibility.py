@@ -55,6 +55,7 @@ def _bundle(receipt: PromotionEvidenceReceipt | None = None):
         receipt or _receipt(),
         runner_id="pytest-manifest",
         runner_digest=RUNNER,
+        budget_id="focused-ci",
         budget_digest=BUDGET,
         source_date_epoch=EPOCH,
         inputs=(
@@ -76,6 +77,7 @@ def _replay(receipt: PromotionEvidenceReceipt | None = None, **overrides: object
     values: dict[str, object] = {
         "runner_id": "pytest-manifest",
         "runner_digest": RUNNER,
+        "budget_id": "focused-ci",
         "budget_digest": BUDGET,
         "source_date_epoch": EPOCH,
         "receipt": receipt
@@ -108,6 +110,7 @@ def test_independent_run_identity_can_reproduce_same_evidence() -> None:
     (
         ("runner_id", "different-runner"),
         ("runner_digest", "5" * 64),
+        ("budget_id", "different-budget"),
         ("budget_digest", "6" * 64),
         ("source_date_epoch", EPOCH + 1),
     ),
@@ -169,6 +172,7 @@ def test_failed_replay_is_not_misreported_as_incompatibility() -> None:
     replay = ReplayObservation(
         runner_id="pytest-manifest",
         runner_digest=RUNNER,
+        budget_id="focused-ci",
         budget_digest=BUDGET,
         source_date_epoch=EPOCH,
         failure_digest="9" * 64,
@@ -198,6 +202,7 @@ def test_bundle_input_order_and_duplicates_are_canonicalized() -> None:
         receipt,
         runner_id="pytest-manifest",
         runner_digest=RUNNER,
+        budget_id="focused-ci",
         budget_digest=BUDGET,
         source_date_epoch=EPOCH,
         inputs=(first, second, first),
@@ -206,6 +211,7 @@ def test_bundle_input_order_and_duplicates_are_canonicalized() -> None:
         receipt,
         runner_id="pytest-manifest",
         runner_digest=RUNNER,
+        budget_id="focused-ci",
         budget_digest=BUDGET,
         source_date_epoch=EPOCH,
         inputs=(second, first),
