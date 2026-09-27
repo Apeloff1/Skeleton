@@ -274,3 +274,21 @@ def test_terminal_task_reaches_intelligence_and_autonomy_anchors(tmp_path: Path)
     assert "P1-INTEL-06" in terminal["depends_on"]
     assert "P1-AUTO-06" in terminal["depends_on"]
 
+def test_p1_backlog_rejects_uncovered_primary_volume(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+
+    def weaken(payload: dict) -> None:
+        task = next(
+            item for item in payload["tasks"] if item["task_id"] == "P1-REL-03"
+        )
+        task["volume_refs"].remove("VOL-062")
+
+    _mutate(root, BACKLOG_PATH, weaken)
+    errors, _ = validate_repository(root)
+
+    assert any(
+        "primary volumes missing executable task coverage" in error
+        and "VOL-062" in error
+        for error in errors
+    )
+
