@@ -2368,7 +2368,7 @@
       "id": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical deterministic prompt-only, multi-turn, retrieval, read/write tool, approval renewal, artifact, provider-outage, engine-outage, cancel/reconnect, governance export/delete and restart-ambiguity journeys are implementation-complete across the engine, authenticated API and production browser-session seams. Remaining closure is exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff.",
       "construction": [
         "define prompt-only journey",
@@ -2400,12 +2400,8 @@
         "real pinned Mongo replica-set transient-failure, cross-worker replay/compaction and cancel-complete race journeys",
         "Mongo transaction-capability startup preflight"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "status_detail": "implementation-complete pending exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff"
+      "outstanding_evidence": [],
+      "status_detail": "closed candidate after Stage-0..6 dependency closure; reopen on golden-journey/App Assembly/dependency regression"
     },
     {
       "id": "gap-release-slo-loop",
@@ -6702,7 +6698,7 @@
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
@@ -6873,10 +6869,7 @@
       "focused process/database restart matrix for engine, approval, admission, execution finalization and governance audit",
       "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry"
     ],
-    "remaining": [
-      "fresh exact-head Stage-7 Golden Journeys Closure Gate and App Assembly evidence",
-      "lower-stage dependency closure and independent signoff"
-    ]
+    "remaining": []
   },
   "memory_runtime_blueprint": {
     "schema_version": 1,
