@@ -35,6 +35,29 @@ class EvidenceRef:
     digest: str
     category: str = "repository_state"
 
+    @property
+    def identity(self) -> str:
+        """Stable content identity for generic canonical evidence references."""
+        return evidence_ref_identity(self)
+
+
+def evidence_ref_identity(evidence: EvidenceRef) -> str:
+    """Hash canonical evidence-ref metadata without inventing a second ID field."""
+    if not isinstance(evidence, EvidenceRef):
+        raise CanonicalContractError("evidence must be EvidenceRef")
+    raw = json.dumps(
+        {
+            "source": evidence.source,
+            "digest": evidence.digest,
+            "category": evidence.category,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
 
 @dataclass(frozen=True, slots=True)
 class CanonicalEnvelope:
