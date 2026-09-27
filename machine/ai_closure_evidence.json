@@ -746,9 +746,9 @@
       "gap": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "stage": 4,
-      "gap_status": "open",
-      "implementation_state": "implementation-complete",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical execution loop ownership selected",
         "execution/turn/result envelope fields defined",
@@ -785,30 +785,8 @@
         "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
-      "outstanding_evidence": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "fresh exact-head Cognitive Execution Closure Gate"
-      ],
-      "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "fresh exact-head Cognitive Execution Closure Gate"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -827,9 +805,9 @@
       "gap": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "stage": 5,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "deadline/trace/budget propagation test",
         "query/result binding test",
@@ -847,7 +825,11 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose plus AST isolation proves Skeleton is sole source-level production provider execution owner",
-        "real TCP separate-process EngineClient submit/retry/status/tenant-denial/cancel regression"
+        "real TCP separate-process EngineClient submit/retry/status/tenant-denial/cancel regression",
+        "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+        "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+        "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+        ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
       ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
@@ -861,17 +843,8 @@
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly proves the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/receipt lineage",
-        "declared dependency-gap closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-provider-surface-convergence"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -890,9 +863,9 @@
       "gap": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "stage": 6,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
         "transport-neutral stream event envelope",
@@ -947,7 +920,10 @@
         "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions",
         "shared-network Mongo operation and stream authorities landed on main via #2030",
         "production browser-session runtime binds replay, durable cursor, resync, cancellation and bounded follow",
-        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races"
+        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races",
+        ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+        "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+        "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -961,16 +937,8 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
-      "blockers": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -989,9 +957,9 @@
       "gap": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "stage": 7,
-      "gap_status": "open",
-      "implementation_state": "implementation-complete",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
@@ -1006,7 +974,12 @@
         "real pinned Mongo replica-set shared-authority journey injects one retryable update failure and proves unchanged canonical state/outbox before successful retry",
         "provider-response-before-checkpoint crash leaves no durable response, resumes to typed failure and never retries provider I/O",
         "exact focused process/database restart matrix covers engine recovery, approval resume, admission rehydration, execution DB reopen, staged finalization and governance audit restore",
-        "provider-response-before-checkpoint crash window is fail-closed and never silently retries provider generation"
+        "provider-response-before-checkpoint crash window is fail-closed and never silently retries provider generation",
+        ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+        "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+        "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+        "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+        "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -1014,29 +987,8 @@
         "artifact/result assertions",
         "degraded-mode assertions"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "blockers": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
