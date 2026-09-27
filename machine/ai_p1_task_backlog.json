@@ -360,7 +360,10 @@
       "acceptance": [
         "Independent rerun can reproduce the maturity evidence or explain deterministic incompatibility.",
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
-        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity.",
+        "Reproducibility bundle binds exact head, canonical runner digest, budget identity/digest and SOURCE_DATE_EPOCH.",
+        "Failed replay under runner, budget or epoch drift is classified incompatible before execution failure.",
+        "Reproducibility evidence remains non-authoritative and cannot self-promote maturity."
       ],
       "evidence_refs": [],
       "accountability_ref": "ACC-P1-EVID-05",
@@ -386,7 +389,12 @@
         "machine/ai_build_accountability.json",
         "machine",
         "scripts",
-        "skeleton/evaluation"
+        "skeleton/evaluation",
+        "machine/p1_reproducibility_policy.json",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/ai/runtime/contracts/reproducibility.py",
+        "scripts/check_p1_reproducibility.py",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
       "test_targets": [
         "planned:skeleton/testing/test_eval_reproducibility.py",
@@ -396,7 +404,9 @@
         "planned:skeleton/testing/test_reproducibility_record.py",
         "planned:skeleton/testing/test_replay_recipe.py",
         "planned:skeleton/testing/test_quality_gate_contracts.py",
-        "planned:skeleton/testing/test_quality_waivers.py"
+        "planned:skeleton/testing/test_quality_waivers.py",
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_reproducibility_bundle.py"
       ],
       "evidence_modes": [
         "contract",
