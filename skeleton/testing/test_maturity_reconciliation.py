@@ -276,8 +276,12 @@ def test_reconciler_never_skips_an_ineligible_intermediate_state() -> None:
 
     assert _evaluation(decision, "production").eligible is True
     assert _evaluation(decision, "implemented").eligible is False
-    assert decision.highest_eligible_status == "specified"
-    assert decision.promotion_candidate is None
+    # Reconciliation advances only through the contiguous eligible prefix:
+    # specified -> scaffolded, then stops at the deliberately blocked
+    # implemented state. A later eligible production state cannot be skipped to.
+    assert decision.highest_eligible_status == "scaffolded"
+    assert decision.promotion_candidate == "scaffolded"
+    assert decision.implementation_status_candidate is None
     assert decision.target_floor_eligible is False
 
 
