@@ -28,6 +28,7 @@ BOUNDARY_FILES = (
     "tests/test_instruction_policy_boundary.py",
     "machine/ai_app_construction.json",
     "machine/ai_implementation_handoff.json",
+    "machine/ai_closure_evidence.json",
 )
 
 MIRROR_PAIRS = (
@@ -205,31 +206,36 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
             errors.append(f"context mirror drift: {canonical} != {mirror}")
 
     construction = _read_json(root, "machine/ai_app_construction.json")
+    gaps = [
+        item
+        for item in construction.get("gap_register", [])
+        if isinstance(item, dict)
+    ]
     gap = next(
         (
             item
-            for item in construction.get("gap_register", [])
-            if isinstance(item, dict)
-            and item.get("id") == "gap-context-compiler-convergence"
+            for item in gaps
+            if item.get("id") == "gap-context-compiler-convergence"
         ),
         None,
     )
-    if not isinstance(gap, dict):
-        errors.append("context compiler construction gap is missing")
-    else:
-        if gap.get("verification_state") != (
-            "implementation-complete-pending-dependencies-exact-head-and-independent-closure"
-        ):
-            errors.append("context compiler verification state is stale")
-        progress = gap.get("progress")
-        if not isinstance(progress, dict) or progress.get("state") != "implemented_pending_closure":
-            errors.append("context compiler progress state is not implemented_pending_closure")
+    gap_status = str(gap.get("status") or "") if isinstance(gap, dict) else "missing"
+
+    dependency_status = {
+        str(item.get("id")): str(item.get("status") or "")
+        for item in gaps
+        if item.get("id") in EXPECTED_DEPENDENCIES
+    }
+    missing_dependencies = sorted(EXPECTED_DEPENDENCIES - set(dependency_status))
+    if missing_dependencies:
+        errors.append(
+            "context compiler dependency statuses missing: "
+            + ", ".join(missing_dependencies)
+        )
 
     blueprint = construction.get("context_compiler_blueprint")
     if not isinstance(blueprint, dict):
         errors.append("context compiler blueprint is missing")
-    elif blueprint.get("status") != "implemented-pending-closure":
-        errors.append("context compiler blueprint status is stale")
 
     handoff = _read_json(root, "machine/ai_implementation_handoff.json")
     handoff_entry = next(
@@ -246,8 +252,6 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
     if not isinstance(handoff_entry, dict):
         errors.append("context compiler implementation handoff is missing")
     else:
-        if handoff_entry.get("implementation_status") != "implemented_pending_closure":
-            errors.append("context compiler handoff status is stale")
         dependency_graph = sorted(
             str(item) for item in handoff_entry.get("depends_on", [])
         )
@@ -261,6 +265,89 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
                 ensure_ascii=False,
             ).encode("utf-8")
         ).hexdigest()
+
+    closure_evidence = _read_json(root, "machine/ai_closure_evidence.json")
+    closure_entry = next(
+        (
+            item
+            for item in closure_evidence.get("entries", [])
+            if isinstance(item, dict)
+            and item.get("gap") == "gap-context-compiler-convergence"
+        ),
+        None,
+    )
+
+    if not isinstance(gap, dict):
+        errors.append("context compiler construction gap is missing")
+    elif gap_status == "closed":
+        open_dependencies = sorted(
+            dep
+            for dep in EXPECTED_DEPENDENCIES
+            if dependency_status.get(dep) != "closed"
+        )
+        if open_dependencies:
+            errors.append(
+                "closed context compiler gap has non-closed dependencies: "
+                + ", ".join(open_dependencies)
+            )
+        if gap.get("verification_state") != "closed":
+            errors.append("closed context compiler gap requires closed verification_state")
+        progress = gap.get("progress")
+        if not isinstance(progress, dict) or progress.get("state") != "closed":
+            errors.append("closed context compiler gap requires closed progress state")
+        elif progress.get("remaining") not in ([], None):
+            errors.append("closed context compiler gap requires empty progress remaining")
+        if not isinstance(blueprint, dict) or blueprint.get("status") not in {
+            "implemented",
+            "complete",
+        }:
+            errors.append("closed context compiler gap requires complete blueprint")
+        if not isinstance(handoff_entry, dict) or handoff_entry.get(
+            "implementation_status"
+        ) != "closed":
+            errors.append("closed context compiler gap requires closed handoff")
+        elif (
+            handoff_entry.get("remaining") not in ([], None)
+            or handoff_entry.get("blockers") not in ([], None)
+        ):
+            errors.append("closed context compiler gap requires empty handoff blockers")
+        if not isinstance(closure_entry, dict):
+            errors.append("closed context compiler gap requires closure evidence")
+        else:
+            for key, expected in (
+                ("gap_status", "closed"),
+                ("implementation_state", "closed"),
+                ("closure_decision", "closed"),
+            ):
+                if closure_entry.get(key) != expected:
+                    errors.append(
+                        f"closed context compiler gap requires closure evidence {key}=closed"
+                    )
+            if (
+                closure_entry.get("outstanding_evidence") not in ([], None)
+                or closure_entry.get("blockers") not in ([], None)
+            ):
+                errors.append(
+                    "closed context compiler gap requires empty closure evidence blockers"
+                )
+    elif gap_status in {"open", "in-progress"}:
+        if gap.get("verification_state") != (
+            "implementation-complete-pending-dependencies-exact-head-and-independent-closure"
+        ):
+            errors.append("context compiler verification state is stale")
+        progress = gap.get("progress")
+        if not isinstance(progress, dict) or progress.get("state") != "implemented_pending_closure":
+            errors.append("context compiler progress state is not implemented_pending_closure")
+        if not isinstance(blueprint, dict) or blueprint.get(
+            "status"
+        ) != "implemented-pending-closure":
+            errors.append("context compiler blueprint status is stale")
+        if not isinstance(handoff_entry, dict) or handoff_entry.get(
+            "implementation_status"
+        ) != "implemented_pending_closure":
+            errors.append("context compiler handoff status is stale")
+    else:
+        errors.append("context compiler construction status is invalid")
 
     return {
         "schema_version": 1,
