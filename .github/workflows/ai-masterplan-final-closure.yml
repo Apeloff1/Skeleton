@@ -1,0 +1,126 @@
+name: Final AI Masterplan Closure Seal
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/verify_ai_masterplan_final_closure.py"
+      - "tests/test_ai_masterplan_final_closure.py"
+      - ".github/workflows/ai-masterplan-final-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-masterplan-final-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  final-ai-masterplan-closure:
+    name: 14-gap final closure seal
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run final closure verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_masterplan_final_closure.py
+
+      - name: Re-run independent lower-stage closure verifiers
+        run: |
+          python scripts/verify_state_authority_closure.py
+          python scripts/verify_governance_closure.py
+          python scripts/verify_cost_admission_closure.py
+          python scripts/verify_provider_surface_closure.py
+          python scripts/verify_ai_dependency_closure.py
+          python scripts/verify_tool_runtime_closure.py
+          python scripts/verify_context_compiler_closure.py
+          python scripts/verify_verification_evidence_closure.py
+          python scripts/verify_cognitive_execution_closure.py
+          python scripts/verify_stage7_golden_journeys.py
+
+      - name: Generate final exact-head closure receipt
+        run: >-
+          python scripts/verify_ai_masterplan_final_closure.py
+          --evidence-out .ai-masterplan-final-closure.json
+          --print-evidence
+
+      - name: Assert final closure receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-masterplan-final-closure.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected_sha = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected_sha:
+              raise SystemExit("final closure receipt head mismatch")
+          if receipt.get("verifier") != "ai-masterplan-final-closure-v1":
+              raise SystemExit("unexpected final closure verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("final masterplan closure verification failed")
+          if receipt.get("expected_gap_count") != 14:
+              raise SystemExit("final closure expected gap count drifted")
+          if receipt.get("closed_gap_count") != 14:
+              raise SystemExit("not all 14 canonical gaps are closed")
+          if len(receipt.get("rows") or {}) != 14:
+              raise SystemExit("final closure row coverage is incomplete")
+          if len(receipt.get("dependency_edges") or []) != 46:
+              raise SystemExit("final closure dependency DAG is not 46 edges")
+          if len(receipt.get("contract_digests") or {}) != 3:
+              raise SystemExit("final closure contract digest coverage is incomplete")
+          for gap_id, row in receipt["rows"].items():
+              expected = {
+                  "construction_status": "closed",
+                  "implementation_status": "closed",
+                  "evidence_status": "closed",
+                  "closure_decision": "closed",
+                  "blueprint_status": "closed",
+              }
+              for field, value in expected.items():
+                  if row.get(field) != value:
+                      raise SystemExit(
+                          f"{gap_id} final closure field drift: "
+                          f"{field}={row.get(field)!r}"
+                      )
+          print(
+              "final AI masterplan closure sealed:",
+              expected_sha,
+              "gaps=14/14",
+              "edges=46",
+          )
+          PY
