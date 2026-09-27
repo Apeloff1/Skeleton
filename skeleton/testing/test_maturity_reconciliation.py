@@ -395,3 +395,26 @@ def test_generic_lifecycle_terminal_has_no_implementation_candidate(
     assert decision.accountability_maturity_status is None
     assert decision.implementation_status_candidate is None
 
+def test_source_digest_changes_when_maturity_policy_changes() -> None:
+    volume = _volume()
+    accountability = _accountability()
+    baseline = reconcile_volume(
+        volume,
+        accountability,
+        POLICY,
+        target_floor="verified",
+    )
+    changed_policy = deepcopy(POLICY)
+    changed_policy["verified"]["required_nonempty_fields"] = [
+        *changed_policy["verified"]["required_nonempty_fields"],
+        "extra_evidence",
+    ]
+    changed = reconcile_volume(
+        volume,
+        accountability,
+        changed_policy,
+        target_floor="verified",
+    )
+
+    assert changed.source_digest != baseline.source_digest
+
