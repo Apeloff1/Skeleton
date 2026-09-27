@@ -1,6 +1,18 @@
 name: Masterplan Completion Gate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/verify_masterplan_completion.py"
+      - "tests/test_masterplan_completion_verifier.py"
+      - ".github/workflows/masterplan-completion.yml"
+      - ".github/workflows/provider-redundancy-closure.yml"
+      - ".github/workflows/p1-feedback-release-closure.yml"
   pull_request:
     branches:
       - main
