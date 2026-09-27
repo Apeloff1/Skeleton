@@ -1442,6 +1442,74 @@
       ],
       "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+    },
+    {
+      "gap": "gap-feedback-promotion",
+      "plane": "feedback-learning",
+      "stage": 8,
+      "depends_on": [
+        "gap-governance-registry",
+        "gap-e2e-golden-journeys"
+      ],
+      "work_package": "WP-P1-FEEDBACK-PROMOTION",
+      "blueprint": "feedback_promotion_blueprint",
+      "implementation_status": "closed",
+      "objective": "Promote feedback-derived behavior only through consent-bound experiments and externally evaluated reversible promotion.",
+      "target_files": {
+        "runtime": [
+          "skeleton/learning/promotion.py"
+        ],
+        "tests": [
+          "skeleton/testing/test_feedback_promotion.py",
+          "tests/test_p1_feedback_release_independent_verifier.py"
+        ],
+        "integration": [
+          "scripts/verify_p1_feedback_release_closure.py",
+          ".github/workflows/p1-feedback-release-closure.yml"
+        ]
+      },
+      "current_evidence": [
+        "skeleton/learning/promotion.py implements deterministic experiment assignment, explicit holdout isolation, consent/data-use validation, external evaluation receipts, promotion idempotency and rollback-to-baseline receipts",
+        "skeleton/testing/test_feedback_promotion.py proves experiment isolation, consent/data-use enforcement, tamper rejection, evaluation/sample gates, holdout exclusion, rollback lineage and event idempotency",
+        "scripts/verify_p1_feedback_release_closure.py independently verifies feedback promotion source surfaces",
+        ".github/workflows/p1-feedback-release-closure.yml binds focused feedback contracts and independent verification to exact PR head"
+      ],
+      "remaining": [],
+      "rollback_rule": "rollback receipt restores the declared baseline version and preserves evaluation/promotion lineage"
+    },
+    {
+      "gap": "gap-release-slo-loop",
+      "plane": "deployment-release",
+      "stage": 8,
+      "depends_on": [
+        "gap-streaming-protocol",
+        "gap-e2e-golden-journeys"
+      ],
+      "work_package": "WP-P1-RELEASE-SLO",
+      "blueprint": "release_slo_blueprint",
+      "implementation_status": "closed",
+      "objective": "Consume canonical canary observability evidence to promote, hold or rollback releases deterministically.",
+      "target_files": {
+        "runtime": [
+          "skeleton/release/slo_promotion.py"
+        ],
+        "tests": [
+          "skeleton/testing/test_release_slo_promotion.py",
+          "tests/test_p1_feedback_release_independent_verifier.py"
+        ],
+        "integration": [
+          "scripts/verify_p1_feedback_release_closure.py",
+          ".github/workflows/p1-feedback-release-closure.yml"
+        ]
+      },
+      "current_evidence": [
+        "skeleton/release/slo_promotion.py implements observability-bound canary SLO policy, promote/hold/rollback decisions and incident-bound conservative operator override receipts",
+        "skeleton/testing/test_release_slo_promotion.py proves healthy promotion, automatic rollback, insufficient-sample hold, stale-signal rollback and fail-closed override behavior",
+        "scripts/verify_p1_feedback_release_closure.py independently verifies release SLO source surfaces",
+        ".github/workflows/p1-feedback-release-closure.yml binds focused release contracts and independent verification to exact PR head"
+      ],
+      "remaining": [],
+      "rollback_rule": "hard SLO failures or conservative operator override emit rollback rather than mutating evidence into promotion"
     }
   ],
   "definition_of_handoff_complete": [
