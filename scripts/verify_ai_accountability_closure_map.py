@@ -225,9 +225,13 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                     )
                 else:
                     source = verifier_path.read_text(encoding="utf-8")
-                    if gap_id not in source:
+                    binding_token = str(
+                        group.get("verifier_binding_token") or gap_id
+                    )
+                    if binding_token not in source:
                         errors.append(
-                            f"{key}: verifier {verifier_script} does not bind {gap_id}"
+                            f"{key}: verifier {verifier_script} does not bind "
+                            f"{binding_token}"
                         )
 
         matching = [
@@ -268,6 +272,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 "workflow": workflow,
                 "workflow_name": workflow_name,
                 "verifier_script": verifier_script,
+                "verifier_binding_token": (
+                    group.get("verifier_binding_token") or gap_id
+                ),
             }
         )
 
