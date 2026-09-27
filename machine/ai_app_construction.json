@@ -1244,7 +1244,7 @@
     {
       "id": "feedback-learning",
       "owner": "skeleton/learning",
-      "state": "partial",
+      "state": "present",
       "responsibility": "User feedback, outcome signals, experiments and bounded adaptation without uncontrolled online mutation.",
       "depends_on": [
         "evaluation",
