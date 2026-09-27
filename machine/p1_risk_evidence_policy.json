@@ -49,7 +49,15 @@
     "stale_review_rejects": true,
     "expired_acceptance_rejects": true,
     "unknown_binding_rejects": true,
-    "duplicate_binding_rejects": true
+    "duplicate_binding_rejects": true,
+    "accepted_risk_signer_types": [
+      "human",
+      "governance"
+    ],
+    "accepted_risk_signature_methods": [
+      "github_identity",
+      "contract_attestation"
+    ]
   },
   "terminal_policy": {
     "unresolved_blocking_obligations_must_equal": 0,
