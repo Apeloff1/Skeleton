@@ -8,9 +8,13 @@ import pytest
 
 from core.operation_stream_transport import (
     OperationAccessDenied,
+    OperationEventStore,
+    OperationStateStore,
     OperationStreamTransport,
+    OperationTransportError,
     encode_sse_event,
     encode_sse_heartbeat,
+    transport_from_env,
 )
 from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.frontier.operation_stream import ReplayCursor, StreamReplayGapError
@@ -584,3 +588,60 @@ def test_projection_lease_serializes_workers_and_allows_clean_takeover(tmp_path:
         assert [event.sequence for event in events_b.replay(ReplayCursor(operation.operation_id))] == [1]
     finally:
         operations_a.close(); operations_b.close(); events_a.close(); events_b.close()
+
+
+def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations-contract.sqlite")
+    events = SQLiteOperationEventStore(tmp_path / "events-contract.sqlite")
+    try:
+        assert isinstance(operations, OperationStateStore)
+        assert isinstance(events, OperationEventStore)
+        transport = OperationStreamTransport(operations, events)
+        assert transport.operation_store is operations
+        assert transport.event_store is events
+
+        class PartialStore:
+            def replay(self, *_args, **_kwargs):
+                return ()
+
+        with pytest.raises(TypeError, match="OperationEventStore contract"):
+            OperationStreamTransport(operations, PartialStore())
+
+        class PartialOperationStore:
+            def get(self, *_args, **_kwargs):
+                raise AssertionError
+
+        with pytest.raises(TypeError, match="OperationStateStore contract"):
+            OperationStreamTransport(PartialOperationStore(), events)
+    finally:
+        operations.close()
+        events.close()
+
+
+def test_transport_factory_rejects_unknown_authority_backend() -> None:
+    with pytest.raises(
+        OperationTransportError,
+        match="unsupported operation authority backend",
+    ):
+        transport_from_env(
+            {
+                "CODEDOCK_OPERATION_AUTHORITY_BACKEND": "unknown",
+            }
+        )
+
+
+def test_transport_factory_validates_mongo_timeout_before_connecting() -> None:
+    with pytest.raises(
+        OperationTransportError,
+        match="timeout must be an integer",
+    ):
+        transport_from_env(
+            {
+                "CODEDOCK_OPERATION_AUTHORITY_BACKEND": "mongo",
+                "CODEDOCK_OPERATION_MONGO_URI": "mongodb://localhost:27017",
+                "CODEDOCK_OPERATION_MONGO_DATABASE": "skeleton",
+                "CODEDOCK_OPERATION_MONGO_TIMEOUT_MS": "not-an-int",
+            }
+        )

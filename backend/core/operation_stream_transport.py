@@ -23,7 +23,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
 from skeleton.contracts.operation import OperationState
@@ -35,6 +35,7 @@ from skeleton.frontier.operation_stream import (
 from skeleton.frontier.operation_stream_store import (
     SQLiteOperationEventStore,
     StreamConsumerCheckpoint,
+    StreamWorkerLease,
 )
 from skeleton.persistence.operation_store import (
     OperationStoreConflict,
@@ -45,6 +46,108 @@ from skeleton.persistence.operation_store import (
 
 
 _PROCESS_STREAM_WORKER_ID = f"worker-{os.getpid()}-{uuid4().hex}"
+
+
+@runtime_checkable
+class OperationEventStore(Protocol):
+    """Durable stream authority contract.
+
+    SQLite is the local reference implementation. Network/shared backends must
+    preserve the same append, replay, lease, consumer, and compaction semantics
+    before they can be injected into the transport.
+    """
+
+    def acquire_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int,
+    ) -> StreamWorkerLease | None: ...
+
+    def renew_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        generation: int,
+        *,
+        lease_seconds: int,
+    ) -> StreamWorkerLease | None: ...
+
+    def release_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        generation: int,
+    ) -> bool: ...
+
+    def append(
+        self,
+        operation_id: str,
+        event_type: str,
+        payload: Mapping[str, Any],
+        *,
+        event_id: str,
+        timestamp: Any,
+    ) -> StreamEvent: ...
+
+    def replay(
+        self,
+        cursor: ReplayCursor,
+        *,
+        limit: int,
+    ) -> tuple[StreamEvent, ...]: ...
+
+    def head(self, operation_id: str) -> Mapping[str, Any]: ...
+
+    def register_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        *,
+        lease_seconds: int,
+    ) -> StreamConsumerCheckpoint: ...
+
+    def active_consumers(
+        self,
+        operation_id: str,
+    ) -> tuple[StreamConsumerCheckpoint, ...]: ...
+
+    def acknowledge_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        sequence: int,
+        *,
+        lease_seconds: int,
+    ) -> StreamConsumerCheckpoint: ...
+
+    def compact_acknowledged(self, operation_id: str) -> int: ...
+
+
+@runtime_checkable
+class OperationStateStore(Protocol):
+    """Authoritative operation/outbox store contract required by transport."""
+
+    def get(self, operation_id: str) -> StoredOperation: ...
+
+    def pending_outbox(
+        self,
+        *,
+        operation_id: str,
+        limit: int = 1000,
+    ) -> tuple[Any, ...]: ...
+
+    def acknowledge_outbox(self, outbox_id: str) -> None: ...
+
+    def transition(
+        self,
+        operation_id: str,
+        target: OperationState,
+        *,
+        expected_version: int,
+        now: Any | None = None,
+    ) -> StoredOperation: ...
 
 
 class OperationTransportError(RuntimeError):
@@ -212,12 +315,18 @@ def operation_runtime_paths(
 def transport_from_env(
     source: Mapping[str, str] | None = None,
 ) -> "OperationStreamTransport":
-    """Create a durable local transport using the canonical environment paths."""
+    """Create the configured durable operation transport authority.
 
-    state_path, stream_path = operation_runtime_paths(source)
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    stream_path.parent.mkdir(parents=True, exist_ok=True)
+    SQLite remains the portable single-host reference. Mongo activates the
+    shared-network authority and requires transaction-capable MongoDB for
+    stream sequence/event atomicity.
+    """
+
     environ = os.environ if source is None else source
+    backend = environ.get(
+        "CODEDOCK_OPERATION_AUTHORITY_BACKEND",
+        "sqlite",
+    ).strip().lower()
     lease_raw = environ.get(
         "CODEDOCK_OPERATION_STREAM_PROJECTION_LEASE_SECONDS",
         "10",
@@ -232,9 +341,73 @@ def transport_from_env(
         raise OperationTransportError(
             "operation stream projection lease must be between 1 and 300 seconds"
         )
+
+    if backend == "sqlite":
+        state_path, stream_path = operation_runtime_paths(environ)
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        stream_path.parent.mkdir(parents=True, exist_ok=True)
+        operation_store: OperationStateStore = SQLiteOperationStore(
+            state_path
+        )
+        event_store: OperationEventStore = SQLiteOperationEventStore(
+            stream_path
+        )
+    elif backend == "mongo":
+        from pymongo import MongoClient
+
+        from skeleton.frontier.operation_stream_store_mongo import (
+            MongoOperationEventStore,
+        )
+        from skeleton.persistence.operation_store_mongo import (
+            MongoOperationStore,
+        )
+
+        uri = environ.get(
+            "CODEDOCK_OPERATION_MONGO_URI",
+            environ.get("SKL_MONGO_URI", "mongodb://localhost:27017"),
+        ).strip()
+        database_name = environ.get(
+            "CODEDOCK_OPERATION_MONGO_DATABASE",
+            environ.get("SKL_MONGO_DATABASE", "skeleton"),
+        ).strip()
+        timeout_raw = environ.get(
+            "CODEDOCK_OPERATION_MONGO_TIMEOUT_MS",
+            environ.get("SKL_MONGO_TIMEOUT_MS", "5000"),
+        ).strip()
+        if not uri or not database_name:
+            raise OperationTransportError(
+                "Mongo operation authority requires URI and database"
+            )
+        try:
+            timeout_ms = int(timeout_raw)
+        except ValueError as exc:
+            raise OperationTransportError(
+                "Mongo operation authority timeout must be an integer"
+            ) from exc
+        if timeout_ms < 100 or timeout_ms > 120_000:
+            raise OperationTransportError(
+                "Mongo operation authority timeout must be between 100 and 120000 ms"
+            )
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=timeout_ms,
+            connectTimeoutMS=timeout_ms,
+        )
+        database = client[database_name]
+        mongo_operations = MongoOperationStore(database)
+        mongo_events = MongoOperationEventStore(database)
+        mongo_operations.ensure_indexes()
+        mongo_events.ensure_indexes()
+        operation_store = mongo_operations
+        event_store = mongo_events
+    else:
+        raise OperationTransportError(
+            "unsupported operation authority backend: " + backend
+        )
+
     return OperationStreamTransport(
-        SQLiteOperationStore(state_path),
-        SQLiteOperationEventStore(stream_path),
+        operation_store,
+        event_store,
         worker_id=_PROCESS_STREAM_WORKER_ID,
         projection_lease_seconds=projection_lease_seconds,
     )
@@ -245,16 +418,20 @@ class OperationStreamTransport:
 
     def __init__(
         self,
-        operation_store: SQLiteOperationStore,
-        event_store: SQLiteOperationEventStore,
+        operation_store: OperationStateStore,
+        event_store: OperationEventStore,
         *,
         worker_id: str | None = None,
         projection_lease_seconds: int = 10,
     ) -> None:
-        if not isinstance(operation_store, SQLiteOperationStore):
-            raise TypeError("operation_store must be SQLiteOperationStore")
-        if not isinstance(event_store, SQLiteOperationEventStore):
-            raise TypeError("event_store must be SQLiteOperationEventStore")
+        if not isinstance(operation_store, OperationStateStore):
+            raise TypeError(
+                "operation_store must implement the durable OperationStateStore contract"
+            )
+        if not isinstance(event_store, OperationEventStore):
+            raise TypeError(
+                "event_store must implement the durable OperationEventStore contract"
+            )
         if (
             isinstance(projection_lease_seconds, bool)
             or not isinstance(projection_lease_seconds, int)
@@ -551,6 +728,7 @@ __all__ = [
     "OperationAcknowledgement",
     "OperationAccessDenied",
     "OperationResyncSnapshot",
+    "OperationEventStore",
     "OperationStreamBatch",
     "OperationStreamTransport",
     "OperationTransportConflict",

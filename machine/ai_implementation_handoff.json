@@ -1366,11 +1366,13 @@
         "slow-client API replay remains operation-local and does not block unrelated operations",
         "fenced expiring per-operation projection lease with crash-safe takeover",
         "generation fencing makes stale release/renew inert after worker takeover",
-        "cross-worker API cursor replay and slow-client isolation journeys"
+        "cross-worker API cursor replay and slow-client isolation journeys",
+        "backend/core/operation_stream_transport.py defines runtime-checkable OperationStateStore and OperationEventStore contracts so shared-network authorities can replace local SQLite without changing replay semantics",
+        "backend/tests/test_operation_stream_transport.py enforces complete durable store adapter contracts and rejects partial backends"
       ],
       "remaining": [
+        "implement and validate concrete shared-network OperationStateStore/OperationEventStore authorities beyond the file-backed reference stores",
         "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
         "browser-level disconnect/reconnect automation against assembled topology",
         "browser-level slow-client/backpressure automation against assembled topology",
         "browser-level cancel-complete automation against assembled topology"
