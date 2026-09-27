@@ -1061,12 +1061,16 @@
       "plane": "product-experience",
       "stage": 7,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
-        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence",
+        "browser operation session covers reconnect, compaction-gap recovery and cancel-complete fencing",
+        "expired write-tool approvals can be reauthorized with stable call/tool/argument identity and restart-safe persistence",
+        "governance export/delete journeys execute tenant-bound conversation lifecycle semantics",
+        "Golden Journey Closure Gate runs exact-head frontend, engine, governance and independent verifier suites"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -1075,31 +1079,20 @@
         "degraded-mode assertions"
       ],
       "outstanding_evidence": [
-        "assembled browser E2E suite across frontend/backend/engine boundaries",
-        "assembled API/browser trace continuity through operation stream replay",
-        "browser-visible artifact/result linkage assertions",
-        "engine-outage and browser degraded-mode assertions",
-        "write-tool approval expiry and resume fault journey",
-        "governance delete/export assembled journey",
-        "all declared lower-stage dependency gaps closed",
-        "exact-head App Assembly and focused Stage-7 journey validation"
+        "fresh exact-head Golden Journey Closure Gate",
+        "fresh exact-head App Assembly",
+        "transaction-capable Mongo replica-set assembled integration",
+        "deployed frontend/backend/engine journey proof",
+        "all lower-stage dependency gaps closed",
+        "independent closure signoff"
       ],
       "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol",
-        "assembled browser/API Stage-7 closure evidence remains outstanding",
-        "exact-head Stage-7 validation remains outstanding"
+        "fresh exact-head Golden Journey Closure Gate",
+        "fresh exact-head App Assembly",
+        "transaction-capable Mongo replica-set assembled integration",
+        "deployed frontend/backend/engine journey proof",
+        "all lower-stage dependency gaps closed",
+        "independent closure signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
