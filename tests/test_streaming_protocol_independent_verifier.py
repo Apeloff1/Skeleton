@@ -17,7 +17,7 @@ def _write_machine(root: Path, *, closed: bool = True) -> None:
     gap_status = "closed" if closed else "open"
     handoff_status = "closed" if closed else "implemented_pending_closure"
     closure_status = "closed" if closed else "open"
-    blueprint_status = "closed" if closed else "implemented-pending-closure"
+    blueprint_status = "complete" if closed else "implemented-pending-closure"
 
     gap_register = [
         {"id": dep, "status": "closed"} for dep in sorted(DEPENDENCIES)
