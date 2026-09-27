@@ -22,6 +22,10 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
 MAX_RISK_EVIDENCE_REFS = 128
+ACCEPTED_RISK_SIGNER_TYPES = frozenset({"human", "governance"})
+ACCEPTED_RISK_SIGNATURE_METHODS = frozenset(
+    {"github_identity", "contract_attestation"}
+)
 
 
 class RiskEvidenceError(ValueError):
@@ -277,6 +281,14 @@ class AcceptedRisk:
                 self,
                 field,
                 _token(getattr(self, field), field, max_length=256),
+            )
+        if self.signer_type not in ACCEPTED_RISK_SIGNER_TYPES:
+            raise RiskEvidenceError(
+                "accepted risk requires a human/governance signer"
+            )
+        if self.signature_method not in ACCEPTED_RISK_SIGNATURE_METHODS:
+            raise RiskEvidenceError(
+                "accepted risk signature method is not approved"
             )
         object.__setattr__(self, "git_sha", _sha(self.git_sha, "git_sha"))
         object.__setattr__(
