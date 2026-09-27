@@ -26,7 +26,7 @@ EXPECTED_POLICY_ID = "skeleton.p1.required_gate_authority"
 EXPECTED_POLICY_VERSION = "1.0.0"
 EXPECTED_TASK_ID = "P1-EVID-03"
 EXPECTED_ACCOUNTABILITY = "ACC-P1-EVID-03"
-EXPECTED_GATE_COUNT = 24
+EXPECTED_GATE_COUNT = 25
 EXPECTED_RULES = {
     "missing_gate": "reject",
     "stale_head": "reject",
