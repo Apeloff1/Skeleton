@@ -383,6 +383,20 @@
       "accepted_conclusions": [
         "success"
       ]
+    },
+    {
+      "id": "GATE-P1-AGENT-DELEGATION",
+      "workflow_name": "P1 Agent Delegation Authority Gate",
+      "workflow_file": ".github/workflows/p1-agent-delegation-authority.yml",
+      "group": "security",
+      "purpose": "Fail-closed agent identity, handoff, delegated authority, resource budget and live lease/fencing qualification.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
     }
   ],
   "groups": [
@@ -459,12 +473,13 @@
         "GATE-MALWARE",
         "GATE-ARTIFACT",
         "GATE-DEPENDENCY",
-        "GATE-P1-PRIVILEGED-TOOL"
+        "GATE-P1-PRIVILEGED-TOOL",
+        "GATE-P1-AGENT-DELEGATION"
       ]
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 26,
+    "required_gate_count": 27,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
