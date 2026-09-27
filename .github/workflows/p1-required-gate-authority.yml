@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
       - "skeleton/contracts/promotion_gates.py"
       - "skeleton/ai/runtime/contracts/promotion_gates.py"
       - "skeleton/contracts/__init__.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
       - "skeleton/contracts/promotion_gates.py"
       - "skeleton/ai/runtime/contracts/promotion_gates.py"
       - "skeleton/contracts/__init__.py"
