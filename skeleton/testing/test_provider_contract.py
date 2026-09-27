@@ -1436,6 +1436,30 @@ def test_provider_registry_readiness_fails_closed_on_invalid_active_receipt() ->
         registry.require_active()
 
 
+
+def test_provider_registry_status_suppresses_invalid_receipt_availability() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [],
+    )
+
+    def receipt_loader(_provider_id: str) -> ProviderArchitectureReceipt:
+        return _provider_receipt("wrong-primary")
+
+    registry = ProviderRegistry(
+        [primary],
+        active="primary",
+        architecture_loader=receipt_loader,
+    )
+
+    [status] = registry.statuses()
+    assert status["available"] is False
+    assert status["architecture_acknowledged"] is False
+    assert status["architecture_tag"] is None
+    assert status["construction_version"] is None
+
+
 def test_provider_registry_secondary_configuration_fails_closed_when_partial(
     monkeypatch,
 ) -> None:
