@@ -924,7 +924,7 @@
     {
       "id": "product-experience",
       "owner": "frontend",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Human interaction shell, streaming state, conversation/task UX, artifacts, errors, settings and control views.",
       "depends_on": [
         "application-api",
@@ -6685,7 +6685,7 @@
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
