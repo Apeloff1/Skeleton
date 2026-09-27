@@ -195,6 +195,7 @@ def test_authority_rejects_terminal_policy_drift(tmp_path: Path) -> None:
         for error in errors
     )
 
+
 def test_authority_rejects_masterplan_pointer_drift(tmp_path: Path) -> None:
     module = _module()
     path = _copy_contract(tmp_path)
@@ -209,6 +210,7 @@ def test_authority_rejects_masterplan_pointer_drift(tmp_path: Path) -> None:
     )
 
     assert "master plan required-gate authority pointer drift" in errors
+
 
 def _passing_rows(authority: dict, head: str = "a" * 40) -> list[dict]:
     return [
@@ -316,6 +318,7 @@ def test_observation_evaluator_rejects_unknown_fields(tmp_path: Path) -> None:
         assert "unknown fields" in str(exc)
     else:
         raise AssertionError("observation with unknown fields unexpectedly accepted")
+
 
 def test_authority_rejects_policy_version_and_self_path_drift(tmp_path: Path) -> None:
     module = _module()
