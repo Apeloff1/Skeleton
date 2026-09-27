@@ -25,7 +25,10 @@
     "master_index": "docs/plan/MASTER_INDEX.md",
     "master_plan": "docs/plan/MASTER_PLAN.md",
     "master_build_sequence": "machine/ai_master_build_sequence.json",
-    "master_build_sequence_human": "docs/plan/MASTER_BUILD_SEQUENCE.md"
+    "master_build_sequence_human": "docs/plan/MASTER_BUILD_SEQUENCE.md",
+    "p1_execution_map": "machine/ai_p1_execution_map.json",
+    "p1_execution_map_human": "docs/plan/P1_EXECUTION_MAP.md",
+    "p1_task_backlog": "machine/ai_p1_task_backlog.json"
   },
   "laws": [
     "durable governed state is authoritative",
