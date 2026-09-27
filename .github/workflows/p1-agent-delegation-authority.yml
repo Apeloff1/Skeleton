@@ -1,0 +1,305 @@
+name: P1 Agent Delegation Authority Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/agents/delegation.py"
+      - "skeleton/ai/agents/core/delegation.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_agent_delegation_authority.py"
+      - "skeleton/testing/test_swarm_fencing.py"
+      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
+      - "skeleton/testing/test_swarm_runtime.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-agent-delegation-authority.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/agents/delegation.py"
+      - "skeleton/ai/agents/core/delegation.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_agent_delegation_authority.py"
+      - "skeleton/testing/test_swarm_fencing.py"
+      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
+      - "skeleton/testing/test_swarm_runtime.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-agent-delegation-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-agent-delegation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate agent delegation authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run delegation and live-fence regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_agent_delegation_authority.py
+          skeleton/testing/test_swarm_fencing.py
+          skeleton/testing/test_swarm_exact_lease_atomicity.py
+          skeleton/testing/test_swarm_runtime.py
+
+      - name: Validate P1 task and terminal gate authority
+        run: |
+          python scripts/check_ai_p1_execution_map.py --print-summary
+          python scripts/check_p1_required_gate_authority.py --print-summary
+
+      - name: Build canonical AUTO-02 delegation decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-auto-02
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          from skeleton.agents.delegation import (
+              AgentIdentity,
+              DelegationBudget,
+              DelegationGrant,
+              DelegationUsage,
+              HandoffPacket,
+              authorize_swarm_child_commit,
+          )
+          from skeleton.agents.swarm_exact_lease import lease_exact
+          from skeleton.agents.swarm_fencing import fence_for
+          from skeleton.agents.swarm_runtime import SwarmRuntime, SwarmTask
+
+          now = datetime.now(timezone.utc)
+          clock = [100.0]
+          runtime = SwarmRuntime(
+              default_lease_seconds=30.0,
+              clock=lambda: clock[0],
+          )
+          child = AgentIdentity(
+              agent_id="agent-ci-child",
+              principal_id="principal-ci-child",
+              tenant_id="ci",
+              capabilities=("read", "tool.execute"),
+          )
+          parent = AgentIdentity(
+              agent_id="agent-ci-parent",
+              principal_id="principal-ci-parent",
+              tenant_id="ci",
+              capabilities=("delegate", "read", "tool.execute", "write"),
+          )
+          runtime.register_worker(
+              child.agent_id,
+              capabilities=child.capabilities,
+              capacity=1,
+          )
+          runtime.submit(
+              SwarmTask(
+                  id="ci-delegated-task",
+                  payload={"kind": "auto-02-ci"},
+                  required_capabilities=frozenset({"tool.execute"}),
+              )
+          )
+          leased = lease_exact(
+              runtime,
+              child.agent_id,
+              "ci-delegated-task",
+          )
+          fence = fence_for(leased)
+          grant = DelegationGrant(
+              delegation_id="delegation-ci",
+              lease_task_id=leased.id,
+              parent=parent,
+              child=child,
+              parent_budget=DelegationBudget(
+                  max_steps=100,
+                  max_tokens=100000,
+                  max_cost_micros=5000000,
+                  max_wall_seconds=600,
+                  max_tool_calls=50,
+                  max_delegation_depth=3,
+              ),
+              budget=DelegationBudget(
+                  max_steps=20,
+                  max_tokens=10000,
+                  max_cost_micros=500000,
+                  max_wall_seconds=120,
+                  max_tool_calls=10,
+                  max_delegation_depth=2,
+              ),
+              handoff=HandoffPacket(
+                  operation_id="operation-ci",
+                  objective_digest="1" * 64,
+                  context_digest="2" * 64,
+                  state_refs=("artifact:ci", "memory:ci"),
+                  checkpoint_digest="3" * 64,
+              ),
+              issued_at=now,
+              expires_at=now + timedelta(seconds=60),
+              lease_epoch=fence.attempt,
+              delegation_depth=1,
+          )
+          decision = authorize_swarm_child_commit(
+              runtime,
+              fence,
+              grant,
+              usage=DelegationUsage(
+                  steps=5,
+                  tokens=2000,
+                  cost_micros=100000,
+                  wall_seconds=10,
+                  tool_calls=2,
+              ),
+              required_capability="tool.execute",
+              now=now + timedelta(seconds=1),
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"AUTO-02 fixture rejected: {decision.reason}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-auto-02/decision.json").write_text(
+              json.dumps(
+                  {
+                      **decision.as_dict(),
+                      "decision_digest": decision.digest,
+                      "grant_digest": grant.digest,
+                      "handoff_digest": grant.handoff.digest,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-auto-02/refs.json").write_text(
+              json.dumps(
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      }
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head AUTO-02 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-auto-02/config.digest").write_text(
+              digest(
+                  [
+                      "machine/ai_p1_task_backlog.json",
+                      "machine/p1_required_gate_authority.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-02/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|auto-02"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-02/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/agents/delegation.py",
+                      "skeleton/ai/agents/core/delegation.py",
+                      ".github/workflows/p1-agent-delegation-authority.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-02/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_agent_delegation_authority.py",
+                      "skeleton/testing/test_swarm_fencing.py",
+                      "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+                      "skeleton/testing/test_swarm_runtime.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-AUTO-02             --accountability-id ACC-P1-AUTO-02             --configuration-digest "$(cat .p1-auto-02/config.digest)"             --environment-digest "$(cat .p1-auto-02/environment.digest)"             --verifier-id github-actions:p1-agent-delegation-authority             --verifier-digest "$(cat .p1-auto-02/verifier.digest)"             --test-manifest-digest "$(cat .p1-auto-02/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-auto-02/refs.json             --out .p1-auto-02/receipt.json             > .p1-auto-02/stdout.json
+
+      - name: Assert exact-head receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-auto-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AUTO-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-AUTO-02":
+              raise SystemExit("AUTO-02 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-AUTO-02":
+              raise SystemExit("AUTO-02 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("AUTO-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY
