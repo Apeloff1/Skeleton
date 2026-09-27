@@ -519,8 +519,10 @@ export async function resyncOperation(
     state = {
       ...state,
       operationState: snapshot.operation.state,
-      terminal: Boolean(snapshot.terminal),
-      connection: snapshot.terminal ? 'terminal' : 'replaying',
+      // Reconcile authoritative terminal content through the reducer before
+      // fencing the client as terminal.
+      terminal: false,
+      connection: 'replaying',
       resyncRequired: false,
       error: null,
     };
