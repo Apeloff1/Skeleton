@@ -45,6 +45,7 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
         uri,
         serverSelectionTimeoutMS=5_000,
         connectTimeoutMS=5_000,
+        retryWrites=False,
     )
     database_name = "stage7_golden_" + uuid4().hex
     database = client[database_name]
