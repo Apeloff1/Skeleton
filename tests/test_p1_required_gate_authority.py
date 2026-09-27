@@ -210,3 +210,110 @@ def test_authority_rejects_masterplan_pointer_drift(tmp_path: Path) -> None:
 
     assert "master plan required-gate authority pointer drift" in errors
 
+def _passing_rows(authority: dict, head: str = "a" * 40) -> list[dict]:
+    return [
+        {
+            "workflow_name": gate["workflow_name"],
+            "head_sha": head,
+            "run_id": f"run-{index}",
+            "run_attempt": 1,
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "completed_at": "2026-09-27T18:00:00Z",
+        }
+        for index, gate in enumerate(authority["gates"], start=1)
+        if gate["required_for_terminal_p1_promotion"] is True
+    ]
+
+
+def test_observation_evaluator_accepts_exact_complete_set(tmp_path: Path) -> None:
+    module = _module()
+    authority_path = _copy_contract(tmp_path)
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    observations = tmp_path / "observations.json"
+    observations.write_text(
+        json.dumps(_passing_rows(authority), indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    payload = module.evaluate_observations(
+        tmp_path,
+        observations_path=observations,
+        target_sha="a" * 40,
+        authority_path=authority_path.relative_to(tmp_path),
+    )
+
+    decision = payload["decision"]
+    assert decision["accepted"] is True
+    assert decision["required_gate_count"] == 22
+    assert decision["passing_gate_count"] == 22
+    assert len(decision["decision_digest"]) == 64
+
+
+def test_observation_evaluator_rejects_stale_required_gate(tmp_path: Path) -> None:
+    module = _module()
+    authority_path = _copy_contract(tmp_path)
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    rows = _passing_rows(authority)
+    rows[0]["head_sha"] = "b" * 40
+    observations = tmp_path / "observations.json"
+    observations.write_text(
+        json.dumps(rows, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    payload = module.evaluate_observations(
+        tmp_path,
+        observations_path=observations,
+        target_sha="a" * 40,
+        authority_path=authority_path.relative_to(tmp_path),
+    )
+
+    assert payload["decision"]["accepted"] is False
+    assert payload["decision"]["stale"] == [authority["gates"][0]["workflow_name"]]
+
+
+def test_observation_evaluator_rejects_non_array_input(tmp_path: Path) -> None:
+    module = _module()
+    authority_path = _copy_contract(tmp_path)
+    observations = tmp_path / "observations.json"
+    observations.write_text("{}", encoding="utf-8")
+
+    try:
+        module.evaluate_observations(
+            tmp_path,
+            observations_path=observations,
+            target_sha="a" * 40,
+            authority_path=authority_path.relative_to(tmp_path),
+        )
+    except module.GateAuthorityValidationError as exc:
+        assert "JSON array" in str(exc)
+    else:
+        raise AssertionError("non-array observations unexpectedly accepted")
+
+
+def test_observation_evaluator_rejects_unknown_fields(tmp_path: Path) -> None:
+    module = _module()
+    authority_path = _copy_contract(tmp_path)
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    rows = _passing_rows(authority)
+    rows[0]["payload"] = "forbidden"
+    observations = tmp_path / "observations.json"
+    observations.write_text(
+        json.dumps(rows, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        module.evaluate_observations(
+            tmp_path,
+            observations_path=observations,
+            target_sha="a" * 40,
+            authority_path=authority_path.relative_to(tmp_path),
+        )
+    except module.GateAuthorityValidationError as exc:
+        assert "unknown fields" in str(exc)
+    else:
+        raise AssertionError("observation with unknown fields unexpectedly accepted")
+
