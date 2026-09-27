@@ -468,7 +468,8 @@
         "scripts/state_recovery_drill.py",
         "skeleton/testing/test_state_recovery_drill.py",
         ".github/workflows/state-recovery-drill.yml"
-      ]
+      ],
+      "gap": "gap-state-authority-convergence"
     },
     {
       "id": "operation-event-stream",
