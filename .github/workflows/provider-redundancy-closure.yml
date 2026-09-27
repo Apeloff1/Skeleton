@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "masterplan/closure-stage7-final-20260927-clean2"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/provider_runtime.py"
