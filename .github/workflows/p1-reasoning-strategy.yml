@@ -1,0 +1,201 @@
+name: P1 Reasoning Strategy Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/p1_reasoning_strategy_registry.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/intelligence/cognitive_runtime.py"
+      - "skeleton/ai/runtime/intelligence/strategy_registry.py"
+      - "skeleton/ai/runtime/intelligence/cognitive_runtime.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "scripts/check_p1_reasoning_strategy_registry.py"
+      - "skeleton/testing/test_reasoning_strategy_registry.py"
+      - "tests/test_p1_reasoning_strategy_registry.py"
+      - ".github/workflows/p1-reasoning-strategy.yml"
+  pull_request:
+    branches:
+      - main
+      - "p1/intel-02-memory-retrieval-knowledge-quality-v2-20260927"
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/p1_reasoning_strategy_registry.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/intelligence/cognitive_runtime.py"
+      - "skeleton/ai/runtime/intelligence/strategy_registry.py"
+      - "skeleton/ai/runtime/intelligence/cognitive_runtime.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "scripts/check_p1_reasoning_strategy_registry.py"
+      - "skeleton/testing/test_reasoning_strategy_registry.py"
+      - "tests/test_p1_reasoning_strategy_registry.py"
+      - ".github/workflows/p1-reasoning-strategy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-reasoning-strategy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate P1 reasoning strategy and stopping authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Verify canonical AI mirror parity
+        run: |
+          set -euo pipefail
+          cmp             skeleton/intelligence/strategy_registry.py             skeleton/ai/runtime/intelligence/strategy_registry.py
+          cmp             skeleton/intelligence/cognitive_runtime.py             skeleton/ai/runtime/intelligence/cognitive_runtime.py
+
+      - name: Validate machine reasoning registry
+        run: >-
+          python scripts/check_p1_reasoning_strategy_registry.py
+          --print-summary
+
+      - name: Compile reasoning policy surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/intelligence/strategy_registry.py
+          skeleton/intelligence/cognitive_runtime.py
+          skeleton/ai/runtime/intelligence/strategy_registry.py
+          skeleton/ai/runtime/intelligence/cognitive_runtime.py
+
+      - name: Run INTEL-03 focused regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_reasoning_strategy_registry.py
+          tests/test_p1_reasoning_strategy_registry.py
+
+      - name: Emit exact-head INTEL-03 evidence receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-intel-03
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence_files = [
+              "machine/p1_reasoning_strategy_registry.json",
+              "skeleton/intelligence/strategy_registry.py",
+              "skeleton/intelligence/cognitive_runtime.py",
+              "skeleton/testing/test_reasoning_strategy_registry.py",
+              "tests/test_p1_reasoning_strategy_registry.py",
+              "scripts/check_p1_reasoning_strategy_registry.py",
+          ]
+
+          def digest_files(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode("utf-8"))
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          refs = [
+              {
+                  "source": name,
+                  "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                  "category": "repository_state",
+              }
+              for name in evidence_files
+          ]
+          Path(".p1-intel-03/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-03/config.digest").write_text(
+              digest_files(
+                  [
+                      "machine/p1_reasoning_strategy_registry.json",
+                      "machine/ai_p1_task_backlog.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-03/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-03/verifier.digest").write_text(
+              digest_files(
+                  [
+                      "scripts/check_p1_reasoning_strategy_registry.py",
+                      ".github/workflows/p1-reasoning-strategy.yml",
+                      "scripts/emit_p1_promotion_evidence.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-03/tests.digest").write_text(
+              digest_files(
+                  [
+                      "skeleton/testing/test_reasoning_strategy_registry.py",
+                      "tests/test_p1_reasoning_strategy_registry.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-INTEL-03             --accountability-id ACC-P1-INTEL-03             --configuration-digest "$(cat .p1-intel-03/config.digest)"             --environment-digest "$(cat .p1-intel-03/environment.digest)"             --verifier-id github-actions:p1-reasoning-strategy             --verifier-digest "$(cat .p1-intel-03/verifier.digest)"             --test-manifest-digest "$(cat .p1-intel-03/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-intel-03/refs.json             --out .p1-intel-03/receipt.json             > .p1-intel-03/stdout.json
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-intel-03/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("INTEL-03 receipt does not bind exact head")
+          if receipt["task_id"] != "P1-INTEL-03":
+              raise SystemExit("INTEL-03 task identity drift")
+          if receipt["accountability_id"] != "ACC-P1-INTEL-03":
+              raise SystemExit("INTEL-03 accountability identity drift")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1 INTEL-03 evidence receipt OK:",
+              receipt["subject_digest"],
+              receipt["receipt_digest"],
+          )
+          PY
