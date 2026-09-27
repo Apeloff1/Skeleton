@@ -535,6 +535,55 @@ async def test_approval_resume_rejects_tampered_request_binding(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
+async def test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry(
+    monkeypatch,
+) -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("uncheckpointed", response_id="resp-uncheckpointed")]
+    )
+    runtime = _runtime(repo, provider, tools)
+    request = _request()
+    real_checkpoint = runtime._checkpoint
+
+    def crash_before_provider_checkpoint(execution, payload, *, now):
+        if (
+            execution.state is ExecutionState.PROVIDER_COMPLETED
+            and isinstance(payload.get("last_provider"), dict)
+        ):
+            raise RuntimeError("simulated crash before provider checkpoint")
+        return real_checkpoint(execution, payload, now=now)
+
+    monkeypatch.setattr(runtime, "_checkpoint", crash_before_provider_checkpoint)
+
+    with pytest.raises(RuntimeError, match="simulated crash before provider checkpoint"):
+        await runtime.start(
+            request,
+            instructions="Answer.",
+            prompt="Do it once.",
+            context_digest="d" * 64,
+            now=_now(),
+        )
+
+    assert repo.get("exec-1").state is ExecutionState.PROVIDER_COMPLETED
+    assert len(provider.requests) == 1
+    checkpoint = repo.latest_checkpoint("exec-1")
+    assert checkpoint is not None
+    assert checkpoint.payload["last_provider"] is None
+
+    resumed_provider = FakeProvider([])
+    recovered = _runtime(repo, resumed_provider, tools)
+    result = await recovered.resume("exec-1", now=_now())
+
+    assert result.completed is True
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.usage["error_code"] == "provider_response_checkpoint_missing"
+    assert resumed_provider.requests == []
+
+
+@pytest.mark.asyncio
 async def test_crash_after_provider_checkpoint_resumes_without_second_provider_call(
     monkeypatch,
 ) -> None:
