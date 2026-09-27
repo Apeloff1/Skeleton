@@ -44,3 +44,30 @@ def test_fenced_api_rejects_stale_attempt() -> None:
         assert "stale lease attempt" in exc.detail
     else:
         raise AssertionError("stale fenced completion was accepted")
+
+def test_pre_renewal_fence_cannot_complete_after_deadline_changes() -> None:
+    clock = [0.0]
+    runtime = HardenedSwarmRuntime(
+        default_lease_seconds=10.0,
+        clock=lambda: clock[0],
+    )
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("t", {}))
+    task = runtime.lease("w")[0]
+    stale = LeaseFence("t", "w", task.attempts, task.lease_deadline)
+
+    clock[0] = 1.0
+    renewed = runtime.renew("w", "t", seconds=20.0)
+    assert renewed.lease_deadline != stale.deadline
+
+    with pytest.raises(LeaseError, match="stale lease deadline"):
+        fenced_succeed(runtime, stale)
+
+    current = LeaseFence(
+        "t",
+        "w",
+        renewed.attempts,
+        renewed.lease_deadline,
+    )
+    assert fenced_succeed(runtime, current).state.value == "succeeded"
+
