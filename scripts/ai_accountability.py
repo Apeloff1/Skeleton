@@ -164,6 +164,7 @@ def sync_mirrors(
 
 
 def render(ledger: dict[str, Any]) -> str:
+    counts = ledger["tracked_counts"]
     lines = [
         "# Skeleton AI Build Accountability Ledger",
         "",
@@ -173,9 +174,33 @@ def render(ledger: dict[str, Any]) -> str:
         "",
         "## Mandatory accountability protocol",
         "",
-        "Checkboxes are derived from signed machine state. Do not hand-edit them.",
+        (
+            "Tracked items: **{total}** ({volumes} volumes, {work_packages} work packages, "
+            "{queue_tasks} AIQ tasks, {vertical_slices} vertical slices, "
+            "{catalog_entries} historical/edge/obscure obligations)."
+        ).format(**counts),
         "",
-        "Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC.",
+        "Every tracked item has a completion checkbox. The checkbox is derived machine state and may not be hand-edited.",
+        "",
+        "Every lifecycle/status transition is attributable: actor identity/type, role, RFC3339 UTC timestamp, full git SHA, statement, signature method, and from/to status.",
+        "",
+        "Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`, `git_ssh`, `sigstore`, `ci_oidc`. Unbound/manual attestations do not count.",
+        "",
+        "Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.",
+        "",
+        "## Lifecycle",
+        "",
+        "```text",
+        "[ ] planned / unverified",
+        "  -> signed STARTED event + UTC timestamp + git SHA",
+        "  -> implementation evidence",
+        "  -> implementation sign-off",
+        "  -> independent verification evidence",
+        "  -> verification sign-off",
+        "  -> signed completion / accepted-risk event",
+        "  -> validator",
+        "  -> [x] closed",
+        "```",
         "",
     ]
 
@@ -200,7 +225,17 @@ def render(ledger: dict[str, Any]) -> str:
     section("Atomic AI Build Queue", [r for r in records if r["type"] == "queue_task"])
     section("Vertical Slices", [r for r in records if r["type"] == "vertical_slice"])
     section("Historical / Edge / Obscure Catalogue", [r for r in records if r["type"] == "catalog_entry"])
-    return "\n".join(lines) + "\n"
+    lines.extend(
+        [
+            "## Audit and correction rule",
+            "",
+            "Git history plus this ledger forms the construction audit trail. Do not rewrite prior sign-offs. Corrections append a superseding signed event tied to a new git revision.",
+            "",
+            "Use `python scripts/ai_accountability.py --help` for the governed signing workflow.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def persist(

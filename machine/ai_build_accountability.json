@@ -18355,9 +18355,9 @@
       "id": "ACC-AIQ-S0-STATE-01",
       "type": "queue_task",
       "title": "AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T18:00:23Z",
       "implementation_signoff": {
@@ -18394,20 +18394,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/52011e83750b3d0184e516cb926427b78a1d7489"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:State Recovery Drill",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:14:27Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+          "github-actions-job:108523369309",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_state_authority_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent State Recovery Drill verified the closed state-authority contract, including canonical durable state ownership and rebuild/recovery invariants covering STATE-01.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T18:15:33Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -18461,29 +18467,76 @@
             "https://github.com/Apeloff1/Skeleton/commit/52011e83750b3d0184e516cb926427b78a1d7489",
             "machine/accountability_events/ACC-AIQ-S0-STATE-01/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:State Recovery Drill",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:14:27Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent State Recovery Drill verified the closed state-authority contract, including canonical durable state ownership and rebuild/recovery invariants covering STATE-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+            "github-actions-job:108523369309",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_state_authority_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-STATE-01 after existing implementation signoff and independent exact-head State Recovery Drill verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+            "github-actions-job:108523369309"
+          ]
         }
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/3d49bd7bdf81a1c00af6464e8189dac37f9c802a",
-        "https://github.com/Apeloff1/Skeleton/commit/f4d784d298724232a824a07afccb2b3355ea4e36",
-        "https://github.com/Apeloff1/Skeleton/commit/c91639271eb8e3ded65dbbce82a223171f9c4d18",
-        "https://github.com/Apeloff1/Skeleton/commit/3d4d26b8708b0047a45cefbae01e94e0d71b8136",
-        "https://github.com/Apeloff1/Skeleton/commit/39897803b503e6dc63b8018769cd25768aa4a23a",
-        "https://github.com/Apeloff1/Skeleton/commit/7330d0262a414f1ee74bb25371440555045d51c9",
-        "https://github.com/Apeloff1/Skeleton/commit/6dd70bda296c3a1ec51e32529c894d761472e571",
-        "https://github.com/Apeloff1/Skeleton/commit/bb539e89e7970a95e06b34bba96d452b6343c1c4",
-        "https://github.com/Apeloff1/Skeleton/commit/7a5907ad784b64290a6c05b880936a9d6505f1dc",
-        "https://github.com/Apeloff1/Skeleton/commit/22c4ea4c747d870f1f933a13c272cfdfd50347cd",
-        "https://github.com/Apeloff1/Skeleton/commit/d900908aeb018e7699d514ebc39d7537b1ee7be4",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523369309",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
         "https://github.com/Apeloff1/Skeleton/commit/10b98598a4ccedde4bdbdab6cd0e14003e7c833a",
-        "https://github.com/Apeloff1/Skeleton/commit/bed56c60e3e1c205e62f7f88f00de63e2c550b44",
-        "https://github.com/Apeloff1/Skeleton/commit/ad1b4cd2c999e1c492311b38bc25e315bb805b02",
-        "https://github.com/Apeloff1/Skeleton/commit/760664313d2d3c7168092efdae17a05f3809bf26",
-        "https://github.com/Apeloff1/Skeleton/commit/ed14dd0afb0b0816a18575147c89fdd485318a4a",
-        "https://github.com/Apeloff1/Skeleton/commit/ac684c5d311265f29a2d5ed30f030de202901844",
-        "https://github.com/Apeloff1/Skeleton/commit/c46810325711c0b6085e237a199e4be3f5420f84",
+        "https://github.com/Apeloff1/Skeleton/commit/22c4ea4c747d870f1f933a13c272cfdfd50347cd",
+        "https://github.com/Apeloff1/Skeleton/commit/39897803b503e6dc63b8018769cd25768aa4a23a",
+        "https://github.com/Apeloff1/Skeleton/commit/3d49bd7bdf81a1c00af6464e8189dac37f9c802a",
+        "https://github.com/Apeloff1/Skeleton/commit/3d4d26b8708b0047a45cefbae01e94e0d71b8136",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
         "https://github.com/Apeloff1/Skeleton/commit/52011e83750b3d0184e516cb926427b78a1d7489",
-        "machine/accountability_events/ACC-AIQ-S0-STATE-01/implementation.json"
+        "https://github.com/Apeloff1/Skeleton/commit/6dd70bda296c3a1ec51e32529c894d761472e571",
+        "https://github.com/Apeloff1/Skeleton/commit/7330d0262a414f1ee74bb25371440555045d51c9",
+        "https://github.com/Apeloff1/Skeleton/commit/760664313d2d3c7168092efdae17a05f3809bf26",
+        "https://github.com/Apeloff1/Skeleton/commit/7a5907ad784b64290a6c05b880936a9d6505f1dc",
+        "https://github.com/Apeloff1/Skeleton/commit/ac684c5d311265f29a2d5ed30f030de202901844",
+        "https://github.com/Apeloff1/Skeleton/commit/ad1b4cd2c999e1c492311b38bc25e315bb805b02",
+        "https://github.com/Apeloff1/Skeleton/commit/bb539e89e7970a95e06b34bba96d452b6343c1c4",
+        "https://github.com/Apeloff1/Skeleton/commit/bed56c60e3e1c205e62f7f88f00de63e2c550b44",
+        "https://github.com/Apeloff1/Skeleton/commit/c46810325711c0b6085e237a199e4be3f5420f84",
+        "https://github.com/Apeloff1/Skeleton/commit/c91639271eb8e3ded65dbbce82a223171f9c4d18",
+        "https://github.com/Apeloff1/Skeleton/commit/d900908aeb018e7699d514ebc39d7537b1ee7be4",
+        "https://github.com/Apeloff1/Skeleton/commit/ed14dd0afb0b0816a18575147c89fdd485318a4a",
+        "https://github.com/Apeloff1/Skeleton/commit/f4d784d298724232a824a07afccb2b3355ea4e36",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-STATE-01/implementation.json",
+        "scripts/verify_state_authority_closure.py"
       ],
       "baseline_status": "pending"
     },
@@ -18491,9 +18544,9 @@
       "id": "ACC-AIQ-S0-STATE-02",
       "type": "queue_task",
       "title": "AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T18:34:20Z",
       "implementation_signoff": {
@@ -18521,20 +18574,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/b1537ae2c50821cefca6d2ea18f14efd7e99f384"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:State Recovery Drill",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:14:27Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+          "github-actions-job:108523369309",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_state_authority_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent State Recovery Drill verified the closed state-authority contract, including durable OperationEnvelope ownership and authoritative/outbox recovery invariants covering STATE-02.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T18:57:14Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -18579,20 +18638,67 @@
             "https://github.com/Apeloff1/Skeleton/commit/b1537ae2c50821cefca6d2ea18f14efd7e99f384",
             "machine/accountability_events/ACC-AIQ-S0-STATE-02/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:State Recovery Drill",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:14:27Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent State Recovery Drill verified the closed state-authority contract, including durable OperationEnvelope ownership and authoritative/outbox recovery invariants covering STATE-02.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+            "github-actions-job:108523369309",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_state_authority_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-STATE-02 after existing implementation signoff and independent exact-head State Recovery Drill verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
+            "github-actions-job:108523369309"
+          ]
         }
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/6b72b3b57d6619f681fe07c6a6c7d7253a3f01b8",
-        "https://github.com/Apeloff1/Skeleton/commit/eaff2d24f0126a50896e7b4d6e53808f9ce1d622",
-        "https://github.com/Apeloff1/Skeleton/commit/17e923d04e8f3b0f8b1e9f914097e20d0cd95304",
-        "https://github.com/Apeloff1/Skeleton/commit/fb376f5667103170555945734b9df71426ac19ec",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523369309",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789226",
         "https://github.com/Apeloff1/Skeleton/commit/026b965846c98bb8942c0992e8ac600c68f97b31",
+        "https://github.com/Apeloff1/Skeleton/commit/17e923d04e8f3b0f8b1e9f914097e20d0cd95304",
         "https://github.com/Apeloff1/Skeleton/commit/1e68de536a12889b495a4a1ad2cf58cbd7f039a8",
-        "https://github.com/Apeloff1/Skeleton/commit/c1fd1dd029e23773a49ba8157ad182adf84e058d",
         "https://github.com/Apeloff1/Skeleton/commit/3dfa9d65cbcabfff2db550295cfbabd7f011aaf0",
         "https://github.com/Apeloff1/Skeleton/commit/44386fcd4448bf7947af455988a1baafb95682a6",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+        "https://github.com/Apeloff1/Skeleton/commit/6b72b3b57d6619f681fe07c6a6c7d7253a3f01b8",
         "https://github.com/Apeloff1/Skeleton/commit/b1537ae2c50821cefca6d2ea18f14efd7e99f384",
-        "machine/accountability_events/ACC-AIQ-S0-STATE-02/implementation.json"
+        "https://github.com/Apeloff1/Skeleton/commit/c1fd1dd029e23773a49ba8157ad182adf84e058d",
+        "https://github.com/Apeloff1/Skeleton/commit/eaff2d24f0126a50896e7b4d6e53808f9ce1d622",
+        "https://github.com/Apeloff1/Skeleton/commit/fb376f5667103170555945734b9df71426ac19ec",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-STATE-02/implementation.json",
+        "scripts/verify_state_authority_closure.py"
       ],
       "baseline_status": "pending"
     },
@@ -18794,9 +18900,9 @@
       "id": "ACC-AIQ-S0-GOV-01",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:30:59Z",
       "implementation_signoff": {
@@ -18824,20 +18930,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:Governance Closure Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:18:24Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "github-actions-job:108523368586",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_governance_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent Governance Closure Gate verified the closed governance-registry contract and canonical governed-write registration invariants covering GOV-01.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:37:44Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -18916,20 +19028,67 @@
             "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json"
           ],
           "supersedes_git_sha": "740954febacd5a52a645e19edc9d8401f8c39037"
+        },
+        {
+          "sequence": 5,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:Governance Closure Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:18:24Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent Governance Closure Gate verified the closed governance-registry contract and canonical governed-write registration invariants covering GOV-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_governance_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 6,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-GOV-01 after existing implementation signoff and independent exact-head Governance Closure Gate verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586"
+          ]
         }
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
-        "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
-        "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json",
-        "https://github.com/Apeloff1/Skeleton/commit/30415b23a06c577d81005f427221b337763d93ea",
-        "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json",
-        "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
-        "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523368586",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
         "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json"
+        "https://github.com/Apeloff1/Skeleton/commit/30415b23a06c577d81005f427221b337763d93ea",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+        "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
+        "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
+        "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+        "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
+        "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
+        "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json",
+        "scripts/verify_governance_closure.py"
       ],
       "baseline_status": "pending"
     },
@@ -18937,9 +19096,9 @@
       "id": "ACC-AIQ-S0-GOV-02",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:43:11Z",
       "implementation_signoff": {
@@ -18963,20 +19122,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:Governance Closure Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:18:24Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "github-actions-job:108523368586",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_governance_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent Governance Closure Gate verified durable delete/export/retention adapter execution and lifecycle propagation invariants covering GOV-02.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:47:05Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -19017,16 +19182,63 @@
             "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
             "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:Governance Closure Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:18:24Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent Governance Closure Gate verified durable delete/export/retention adapter execution and lifecycle propagation invariants covering GOV-02.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_governance_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-GOV-02 after existing implementation signoff and independent exact-head Governance Closure Gate verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586"
+          ]
         }
       ],
       "evidence": [
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523368586",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
         "https://github.com/Apeloff1/Skeleton/commit/0c75f60eff79e390cde09b4940824b78bab98674",
         "https://github.com/Apeloff1/Skeleton/commit/239d53c92110348393c5f2d1b14908bda1e3a0a6",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
         "https://github.com/Apeloff1/Skeleton/commit/5a43a0cdc980520c7f8104bc45cef75a007cb837",
         "https://github.com/Apeloff1/Skeleton/commit/63fca8212521a260a8a62958891ceee0d2162cf3",
-        "https://github.com/Apeloff1/Skeleton/commit/fdd95adaf18aea3919e5147b733d56ccf843b7dc",
         "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json"
+        "https://github.com/Apeloff1/Skeleton/commit/fdd95adaf18aea3919e5147b733d56ccf843b7dc",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json",
+        "scripts/verify_governance_closure.py"
       ],
       "baseline_status": "pending"
     },
@@ -19034,9 +19246,9 @@
       "id": "ACC-AIQ-S0-GOV-03",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:52:22Z",
       "implementation_signoff": {
@@ -19062,20 +19274,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:Governance Closure Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:18:24Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "github-actions-job:108523368586",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_governance_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent Governance Closure Gate verified governance receipt/lifecycle audit integration and payload-safe observability invariants covering GOV-03.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:58:49Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -19118,18 +19336,65 @@
             "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
             "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:Governance Closure Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:18:24Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent Governance Closure Gate verified governance receipt/lifecycle audit integration and payload-safe observability invariants covering GOV-03.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_governance_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-GOV-03 after existing implementation signoff and independent exact-head Governance Closure Gate verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
+            "github-actions-job:108523368586"
+          ]
         }
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/34fc2c2f59427bc43b0b303bcbebb3f3d3bca25b",
-        "https://github.com/Apeloff1/Skeleton/commit/ba24c06cdeaf685fc4a740ae37fb9de31f4f6081",
-        "https://github.com/Apeloff1/Skeleton/commit/9c7f0a8923c0c8a914eeaf99625175658fa1206d",
-        "https://github.com/Apeloff1/Skeleton/commit/d0e241fdd87563cc0e7d4c96847879a7e8114e98",
-        "https://github.com/Apeloff1/Skeleton/commit/426e87cd841e71b9db82d8af58c840cdb5cd2a78",
-        "https://github.com/Apeloff1/Skeleton/commit/f339e176b24722bb2cd0419e2c9a45379c4a8450",
-        "https://github.com/Apeloff1/Skeleton/commit/a5e376f5e1008e8526682d9942ffe87cb313ee5a",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523368586",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789145",
         "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json"
+        "https://github.com/Apeloff1/Skeleton/commit/34fc2c2f59427bc43b0b303bcbebb3f3d3bca25b",
+        "https://github.com/Apeloff1/Skeleton/commit/426e87cd841e71b9db82d8af58c840cdb5cd2a78",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+        "https://github.com/Apeloff1/Skeleton/commit/9c7f0a8923c0c8a914eeaf99625175658fa1206d",
+        "https://github.com/Apeloff1/Skeleton/commit/a5e376f5e1008e8526682d9942ffe87cb313ee5a",
+        "https://github.com/Apeloff1/Skeleton/commit/ba24c06cdeaf685fc4a740ae37fb9de31f4f6081",
+        "https://github.com/Apeloff1/Skeleton/commit/d0e241fdd87563cc0e7d4c96847879a7e8114e98",
+        "https://github.com/Apeloff1/Skeleton/commit/f339e176b24722bb2cd0419e2c9a45379c4a8450",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json",
+        "scripts/verify_governance_closure.py"
       ],
       "baseline_status": "pending"
     },
@@ -19137,9 +19402,9 @@
       "id": "ACC-AIQ-S0-COST-01",
       "type": "queue_task",
       "title": "AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption.",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T18:18:09Z",
       "implementation_signoff": {
@@ -19164,20 +19429,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:Cost Admission Closure Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T01:14:42Z",
+        "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
+          "github-actions-job:108523367880",
+          "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "scripts/verify_cost_admission_closure.py",
+          "machine/accountability_batches/stage0-independent-verification-20260927.json"
+        ],
+        "statement": "Independent Cost Admission Closure Gate verified durable quota/reservation restart and multi-worker accounting invariants covering COST-01.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T18:26:07Z",
+      "completed_at_utc": "2026-09-27T05:06:47Z",
+      "last_event_at_utc": "2026-09-27T05:06:47Z",
       "history": [
         {
           "sequence": 1,
@@ -19219,17 +19490,64 @@
             "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
             "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:Cost Admission Closure Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T01:14:42Z",
+          "git_sha": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "statement": "Independent Cost Admission Closure Gate verified durable quota/reservation restart and multi-worker accounting invariants covering COST-01.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
+            "github-actions-job:108523367880",
+            "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+            "scripts/verify_cost_admission_closure.py",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json"
+          ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-27T05:06:47Z",
+          "git_sha": "4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "statement": "Finalize ACC-AIQ-S0-COST-01 after existing implementation signoff and independent exact-head Cost Admission Closure Gate verification.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+          "from_status": "evidence_pending",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
+            "machine/accountability_batches/stage0-independent-verification-20260927.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
+            "github-actions-job:108523367880"
+          ]
         }
       ],
       "evidence": [
-        "https://github.com/Apeloff1/Skeleton/commit/6c8d09b279e5aa898e09ad487960ccd0e238f01f",
-        "https://github.com/Apeloff1/Skeleton/commit/aab142cd7142d27e163fb3b3b821e0a30eb74d54",
+        "git-head:4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+        "github-actions-job:108523367880",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36284789200",
         "https://github.com/Apeloff1/Skeleton/commit/0cbe739ba63922191519e9e025b9480bffe7fc44",
-        "https://github.com/Apeloff1/Skeleton/commit/a51d64f4d28cb95a640213fb8263eff4737653ec",
-        "https://github.com/Apeloff1/Skeleton/commit/ffc01aa78a66c05c9aad86717b509b009f2cb762",
+        "https://github.com/Apeloff1/Skeleton/commit/4569245fa1bc921a759eb109f0020b202c3b6a33",
         "https://github.com/Apeloff1/Skeleton/commit/696d8d2da1067a247403ab670a1fd2e3960b6b99",
+        "https://github.com/Apeloff1/Skeleton/commit/6c8d09b279e5aa898e09ad487960ccd0e238f01f",
+        "https://github.com/Apeloff1/Skeleton/commit/a51d64f4d28cb95a640213fb8263eff4737653ec",
+        "https://github.com/Apeloff1/Skeleton/commit/aab142cd7142d27e163fb3b3b821e0a30eb74d54",
         "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
-        "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json"
+        "https://github.com/Apeloff1/Skeleton/commit/ffc01aa78a66c05c9aad86717b509b009f2cb762",
+        "machine/accountability_batches/stage0-independent-verification-20260927.json",
+        "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json",
+        "scripts/verify_cost_admission_closure.py"
       ],
       "baseline_status": "pending"
     },
