@@ -550,9 +550,9 @@
       "gap": "gap-context-compiler-convergence",
       "plane": "prompt-context",
       "stage": 2,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/context.py",
         "skeleton/context/policy.py",
@@ -602,20 +602,8 @@
         "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
-        "fresh exact-head App Assembly context/instruction-policy boundary evidence",
-        "declared dependency-gap closure",
-        "independent context-compiler closure verification"
-      ],
-      "blockers": [
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-governance-registry",
-        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
-        "fresh exact-head App Assembly context/instruction-policy boundary evidence"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -634,9 +622,9 @@
       "gap": "gap-provider-interaction-protocol",
       "plane": "model-provider",
       "stage": 2,
-      "gap_status": "open",
-      "implementation_state": "implemented",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
         "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
@@ -664,18 +652,8 @@
         "stream delta ordering/finalization tests when streaming enabled",
         "no provider SDK/native response object escapes provider_runtime"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head execution of provider protocol and provider-boundary regression suites",
-        "fresh exact-head proof that provider-native SDK/response types remain isolated inside provider_runtime",
-        "declared dependency-gap closure",
-        "independent verification before gap closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-provider-surface-convergence",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
