@@ -404,3 +404,45 @@ def test_evidence_order_and_duplicates_do_not_change_binding_payload() -> None:
     )
 
     assert left.as_dict() == right.as_dict()
+
+def test_accepted_risk_rejects_non_human_governance_signer() -> None:
+    obligation = _obligation()
+
+    with pytest.raises(RiskEvidenceError, match="human/governance"):
+        AcceptedRisk(
+            obligation_id=obligation.obligation_id,
+            obligation_digest=obligation.obligation_digest,
+            owner_id="owner:security",
+            severity=RiskSeverity.HIGH,
+            accepted_at=NOW - timedelta(days=1),
+            review_at=NOW + timedelta(days=7),
+            expires_at=NOW + timedelta(days=30),
+            signer_id="ci:auto",
+            signer_type="ci",
+            git_sha=HEAD,
+            signature_method="github_identity",
+            signature_ref="https://github.com/Apeloff1/Skeleton/actions/runs/1",
+            statement="Automated acceptance is forbidden.",
+        )
+
+
+def test_accepted_risk_rejects_unapproved_signature_method() -> None:
+    obligation = _obligation()
+
+    with pytest.raises(RiskEvidenceError, match="not approved"):
+        AcceptedRisk(
+            obligation_id=obligation.obligation_id,
+            obligation_digest=obligation.obligation_digest,
+            owner_id="owner:security",
+            severity=RiskSeverity.HIGH,
+            accepted_at=NOW - timedelta(days=1),
+            review_at=NOW + timedelta(days=7),
+            expires_at=NOW + timedelta(days=30),
+            signer_id="human:risk-owner",
+            signer_type="human",
+            git_sha=HEAD,
+            signature_method="unsigned_note",
+            signature_ref="note:1",
+            statement="Weak signature methods are forbidden.",
+        )
+
