@@ -16,6 +16,12 @@ on:
       - "backend/tests/test_engine_cross_service_closure.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_operation_stream_mongo_stage7.py"
+      - "backend/core/operation_stream_transport.py"
+      - "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
+      - "skeleton/frontier/operation_stream_store_mongo.py"
+      - "skeleton/testing/test_operation_stream_store_mongo.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "backend/tests/test_engine_live_process_boundary.py"
       - "frontend/services/operationStreamSession.ts"
       - "frontend/services/operationStream.ts"
       - "frontend/scripts/test-operation-stream-session.mjs"
@@ -76,6 +82,12 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_engine_cross_service_closure.py
           backend/tests/test_ai_chat_engine_cutover.py
+
+      - name: Run approval renewal and real engine restart evidence
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_service.py::test_expired_persisted_approval_can_be_safely_reauthorized
+          backend/tests/test_engine_live_process_boundary.py::test_engine_state_survives_real_process_restart
 
       - name: Run process and database restart fault journeys
         run: >-
@@ -259,6 +271,11 @@ jobs:
             fi
             sleep 1
           done
+
+      - name: Run Mongo transaction preflight unit contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_operation_stream_store_mongo.py
 
       - name: Run shared-authority transient-failure journey
         run: >-
