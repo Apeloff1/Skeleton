@@ -20,6 +20,7 @@ def _copy_fixture(tmp_path: Path) -> None:
         {
             "machine/ai_app_construction.json",
             "machine/ai_implementation_handoff.json",
+            "machine/ai_closure_evidence.json",
         }
     )
     for source_rel, mirror_rel in MIRROR_PAIRS:
@@ -71,18 +72,16 @@ def test_verification_evidence_verifier_rejects_false_closed_state(
     tmp_path: Path,
 ) -> None:
     _copy_fixture(tmp_path)
-    construction_path = tmp_path / "machine/ai_app_construction.json"
-    construction = json.loads(
-        construction_path.read_text(encoding="utf-8")
-    )
-    gap = next(
+    handoff_path = tmp_path / "machine/ai_implementation_handoff.json"
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    entry = next(
         item
-        for item in construction["gap_register"]
-        if item["id"] == "gap-verification-evidence-contract"
+        for item in handoff["entries"]
+        if item["gap"] == "gap-verification-evidence-contract"
     )
-    gap["status"] = "closed"
-    construction_path.write_text(
-        json.dumps(construction, indent=2) + "\n",
+    entry["implementation_status"] = "implemented_pending_closure"
+    handoff_path.write_text(
+        json.dumps(handoff, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -90,7 +89,7 @@ def test_verification_evidence_verifier_rejects_false_closed_state(
 
     assert receipt["valid"] is False
     assert any(
-        "closed verification gap has non-closed dependencies" in item
+        "closed verification gap requires closed handoff state" in item
         for item in receipt["errors"]
     )
 
