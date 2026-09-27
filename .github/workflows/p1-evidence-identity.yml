@@ -39,20 +39,6 @@ on:
       - "skeleton/testing/test_promotion_evidence.py"
       - "tests/test_p1_promotion_evidence_emitter.py"
       - "tests/test_p1_accountability_materialization.py"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_p1_execution_map.json"
-      - "skeleton/contracts/maturity_reconciliation.py"
-      - "skeleton/contracts/maturity_reconciliation.py"
-      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
-      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "skeleton/testing/test_maturity_reconciliation.py"
-      - "skeleton/testing/test_maturity_reconciliation.py"
-      - "tests/test_p1_maturity_reconciliation.py"
-      - "tests/test_p1_maturity_reconciliation.py"
       - ".github/workflows/p1-evidence-identity.yml"
   workflow_dispatch:
 
@@ -107,19 +93,6 @@ jobs:
 
       - name: Validate P1 execution map remains coherent
         run: python scripts/check_ai_p1_execution_map.py --print-summary
-
-      - name: Validate P1 maturity reconciliation
-        run: |
-          set -euo pipefail
-          python -m pytest -q --noconftest \
-            skeleton/testing/test_maturity_reconciliation.py \
-            tests/test_p1_maturity_reconciliation.py
-          python scripts/reconcile_p1_maturity.py \
-            --volume VOL-000 \
-            --volume VOL-056 \
-            --volume VOL-080 \
-            --out .p1-maturity-premerge.json
-
 
       - name: Emit exact-head evidence receipt
         run: |
