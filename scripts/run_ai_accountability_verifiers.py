@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,16 @@ def _safe_script(root: Path, rel: object) -> tuple[str, Path]:
     if not candidate.is_file():
         raise RunnerError(f"verifier script is missing: {normalized}")
     return normalized, candidate
+
+
+def _read_receipt(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RunnerError(f"verifier did not emit a readable receipt: {path.name}") from exc
+    if not isinstance(payload, dict):
+        raise RunnerError(f"verifier receipt must be an object: {path.name}")
+    return payload
 
 
 def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
@@ -87,52 +98,109 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     failures: list[str] = []
 
-    for group in groups:
-        if not isinstance(group, dict):
-            raise RunnerError("accountability group must be an object")
-        key = str(group.get("key") or "").strip()
-        if not key:
-            raise RunnerError("accountability group key is required")
-        rel, script = _safe_script(root, group.get("verifier_script"))
-        if rel in seen:
-            raise RunnerError(f"verifier script is reused by multiple groups: {rel}")
-        seen.add(rel)
+    with tempfile.TemporaryDirectory(prefix="accountability-verifiers-") as tmp:
+        receipt_root = Path(tmp)
+        for index, group in enumerate(groups):
+            if not isinstance(group, dict):
+                raise RunnerError("accountability group must be an object")
+            key = str(group.get("key") or "").strip()
+            gap_id = str(group.get("gap_id") or "").strip()
+            if not key:
+                raise RunnerError("accountability group key is required")
+            if not gap_id:
+                raise RunnerError(f"{key}: accountability gap_id is required")
+            rel, script = _safe_script(root, group.get("verifier_script"))
+            if rel in seen:
+                raise RunnerError(
+                    f"verifier script is reused by multiple groups: {rel}"
+                )
+            seen.add(rel)
 
-        try:
-            completed = subprocess.run(
-                [sys.executable, rel],
-                cwd=root,
-                env=base_env,
-                text=True,
-                capture_output=True,
-                timeout=120,
-                check=False,
-            )
-            returncode = completed.returncode
-            stdout = completed.stdout[-4096:]
-            stderr = completed.stderr[-4096:]
-        except subprocess.TimeoutExpired as exc:
-            returncode = 124
-            stdout = (exc.stdout or "")[-4096:] if isinstance(exc.stdout, str) else ""
-            stderr = (exc.stderr or "")[-4096:] if isinstance(exc.stderr, str) else ""
-            stderr = (stderr + "\nverifier timed out").strip()
+            evidence = receipt_root / f"{index:02d}-{key}.json"
+            returncode = 0
+            stdout = ""
+            stderr = ""
+            receipt: dict[str, Any] | None = None
+            receipt_error: str | None = None
 
-        digest = hashlib.sha256(script.read_bytes()).hexdigest()
-        passed = returncode == 0
-        if not passed:
-            failures.append(key)
-        results.append(
-            {
+            try:
+                completed = subprocess.run(
+                    [
+                        sys.executable,
+                        rel,
+                        "--evidence-out",
+                        str(evidence),
+                    ],
+                    cwd=root,
+                    env=base_env,
+                    text=True,
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
+                )
+                returncode = completed.returncode
+                stdout = completed.stdout[-4096:]
+                stderr = completed.stderr[-4096:]
+            except subprocess.TimeoutExpired as exc:
+                returncode = 124
+                stdout = (
+                    (exc.stdout or "")[-4096:]
+                    if isinstance(exc.stdout, str)
+                    else ""
+                )
+                stderr = (
+                    (exc.stderr or "")[-4096:]
+                    if isinstance(exc.stderr, str)
+                    else ""
+                )
+                stderr = (stderr + "\nverifier timed out").strip()
+
+            if returncode == 0:
+                try:
+                    receipt = _read_receipt(evidence)
+                except RunnerError as exc:
+                    receipt_error = str(exc)
+            else:
+                receipt_error = f"verifier exited with code {returncode}"
+
+            if receipt is not None:
+                if receipt.get("head_sha") != head:
+                    receipt_error = "verifier receipt is not exact-head"
+                elif receipt.get("valid") is not True or receipt.get("errors"):
+                    receipt_error = "verifier receipt reports invalid evidence"
+                elif (
+                    receipt.get("gap_id") is not None
+                    and receipt.get("gap_id") != gap_id
+                ):
+                    receipt_error = "verifier receipt gap binding mismatch"
+
+            passed = returncode == 0 and receipt is not None and receipt_error is None
+            if not passed:
+                failures.append(key)
+
+            result: dict[str, Any] = {
                 "key": key,
-                "gap_id": group.get("gap_id"),
+                "gap_id": gap_id,
                 "verifier_script": rel,
-                "script_digest": digest,
+                "script_digest": hashlib.sha256(script.read_bytes()).hexdigest(),
                 "returncode": returncode,
                 "passed": passed,
                 "stdout_tail": stdout,
                 "stderr_tail": stderr,
+                "receipt_error": receipt_error,
             }
-        )
+            if receipt is not None:
+                result.update(
+                    {
+                        "receipt_verifier": receipt.get("verifier"),
+                        "receipt_head_sha": receipt.get("head_sha"),
+                        "receipt_valid": receipt.get("valid"),
+                        "receipt_digest": hashlib.sha256(
+                            evidence.read_bytes()
+                        ).hexdigest(),
+                    }
+                )
+            results.append(result)
 
     return {
         "schema_version": 1,
