@@ -507,7 +507,7 @@
     {
       "id": "tool-runtime",
       "owner": "skeleton/skills",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Tool discovery, typed invocation, authority checks, sandboxing, idempotency and result normalization.",
       "depends_on": [
         "foundation",
@@ -565,7 +565,7 @@
     {
       "id": "memory",
       "owner": "skeleton/memory",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Working, episodic, semantic and durable memory with tenant isolation and retention.",
       "depends_on": [
         "foundation",
@@ -822,7 +822,7 @@
     {
       "id": "application-api",
       "owner": "backend",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Product/business API, canonical control plane and application workflows.",
       "depends_on": [
         "identity",
@@ -5171,7 +5171,7 @@
     "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land",
     "schema_version": 1,
     "contract_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-conversation-state-authority",
     "implemented_surfaces": [
       "canonical envelopes",
@@ -5195,7 +5195,7 @@
   "tool_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-tool-runtime-convergence",
     "conceptual_split": {
       "skill": {
@@ -6882,7 +6882,7 @@
   "memory_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
       "storage": "skeleton/frontier/contracts.py:MemoryContract",
