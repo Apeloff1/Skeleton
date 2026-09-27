@@ -1682,6 +1682,31 @@
         "ProviderSpeechRequest",
         "ProviderSpeechResponse"
       ]
+    },
+    {
+      "id": "openai-compatible-secondary",
+      "state": "optional",
+      "adapter": "skeleton/provider_runtime.py:OpenAICompatibleSecondaryAdapter",
+      "protocol": "OpenAI-compatible Responses API; text generation only",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [
+        "AI_SECONDARY_API_KEY"
+      ],
+      "required_configuration": [
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL"
+      ],
+      "capabilities": [
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "https-only; distinct provider hostname from primary; no URL credentials; block localhost, metadata endpoints and non-global literal IPs",
+      "execution_owner": "skeleton/provider_runtime.py",
+      "activation_rule": "secondary configuration is all-or-nothing; partial configuration fails closed",
+      "failover_rule": "eligible only after ProviderUnavailableError or ProviderInvocationError; policy/governance/admission failures never fail over",
+      "privacy_ceiling": "confidential-with-tenant; restricted external transfer denied"
     }
   ],
   "gap_policy": {
