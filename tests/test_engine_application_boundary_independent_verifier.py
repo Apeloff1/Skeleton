@@ -95,3 +95,23 @@ def test_engine_verifier_rejects_backend_provider_credential_leak(
     receipt = verify_repository(root)
     assert receipt["valid"] is False
     assert "OPENAI_API_KEY leaked into backend service" in receipt["errors"]
+
+
+def test_engine_verifier_rejects_lost_client_recovery(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    path = root / "backend/core/engine_client.py"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(
+        "_recover_ambiguous_submit",
+        "_removed_ambiguous_submit_recovery",
+    )
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "backend/core/engine_client.py lost Stage-5 token: _recover_ambiguous_submit"
+        in error
+        for error in receipt["errors"]
+    )
