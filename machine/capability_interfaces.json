@@ -173,7 +173,7 @@
         "qualified/degraded state accessibility",
         "capability readiness/degraded UX"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:application-api->artifact-files",
@@ -2722,7 +2722,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:product-experience->engine-api",
@@ -2830,7 +2830,7 @@
         "child authority subset",
         "service/user identity separation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:product-experience->observability",
@@ -2885,7 +2885,7 @@
         "usage/cost correlation",
         "stuck-operation diagnostics"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:prompt-context->foundation",
