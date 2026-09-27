@@ -63,7 +63,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "acceptance_target:deployment-release->engine-api",
@@ -221,7 +221,7 @@
         "generated artifact lineage",
         "artifact deletion propagation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:application-api->identity",
@@ -264,7 +264,7 @@
         "child authority subset",
         "service/user identity separation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:application-api->memory",
@@ -313,7 +313,7 @@
         "write-policy provenance test",
         "delete/export/retention propagation test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:application-api->model-provider",
@@ -479,7 +479,7 @@
         "vector index loss/rebuild",
         "retrieval injection isolation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:artifact-files->data-persistence",
@@ -1888,7 +1888,7 @@
         "state topology validator",
         "authoritative-state restore and derived-index rebuild drill"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:memory->foundation",
@@ -1926,7 +1926,7 @@
         "no heavy imports in skeleton/__init__.py",
         "capability manifest serialization/compatibility"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:memory->governance",
@@ -1970,7 +1970,7 @@
         "confidential tenant binding",
         "transfer receipt determinism"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:memory->identity",
@@ -2015,7 +2015,7 @@
         "child authority subset",
         "service/user identity separation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:model-provider->configuration-secrets",
@@ -2293,7 +2293,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:operator-control->deployment-release",
@@ -3427,7 +3427,7 @@
         "write-policy provenance test",
         "delete/export/retention propagation test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:retrieval->model-provider",
@@ -3620,7 +3620,7 @@
         "network/database scope tests",
         "durable tool receipt lineage test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:streaming-realtime->application-api",
@@ -3827,7 +3827,7 @@
         "secret redaction tests",
         "snapshot reproducibility"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:tool-runtime->foundation",
@@ -3865,7 +3865,7 @@
         "no heavy imports in skeleton/__init__.py",
         "capability manifest serialization/compatibility"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:tool-runtime->identity",
@@ -3910,7 +3910,7 @@
         "child authority subset",
         "service/user identity separation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:tool-runtime->observability",
@@ -3959,7 +3959,7 @@
         "usage/cost correlation",
         "stuck-operation diagnostics"
       ],
-      "status": "partial"
+      "status": "present"
     }
   ]
 }

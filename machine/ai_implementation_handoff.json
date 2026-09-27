@@ -413,7 +413,7 @@
       ],
       "work_package": "WP-P0-CONVERSATION-STATE",
       "blueprint": "conversation_runtime_contract",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Make multi-turn conversation continuity, message ordering and branch lineage durable server-owned product state that feeds the cognitive runtime without trusting browser-supplied history.",
       "target_files": {
         "contracts": [
@@ -535,11 +535,9 @@
         "frontend/scripts/test-conversation-projection.mjs refresh/reconnect projection regressions",
         "backend/tests/test_conversation_regeneration_route.py engine-routed regeneration ordering"
       ],
-      "remaining": [
-        "close gap-state-authority-convergence and gap-governance-registry",
-        "collect fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     },
     {
       "gap": "gap-memory-durable-authority",
@@ -551,7 +549,7 @@
       ],
       "work_package": "WP-P0-MEMORY-AUTHORITY",
       "blueprint": "memory_runtime_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Bind the existing storage-neutral memory/retrieval contracts to durable tenant-scoped canonical memory while keeping vector/MAG/CAG/process stores derived or compatibility-only.",
       "target_files": {
         "contracts": [
@@ -635,12 +633,9 @@
         "backend/routes/ai.py explicit AIChatMemoryPolicy opt-in",
         "backend/tests/test_ai_chat_memory_policy.py end-to-end delegated engine memory policy and fail-closed no-engine behavior"
       ],
-      "remaining": [
-        "close gap-state-authority-convergence and gap-governance-registry",
-        "collect fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
-        "obtain independent closure verification"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     },
     {
       "gap": "gap-tool-runtime-convergence",
@@ -653,7 +648,7 @@
       ],
       "work_package": "WP-P0-TOOL-RUNTIME",
       "blueprint": "tool_runtime_blueprint",
-      "implementation_status": "implemented_pending_verification",
+      "implementation_status": "closed",
       "objective": "Converge all model-callable actions onto one typed, authority-aware, idempotent, sandbox/network-governed tool runtime before the cognitive loop can execute side effects.",
       "target_files": {
         "contracts": [
@@ -734,13 +729,9 @@
         "scripts/verify_tool_runtime_closure.py independently verifies runtime ownership, lineage, admission, compatibility delegation and AI mirror parity",
         "closure gate covers canonical runtime, durable receipt, scoped adapters, backend delegation and cognitive lineage/minimal projection"
       ],
-      "remaining": [
-        "close gap-governance-registry",
-        "close gap-cost-admission",
-        "close gap-provider-surface-convergence",
-        "collect fresh exact-head Tool Runtime Closure Gate evidence"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     },
     {
       "gap": "gap-context-compiler-convergence",
