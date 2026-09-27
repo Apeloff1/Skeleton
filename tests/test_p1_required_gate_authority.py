@@ -363,3 +363,35 @@ def test_authority_rejects_duplicate_group_name(tmp_path: Path) -> None:
 
     assert any("duplicate authority group name" in error for error in errors)
 
+
+
+def test_authority_rejects_duplicate_required_workflow_name(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    path = _copy_contract(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    required_name = payload["gates"][0]["workflow_name"]
+    duplicate = tmp_path / ".github/workflows/duplicate-required-name.yml"
+    duplicate.parent.mkdir(parents=True, exist_ok=True)
+    duplicate.write_text(
+        "name: " + required_name + "\n"
+        "on:\n"
+        "  pull_request:\n"
+        "jobs:\n"
+        "  noop:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - run: echo noop\n",
+        encoding="utf-8",
+    )
+
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any(
+        "required workflow name must resolve uniquely" in error
+        for error in errors
+    )
