@@ -17,7 +17,7 @@ import re
 from typing import Any, Iterable
 
 from skeleton.contracts.canonical import EvidenceRef
-from skeleton.intelligence.strategy_registry import ReasoningPolicy
+from skeleton.intelligence.strategy_registry import ReasoningPolicy, ReasoningStrategy
 
 
 PLAN_ANALYSIS_SCHEMA_VERSION = 1
@@ -451,6 +451,13 @@ def analyze_plan(
                 findings.append(f"graph:unknown-dependency:{step_id}:{dep}")
             else:
                 dependents[dep].add(step_id)
+                if not (
+                    set(step.preconditions)
+                    & set(by_id[dep].postconditions)
+                ):
+                    findings.append(
+                        f"contract:dependency-condition-unbound:{step_id}:{dep}"
+                    )
 
         missing_capabilities = set(step.required_capabilities) - allowed_capabilities
         for capability in sorted(missing_capabilities):
@@ -501,6 +508,41 @@ def analyze_plan(
         for step_id, outgoing in sorted(dependents.items()):
             if not outgoing and step_id not in terminals:
                 findings.append(f"graph:sink-not-terminal:{step_id}")
+
+        side_effecting = {
+            step_id
+            for step_id, step in by_id.items()
+            if step.side_effecting
+        }
+        if side_effecting and reasoning_policy.require_verification_for_high_risk:
+            if ReasoningStrategy.VERIFY not in reasoning_policy.allowed_strategies:
+                findings.append("policy:verification-strategy-unavailable")
+            verification_terminals = {
+                step_id
+                for step_id in terminals
+                if "verify" in by_id[step_id].required_capabilities
+            }
+
+            def reaches_verification(start: str) -> bool:
+                pending = list(dependents[start])
+                seen: set[str] = set()
+                while pending:
+                    current = pending.pop()
+                    if current in seen:
+                        continue
+                    seen.add(current)
+                    if current in verification_terminals:
+                        return True
+                    pending.extend(dependents[current])
+                return False
+
+            for step_id in sorted(side_effecting):
+                if not reaches_verification(step_id):
+                    findings.append(
+                        "verification:side-effect-without-terminal-verification:"
+                        + step_id
+                    )
+
         if critical_path > plan.budget.max_wall_time_s:
             findings.append("budget:critical-path-wall-time-exceeded")
 
