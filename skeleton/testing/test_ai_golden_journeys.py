@@ -32,6 +32,7 @@ from skeleton.api.engine_service import (
     EngineExecutionService,
     SQLiteEngineSubmissionStore,
 )
+from skeleton.api.server import ServerState
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
@@ -840,6 +841,97 @@ async def test_stage7_artifact_action_is_receipted_once(
 
     await coordinator.shutdown()
     receipt_store.close()
+
+
+@pytest.mark.asyncio
+async def test_stage7_governance_export_delete_spans_artifact_and_retrieval_planes(
+    tmp_path,
+) -> None:
+    """One tenant lifecycle request exports and deletes across canonical planes."""
+
+    state = ServerState()
+    try:
+        artifacts = state.bind_canonical_artifact_store(
+            tmp_path / "stage7-governed-artifacts"
+        )
+        retrieval = state.bind_canonical_retrieval_index()
+        assert state.governance_lifecycle_executor is not None
+
+        artifact = artifacts.write_bytes(
+            tenant_id="tenant-a",
+            artifact_id="stage7-report.bin",
+            payload=b"stage7-governed-artifact",
+            data_class="confidential",
+            purposes=("artifact-delivery", "model-inference"),
+            created_at=10.0,
+            retention_until=100.0,
+        )
+        document = retrieval.add(
+            tenant_id="tenant-a",
+            doc_id="stage7-retrieval-doc",
+            text="stage7 governed retrieval evidence",
+            created_at=10.0,
+        )
+
+        inventory = state.governance_registry.export_inventory("tenant-a")
+        inventory_ids = {
+            item["record_id"] for item in inventory["records"]
+        }
+        assert artifact.record_id in inventory_ids
+        assert document.record_id in inventory_ids
+
+        exported = await state.governance_lifecycle_executor.export_tenant(
+            "tenant-a"
+        )
+        exported_ids = {
+            item["governance"]["record_id"]
+            for item in exported.records
+        }
+        assert artifact.record_id in exported_ids
+        assert document.record_id in exported_ids
+        artifact_export = next(
+            item
+            for item in exported.records
+            if item["governance"]["record_id"] == artifact.record_id
+        )
+        retrieval_export = next(
+            item
+            for item in exported.records
+            if item["governance"]["record_id"] == document.record_id
+        )
+        assert artifact_export["payload"]["artifact_id"] == "stage7-report.bin"
+        assert retrieval_export["payload"]["doc_id"] == "stage7-retrieval-doc"
+
+        plan = state.governance_lifecycle.request_deletion(
+            "tenant-a",
+            record_ids=(artifact.record_id, document.record_id),
+            now=20.0,
+        )
+        deletion = (
+            await state.governance_lifecycle_executor.execute_deletion_plan(
+                plan,
+                now=21.0,
+            )
+        )
+        assert {receipt.record_id for receipt in deletion.receipts} == {
+            artifact.record_id,
+            document.record_id,
+        }
+        assert artifacts.read_bytes(
+            "tenant-a",
+            "stage7-report.bin",
+        ) is None
+        assert retrieval.size("tenant-a") == 0
+        assert (
+            state.governance_lifecycle.get(artifact.record_id)["state"]
+            == "deleted"
+        )
+        assert (
+            state.governance_lifecycle.get(document.record_id)["state"]
+            == "deleted"
+        )
+    finally:
+        state.close_governance_registry()
 
 
 @pytest.mark.asyncio
