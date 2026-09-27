@@ -154,6 +154,7 @@ def test_planned_test_never_counts_as_materialized_implementation() -> None:
 
     implemented = _evaluation(decision, "implemented")
     assert implemented.eligible is False
+    assert decision.implementation_status_candidate is None
     assert any(
         "tests must contain materialized references" in blocker
         for blocker in implemented.blockers
@@ -439,6 +440,7 @@ def test_reference_validator_blocks_unresolved_repository_paths() -> None:
 
     implemented = _evaluation(decision, "implemented")
     assert implemented.eligible is False
+    assert decision.implementation_status_candidate is None
     assert any(
         "implementation_paths contains unresolved repository references" in blocker
         and "missing/module.py" in blocker
@@ -457,3 +459,22 @@ def test_reference_validator_does_not_affect_planning_only_scaffolded() -> None:
 
     assert _evaluation(decision, "scaffolded").eligible is True
     assert decision.promotion_candidate == "scaffolded"
+
+def test_materialized_production_can_raise_implementation_status_contiguously() -> None:
+    decision = reconcile_volume(
+        _volume(gaps=[]),
+        _accountability(
+            status="production",
+            implementation_signoff=_signoff(True),
+            verification_signoff=_signoff(True),
+            evidence=["ledger:evidence"],
+        ),
+        POLICY,
+        target_floor="production",
+    )
+
+    assert all(
+        _evaluation(decision, state).eligible
+        for state in ("implemented", "integrated", "verified", "hardened", "production")
+    )
+    assert decision.implementation_status_candidate == "production"
