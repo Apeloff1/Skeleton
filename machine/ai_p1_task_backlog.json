@@ -457,12 +457,17 @@
         "docs/plan/MASTER_INDEX.md",
         "machine/ai_master_plan.json",
         "machine/ai_build_accountability.json",
-        "docs/plan"
+        "docs/plan",
+        "machine/ai_scope_freeze_adrs.json",
+        "scripts/check_ai_scope_freeze.py",
+        ".github/workflows/p1-scope-freeze.yml"
       ],
       "test_targets": [
         "scripts/check_ai_master_plan.py",
         "skeleton/testing/test_ai_master_plan.py",
-        "planned:skeleton/testing/test_architecture_scope_freeze.py"
+        "planned:skeleton/testing/test_architecture_scope_freeze.py",
+        "skeleton/testing/test_architecture_scope_freeze.py",
+        "scripts/check_ai_scope_freeze.py"
       ],
       "evidence_modes": [
         "contract",
