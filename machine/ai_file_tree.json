@@ -4683,6 +4683,11 @@
         "reason": "release/deployment ownership validates the AI engine but must not be nested inside it"
       },
       {
+        "path": "skeleton/release",
+        "owner": "deployment-release plane",
+        "reason": "release SLO and promotion policy are deployment-release authority and remain intentionally outside canonical AI engine ownership"
+      },
+      {
         "path": "skeleton/deployment",
         "owner": "deployment-release plane",
         "reason": "deployment support remains release infrastructure"

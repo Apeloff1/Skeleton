@@ -1,6 +1,27 @@
 name: AI Accountability Closure Bridge
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_accountability_closure_map.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_build_queue.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/ai_accountability.py"
+      - "scripts/check_ai_build_accountability.py"
+      - "scripts/verify_ai_accountability_closure_map.py"
+      - "scripts/run_ai_accountability_verifiers.py"
+      - "scripts/verify_*.py"
+      - "tests/test_ai_accountability_closure_map.py"
+      - "tests/test_*verifier*.py"
+      - ".github/workflows/*closure*.yml"
+      - ".github/workflows/state-recovery-drill.yml"
+      - ".github/workflows/engine-container-boundary.yml"
+      - ".github/workflows/ai-accountability-closure-map.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -103,7 +124,7 @@ jobs:
           ACCOUNTABILITY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/run_ai_accountability_verifiers.py
-          --head-sha "${{ github.event.pull_request.head.sha || github.sha }}"
+          --head-sha "$ACCOUNTABILITY_HEAD_SHA"
           --evidence-out .ai-accountability-verifier-runner.json
           --print-evidence
 

@@ -1520,7 +1520,7 @@
         "golden journey evidence binding",
         "flakiness quarantine enforcement"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:feedback-learning->governance",
@@ -1559,7 +1559,7 @@
         "confidential tenant binding",
         "transfer receipt determinism"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:feedback-learning->observability",
@@ -1603,7 +1603,7 @@
         "usage/cost correlation",
         "stuck-operation diagnostics"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:governance->configuration-secrets",

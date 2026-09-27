@@ -1244,7 +1244,7 @@
     {
       "id": "feedback-learning",
       "owner": "skeleton/learning",
-      "state": "partial",
+      "state": "present",
       "responsibility": "User feedback, outcome signals, experiments and bounded adaptation without uncontrolled online mutation.",
       "depends_on": [
         "evaluation",
@@ -1751,9 +1751,9 @@
         "browser refresh/reconnect reconstructs the same canonical transcript",
         "conversation retention expiry propagation test"
       ],
-      "verification_state": "implemented-pending-dependency-and-exact-head-closure",
+      "verification_state": "closed",
       "progress": {
-        "state": "implemented_pending_closure",
+        "state": "closed",
         "completed": [
           "ConversationThread and ConversationMessage canonical envelopes",
           "tenant/owner binding, monotonic sequence and optimistic thread version contract",
@@ -1797,10 +1797,7 @@
           "Jeeves optimistic turn races surface as retryable 409 conflicts",
           "frontend reconstructConversation validates canonical thread identity/order/version and regeneration uses engine-backed API"
         ],
-        "remaining": [
-          "close gap-state-authority-convergence and gap-governance-registry",
-          "collect fresh exact-head Conversation Authority Closure Gate evidence after final PR head stabilizes"
-        ]
+        "remaining": []
       },
       "status_detail": "closed by staged Stage-1 dependency promotion; reopen on required gate or invariant regression"
     },
@@ -2204,7 +2201,7 @@
         ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
       "outstanding_evidence": [],
-      "verification_state": "implemented-pending-exact-head-verification"
+      "verification_state": "closed"
     },
     {
       "id": "gap-feedback-promotion",
@@ -2268,9 +2265,9 @@
         "retrieval provenance points back to canonical memory records",
         "memory outage produces explicit degraded continuity behavior"
       ],
-      "verification_state": "memory-authority-product-policy-activated-pending-dependency-and-exact-head-closure",
+      "verification_state": "closed",
       "progress": {
-        "state": "implemented_pending_closure",
+        "state": "closed",
         "completed": [
           "production Mongo canonical memory repository",
           "tenant/namespace scoped idempotency and optimistic version fencing",
@@ -2292,11 +2289,7 @@
           "memory opt-in fails closed without canonical engine and never falls back to legacy provider execution",
           "canonical assistant messages persist returned engine memory refs"
         ],
-        "remaining": [
-          "close gap-state-authority-convergence and gap-governance-registry",
-          "collect fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR head stabilizes",
-          "obtain independent closure verification"
-        ]
+        "remaining": []
       },
       "status_detail": "closed by staged Stage-1 dependency promotion; reopen on required gate or invariant regression"
     },
@@ -2326,7 +2319,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "implementation-complete-pending-exact-head-and-independent-closure",
+      "verification_state": "closed",
       "progress": {
         "completed": [
           "canonical RAG user/session/progress/feedback state migrated to Mongo authority",
@@ -2342,10 +2335,7 @@
           "machine-readable durable state backup and retention policy",
           "verified backup bundle tool with required-store and tamper detection"
         ],
-        "remaining": [
-          "collect fresh exact-head State Recovery Drill, state topology, App Assembly and Backend Quality evidence",
-          "obtain independent closure verification"
-        ]
+        "remaining": []
       },
       "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression"
     },
@@ -2506,7 +2496,7 @@
         "media provider boundary regression suite",
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
-      "verification_state": "provider-surface-closure-gate-pending",
+      "verification_state": "closed",
       "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression"
     }
   ],

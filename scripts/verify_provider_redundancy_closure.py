@@ -125,11 +125,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     if not isinstance(blueprint, dict):
         errors.append("provider_redundancy_blueprint is missing")
     else:
-        if blueprint.get("status") not in {
-            "implemented-pending-closure",
-            "closed",
-        }:
-            errors.append("provider redundancy blueprint has invalid status")
+        if blueprint.get("status") != "closed":
+            errors.append("provider redundancy blueprint must remain closed")
         if blueprint.get("gap") != "gap-provider-redundancy":
             errors.append("provider redundancy blueprint gap binding is invalid")
         routing = blueprint.get("routing")
@@ -159,8 +156,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         )
     if gap is None:
         errors.append("provider redundancy gap is missing")
-    elif gap.get("status") not in {"open", "closed"}:
-        errors.append("provider redundancy gap status is invalid")
+    elif gap.get("status") != "closed":
+        errors.append("provider redundancy gap must remain closed")
 
     return {
         "schema_version": 1,

@@ -1,6 +1,17 @@
 name: Provider Redundancy Closure Gate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "machine/ai_app_construction.json"
+      - "scripts/verify_provider_redundancy_closure.py"
+      - "tests/test_provider_redundancy_independent_verifier.py"
+      - ".github/workflows/provider-redundancy-closure.yml"
   pull_request:
     branches:
       - main

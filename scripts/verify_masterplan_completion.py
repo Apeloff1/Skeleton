@@ -133,6 +133,31 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         if isinstance(outstanding, list) and outstanding:
             errors.append(f"{gap_id} still has outstanding construction evidence")
 
+        if item.get("status") == "closed":
+            verification_state = item.get("verification_state")
+            if (
+                verification_state is not None
+                and verification_state != "closed"
+            ):
+                errors.append(
+                    f"{gap_id} is closed but verification_state is "
+                    f"{verification_state!r}"
+                )
+
+            progress = item.get("progress")
+            if isinstance(progress, dict):
+                progress_state = progress.get("state")
+                if progress_state is not None and progress_state != "closed":
+                    errors.append(
+                        f"{gap_id} is closed but progress.state is "
+                        f"{progress_state!r}"
+                    )
+                remaining = progress.get("remaining")
+                if isinstance(remaining, list) and remaining:
+                    errors.append(
+                        f"{gap_id} is closed but progress.remaining is non-empty"
+                    )
+
     handoff_entries = handoff.get("entries")
     if not isinstance(handoff_entries, list):
         errors.append("implementation handoff entries must be a list")
