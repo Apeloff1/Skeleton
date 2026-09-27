@@ -1,0 +1,109 @@
+name: AI Accountability Closure Bridge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_accountability_closure_map.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_build_queue.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/ai_accountability.py"
+      - "scripts/check_ai_build_accountability.py"
+      - "scripts/verify_ai_accountability_closure_map.py"
+      - "tests/test_ai_accountability_closure_map.py"
+      - ".github/workflows/*closure*.yml"
+      - ".github/workflows/state-recovery-drill.yml"
+      - ".github/workflows/engine-container-boundary.yml"
+      - ".github/workflows/ai-accountability-closure-map.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-accountability-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  accountability-closure-map:
+    name: Independent accountability closure-map verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Validate canonical accountability ledger
+        run: python scripts/check_ai_build_accountability.py
+
+      - name: Run accountability bridge adversarial tests
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_accountability_closure_map.py
+
+      - name: Emit exact-head accountability closure-map receipt
+        env:
+          ACCOUNTABILITY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_accountability_closure_map.py
+          --evidence-out .ai-accountability-closure-map.json
+          --print-evidence
+
+      - name: Assert exact-head bridge receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-accountability-closure-map.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("accountability bridge receipt is not exact-head")
+          if receipt.get("verifier") != "ai-accountability-closure-map-v1":
+              raise SystemExit("unexpected accountability bridge verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("accountability closure map is invalid")
+          if receipt.get("task_count") != 42:
+              raise SystemExit("accountability queue must contain exactly 42 atomic tasks")
+          if receipt.get("mapped_task_count") != 42:
+              raise SystemExit("not every atomic queue task is mapped")
+          if receipt.get("group_count") != 14:
+              raise SystemExit("accountability map must contain exactly 14 gap groups")
+          counts = receipt.get("candidate_counts") or {}
+          if sum(int(value) for value in counts.values()) != 42:
+              raise SystemExit("candidate-state accounting does not cover all tasks")
+          if not all(receipt.get("digests", {}).values()):
+              raise SystemExit("accountability bridge digests are incomplete")
+          print(
+              "AI accountability closure bridge exact-head receipt:",
+              expected,
+              counts,
+          )
+          PY
