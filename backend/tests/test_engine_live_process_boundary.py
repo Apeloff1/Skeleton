@@ -249,3 +249,120 @@ async def test_engine_client_crosses_real_tcp_process_boundary(tmp_path) -> None
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_engine_state_survives_real_process_restart(tmp_path) -> None:
+    port = _free_port()
+    base_url = "http://127.0.0.1:" + str(port)
+    log_path = tmp_path / "engine-restart.log"
+    env = dict(os.environ)
+    env.update(
+        {
+            "TEST_ENGINE_EXECUTION_PATH": str(
+                tmp_path / "restart-execution.sqlite3"
+            ),
+            "TEST_ENGINE_SUBMISSION_PATH": str(
+                tmp_path / "restart-submission.sqlite3"
+            ),
+            "TEST_ENGINE_SERVICE_TOKEN": _SERVICE_TOKEN,
+            "PYTHONUNBUFFERED": "1",
+        }
+    )
+
+    command_line = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "skeleton.testing.live_engine_process_app:create_app",
+        "--factory",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
+    ]
+
+    def start_process(log_file):
+        process = subprocess.Popen(
+            command_line,
+            cwd=ROOT,
+            env=env,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        _wait_ready(base_url, process, log_path)
+        return process
+
+    def stop_process(process):
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+
+    with log_path.open("a", encoding="utf-8") as log_file:
+        first_process = start_process(log_file)
+        try:
+            first_client = EngineClient(
+                EngineClientConfig(
+                    base_url=base_url,
+                    service_token=_SERVICE_TOKEN,
+                    service_principal="codedock-backend",
+                    request_timeout_s=2,
+                    execution_timeout_s=10,
+                )
+            )
+            context = _context()
+            started = _now()
+            command = _command(context, started=started)
+            ack = await first_client.submit(command)
+            assert ack["execution_id"] == context.execution_id
+            accepted_at = ack["accepted_at"]
+        finally:
+            stop_process(first_process)
+
+        second_process = start_process(log_file)
+        try:
+            restarted_client = EngineClient(
+                EngineClientConfig(
+                    base_url=base_url,
+                    service_token=_SERVICE_TOKEN,
+                    service_principal="codedock-backend",
+                    request_timeout_s=2,
+                    execution_timeout_s=10,
+                )
+            )
+
+            status = await restarted_client.status(
+                context.execution_id,
+                actor_id="actor-a",
+                tenant_id="tenant-a",
+            )
+            assert status["operation_id"] == context.operation_id
+            assert status["execution_id"] == context.execution_id
+            assert status["execution_state"] == "created"
+
+            replay = await restarted_client.submit(
+                _command(
+                    context,
+                    started=started + timedelta(seconds=1),
+                )
+            )
+            assert replay["execution_id"] == ack["execution_id"]
+            assert replay["operation_id"] == ack["operation_id"]
+            assert replay["idempotency_digest"] == ack["idempotency_digest"]
+            assert replay["accepted_at"] == accepted_at
+
+            cancelled = await restarted_client.cancel(
+                context.execution_id,
+                actor_id="actor-a",
+                tenant_id="tenant-a",
+                reason="restart durability proof",
+            )
+            assert cancelled["cancellation_requested"] is True
+        finally:
+            stop_process(second_process)
