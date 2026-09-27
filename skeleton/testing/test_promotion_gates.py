@@ -108,6 +108,28 @@ def test_only_stale_observation_fails_closed() -> None:
     assert decision.stale == (target,)
 
 
+def test_exact_success_plus_stale_history_still_fails_closed() -> None:
+    authority = _authority()
+    observations = list(_passing_observations(authority))
+    target = observations[0].workflow_name
+    observations.append(
+        _observation(
+            target,
+            head_sha=STALE,
+            run_id="stale-history",
+        )
+    )
+
+    decision = evaluate_required_gates(
+        authority,
+        observations,
+        target_sha=HEAD,
+    )
+
+    assert decision.accepted is False
+    assert decision.stale == (target,)
+
+
 @pytest.mark.parametrize(
     ("status", "conclusion", "bucket"),
     (
