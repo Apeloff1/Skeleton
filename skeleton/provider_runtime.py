@@ -2880,15 +2880,15 @@ class ProviderRegistry:
         if adapter is None:
             return False
         candidate_ids = (self.active_id, *self._fallback_ids)
-        for provider_id in candidate_ids:
-            candidate = self._adapters[provider_id]
-            try:
+        try:
+            for provider_id in candidate_ids:
                 self._architecture_receipt(provider_id)
-            except ProviderUnavailableError:
-                continue
-            if candidate.available:
-                return True
-        return False
+        except ProviderUnavailableError:
+            return False
+        return any(
+            self._adapters[provider_id].available
+            for provider_id in candidate_ids
+        )
 
     def require_active(self) -> ProviderAdapter:
         adapter = self.active
