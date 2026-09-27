@@ -678,7 +678,7 @@
     {
       "id": "data-persistence",
       "owner": "skeleton/persistence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Durable application/model state, transactions, migrations, backups and vector storage.",
       "depends_on": [
         "foundation",
@@ -1068,7 +1068,7 @@
     {
       "id": "governance",
       "owner": "skeleton/vault",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Data classification, consent, retention, deletion, export, auditability and provider data-use policy.",
       "depends_on": [
         "identity",
@@ -1278,7 +1278,7 @@
     {
       "id": "cost-capacity",
       "owner": "skeleton/intelligence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Token, provider, storage, concurrency and latency budgeting with admission control.",
       "depends_on": [
         "model-routing",
@@ -7345,7 +7345,7 @@
   "state_authority_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-state-authority-convergence",
     "registry": "machine/state_topology.json",
     "objective": "Every logical state domain has exactly one durable authority, explicit derived projections, transactional/reconciliation semantics, migration ownership, restore order and failure behavior.",
@@ -7467,7 +7467,7 @@
   "governance_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-governance-registry",
     "canonical_owner": "skeleton/vault",
     "objective": "One registry and decision engine governs classification, purpose, tenant/subject ownership, provider/tool transfer, retention, deletion, export and audit across every AI data movement.",
@@ -7632,7 +7632,7 @@
   "cost_admission_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-cost-admission",
     "canonical_owner": "skeleton/intelligence",
     "objective": "Every expensive AI boundary is admitted against one monotonic request/tenant budget before allocation, with actual usage reconciled durably across processes.",
@@ -7749,7 +7749,7 @@
   "provider_surface_convergence_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-provider-surface-convergence",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",
