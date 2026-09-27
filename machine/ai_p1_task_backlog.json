@@ -694,20 +694,18 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "planned:skeleton/intelligence/cognitive_runtime.py",
-        "planned:skeleton/intelligence/strategy_registry.py",
-        "skeleton/ai",
-        "skeleton/eval",
-        "skeleton/retrieval",
-        "machine"
+        "machine/p1_reasoning_strategy_registry.json",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/cognitive_runtime.py",
+        "skeleton/ai/runtime/intelligence/cognitive_runtime.py",
+        "scripts/check_p1_reasoning_strategy_registry.py"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_cognitive_stop_policy.py",
-        "planned:skeleton/testing/test_strategy_budget.py",
-        "planned:skeleton/testing/test_uncertainty_representation.py",
-        "planned:skeleton/testing/test_search_strategy_engine.py",
-        "planned:skeleton/testing/test_value_of_information.py",
-        "planned:skeleton/testing/test_stopping_policies.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "scripts/check_p1_reasoning_strategy_registry.py",
+        "skeleton/testing/test_uncertainty.py",
+        "skeleton/testing/test_cascade.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -716,9 +714,14 @@
         "replay"
       ],
       "failure_modes": [
-        "stale/poisoned intelligence state",
-        "unbounded reasoning/search",
-        "unsupported quality promotion"
+        "strategy selected without required capabilities",
+        "reasoning or search crosses a hard resource budget",
+        "zero-cap resource dimension causes a false stop",
+        "self-confidence substitutes for evidence or verification",
+        "stale strategy-registry identity",
+        "unverified completion self-finalizes",
+        "low-value search continues after diminishing returns",
+        "uncertainty persists without evidence gain"
       ],
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
