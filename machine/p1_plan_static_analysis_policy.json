@@ -24,5 +24,11 @@
   "hard_limits": {
     "max_plan_steps": 1024,
     "max_retries_per_step": 32
+  },
+  "architecture": {
+    "canonical_source_root": "skeleton/intelligence",
+    "canonical_ai_mirror_root": "skeleton/ai/runtime/intelligence",
+    "parallel_planning_root_allowed": false,
+    "forbidden_parallel_root": "skeleton/planning"
   }
 }
