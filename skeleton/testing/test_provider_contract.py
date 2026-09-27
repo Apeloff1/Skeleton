@@ -1326,6 +1326,18 @@ def test_provider_registry_rejects_secondary_on_primary_hostname(monkeypatch) ->
         ProviderRegistry.from_env()
 
 
+def test_declared_secondary_has_mandatory_runtime_architecture_receipt() -> None:
+    receipt = load_provider_architecture(
+        "openai-compatible-secondary",
+        provider_family="runtime_model",
+    )
+
+    assert receipt.provider_id == "openai-compatible-secondary"
+    assert receipt.provider_family == "runtime_model"
+    assert receipt.architecture_tag
+    assert receipt.contract_digest
+
+
 def test_declared_secondary_adapter_identity_is_stable() -> None:
     adapter = OpenAICompatibleSecondaryAdapter(
         api_key="secondary-key",
