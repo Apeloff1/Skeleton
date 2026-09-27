@@ -133,6 +133,20 @@
       ]
     },
     {
+      "id": "GATE-P1-RISK-EVIDENCE",
+      "workflow_name": "P1 Risk Evidence Binding Gate",
+      "workflow_file": ".github/workflows/p1-risk-evidence-binding.yml",
+      "group": "evidence",
+      "purpose": "Exact-head P1 risk/gap obligation inventory, evidence binding and fail-closed accepted-risk validation.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
+    },
+    {
       "id": "GATE-PROVENANCE",
       "workflow_name": "Provenance Policy",
       "workflow_file": ".github/workflows/provenance-policy.yml",
@@ -343,7 +357,8 @@
         "GATE-P1-GATE-AUTHORITY",
         "GATE-ACCOUNTABILITY",
         "GATE-P1-MAP",
-        "GATE-PROVENANCE"
+        "GATE-PROVENANCE",
+        "GATE-P1-RISK-EVIDENCE"
       ]
     },
     {
@@ -404,7 +419,7 @@
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 22,
+    "required_gate_count": 23,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
