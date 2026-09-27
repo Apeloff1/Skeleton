@@ -1002,6 +1002,61 @@
         "canonical owner or state authority drifts",
         "security/governance/provider-surface isolation regresses"
       ]
+    },
+    {
+      "gap": "gap-feedback-promotion",
+      "plane": "feedback-learning",
+      "stage": 8,
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
+      "evidence_present": [
+        "skeleton/learning/promotion.py implements deterministic experiment assignment, explicit holdout isolation, consent/data-use validation, external evaluation receipts, promotion idempotency and rollback-to-baseline receipts",
+        "skeleton/testing/test_feedback_promotion.py proves experiment isolation, consent/data-use enforcement, tamper rejection, evaluation/sample gates, holdout exclusion, rollback lineage and event idempotency",
+        "scripts/verify_p1_feedback_release_closure.py independently verifies feedback promotion source surfaces",
+        ".github/workflows/p1-feedback-release-closure.yml binds focused feedback contracts and independent verification to exact PR head"
+      ],
+      "closure_evidence_required": [
+        "experiment isolation test",
+        "promotion requires evaluation test",
+        "rollback test",
+        "consent/data-use test"
+      ],
+      "outstanding_evidence": [],
+      "blockers": [],
+      "close_when": [
+        "P1 Feedback Release Closure Gate is green on exact head"
+      ],
+      "reopen_when": [
+        "experiment isolation, consent, holdout, evaluation or rollback invariant regresses"
+      ]
+    },
+    {
+      "gap": "gap-release-slo-loop",
+      "plane": "deployment-release",
+      "stage": 8,
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
+      "evidence_present": [
+        "skeleton/release/slo_promotion.py implements observability-bound canary SLO policy, promote/hold/rollback decisions and incident-bound conservative operator override receipts",
+        "skeleton/testing/test_release_slo_promotion.py proves healthy promotion, automatic rollback, insufficient-sample hold, stale-signal rollback and fail-closed override behavior",
+        "scripts/verify_p1_feedback_release_closure.py independently verifies release SLO source surfaces",
+        ".github/workflows/p1-feedback-release-closure.yml binds focused release contracts and independent verification to exact PR head"
+      ],
+      "closure_evidence_required": [
+        "canary promotion test",
+        "automatic rollback drill",
+        "release evidence artifact"
+      ],
+      "outstanding_evidence": [],
+      "blockers": [],
+      "close_when": [
+        "P1 Feedback Release Closure Gate is green on exact head"
+      ],
+      "reopen_when": [
+        "SLO thresholds, observability freshness, rollback or override evidence regresses"
+      ]
     }
   ]
 }
