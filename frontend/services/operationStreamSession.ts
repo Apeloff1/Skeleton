@@ -347,8 +347,10 @@ export class OperationBrowserSession {
       this.current = {
         ...createOperationClientState(this.operationId, floor),
         operationState: snapshot.operation.state,
-        terminal: Boolean(snapshot.terminal),
-        connection: snapshot.terminal ? 'terminal' : 'replaying',
+        // Keep the local reducer non-terminal until it has reconciled the
+        // authoritative canonical result or terminal event.
+        terminal: false,
+        connection: 'replaying',
         resyncRequired: false,
         error: null,
       };
