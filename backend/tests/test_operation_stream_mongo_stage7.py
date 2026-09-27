@@ -85,13 +85,31 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
         assert [item.type for item in first.events] == ["operation.created"]
         assert first.latest_sequence == 1
 
-        running = operations.transition(
+        validated = operations.transition(
             operation_id,
-            OperationState.RUNNING,
+            OperationState.VALIDATED,
             expected_version=1,
             now=started + timedelta(seconds=1),
         )
-        assert running.version == 2
+        authorized = operations.transition(
+            operation_id,
+            OperationState.AUTHORIZED,
+            expected_version=validated.version,
+            now=started + timedelta(seconds=2),
+        )
+        admitted = operations.transition(
+            operation_id,
+            OperationState.ADMITTED,
+            expected_version=authorized.version,
+            now=started + timedelta(seconds=3),
+        )
+        running = operations.transition(
+            operation_id,
+            OperationState.RUNNING,
+            expected_version=admitted.version,
+            now=started + timedelta(seconds=4),
+        )
+        assert running.version == 5
 
         worker_b = OperationStreamTransport(
             operations,
@@ -104,8 +122,13 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
             after_sequence=1,
             consumer_id="browser-b",
         )
-        assert [item.type for item in second.events] == ["operation.running"]
-        assert second.latest_sequence == 2
+        assert [item.type for item in second.events] == [
+            "operation.validated",
+            "operation.authorized",
+            "operation.admitted",
+            "operation.running",
+        ]
+        assert second.latest_sequence == 5
 
         client.admin.command(
             {
@@ -122,12 +145,12 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
             operations.transition(
                 operation_id,
                 OperationState.COMPLETED,
-                expected_version=2,
-                now=started + timedelta(seconds=2),
+                expected_version=5,
+                now=started + timedelta(seconds=5),
             )
 
         unchanged = operations.get(operation_id)
-        assert unchanged.version == 2
+        assert unchanged.version == 5
         assert unchanged.envelope.state is OperationState.RUNNING
         pending = operations.pending_outbox(operation_id=operation_id)
         # Both created/running outbox rows were already projected and ACKed.
@@ -138,30 +161,30 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
         completed = operations.transition(
             operation_id,
             OperationState.COMPLETED,
-            expected_version=2,
-            now=started + timedelta(seconds=3),
+            expected_version=5,
+            now=started + timedelta(seconds=6),
         )
-        assert completed.version == 3
+        assert completed.version == 6
         assert completed.envelope.state is OperationState.COMPLETED
 
         terminal = worker_a.replay(
             operation_id,
             tenant_id="tenant-stage7",
-            after_sequence=2,
+            after_sequence=5,
             consumer_id="browser-a",
         )
         assert [item.type for item in terminal.events] == ["operation.completed"]
-        assert terminal.latest_sequence == 3
+        assert terminal.latest_sequence == 6
         assert terminal.terminal is True
 
         acknowledgement = worker_a.acknowledge_and_compact(
             operation_id,
             tenant_id="tenant-stage7",
             consumer_id="browser-a",
-            sequence=3,
+            sequence=6,
         )
-        assert acknowledgement.consumer.acknowledged_through == 3
-        assert acknowledgement.latest_sequence == 3
+        assert acknowledgement.consumer.acknowledged_through == 6
+        assert acknowledgement.latest_sequence == 6
 
         cancelled = worker_b.cancel(
             operation_id,
@@ -172,7 +195,7 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
 
         assert operations.pending_outbox(operation_id=operation_id) == ()
         head = events.head(operation_id)
-        assert head["latest_sequence"] == 3
+        assert head["latest_sequence"] == 6
         assert head["terminal"] is True
     finally:
         try:
