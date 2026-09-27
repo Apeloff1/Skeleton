@@ -147,6 +147,20 @@
       ]
     },
     {
+      "id": "GATE-P1-REPRODUCIBILITY",
+      "workflow_name": "P1 Reproducibility Bundle Gate",
+      "workflow_file": ".github/workflows/p1-reproducibility-bundle.yml",
+      "group": "evidence",
+      "purpose": "Exact-head deterministic replay contract for qualifying P1 promotion evidence.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
+    },
+    {
       "id": "GATE-PROVENANCE",
       "workflow_name": "Provenance Policy",
       "workflow_file": ".github/workflows/provenance-policy.yml",
@@ -358,7 +372,8 @@
         "GATE-ACCOUNTABILITY",
         "GATE-P1-MAP",
         "GATE-PROVENANCE",
-        "GATE-P1-RISK-EVIDENCE"
+        "GATE-P1-RISK-EVIDENCE",
+        "GATE-P1-REPRODUCIBILITY"
       ]
     },
     {
@@ -419,7 +434,7 @@
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 23,
+    "required_gate_count": 24,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
