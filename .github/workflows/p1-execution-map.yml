@@ -10,7 +10,7 @@ on:
       - "machine/ai_app_construction.json"
       - "machine/ai_master_build_sequence.json"
       - "scripts/check_ai_p1_execution_map.py"
-      - "skeleton/testing/test_ai_p1_execution_map.py"
+      - "tests/test_ai_p1_execution_map.py"
       - "docs/plan/P1_EXECUTION_MAP.md"
       - "docs/plan/MASTER_INDEX.md"
       - ".github/workflows/p1-execution-map.yml"
@@ -25,7 +25,7 @@ on:
       - "machine/ai_app_construction.json"
       - "machine/ai_master_build_sequence.json"
       - "scripts/check_ai_p1_execution_map.py"
-      - "skeleton/testing/test_ai_p1_execution_map.py"
+      - "tests/test_ai_p1_execution_map.py"
       - "docs/plan/P1_EXECUTION_MAP.md"
       - "docs/plan/MASTER_INDEX.md"
       - ".github/workflows/p1-execution-map.yml"
@@ -68,4 +68,4 @@ jobs:
       - name: Run P1 map regression tests
         run: >-
           python -m pytest -q --noconftest
-          skeleton/testing/test_ai_p1_execution_map.py
+          tests/test_ai_p1_execution_map.py
