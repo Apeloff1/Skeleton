@@ -63,6 +63,89 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_ai_accountability_closure_map.py
 
+      - name: Execute every mapped verifier on the exact head
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tempfile
+
+          expected = os.environ["EXPECTED_SHA"].strip()
+          mapping = json.loads(
+              Path("machine/ai_accountability_closure_map.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          groups = mapping.get("groups") or []
+          if len(groups) != 14:
+              raise SystemExit("expected 14 accountability verifier groups")
+
+          receipts = []
+          with tempfile.TemporaryDirectory(prefix="accountability-verifiers-") as tmp:
+              root = Path(tmp)
+              for group in groups:
+                  key = str(group.get("key") or "")
+                  script = str(group.get("verifier_script") or "")
+                  if not key or not script:
+                      raise SystemExit(f"{key or '<unknown>'}: verifier is missing")
+                  evidence = root / f"{key}.json"
+                  env = os.environ.copy()
+                  env["EVIDENCE_HEAD_SHA"] = expected
+                  env["ACCOUNTABILITY_HEAD_SHA"] = expected
+                  env["GITHUB_SHA"] = expected
+                  subprocess.run(
+                      [
+                          sys.executable,
+                          script,
+                          "--evidence-out",
+                          str(evidence),
+                      ],
+                      check=True,
+                      env=env,
+                  )
+                  receipt = json.loads(evidence.read_text(encoding="utf-8"))
+                  if receipt.get("head_sha") != expected:
+                      raise SystemExit(
+                          f"{key}: verifier receipt is not exact-head"
+                      )
+                  if receipt.get("valid") is not True or receipt.get("errors"):
+                      raise SystemExit(f"{key}: verifier rejected exact head")
+                  receipts.append(
+                      {
+                          "key": key,
+                          "gap_id": group.get("gap_id"),
+                          "script": script,
+                          "verifier": receipt.get("verifier"),
+                          "head_sha": receipt.get("head_sha"),
+                      }
+                  )
+
+          Path(".all-accountability-verifiers.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "head_sha": expected,
+                      "count": len(receipts),
+                      "receipts": receipts,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          print(
+              "exact-head independent accountability verifiers:",
+              len(receipts),
+              expected,
+          )
+          PY
+
       - name: Emit exact-head accountability closure-map receipt
         env:
           ACCOUNTABILITY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
