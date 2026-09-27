@@ -2367,7 +2367,7 @@
       "plane": "product-experience",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical deterministic prompt-only, multi-turn, retrieval, read/write tool, approval renewal, artifact, provider-outage, engine-outage, cancel/reconnect, governance export/delete and restart-ambiguity journeys are implementation-complete across the engine, authenticated API and production browser-session seams. Remaining closure is exact-head Stage-7/App Assembly evidence, remaining crash-window injections, dependency closure and independent signoff.",
+      "gap": "Canonical deterministic prompt-only, multi-turn, retrieval, read/write tool, approval renewal, artifact, provider-outage, engine-outage, cancel/reconnect, governance export/delete and restart-ambiguity journeys are implementation-complete across the engine, authenticated API and production browser-session seams. Remaining closure is exact-head Stage-7/App Assembly evidence, remaining process/database restart injections, dependency closure and independent signoff.",
       "construction": [
         "define prompt-only journey",
         "define retrieval-backed journey",
@@ -2397,7 +2397,7 @@
         "lower-stage dependency closure",
         "exact-head validation and independent signoff"
       ],
-      "status_detail": "implementation-complete pending Stage-7 exact-head gate, App Assembly, remaining crash-window evidence and dependency closure"
+      "status_detail": "implementation-complete pending Stage-7 exact-head gate, App Assembly, remaining process/database restart evidence and dependency closure"
     },
     {
       "id": "gap-release-slo-loop",
@@ -6872,11 +6872,12 @@
       "cross-plane governance export/delete physical propagation journey",
       "tool reservation/restart ambiguity no-replay journey",
       "independent Stage-7 exact-head verifier",
-      "real pinned Mongo replica-set transient-failure atomicity and safe-retry journey"
+      "real pinned Mongo replica-set transient-failure atomicity and safe-retry journey",
+      "provider-response-before-checkpoint crash fails closed without second provider call"
     ],
     "remaining": [
       "fresh exact-head Stage-7 Golden Journeys Closure Gate and App Assembly evidence",
-      "provider-response-before-checkpoint and remaining process/database restart fault injections",
+      "remaining process/database restart fault injections",
       "lower-stage dependency closure and independent signoff"
     ]
   },
