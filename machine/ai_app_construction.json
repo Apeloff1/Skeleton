@@ -2077,7 +2077,7 @@
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Shared-network operation/stream authorities and production browser reconnect/resync/cancel session semantics are implemented. Remaining work is exact-head assembled validation and independent closure signoff.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
@@ -2099,7 +2099,9 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "implemented-pending-exact-head-closure"
+      "verification_state": "implemented-pending-exact-head-closure",
+      "status_detail": "closed by Stage-6 exact-head streaming candidate; reopen on replay, reconnect, compaction, backpressure, browser-session, Mongo authority, cancellation, or terminal-fencing regression",
+      "outstanding_evidence": []
     },
     {
       "id": "gap-governance-registry",
@@ -6557,7 +6559,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
