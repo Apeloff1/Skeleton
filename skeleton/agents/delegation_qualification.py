@@ -353,8 +353,10 @@ def qualify_agent_delegation(
         reasons.append("parent-identity-mismatch")
     if child.agent_id == parent.agent_id:
         reasons.append("delegation-self-cycle")
-    if child.generation <= parent.generation:
-        reasons.append("delegation-generation-not-descending")
+    if child.generation != parent.generation + 1:
+        reasons.append("delegation-generation-mismatch")
+    if child.delegation_id == parent.delegation_id:
+        reasons.append("delegation-id-reused")
     if child.expires_at > parent.expires_at:
         reasons.append("child-expiry-exceeds-parent")
     if now > parent.expires_at:
