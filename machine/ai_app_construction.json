@@ -4141,7 +4141,7 @@
       ],
       "exit": "frontend can lose transport and resume without duplicating side effects or losing terminal state",
       "progress": {
-        "state": "in_progress",
+        "state": "closed",
         "completed": [
           "canonical operation identity and lifecycle state machine",
           "transport-neutral stream event envelope",
@@ -4173,15 +4173,16 @@
           "bounded frontend replay pages and bounded SSE replay batches",
           "terminal backlog drains fully across bounded batches",
           "completion-versus-cancel race preserves exactly one terminal outcome",
-          "fenced expiring per-operation projection lease serializes cross-worker outbox projection with generation takeover fencing"
+          "fenced expiring per-operation projection lease serializes cross-worker outbox projection with generation takeover fencing",
+          "shared-network Mongo operation and stream authority",
+          "production browser session reconnect/resync/cancel runtime",
+          "browser disconnect/reconnect assembled-transport journey",
+          "browser slow-client replay-gap/backpressure recovery journey",
+          "browser cancel-complete terminal race journey",
+          "exact-head frontend typecheck and test:operation-stream closure evidence",
+          "independent Stage-6 streaming protocol closure verifier"
         ],
-        "remaining": [
-          "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",
-          "cross-host/shared-network stream authority beyond the file-backed reference store",
-          "browser-level disconnect/reconnect automation against assembled topology",
-          "browser-level slow-client/backpressure automation against assembled topology",
-          "browser-level cancel-complete automation against assembled topology"
-        ],
+        "remaining": [],
         "evidence": [
           "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions",
           "fenced projection lease takeover plus cross-worker API reconnect and operation-local slow-client isolation regressions"
