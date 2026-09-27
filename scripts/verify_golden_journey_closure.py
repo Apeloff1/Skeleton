@@ -77,6 +77,12 @@ JOURNEY_SURFACES: dict[str, tuple[str, ...]] = {
         "test_mongo_stream_transaction_preflight_executes_real_transactional_read",
         "test_mongo_stream_transaction_preflight_rejects_standalone_topology",
     ),
+    "backend/tests/test_operation_stream_mongo_replica_integration.py": (
+        "test_real_replica_set_preserves_cross_client_stream_authority",
+        "stage7-mongo-worker-a",
+        "stage7-mongo-worker-b",
+        "stage7-mongo-worker-c",
+    ),
     "skeleton/testing/test_ai_golden_journeys.py": (
         "retrieval_tool_provider_journey",
         "provider",
