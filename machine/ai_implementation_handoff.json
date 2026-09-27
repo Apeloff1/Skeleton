@@ -1266,7 +1266,7 @@
       ],
       "work_package": "WP-P0-STREAM",
       "blueprint": "realtime_delivery_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
@@ -1375,13 +1375,15 @@
         "frontend/services/operationStreamSession.ts provides an injectable production browser-session replay/resync/cancel runtime",
         "frontend/services/operationStream.ts binds the browser-session runtime to authenticated product API and AsyncStorage",
         "frontend/scripts/test-operation-stream-session.mjs covers browser disconnect/reconnect cursor continuity, compacted slow-client resync, cancel-complete terminal races and terminal snapshot reconciliation",
-        "frontend test:operation-stream now executes reducer and browser-session journey suites"
+        "frontend test:operation-stream now executes reducer and browser-session journey suites",
+        "frontend/services/operationStreamSession.ts provides an injectable production browser-session runtime for replay, cursor durability, resync, follow and cancellation",
+        "frontend/services/operationStream.ts binds the session runtime to authenticated production API and AsyncStorage adapters",
+        "frontend/scripts/test-operation-stream-session.mjs executes disconnect/reconnect, compaction-gap recovery and cancel/complete race journeys",
+        "frontend/package.json includes browser-session journeys in test:operation-stream"
       ],
       "remaining": [
-        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence for the browser-session production path",
-        "run assembled backend+frontend reconnect, slow-client and cancel/complete journeys against one deployed topology",
-        "run Mongo shared-authority integration against a transaction-capable replica-set topology",
-        "close declared lower-stage dependencies and independent closure evidence"
+        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence",
+        "obtain independent signoff before changing canonical gap status to closed"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
