@@ -844,6 +844,170 @@ async def test_stage7_artifact_action_is_receipted_once(
 
 
 @pytest.mark.asyncio
+async def test_stage7_expired_approval_can_be_renewed_without_widening_identity(
+    tmp_path,
+) -> None:
+    """Expired approval can be renewed for the exact pending call only."""
+
+    receipt_path = tmp_path / "stage7-approval-renewal-receipts.sqlite3"
+    effects: list[str | None] = []
+    manifest = ToolManifest(
+        tool_id="repo.write",
+        version="1.0.0",
+        description="Write one deterministic repository target.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "minLength": 1, "maxLength": 256},
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        effect=ToolEffect.REVERSIBLE,
+        approval_required=True,
+    )
+    definition = ProviderToolDefinition(
+        tool_id=manifest.tool_id,
+        description=manifest.description,
+        input_schema=dict(manifest.input_schema),
+    )
+    operation, command = _command(
+        execution_id="stage7-approval-renewal",
+        tool_definitions=(definition,),
+        idempotency_key="approval-renewal",
+    )
+    service = _service(tmp_path, prefix="approval-renewal")
+    _submit(service, command)
+
+    first_tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+
+    async def handler(request: ToolExecutionRequest) -> str:
+        effects.append(request.approval_ref)
+        return "artifact:renewed-write"
+
+    await first_tools.register(manifest, handler)
+    first_provider = _SequenceProvider(
+        [
+            _tool_response(
+                tool_id="repo.write",
+                arguments={"path": "README.md"},
+                call_id="call-renew",
+                response_id="provider-renew-proposal",
+            )
+        ]
+    )
+    first = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(first_provider),
+        tool_runtime=first_tools,
+        verification_hook=_verification,
+    )
+    await first.ensure_started(command)
+
+    for _ in range(200):
+        current = service.repository.get(command.execution_request.execution_id)
+        if current.state.value == "waiting_for_user":
+            break
+        await asyncio.sleep(0)
+    else:
+        raise AssertionError("renewal journey did not suspend for approval")
+
+    pending = service.pending_tool_approvals(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        now=_now(),
+    )
+    assert len(pending) == 1
+    await first.shutdown()
+
+    issued = _now()
+    initial = service.approve_tool_call(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        call_id=pending[0]["call_id"],
+        tool_id=pending[0]["tool_id"],
+        arguments_digest=pending[0]["arguments_digest"],
+        idempotency_key=pending[0]["idempotency_key"],
+        expires_at=issued + timedelta(seconds=1),
+        now=issued,
+    )
+    assert service.active_approval_refs(
+        command.execution_request.execution_id,
+        now=issued,
+    ) == {pending[0]["call_id"]: initial.approval_ref}
+    assert service.active_approval_refs(
+        command.execution_request.execution_id,
+        now=issued + timedelta(seconds=2),
+    ) == {}
+
+    renewed = service.approve_tool_call(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        call_id=pending[0]["call_id"],
+        tool_id=pending[0]["tool_id"],
+        arguments_digest=pending[0]["arguments_digest"],
+        idempotency_key=pending[0]["idempotency_key"],
+        expires_at=min(
+            operation.deadline,
+            issued + timedelta(minutes=1),
+        ),
+        now=issued + timedelta(seconds=2),
+    )
+    assert renewed.approval_id == initial.approval_id
+    assert renewed.approval_ref == initial.approval_ref
+    assert renewed.expires_at > initial.expires_at
+
+    with pytest.raises(Exception, match="active approval cannot be widened"):
+        service.submissions.remember_approval(
+            type(renewed)(
+                approval_id=renewed.approval_id,
+                execution_id=renewed.execution_id,
+                call_id=renewed.call_id,
+                tool_id=renewed.tool_id,
+                arguments_digest=renewed.arguments_digest,
+                actor_id=renewed.actor_id,
+                tenant_id=renewed.tenant_id,
+                idempotency_key=renewed.idempotency_key,
+                bound_approval_ref=renewed.bound_approval_ref,
+                issued_at=renewed.issued_at + timedelta(seconds=1),
+                expires_at=renewed.expires_at + timedelta(seconds=1),
+            )
+        )
+
+    restarted_tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+    await restarted_tools.register(manifest, handler)
+    final_provider = _SequenceProvider(
+        [_text_response("renewed write confirmed", response_id="provider-renew-final")]
+    )
+    restarted = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(final_provider),
+        tool_runtime=restarted_tools,
+        verification_hook=_verification,
+    )
+    await restarted.ensure_execution(command.execution_request.execution_id)
+    result = await _wait_result(service, command.execution_request.execution_id)
+
+    assert result.status == "completed"
+    assert result.final_output == "renewed write confirmed"
+    assert effects == [renewed.approval_ref]
+    assert result.usage["tool_calls"] == 1
+    assert len(result.tool_receipts) == 1
+    await restarted.shutdown()
+    restarted_tools.receipt_store.close()
+
+
+@pytest.mark.asyncio
 async def test_stage7_governance_export_delete_spans_artifact_and_retrieval_planes(
     tmp_path,
 ) -> None:
