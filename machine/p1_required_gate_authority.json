@@ -161,6 +161,20 @@
       ]
     },
     {
+      "id": "GATE-P1-SCOPE-FREEZE",
+      "workflow_name": "P1 Scope Freeze Gate",
+      "workflow_file": ".github/workflows/p1-scope-freeze.yml",
+      "group": "evidence",
+      "purpose": "Exact-head enforcement of the VOL-420 P1 breadth freeze and ADR-governed future exception path.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
+    },
+    {
       "id": "GATE-PROVENANCE",
       "workflow_name": "Provenance Policy",
       "workflow_file": ".github/workflows/provenance-policy.yml",
@@ -373,7 +387,8 @@
         "GATE-P1-MAP",
         "GATE-PROVENANCE",
         "GATE-P1-RISK-EVIDENCE",
-        "GATE-P1-REPRODUCIBILITY"
+        "GATE-P1-REPRODUCIBILITY",
+        "GATE-P1-SCOPE-FREEZE"
       ]
     },
     {
@@ -434,7 +449,7 @@
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 24,
+    "required_gate_count": 25,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
