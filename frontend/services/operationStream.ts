@@ -21,6 +21,8 @@ import {
 } from './operationStreamReducer';
 import {
   OperationBrowserSession,
+} from './operationStreamSession';
+import type {
   OperationBrowserSessionOptions,
   OperationSessionCursorStore,
   OperationSessionTransport,
