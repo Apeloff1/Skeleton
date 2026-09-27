@@ -246,9 +246,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                             f"{verifier_script}"
                         )
                     verifier_trigger = re.compile(
-                        r"(?m)^\\s*-\\s*[\"']?"
+                        r"(?m)^\s*-\s*[\"']?"
                         + re.escape(verifier_script)
-                        + r"[\"']?\\s*$"
+                        + r"[\"']?\s*$"
                     )
                     if verifier_trigger.search(workflow_source) is None:
                         errors.append(
