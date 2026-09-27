@@ -620,7 +620,8 @@
         "skeleton/retrieval/freshness.py",
         "skeleton/retrieval/receipts.py",
         "skeleton/retrieval/scope.py",
-        "skeleton/intelligence/knowledge_base.py"
+        "skeleton/intelligence/knowledge_base.py",
+        ".github/workflows/p1-information-quality.yml"
       ],
       "test_targets": [
         "skeleton/testing/test_information_quality.py",
