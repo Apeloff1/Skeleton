@@ -90,6 +90,16 @@ def _fresh(
     )
 
 
+def _retrieval_provenance() -> tuple[EvidenceRef, ...]:
+    return (
+        EvidenceRef(
+            source="retrieval://fragment-1/source-a",
+            digest="c" * 64,
+            category="retrieval_source",
+        ),
+    )
+
+
 def _knowledge(
     *,
     claim_id: str = "claim-1",
@@ -132,6 +142,7 @@ def _evaluate(**overrides):
         "memory_decisions": (_memory(),),
         "memory_conflicts": (),
         "retrieval_receipt": _retrieval(),
+        "retrieval_provenance": _retrieval_provenance(),
         "freshness_by_plane": {"lexical": _fresh()},
         "knowledge": (_knowledge(),),
         "quality_report": _quality(),
@@ -314,7 +325,7 @@ def test_knowledge_quality_failures_reject(
 def test_knowledge_requires_real_provenance() -> None:
     with pytest.raises(
         IntelligenceQualityError,
-        match="require provenance references",
+        match="requires evidence references",
     ):
         KnowledgeQualityObservation(
             claim_id="claim-1",
@@ -413,3 +424,109 @@ def test_resolved_conflict_is_bound_but_does_not_block() -> None:
     assert decision.accepted is True
     assert decision.reasons == ()
     assert len(decision.conflict_digest) == 64
+
+def test_retrieval_requires_real_provenance() -> None:
+    with pytest.raises(
+        IntelligenceQualityError,
+        match="retrieval provenance requires evidence references",
+    ):
+        _evaluate(retrieval_provenance=())
+
+    with pytest.raises(IntelligenceQualityError, match="retrieval provenance digest"):
+        _evaluate(
+            retrieval_provenance=(
+                EvidenceRef(
+                    source="retrieval://bad",
+                    digest="bad",
+                    category="retrieval_source",
+                ),
+            )
+        )
+
+
+def test_retrieval_provenance_order_and_duplicates_are_canonical() -> None:
+    left = EvidenceRef(
+        source="retrieval://left",
+        digest="3" * 64,
+        category="retrieval_source",
+    )
+    right = EvidenceRef(
+        source="retrieval://right",
+        digest="4" * 64,
+        category="retrieval_source",
+    )
+
+    first = _evaluate(retrieval_provenance=(left, right, left))
+    second = _evaluate(retrieval_provenance=(right, left))
+
+    assert first.accepted is True
+    assert second.accepted is True
+    assert first.retrieval_provenance_digest == second.retrieval_provenance_digest
+    assert first.decision_digest == second.decision_digest
+
+
+def test_memory_signal_shape_is_fail_closed() -> None:
+    malformed = replace(
+        _memory(),
+        signals=(("freshness", 0.95), ("utility", 0.8)),
+    )
+
+    with pytest.raises(IntelligenceQualityError, match="must contain"):
+        _evaluate(memory_decisions=(malformed,))
+
+
+def test_memory_freshness_and_evidence_are_explicit_gates() -> None:
+    stale = replace(
+        _memory(),
+        signals=(
+            ("freshness", 0.10),
+            ("utility", 0.80),
+            ("evidence", 0.90),
+            ("contradiction", 0.0),
+        ),
+    )
+    stale_decision = _evaluate(memory_decisions=(stale,))
+    assert stale_decision.accepted is False
+    assert "memory-stale:memory-1" in stale_decision.reasons
+
+    unprovenanced = replace(
+        _memory(),
+        signals=(
+            ("freshness", 0.95),
+            ("utility", 0.80),
+            ("evidence", 0.0),
+            ("contradiction", 0.0),
+        ),
+    )
+    evidence_decision = _evaluate(memory_decisions=(unprovenanced,))
+    assert evidence_decision.accepted is False
+    assert "memory-provenance-missing:memory-1" in evidence_decision.reasons
+
+
+def test_memory_contradiction_requires_explicit_resolution() -> None:
+    contradicted = replace(
+        _memory(record_id="memory-a"),
+        reasons=("contradicted",),
+        signals=(
+            ("freshness", 0.95),
+            ("utility", 0.80),
+            ("evidence", 0.90),
+            ("contradiction", 0.25),
+        ),
+    )
+    unresolved = _evaluate(memory_decisions=(contradicted,))
+    assert unresolved.accepted is False
+    assert "memory-contradiction-unresolved:memory-a" in unresolved.reasons
+
+    resolved_conflict = replace(
+        _unresolved_conflict(),
+        resolution=MemoryConflictResolution.KEEP_BOTH,
+        reason="independent provenance supports both scoped claims",
+    )
+    resolved = _evaluate(
+        memory_decisions=(contradicted,),
+        memory_conflicts=(resolved_conflict,),
+    )
+    assert resolved.accepted is True
+    assert "memory-contradiction-unresolved:memory-a" not in resolved.reasons
+
