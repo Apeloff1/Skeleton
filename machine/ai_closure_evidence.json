@@ -1072,7 +1072,9 @@
         "governance export/delete journeys execute tenant-bound conversation lifecycle semantics",
         "Golden Journey Closure Gate runs exact-head frontend, engine, governance and independent verifier suites",
         "shared Mongo operation-stream authority is startup-fenced by an actual transactional read probe",
-        "Mongo transaction-capability regressions reject standalone/sessionless deployments before authority cutover"
+        "Mongo transaction-capability regressions reject standalone/sessionless deployments before authority cutover",
+        "exact-head Stage-7 gate provisions a real transaction-capable Mongo replica set",
+        "cross-client Mongo operation/stream journey proves ordered replay, terminal handoff, consumer acknowledgement, compaction and reconnect snapshot"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -1083,7 +1085,6 @@
       "outstanding_evidence": [
         "fresh exact-head Golden Journey Closure Gate",
         "fresh exact-head App Assembly",
-        "assembled transaction-capable Mongo replica-set integration",
         "deployed frontend/backend/engine topology proof",
         "all lower-stage dependency gaps closed",
         "independent closure signoff"
@@ -1091,7 +1092,6 @@
       "blockers": [
         "fresh exact-head Golden Journey Closure Gate",
         "fresh exact-head App Assembly",
-        "assembled transaction-capable Mongo replica-set integration",
         "deployed frontend/backend/engine topology proof",
         "all lower-stage dependency gaps closed",
         "independent closure signoff"
