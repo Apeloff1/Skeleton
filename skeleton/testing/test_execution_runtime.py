@@ -1274,9 +1274,15 @@ async def test_default_verification_materializes_tool_result_evidence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reversible_tool_action_without_independent_verifier_fails_closed() -> None:
+async def test_reversible_tool_action_without_independent_verifier_fails_closed(
+    tmp_path,
+) -> None:
     repo = SQLiteExecutionRepository()
-    tools = AsyncToolRuntime()
+    tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(
+            tmp_path / "verification-write-receipts.sqlite3"
+        )
+    )
 
     async def handler(_request):
         return "artifact:write-result"
