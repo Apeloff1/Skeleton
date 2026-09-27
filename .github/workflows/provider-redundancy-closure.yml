@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "masterplan/p1-provider-redundancy-20260927-chat"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/provider_runtime.py"
