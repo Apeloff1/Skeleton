@@ -699,7 +699,8 @@
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/cognitive_runtime.py",
         "skeleton/ai/runtime/intelligence/cognitive_runtime.py",
-        "scripts/check_p1_reasoning_strategy_registry.py"
+        "scripts/check_p1_reasoning_strategy_registry.py",
+        ".github/workflows/p1-reasoning-strategy.yml"
       ],
       "test_targets": [
         "skeleton/testing/test_reasoning_strategy_registry.py",
