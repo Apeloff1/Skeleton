@@ -28,7 +28,7 @@ def _valid_repo(root: Path) -> Path:
                     {
                         "id": gap_id,
                         "plane": plane,
-                        "status": "open",
+                        "status": "closed",
                     }
                     for gap_id, plane in EXPECTED_GAPS.items()
                 ]
@@ -107,3 +107,21 @@ def test_independent_p1_verifier_rejects_masterplan_plane_drift(
 
     assert receipt["valid"] is False
     assert any("masterplan plane drift" in error for error in receipt["errors"])
+
+def test_independent_p1_verifier_rejects_reopened_gap(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_app_construction.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["gap_register"][0]["status"] = "open"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "must remain closed" in error
+        for error in receipt["errors"]
+    )
+
