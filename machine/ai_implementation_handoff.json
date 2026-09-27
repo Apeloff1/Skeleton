@@ -1408,7 +1408,7 @@
       ],
       "work_package": "WP-P0-GOLDEN-JOURNEYS",
       "blueprint": "golden_journey_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
       "target_files": {
         "contracts": [
@@ -1461,18 +1461,20 @@
       "current_evidence": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
-        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence",
+        "frontend/services/operationStreamSession.ts production browser-session runtime plus reconnect/resync/cancel journeys",
+        "frontend/scripts/test-operation-stream-session.mjs assembled client-session disconnect, slow-client and terminal-race evidence",
+        "skeleton/api/engine_service.py permits identity-stable renewal only after a durable approval has expired",
+        "skeleton/testing/test_engine_execution_service.py proves expired approval reauthorization survives restart",
+        "backend/tests/test_conversation_governance.py covers governed export and ordered deletion",
+        ".github/workflows/golden-journey-closure.yml binds frontend, engine, governance and independent Stage-7 exact-head evidence",
+        "scripts/verify_golden_journey_closure.py independently binds required journey surfaces and dependency graph"
       ],
       "remaining": [
-        "assemble browser prompt-only and multi-turn journeys",
-        "assemble browser/API retrieval and read-tool trace continuity",
-        "assemble write-tool-with-approval including approval-expiry recovery",
-        "assemble browser artifact/result linkage",
-        "assemble reconnect/slow-client/cancel-complete race against Stage-6 transport",
-        "assemble provider-outage and engine-outage degraded UX",
-        "assemble governance delete/export journey",
-        "inject remaining provider/checkpoint/process/database faults",
-        "collect exact-head CI evidence and independent signoff after dependencies close"
+        "collect fresh exact-head Golden Journey Closure Gate and App Assembly evidence",
+        "run transaction-capable Mongo replica-set and deployed assembled-topology journey proof",
+        "close all declared lower-stage dependency gaps",
+        "obtain independent signoff before canonical Stage-7 closure"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     }
