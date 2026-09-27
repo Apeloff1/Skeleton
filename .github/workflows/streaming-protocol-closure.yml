@@ -61,6 +61,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           -e ".[dev]"
           "httpx==0.28.1"
+          "bcrypt==4.3.0"
 
       - name: Run canonical stream contracts
         run: >-
