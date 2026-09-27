@@ -85,6 +85,18 @@ def _strings(
     return result
 
 
+def _known_gaps(construction: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw = construction.get("gap_register")
+    if not isinstance(raw, list):
+        return {}
+    return {
+        item["id"]: item
+        for item in raw
+        if isinstance(item, dict)
+        and isinstance(item.get("id"), str)
+    }
+
+
 def _open_gaps(construction: dict[str, Any]) -> dict[str, dict[str, Any]]:
     raw = construction.get("gap_register")
     if not isinstance(raw, list):
@@ -266,6 +278,7 @@ def _validate_state_domains(
         return {}
 
     plane_ids = _planes(construction)
+    known_gaps = _known_gaps(construction)
     open_gaps = _open_gaps(construction)
     domains: dict[str, dict[str, Any]] = {}
 
@@ -393,9 +406,9 @@ def _validate_state_domains(
                 errors.append(
                     f"transitional state domain {domain_id} gap must be P0: {gap_id}"
                 )
-        elif gap_id is not None and gap_id not in open_gaps:
+        elif gap_id is not None and gap_id not in known_gaps:
             errors.append(
-                f"state domain {domain_id} references unknown/closed gap {gap_id!r}"
+                f"state domain {domain_id} references unknown gap {gap_id!r}"
             )
 
         store = stores.get(str(store_id))
