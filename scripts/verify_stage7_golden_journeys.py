@@ -271,7 +271,7 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append("golden journey blueprint gap binding is invalid")
         if blueprint.get("status") not in {
             "implemented-pending-closure",
-            "closed",
+            "complete",
         }:
             errors.append(
                 "golden journey blueprint is not implemented-pending-closure"
@@ -313,6 +313,10 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
                 "closed Stage-7 gap has non-closed dependencies: "
                 + ", ".join(open_dependencies)
             )
+        if not isinstance(blueprint, dict) or blueprint.get("status") != "complete":
+            errors.append("closed Stage-7 gap requires complete blueprint")
+        if entry.get("implementation_status") != "closed":
+            errors.append("closed Stage-7 gap requires closed handoff")
     elif stage7_status != "open":
         errors.append("Stage-7 construction status is invalid")
 
