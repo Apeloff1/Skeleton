@@ -592,4 +592,3 @@ def test_future_knowledge_skew_policy_is_validated_and_digest_bound() -> None:
         match="max_future_knowledge_skew_s must be non-negative",
     ):
         IntelligenceQualityPolicy(max_future_knowledge_skew_s=-1.0)
-
