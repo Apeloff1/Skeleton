@@ -290,7 +290,7 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append("cognitive runtime blueprint gap binding is invalid")
         if blueprint.get("status") not in {
             "implemented-pending-closure",
-            "closed",
+            "complete",
         }:
             errors.append(
                 "cognitive runtime blueprint is not implemented-pending-closure"

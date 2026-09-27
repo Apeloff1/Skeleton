@@ -576,7 +576,6 @@
       "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/contracts/ai_execution.py",
         "skeleton/persistence/execution_repository.py",
@@ -667,7 +666,6 @@
       "migration": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/intelligence/admission.py",
         "skeleton/intelligence/admission_runtime.py",
@@ -698,7 +696,6 @@
       "migration": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/contracts/ai_execution.py",
         "skeleton/persistence/execution_repository.py",
