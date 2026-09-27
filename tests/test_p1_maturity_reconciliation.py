@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 from types import ModuleType
 
@@ -28,6 +29,14 @@ def _module() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _copy_sources(tmp_path: Path) -> None:
+    for source in SOURCE_PATHS:
+        relative = source.relative_to(ROOT)
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
 
 
 def _digests() -> tuple[str, ...]:
@@ -136,3 +145,27 @@ def test_report_binds_reconciliation_engine_sources() -> None:
         len(value) == 64
         for value in report["source_digests"].values()
     )
+
+def test_reconciliation_rejects_masterplan_authority_pointer_drift(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    _copy_sources(tmp_path)
+    master = tmp_path / "machine/ai_master_plan.json"
+    payload = json.loads(master.read_text(encoding="utf-8"))
+    payload["authority"]["p1_maturity_reconciliation_engine"] = (
+        "scripts/shadow_reconciler.py"
+    )
+    master.write_text(
+        json.dumps(payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        module.ReconciliationError,
+        match="authority pointer drift",
+    ):
+        module.reconcile_repository(
+            tmp_path,
+            selected_volumes=("VOL-000",),
+        )
