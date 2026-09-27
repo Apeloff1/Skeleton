@@ -2989,6 +2989,7 @@ class ProviderRegistry:
             try:
                 receipt = self._architecture_receipt(provider_id)
             except ProviderUnavailableError:
+                status["available"] = False
                 status["architecture_acknowledged"] = False
                 status["architecture_tag"] = None
                 status["construction_version"] = None
