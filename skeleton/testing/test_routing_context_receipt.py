@@ -328,7 +328,10 @@ def test_receipt_identity_ignores_timing_jitter() -> None:
         quality_floor=0.8,
     )
 
-    assert first.observed_attempt_latency_seconds != second.observed_attempt_latency_seconds
+    assert (
+        first.observed_attempt_latency_seconds
+        != second.observed_attempt_latency_seconds
+    )
     assert first.receipt_digest == second.receipt_digest
     assert first.identity_payload() == second.identity_payload()
     assert first.payload()["telemetry"] != second.payload()["telemetry"]
