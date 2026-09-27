@@ -140,6 +140,7 @@ def _command(
     execution_id: str,
     tool_definitions: tuple[ProviderToolDefinition, ...] = (),
     idempotency_key: str = "fixture",
+    history: tuple[tuple[str, str], ...] | None = None,
 ) -> tuple[OperationEnvelope, EngineExecutionCommand]:
     started = _now()
     operation = OperationEnvelope(
@@ -177,8 +178,12 @@ def _command(
         instructions="Use canonical authority and cite durable evidence.",
         prompt="Resolve the deterministic golden journey.",
         history=(
-            ("user", "Earlier user turn."),
-            ("assistant", "Earlier assistant turn."),
+            history
+            if history is not None
+            else (
+                ("user", "Earlier user turn."),
+                ("assistant", "Earlier assistant turn."),
+            )
         ),
         tools=tool_definitions,
     )
@@ -344,6 +349,241 @@ def _events(
         now=_now(),
     )
     return tuple(payload["events"])
+
+
+@pytest.mark.asyncio
+async def test_stage7_prompt_only_journey_preserves_operation_context_and_terminal_lineage(
+    tmp_path,
+) -> None:
+    provider = _SequenceProvider(
+        [_text_response("prompt-only answer", response_id="provider-prompt-only")]
+    )
+    service = _service(tmp_path, prefix="prompt-only")
+    operation, command = _command(
+        execution_id="stage7-prompt-only",
+        history=(),
+    )
+    _submit(service, command)
+
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(provider),
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    await coordinator.ensure_started(command)
+    result = await _wait_result(service, command.execution_request.execution_id)
+
+    assert result.status == "completed"
+    assert result.final_output == "prompt-only answer"
+    assert result.provider_receipts == (
+        "provider:deterministic:provider-prompt-only",
+    )
+    assert result.tool_receipts == ()
+    assert result.verification_receipt["outcome"] == "passed"
+    assert len(provider.requests) == 1
+    request = provider.requests[0]
+    assert request.operation_id == operation.operation_id
+    assert request.execution_id == command.execution_request.execution_id
+    assert request.history == ()
+    assert request.context_id == command.compiled_context.context_id
+    assert request.context_digest == command.compiled_context.context_digest
+
+    terminal = [
+        event
+        for event in _events(service, command.execution_request.execution_id)
+        if event["type"] == "execution.result"
+    ]
+    assert len(terminal) == 1
+    assert terminal[0]["result"]["status"] == "completed"
+    assert terminal[0]["result"]["provider_receipts"] == list(
+        result.provider_receipts
+    )
+
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_stage7_multi_turn_journey_preserves_canonical_history_and_trace(
+    tmp_path,
+) -> None:
+    history = (
+        ("user", "First user turn."),
+        ("assistant", "First assistant answer."),
+        ("user", "Second user turn."),
+    )
+    provider = _SequenceProvider(
+        [_text_response("second assistant answer", response_id="provider-multiturn")]
+    )
+    service = _service(tmp_path, prefix="multi-turn")
+    operation, command = _command(
+        execution_id="stage7-multi-turn",
+        history=history,
+    )
+    _submit(service, command)
+
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(provider),
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    await coordinator.ensure_started(command)
+    result = await _wait_result(service, command.execution_request.execution_id)
+
+    assert result.status == "completed"
+    assert result.final_output == "second assistant answer"
+    request = provider.requests[0]
+    assert tuple((item.role, item.content) for item in request.history) == history
+    assert request.operation_id == operation.operation_id
+    assert request.execution_id == command.execution_request.execution_id
+    assert request.turn_id == command.compiled_context.turn_id
+    assert request.context_source_snapshot == command.compiled_context.source_snapshot
+    assert result.stream_terminal_event is not None
+
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_stage7_approval_write_survives_restart_and_executes_effect_once(
+    tmp_path,
+) -> None:
+    receipt_path = tmp_path / "stage7-approval-write-receipts.sqlite3"
+    effects: list[str | None] = []
+    manifest = ToolManifest(
+        tool_id="repo.write",
+        version="1.0.0",
+        description="Write one deterministic repository target.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "minLength": 1, "maxLength": 256},
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        effect=ToolEffect.REVERSIBLE,
+        approval_required=True,
+    )
+    definition = ProviderToolDefinition(
+        tool_id=manifest.tool_id,
+        description=manifest.description,
+        input_schema=dict(manifest.input_schema),
+    )
+    operation, command = _command(
+        execution_id="stage7-approval-write",
+        tool_definitions=(definition,),
+        idempotency_key="approval-write",
+    )
+    service = _service(tmp_path, prefix="approval-write")
+    _submit(service, command)
+
+    first_tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+
+    async def first_handler(request: ToolExecutionRequest) -> str:
+        effects.append(request.approval_ref)
+        return "artifact:approved-write"
+
+    await first_tools.register(manifest, first_handler)
+    first_provider = _SequenceProvider(
+        [
+            _tool_response(
+                tool_id="repo.write",
+                arguments={"path": "README.md"},
+                call_id="call-write",
+                response_id="provider-write-proposal",
+            )
+        ]
+    )
+    first = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(first_provider),
+        tool_runtime=first_tools,
+        verification_hook=_verification,
+    )
+    await first.ensure_started(command)
+
+    for _ in range(200):
+        current = service.repository.get(command.execution_request.execution_id)
+        if current.state.value == "waiting_for_user":
+            break
+        await asyncio.sleep(0)
+    else:
+        raise AssertionError("approval journey did not suspend for user authority")
+
+    pending = service.pending_tool_approvals(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        now=_now(),
+    )
+    assert len(pending) == 1
+    assert pending[0]["call_id"] == "call-write"
+    assert pending[0]["tool_id"] == "repo.write"
+    assert effects == []
+    await first.shutdown()
+
+    approval = service.approve_tool_call(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        call_id=pending[0]["call_id"],
+        tool_id=pending[0]["tool_id"],
+        arguments_digest=pending[0]["arguments_digest"],
+        idempotency_key=pending[0]["idempotency_key"],
+        expires_at=min(
+            operation.deadline,
+            command.delegated_authority.expires_at,
+        ) - timedelta(seconds=1),
+        now=_now(),
+    )
+
+    restarted_tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+
+    async def restarted_handler(request: ToolExecutionRequest) -> str:
+        effects.append(request.approval_ref)
+        return "artifact:approved-write"
+
+    await restarted_tools.register(manifest, restarted_handler)
+    final_provider = _SequenceProvider(
+        [_text_response("write confirmed", response_id="provider-write-final")]
+    )
+    restarted = EngineExecutionCoordinator(
+        service,
+        provider_registry=_Registry(final_provider),
+        tool_runtime=restarted_tools,
+        verification_hook=_verification,
+    )
+    await restarted.ensure_execution(command.execution_request.execution_id)
+    result = await _wait_result(service, command.execution_request.execution_id)
+
+    assert result.status == "completed"
+    assert result.final_output == "write confirmed"
+    assert effects == [approval.approval_ref]
+    assert result.usage["tool_calls"] == 1
+    assert len(result.tool_receipts) == 1
+    assert result.provider_receipts == (
+        "provider:deterministic:provider-write-proposal",
+        "provider:deterministic:provider-write-final",
+    )
+    assert result.verification_receipt["outcome"] == "passed"
+
+    terminal = [
+        event
+        for event in _events(service, command.execution_request.execution_id)
+        if event["type"] == "execution.result"
+    ]
+    assert len(terminal) == 1
+    assert terminal[0]["result"]["tool_receipts"] == list(result.tool_receipts)
+
+    await restarted.shutdown()
+    restarted_tools.receipt_store.close()
 
 
 @pytest.mark.asyncio
