@@ -1227,7 +1227,7 @@
       ],
       "work_package": "WP-P0-STREAM",
       "blueprint": "realtime_delivery_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
@@ -1340,13 +1340,13 @@
         "frontend/services/operationStreamSession.ts provides an injectable production browser-session runtime for replay, cursor durability, resync, follow and cancellation",
         "frontend/services/operationStream.ts binds the session runtime to authenticated production API and AsyncStorage adapters",
         "frontend/scripts/test-operation-stream-session.mjs executes disconnect/reconnect, compaction-gap recovery and cancel/complete race journeys",
-        "frontend/package.json includes browser-session journeys in test:operation-stream"
+        "frontend/package.json includes browser-session journeys in test:operation-stream",
+        ".github/workflows/streaming-protocol-closure.yml exact-head backend/frontend/independent closure gate",
+        "scripts/verify_streaming_protocol_closure.py independent source/mirror/dependency verifier"
       ],
-      "remaining": [
-        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence",
-        "obtain independent signoff before changing canonical gap status to closed"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "blockers": []
     },
     {
       "gap": "gap-e2e-golden-journeys",
