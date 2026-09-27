@@ -182,6 +182,32 @@ def test_independent_verifier_rejects_application_credential_read(
     )
 
 
+def test_independent_verifier_rejects_secondary_application_credential_read(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    (root / "backend" / "facade.py").write_text(
+        "\n".join(
+            [
+                "import os",
+                'CANONICAL_DELEGATION = "skeleton/provider_runtime.py"',
+                'key = os.getenv("AI_SECONDARY_API_KEY")',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "backend/facade.py owns forbidden credential edges"
+        in error
+        for error in receipt["errors"]
+    )
+
+
 def test_independent_verifier_rejects_inconsistent_declared_edges(
     tmp_path: Path,
 ) -> None:
