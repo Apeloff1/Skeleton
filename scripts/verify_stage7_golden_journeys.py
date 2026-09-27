@@ -53,6 +53,34 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "slow browser recovers from compacted replay gap through authoritative floor",
         "cancel-complete race exposes exactly one canonical terminal outcome per session",
         "terminal authoritative resync snapshot reconciles canonical output before fencing",
+        "browser terminal artifact result linkage survives reconnect",
+    ),
+    "backend/tests/test_engine_live_process_boundary.py": (
+        "test_engine_client_crosses_real_tcp_process_boundary",
+        "test_engine_state_survives_real_process_restart",
+    ),
+    "skeleton/frontier/operation_stream_store_mongo.py": (
+        "class MongoOperationEventStore",
+        "def validate_transaction_capability(",
+        "Mongo stream authority requires transaction-capable deployment",
+    ),
+    "skeleton/testing/test_operation_stream_store_mongo.py": (
+        "test_mongo_stream_transaction_preflight_executes_real_transactional_read",
+        "test_mongo_stream_transaction_preflight_rejects_standalone_topology",
+        "test_mongo_stream_transaction_preflight_rejects_client_without_sessions",
+    ),
+    "backend/tests/test_operation_stream_mongo_stage7.py": (
+        "test_stage7_mongo_shared_authority_survives_transient_update_failure",
+        "configureFailPoint",
+        "RetryableWriteError",
+    ),
+    "backend/tests/test_operation_stream_mongo_integration.py": (
+        "test_mongo_shared_authority_replays_across_workers_and_compacts_by_ack",
+        "test_mongo_cancel_complete_race_projects_exactly_one_terminal_event",
+    ),
+    "skeleton/testing/test_engine_execution_service.py": (
+        "test_expired_persisted_approval_can_be_safely_reauthorized",
+        "test_expired_persisted_approval_is_not_replayed_into_resume",
     ),
     "skeleton/api/engine_service.py": (
         "active approval cannot be widened or renewed",
