@@ -260,18 +260,20 @@ def test_hardened_and_production_reject_unresolved_gaps() -> None:
 
 
 def test_reconciler_never_skips_an_ineligible_intermediate_state() -> None:
+    policy = deepcopy(POLICY)
+    policy["implemented"]["required_nonempty_fields"] = [
+        *policy["implemented"]["required_nonempty_fields"],
+        "intermediate_only_requirement",
+    ]
     decision = reconcile_volume(
-        _volume(
-            tests=["planned:tests/test_example.py"],
-            gaps=[],
-        ),
+        _volume(gaps=[]),
         _accountability(
             status="production",
             implementation_signoff=_signoff(True),
             verification_signoff=_signoff(True),
             evidence=["ledger:evidence"],
         ),
-        POLICY,
+        policy,
         target_floor="production",
     )
 
@@ -455,4 +457,3 @@ def test_reference_validator_does_not_affect_planning_only_scaffolded() -> None:
 
     assert _evaluation(decision, "scaffolded").eligible is True
     assert decision.promotion_candidate == "scaffolded"
-
