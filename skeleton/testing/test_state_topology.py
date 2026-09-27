@@ -21,6 +21,19 @@ def test_state_topology_is_valid() -> None:
     assert summary["state_flows"] >= 7
 
 
+def test_closed_gap_lineage_is_retained_on_stable_authorities() -> None:
+    topology = _topology()
+    domains = {domain["id"]: domain for domain in topology["state_domains"]}
+
+    operation = domains["canonical-operation-state"]
+    assert operation["authority"] == "authoritative"
+    assert operation["gap"] == "gap-state-authority-convergence"
+
+    memory = domains["canonical-ai-memory-records"]
+    assert memory["authority"] == "authoritative"
+    assert memory["gap"] == "gap-memory-durable-authority"
+
+
 def test_only_declared_authority_classes_are_sources_of_truth() -> None:
     topology = _topology()
     authoritative = {
