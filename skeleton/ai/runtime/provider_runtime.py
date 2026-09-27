@@ -929,11 +929,11 @@ def _provider_tool_call_from_item(
         or ""
     ).strip()
     if not call_id or not tool_id:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned malformed tool call"
         )
     if tool_id not in offered_tool_ids:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned an unoffered tool call"
         )
     raw_arguments = _provider_field(item, "arguments", {})
@@ -941,13 +941,13 @@ def _provider_tool_call_from_item(
         try:
             parsed_arguments = json.loads(raw_arguments)
         except json.JSONDecodeError as exc:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned malformed tool arguments"
             ) from exc
     else:
         parsed_arguments = raw_arguments
     if not isinstance(parsed_arguments, Mapping):
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider tool arguments must be a JSON object"
         )
     try:
@@ -978,13 +978,13 @@ def _extract_provider_tool_calls(
         if call is None:
             continue
         if call.call_id in seen:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned duplicate tool call id"
             )
         seen.add(call.call_id)
         calls.append(call)
         if len(calls) > 256:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned too many tool calls"
             )
     return tuple(calls)
@@ -999,7 +999,7 @@ def _extract_provider_structured_output(
     parsed = _provider_field(response, "output_parsed", None)
     if parsed is not None:
         if not isinstance(parsed, Mapping):
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider structured output is not an object"
             )
         return _strict_json_object(
@@ -1011,11 +1011,11 @@ def _extract_provider_structured_output(
     try:
         value = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider structured output is invalid JSON"
         ) from exc
     if not isinstance(value, Mapping):
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider structured output is not an object"
         )
     return _strict_json_object(
@@ -1159,7 +1159,7 @@ def _normalize_provider_interaction(
             FinishReason.CANCELLED,
             FinishReason.DEADLINE,
         }:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned no normalized output"
             )
     return normalized_text, structured, tool_calls, finish, usage
@@ -1200,15 +1200,15 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     """Validate provider-neutral request fields before any provider I/O."""
 
     if not isinstance(request.prompt, str) or not request.prompt.strip():
-        raise ProviderInvocationError("model provider prompt must be non-empty text")
+        raise ProviderProtocolViolationError("model provider prompt must be non-empty text")
 
     for message in request.history:
         if not isinstance(message, AIMessage):
-            raise ProviderInvocationError("model provider history contains an invalid message")
+            raise ProviderProtocolViolationError("model provider history contains an invalid message")
         if message.role not in _ALLOWED_HISTORY_ROLES:
-            raise ProviderInvocationError("model provider history contains an invalid role")
+            raise ProviderProtocolViolationError("model provider history contains an invalid role")
         if not isinstance(message.content, str) or not message.content.strip():
-            raise ProviderInvocationError("model provider history contains empty content")
+            raise ProviderProtocolViolationError("model provider history contains empty content")
 
     max_output_tokens = request.max_output_tokens
     if max_output_tokens is not None and (
@@ -1216,17 +1216,17 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         or not isinstance(max_output_tokens, int)
         or max_output_tokens <= 0
     ):
-        raise ProviderInvocationError("max_output_tokens must be a positive integer")
+        raise ProviderProtocolViolationError("max_output_tokens must be a positive integer")
 
     if request.model is None:
         model = default_model
     elif not isinstance(request.model, str) or not request.model.strip():
-        raise ProviderInvocationError("model provider model must be non-empty text")
+        raise ProviderProtocolViolationError("model provider model must be non-empty text")
     else:
         model = request.model.strip()
 
     if not model:
-        raise ProviderInvocationError("model provider model must be non-empty text")
+        raise ProviderProtocolViolationError("model provider model must be non-empty text")
 
     if not isinstance(request.purpose, str) or not request.purpose.strip():
         raise ProviderPolicyError("model provider transfer purpose is invalid")
@@ -1400,7 +1400,7 @@ def provider_request_from_context(
 
     projection = project_provider_context(envelope)
     if not projection.prompt.strip():
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "compiled context requires a final canonical user message"
         )
 
@@ -2519,7 +2519,7 @@ class OpenAISyncProviderAdapter:
     @staticmethod
     def _extract_response_text(payload: Any) -> str | None:
         if not isinstance(payload, Mapping):
-            raise ProviderInvocationError("model provider returned malformed JSON")
+            raise ProviderProtocolViolationError("model provider returned malformed JSON")
 
         direct = payload.get("output_text")
         if isinstance(direct, str) and direct.strip():
