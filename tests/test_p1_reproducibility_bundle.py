@@ -312,4 +312,3 @@ def test_policy_rejects_terminal_weakening(tmp_path: Path) -> None:
         match="terminal policy drift",
     ):
         module.validate_policy(root)
-
