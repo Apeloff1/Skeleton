@@ -60,6 +60,8 @@ def reconcile_repository(
         "master_plan": root / MASTER,
         "accountability": root / ACCOUNTABILITY,
         "p1_execution_map": root / P1_MAP,
+        "engine_contract": root / "skeleton/contracts/maturity_reconciliation.py",
+        "engine_runner": root / "scripts/reconcile_p1_maturity.py",
     }
     before = {name: _digest(path) for name, path in paths.items()}
     master = _load(paths["master_plan"])
