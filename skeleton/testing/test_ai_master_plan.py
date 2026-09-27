@@ -248,3 +248,28 @@ def test_depth_pass_coverage_rejects_overlap() -> None:
     )
     errors = checker.validate(mutated)
     assert any("depth coverage for VOL-000 must be exactly one pass" in e for e in errors)
+
+def test_master_plan_binds_scope_freeze_adr_register() -> None:
+    data = checker.load_plan()
+
+    assert (
+        data["authority"]["p1_scope_freeze_adr_register"]
+        == "machine/ai_scope_freeze_adrs.json"
+    )
+    assert (
+        data["breadth_freeze"]["exception_register"]
+        == "machine/ai_scope_freeze_adrs.json"
+    )
+    assert data["breadth_freeze"]["p1_application_policy"] == "forbid"
+
+
+def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["breadth_freeze"]["p1_application_policy"] = "allow"
+    mutated["authority"]["p1_scope_freeze_adr_register"] = "machine/wrong.json"
+
+    errors = checker.validate(mutated)
+
+    assert "breadth_freeze.p1_application_policy must equal forbid" in errors
+    assert "authority.p1_scope_freeze_adr_register path drifted" in errors
