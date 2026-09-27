@@ -1070,7 +1070,9 @@
         "browser operation session covers reconnect, compaction-gap recovery and cancel-complete fencing",
         "expired write-tool approvals can be reauthorized with stable call/tool/argument identity and restart-safe persistence",
         "governance export/delete journeys execute tenant-bound conversation lifecycle semantics",
-        "Golden Journey Closure Gate runs exact-head frontend, engine, governance and independent verifier suites"
+        "Golden Journey Closure Gate runs exact-head frontend, engine, governance and independent verifier suites",
+        "shared Mongo operation-stream authority is startup-fenced by an actual transactional read probe",
+        "Mongo transaction-capability regressions reject standalone/sessionless deployments before authority cutover"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -1081,16 +1083,16 @@
       "outstanding_evidence": [
         "fresh exact-head Golden Journey Closure Gate",
         "fresh exact-head App Assembly",
-        "transaction-capable Mongo replica-set assembled integration",
-        "deployed frontend/backend/engine journey proof",
+        "assembled transaction-capable Mongo replica-set integration",
+        "deployed frontend/backend/engine topology proof",
         "all lower-stage dependency gaps closed",
         "independent closure signoff"
       ],
       "blockers": [
         "fresh exact-head Golden Journey Closure Gate",
         "fresh exact-head App Assembly",
-        "transaction-capable Mongo replica-set assembled integration",
-        "deployed frontend/backend/engine journey proof",
+        "assembled transaction-capable Mongo replica-set integration",
+        "deployed frontend/backend/engine topology proof",
         "all lower-stage dependency gaps closed",
         "independent closure signoff"
       ],
