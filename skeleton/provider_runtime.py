@@ -2527,14 +2527,22 @@ class ProviderRegistry:
             return False
         return True
 
-    def require_active(self) -> ProviderAdapter:
-        adapter = self.active
+    def require(self, provider_id: str) -> ProviderAdapter:
+        target = str(provider_id).strip().lower()
+        adapter = self._adapters.get(target)
         if adapter is None:
-            raise ProviderUnavailableError(f"unsupported AI provider: {self.active_id}")
-        self._architecture_receipt(self.active_id)
+            raise ProviderUnavailableError(
+                f"unsupported AI provider: {target}"
+            )
+        self._architecture_receipt(target)
         if not adapter.available:
-            raise ProviderUnavailableError(f"AI provider is not configured: {self.active_id}")
+            raise ProviderUnavailableError(
+                f"AI provider is not configured: {target}"
+            )
         return adapter
+
+    def require_active(self) -> ProviderAdapter:
+        return self.require(self.active_id)
 
     def verification_adapter_for(
         self,
