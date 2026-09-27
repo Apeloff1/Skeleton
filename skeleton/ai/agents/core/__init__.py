@@ -1,6 +1,16 @@
 """Skeleton agent orchestration primitives."""
 
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
+from skeleton.agents.delegation_qualification import (
+    AGENT_DELEGATION_ACCOUNTABILITY_ID,
+    AGENT_DELEGATION_SCHEMA_VERSION,
+    AGENT_DELEGATION_TASK_ID,
+    AgentDelegationAuthority,
+    AgentDelegationDecision,
+    AgentDelegationError,
+    DelegationBudget,
+    qualify_agent_delegation,
+)
 from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
@@ -46,6 +56,9 @@ from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSna
 
 __all__ = [
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
+    "AGENT_DELEGATION_ACCOUNTABILITY_ID", "AGENT_DELEGATION_SCHEMA_VERSION",
+    "AGENT_DELEGATION_TASK_ID", "AgentDelegationAuthority", "AgentDelegationDecision",
+    "AgentDelegationError", "DelegationBudget", "qualify_agent_delegation",
     "AdmissionError", "LeaseError", "RuntimeSnapshot", "SwarmRuntime", "HardenedSwarmRuntime",
     "SwarmTask", "TaskState", "WorkerState", "AdmissionDecision", "AdmissionPolicy",
     "capability_coverage", "AutoscalePolicy", "ScaleRecommendation", "BrokerResult", "CompletionResult",
