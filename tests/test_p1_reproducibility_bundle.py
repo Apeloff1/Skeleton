@@ -255,3 +255,61 @@ def test_verify_returns_nonzero_with_deterministic_incompatibility(
         "environment_digest mismatch" in item
         for item in evaluation["incompatibilities"]
     )
+
+def test_policy_rejects_runner_inventory_drift(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    root = _copy_policy_repo(tmp_path)
+    policy = json.loads((root / POLICY).read_text(encoding="utf-8"))
+    policy["runners"][0]["id"] = "replacement-runner"
+    _write(root / POLICY, policy)
+
+    with pytest.raises(
+        module.ReproducibilityCliError,
+        match="runner inventory drift",
+    ):
+        module.validate_policy(root)
+
+
+def test_policy_rejects_budget_weakening(tmp_path: Path) -> None:
+    module = _module()
+    root = _copy_policy_repo(tmp_path)
+    policy = json.loads((root / POLICY).read_text(encoding="utf-8"))
+    policy["budgets"][0]["retries"] = 5
+    _write(root / POLICY, policy)
+
+    with pytest.raises(
+        module.ReproducibilityCliError,
+        match="budget policy drift",
+    ):
+        module.validate_policy(root)
+
+
+def test_policy_rejects_comparison_weakening(tmp_path: Path) -> None:
+    module = _module()
+    root = _copy_policy_repo(tmp_path)
+    policy = json.loads((root / POLICY).read_text(encoding="utf-8"))
+    policy["comparison"]["require_same_environment_digest"] = False
+    _write(root / POLICY, policy)
+
+    with pytest.raises(
+        module.ReproducibilityCliError,
+        match="comparison policy drift",
+    ):
+        module.validate_policy(root)
+
+
+def test_policy_rejects_terminal_weakening(tmp_path: Path) -> None:
+    module = _module()
+    root = _copy_policy_repo(tmp_path)
+    policy = json.loads((root / POLICY).read_text(encoding="utf-8"))
+    policy["terminal_policy"]["failed_replay_is_not_success"] = False
+    _write(root / POLICY, policy)
+
+    with pytest.raises(
+        module.ReproducibilityCliError,
+        match="terminal policy drift",
+    ):
+        module.validate_policy(root)
+
