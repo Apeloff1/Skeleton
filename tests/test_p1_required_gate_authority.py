@@ -317,3 +317,49 @@ def test_observation_evaluator_rejects_unknown_fields(tmp_path: Path) -> None:
     else:
         raise AssertionError("observation with unknown fields unexpectedly accepted")
 
+def test_authority_rejects_policy_version_and_self_path_drift(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["policy_version"] = "2.0.0"
+        payload["authority"] = "machine/other.json"
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert "authority policy_version drift" in errors
+    assert "authority self-path drift" in errors
+
+
+def test_authority_rejects_invalid_gate_id(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["gates"][0]["id"] = "gate bad"
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert "invalid gate id: gate bad" in errors
+
+
+def test_authority_rejects_duplicate_group_name(tmp_path: Path) -> None:
+    module = _module()
+
+    def mutate(payload: dict) -> None:
+        payload["groups"].append(json.loads(json.dumps(payload["groups"][0])))
+
+    path = _mutate_authority(tmp_path, mutate)
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert any("duplicate authority group name" in error for error in errors)
+
