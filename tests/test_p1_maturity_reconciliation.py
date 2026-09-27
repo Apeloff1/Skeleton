@@ -217,3 +217,14 @@ def test_live_reconciliation_surfaces_unresolved_unplanned_paths() -> None:
         for blocker in implemented["blockers"]
     )
 
+def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
+    workflow = (
+        ROOT / ".github/workflows/p1-maturity-reconciliation.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "--task-id P1-EVID-02" in workflow
+    assert "--accountability-id ACC-P1-EVID-02" in workflow
+    assert '--expected-head "$EXPECTED_SHA"' in workflow
+    assert "p1:maturity-reconciliation-report" in workflow
+    assert "receipt does not bind reconciliation report" in workflow
+
