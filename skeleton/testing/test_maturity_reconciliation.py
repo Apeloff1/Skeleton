@@ -256,22 +256,49 @@ def test_hardened_and_production_reject_unresolved_gaps() -> None:
         )
 
 
-def test_closed_gaps_allow_hardened_candidate_when_accountability_supports_it() -> None:
+def test_reconciler_never_skips_an_ineligible_intermediate_state() -> None:
     decision = reconcile_volume(
-        _volume(gaps=[]),
+        _volume(
+            tests=["planned:tests/test_example.py"],
+            gaps=[],
+        ),
         _accountability(
-            status="hardened",
+            status="production",
             implementation_signoff=_signoff(True),
             verification_signoff=_signoff(True),
             evidence=["ledger:evidence"],
         ),
         POLICY,
-        target_floor="hardened",
+        target_floor="production",
     )
 
-    assert _evaluation(decision, "hardened").eligible is True
-    assert decision.highest_eligible_status == "hardened"
-    assert decision.target_floor_eligible is True
+    assert _evaluation(decision, "production").eligible is True
+    assert _evaluation(decision, "implemented").eligible is False
+    assert decision.highest_eligible_status == "specified"
+    assert decision.promotion_candidate is None
+    assert decision.target_floor_eligible is False
+
+
+def test_invalid_current_claim_blocks_further_promotion() -> None:
+    decision = reconcile_volume(
+        _volume(
+            status="implemented",
+            tests=["planned:tests/test_example.py"],
+        ),
+        _accountability(
+            status="production",
+            implementation_signoff=_signoff(True),
+            verification_signoff=_signoff(True),
+            evidence=["ledger:evidence"],
+        ),
+        POLICY,
+        target_floor="verified",
+    )
+
+    assert decision.current_claim_valid is False
+    assert decision.current_claim_blockers
+    assert decision.promotion_candidate is None
+    assert decision.highest_eligible_status == "implemented"
 
 
 def test_reconciliation_never_mutates_inputs() -> None:
