@@ -462,6 +462,12 @@ def derive_child_grant(
     next_depth = parent_grant.delegation_depth + 1
     if next_depth > parent_grant.budget.max_delegation_depth:
         raise DelegationContractError("delegation depth exhausted")
+    child_issued = _utc(issued_at, "issued_at")
+    child_expires = _utc(expires_at, "expires_at")
+    if child_issued < parent_grant.issued_at:
+        raise DelegationContractError("child grant cannot predate parent grant")
+    if child_expires > parent_grant.expires_at:
+        raise DelegationContractError("child grant cannot outlive parent grant")
     return DelegationGrant(
         delegation_id=delegation_id,
         lease_task_id=lease_task_id,
@@ -561,41 +567,39 @@ def authorize_swarm_child_commit(
         raise DelegationContractError("fence must be LeaseFence")
     if not isinstance(grant, DelegationGrant):
         raise DelegationContractError("grant must be DelegationGrant")
+    if not isinstance(usage, DelegationUsage):
+        raise DelegationContractError("usage must be DelegationUsage")
+    capability = _identifier(required_capability, "required_capability")
+
+    def reject(reason: str) -> DelegationCommitDecision:
+        return DelegationCommitDecision(
+            accepted=False,
+            reason=reason,
+            delegation_digest=grant.digest,
+            handoff_digest=grant.handoff.digest,
+            child_agent_id=fence.worker_id,
+            lease_epoch=fence.attempt,
+            fencing_token=grant.fencing_token,
+            usage=usage,
+            required_capability=capability,
+        )
 
     try:
         assert_fence(runtime, fence)
     except LeaseError:
-        return DelegationCommitDecision(
-            accepted=False,
-            reason="runtime lease fence rejected",
-            delegation_digest=grant.digest,
-            handoff_digest=grant.handoff.digest,
-            child_agent_id=fence.worker_id,
-            lease_epoch=fence.attempt,
-            fencing_token=grant.fencing_token,
-            usage=usage,
-            required_capability=_identifier(
-                required_capability,
-                "required_capability",
-            ),
-        )
+        return reject("runtime lease fence rejected")
 
-    now_mono = runtime._clock()
-    if fence.deadline is not None and now_mono >= fence.deadline:
-        return DelegationCommitDecision(
-            accepted=False,
-            reason="runtime lease expired",
-            delegation_digest=grant.digest,
-            handoff_digest=grant.handoff.digest,
-            child_agent_id=fence.worker_id,
-            lease_epoch=fence.attempt,
-            fencing_token=grant.fencing_token,
-            usage=usage,
-            required_capability=_identifier(
-                required_capability,
-                "required_capability",
-            ),
-        )
+    worker = runtime.worker(fence.worker_id)
+    if worker is None:
+        return reject("runtime worker missing")
+    if not set(grant.child.capabilities).issubset(worker.capabilities):
+        return reject("runtime worker capability mismatch")
+    if fence.deadline is None:
+        return reject("runtime lease missing deadline")
+    now_mono = _finite_nonnegative(runtime._clock(), "runtime_clock")
+    deadline = _finite_nonnegative(fence.deadline, "lease_deadline")
+    if now_mono >= deadline:
+        return reject("runtime lease expired")
 
     return authorize_child_commit(
         grant,
@@ -605,7 +609,7 @@ def authorize_swarm_child_commit(
         presented_fencing_token=grant.fencing_token,
         handoff_digest=grant.handoff.digest,
         usage=usage,
-        required_capability=required_capability,
+        required_capability=capability,
         now=now,
     )
 
