@@ -53,7 +53,7 @@ def test_repository_required_gate_authority_is_valid() -> None:
 
     assert errors == []
     assert summary["valid"] is True
-    assert summary["required_gate_count"] == 21
+    assert summary["required_gate_count"] == 22
     assert summary["group_count"] == 10
     assert len(summary["authority_digest"]) == 64
 
