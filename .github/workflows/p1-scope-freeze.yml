@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
       - "machine/ai_scope_freeze_adrs.json"
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_scope_freeze.py"
@@ -19,6 +21,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_required_gate_authority.json"
       - "machine/ai_scope_freeze_adrs.json"
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_scope_freeze.py"
