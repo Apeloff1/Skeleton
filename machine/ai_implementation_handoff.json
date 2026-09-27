@@ -1125,7 +1125,7 @@
       ],
       "work_package": "WP-P0-ENGINE-BOUNDARY",
       "blueprint": "engine_application_boundary_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
       "target_files": {
         "contracts": [
@@ -1206,14 +1206,12 @@
         "backend/tests/test_engine_http_boundary.py authenticated HTTP retry/denial/cancel/golden journey",
         "skeleton/testing/test_engine_execution_coordinator.py late-provider cancellation fence",
         "skeleton/testing/test_engine_process_isolation.py sole-provider-owner production topology invariant",
-        "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel"
+        "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel",
+        ".github/workflows/engine-container-boundary.yml runs both fail-closed production topology smoke and successful deterministic provider->tool->verification->result lineage inside the exact built Skeleton image",
+        "skeleton/testing/live_engine_process_app.py exposes an opt-in test-only deterministic coordinator without changing production provider bootstrap",
+        "scripts/check_engine_container_boundary.py success mode asserts operation/execution identity, provider receipts, tool receipt, verification receipt, usage and unique terminal result event"
       ],
-      "remaining": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserving operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ],
+      "remaining": [],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
