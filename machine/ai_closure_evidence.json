@@ -672,9 +672,9 @@
       "gap": "gap-verification-evidence-contract",
       "plane": "reasoning-verification",
       "stage": 3,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
         "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
@@ -721,16 +721,8 @@
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
         ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Verification Evidence Closure Gate",
-        "fresh exact-head Cognitive Execution Closure Gate",
-        "declared lower-stage dependency closure and independent signoff"
-      ],
-      "blockers": [
-        "fresh exact-head Verification Evidence Closure Gate",
-        "fresh exact-head Cognitive Execution Closure Gate",
-        "declared lower-stage dependency closure and independent signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
