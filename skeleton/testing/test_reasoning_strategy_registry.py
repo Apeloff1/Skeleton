@@ -500,4 +500,3 @@ def test_high_risk_verification_cannot_be_disabled() -> None:
         match="high-risk verification cannot be disabled",
     ):
         _policy(require_verification_for_high_risk=False)
-
