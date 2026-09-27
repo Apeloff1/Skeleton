@@ -227,6 +227,7 @@ def test_planned_input_is_rejected() -> None:
             _receipt(),
             runner_id="pytest-manifest",
             runner_digest=RUNNER,
+            budget_id="focused-ci",
             budget_digest=BUDGET,
             source_date_epoch=EPOCH,
             inputs=(
@@ -244,6 +245,7 @@ def test_missing_receipt_requires_failure_digest() -> None:
         ReplayObservation(
             runner_id="pytest-manifest",
             runner_digest=RUNNER,
+            budget_id="focused-ci",
             budget_digest=BUDGET,
             source_date_epoch=EPOCH,
         )
@@ -254,6 +256,7 @@ def test_successful_receipt_cannot_carry_failure_digest() -> None:
         ReplayObservation(
             runner_id="pytest-manifest",
             runner_digest=RUNNER,
+            budget_id="focused-ci",
             budget_digest=BUDGET,
             source_date_epoch=EPOCH,
             receipt=_receipt(),
