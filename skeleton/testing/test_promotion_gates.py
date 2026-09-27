@@ -198,6 +198,7 @@ def test_unknown_gate_is_ignored_but_cannot_substitute_for_required_gate() -> No
     assert decision.accepted is True
     assert decision.passing_gate_count == 22
     assert decision.observations_digest == baseline.observations_digest
+    assert decision.decision_digest == baseline.decision_digest
 
     observations = observations[1:]
     decision = evaluate_required_gates(
