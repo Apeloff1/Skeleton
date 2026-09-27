@@ -166,6 +166,7 @@ class IntelligenceQualityPolicy:
     min_memory_evidence: float = 0.10
     min_independent_quality_score: float = 0.70
     max_knowledge_age_s: float = 30.0 * 24.0 * 3600.0
+    max_future_knowledge_skew_s: float = 300.0
     allow_partial_retrieval: bool = False
     require_retrieval_candidates: bool = True
     allow_memory_review: bool = False
@@ -187,6 +188,19 @@ class IntelligenceQualityPolicy:
                 "max_knowledge_age_s must be positive"
             )
         object.__setattr__(self, "max_knowledge_age_s", max_age)
+        future_skew = _finite(
+            self.max_future_knowledge_skew_s,
+            "max_future_knowledge_skew_s",
+        )
+        if future_skew < 0:
+            raise IntelligenceQualityError(
+                "max_future_knowledge_skew_s must be non-negative"
+            )
+        object.__setattr__(
+            self,
+            "max_future_knowledge_skew_s",
+            future_skew,
+        )
         for field in (
             "allow_partial_retrieval",
             "require_retrieval_candidates",
@@ -202,6 +216,7 @@ class IntelligenceQualityPolicy:
             "min_memory_evidence": self.min_memory_evidence,
             "min_independent_quality_score": self.min_independent_quality_score,
             "max_knowledge_age_s": self.max_knowledge_age_s,
+            "max_future_knowledge_skew_s": self.max_future_knowledge_skew_s,
             "allow_partial_retrieval": self.allow_partial_retrieval,
             "require_retrieval_candidates": self.require_retrieval_candidates,
             "allow_memory_review": self.allow_memory_review,
@@ -480,6 +495,9 @@ def evaluate_intelligence_quality(
             reasons.append(f"retrieval-source-revision-missing:{plane}")
 
     for row in knowledge_rows:
+        future_skew = row.updated_at - now
+        if future_skew > resolved_policy.max_future_knowledge_skew_s:
+            reasons.append(f"knowledge-future-dated:{row.claim_id}")
         age = max(0.0, now - row.updated_at)
         if age > resolved_policy.max_knowledge_age_s:
             reasons.append(f"knowledge-stale:{row.claim_id}")
