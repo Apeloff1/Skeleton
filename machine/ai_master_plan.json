@@ -29,7 +29,9 @@
     "p1_execution_map": "machine/ai_p1_execution_map.json",
     "p1_execution_map_human": "docs/plan/P1_EXECUTION_MAP.md",
     "p1_task_backlog": "machine/ai_p1_task_backlog.json",
-    "p1_required_gate_authority": "machine/p1_required_gate_authority.json"
+    "p1_required_gate_authority": "machine/p1_required_gate_authority.json",
+    "p1_maturity_reconciliation_engine": "scripts/reconcile_p1_maturity.py",
+    "p1_maturity_reconciliation_contract": "skeleton/contracts/maturity_reconciliation.py"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -20775,8 +20777,7 @@
         "requirements",
         "capabilities",
         "contracts",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "implemented": {
@@ -20787,8 +20788,7 @@
         "contracts",
         "implementation_paths",
         "tests",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "integrated": {
@@ -20800,8 +20800,7 @@
         "implementation_paths",
         "tests",
         "evaluations",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "verified": {
@@ -20814,8 +20813,7 @@
         "tests",
         "evaluations",
         "evidence",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "hardened": {

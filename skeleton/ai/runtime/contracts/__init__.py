@@ -49,6 +49,14 @@ from .memory_record import (
     MemoryWriteProposal,
     memory_payload_digest,
 )
+from .maturity_reconciliation import (
+    MATURITY_ORDER,
+    MaturityEvaluation,
+    MaturityReconciliation,
+    MaturityReconciliationError,
+    MaturityState,
+    reconcile_volume,
+)
 from .promotion_evidence import (
     MAX_PROMOTION_EVIDENCE_BYTES,
     MAX_PROMOTION_EVIDENCE_REFS,
@@ -89,6 +97,12 @@ __all__ = [
     "EvidenceRef",
     "Identity",
     "evidence_ref_identity",
+    "MATURITY_ORDER",
+    "MaturityEvaluation",
+    "MaturityReconciliation",
+    "MaturityReconciliationError",
+    "MaturityState",
+    "reconcile_volume",
     "MAX_PROMOTION_EVIDENCE_BYTES",
     "MAX_PROMOTION_EVIDENCE_REFS",
     "PROMOTION_EVIDENCE_SCHEMA_ID",
