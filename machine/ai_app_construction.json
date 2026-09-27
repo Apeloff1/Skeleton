@@ -2367,7 +2367,7 @@
       "plane": "product-experience",
       "priority": "P0",
       "status": "open",
-      "gap": "Deterministic engine-level golden journeys now assemble canonical retrieval, provider, governed tool execution, durable tool receipts, artifact actions, verification, cancellation fencing, outage behavior and restart ambiguity without live provider secrets. Remaining closure is assembled frontend/backend/engine browser evidence, the rest of the mandatory fault matrix, exact-head validation, and declared lower-stage dependency closure.",
+      "gap": "Stage-7 mandatory journey implementations are assembled across browser session recovery, authenticated backend/engine execution, retrieval/tool/provider/artifact lineage, approval expiry recovery, outages, cancellation and governance export/delete. Closure remains open for exact-head release evidence, transaction-capable/deployed topology proof, dependency closure and independent signoff.",
       "construction": [
         "define prompt-only journey",
         "define retrieval-backed journey",
@@ -2385,17 +2385,18 @@
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
-        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence",
+        "frontend browser-session reconnect, slow-client resync and cancel/complete race journeys",
+        "identity-stable expired write-tool approval renewal with restart persistence",
+        "governed conversation export/delete journey evidence",
+        "exact-head Golden Journey Closure Gate and independent verifier implementation"
       ],
       "outstanding_evidence": [
-        "assembled browser E2E suite",
-        "browser/API trace continuity across reconnect/replay",
-        "browser artifact/result assertions",
-        "engine-outage/degraded UX assertions",
-        "approval-expiry and remaining fault-injection journeys",
-        "governance delete/export journey",
-        "lower-stage dependency closure",
-        "exact-head validation and independent signoff"
+        "exact-head Golden Journey Closure Gate",
+        "exact-head App Assembly",
+        "transaction-capable Mongo replica-set assembled integration",
+        "deployed assembled topology journey proof",
+        "lower-stage dependency closure and independent signoff"
       ]
     },
     {
@@ -6705,7 +6706,7 @@
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "in-progress",
+    "status": "implemented-pending-closure",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
@@ -6861,13 +6862,17 @@
     "current_evidence": [
       "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
       "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
-      "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+      "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence",
+      "frontend/services/operationStreamSession.ts production browser session",
+      "frontend/scripts/test-operation-stream-session.mjs reconnect/backpressure/race journeys",
+      "skeleton/testing/test_engine_execution_service.py approval expiry renewal",
+      "backend/tests/test_conversation_governance.py governed export/delete",
+      ".github/workflows/golden-journey-closure.yml exact-head Stage-7 gate",
+      "scripts/verify_golden_journey_closure.py independent journey/dependency verifier"
     ],
     "remaining": [
-      "assembled browser/API journeys",
-      "approval-expiry and remaining process/database fault injection",
-      "governance delete/export journey",
-      "exact-head CI evidence",
+      "fresh exact-head Golden Journey Closure and App Assembly evidence",
+      "transaction-capable Mongo replica-set and deployed assembled-topology validation",
       "lower-stage dependency closure and independent signoff"
     ]
   },
