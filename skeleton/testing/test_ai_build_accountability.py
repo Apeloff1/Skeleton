@@ -17,6 +17,7 @@ def test_accountability_tracks_every_plan_build_surface() -> None:
     ledger = _load()
     master = json.loads(checker.MASTER.read_text(encoding="utf-8"))
     queue = json.loads(checker.QUEUE.read_text(encoding="utf-8"))
+    p1 = json.loads(checker.P1.read_text(encoding="utf-8"))
     catalog = json.loads(checker.CATALOG.read_text(encoding="utf-8"))
     assert ledger["tracked_counts"] == {
         "volumes": 421,
@@ -24,7 +25,15 @@ def test_accountability_tracks_every_plan_build_surface() -> None:
         "queue_tasks": len(queue["tasks"]),
         "vertical_slices": len(master["vertical_slices"]),
         "catalog_entries": len(catalog["entries"]),
-        "total": 421 + 31 + len(queue["tasks"]) + len(master["vertical_slices"]) + len(catalog["entries"]),
+        "p1_tasks": len(p1["tasks"]),
+        "total": (
+            421
+            + 31
+            + len(queue["tasks"])
+            + len(p1["tasks"])
+            + len(master["vertical_slices"])
+            + len(catalog["entries"])
+        ),
     }
     assert all(record["signing_required"] is True for record in ledger["records"])
 
