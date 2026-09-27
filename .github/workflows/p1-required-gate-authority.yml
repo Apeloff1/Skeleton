@@ -83,66 +83,15 @@ jobs:
           skeleton/testing/test_promotion_gates.py
           tests/test_p1_required_gate_authority.py
 
-      - name: Build exact-head passing observation fixture
+      - name: Emit authority validation snapshot
         run: |
           set -euo pipefail
           mkdir -p .p1-gate-authority
-          python - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          from pathlib import Path
+          python scripts/check_p1_required_gate_authority.py \
+            --out .p1-gate-authority/authority.json \
+            --print-summary
 
-          authority = json.loads(
-              Path("machine/p1_required_gate_authority.json").read_text(
-                  encoding="utf-8"
-              )
-          )
-          head = os.environ["EXPECTED_SHA"]
-          now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-          rows = []
-          for index, gate in enumerate(authority["gates"], start=1):
-              if gate.get("required_for_terminal_p1_promotion") is not True:
-                  continue
-              rows.append(
-                  {
-                      "workflow_name": gate["workflow_name"],
-                      "head_sha": head,
-                      "run_id": f"synthetic-{index}",
-                      "run_attempt": 1,
-                      "event": "pull_request",
-                      "status": "completed",
-                      "conclusion": "success",
-                      "completed_at": now,
-                  }
-              )
-          Path(".p1-gate-authority/passing.json").write_text(
-              json.dumps(rows, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          Path(".p1-gate-authority/missing.json").write_text(
-              json.dumps(rows[:-1], indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          PY
-
-      - name: Emit exact-head gate-authority decision
-        run: >-
-          python scripts/check_p1_required_gate_authority.py
-          --observations .p1-gate-authority/passing.json
-          --target-sha "$EXPECTED_SHA"
-          --out .p1-gate-authority/decision.json
-          --print-summary
-
-      - name: Prove missing required gate rejects
-        run: |
-          set -euo pipefail
-          if python scripts/check_p1_required_gate_authority.py             --observations .p1-gate-authority/missing.json             --target-sha "$EXPECTED_SHA"; then
-            echo "missing required gate unexpectedly passed" >&2
-            exit 1
-          fi
-
-      - name: Assert exact-head decision receipt
+      - name: Assert authority snapshot is non-promotional
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -151,29 +100,25 @@ jobs:
           from pathlib import Path
 
           payload = json.loads(
-              Path(".p1-gate-authority/decision.json").read_text(
+              Path(".p1-gate-authority/authority.json").read_text(
                   encoding="utf-8"
               )
           )
           authority = payload["authority"]
-          decision = payload["decision"]
-          if decision["accepted"] is not True:
-              raise SystemExit("gate authority decision is not accepted")
-          if decision["target_sha"] != os.environ["EXPECTED_SHA"]:
-              raise SystemExit("gate authority receipt head mismatch")
-          if decision["required_gate_count"] != 22:
+          if authority["valid"] is not True:
+              raise SystemExit("required-gate authority is invalid")
+          if authority["required_gate_count"] != 22:
               raise SystemExit("required gate count drift")
-          if decision["passing_gate_count"] != 22:
-              raise SystemExit("passing gate count drift")
-          if decision["authority_digest"] != authority["authority_digest"]:
-              raise SystemExit("authority digest mismatch")
-          for field in ("authority_digest", "observations_digest"):
-              if len(decision.get(field, "")) != 64:
-                  raise SystemExit(f"invalid {field}")
+          if len(authority.get("authority_digest", "")) != 64:
+              raise SystemExit("invalid authority digest")
+          if "decision" in payload:
+              raise SystemExit(
+                  "authority validation must not fabricate promotion decision"
+              )
           print(
-              "P1 required-gate authority receipt:",
-              decision["target_sha"],
-              decision["authority_digest"],
-              decision["observations_digest"],
+              "P1 required-gate authority validated for head:",
+              os.environ["EXPECTED_SHA"],
+              authority["authority_digest"],
           )
           PY
+
