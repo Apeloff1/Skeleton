@@ -168,6 +168,7 @@ def test_completion_verifier_rejects_outstanding_closure_evidence(
         for item in receipt["errors"]
     )
 
+
 def test_completion_verifier_rejects_closed_gap_with_pending_machine_state(
     tmp_path: Path,
 ) -> None:
