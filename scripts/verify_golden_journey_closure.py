@@ -39,6 +39,11 @@ JOURNEY_SURFACES: dict[str, tuple[str, ...]] = {
         "disconnect and reconnect",
         "slow browser recovers",
         "cancel-complete race",
+        "browser terminal artifact result linkage survives reconnect",
+    ),
+    "frontend/scripts/test-conversation-projection.mjs": (
+        "refresh/reconnect reconstructs deterministic canonical order",
+        "projection cannot outrun canonical thread authority",
     ),
     "frontend/services/operationStreamSession.ts": (
         "class OperationBrowserSession",
@@ -50,6 +55,10 @@ JOURNEY_SURFACES: dict[str, tuple[str, ...]] = {
     "backend/tests/test_engine_cross_service_closure.py": (
         "test_http_golden_journey_preserves_provider_tool_verification_lineage",
         "test_cross_service_cancel_fences_late_provider_result",
+    ),
+    "backend/tests/test_ai_chat_engine_cutover.py": (
+        "test_configured_engine_outage_never_falls_back_to_backend_provider",
+        "engine_unavailable",
     ),
     "skeleton/testing/test_ai_golden_journeys.py": (
         "retrieval_tool_provider_journey",
