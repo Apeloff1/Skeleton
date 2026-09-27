@@ -1997,7 +1997,7 @@
       "id": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. Authenticated evidence now covers in-process HTTP submit/retry/denial/cancel/tool+verification lineage and a real TCP separate-process submit/retry/status/tenant-denial/cancel boundary. Closure remains open for exact-head validation, containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
@@ -2030,20 +2030,20 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose and AST isolation prove a single source-level provider execution owner",
-        "real TCP separate-process engine-client boundary regression"
+        "real TCP separate-process engine-client boundary regression",
+        "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+        "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+        "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+        ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ]
+      "outstanding_evidence": [],
+      "status_detail": "closed by Stage-5 exact-head engine boundary candidate; reopen on process isolation, deployed lineage, App Assembly, or dependency regression"
     },
     {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "The canonical durable cognitive execution loop is implementation-complete: AIExecution contracts, restart-safe execution/turn/checkpoint/finalization persistence, bounded provider->tool->provider orchestration, approval wait/resume, cancellation/deadline checks, governed tool lineage, verification, finalization, operation-level admission and metered durable execution storage are production-bound through the engine boundary. A dedicated Cognitive Execution Closure Gate now binds exact-head runtime/repository/engine regressions and an independent source/mirror/dependency verifier. Remaining closure is the declared lower-stage dependency closures plus a fresh green exact-head gate.",
       "construction": [
         "define AIExecutionRequest and AIExecutionResult as orchestration-owned envelopes bound to OperationEnvelope",
@@ -2074,13 +2074,13 @@
         "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
-      "status_detail": "implementation-complete pending declared dependency closures and fresh exact-head Cognitive Execution Closure Gate"
+      "status_detail": "closed by Stage-4 exact-head candidate after Stage-3 verification closure; reopen on dependency, runtime, recovery, verification, or golden-journey regression"
     },
     {
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Shared-network operation/stream authorities and production browser reconnect/resync/cancel session semantics are implemented. Remaining work is exact-head assembled validation and independent closure signoff.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
@@ -2102,7 +2102,14 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "implemented-pending-exact-head-closure"
+      "verification_state": "implemented-pending-exact-head-closure",
+      "status_detail": "closed by Stage-6 exact-head streaming candidate; reopen on replay, reconnect, Mongo authority, App Assembly, browser-session, or dependency regression",
+      "evidence_present": [
+        ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+        "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+        "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
+      ],
+      "outstanding_evidence": []
     },
     {
       "id": "gap-governance-registry",
@@ -2362,7 +2369,7 @@
       "id": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical deterministic prompt-only, multi-turn, retrieval, read/write tool, approval renewal, artifact, provider-outage, engine-outage, cancel/reconnect, governance export/delete and restart-ambiguity journeys are implementation-complete across the engine, authenticated API and production browser-session seams. Remaining closure is exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff.",
       "construction": [
         "define prompt-only journey",
@@ -2392,14 +2399,15 @@
         "provider-response-before-checkpoint fail-closed recovery with no provider retry",
         "real engine TCP process restart durability journey",
         "real pinned Mongo replica-set transient-failure, cross-worker replay/compaction and cancel-complete race journeys",
-        "Mongo transaction-capability startup preflight"
+        "Mongo transaction-capability startup preflight",
+        ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+        "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+        "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+        "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+        "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "status_detail": "implementation-complete pending exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff"
+      "outstanding_evidence": [],
+      "status_detail": "closed by Stage-7 exact-head final P0 candidate; reopen on golden-journey, streaming, engine-boundary, App Assembly, dependency, or independent-verifier regression"
     },
     {
       "id": "gap-release-slo-loop",
@@ -4499,7 +4507,7 @@
   "cognitive_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-cognitive-execution-loop",
     "objective": "Specify the exact runtime, state, contracts, recovery, safety and evidence semantics required for one fully functional AI execution path without introducing a second orchestration framework.",
     "target_modules": {
@@ -6358,7 +6366,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-deployed-closure",
+    "status": "complete",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
@@ -6555,12 +6563,19 @@
       "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
-    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
+    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features",
+    "current_evidence": [
+      "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+      "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+      "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+      ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
+    ],
+    "remaining": []
   },
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
@@ -6685,12 +6700,18 @@
       "browser-session compacted slow-client authoritative resync journey",
       "browser-session cancel-complete terminal race journey",
       "authoritative terminal snapshot canonical-result reconciliation"
-    ]
+    ],
+    "current_evidence": [
+      ".github/workflows/stage6-streaming-closure.yml binds exact-head backend, frontend and independent streaming validation",
+      "scripts/verify_stage6_streaming_closure.py independently verifies durable stream authority, browser reconnect semantics, Mongo authority and dependency closure",
+      "tests/test_stage6_streaming_independent_verifier.py adversarially proves the Stage-6 verifier fails closed on missing evidence or mirror drift"
+    ],
+    "remaining": []
   },
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
@@ -6859,12 +6880,14 @@
       "real pinned Mongo replica-set transient-failure atomicity and safe-retry journey",
       "provider-response-before-checkpoint crash fails closed without second provider call",
       "focused process/database restart matrix for engine, approval, admission, execution finalization and governance audit",
-      "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry"
+      "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry",
+      ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+      "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+      "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+      "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+      "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
     ],
-    "remaining": [
-      "fresh exact-head Stage-7 Golden Journeys Closure Gate and App Assembly evidence",
-      "lower-stage dependency closure and independent signoff"
-    ]
+    "remaining": []
   },
   "memory_runtime_blueprint": {
     "schema_version": 1,
