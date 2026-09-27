@@ -1846,7 +1846,7 @@
       "id": "gap-context-compiler-convergence",
       "plane": "prompt-context",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical context contracts, governed source adapters, deterministic packing/omission, provider-neutral projection, digest-bound engine handoff, provenance-preserving compaction, compatibility-service delegation and versioned product instruction ownership are implemented. Product routes/services/GameForge cannot own ProviderRequest/ProviderRegistry/legacy provider execution and every product EngineChat construction must bind an explicit instruction policy. Deterministic compaction is fail-closed; semantic multi-source summarization remains an optional future optimization and is not required for canonical execution. Remaining closure is lower-stage dependency closure plus fresh exact-head/independent evidence.",
       "construction": [
         "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
@@ -1876,7 +1876,7 @@
       ],
       "verification_state": "implementation-complete-pending-dependencies-exact-head-and-independent-closure",
       "progress": {
-        "state": "implemented_pending_closure",
+        "state": "closed",
         "completed": [
           "ContextBudget, ContextSegment and ContextEnvelope immutable contracts",
           "stable source snapshot and context digest contract",
@@ -1906,12 +1906,11 @@
           "repository-wide product context execution boundary rejects direct provider/prompt ownership",
           "versioned instruction policy ownership is statically enforced for product EngineChat surfaces"
         ],
-        "remaining": [
-          "close declared conversation/memory/tool/governance dependencies",
-          "collect fresh exact-head Context Compiler/Backend Quality/App Assembly evidence including instruction-policy boundary",
-          "obtain independent closure verification"
-        ]
-      }
+        "remaining": []
+      },
+      "status_detail": "closed by stacked Stage-2 closure candidate; reopen on any dependency, provider-boundary, context-boundary, or exact-head regression",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "id": "gap-verification-evidence-contract",
@@ -1967,7 +1966,7 @@
       "id": "gap-provider-interaction-protocol",
       "plane": "model-provider",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Provider-neutral structured output, governed tool schema projection/calls, normalized usage/finish reasons, deadlines and neutral response deltas are implemented in the canonical provider boundary and consumed by the cognitive runtime. Closure remains open for fresh exact-head protocol/provider-boundary evidence, dependency closure and independent verification.",
       "construction": [
         "define ProviderToolDefinition, ProviderToolCall, ProviderStructuredOutput, ProviderUsage and FinishReason contracts",
@@ -1992,7 +1991,10 @@
         "deadline/cancellation provider tests",
         "stream delta ordering/finalization tests when streaming enabled",
         "no provider SDK/native response object escapes provider_runtime"
-      ]
+      ],
+      "status_detail": "closed by stacked Stage-2 closure candidate; reopen on any dependency, provider-boundary, context-boundary, or exact-head regression",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "id": "gap-engine-application-execution-boundary",
@@ -5460,7 +5462,7 @@
   "context_compiler_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-context-compiler-convergence",
     "target_modules": {
       "contracts": "skeleton/contracts/context.py",
@@ -5704,11 +5706,7 @@
       "repository-wide product provider/context execution boundary",
       "versioned product EngineChat instruction-policy ownership gate"
     ],
-    "remaining_surfaces": [
-      "optional semantic/multi-segment summarization only if a future workload cannot safely use deterministic excerpts/omission",
-      "declared dependency closure",
-      "fresh exact-head and independent closure evidence"
-    ]
+    "remaining_surfaces": []
   },
   "verification_runtime_blueprint": {
     "schema_version": 1,
@@ -6006,7 +6004,7 @@
   "provider_interaction_protocol": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-provider-interaction-protocol",
     "owner": "skeleton/provider_runtime.py",
     "request_extension": {
@@ -6182,11 +6180,7 @@
       "skeleton/testing/test_provider_contract.py covers async provider transport normalization and admission reconciliation",
       "skeleton/intelligence/execution_runtime.py projects only admitted minimal ProviderToolDefinition values and consumes neutral provider tool/structured outputs"
     ],
-    "remaining": [
-      "collect fresh exact-head provider protocol and provider-boundary regression evidence",
-      "close declared lower-stage dependencies",
-      "obtain independent verification before canonical gap closure"
-    ]
+    "remaining": []
   },
   "functional_ai_closure": {
     "version": "1.0.0",
