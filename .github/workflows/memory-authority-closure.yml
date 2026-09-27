@@ -1,0 +1,93 @@
+name: Memory Authority Closure Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/memory_record.py"
+      - "skeleton/persistence/memory_repository.py"
+      - "skeleton/memory/**"
+      - "skeleton/testing/test_memory_*.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/verify_memory_authority_closure.py"
+      - "tests/test_memory_authority_independent_verifier.py"
+      - ".github/workflows/memory-authority-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-authority-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-authority-contracts:
+    name: Memory authority contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused memory runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Run canonical memory authority regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_memory_repository.py
+          skeleton/testing/test_mongo_memory_repository.py
+          skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_memory_projection.py
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_memory_authority_independent_verifier.py
+
+      - name: Emit exact-head memory authority receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_memory_authority_closure.py
+          --evidence-out .memory-authority-closure.json
+          --print-evidence
+
+      - name: Assert exact-head memory receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".memory-authority-closure.json").read_text(encoding="utf-8")
+          )
+          if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
+              raise SystemExit("memory authority receipt is not exact-head")
+          if receipt.get("verifier") != "independent-memory-authority-v1":
+              raise SystemExit("unexpected memory verifier identity")
+          if receipt.get("gap_id") != "gap-memory-durable-authority":
+              raise SystemExit("memory verifier lost gap binding")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("memory authority closure verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 8:
+              raise SystemExit("memory authority boundary coverage is incomplete")
+          PY
