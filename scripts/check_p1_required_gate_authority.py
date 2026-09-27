@@ -21,6 +21,7 @@ from skeleton.contracts.promotion_gates import (
 
 ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = Path("machine/p1_required_gate_authority.json")
+MASTER_PLAN_PATH = Path("machine/ai_master_plan.json")
 EXPECTED_POLICY_ID = "skeleton.p1.required_gate_authority"
 EXPECTED_TASK_ID = "P1-EVID-03"
 EXPECTED_ACCOUNTABILITY = "ACC-P1-EVID-03"
@@ -85,6 +86,18 @@ def validate_authority(
     authority = _load_json(root / authority_path)
     if not isinstance(authority, dict):
         raise GateAuthorityValidationError("authority must be an object")
+
+    master = _load_json(root / MASTER_PLAN_PATH)
+    if not isinstance(master, dict):
+        errors.append("master plan must be an object")
+    else:
+        master_authority = master.get("authority")
+        if not isinstance(master_authority, dict):
+            errors.append("master plan authority must be an object")
+        elif master_authority.get("p1_required_gate_authority") != str(
+            authority_path
+        ):
+            errors.append("master plan required-gate authority pointer drift")
 
     if authority.get("schema_version") != 1:
         errors.append("authority schema_version must equal 1")
