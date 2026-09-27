@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from skeleton.contracts.canonical import EvidenceRef
+from skeleton.agents.swarm_fencing import LeaseFence, assert_fence
+from skeleton.agents.swarm_runtime import LeaseError, SwarmRuntime
 
 
 DELEGATION_SCHEMA_VERSION = 1
@@ -292,6 +294,7 @@ class HandoffPacket:
 @dataclass(frozen=True, slots=True)
 class DelegationGrant:
     delegation_id: str
+    lease_task_id: str
     parent: AgentIdentity
     child: AgentIdentity
     parent_budget: DelegationBudget
@@ -309,6 +312,11 @@ class DelegationGrant:
             self,
             "delegation_id",
             _identifier(self.delegation_id, "delegation_id"),
+        )
+        object.__setattr__(
+            self,
+            "lease_task_id",
+            _identifier(self.lease_task_id, "lease_task_id"),
         )
         if not isinstance(self.parent, AgentIdentity) or not isinstance(
             self.child, AgentIdentity
@@ -365,6 +373,7 @@ class DelegationGrant:
         return {
             "schema_version": DELEGATION_SCHEMA_VERSION,
             "delegation_id": self.delegation_id,
+            "lease_task_id": self.lease_task_id,
             "parent": self.parent.as_dict(),
             "child": self.child.as_dict(),
             "parent_budget": self.parent_budget.as_dict(),
@@ -438,6 +447,7 @@ def authorize_child_commit(
     grant: DelegationGrant,
     *,
     child_agent_id: str,
+    presented_task_id: str,
     presented_epoch: int,
     presented_fencing_token: str,
     handoff_digest: str,
@@ -450,6 +460,7 @@ def authorize_child_commit(
     if not isinstance(grant, DelegationGrant):
         raise DelegationContractError("grant must be DelegationGrant")
     child = _identifier(child_agent_id, "child_agent_id")
+    task = _identifier(presented_task_id, "presented_task_id")
     epoch = _positive_int(presented_epoch, "presented_epoch")
     fence = _sha256(presented_fencing_token, "presented_fencing_token")
     handoff = _sha256(handoff_digest, "handoff_digest")
@@ -463,6 +474,9 @@ def authorize_child_commit(
     if child != grant.child.agent_id:
         accepted = False
         reason = "child identity mismatch"
+    elif task != grant.lease_task_id:
+        accepted = False
+        reason = "lease task mismatch"
     elif epoch != grant.lease_epoch:
         accepted = False
         reason = "stale lease epoch"
@@ -496,3 +510,69 @@ def authorize_child_commit(
         usage=usage,
         required_capability=capability,
     )
+
+def authorize_swarm_child_commit(
+    runtime: SwarmRuntime,
+    fence: LeaseFence,
+    grant: DelegationGrant,
+    *,
+    usage: DelegationUsage,
+    required_capability: str,
+    now: datetime,
+) -> DelegationCommitDecision:
+    """Bind AUTO-02 authority to the live swarm lease/fence without mutation."""
+
+    if not isinstance(runtime, SwarmRuntime):
+        raise DelegationContractError("runtime must be SwarmRuntime")
+    if not isinstance(fence, LeaseFence):
+        raise DelegationContractError("fence must be LeaseFence")
+    if not isinstance(grant, DelegationGrant):
+        raise DelegationContractError("grant must be DelegationGrant")
+
+    try:
+        assert_fence(runtime, fence)
+    except LeaseError:
+        return DelegationCommitDecision(
+            accepted=False,
+            reason="runtime lease fence rejected",
+            delegation_digest=grant.digest,
+            handoff_digest=grant.handoff.digest,
+            child_agent_id=fence.worker_id,
+            lease_epoch=fence.attempt,
+            fencing_token=grant.fencing_token,
+            usage=usage,
+            required_capability=_identifier(
+                required_capability,
+                "required_capability",
+            ),
+        )
+
+    now_mono = runtime._clock()
+    if fence.deadline is not None and now_mono >= fence.deadline:
+        return DelegationCommitDecision(
+            accepted=False,
+            reason="runtime lease expired",
+            delegation_digest=grant.digest,
+            handoff_digest=grant.handoff.digest,
+            child_agent_id=fence.worker_id,
+            lease_epoch=fence.attempt,
+            fencing_token=grant.fencing_token,
+            usage=usage,
+            required_capability=_identifier(
+                required_capability,
+                "required_capability",
+            ),
+        )
+
+    return authorize_child_commit(
+        grant,
+        child_agent_id=fence.worker_id,
+        presented_task_id=fence.task_id,
+        presented_epoch=fence.attempt,
+        presented_fencing_token=grant.fencing_token,
+        handoff_digest=grant.handoff.digest,
+        usage=usage,
+        required_capability=required_capability,
+        now=now,
+    )
+
