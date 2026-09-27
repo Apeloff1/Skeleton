@@ -215,7 +215,7 @@ def test_live_reconciliation_surfaces_planned_paths_as_nonmaterialized() -> None
         "implementation_paths must contain materialized references" in blocker
         for blocker in implemented["blockers"]
     )
-    assert row["promotion_candidate"] is None
+    assert row["promotion_candidate"] == "scaffolded"
 
 def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
     workflow = (
