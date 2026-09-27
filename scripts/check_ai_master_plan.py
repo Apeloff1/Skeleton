@@ -79,8 +79,23 @@ def validate(data: dict) -> list[str]:
     freeze = data.get("breadth_freeze")
     if not isinstance(freeze, dict) or freeze.get("enabled") is not True:
         errors.append("breadth_freeze.enabled must be true")
-    elif freeze.get("last_top_level_volume") != EXPECTED_LAST:
-        errors.append(f"breadth_freeze.last_top_level_volume must be {EXPECTED_LAST}")
+    else:
+        if freeze.get("last_top_level_volume") != EXPECTED_LAST:
+            errors.append(f"breadth_freeze.last_top_level_volume must be {EXPECTED_LAST}")
+        if freeze.get("exception_register") != "machine/ai_scope_freeze_adrs.json":
+            errors.append(
+                "breadth_freeze.exception_register must equal machine/ai_scope_freeze_adrs.json"
+            )
+        if freeze.get("p1_application_policy") != "forbid":
+            errors.append("breadth_freeze.p1_application_policy must equal forbid")
+
+    authority = data.get("authority")
+    if not isinstance(authority, dict):
+        errors.append("authority must be an object")
+    elif authority.get("p1_scope_freeze_adr_register") != (
+        "machine/ai_scope_freeze_adrs.json"
+    ):
+        errors.append("authority.p1_scope_freeze_adr_register path drifted")
 
     maturity = data.get("volume_maturity_policy")
     if not isinstance(maturity, dict):
