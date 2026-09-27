@@ -24,7 +24,7 @@ AUTHORITY_PATH = Path("machine/p1_required_gate_authority.json")
 EXPECTED_POLICY_ID = "skeleton.p1.required_gate_authority"
 EXPECTED_TASK_ID = "P1-EVID-03"
 EXPECTED_ACCOUNTABILITY = "ACC-P1-EVID-03"
-EXPECTED_GATE_COUNT = 21
+EXPECTED_GATE_COUNT = 22
 EXPECTED_RULES = {
     "missing_gate": "reject",
     "stale_head": "reject",
