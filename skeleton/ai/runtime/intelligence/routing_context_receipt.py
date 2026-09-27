@@ -194,7 +194,21 @@ def _result_digest(result: ModelRouteResult) -> str:
                     },
                 }
             ),
-            "attempts": [attempt.as_dict() for attempt in result.attempts],
+            "attempts": [
+                {
+                    "provider_id": attempt.provider_id,
+                    "adapter_name": attempt.adapter_name,
+                    "model": attempt.model,
+                    "outcome": attempt.outcome,
+                    "usage": {
+                        "input_tokens": attempt.usage.input_tokens,
+                        "output_tokens": attempt.usage.output_tokens,
+                    },
+                    "estimated_cost": round(attempt.estimated_cost, 8),
+                    "error_type": attempt.error_type,
+                }
+                for attempt in result.attempts
+            ],
             "provenance": {
                 "source_repository": provenance.source_repository,
                 "source_revision": provenance.source_revision,
@@ -268,7 +282,9 @@ class RoutingContextReceipt:
                 "promotion eligibility must be derived from blockers"
             )
 
-    def payload(self) -> dict[str, Any]:
+    def identity_payload(self) -> dict[str, Any]:
+        """Stable evidence identity; excludes nondeterministic timing telemetry."""
+
         return {
             "schema_version": self.schema_version,
             "task_id": self.task_id,
@@ -318,17 +334,25 @@ class RoutingContextReceipt:
             },
             "deadline": {
                 "seconds": self.deadline_seconds,
-                "observed_attempt_latency_seconds": (
-                    self.observed_attempt_latency_seconds
-                ),
+                "met": "route_deadline_exceeded" not in self.blockers,
             },
             "blockers": list(self.blockers),
             "eligible_for_promotion": self.eligible_for_promotion,
         }
 
+    def payload(self) -> dict[str, Any]:
+        payload = self.identity_payload()
+        payload["telemetry"] = {
+            "observed_attempt_latency_seconds": (
+                self.observed_attempt_latency_seconds
+            ),
+        }
+        payload["receipt_digest"] = self.receipt_digest
+        return payload
+
     @property
     def receipt_digest(self) -> str:
-        return stable_content_digest(self.payload())
+        return stable_content_digest(self.identity_payload())
 
     def evidence_ref(self) -> EvidenceRef:
         if not self.eligible_for_promotion:
