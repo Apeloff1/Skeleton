@@ -2032,10 +2032,11 @@
         "canonical Compose and AST isolation prove a single source-level provider execution owner",
         "real TCP separate-process engine-client boundary regression",
         "built-image Engine Container Boundary credential-owner attestation",
-        "built-image authenticated provider/tool/verification/result golden journey"
+        "built-image authenticated provider/tool/verification/result golden journey",
+        "Stage-4 cognitive execution gap closed on main at 9889f950f99e70c7eabefee8d3e8e8452940a25b before Stage-5 exact-head validation"
       ],
       "outstanding_evidence": [],
-      "status_detail": "closed candidate; merge only after exact-head Engine Container Boundary, App Assembly and lower-stage dependency gates pass"
+      "status_detail": "closed candidate; Stage-4 dependency is merged on main and final merge requires fresh exact-head Engine Container Boundary, App Assembly and broad quality gates"
     },
     {
       "id": "gap-cognitive-execution-loop",
