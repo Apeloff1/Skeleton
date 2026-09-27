@@ -57,6 +57,13 @@ from .promotion_evidence import (
     PromotionEvidenceError,
     PromotionEvidenceReceipt,
 )
+from .promotion_gates import (
+    GateAuthorityDecision,
+    GateObservation,
+    PromotionGateError,
+    canonical_digest as promotion_gate_digest,
+    evaluate_required_gates,
+)
 from .operation import (
     OperationContractError,
     OperationEnvelope,
@@ -88,6 +95,11 @@ __all__ = [
     "PROMOTION_EVIDENCE_SCHEMA_VERSION",
     "PromotionEvidenceError",
     "PromotionEvidenceReceipt",
+    "GateAuthorityDecision",
+    "GateObservation",
+    "PromotionGateError",
+    "promotion_gate_digest",
+    "evaluate_required_gates",
     "CONTEXT_SCHEMA_VERSION",
     "ContextBudget",
     "ContextContractError",

@@ -1,0 +1,123 @@
+name: P1 Required Gate Authority Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-required-gate-authority.yml"
+      - ".github/workflows/*.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-required-gate-authority.yml"
+      - ".github/workflows/*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-required-gate-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate terminal P1 gate authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused authority runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate repository-owned gate authority
+        run: >-
+          python scripts/check_p1_required_gate_authority.py
+          --print-summary
+
+      - name: Run fail-closed authority regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_promotion_gates.py
+          tests/test_p1_required_gate_authority.py
+
+      - name: Emit authority validation snapshot
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-gate-authority
+          python scripts/check_p1_required_gate_authority.py \
+            --out .p1-gate-authority/authority.json \
+            --print-summary
+
+      - name: Assert authority snapshot is non-promotional
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(
+              Path(".p1-gate-authority/authority.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          authority = payload["authority"]
+          if authority["valid"] is not True:
+              raise SystemExit("required-gate authority is invalid")
+          if authority["required_gate_count"] != 22:
+              raise SystemExit("required gate count drift")
+          if len(authority.get("authority_digest", "")) != 64:
+              raise SystemExit("invalid authority digest")
+          if "decision" in payload:
+              raise SystemExit(
+                  "authority validation must not fabricate promotion decision"
+              )
+          print(
+              "P1 required-gate authority validated for head:",
+              os.environ["EXPECTED_SHA"],
+              authority["authority_digest"],
+          )
+          PY

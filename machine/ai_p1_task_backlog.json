@@ -185,7 +185,10 @@
       "acceptance": [
         "A promotion receipt cannot be valid when any required gate is absent, stale or non-success.",
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
-        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity.",
+        "Required workflow display names resolve uniquely to their declared workflow files, preventing gate-name impersonation.",
+        "Unknown workflow observations cannot change the canonical observation digest or substitute for a required gate.",
+        "Only an all-required-gates accepted decision may materialize promotion evidence."
       ],
       "evidence_refs": [],
       "accountability_ref": "ACC-P1-EVID-03",
@@ -208,13 +211,21 @@
         "scripts",
         "skeleton/testing",
         "skeleton/intelligence/verification_runtime.py",
-        "planned:skeleton/verification"
+        "planned:skeleton/verification",
+        "machine/p1_required_gate_authority.json",
+        "skeleton/contracts/promotion_gates.py",
+        "skeleton/ai/runtime/contracts/promotion_gates.py",
+        "scripts/check_p1_required_gate_authority.py",
+        ".github/workflows/p1-required-gate-authority.yml",
+        ".github/workflows/p1-evidence-identity.yml"
       ],
       "test_targets": [
         "planned:skeleton/testing/test_ci_contracts.py",
         "planned:skeleton/testing/test_merge_readiness.py",
         "planned:skeleton/testing/test_verification_independence.py",
-        "planned:skeleton/testing/test_postcondition_verification.py"
+        "planned:skeleton/testing/test_postcondition_verification.py",
+        "skeleton/testing/test_promotion_gates.py",
+        "tests/test_p1_required_gate_authority.py"
       ],
       "evidence_modes": [
         "contract",

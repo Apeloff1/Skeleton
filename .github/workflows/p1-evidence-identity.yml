@@ -19,6 +19,12 @@ on:
       - "skeleton/testing/test_promotion_evidence.py"
       - "tests/test_p1_promotion_evidence_emitter.py"
       - "tests/test_p1_accountability_materialization.py"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
       - ".github/workflows/p1-evidence-identity.yml"
   pull_request:
     branches:
@@ -39,6 +45,12 @@ on:
       - "skeleton/testing/test_promotion_evidence.py"
       - "tests/test_p1_promotion_evidence_emitter.py"
       - "tests/test_p1_accountability_materialization.py"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
       - ".github/workflows/p1-evidence-identity.yml"
   workflow_dispatch:
 
@@ -93,6 +105,16 @@ jobs:
 
       - name: Validate P1 execution map remains coherent
         run: python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Validate P1 required-gate authority
+        run: python scripts/check_p1_required_gate_authority.py --print-summary
+
+      - name: Run P1 required-gate authority regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_promotion_gates.py
+          tests/test_p1_required_gate_authority.py
+
 
       - name: Emit exact-head evidence receipt
         run: |
