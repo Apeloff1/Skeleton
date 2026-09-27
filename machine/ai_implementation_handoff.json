@@ -1128,7 +1128,7 @@
       ],
       "work_package": "WP-P0-ENGINE-BOUNDARY",
       "blueprint": "engine_application_boundary_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
       "target_files": {
         "contracts": [
@@ -1211,13 +1211,10 @@
         "skeleton/testing/test_engine_process_isolation.py sole-provider-owner production topology invariant",
         "backend/tests/test_engine_live_process_boundary.py real TCP separate-process authentication/retry/denial/cancel"
       ],
-      "remaining": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserving operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-streaming-protocol",
