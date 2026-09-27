@@ -31,9 +31,9 @@
       "gap": "gap-cost-admission",
       "plane": "cost-capacity",
       "stage": 0,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_verification",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "ResourceBudget and UsageEstimate contracts",
         "deterministic admission receipt",
@@ -108,12 +108,8 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Cost Admission Closure Gate"
-      ],
-      "blockers": [
-        "fresh exact-head Cost Admission Closure Gate"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -132,9 +128,9 @@
       "gap": "gap-governance-registry",
       "plane": "governance",
       "stage": 0,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "baseline data class registry",
         "provider transfer decision receipt",
@@ -201,16 +197,8 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Governance Closure Gate",
-        "fresh exact-head Stage-0/App Assembly governance verification",
-        "fresh exact-head Governance Closure Gate independent verifier receipt"
-      ],
-      "blockers": [
-        "fresh exact-head Governance Closure Gate",
-        "fresh exact-head Stage-0/App Assembly governance verification",
-        "fresh exact-head Governance Closure Gate independent verifier receipt"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -229,9 +217,9 @@
       "gap": "gap-provider-surface-convergence",
       "plane": "model-provider",
       "stage": 0,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_verification",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_provider_contract.py",
         "tests/test_provider_runtime_boundary.py",
@@ -263,12 +251,8 @@
         "media provider boundary regression suite",
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Provider Surface Closure Gate"
-      ],
-      "blockers": [
-        "fresh exact-head Provider Surface Closure Gate"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -287,9 +271,9 @@
       "gap": "gap-state-authority-convergence",
       "plane": "data-persistence",
       "stage": 0,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "machine-readable state authority topology",
         "authoritative/derived/scratch/recovery classifications",
@@ -325,16 +309,8 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head State Recovery Drill and state-topology validation",
-        "fresh exact-head App Assembly/Backend Quality evidence",
-        "independent closure verification"
-      ],
-      "blockers": [
-        "fresh exact-head State Recovery Drill and state-topology validation",
-        "fresh exact-head App Assembly/Backend Quality evidence",
-        "independent closure verification"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
