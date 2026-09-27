@@ -44,7 +44,7 @@ def _parent(**overrides: object) -> AgentDelegationAuthority:
         "parent_agent_id": None,
         "generation": 1,
         "capabilities": ("repo.read", "repo.write", "tests.run"),
-        "scopes": ("repo:Apeloff1/Skeleton", "branch:p1/*"),
+        "scopes": ("repo:Apeloff1/Skeleton", "branch:p1"),
         "budget": _budget(),
         "expires_at": NOW + 3600.0,
         "delegation_id": "delegation-root-1",
@@ -417,4 +417,3 @@ def test_live_lease_identity_is_digest_bound() -> None:
     assert changed.accepted is True
     assert baseline.live_lease_digest != changed.live_lease_digest
     assert baseline.decision_digest != changed.decision_digest
-
