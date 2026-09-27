@@ -63,8 +63,8 @@ def test_required_gate_authority_accepts_one_exact_success_per_gate() -> None:
     )
 
     assert decision.accepted is True
-    assert decision.required_gate_count == 21
-    assert decision.passing_gate_count == 21
+    assert decision.required_gate_count == 22
+    assert decision.passing_gate_count == 22
     assert decision.missing == ()
     assert decision.stale == ()
     assert decision.duplicate == ()
@@ -88,7 +88,7 @@ def test_missing_required_gate_fails_closed() -> None:
 
     assert decision.accepted is False
     assert decision.missing == (missing,)
-    assert decision.passing_gate_count == 20
+    assert decision.passing_gate_count == 22
 
 
 def test_only_stale_observation_fails_closed() -> None:
