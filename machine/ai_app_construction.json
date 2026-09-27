@@ -1918,7 +1918,7 @@
       "id": "gap-verification-evidence-contract",
       "plane": "reasoning-verification",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical verification contracts, deterministic grounding, durable observable receipts, production evidence materialization, tool/action postcondition aggregation, isolated semantic verification, and execution disposition handling are implemented. The gap remains open only for exact-head closure evidence, lower-stage dependency closure, and independent signoff.",
       "construction": [
         "define VerificationRequest, VerificationReceipt, ClaimRecord, EvidenceReference and PostconditionCheck contracts",
@@ -1962,7 +1962,8 @@
         "skeleton/testing/test_execution_runtime.py covers evidence-backed publication and fail-closed reversible action verification",
         "skeleton/testing/test_provider_contract.py covers verifier identity separation"
       ],
-      "verification_state": "production-binding-implemented-pending-exact-head-closure"
+      "verification_state": "production-binding-implemented-pending-exact-head-closure",
+      "status_detail": "closed by staged Stage-3 dependency promotion; reopen on required gate or invariant regression"
     },
     {
       "id": "gap-provider-interaction-protocol",
@@ -5711,7 +5712,7 @@
   "verification_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-verification-evidence-contract",
     "planned_modules": {
       "contracts": "skeleton/contracts/verification.py",
@@ -5988,11 +5989,7 @@
       "isolated semantic verifier role with generator identity separation",
       "execution publish/qualified/abstain/block disposition handling"
     ],
-    "remaining_surfaces": [
-      "collect exact-head Verification Evidence/Cognitive Execution closure evidence",
-      "close declared lower-stage dependencies",
-      "obtain independent signoff before canonical gap closure"
-    ],
+    "remaining_surfaces": [],
     "independent_verification": {
       "verifier": "scripts/verify_verification_evidence_closure.py",
       "regressions": "tests/test_verification_evidence_independent_verifier.py",
