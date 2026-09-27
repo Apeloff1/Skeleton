@@ -72,7 +72,8 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
     "backend/tests/test_operation_stream_mongo_stage7.py": (
         "test_stage7_mongo_shared_authority_survives_transient_update_failure",
         "configureFailPoint",
-        "RetryableWriteError",
+        "\"errorCode\": 112",
+        "TransientTransactionError",
     ),
     "backend/tests/test_operation_stream_mongo_integration.py": (
         "test_mongo_shared_authority_replays_across_workers_and_compacts_by_ack",
