@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
+from .canonical import EvidenceRef
+
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/ -]*$")
@@ -147,7 +149,7 @@ class GateAuthorityDecision:
     nonterminal: tuple[str, ...] = ()
     rejected: tuple[str, ...] = ()
 
-    def as_dict(self) -> dict[str, Any]:
+    def _digest_payload(self) -> dict[str, Any]:
         return {
             "target_sha": self.target_sha,
             "authority_digest": self.authority_digest,
@@ -161,6 +163,31 @@ class GateAuthorityDecision:
             "wrong_event": list(self.wrong_event),
             "nonterminal": list(self.nonterminal),
             "rejected": list(self.rejected),
+        }
+
+    @property
+    def decision_digest(self) -> str:
+        return canonical_digest(self._digest_payload())
+
+    def accepted_evidence_ref(
+        self,
+        *,
+        source: str = "p1:required-gate-authority",
+    ) -> EvidenceRef:
+        if not self.accepted:
+            raise PromotionGateError(
+                "rejected gate authority decision cannot become promotion evidence"
+            )
+        return EvidenceRef(
+            source=_text(source, "source", max_length=2048),
+            digest=self.decision_digest,
+            category="promotion_gate_authority",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            **self._digest_payload(),
+            "decision_digest": self.decision_digest,
         }
 
 
