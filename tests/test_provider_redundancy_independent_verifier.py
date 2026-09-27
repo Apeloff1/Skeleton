@@ -39,7 +39,7 @@ def _valid_repo(tmp_path: Path) -> Path:
             }
         ],
         "provider_redundancy_blueprint": {
-            "status": "implemented-pending-closure",
+            "status": "closed",
             "gap": "gap-provider-redundancy",
             "routing": {
                 "failover_on": [
@@ -58,7 +58,7 @@ def _valid_repo(tmp_path: Path) -> Path:
         "gap_register": [
             {
                 "id": "gap-provider-redundancy",
-                "status": "open",
+                "status": "closed",
             }
         ],
     }
@@ -176,3 +176,35 @@ def test_provider_redundancy_verifier_rejects_missing_protocol_fence_regression(
         "provider tests lost redundancy token" in error
         for error in receipt["errors"]
     )
+
+def test_provider_redundancy_verifier_rejects_reopened_gap(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_app_construction.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["gap_register"][0]["status"] = "open"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any("gap must remain closed" in error for error in receipt["errors"])
+
+
+def test_provider_redundancy_verifier_rejects_blueprint_regression(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_app_construction.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["provider_redundancy_blueprint"]["status"] = (
+        "implemented-pending-closure"
+    )
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any("blueprint must remain closed" in error for error in receipt["errors"])
+
