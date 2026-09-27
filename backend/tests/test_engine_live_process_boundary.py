@@ -18,6 +18,8 @@ from core.engine_client import (
     EngineClientConfig,
     command_from_context,
 )
+from skeleton.provider_contract import ProviderToolDefinition
+
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -97,7 +99,13 @@ def _context() -> ContextEnvelope:
     )
 
 
-def _command(context: ContextEnvelope, *, started: datetime):
+def _command(
+    context: ContextEnvelope,
+    *,
+    started: datetime,
+    tools: tuple[ProviderToolDefinition, ...] = (),
+    verification_profile: str = "assistant_proposal",
+):
     return command_from_context(
         context=context,
         actor_id="actor-a",
@@ -106,14 +114,15 @@ def _command(context: ContextEnvelope, *, started: datetime):
         instructions="Follow the live-process test policy.",
         prompt="Return a bounded answer.",
         objective="Live engine process boundary test",
-        verification_profile="assistant_proposal",
+        verification_profile=verification_profile,
         service_principal="codedock-backend",
         created_at=started,
         deadline=started + timedelta(seconds=20),
         trace_id="trace-live-process",
         max_model_turns=2,
-        max_tool_calls=1,
+        max_tool_calls=2,
         max_repeat_tool_batches=1,
+        tools=tools,
     )
 
 
@@ -366,3 +375,125 @@ async def test_engine_state_survives_real_process_restart(tmp_path) -> None:
             assert cancelled["cancellation_requested"] is True
         finally:
             stop_process(second_process)
+
+
+
+@pytest.mark.asyncio
+async def test_engine_successful_lineage_crosses_real_tcp_process_boundary(
+    tmp_path,
+) -> None:
+    port = _free_port()
+    base_url = "http://127.0.0.1:" + str(port)
+    log_path = tmp_path / "engine-success-lineage.log"
+    env = dict(os.environ)
+    env.update(
+        {
+            "TEST_ENGINE_EXECUTION_PATH": str(
+                tmp_path / "lineage-execution.sqlite3"
+            ),
+            "TEST_ENGINE_SUBMISSION_PATH": str(
+                tmp_path / "lineage-submission.sqlite3"
+            ),
+            "TEST_ENGINE_SERVICE_TOKEN": _SERVICE_TOKEN,
+            "TEST_ENGINE_ENABLE_COORDINATOR": "1",
+            "PYTHONUNBUFFERED": "1",
+        }
+    )
+
+    with log_path.open("w", encoding="utf-8") as log_file:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "skeleton.testing.live_engine_process_app:create_app",
+                "--factory",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
+                "--log-level",
+                "warning",
+            ],
+            cwd=ROOT,
+            env=env,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        try:
+            _wait_ready(base_url, process, log_path)
+            client = EngineClient(
+                EngineClientConfig(
+                    base_url=base_url,
+                    service_token=_SERVICE_TOKEN,
+                    service_principal="codedock-backend",
+                    request_timeout_s=2,
+                    execution_timeout_s=10,
+                    poll_interval_s=0.01,
+                )
+            )
+            context = _context()
+            tool = ProviderToolDefinition(
+                tool_id="fixture.read",
+                description="Read deterministic Stage-5 container fixture.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64,
+                        }
+                    },
+                    "required": ["key"],
+                    "additionalProperties": False,
+                },
+            )
+            result = await client.execute(
+                _command(
+                    context,
+                    started=_now(),
+                    tools=(tool,),
+                    verification_profile="evidence_required",
+                )
+            )
+
+            assert result.operation_id == context.operation_id
+            assert result.execution_id == context.execution_id
+            assert result.final_output == "containerized canonical answer"
+            assert result.verification_receipt is not None
+            assert result.verification_receipt["outcome"] == "passed"
+            assert result.evidence_refs == ("evidence:container-boundary",)
+            assert result.provider_receipts == (
+                "provider:fake:container-provider-tool",
+                "provider:fake:container-provider-final",
+            )
+            assert len(result.tool_receipts) == 1
+            assert result.usage["tool_calls"] == 1
+            assert result.stream_terminal_event is not None
+
+            events = await client.events(
+                context.execution_id,
+                actor_id="actor-a",
+                tenant_id="tenant-a",
+            )
+            terminal = [
+                event
+                for event in events["events"]
+                if event["type"] == "execution.result"
+            ]
+            assert len(terminal) == 1
+            assert terminal[0]["result"]["provider_receipts"] == list(
+                result.provider_receipts
+            )
+            assert terminal[0]["result"]["tool_receipts"] == list(
+                result.tool_receipts
+            )
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
