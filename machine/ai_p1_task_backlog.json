@@ -1,0 +1,735 @@
+{
+  "schema_version": 1,
+  "backlog_version": "1.0.0",
+  "status": "active",
+  "title": "P1 Production Promotion Task Backlog",
+  "authority": {
+    "execution_map": "machine/ai_p1_execution_map.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "accountability": "machine/ai_build_accountability.json"
+  },
+  "status_values": [
+    "ready",
+    "blocked",
+    "in_progress",
+    "evidence_pending",
+    "done"
+  ],
+  "scheduling_policy": {
+    "start_lane": "P1-L0",
+    "initial_ready_task": "P1-EVID-01",
+    "dependency_rule": "A task may enter ready/in_progress only after every depends_on task is done, except the single declared initial_ready_task.",
+    "concurrency_rule": "Tasks with satisfied dependencies may run concurrently when they do not change the same canonical authority contract.",
+    "promotion_rule": "done means implementation plus task acceptance evidence; maturity promotion remains a separate signed accountability action."
+  },
+  "tasks": [
+    {
+      "task_id": "P1-EVID-01",
+      "lane_id": "P1-L0",
+      "status": "ready",
+      "title": "Canonical evidence identity",
+      "volume_refs": [
+        "VOL-034",
+        "VOL-038",
+        "VOL-078"
+      ],
+      "depends_on": [],
+      "objective": "Define one receipt identity binding git head, config digest, environment, test/verifier identity, timestamps and evidence digest.",
+      "acceptance": [
+        "Exact-head evidence from independent gates can be joined deterministically without filename or log scraping."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-EVID-02",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Maturity reconciliation engine",
+      "volume_refs": [
+        "VOL-000",
+        "VOL-056",
+        "VOL-080"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Compare masterplan volume claims against implementation paths, tests, evidence and accountability; emit promotion candidates without self-signing them.",
+      "acceptance": [
+        "Candidate promotions are explainable, reversible and cannot mutate signed maturity state."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-EVID-03",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Required-gate authority map",
+      "volume_refs": [
+        "VOL-059",
+        "VOL-037"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Define which gates are required for which promotion classes and fail closed on missing, skipped, cancelled or stale evidence.",
+      "acceptance": [
+        "A promotion receipt cannot be valid when any required gate is absent, stale or non-success."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-EVID-04",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Risk/gap evidence binding",
+      "volume_refs": [
+        "VOL-036",
+        "VOL-056",
+        "VOL-057"
+      ],
+      "depends_on": [
+        "P1-EVID-01",
+        "P1-EVID-03"
+      ],
+      "objective": "Bind critical/high risks and gaps to executable evidence, owner, expiry/review cadence and accepted-risk disposition.",
+      "acceptance": [
+        "Every blocking P1 risk has executable evidence or a signed, time-bounded accepted-risk record."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-EVID-05",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Reproducibility bundle",
+      "volume_refs": [
+        "VOL-035",
+        "VOL-038",
+        "VOL-078",
+        "VOL-079"
+      ],
+      "depends_on": [
+        "P1-EVID-01",
+        "P1-EVID-03"
+      ],
+      "objective": "Package exact inputs, environment, budgets, tests/evals and receipts needed to reproduce qualifying evidence.",
+      "acceptance": [
+        "Independent rerun can reproduce the maturity evidence or explain deterministic incompatibility."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-EVID-06",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Scope-freeze and ADR enforcement",
+      "volume_refs": [
+        "VOL-000",
+        "VOL-420"
+      ],
+      "depends_on": [
+        "P1-EVID-02"
+      ],
+      "objective": "Enforce VOL-420 breadth freeze and require a machine-linked ADR for any top-level scope exception.",
+      "acceptance": [
+        "Unapproved new top-level volume or scope bypass fails validation."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROD-01",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "API schema and compatibility registry",
+      "volume_refs": [
+        "VOL-041"
+      ],
+      "depends_on": [
+        "P1-EVID-03"
+      ],
+      "objective": "Inventory externally visible API contracts, versions, producers/consumers and migration/compatibility rules.",
+      "acceptance": [
+        "Breaking API drift is detected before release promotion."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROD-02",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Streaming projection authority",
+      "volume_refs": [
+        "VOL-040",
+        "VOL-042",
+        "VOL-044"
+      ],
+      "depends_on": [
+        "P1-PROD-01",
+        "P1-EVID-01"
+      ],
+      "objective": "Bind cursor/replay/resync and client projection state to durable operation/event authority.",
+      "acceptance": [
+        "Refresh, reconnect, duplicate and out-of-order delivery reconstruct the same durable truth."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROD-03",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Workspace and product projection contract",
+      "volume_refs": [
+        "VOL-042",
+        "VOL-045"
+      ],
+      "depends_on": [
+        "P1-PROD-02"
+      ],
+      "objective": "Define product/workspace projection records for progress, blockers, cost, evidence and terminal results.",
+      "acceptance": [
+        "UI projections cannot invent or overwrite canonical operation state."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROD-04",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Pause/resume/cancel and human override",
+      "volume_refs": [
+        "VOL-045"
+      ],
+      "depends_on": [
+        "P1-PROD-03"
+      ],
+      "objective": "Materialize interruptibility, pause/resume and human override semantics with durable receipts.",
+      "acceptance": [
+        "Control actions survive reconnect/restart and preserve terminal finality."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROD-05",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Web/desktop tenant and storage boundary",
+      "volume_refs": [
+        "VOL-043",
+        "VOL-044",
+        "VOL-046"
+      ],
+      "depends_on": [
+        "P1-PROD-01",
+        "P1-PROD-02"
+      ],
+      "objective": "Propagate tenant identity, permission and storage classification through desktop/web/API/stream boundaries.",
+      "acceptance": [
+        "Cross-tenant, local-storage and permission boundary regressions are executable tests."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-01",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Experiment registry",
+      "volume_refs": [
+        "VOL-077"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Define experiment identity, hypotheses, traffic/data eligibility, environment, budgets, metrics and lineage.",
+      "acceptance": [
+        "Experiment results are reproducible and cannot silently change production authority."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-02",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Benchmark registry and contamination controls",
+      "volume_refs": [
+        "VOL-082",
+        "VOL-035"
+      ],
+      "depends_on": [
+        "P1-LEARN-01",
+        "P1-EVID-05"
+      ],
+      "objective": "Version benchmark datasets, splits, contamination status, metric policy and environment.",
+      "acceptance": [
+        "Improvement claims fail when benchmark lineage or contamination state is missing."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-03",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Candidate and champion/challenger registry",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-415"
+      ],
+      "depends_on": [
+        "P1-LEARN-01",
+        "P1-LEARN-02"
+      ],
+      "objective": "Standardize candidate artifacts and incumbent/challenger comparison state with immutable promotion history.",
+      "acceptance": [
+        "Candidate cannot overwrite champion and every promotion has comparative evidence."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-04",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Shadow traffic isolation",
+      "volume_refs": [
+        "VOL-414"
+      ],
+      "depends_on": [
+        "P1-LEARN-03"
+      ],
+      "objective": "Mirror eligible traffic to candidates with redaction, side-effect suppression and paired-comparison metadata.",
+      "acceptance": [
+        "Shadow execution cannot affect authoritative user outcomes or widen privacy boundaries."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-05",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Specification and reasoning regression corpus",
+      "volume_refs": [
+        "VOL-324",
+        "VOL-369",
+        "VOL-083"
+      ],
+      "depends_on": [
+        "P1-LEARN-02",
+        "P1-EVID-04"
+      ],
+      "objective": "Turn adversarial/specification-gaming and reasoning failures into versioned promotion-blocking regressions.",
+      "acceptance": [
+        "Known failure classes block promotion when they regress."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-LEARN-06",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Failure knowledge pipeline",
+      "volume_refs": [
+        "VOL-419",
+        "VOL-024"
+      ],
+      "depends_on": [
+        "P1-LEARN-05"
+      ],
+      "objective": "Ingest incidents, failed experiments, rejected designs and counterexamples into structured failure knowledge linked to risks/tests.",
+      "acceptance": [
+        "Repeated failures are traceable to regression coverage or explicit non-applicability."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-01",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Release evidence bundle",
+      "volume_refs": [
+        "VOL-060",
+        "VOL-075",
+        "VOL-076"
+      ],
+      "depends_on": [
+        "P1-EVID-05",
+        "P1-PROD-05",
+        "P1-LEARN-03"
+      ],
+      "objective": "Bind release artifacts, config, SBOM/provenance, tests/evals, installer metadata and rollback evidence to one digest.",
+      "acceptance": [
+        "Release candidate is reconstructable from its evidence bundle."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-02",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Installer/update/repair lifecycle",
+      "volume_refs": [
+        "VOL-047",
+        "VOL-048",
+        "VOL-049",
+        "VOL-050"
+      ],
+      "depends_on": [
+        "P1-REL-01"
+      ],
+      "objective": "Prove clean install, interrupted update, repair, uninstall and residual ownership semantics.",
+      "acceptance": [
+        "Lifecycle operations are idempotent/recoverable and leave no unowned critical state."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-03",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Migration and rollback compatibility",
+      "volume_refs": [
+        "VOL-048",
+        "VOL-061",
+        "VOL-063"
+      ],
+      "depends_on": [
+        "P1-REL-01"
+      ],
+      "objective": "Bind schema/config migrations to declared rollback windows and backward-read compatibility.",
+      "acceptance": [
+        "Rollback can read state created by upgraded versions within the declared compatibility window."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-04",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Backup and restore qualification",
+      "volume_refs": [
+        "VOL-064",
+        "VOL-065"
+      ],
+      "depends_on": [
+        "P1-REL-03"
+      ],
+      "objective": "Define backup coverage, restore dependency order and derived-state rebuild semantics; execute restore drills.",
+      "acceptance": [
+        "Authoritative state restores without semantic loss and derived projections rebuild deterministically."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-05",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Disaster recovery and incident feedback",
+      "volume_refs": [
+        "VOL-065",
+        "VOL-066"
+      ],
+      "depends_on": [
+        "P1-REL-04",
+        "P1-LEARN-06"
+      ],
+      "objective": "Exercise disaster scenarios and route incident/postmortem actions into risk/gap/failure ledgers.",
+      "acceptance": [
+        "DR evidence includes RTO/RPO behavior and every corrective action has accountable follow-up."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-REL-06",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Attribution and release notices",
+      "volume_refs": [
+        "VOL-409"
+      ],
+      "depends_on": [
+        "P1-REL-01"
+      ],
+      "objective": "Generate release attribution and notices from provenance/license lineage.",
+      "acceptance": [
+        "Release notices are traceable to exact contributing versions and obligations."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-01",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Remote execution and worker trust",
+      "volume_refs": [
+        "VOL-030",
+        "VOL-398",
+        "VOL-399"
+      ],
+      "depends_on": [
+        "P1-EVID-03",
+        "P1-PROD-05"
+      ],
+      "objective": "Define remote execution envelope, worker identity, attestation, leases and fencing.",
+      "acceptance": [
+        "Unattested or stale workers cannot commit authoritative effects."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-02",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Topology-aware model placement and warming",
+      "volume_refs": [
+        "VOL-031",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-392",
+        "VOL-397"
+      ],
+      "depends_on": [
+        "P1-DIST-01"
+      ],
+      "objective": "Bind model placement/warming decisions to compute/network topology, readiness and data-boundary constraints.",
+      "acceptance": [
+        "Placement is reproducible and respects hard resource/security constraints."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-03",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Batching and autoscaling controller",
+      "volume_refs": [
+        "VOL-386",
+        "VOL-390"
+      ],
+      "depends_on": [
+        "P1-DIST-02"
+      ],
+      "objective": "Implement deadline-aware continuous batching and autoscaling against measured service objectives.",
+      "acceptance": [
+        "Throughput improvements cannot violate tail-latency, cancellation or quality budgets."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-04",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Load and capacity qualification",
+      "volume_refs": [
+        "VOL-067",
+        "VOL-068",
+        "VOL-391"
+      ],
+      "depends_on": [
+        "P1-DIST-03"
+      ],
+      "objective": "Define canonical load profiles, saturation points, load shedding and capacity-plan evidence.",
+      "acceptance": [
+        "Capacity exhaustion follows declared degradation policy instead of uncontrolled collapse."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-05",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Quota and budget accounting ledger",
+      "volume_refs": [
+        "VOL-069",
+        "VOL-403",
+        "VOL-404"
+      ],
+      "depends_on": [
+        "P1-DIST-01",
+        "P1-EVID-01"
+      ],
+      "objective": "Unify quota hierarchy with idempotent budget reservation, charge and reconciliation.",
+      "acceptance": [
+        "Duplicate/retry paths cannot double-charge or bypass quota/authority constraints."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-DIST-06",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Forecasting and cost anomaly loop",
+      "volume_refs": [
+        "VOL-405",
+        "VOL-406"
+      ],
+      "depends_on": [
+        "P1-DIST-04",
+        "P1-DIST-05"
+      ],
+      "objective": "Backtest demand/capacity/cost forecasts and connect anomalies to accountable incident/workflow handling.",
+      "acceptance": [
+        "Forecast accuracy and anomaly thresholds are measured, versioned and tied to operational action."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROM-01",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Aggregate exact-head P1 evidence",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-EVID-06",
+        "P1-PROD-04",
+        "P1-PROD-05",
+        "P1-LEARN-04",
+        "P1-LEARN-06",
+        "P1-REL-05",
+        "P1-REL-06",
+        "P1-DIST-06"
+      ],
+      "objective": "Assemble exact-head lane receipts and maturity results into one terminal P1 evidence package.",
+      "acceptance": [
+        "Every primary frontier volume is represented with required maturity evidence or explicit blocking status."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROM-02",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Terminal failure-journey qualification",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-PROM-01"
+      ],
+      "objective": "Run clean-machine, rollback, restore, saturation, partition, adversarial, provider-failover and stale-evidence journeys.",
+      "acceptance": [
+        "All mandatory P1 failure families pass on the promotion head or block promotion."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    },
+    {
+      "task_id": "P1-PROM-03",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Independent signed P1 promotion decision",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-PROM-02"
+      ],
+      "objective": "Independently verify all P1 evidence and record signed promotion or explicit rejection without self-certification.",
+      "acceptance": [
+        "Promotion is exact-head, independently verified, signed, and leaves deferred 357-volume work visible."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1"
+    }
+  ],
+  "summary": {
+    "task_count": 32,
+    "lane_task_counts": {
+      "P1-L0": 6,
+      "P1-L1": 5,
+      "P1-L2": 6,
+      "P1-L3": 6,
+      "P1-L4": 6,
+      "P1-L5": 3
+    },
+    "ready_count": 1,
+    "blocked_count": 31
+  }
+}
