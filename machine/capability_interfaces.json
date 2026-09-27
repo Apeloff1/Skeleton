@@ -114,7 +114,7 @@
         "process credential ownership test",
         "capability readiness contract tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "acceptance_target:deployment-release->product-experience",
@@ -945,7 +945,7 @@
         "process credential ownership test",
         "capability readiness contract tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:deployment-release->evaluation",
@@ -1171,7 +1171,7 @@
         "child authority subset",
         "service/user identity separation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:engine-api->memory",
@@ -1223,7 +1223,7 @@
         "write-policy provenance test",
         "delete/export/retention propagation test"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:engine-api->observability",
@@ -1273,7 +1273,7 @@
         "usage/cost correlation",
         "stuck-operation diagnostics"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:engine-api->orchestration",
@@ -1381,7 +1381,7 @@
         "vector index loss/rebuild",
         "retrieval injection isolation"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:evaluation->observability",
@@ -2779,7 +2779,7 @@
         "process credential ownership test",
         "capability readiness contract tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:product-experience->identity",
@@ -3704,7 +3704,7 @@
         "process credential ownership test",
         "capability readiness contract tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:streaming-realtime->jobs-durability",
