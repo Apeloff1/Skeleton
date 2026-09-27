@@ -381,9 +381,9 @@ def qualify_agent_delegation(
         reasons.append("delegation-id-reused")
     if child.expires_at > parent.expires_at:
         reasons.append("child-expiry-exceeds-parent")
-    if now > parent.expires_at:
+    if now >= parent.expires_at:
         reasons.append("parent-authority-expired")
-    if now > child.expires_at:
+    if now >= child.expires_at:
         reasons.append("child-authority-expired")
     if not set(child.capabilities).issubset(parent.capabilities):
         reasons.append("child-capability-authority-widened")
