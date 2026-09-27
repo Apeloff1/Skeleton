@@ -346,10 +346,6 @@ def test_high_risk_without_verification_or_information_value_abstains() -> None:
     ("step", "disposition"),
     (
         (
-            _step(index=6, tokens=1000, cost=2.0, elapsed=20.0),
-            StopDisposition.BUDGET_EXHAUSTED,
-        ),
-        (
             _step(tokens=6000, cost=2.0, elapsed=20.0),
             StopDisposition.BUDGET_EXHAUSTED,
         ),
@@ -363,7 +359,7 @@ def test_high_risk_without_verification_or_information_value_abstains() -> None:
         ),
     ),
 )
-def test_every_budget_dimension_terminates(
+def test_token_cost_and_time_budgets_terminate(
     step: ReasoningStep,
     disposition: StopDisposition,
 ) -> None:
@@ -378,6 +374,28 @@ def test_every_budget_dimension_terminates(
     assert decision.tokens_remaining >= 0
     assert decision.cost_remaining >= 0.0
     assert decision.time_remaining_s >= 0.0
+
+
+def test_step_budget_requires_real_contiguous_history() -> None:
+    history = tuple(
+        _step(
+            index,
+            tokens=index * 300,
+            cost=index * 0.5,
+            elapsed=index * 5.0,
+            progress=str(index),
+        )
+        for index in range(1, 7)
+    )
+
+    decision = evaluate_stopping(
+        _policy(),
+        history,
+        risk=ReasoningRisk.LOW,
+    )
+
+    assert decision.disposition is StopDisposition.BUDGET_EXHAUSTED
+    assert decision.steps_remaining == 0
 
 
 def test_value_of_information_floor_stops_search() -> None:
