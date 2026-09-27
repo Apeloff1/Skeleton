@@ -107,10 +107,10 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                     errors.append(f"P1 masterplan plane drift: {gap_id}")
                 status = str(row.get("status") or "")
                 gap_state[gap_id] = status
-                # This implementation lane may not self-close the canonical
-                # gap before exact-head evidence and ledger reconciliation.
-                if status not in {"open", "closed"}:
-                    errors.append(f"P1 masterplan status is invalid: {gap_id}")
+                if status != "closed":
+                    errors.append(
+                        f"P1 masterplan gap must remain closed: {gap_id}"
+                    )
 
     return {
         "schema_version": 1,
