@@ -614,24 +614,22 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "skeleton/memory",
-        "skeleton/vault",
+        "skeleton/intelligence/information_quality.py",
+        "skeleton/ai/runtime/intelligence/information_quality.py",
         "skeleton/memory/reconciliation.py",
-        "skeleton/contracts/memory_record.py",
-        "skeleton/persistence/memory_repository.py",
-        "skeleton/memory/projection.py",
-        "skeleton/retrieval",
-        "backend/services/rag_service.py"
+        "skeleton/retrieval/freshness.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/scope.py",
+        "skeleton/intelligence/knowledge_base.py",
+        ".github/workflows/p1-information-quality.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_memory_promotion.py",
-        "planned:skeleton/testing/test_memory_poisoning.py",
-        "skeleton/testing/test_memory_repository.py",
-        "skeleton/testing/test_mongo_memory_repository.py",
-        "skeleton/testing/test_memory_projection.py",
+        "skeleton/testing/test_information_quality.py",
         "tests/test_memory_reconciliation.py",
-        "tests/test_retrieval_pipeline_internals.py",
-        "tests/test_quad_retrieval_internals.py"
+        "tests/test_retrieval_freshness.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_scope.py",
+        "tests/test_knowledge_base_update.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -640,9 +638,14 @@
         "replay"
       ],
       "failure_modes": [
-        "stale/poisoned intelligence state",
-        "unbounded reasoning/search",
-        "unsupported quality promotion"
+        "memory under review or tombstone used as quality evidence",
+        "unresolved same-scope memory contradiction",
+        "unscoped partial or failed retrieval",
+        "missing or stale retrieval-plane freshness",
+        "knowledge observation without explicit provenance",
+        "stale knowledge observation",
+        "unresolved knowledge contradiction",
+        "wall-clock jitter changing identity before freshness classification changes"
       ],
       "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
       "promotion_effect": "maturity_candidate",
