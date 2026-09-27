@@ -11,6 +11,7 @@ from core.operation_stream_transport import (
     OperationEventStore,
     OperationStateStore,
     OperationStreamTransport,
+    OperationTransportError,
     encode_sse_event,
     encode_sse_heartbeat,
     transport_from_env,
@@ -621,7 +622,7 @@ def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
 
 def test_transport_factory_rejects_unknown_authority_backend() -> None:
     with pytest.raises(
-        Exception,
+        OperationTransportError,
         match="unsupported operation authority backend",
     ):
         transport_from_env(
@@ -633,7 +634,7 @@ def test_transport_factory_rejects_unknown_authority_backend() -> None:
 
 def test_transport_factory_validates_mongo_timeout_before_connecting() -> None:
     with pytest.raises(
-        Exception,
+        OperationTransportError,
         match="timeout must be an integer",
     ):
         transport_from_env(
