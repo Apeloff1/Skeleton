@@ -976,9 +976,11 @@
       ],
       "test_targets": [
         "skeleton/testing/test_privileged_tool_transaction.py",
-        "skeleton/testing/test_tool_runtime_contracts.py",
+        "skeleton/testing/test_tool_runtime.py",
         "skeleton/testing/test_tool_receipt_store.py",
-        "skeleton/testing/test_shell_isolation.py"
+        "skeleton/testing/test_shell_ai_isolation_sandbox.py",
+        "tests/test_governed_tool_journey.py",
+        "tests/test_tool_runtime_independent_verifier.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
