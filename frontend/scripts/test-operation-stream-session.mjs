@@ -336,3 +336,51 @@ test('cancel-complete race exposes exactly one canonical terminal outcome per se
     }
   }
 });
+
+
+test('terminal authoritative resync snapshot reconciles canonical output before fencing', async () => {
+  const cursors = new MemoryCursorStore();
+  const transport = new ScriptedTransport({
+    replay() {
+      return {
+        ok: false,
+        replayGap: true,
+        error: 'replay_gap',
+      };
+    },
+    resync() {
+      return {
+        ok: true,
+        operation: snapshot('completed', 5),
+        compacted_through: 5,
+        resume_after_sequence: 5,
+        latest_sequence: 5,
+        terminal: true,
+        active_consumer_count: 1,
+        canonical_result: {
+          status: 'completed',
+          final_output: 'snapshot canonical',
+          result_ref: 'result:snapshot-canonical',
+        },
+      };
+    },
+  });
+
+  const session = new OperationBrowserSession(
+    'op-browser',
+    transport,
+    cursors,
+    { consumerId: 'terminal-resync-browser' },
+  );
+
+  const terminal = await session.resume();
+
+  assert.equal(terminal.terminal, true);
+  assert.equal(terminal.connection, 'terminal');
+  assert.equal(terminal.contentState, 'canonical');
+  assert.equal(terminal.displayedAssistantContent, 'snapshot canonical');
+  assert.equal(terminal.terminalResultRef, 'result:snapshot-canonical');
+  assert.equal(terminal.resyncRequired, false);
+  assert.equal(transport.resyncCalls, 1);
+  assert.deepEqual(cursors.writes, [5]);
+});
