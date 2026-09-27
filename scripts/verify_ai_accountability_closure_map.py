@@ -214,24 +214,31 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         errors.extend(
             _workflow_exact_head_errors(root, workflow, workflow_name)
         )
-        if verifier_script is not None:
-            if not isinstance(verifier_script, str) or not verifier_script:
-                errors.append(f"{key}: verifier_script must be null or a path")
+        if not isinstance(verifier_script, str) or not verifier_script:
+            errors.append(f"{key}: verifier_script is required")
+        else:
+            verifier_path = root / verifier_script
+            if not verifier_path.is_file():
+                errors.append(
+                    f"{key}: missing verifier script {verifier_script}"
+                )
             else:
-                verifier_path = root / verifier_script
-                if not verifier_path.is_file():
+                source = verifier_path.read_text(encoding="utf-8")
+                binding_token = str(
+                    group.get("verifier_binding_token") or gap_id
+                )
+                if binding_token not in source:
                     errors.append(
-                        f"{key}: missing verifier script {verifier_script}"
+                        f"{key}: verifier {verifier_script} does not bind "
+                        f"{binding_token}"
                     )
-                else:
-                    source = verifier_path.read_text(encoding="utf-8")
-                    binding_token = str(
-                        group.get("verifier_binding_token") or gap_id
-                    )
-                    if binding_token not in source:
+                workflow_path = root / workflow
+                if workflow_path.is_file():
+                    workflow_source = workflow_path.read_text(encoding="utf-8")
+                    if verifier_script not in workflow_source:
                         errors.append(
-                            f"{key}: verifier {verifier_script} does not bind "
-                            f"{binding_token}"
+                            f"{key}: workflow {workflow} does not execute "
+                            f"{verifier_script}"
                         )
 
         matching = [
