@@ -48,16 +48,17 @@ def test_every_partial_plane_has_an_explicit_gap() -> None:
     assert partial <= gap_planes
 
 
-def test_p0_gaps_are_explicitly_blocking_sota_completion() -> None:
+def test_p0_gaps_remain_explicit_after_sota_closure() -> None:
     contract = _contract()
     p0 = [
         gap
         for gap in contract["gap_register"]
-        if gap["priority"] == "P0" and gap["status"] == "open"
+        if gap["priority"] == "P0"
     ]
 
     assert p0
     assert contract["gap_closure_policy"]["p0_gaps_block_sota_complete"] is True
+    assert all(gap["status"] == "closed" for gap in p0)
     assert all(gap["construction"] for gap in p0)
     assert all(gap["closure_evidence"] for gap in p0)
 
