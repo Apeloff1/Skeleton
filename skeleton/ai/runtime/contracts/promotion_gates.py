@@ -75,8 +75,8 @@ class GateObservation:
     run_attempt: int
     event: str
     status: str
-    conclusion: str
-    completed_at: datetime
+    conclusion: str | None
+    completed_at: datetime | None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -108,16 +108,27 @@ class GateObservation:
             "status",
             _text(self.status, "status", max_length=64),
         )
-        object.__setattr__(
-            self,
-            "conclusion",
-            _text(self.conclusion, "conclusion", max_length=64),
-        )
-        object.__setattr__(
-            self,
-            "completed_at",
-            _utc(self.completed_at, "completed_at"),
-        )
+        if self.conclusion is not None:
+            object.__setattr__(
+                self,
+                "conclusion",
+                _text(self.conclusion, "conclusion", max_length=64),
+            )
+        if self.completed_at is not None:
+            object.__setattr__(
+                self,
+                "completed_at",
+                _utc(self.completed_at, "completed_at"),
+            )
+        if self.status == "completed":
+            if self.conclusion is None:
+                raise PromotionGateError(
+                    "completed gate observation requires conclusion"
+                )
+            if self.completed_at is None:
+                raise PromotionGateError(
+                    "completed gate observation requires completed_at"
+                )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -128,8 +139,10 @@ class GateObservation:
             "event": self.event,
             "status": self.status,
             "conclusion": self.conclusion,
-            "completed_at": self.completed_at.isoformat().replace(
-                "+00:00", "Z"
+            "completed_at": (
+                self.completed_at.isoformat().replace("+00:00", "Z")
+                if self.completed_at is not None
+                else None
             ),
         }
 
