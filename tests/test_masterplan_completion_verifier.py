@@ -167,3 +167,24 @@ def test_completion_verifier_rejects_outstanding_closure_evidence(
         "closure still has outstanding_evidence" in item
         for item in receipt["errors"]
     )
+
+def test_completion_verifier_rejects_closed_gap_with_pending_machine_state(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_app_construction.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["gap_register"][0]["verification_state"] = "pending-exact-head"
+    payload["gap_register"][0]["progress"] = {
+        "state": "implemented_pending_closure",
+        "remaining": ["collect exact-head evidence"],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any("verification_state" in item for item in receipt["errors"])
+    assert any("progress.state" in item for item in receipt["errors"])
+    assert any("progress.remaining" in item for item in receipt["errors"])
+
