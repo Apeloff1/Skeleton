@@ -857,9 +857,9 @@
       "gap": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "stage": 6,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
         "transport-neutral stream event envelope",
@@ -914,7 +914,9 @@
         "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions",
         "shared-network Mongo operation and stream authorities landed on main via #2030",
         "production browser-session runtime binds replay, durable cursor, resync, cancellation and bounded follow",
-        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races"
+        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races",
+        "independent Stage-6 source/mirror/dependency verifier with adversarial regression suite",
+        "dedicated exact-head Stage 6 Streaming Closure Gate"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -923,18 +925,13 @@
         "disconnect/reconnect browser/API test",
         "duplicate/out-of-order client reducer test",
         "cancel race test",
-        "slow-client/backpressure test"
+        "slow-client/backpressure test",
+        "MongoOperationStore and MongoOperationEventStore provide shared-network authority",
+        "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
+        "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
-      "blockers": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
