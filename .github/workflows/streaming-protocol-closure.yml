@@ -62,6 +62,7 @@ jobs:
           -e ".[dev]"
           "httpx==0.28.1"
           "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
 
       - name: Run canonical stream contracts
         run: >-
