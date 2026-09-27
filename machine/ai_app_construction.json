@@ -988,7 +988,7 @@
     {
       "id": "streaming-realtime",
       "owner": "backend",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Token/event streaming, progress, cancellation, reconnect and ordered delivery.",
       "depends_on": [
         "application-api",
@@ -6555,7 +6555,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
