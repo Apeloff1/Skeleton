@@ -20777,8 +20777,7 @@
         "requirements",
         "capabilities",
         "contracts",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "implemented": {
@@ -20789,8 +20788,7 @@
         "contracts",
         "implementation_paths",
         "tests",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "integrated": {
@@ -20802,8 +20800,7 @@
         "implementation_paths",
         "tests",
         "evaluations",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "verified": {
@@ -20816,8 +20813,7 @@
         "tests",
         "evaluations",
         "evidence",
-        "risks",
-        "gaps"
+        "risks"
       ]
     },
     "hardened": {
