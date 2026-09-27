@@ -60,6 +60,19 @@ JOURNEY_SURFACES: dict[str, tuple[str, ...]] = {
         "test_configured_engine_outage_never_falls_back_to_backend_provider",
         "engine_unavailable",
     ),
+    "skeleton/frontier/operation_stream_store_mongo.py": (
+        "def validate_transaction_capability(",
+        "start_transaction",
+        "transaction-capable deployment",
+    ),
+    "backend/core/operation_stream_transport.py": (
+        "CODEDOCK_OPERATION_AUTHORITY_BACKEND",
+        "mongo_events.validate_transaction_capability()",
+    ),
+    "skeleton/testing/test_operation_stream_store_mongo.py": (
+        "test_mongo_stream_transaction_preflight_executes_real_transactional_read",
+        "test_mongo_stream_transaction_preflight_rejects_standalone_topology",
+    ),
     "skeleton/testing/test_ai_golden_journeys.py": (
         "retrieval_tool_provider_journey",
         "provider",
