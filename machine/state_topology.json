@@ -468,7 +468,8 @@
         "scripts/state_recovery_drill.py",
         "skeleton/testing/test_state_recovery_drill.py",
         ".github/workflows/state-recovery-drill.yml"
-      ]
+      ],
+      "gap": "gap-state-authority-convergence"
     },
     {
       "id": "operation-event-stream",
@@ -864,7 +865,8 @@
         "skeleton/testing/test_governance_runtime_binding.py",
         "pyproject.toml",
         "skeleton/vault/lifecycle_adapters.py"
-      ]
+      ],
+      "gap": "gap-memory-durable-authority"
     }
   ],
   "state_flows": [
