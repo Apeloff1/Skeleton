@@ -310,17 +310,6 @@ def reconcile_volume(
             "exceeds explicit accountability maturity"
         )
 
-    implementation_candidate: str | None = None
-    for state in MATURITY_ORDER[
-        _MATURITY_INDEX[MaturityState.IMPLEMENTED.value]:
-    ]:
-        state_name = state.value
-        if _accountability_blockers(accountability, state_name):
-            break
-        state_index = _MATURITY_INDEX[state_name]
-        if state_index > current_implementation_index:
-            implementation_candidate = state_name
-
     source_digest = _canonical_digest(
         {
             "volume": dict(volume),
@@ -366,6 +355,18 @@ def reconcile_volume(
         item.state: item
         for item in evaluations
     }
+
+    implementation_candidate: str | None = None
+    for index in range(
+        _MATURITY_INDEX[MaturityState.IMPLEMENTED.value],
+        len(MATURITY_ORDER),
+    ):
+        state_name = MATURITY_ORDER[index].value
+        if not evaluation_by_state[state_name].eligible:
+            break
+        if index > current_implementation_index:
+            implementation_candidate = state_name
+
     current_eval = evaluation_by_state[current]
     highest_index = current_index
     if current_eval.eligible:
