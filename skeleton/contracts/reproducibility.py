@@ -136,6 +136,7 @@ class ReproducibilityBundle:
     test_manifest_digest: str
     runner_id: str
     runner_digest: str
+    budget_id: str
     budget_digest: str
     source_date_epoch: int
     expected_subject_digest: str
@@ -172,6 +173,7 @@ class ReproducibilityBundle:
             _text(self.verifier_id, "verifier_id", max_length=512),
         )
         object.__setattr__(self, "runner_id", _token(self.runner_id, "runner_id"))
+        object.__setattr__(self, "budget_id", _token(self.budget_id, "budget_id"))
         object.__setattr__(
             self,
             "source_date_epoch",
@@ -201,6 +203,7 @@ class ReproducibilityBundle:
             "test_manifest_digest": self.test_manifest_digest,
             "runner_id": self.runner_id,
             "runner_digest": self.runner_digest,
+            "budget_id": self.budget_id,
             "budget_digest": self.budget_digest,
             "source_date_epoch": self.source_date_epoch,
             "expected_subject_digest": self.expected_subject_digest,
@@ -221,6 +224,7 @@ class ReproducibilityBundle:
 class ReplayObservation:
     runner_id: str
     runner_digest: str
+    budget_id: str
     budget_digest: str
     source_date_epoch: int
     receipt: PromotionEvidenceReceipt | None = None
@@ -228,6 +232,7 @@ class ReplayObservation:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "runner_id", _token(self.runner_id, "runner_id"))
+        object.__setattr__(self, "budget_id", _token(self.budget_id, "budget_id"))
         for field in ("runner_digest", "budget_digest"):
             object.__setattr__(self, field, _sha256(getattr(self, field), field))
         object.__setattr__(
@@ -288,6 +293,7 @@ def bundle_from_receipt(
     *,
     runner_id: str,
     runner_digest: str,
+    budget_id: str,
     budget_digest: str,
     source_date_epoch: int,
     inputs: Iterable[EvidenceRef],
@@ -306,6 +312,7 @@ def bundle_from_receipt(
         test_manifest_digest=receipt.test_manifest_digest,
         runner_id=runner_id,
         runner_digest=runner_digest,
+        budget_id=budget_id,
         budget_digest=budget_digest,
         source_date_epoch=source_date_epoch,
         expected_subject_digest=receipt.subject_digest,
@@ -338,6 +345,7 @@ def evaluate_replay(
     pairs = (
         ("runner_id", replay.runner_id, bundle.runner_id),
         ("runner_digest", replay.runner_digest, bundle.runner_digest),
+        ("budget_id", replay.budget_id, bundle.budget_id),
         ("budget_digest", replay.budget_digest, bundle.budget_digest),
         (
             "source_date_epoch",
