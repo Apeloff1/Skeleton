@@ -39,6 +39,14 @@ from .conversation import (
     ConversationThread,
     ConversationThreadState,
 )
+from .maturity_reconciliation import (
+    MATURITY_ORDER,
+    MaturityEvaluation,
+    MaturityReconciliation,
+    MaturityReconciliationError,
+    MaturityState,
+    reconcile_volume,
+)
 from .memory_record import (
     MEMORY_SCHEMA_VERSION,
     MAX_MEMORY_CONTENT_CHARS,
@@ -97,6 +105,12 @@ __all__ = [
     "ContextTrust",
     "context_digest_payload",
     "estimate_tokens",
+    "MATURITY_ORDER",
+    "MaturityEvaluation",
+    "MaturityReconciliation",
+    "MaturityReconciliationError",
+    "MaturityState",
+    "reconcile_volume",
     "CONVERSATION_SCHEMA_VERSION",
     "ConversationAuthorType",
     "ConversationContractError",
