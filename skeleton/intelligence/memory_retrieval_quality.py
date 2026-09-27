@@ -326,6 +326,7 @@ def evaluate_intelligence_quality(
         raise IntelligenceQualityError("knowledge contains duplicate claim ids")
 
     freshness_rows: dict[str, PlaneFreshness] = {}
+    candidate_planes = set(retrieval_receipt.candidate_planes)
     for plane, row in freshness_by_plane.items():
         name = _text(plane, "freshness plane", max_length=128)
         if not isinstance(row, PlaneFreshness):
@@ -334,7 +335,8 @@ def evaluate_intelligence_quality(
             )
         if row.plane != name:
             raise IntelligenceQualityError("freshness plane identity mismatch")
-        freshness_rows[name] = row
+        if name in candidate_planes:
+            freshness_rows[name] = row
 
     reasons: list[str] = []
 
