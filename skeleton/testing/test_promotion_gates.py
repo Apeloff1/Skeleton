@@ -64,8 +64,8 @@ def test_required_gate_authority_accepts_one_exact_success_per_gate() -> None:
     )
 
     assert decision.accepted is True
-    assert decision.required_gate_count == 22
-    assert decision.passing_gate_count == 22
+    assert decision.required_gate_count == 23
+    assert decision.passing_gate_count == 23
     assert decision.missing == ()
     assert decision.stale == ()
     assert decision.duplicate == ()
@@ -89,7 +89,7 @@ def test_missing_required_gate_fails_closed() -> None:
 
     assert decision.accepted is False
     assert decision.missing == (missing,)
-    assert decision.passing_gate_count == 21
+    assert decision.passing_gate_count == 22
 
 
 def test_only_stale_observation_fails_closed() -> None:
@@ -218,7 +218,7 @@ def test_unknown_gate_is_ignored_but_cannot_substitute_for_required_gate() -> No
     )
 
     assert decision.accepted is True
-    assert decision.passing_gate_count == 22
+    assert decision.passing_gate_count == 23
     assert decision.observations_digest == baseline.observations_digest
     assert decision.decision_digest == baseline.decision_digest
 
@@ -229,7 +229,7 @@ def test_unknown_gate_is_ignored_but_cannot_substitute_for_required_gate() -> No
         target_sha=HEAD,
     )
     assert decision.accepted is False
-    assert decision.passing_gate_count == 21
+    assert decision.passing_gate_count == 22
 
 
 def test_observation_order_is_canonical() -> None:
