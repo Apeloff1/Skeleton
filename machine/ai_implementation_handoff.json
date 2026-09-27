@@ -1408,7 +1408,7 @@
       ],
       "work_package": "WP-P0-GOLDEN-JOURNEYS",
       "blueprint": "golden_journey_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implementation-complete",
       "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
       "target_files": {
         "contracts": [
@@ -1461,18 +1461,22 @@
       "current_evidence": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
-        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence",
+        "skeleton/testing/test_ai_golden_journeys.py prompt-only journey preserves operation/context/provider/verification/terminal lineage",
+        "skeleton/testing/test_ai_golden_journeys.py multi-turn journey preserves canonical history, turn identity and context source snapshot",
+        "skeleton/testing/test_ai_golden_journeys.py restart-safe approval-write journey executes the authorized side effect exactly once",
+        "skeleton/testing/test_ai_golden_journeys.py expired approval renewal journey proves exact-call recovery while active approval widening remains denied",
+        "skeleton/testing/test_ai_golden_journeys.py cross-plane governance journey exports then physically deletes artifact and retrieval records",
+        "backend/tests/test_ai_chat_engine_cutover.py proves configured engine outage returns engine_unavailable without local provider fallback",
+        "frontend browser session suite covers reconnect, slow-client replay-gap recovery, cancel-complete race and terminal canonical reconciliation",
+        "scripts/verify_stage7_golden_journeys.py independently verifies mandatory Stage-7 source boundaries, dependency graph, mirror parity and exact-head identity"
       ],
       "remaining": [
-        "assemble browser prompt-only and multi-turn journeys",
-        "assemble browser/API retrieval and read-tool trace continuity",
-        "assemble write-tool-with-approval including approval-expiry recovery",
-        "assemble browser artifact/result linkage",
-        "assemble reconnect/slow-client/cancel-complete race against Stage-6 transport",
-        "assemble provider-outage and engine-outage degraded UX",
-        "assemble governance delete/export journey",
-        "inject remaining provider/checkpoint/process/database faults",
-        "collect exact-head CI evidence and independent signoff after dependencies close"
+        "collect fresh exact-head Stage-7 golden journey and independent verifier evidence",
+        "collect fresh exact-head App Assembly and frontend operation-stream evidence",
+        "run transaction-capable Mongo replica-set plus Mongo transient failure journey",
+        "inject provider-response-before-checkpoint and remaining process/database restart faults",
+        "close all declared lower-stage dependencies and obtain independent signoff"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     }
