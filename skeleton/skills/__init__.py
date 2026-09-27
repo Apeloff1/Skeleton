@@ -2,6 +2,14 @@
 
 from .lifecycle import PromotionPolicy, SkillLifecycle
 from .manifest import SkillManifest, SkillState
+from .privileged_transaction import (
+    AUTO_TOOL_TRANSACTION_ACCOUNTABILITY_ID,
+    AUTO_TOOL_TRANSACTION_SCHEMA_VERSION,
+    AUTO_TOOL_TRANSACTION_TASK_ID,
+    PrivilegedToolTransactionDecision,
+    PrivilegedToolTransactionError,
+    qualify_privileged_tool_transaction,
+)
 from .store import SkillStore
 from .tool_contract import (
     ToolApprovalPolicy,
@@ -40,6 +48,12 @@ __all__ = [
     "SkillState",
     "SkillStore",
     "SkillUsageMeter",
+    "AUTO_TOOL_TRANSACTION_ACCOUNTABILITY_ID",
+    "AUTO_TOOL_TRANSACTION_SCHEMA_VERSION",
+    "AUTO_TOOL_TRANSACTION_TASK_ID",
+    "PrivilegedToolTransactionDecision",
+    "PrivilegedToolTransactionError",
+    "qualify_privileged_tool_transaction",
     "SQLiteToolReceiptStore",
     "ToolReceiptConflict",
     "ToolReceiptStoreError",

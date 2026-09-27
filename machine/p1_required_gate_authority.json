@@ -369,6 +369,20 @@
       "accepted_conclusions": [
         "success"
       ]
+    },
+    {
+      "id": "GATE-P1-PRIVILEGED-TOOL",
+      "workflow_name": "P1 Privileged Tool Transaction Gate",
+      "workflow_file": ".github/workflows/p1-privileged-tool-transaction.yml",
+      "group": "security",
+      "purpose": "Fail-closed privileged tool transaction, sandbox, admission, approval, idempotency and receipt qualification.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
     }
   ],
   "groups": [
@@ -444,12 +458,13 @@
         "GATE-WORKFLOW-INPUT",
         "GATE-MALWARE",
         "GATE-ARTIFACT",
-        "GATE-DEPENDENCY"
+        "GATE-DEPENDENCY",
+        "GATE-P1-PRIVILEGED-TOOL"
       ]
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 25,
+    "required_gate_count": 26,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
