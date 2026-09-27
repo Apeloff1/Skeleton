@@ -124,4 +124,3 @@ def test_independent_p1_verifier_rejects_reopened_gap(
         "must remain closed" in error
         for error in receipt["errors"]
     )
-
