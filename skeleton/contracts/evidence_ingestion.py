@@ -5,9 +5,7 @@ Keeps evidence handling bounded and deterministic before memory updates.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
-
-from .canonical import CanonicalEnvelope
+from .canonical import CanonicalEnvelope, evidence_ref_identity
 
 
 class EvidenceDisposition(str, Enum):
@@ -41,17 +39,24 @@ def ingest_execution_evidence(
             (),
         )
 
-    evidence_ids = tuple(
-        getattr(item, "evidence_id", "")
+    if not envelope.evidence or any(
+        not item.source or not item.digest or not item.category
         for item in envelope.evidence
-    )
-
-    if not evidence_ids or any(not item for item in evidence_ids):
+    ):
         return EvidenceDecision(
             EvidenceDisposition.TEMPORARY,
             "missing evidence references",
-            evidence_ids,
+            (),
         )
+
+    evidence_ids = tuple(
+        sorted(
+            {
+                evidence_ref_identity(item)
+                for item in envelope.evidence
+            }
+        )
+    )
 
     return EvidenceDecision(
         EvidenceDisposition.STABLE,
