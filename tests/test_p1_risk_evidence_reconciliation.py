@@ -59,12 +59,13 @@ def _write(root: Path, relative: Path, payload: dict) -> None:
 
 
 def _first_obligation(root: Path):
-    return derive_obligations(
+    obligations = derive_obligations(
         _load(root, MASTER),
         _load(root, P1_MAP),
         _load(root, ADVERSARIAL),
         _load(root, POLICY),
-    )[0]
+    )
+    return next(item for item in obligations if item.kind.value == "risk")
 
 
 def _evidence_record(obligation, *, owner: str = "owner:test") -> dict:
