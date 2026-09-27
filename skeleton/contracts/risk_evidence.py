@@ -133,7 +133,11 @@ def _normalize_evidence(
     for item in evidence:
         if not isinstance(item, EvidenceRef):
             raise RiskEvidenceError("evidence must contain EvidenceRef values")
-        _text(item.source, "evidence.source")
+        source = _text(item.source, "evidence.source")
+        if source.startswith("planned:"):
+            raise RiskEvidenceError(
+                "risk evidence source must be materialized, not planned"
+            )
         _sha256(item.digest, "evidence.digest")
         _token(item.category, "evidence.category", max_length=128)
         by_identity[evidence_ref_identity(item)] = item
@@ -288,9 +292,9 @@ class AcceptedRisk:
 
     def valid_at(self, when: datetime) -> bool:
         now = _utc(when, "when")
-        return self.accepted_at <= now <= self.review_at < self.expires_at or (
-            self.accepted_at <= now < self.expires_at
-            and now == self.review_at
+        return (
+            self.accepted_at <= now <= self.review_at
+            and now < self.expires_at
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -478,6 +482,19 @@ def evaluate_risk_binding(
         blockers.append(
             "gap/adversarial obligations cannot be declared non-blocking"
         )
+
+    if (
+        binding.disposition is RiskDisposition.EVIDENCE
+        and obligation.required_evidence_modes
+    ):
+        categories = {item.category for item in binding.evidence}
+        missing_modes = sorted(
+            set(obligation.required_evidence_modes) - categories
+        )
+        if missing_modes:
+            blockers.append(
+                "required evidence modes missing: " + ",".join(missing_modes)
+            )
 
     if binding.disposition is RiskDisposition.ACCEPTED_RISK:
         accepted = binding.accepted_risk
