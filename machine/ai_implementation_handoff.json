@@ -1472,11 +1472,13 @@
         "MongoOperationEventStore performs a real transactional read preflight before shared authority cutover",
         "backend transport invokes Mongo transaction-capability preflight before indexes or production authority assignment",
         "skeleton/testing/test_operation_stream_store_mongo.py proves transaction-capable acceptance and standalone/sessionless fail-closed rejection",
-        "backend/tests/test_engine_live_process_boundary.py kills and restarts the real TCP engine process over the same durable databases, then proves status, idempotent submit replay and cancellation survive restart"
+        "backend/tests/test_engine_live_process_boundary.py kills and restarts the real TCP engine process over the same durable databases, then proves status, idempotent submit replay and cancellation survive restart",
+        "backend/tests/test_operation_stream_mongo_replica_integration.py proves independent Mongo clients/workers share ordered terminal stream authority, cursor handoff, compaction and reconnect snapshot on a real replica set",
+        "Golden Journey Closure Gate boots a pinned Mongo 7.0 replica set and runs the live shared-authority journey on exact head"
       ],
       "remaining": [
         "collect fresh exact-head Golden Journey Closure Gate and App Assembly evidence",
-        "run assembled transaction-capable Mongo replica-set and deployed frontend/backend/engine topology proof",
+        "run deployed frontend/backend/engine topology proof",
         "close all declared lower-stage dependency gaps",
         "obtain independent signoff before canonical Stage-7 closure"
       ],
