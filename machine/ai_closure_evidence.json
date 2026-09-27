@@ -805,9 +805,9 @@
       "gap": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "stage": 5,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "deadline/trace/budget propagation test",
         "query/result binding test",
@@ -839,17 +839,8 @@
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly proves the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/receipt lineage",
-        "declared dependency-gap closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-provider-surface-convergence"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
