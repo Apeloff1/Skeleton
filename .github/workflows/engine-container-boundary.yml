@@ -17,6 +17,7 @@ on:
       - "skeleton/provider_runtime.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/persistence/execution_repository.py"
+      - "skeleton/testing/live_engine_process_app.py"
       - "scripts/check_engine_container_boundary.py"
       - ".github/workflows/engine-container-boundary.yml"
   workflow_dispatch:
@@ -95,6 +96,47 @@ jobs:
           set -euo pipefail
           python scripts/check_engine_container_boundary.py
 
+      - name: Exercise successful lineage in the built Skeleton image
+        env:
+          PYTHONPATH: ".:backend"
+        run: |
+          set -euo pipefail
+          engine_image="$(docker compose -f docker-compose.yml images -q skeleton)"
+          if [ -z "$engine_image" ]; then
+            echo "Skeleton image id is unavailable"
+            exit 1
+          fi
+          docker run -d --name stage5-engine-success \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+            -p 18011:8001 \
+            -e TEST_ENGINE_EXECUTION_PATH=/tmp/stage5-execution.sqlite3 \
+            -e TEST_ENGINE_SUBMISSION_PATH=/tmp/stage5-submission.sqlite3 \
+            -e TEST_ENGINE_SERVICE_TOKEN="$SKL_ENGINE_SERVICE_TOKEN" \
+            -e TEST_ENGINE_ENABLE_COORDINATOR=1 \
+            "$engine_image" \
+            python -m uvicorn skeleton.testing.live_engine_process_app:create_app \
+              --factory --host 0.0.0.0 --port 8001 --log-level warning
+
+          ready=false
+          for _ in $(seq 1 120); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:18011/healthz >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            docker logs stage5-engine-success
+            exit 1
+          fi
+
+          python scripts/check_engine_container_boundary.py \
+            --url http://127.0.0.1:18011 \
+            --token "$SKL_ENGINE_SERVICE_TOKEN" \
+            --expect-success-lineage
+
       - name: Assert provider credentials are engine-only
         run: |
           set -euo pipefail
@@ -134,6 +176,10 @@ jobs:
       - name: Capture container logs
         if: failure()
         run: docker compose -f docker-compose.yml logs --no-color skeleton mongo
+
+      - name: Tear down successful lineage container
+        if: always()
+        run: docker rm -f stage5-engine-success 2>/dev/null || true
 
       - name: Tear down engine topology
         if: always()
