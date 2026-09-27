@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from scripts.verify_ai_masterplan_final_closure import (
+    EXPECTED_DEPENDENCIES,
     EXPECTED_GAPS,
     verify_repository,
 )
@@ -25,7 +26,7 @@ def _write_valid_repo(root: Path) -> Path:
                 "gap": gap_id,
                 "implementation_status": "closed",
                 "remaining": [],
-                "depends_on": [],
+                "depends_on": list(EXPECTED_DEPENDENCIES[gap_id]),
             }
         )
         evidence.append(
