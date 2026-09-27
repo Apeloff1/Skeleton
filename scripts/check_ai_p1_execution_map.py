@@ -573,6 +573,26 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             + ",".join(missing_primary_task_coverage)
         )
 
+    tasks_by_lane: dict[str, set[str]] = {
+        lane_id: {
+            task_id
+            for task_id, task in task_by_id.items()
+            if task.get("lane_id") == lane_id
+        }
+        for lane_id in lane_by_id
+    }
+    for lane_id, lane in lane_by_id.items():
+        for dep_lane in lane_graph.get(lane_id, set()):
+            dep_tasks = tasks_by_lane.get(dep_lane, set())
+            realized = any(
+                bool(_ancestor_set(task_graph, task_id) & dep_tasks)
+                for task_id in tasks_by_lane.get(lane_id, set())
+            )
+            if not realized:
+                errors.append(
+                    f"{lane_id}: lane dependency {dep_lane} is not realized in task DAG"
+                )
+
     scheduling = backlog.get("scheduling_policy")
     initial_ready = (
         str(scheduling.get("initial_ready_task"))
