@@ -85,7 +85,8 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
     ),
     "skeleton/api/engine_runtime.py": (
         "semantic_verification_adapter",
-        "verification_adapter_for(provider)",
+        "verification_adapter_for",
+        "verifier_selector(provider)",
     ),
     "skeleton/skills/verification.py": (
         "observe_tool_postcondition",
