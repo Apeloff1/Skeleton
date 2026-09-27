@@ -95,6 +95,7 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
     base_env["PYTHONPATH"] = str(root.resolve())
 
     seen: set[str] = set()
+    seen_receipt_verifiers: dict[str, str] = {}
     results: list[dict[str, Any]] = []
     failures: list[str] = []
 
@@ -173,6 +174,23 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
                     and receipt.get("gap_id") != gap_id
                 ):
                     receipt_error = "verifier receipt gap binding mismatch"
+                else:
+                    verifier_identity = receipt.get("verifier")
+                    if (
+                        not isinstance(verifier_identity, str)
+                        or not verifier_identity.strip()
+                    ):
+                        receipt_error = "verifier receipt identity is missing"
+                    else:
+                        verifier_identity = verifier_identity.strip()
+                        owner = seen_receipt_verifiers.get(verifier_identity)
+                        if owner is not None:
+                            receipt_error = (
+                                "verifier receipt identity is reused by multiple "
+                                f"groups: {verifier_identity} ({owner}, {key})"
+                            )
+                        else:
+                            seen_receipt_verifiers[verifier_identity] = key
 
             passed = returncode == 0 and receipt is not None and receipt_error is None
             if not passed:
@@ -207,6 +225,7 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
         "verifier": "ai-accountability-verifier-runner-v1",
         "head_sha": head,
         "verifier_count": len(results),
+        "verifier_identity_count": len(seen_receipt_verifiers),
         "passed_count": sum(1 for result in results if result["passed"]),
         "failures": failures,
         "results": results,
