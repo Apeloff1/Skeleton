@@ -207,7 +207,7 @@ def test_operation_and_stream_architecture_is_materialized() -> None:
     } <= stream_fields
 
 
-def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
+def test_stream_gap_and_work_package_are_closed_consistently() -> None:
     contract = _contract()
     gap = next(
         item
@@ -220,22 +220,38 @@ def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
         if item["id"] == "WP-P0-STREAM"
     )
 
-    assert gap["status"] == "open"
-    assert package["progress"]["state"] == "in_progress"
-    assert "durable SQLite operation event store" in package["progress"]["completed"]
-    assert "durable stream storage adapter" not in package["progress"]["remaining"]
-    assert "tenant-bound backend operation transport service" in package["progress"]["completed"]
-    assert "backend SSE or WebSocket transport" not in package["progress"]["remaining"]
-    assert "persisted frontend reconnect cursor and authoritative replay-gap resync" in package["progress"]["completed"]
-    remaining = set(package["progress"]["remaining"])
-    assert "frontend reconnect/resume cursor" not in remaining
-    assert "browser/API disconnect-reconnect recovery journey" not in remaining
-    assert "browser/API slow-client backpressure journey" not in remaining
-    assert "browser/API cancel-complete race journey" not in remaining
-    assert "cross-host/shared-network stream authority beyond the file-backed reference store" in remaining
-    assert "browser-level disconnect/reconnect automation against assembled topology" in remaining
-    assert "browser-level slow-client/backpressure automation against assembled topology" in remaining
-    assert "browser-level cancel-complete automation against assembled topology" in remaining
+    assert gap["status"] == "closed"
+    assert gap["verification_state"] == "closed"
+    assert gap["outstanding_evidence"] == []
+    assert package["progress"]["state"] == "closed"
+    assert package["progress"]["remaining"] == []
+
+    completed = set(package["progress"]["completed"])
+    assert "durable SQLite operation event store" in completed
+    assert "tenant-bound backend operation transport service" in completed
+    assert (
+        "persisted frontend reconnect cursor and authoritative replay-gap resync"
+        in completed
+    )
+    assert "shared-network Mongo operation and stream authority" in completed
+    assert (
+        "production browser session reconnect/resync/cancel runtime"
+        in completed
+    )
+    assert (
+        "browser disconnect/reconnect assembled-transport journey"
+        in completed
+    )
+    assert (
+        "browser slow-client replay-gap/backpressure recovery journey"
+        in completed
+    )
+    assert "browser cancel-complete terminal race journey" in completed
+    assert (
+        "exact-head frontend typecheck and test:operation-stream closure evidence"
+        in completed
+    )
+    assert "independent Stage-6 streaming protocol closure verifier" in completed
 
 
 def test_dependency_and_acceptance_relationships_are_separate() -> None:
