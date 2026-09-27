@@ -153,3 +153,40 @@ def test_bridge_rejects_same_signer_without_independence_exception(
         "same-signer verification lacks exception" in error
         for error in receipt["errors"]
     )
+
+
+
+def test_bridge_rejects_group_without_independent_verifier(tmp_path: Path) -> None:
+    root = _copy_bridge_tree(tmp_path)
+    path = root / MAP.relative_to(ROOT)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    group = next(item for item in payload["groups"] if item["key"] == "S1-CONV")
+    group["verifier_script"] = None
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "S1-CONV: verifier_script is required" in receipt["errors"]
+
+
+def test_bridge_rejects_workflow_that_detaches_declared_verifier(
+    tmp_path: Path,
+) -> None:
+    root = _copy_bridge_tree(tmp_path)
+    workflow = root / ".github/workflows/conversation-authority-closure.yml"
+    source = workflow.read_text(encoding="utf-8")
+    source = source.replace(
+        "python scripts/verify_jeeves_conversation_cutover.py",
+        "python scripts/detached_conversation_verifier.py",
+    )
+    workflow.write_text(source, encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "S1-CONV: workflow" in error
+        and "does not execute scripts/verify_jeeves_conversation_cutover.py" in error
+        for error in receipt["errors"]
+    )
