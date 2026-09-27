@@ -17,6 +17,10 @@ import re
 from typing import Any, Iterable
 
 from skeleton.agents.swarm_fencing import LeaseFence
+from skeleton.agents.swarm_runtime import (
+    SwarmTask,
+    TaskState as RuntimeTaskState,
+)
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.swarm.handoff import TaskEnvelope, TaskState
 
@@ -214,6 +218,7 @@ class AgentDelegationDecision:
     child_authority_digest: str
     handoff_digest: str
     lease_fence_digest: str
+    live_lease_digest: str
     observed_at: float
     task_id: str = AGENT_DELEGATION_TASK_ID
     accountability_id: str = AGENT_DELEGATION_ACCOUNTABILITY_ID
@@ -234,6 +239,7 @@ class AgentDelegationDecision:
             "child_authority_digest",
             "handoff_digest",
             "lease_fence_digest",
+            "live_lease_digest",
         ):
             value = getattr(self, field)
             if (
@@ -264,6 +270,7 @@ class AgentDelegationDecision:
             "child_authority_digest": self.child_authority_digest,
             "handoff_digest": self.handoff_digest,
             "lease_fence_digest": self.lease_fence_digest,
+            "live_lease_digest": self.live_lease_digest,
         }
 
     def payload(self) -> dict[str, Any]:
@@ -329,12 +336,26 @@ def _fence_payload(fence: LeaseFence) -> dict[str, Any]:
     }
 
 
+def _live_task_payload(task: SwarmTask) -> dict[str, Any]:
+    if not isinstance(task, SwarmTask):
+        raise TypeError("live_task must be SwarmTask")
+    return {
+        "id": _token(task.id, "live task id"),
+        "state": task.state.value,
+        "attempts": task.attempts,
+        "leased_to": task.leased_to,
+        "lease_deadline": task.lease_deadline,
+        "required_capabilities": sorted(task.required_capabilities),
+    }
+
+
 def qualify_agent_delegation(
     *,
     parent: AgentDelegationAuthority,
     child: AgentDelegationAuthority,
     envelope: TaskEnvelope,
     fence: LeaseFence,
+    live_task: SwarmTask,
     observed_at: float,
 ) -> AgentDelegationDecision:
     """Qualify one accepted agent handoff against exact delegated authority."""
@@ -346,6 +367,7 @@ def qualify_agent_delegation(
     now = _positive(observed_at, "observed_at")
     handoff = _handoff_payload(envelope)
     fence_payload = _fence_payload(fence)
+    live_payload = _live_task_payload(live_task)
 
     reasons: list[str] = []
 
@@ -381,6 +403,19 @@ def qualify_agent_delegation(
     if envelope.capability not in parent.capabilities:
         reasons.append("handoff-capability-not-parent-authorized")
 
+    if live_task.id != envelope.task_id:
+        reasons.append("live-lease-task-mismatch")
+    if live_task.state is not RuntimeTaskState.LEASED:
+        reasons.append("live-lease-not-leased")
+    if live_task.leased_to != child.agent_id:
+        reasons.append("live-lease-worker-mismatch")
+    if live_task.attempts != fence.attempt:
+        reasons.append("live-lease-attempt-mismatch")
+    if live_task.lease_deadline != fence.deadline:
+        reasons.append("live-lease-deadline-mismatch")
+    if envelope.capability not in live_task.required_capabilities:
+        reasons.append("live-task-capability-mismatch")
+
     if fence.task_id != envelope.task_id:
         reasons.append("lease-task-mismatch")
     if fence.worker_id != child.agent_id:
@@ -404,6 +439,7 @@ def qualify_agent_delegation(
         child_authority_digest=child.digest,
         handoff_digest=_canonical_digest(handoff),
         lease_fence_digest=_canonical_digest(fence_payload),
+        live_lease_digest=_canonical_digest(live_payload),
         observed_at=now,
     )
 
