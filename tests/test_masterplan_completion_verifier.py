@@ -188,4 +188,3 @@ def test_completion_verifier_rejects_closed_gap_with_pending_machine_state(
     assert any("verification_state" in item for item in receipt["errors"])
     assert any("progress.state" in item for item in receipt["errors"])
     assert any("progress.remaining" in item for item in receipt["errors"])
-
