@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - main
-      - "masterplan/closure-stage7-final-20260927-clean2"
+      - "masterplan/p1-provider-redundancy-20260927-clean3"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/provider_runtime.py"
@@ -115,6 +115,21 @@ jobs:
               raise SystemExit("provider runtime mirror digest mismatch")
           if receipt.get("declared_secondary") is not True:
               raise SystemExit("secondary provider declaration is missing")
+          if receipt.get("gap_status") != "closed":
+              raise SystemExit("provider redundancy gap is not closed")
+          construction = json.loads(
+              Path("machine/ai_app_construction.json").read_text(encoding="utf-8")
+          )
+          blueprint = construction.get("provider_redundancy_blueprint") or {}
+          if blueprint.get("status") != "closed":
+              raise SystemExit("provider redundancy blueprint is not closed")
+          gap = next(
+              item
+              for item in construction.get("gap_register", [])
+              if item.get("id") == "gap-provider-redundancy"
+          )
+          if gap.get("outstanding_evidence"):
+              raise SystemExit("provider redundancy closure still has outstanding evidence")
           print(
               "provider redundancy exact-head receipt:",
               receipt["head_sha"],
