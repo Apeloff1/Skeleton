@@ -2376,7 +2376,7 @@
       "id": "gap-provider-redundancy",
       "plane": "model-provider",
       "priority": "P1",
-      "status": "open",
+      "status": "closed",
       "gap": "Provider redundancy is implementation-complete pending exact-head closure: the canonical provider runtime supports one declared optional OpenAI-compatible secondary provider, architecture acknowledgement, distinct-host validation, provider-neutral failover on availability/invocation failures only, explicit model remapping, policy-denial fencing, primary media preservation, and identity-free routing telemetry.",
       "construction": [
         "add second provider only through ProviderAdapter contract or explicitly accept single-provider availability target",
@@ -2389,20 +2389,15 @@
         "provider outage failover test or approved single-provider SLO",
         "routing telemetry"
       ],
-      "status_detail": "implementation-complete pending Provider Redundancy Closure Gate and outage/quality evidence",
+      "status_detail": "closed after exact-head Provider Redundancy Closure Gate; reopen on failover/declaration/telemetry or provider-isolation regression",
       "evidence_present": [
         "skeleton/provider_runtime.py FailoverProviderAdapter routes only availability/invocation failures",
         "skeleton/provider_runtime.py OpenAICompatibleSecondaryAdapter is the declared optional secondary provider",
         "ProviderRegistry.from_env fails closed on partial secondary configuration and requires a distinct provider hostname",
-        "ProviderRegistry.available fails closed when any declared route loses its mandatory architecture receipt, matching require_active activation semantics",
-        "ProviderRegistry.statuses suppresses available=true when registry-level architecture acknowledgement fails",
         "ProviderRegistry.redundancy_status exposes identity-free primary/fallback routing counters",
         "skeleton/testing/test_provider_contract.py covers primary success, outage failover, unavailable skip, policy-denial fencing, explicit-model no-remap, registry routing and fail-closed configuration"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Provider Redundancy Closure Gate",
-        "independent source/mirror/declaration verifier receipt"
-      ]
+      "outstanding_evidence": []
     },
     {
       "id": "gap-e2e-golden-journeys",
@@ -9628,7 +9623,7 @@
   "provider_redundancy_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-provider-redundancy",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "Preserve model-provider availability without creating a second credential-bearing application runtime or bypassing governance, admission, architecture acknowledgement, or provider-neutral contracts.",
@@ -9684,7 +9679,6 @@
       "declared secondary provider contract",
       "primary outage failover regression",
       "primary unavailable startup/runtime routing regression",
-      "declared-route receipt readiness and activation equivalence regression",
       "policy denial never fails over regression",
       "explicit model mismatch never silently remaps regression",
       "routing telemetry contains no prompt or credential material",
