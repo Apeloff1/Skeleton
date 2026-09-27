@@ -236,9 +236,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 if workflow_path.is_file():
                     workflow_source = workflow_path.read_text(encoding="utf-8")
                     verifier_exec = re.compile(
-                        r"(?m)^\\s*(?:python|python3)\\s+"
+                        r"(?m)^\s*(?:python|python3)\s+"
                         + re.escape(verifier_script)
-                        + r"(?:\\s|$)"
+                        + r"(?:\s|$)"
                     )
                     if verifier_exec.search(workflow_source) is None:
                         errors.append(
