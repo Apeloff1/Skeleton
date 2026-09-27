@@ -41,6 +41,7 @@ def _map(root: Path, scripts: list[str]) -> None:
 def _receipt_verifier(
     *,
     gap_id: str,
+    verifier: str = "fixture-verifier-v1",
     head: str = "abc123",
     valid: bool = True,
     exit_code: int = 0,
@@ -58,7 +59,7 @@ def _receipt_verifier(
         f"assert os.environ['ACCOUNTABILITY_HEAD_SHA'] == 'abc123'\n"
         "Path(args.evidence_out).write_text(json.dumps({\n"
         "    'schema_version': 1,\n"
-        "    'verifier': 'fixture-verifier-v1',\n"
+        f"    'verifier': {verifier!r},\n"
         f"    'gap_id': {gap_id!r},\n"
         f"    'head_sha': {head!r},\n"
         f"    'valid': {valid!r},\n"
@@ -74,12 +75,12 @@ def test_runner_executes_every_declared_verifier_with_exact_head_receipts(
     _write(
         tmp_path,
         "scripts/a.py",
-        _receipt_verifier(gap_id="gap-0"),
+        _receipt_verifier(gap_id="gap-0", verifier="fixture-verifier-a-v1"),
     )
     _write(
         tmp_path,
         "scripts/b.py",
-        _receipt_verifier(gap_id="gap-1"),
+        _receipt_verifier(gap_id="gap-1", verifier="fixture-verifier-b-v1"),
     )
     _map(tmp_path, ["scripts/a.py", "scripts/b.py"])
 
@@ -88,6 +89,7 @@ def test_runner_executes_every_declared_verifier_with_exact_head_receipts(
     assert receipt["valid"] is True
     assert receipt["verifier_count"] == 2
     assert receipt["passed_count"] == 2
+    assert receipt["verifier_identity_count"] == 2
     assert receipt["failures"] == []
     assert all(result["receipt_head_sha"] == "abc123" for result in receipt["results"])
     assert all(result["receipt_digest"] for result in receipt["results"])
@@ -186,3 +188,52 @@ def test_runner_rejects_duplicate_verifier_reuse(tmp_path: Path) -> None:
 
     with pytest.raises(RunnerError, match="reused by multiple groups"):
         run_verifiers(tmp_path, head_sha="abc123")
+
+
+def test_runner_rejects_duplicate_receipt_verifier_identity(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(
+            gap_id="gap-0",
+            verifier="shared-independent-verifier-v1",
+        ),
+    )
+    _write(
+        tmp_path,
+        "scripts/b.py",
+        _receipt_verifier(
+            gap_id="gap-1",
+            verifier="shared-independent-verifier-v1",
+        ),
+    )
+    _map(tmp_path, ["scripts/a.py", "scripts/b.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["passed_count"] == 1
+    assert receipt["verifier_identity_count"] == 1
+    assert receipt["failures"] == ["G1"]
+    assert "identity is reused by multiple groups" in (
+        receipt["results"][1]["receipt_error"] or ""
+    )
+
+
+def test_runner_rejects_missing_receipt_verifier_identity(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0", verifier=""),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["passed_count"] == 0
+    assert receipt["verifier_identity_count"] == 0
+    assert receipt["failures"] == ["G0"]
+    assert receipt["results"][0]["receipt_error"] == (
+        "verifier receipt identity is missing"
+    )
