@@ -1371,6 +1371,95 @@ async def test_provider_registry_returns_failover_adapter_and_exposes_routing() 
     assert "hello" not in json.dumps(status)
 
 
+
+def test_provider_registry_readiness_fails_closed_on_invalid_fallback_receipt() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [],
+    )
+
+    def receipt_loader(provider_id: str) -> ProviderArchitectureReceipt:
+        if provider_id == "secondary":
+            return _provider_receipt("wrong-secondary")
+        return _provider_receipt(provider_id)
+
+    registry = ProviderRegistry(
+        [primary, secondary],
+        active="primary",
+        fallback_ids=("secondary",),
+        architecture_loader=receipt_loader,
+    )
+
+    assert registry.available is False
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="architecture receipt identity mismatch",
+    ):
+        registry.require_active()
+
+
+def test_provider_registry_readiness_fails_closed_on_invalid_active_receipt() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [],
+    )
+
+    def receipt_loader(provider_id: str) -> ProviderArchitectureReceipt:
+        if provider_id == "primary":
+            return _provider_receipt("wrong-primary")
+        return _provider_receipt(provider_id)
+
+    registry = ProviderRegistry(
+        [primary, secondary],
+        active="primary",
+        fallback_ids=("secondary",),
+        architecture_loader=receipt_loader,
+    )
+
+    assert registry.available is False
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="architecture receipt identity mismatch",
+    ):
+        registry.require_active()
+
+
+
+def test_provider_registry_status_suppresses_invalid_receipt_availability() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [],
+    )
+
+    def receipt_loader(_provider_id: str) -> ProviderArchitectureReceipt:
+        return _provider_receipt("wrong-primary")
+
+    registry = ProviderRegistry(
+        [primary],
+        active="primary",
+        architecture_loader=receipt_loader,
+    )
+
+    [status] = registry.statuses()
+    assert status["available"] is False
+    assert status["architecture_acknowledged"] is False
+    assert status["architecture_tag"] is None
+    assert status["construction_version"] is None
+
+
 def test_provider_registry_secondary_configuration_fails_closed_when_partial(
     monkeypatch,
 ) -> None:
