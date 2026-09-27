@@ -13,6 +13,7 @@ from core.operation_stream_transport import (
     OperationStreamTransport,
     encode_sse_event,
     encode_sse_heartbeat,
+    transport_from_env,
 )
 from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.frontier.operation_stream import ReplayCursor, StreamReplayGapError
@@ -616,3 +617,30 @@ def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
     finally:
         operations.close()
         events.close()
+
+
+def test_transport_factory_rejects_unknown_authority_backend() -> None:
+    with pytest.raises(
+        Exception,
+        match="unsupported operation authority backend",
+    ):
+        transport_from_env(
+            {
+                "CODEDOCK_OPERATION_AUTHORITY_BACKEND": "unknown",
+            }
+        )
+
+
+def test_transport_factory_validates_mongo_timeout_before_connecting() -> None:
+    with pytest.raises(
+        Exception,
+        match="timeout must be an integer",
+    ):
+        transport_from_env(
+            {
+                "CODEDOCK_OPERATION_AUTHORITY_BACKEND": "mongo",
+                "CODEDOCK_OPERATION_MONGO_URI": "mongodb://localhost:27017",
+                "CODEDOCK_OPERATION_MONGO_DATABASE": "skeleton",
+                "CODEDOCK_OPERATION_MONGO_TIMEOUT_MS": "not-an-int",
+            }
+        )
