@@ -149,6 +149,7 @@ jobs:
           grant = DelegationGrant(
               delegation_id="delegation-ci",
               lease_task_id=leased.id,
+              parent_authority_digest="4" * 64,
               parent=parent,
               child=child,
               parent_budget=DelegationBudget(
