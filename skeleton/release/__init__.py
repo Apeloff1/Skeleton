@@ -42,4 +42,21 @@ __all__ = [
     "parse_evidence",
     "require_release_ready",
     "serialize_evidence",
+    "CanarySLOSignal",
+    "OperatorOverride",
+    "ReleaseAction",
+    "ReleaseDecisionReceipt",
+    "ReleasePromotionError",
+    "ReleaseSLOPolicy",
+    "ReleaseSLOPromotionController",
 ]
+
+from skeleton.release.slo_promotion import (
+    CanarySLOSignal,
+    OperatorOverride,
+    ReleaseAction,
+    ReleaseDecisionReceipt,
+    ReleasePromotionError,
+    ReleaseSLOPolicy,
+    ReleaseSLOPromotionController,
+)
