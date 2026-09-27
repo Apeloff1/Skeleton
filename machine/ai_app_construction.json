@@ -2082,8 +2082,8 @@
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
-      "status": "open",
-      "gap": "Shared-network operation/stream authorities and production browser reconnect/resync/cancel session semantics are implemented. Remaining work is exact-head assembled validation and independent closure signoff.",
+      "status": "closed",
+      "gap": "Shared-network operation/stream authorities, production browser reconnect/resync/cancel session semantics, durable cursor/compaction rules, multi-worker lease fencing, and independent source/mirror verification are implementation-complete.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
@@ -2104,7 +2104,8 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "implemented-pending-exact-head-closure"
+      "verification_state": "closed-candidate-exact-head-gated",
+      "status_detail": "closed candidate; reopen on Stage-6, App Assembly, frontend or lower-stage regression"
     },
     {
       "id": "gap-governance-registry",
@@ -6562,7 +6563,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
@@ -6686,7 +6687,8 @@
       "browser-session disconnect/reconnect persisted cursor journey",
       "browser-session compacted slow-client authoritative resync journey",
       "browser-session cancel-complete terminal race journey",
-      "authoritative terminal snapshot canonical-result reconciliation"
+      "authoritative terminal snapshot canonical-result reconciliation",
+      "independent exact-head Stage-6 source/mirror/dependency verifier"
     ]
   },
   "golden_journey_blueprint": {
