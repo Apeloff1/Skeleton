@@ -800,9 +800,9 @@
       "gap": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "stage": 5,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "deadline/trace/budget propagation test",
         "query/result binding test",
@@ -834,17 +834,8 @@
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly proves the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/receipt lineage",
-        "declared dependency-gap closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-provider-surface-convergence"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -863,9 +854,9 @@
       "gap": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "stage": 6,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
         "transport-neutral stream event envelope",
@@ -931,16 +922,8 @@
         "cancel race test",
         "slow-client/backpressure test"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
-      "blockers": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -959,9 +942,9 @@
       "gap": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "stage": 7,
-      "gap_status": "open",
-      "implementation_state": "implementation-complete",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
         "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
@@ -984,29 +967,8 @@
         "artifact/result assertions",
         "degraded-mode assertions"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "blockers": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "dependency must close: gap-conversation-state-authority",
-        "dependency must close: gap-memory-durable-authority",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "dependency must close: gap-verification-evidence-contract",
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
