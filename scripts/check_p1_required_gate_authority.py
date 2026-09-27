@@ -192,6 +192,34 @@ def validate_authority(
         if not isinstance(purpose, str) or not purpose.strip():
             errors.append(f"{gate_id or index}: purpose must be non-empty")
 
+    # Required workflow names are collection identities. Enforce global
+    # uniqueness so an unrelated workflow cannot impersonate a required gate
+    # merely by reusing its display name.
+    workflow_name_paths: dict[str, list[str]] = {}
+    workflow_root = root / ".github/workflows"
+    for pattern in ("*.yml", "*.yaml"):
+        for candidate in sorted(workflow_root.glob(pattern)):
+            try:
+                candidate_name = _workflow_name(candidate)
+            except GateAuthorityValidationError:
+                continue
+            rel = candidate.relative_to(root).as_posix()
+            workflow_name_paths.setdefault(candidate_name, []).append(rel)
+    for gate in gates:
+        if not isinstance(gate, dict):
+            continue
+        gate_id = gate.get("id")
+        name = gate.get("workflow_name")
+        workflow_file = gate.get("workflow_file")
+        if not isinstance(name, str) or not isinstance(workflow_file, str):
+            continue
+        matches = workflow_name_paths.get(name, [])
+        if matches != [workflow_file]:
+            errors.append(
+                f"{gate_id}: required workflow name must resolve uniquely "
+                f"to {workflow_file}; matches={matches}"
+            )
+
     groups = authority.get("groups")
     if not isinstance(groups, list):
         errors.append("authority groups must be a list")
@@ -279,8 +307,13 @@ def _parse_observation(row: object) -> GateObservation:
             "observation contains unknown fields: " + ",".join(sorted(unknown))
         )
     try:
-        completed_at = datetime.fromisoformat(
-            str(row["completed_at"]).replace("Z", "+00:00")
+        completed_raw = row.get("completed_at")
+        completed_at = (
+            None
+            if completed_raw is None
+            else datetime.fromisoformat(
+                str(completed_raw).replace("Z", "+00:00")
+            )
         )
         return GateObservation(
             workflow_name=row["workflow_name"],
@@ -289,7 +322,7 @@ def _parse_observation(row: object) -> GateObservation:
             run_attempt=row["run_attempt"],
             event=row["event"],
             status=row["status"],
-            conclusion=row["conclusion"],
+            conclusion=row.get("conclusion"),
             completed_at=completed_at,
         )
     except (KeyError, TypeError, ValueError, PromotionGateError) as exc:
