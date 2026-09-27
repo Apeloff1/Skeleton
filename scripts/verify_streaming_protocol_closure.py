@@ -212,7 +212,7 @@ def _machine_receipt(root: Path, errors: list[str]) -> dict[str, Any]:
 
     if blueprint.get("gap") != GAP_ID:
         errors.append("Stage-6 blueprint gap binding is invalid")
-    if blueprint.get("status") not in {"implemented-pending-closure", "closed"}:
+    if blueprint.get("status") not in {"implemented-pending-closure", "complete"}:
         errors.append("Stage-6 blueprint status is invalid")
 
     if handoff_entry.get("implementation_status") not in {
@@ -249,8 +249,8 @@ def _machine_receipt(root: Path, errors: list[str]) -> dict[str, Any]:
                 "closed Stage-6 gap has non-closed dependencies: "
                 + ", ".join(open_dependencies)
             )
-        if blueprint.get("status") != "closed":
-            errors.append("closed Stage-6 gap requires closed blueprint")
+        if blueprint.get("status") != "complete":
+            errors.append("closed Stage-6 gap requires complete blueprint")
         if handoff_entry.get("implementation_status") != "closed":
             errors.append("closed Stage-6 gap requires closed handoff")
         if closure_entry.get("closure_decision") != "closed":

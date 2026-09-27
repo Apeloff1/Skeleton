@@ -988,7 +988,7 @@
     {
       "id": "streaming-realtime",
       "owner": "backend",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Token/event streaming, progress, cancellation, reconnect and ordered delivery.",
       "depends_on": [
         "application-api",
@@ -2101,8 +2101,8 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "closed-candidate-exact-head-gated",
-      "status_detail": "closed candidate; reopen on any backend stream, frontend typecheck/browser journey, mirror, dependency or App Assembly regression",
+      "verification_state": "closed",
+      "status_detail": "closed by staged Stage-6 promotion; reopen on streaming protocol gate, frontend operation-stream, App Assembly or invariant regression",
       "outstanding_evidence": [],
       "evidence_present": [
         "Streaming Protocol Closure Gate runs canonical backend stream/store/route/multiworker contracts on exact PR head",
@@ -6567,7 +6567,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
