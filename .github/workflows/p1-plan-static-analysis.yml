@@ -1,0 +1,281 @@
+name: P1 Plan Static Analysis Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "p1/intel-03-reasoning-search-stop-policy-20260928"
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/plan_static_analyzer.py"
+      - "skeleton/ai/runtime/intelligence/plan_static_analyzer.py"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/ai/runtime/intelligence/strategy_registry.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/testing/test_plan_static_analyzer.py"
+      - "machine/p1_plan_static_analysis_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "scripts/check_p1_plan_static_analysis.py"
+      - "tests/test_p1_plan_static_analysis_policy.py"
+      - ".github/workflows/p1-plan-static-analysis.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/intelligence/plan_static_analyzer.py"
+      - "skeleton/ai/runtime/intelligence/plan_static_analyzer.py"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/ai/runtime/intelligence/strategy_registry.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/testing/test_plan_static_analyzer.py"
+      - "machine/p1_plan_static_analysis_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "scripts/check_p1_plan_static_analysis.py"
+      - "tests/test_p1_plan_static_analysis_policy.py"
+      - ".github/workflows/p1-plan-static-analysis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-plan-static-analysis-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate bounded plan static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Validate plan-analysis authority
+        run: >-
+          python scripts/check_p1_plan_static_analysis.py
+          --print-summary
+
+      - name: Run plan-analysis regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_plan_static_analyzer.py
+          tests/test_p1_plan_static_analysis_policy.py
+          skeleton/testing/test_reasoning_strategy_registry.py
+
+      - name: Build accepted INTEL-05 analysis evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-intel-05
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from skeleton.intelligence.plan_static_analyzer import (
+              ExecutionPlanSpec,
+              FailurePolicy,
+              PlanBudget,
+              PlanStepSpec,
+              analyze_plan,
+          )
+          from skeleton.intelligence.strategy_registry import (
+              ReasoningPolicy,
+              ReasoningStrategy,
+          )
+
+          policy = ReasoningPolicy(
+              policy_id="p1-ci-reasoning",
+              version=1,
+              allowed_strategies=(
+                  ReasoningStrategy.DIRECT,
+                  ReasoningStrategy.RETRIEVE,
+                  ReasoningStrategy.DECOMPOSE,
+                  ReasoningStrategy.SEARCH,
+                  ReasoningStrategy.VERIFY,
+              ),
+              default_strategy=ReasoningStrategy.DIRECT,
+              max_steps=6,
+              max_tokens=6000,
+              max_cost_units=12.0,
+              max_wall_time_s=120.0,
+              min_value_of_information=0.10,
+              completion_confidence=0.85,
+              max_uncertainty=0.55,
+              max_stall_steps=3,
+              require_verification_for_high_risk=True,
+          )
+          plan = ExecutionPlanSpec(
+              plan_id="p1-ci-plan",
+              reasoning_policy_digest=policy.digest,
+              allowed_capabilities=("read", "write", "verify"),
+              budget=PlanBudget(
+                  max_steps=4,
+                  max_tokens=3000,
+                  max_cost_units=6.0,
+                  max_wall_time_s=60.0,
+                  max_retries_per_step=2,
+              ),
+              steps=(
+                  PlanStepSpec(
+                      step_id="prepare",
+                      depends_on=(),
+                      required_capabilities=("read",),
+                      preconditions=("operation authorized",),
+                      postconditions=("context ready",),
+                      max_tokens=500,
+                      max_cost_units=1.0,
+                      max_wall_time_s=5.0,
+                  ),
+                  PlanStepSpec(
+                      step_id="apply",
+                      depends_on=("prepare",),
+                      required_capabilities=("write",),
+                      preconditions=("context ready",),
+                      postconditions=("mutation committed",),
+                      max_tokens=1000,
+                      max_cost_units=2.0,
+                      max_wall_time_s=10.0,
+                      failure_policy=FailurePolicy.COMPENSATE,
+                      side_effecting=True,
+                      idempotent=False,
+                      recovery_action="rollback.apply",
+                  ),
+                  PlanStepSpec(
+                      step_id="verify",
+                      depends_on=("apply",),
+                      required_capabilities=("verify",),
+                      preconditions=("mutation committed",),
+                      postconditions=("postcondition verified",),
+                      max_tokens=500,
+                      max_cost_units=1.0,
+                      max_wall_time_s=5.0,
+                      terminal=True,
+                  ),
+              ),
+          )
+          decision = analyze_plan(plan, reasoning_policy=policy)
+          if not decision.accepted:
+              raise SystemExit(
+                  f"INTEL-05 fixture rejected: {decision.findings}"
+              )
+          evidence = decision.evidence_ref()
+          Path(".p1-intel-05/decision.json").write_text(
+              json.dumps(
+                  {
+                      **decision.payload(),
+                      "decision_digest": decision.decision_digest,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/refs.json").write_text(
+              json.dumps(
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      }
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head INTEL-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-intel-05/config.digest").write_text(
+              digest(["machine/p1_plan_static_analysis_policy.json"]),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|intel-05"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/intelligence/plan_static_analyzer.py",
+                      "scripts/check_p1_plan_static_analysis.py",
+                      ".github/workflows/p1-plan-static-analysis.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_plan_static_analyzer.py",
+                      "tests/test_p1_plan_static_analysis_policy.py",
+                      "skeleton/testing/test_reasoning_strategy_registry.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-INTEL-05             --accountability-id ACC-P1-INTEL-05             --configuration-digest "$(cat .p1-intel-05/config.digest)"             --environment-digest "$(cat .p1-intel-05/environment.digest)"             --verifier-id github-actions:p1-plan-static-analysis             --verifier-digest "$(cat .p1-intel-05/verifier.digest)"             --test-manifest-digest "$(cat .p1-intel-05/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-intel-05/refs.json             --out .p1-intel-05/receipt.json             > .p1-intel-05/stdout.json
+
+      - name: Assert exact-head receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-intel-05/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("INTEL-05 receipt head mismatch")
+          if receipt["task_id"] != "P1-INTEL-05":
+              raise SystemExit("INTEL-05 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-INTEL-05":
+              raise SystemExit("INTEL-05 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("INTEL-05 exact-head receipt OK", receipt["receipt_digest"])
+          PY
