@@ -211,7 +211,7 @@ jobs:
     env:
       PYTHONPATH: ".:backend"
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-      STAGE7_MONGO_URI: "mongodb://localhost:27017/?replicaSet=rs0"
+      STAGE7_MONGO_URI: "mongodb://localhost:27017/?replicaSet=rs0&retryWrites=false"
 
     steps:
       - name: Check out exact PR head
