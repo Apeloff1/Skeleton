@@ -56,6 +56,10 @@ JOURNEY_SURFACES: dict[str, tuple[str, ...]] = {
         "test_http_golden_journey_preserves_provider_tool_verification_lineage",
         "test_cross_service_cancel_fences_late_provider_result",
     ),
+    "backend/tests/test_engine_live_process_boundary.py": (
+        "test_engine_state_survives_real_process_restart",
+        "restart durability proof",
+    ),
     "backend/tests/test_ai_chat_engine_cutover.py": (
         "test_configured_engine_outage_never_falls_back_to_backend_provider",
         "engine_unavailable",
