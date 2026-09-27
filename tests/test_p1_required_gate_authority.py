@@ -9,6 +9,7 @@ from types import ModuleType
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/check_p1_required_gate_authority.py"
 AUTHORITY = ROOT / "machine/p1_required_gate_authority.json"
+MASTER_PLAN = ROOT / "machine/ai_master_plan.json"
 
 
 def _module() -> ModuleType:
@@ -28,6 +29,11 @@ def _copy_contract(tmp_path: Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(authority, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    master_target = tmp_path / "machine/ai_master_plan.json"
+    master_target.write_text(
+        MASTER_PLAN.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     for gate in authority["gates"]:
@@ -188,3 +194,19 @@ def test_authority_rejects_terminal_policy_drift(tmp_path: Path) -> None:
         "terminal_policy all_required_gates_must_pass drift" in error
         for error in errors
     )
+
+def test_authority_rejects_masterplan_pointer_drift(tmp_path: Path) -> None:
+    module = _module()
+    path = _copy_contract(tmp_path)
+    master = tmp_path / "machine/ai_master_plan.json"
+    payload = json.loads(master.read_text(encoding="utf-8"))
+    payload["authority"]["p1_required_gate_authority"] = "machine/wrong.json"
+    master.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    errors, _ = module.validate_authority(
+        tmp_path,
+        authority_path=path.relative_to(tmp_path),
+    )
+
+    assert "master plan required-gate authority pointer drift" in errors
+
