@@ -340,7 +340,7 @@ def test_generic_lifecycle_terminal_does_not_imply_maturity(
     status: str,
 ) -> None:
     decision = reconcile_volume(
-        _volume(gaps=[]),
+        _volume(),
         _accountability(
             status=status,
             implementation_signoff=_signoff(True),
