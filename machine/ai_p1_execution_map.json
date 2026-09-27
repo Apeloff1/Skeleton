@@ -693,8 +693,7 @@
       "depends_on": [
         "P1-L1",
         "P1-L2",
-        "P1-L3",
-        "P1-L4"
+        "P1-L3"
       ],
       "parallel_with": [
         "P1-L5"
