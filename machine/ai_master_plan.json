@@ -39,10 +39,10 @@
     "p1_risk_evidence_registry": "machine/p1_risk_evidence_bindings.json",
     "p1_risk_evidence_engine": "scripts/reconcile_p1_risk_evidence.py",
     "p1_risk_evidence_contract": "skeleton/contracts/risk_evidence.py",
+    "p1_scope_freeze_adr_register": "machine/ai_scope_freeze_adrs.json",
     "p1_reproducibility_policy": "machine/p1_reproducibility_policy.json",
     "p1_reproducibility_engine": "scripts/check_p1_reproducibility.py",
-    "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
-    "p1_scope_freeze_adr_register": "machine/ai_scope_freeze_adrs.json"
+    "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py"
   },
   "laws": [
     "durable governed state is authoritative",

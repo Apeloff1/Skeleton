@@ -273,3 +273,4 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
 
     assert "breadth_freeze.p1_application_policy must equal forbid" in errors
     assert "authority.p1_scope_freeze_adr_register path drifted" in errors
+
