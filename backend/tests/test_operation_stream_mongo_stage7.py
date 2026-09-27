@@ -130,8 +130,10 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
         assert unchanged.version == 2
         assert unchanged.envelope.state is OperationState.RUNNING
         pending = operations.pending_outbox(operation_id=operation_id)
-        assert len(pending) == 1
-        assert pending[0].operation_version == 2
+        # Both created/running outbox rows were already projected and ACKed.
+        # A failed completion transition must not leave any new partial outbox
+        # publication intent behind.
+        assert pending == ()
 
         completed = operations.transition(
             operation_id,
