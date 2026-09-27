@@ -965,7 +965,7 @@
       "plane": "streaming-realtime",
       "stage": 6,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
@@ -1018,7 +1018,10 @@
         "Mongo transactional operation-event authority with replay/consumer/lease/compaction semantics merged in PR #2030",
         "environment-selectable SQLite or Mongo operation authority with fail-closed backend validation",
         "injectable production browser operation session bound to authenticated API and per-consumer AsyncStorage cursor",
-        "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions"
+        "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions",
+        "shared-network Mongo operation and stream authorities landed on main via #2030",
+        "production browser-session runtime binds replay, durable cursor, resync, cancellation and bounded follow",
+        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -1030,20 +1033,14 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "fresh exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "transaction-capable Mongo replica-set integration evidence",
-        "assembled backend+frontend disconnect/reconnect journey evidence",
-        "assembled backend+frontend slow-client/backpressure journey evidence",
-        "assembled backend+frontend cancel-complete race journey evidence",
-        "declared dependency closure and independent signoff"
+        "fresh exact-head frontend typecheck/test:operation-stream",
+        "fresh exact-head App Assembly",
+        "independent closure signoff"
       ],
       "blockers": [
-        "fresh exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "transaction-capable Mongo replica-set integration evidence",
-        "assembled backend+frontend disconnect/reconnect journey evidence",
-        "assembled backend+frontend slow-client/backpressure journey evidence",
-        "assembled backend+frontend cancel-complete race journey evidence",
-        "declared dependency closure and independent signoff"
+        "fresh exact-head frontend typecheck/test:operation-stream",
+        "fresh exact-head App Assembly",
+        "independent closure signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
