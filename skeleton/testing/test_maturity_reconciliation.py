@@ -417,3 +417,42 @@ def test_source_digest_changes_when_maturity_policy_changes() -> None:
     )
 
     assert changed.source_digest != baseline.source_digest
+
+def test_reference_validator_blocks_unresolved_repository_paths() -> None:
+    decision = reconcile_volume(
+        _volume(
+            implementation_paths=["missing/module.py"],
+            tests=["tests/test_example.py"],
+        ),
+        _accountability(
+            status="implemented",
+            implementation_signoff=_signoff(True),
+        ),
+        POLICY,
+        target_floor="implemented",
+        reference_validator=lambda field, reference: (
+            reference != "missing/module.py"
+        ),
+    )
+
+    implemented = _evaluation(decision, "implemented")
+    assert implemented.eligible is False
+    assert any(
+        "implementation_paths contains unresolved repository references" in blocker
+        and "missing/module.py" in blocker
+        for blocker in implemented.blockers
+    )
+
+
+def test_reference_validator_does_not_affect_planning_only_scaffolded() -> None:
+    decision = reconcile_volume(
+        _volume(implementation_paths=["missing/module.py"]),
+        _accountability(),
+        POLICY,
+        target_floor="verified",
+        reference_validator=lambda field, reference: False,
+    )
+
+    assert _evaluation(decision, "scaffolded").eligible is True
+    assert decision.promotion_candidate == "scaffolded"
+
