@@ -481,6 +481,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     task_graph: dict[str, set[str]] = {}
     lane_task_counts = {lane_id: 0 for lane_id in lane_by_id}
     accountability_refs: set[str] = set()
+    primary_task_refs: set[str] = set()
 
     for task_id, task in sorted(task_by_id.items()):
         lane_id = str(task.get("lane_id") or "")
@@ -503,6 +504,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             ref = str(ref)
             if ref not in volume_by_ref:
                 errors.append(f"{task_id}: unknown volume {ref}")
+            if ref in all_primary:
+                primary_task_refs.add(ref)
             if lane_id in lane_by_id and ref not in allowed_volumes:
                 errors.append(
                     f"{task_id}: volume {ref} is outside {lane_id} primary/supporting scope"
@@ -562,6 +565,13 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             accountability_refs.add(accountability_ref)
 
     errors.extend(_cycle_errors(task_graph, label="P1 task"))
+
+    missing_primary_task_coverage = sorted(all_primary - primary_task_refs)
+    if missing_primary_task_coverage:
+        errors.append(
+            "P1 primary volumes missing executable task coverage: "
+            + ",".join(missing_primary_task_coverage)
+        )
 
     scheduling = backlog.get("scheduling_policy")
     initial_ready = (
