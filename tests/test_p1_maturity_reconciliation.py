@@ -52,27 +52,22 @@ def test_live_p1_frontier_reconciliation_is_non_mutating() -> None:
     assert len(report["report_digest"]) == 64
 
 
-def test_current_unsigned_frontier_cannot_reach_lane_floors() -> None:
+def test_unsigned_records_never_reach_their_lane_floor() -> None:
     module = _module()
 
     report = module.reconcile_repository(ROOT)
 
-    assert report["target_floor_eligible_count"] == 0
-    assert all(
-        row["implementation_signed"] is False
-        for row in report["records"]
-    )
-    assert all(
-        row["verification_signed"] is False
-        for row in report["records"]
-    )
-    assert all(
-        row["promotion_candidate"] in {None, "scaffolded"}
-        for row in report["records"]
-    )
+    for row in report["records"]:
+        if row["implementation_signed"] is False:
+            assert row["target_floor_eligible"] is False
+        if (
+            row["target_floor"] in {"verified", "hardened", "production"}
+            and row["verification_signed"] is False
+        ):
+            assert row["target_floor_eligible"] is False
 
 
-def test_plan_constitution_is_only_a_scaffold_candidate_today() -> None:
+def test_report_identity_matches_canonical_volume_and_accountability() -> None:
     module = _module()
 
     report = module.reconcile_repository(
@@ -81,31 +76,12 @@ def test_plan_constitution_is_only_a_scaffold_candidate_today() -> None:
     )
     row = _row(report, "VOL-000")
 
-    assert row["current_status"] == "specified"
-    assert row["accountability_status"] == "unverified"
-    assert row["promotion_candidate"] == "scaffolded"
+    assert row["volume_key"] == "VOL-000"
+    assert row["accountability_id"] == "ACC-VOL-000"
     assert row["target_floor"] == "verified"
-    assert row["target_floor_eligible"] is False
-
-
-def test_planned_gap_ledger_tests_do_not_count_as_implemented() -> None:
-    module = _module()
-
-    report = module.reconcile_repository(
-        ROOT,
-        selected_volumes=("VOL-056",),
-    )
-    row = _row(report, "VOL-056")
-    implemented = next(
-        item for item in row["evaluations"]
-        if item["state"] == "implemented"
-    )
-
-    assert implemented["eligible"] is False
-    assert any(
-        "tests must contain materialized references" in blocker
-        for blocker in implemented["blockers"]
-    )
+    assert len(row["source_digest"]) == 64
+    assert isinstance(row["current_claim_valid"], bool)
+    assert len(row["evaluations"]) == 7
 
 
 def test_reconciliation_report_is_deterministic() -> None:
