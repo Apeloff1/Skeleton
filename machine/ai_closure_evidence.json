@@ -1075,7 +1075,8 @@
         "Stage-6 production browser-session reconnect/backpressure/cancel-race journeys",
         "independent Stage-7 source verifier and exact-head closure workflow",
         "real pinned Mongo replica-set shared-authority journey injects one retryable update failure and proves unchanged canonical state/outbox before successful retry",
-        "provider-response-before-checkpoint crash leaves no durable response, resumes to typed failure and never retries provider I/O"
+        "provider-response-before-checkpoint crash leaves no durable response, resumes to typed failure and never retries provider I/O",
+        "exact focused process/database restart matrix covers engine recovery, approval resume, admission rehydration, execution DB reopen, staged finalization and governance audit restore"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
