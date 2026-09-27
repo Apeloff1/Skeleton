@@ -58,7 +58,8 @@
       "gap_id": "gap-conversation-state-authority",
       "workflow": ".github/workflows/conversation-authority-closure.yml",
       "workflow_name": "Conversation Authority Closure Gate",
-      "verifier_script": null
+      "verifier_script": "scripts/verify_jeeves_conversation_cutover.py",
+      "verifier_binding_token": "ConversationThread/ConversationMessage is the only mutable"
     },
     {
       "key": "S1-MEM",
@@ -121,7 +122,7 @@
       "gap_id": "gap-engine-application-execution-boundary",
       "workflow": ".github/workflows/engine-container-boundary.yml",
       "workflow_name": "Engine Container Boundary",
-      "verifier_script": null
+      "verifier_script": "scripts/verify_engine_application_boundary_closure.py"
     },
     {
       "key": "S6-STREAM",
