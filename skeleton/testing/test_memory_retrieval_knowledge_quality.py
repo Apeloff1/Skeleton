@@ -529,4 +529,3 @@ def test_memory_contradiction_requires_explicit_resolution() -> None:
     )
     assert resolved.accepted is True
     assert "memory-contradiction-unresolved:memory-a" not in resolved.reasons
-
