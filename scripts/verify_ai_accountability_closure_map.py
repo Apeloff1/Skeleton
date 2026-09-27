@@ -235,7 +235,12 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 workflow_path = root / workflow
                 if workflow_path.is_file():
                     workflow_source = workflow_path.read_text(encoding="utf-8")
-                    if verifier_script not in workflow_source:
+                    verifier_exec = re.compile(
+                        r"(?m)^\\s*(?:python|python3)\\s+"
+                        + re.escape(verifier_script)
+                        + r"(?:\\s|$)"
+                    )
+                    if verifier_exec.search(workflow_source) is None:
                         errors.append(
                             f"{key}: workflow {workflow} does not execute "
                             f"{verifier_script}"
