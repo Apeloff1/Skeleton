@@ -207,4 +207,3 @@ def test_provider_redundancy_verifier_rejects_blueprint_regression(
 
     assert receipt["valid"] is False
     assert any("blueprint must remain closed" in error for error in receipt["errors"])
-
