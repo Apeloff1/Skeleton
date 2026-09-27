@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -362,6 +363,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "verifier": "ai-accountability-closure-map-v1",
+        "head_sha": (
+            os.environ.get("ACCOUNTABILITY_HEAD_SHA", "").strip()
+            or os.environ.get("GITHUB_SHA", "").strip()
+            or "unknown"
+        ),
         "valid": not errors,
         "errors": errors,
         "task_count": len(tasks),
