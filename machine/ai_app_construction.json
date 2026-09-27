@@ -2397,7 +2397,7 @@
         "lower-stage dependency closure",
         "exact-head validation and independent signoff"
       ],
-      "status_detail": "implementation-complete pending fresh Stage-7 exact-head gate, App Assembly, dependency closure and independent signoff"
+      "status_detail": "implementation-complete pending exact-head Stage-7/App Assembly evidence, remaining process/database fault proof, dependency closure and independent signoff"
     },
     {
       "id": "gap-release-slo-loop",
@@ -6874,7 +6874,8 @@
       "independent Stage-7 exact-head verifier",
       "real pinned Mongo replica-set transient-failure atomicity and safe-retry journey",
       "provider-response-before-checkpoint crash fails closed without second provider call",
-      "focused process/database restart matrix for engine, approval, admission, execution finalization and governance audit"
+      "focused process/database restart matrix for engine, approval, admission, execution finalization and governance audit",
+      "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry"
     ],
     "remaining": [
       "fresh exact-head Stage-7 Golden Journeys Closure Gate and App Assembly evidence",
