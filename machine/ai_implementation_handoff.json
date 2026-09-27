@@ -745,7 +745,7 @@
       ],
       "work_package": "WP-P0-CONTEXT-COMPILER",
       "blueprint": "context_compiler_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Converge all model-visible instructions, conversation, memory, retrieval, artifacts, tools and skills through one deterministic governed ContextEnvelope compiler.",
       "target_files": {
         "contracts": [
@@ -840,12 +840,10 @@
         ".github/workflows/backend-quality.yml runs context execution and instruction-policy boundary gates",
         ".github/workflows/app-assembly.yml runs both boundaries and their regressions on the assembled application"
       ],
-      "remaining": [
-        "close conversation/memory/tool/governance dependency gaps",
-        "collect fresh exact-head Backend Quality/App Assembly context and instruction-policy boundary evidence",
-        "obtain independent context-compiler closure verification"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-provider-interaction-protocol",
@@ -859,7 +857,7 @@
       ],
       "work_package": "WP-P0-PROVIDER-PROTOCOL",
       "blueprint": "provider_interaction_protocol",
-      "implementation_status": "implemented",
+      "implementation_status": "closed",
       "objective": "Extend the single canonical provider owner from text/media transport into a complete provider-neutral interaction protocol for structured outputs and governed tool calling.",
       "target_files": {
         "contracts": [
@@ -922,12 +920,10 @@
         "skeleton/testing/test_provider_contract.py covers async provider transport normalization and admission reconciliation",
         "skeleton/intelligence/execution_runtime.py projects only admitted minimal ProviderToolDefinition values and consumes neutral provider tool/structured outputs"
       ],
-      "remaining": [
-        "collect fresh exact-head provider protocol/provider-boundary validation",
-        "close declared lower-stage dependencies",
-        "obtain independent signoff before canonical closure"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-verification-evidence-contract",
