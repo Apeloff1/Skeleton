@@ -64,6 +64,9 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_ai_accountability_closure_map.py
           tests/test_ai_accountability_verifier_runner.py
+          tests/test_engine_application_boundary_independent_verifier.py
+          tests/test_memory_authority_independent_verifier.py
+          tests/test_provider_protocol_independent_verifier.py
 
       - name: Re-verify inherited terminal masterplan on exact PR head
         env:
