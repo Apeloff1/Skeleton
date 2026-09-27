@@ -447,7 +447,8 @@
         "VOL-063"
       ],
       "depends_on": [
-        "P1-REL-01"
+        "P1-REL-01",
+        "P1-REL-02"
       ],
       "objective": "Bind schema/config migrations to declared rollback windows and backward-read compatibility.",
       "acceptance": [
