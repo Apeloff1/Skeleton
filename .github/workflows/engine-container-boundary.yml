@@ -19,6 +19,8 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/testing/live_engine_process_app.py"
       - "scripts/check_engine_container_boundary.py"
+      - "scripts/verify_engine_application_boundary_closure.py"
+      - "tests/test_engine_application_boundary_independent_verifier.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_implementation_handoff.json"
       - "machine/ai_closure_evidence.json"
@@ -54,10 +56,11 @@ jobs:
       EMERGENT_LLM_KEY: ""
 
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -67,7 +70,50 @@ jobs:
       - name: Install smoke client runtime
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check -e . httpx==0.28.1
+          python -m pip install --disable-pip-version-check
+          -e . httpx==0.28.1 "pytest>=8,<9"
+
+      - name: Run independent Stage-5 verifier regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_engine_application_boundary_independent_verifier.py
+
+      - name: Emit exact-head Stage-5 closure receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_engine_application_boundary_closure.py
+          --evidence-out .engine-application-boundary-closure.json
+          --print-evidence
+
+      - name: Assert exact-head Stage-5 closure receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".engine-application-boundary-closure.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
+              raise SystemExit("Stage-5 closure receipt is not exact-head")
+          if receipt.get("verifier") != "independent-engine-application-boundary-v1":
+              raise SystemExit("unexpected Stage-5 verifier identity")
+          if receipt.get("gap_id") != "gap-engine-application-execution-boundary":
+              raise SystemExit("Stage-5 verifier lost canonical gap binding")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("Stage-5 independent closure verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 9:
+              raise SystemExit("Stage-5 boundary digest coverage is incomplete")
+          PY
 
       - name: Assert Stage-5 closure contract consistency
         run: |
