@@ -30,3 +30,7 @@ def test_accountability_cli_render_exposes_every_checkbox() -> None:
     for record in ledger["records"]:
         assert f"`{record['id']}`" in rendered
         assert f"- {record['checkbox_mark']} " in rendered
+    assert "Tracked items: **742**" in rendered
+    assert "## Lifecycle" in rendered
+    assert "## Audit and correction rule" in rendered
+    assert "Do not rewrite prior sign-offs." in rendered
