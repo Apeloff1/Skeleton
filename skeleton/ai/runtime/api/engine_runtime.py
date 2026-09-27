@@ -203,14 +203,23 @@ class EngineExecutionCoordinator:
                 )
                 return
 
+        verifier_selector = getattr(
+            self.provider_registry,
+            "verification_adapter_for",
+            None,
+        )
+        semantic_verification_adapter = (
+            verifier_selector(provider)
+            if callable(verifier_selector)
+            else None
+        )
+
         runtime = CognitiveExecutionRuntime(
             self.service.repository,
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
-            semantic_verification_adapter=(
-                self.provider_registry.verification_adapter_for(provider)
-            ),
+            semantic_verification_adapter=semantic_verification_adapter,
             finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (
