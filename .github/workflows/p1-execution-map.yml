@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
       - "machine/ai_master_plan.json"
       - "machine/ai_app_construction.json"
       - "machine/ai_master_build_sequence.json"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
       - "machine/ai_master_plan.json"
       - "machine/ai_app_construction.json"
       - "machine/ai_master_build_sequence.json"
