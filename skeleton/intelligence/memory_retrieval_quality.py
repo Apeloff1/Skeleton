@@ -257,7 +257,8 @@ class IntelligenceQualityDecision:
         if self.schema_version != INTEL_QUALITY_SCHEMA_VERSION:
             raise IntelligenceQualityError("unsupported schema version")
 
-    def payload(self) -> dict[str, Any]:
+    def identity_payload(self) -> dict[str, Any]:
+        """State identity excluding wall-clock observation metadata."""
         return {
             "schema_version": self.schema_version,
             "task_id": self.task_id,
@@ -272,12 +273,17 @@ class IntelligenceQualityDecision:
             "knowledge_digest": self.knowledge_digest,
             "quality_digest": self.quality_digest,
             "policy_digest": self.policy_digest,
+        }
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            **self.identity_payload(),
             "observed_at": self.observed_at,
         }
 
     @property
     def decision_digest(self) -> str:
-        return _canonical_digest(self.payload())
+        return _canonical_digest(self.identity_payload())
 
     def accepted_evidence_ref(
         self,
@@ -513,7 +519,7 @@ def evaluate_intelligence_quality(
     freshness_payload = {
         key: {
             **row.to_dict(),
-            "metadata_at_observation": row.metadata(now),
+            "stale": row.stale(now),
         }
         for key, row in sorted(freshness_rows.items())
     }
