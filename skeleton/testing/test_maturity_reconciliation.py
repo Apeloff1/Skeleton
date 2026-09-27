@@ -88,6 +88,7 @@ def _volume(**overrides: object) -> dict:
     value = {
         "key": "VOL-999",
         "status": "specified",
+        "implementation_status": "unverified",
         "accountability_id": "ACC-VOL-999",
         "requirements": ["requirement"],
         "capabilities": ["capability"],
@@ -173,6 +174,8 @@ def test_signed_implementation_can_become_implemented() -> None:
     assert _evaluation(decision, "implemented").eligible is True
     assert decision.highest_eligible_status == "implemented"
     assert decision.promotion_candidate == "implemented"
+    assert decision.implementation_status_candidate == "implemented"
+    assert decision.accountability_maturity_status == "implemented"
     assert decision.target_floor_eligible is True
 
 
@@ -353,4 +356,42 @@ def test_generic_lifecycle_terminal_does_not_imply_maturity(
     assert _evaluation(decision, "production").eligible is False
     assert decision.target_floor_eligible is False
     assert decision.promotion_candidate == "scaffolded"
+
+def test_implementation_status_cannot_lead_accountability() -> None:
+    with pytest.raises(
+        MaturityReconciliationError,
+        match="exceeds explicit accountability maturity",
+    ):
+        reconcile_volume(
+            _volume(implementation_status="verified"),
+            _accountability(
+                status="implemented",
+                implementation_signoff=_signoff(True),
+            ),
+            POLICY,
+            target_floor="verified",
+        )
+
+
+@pytest.mark.parametrize(
+    "status",
+    ("passing", "done", "closed", "accepted_risk"),
+)
+def test_generic_lifecycle_terminal_has_no_implementation_candidate(
+    status: str,
+) -> None:
+    decision = reconcile_volume(
+        _volume(gaps=[]),
+        _accountability(
+            status=status,
+            implementation_signoff=_signoff(True),
+            verification_signoff=_signoff(True),
+            evidence=["ledger:evidence"],
+        ),
+        POLICY,
+        target_floor="production",
+    )
+
+    assert decision.accountability_maturity_status is None
+    assert decision.implementation_status_candidate is None
 
