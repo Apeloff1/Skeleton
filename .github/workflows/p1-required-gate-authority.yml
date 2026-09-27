@@ -107,7 +107,7 @@ jobs:
           authority = payload["authority"]
           if authority["valid"] is not True:
               raise SystemExit("required-gate authority is invalid")
-          if authority["required_gate_count"] != 23:
+          if authority["required_gate_count"] != 25:
               raise SystemExit("required gate count drift")
           if len(authority.get("authority_digest", "")) != 64:
               raise SystemExit("invalid authority digest")
