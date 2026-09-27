@@ -38,6 +38,7 @@ REQUIRED_TEST_TOKENS = (
     "test_failover_provider_never_routes_policy_denial",
     "test_malformed_provider_json_is_terminal_protocol_violation",
     "test_failover_provider_never_routes_protocol_violation",
+    "test_failover_provider_never_routes_invalid_request_protocol",
     "test_failover_provider_does_not_remap_explicit_nonprimary_model",
     "test_provider_registry_returns_failover_adapter_and_exposes_routing",
     "test_provider_registry_secondary_configuration_fails_closed_when_partial",
