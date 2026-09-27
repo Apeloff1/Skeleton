@@ -1281,6 +1281,36 @@ async def test_failover_provider_never_routes_protocol_violation() -> None:
     assert snapshot["last_failure_kind"] == "protocol"
 
 
+
+@pytest.mark.asyncio
+async def test_failover_provider_never_routes_invalid_request_protocol() -> None:
+    primary = OpenAIProviderAdapter(
+        api_key="primary-key",
+        model="primary-model",
+        client=SimpleNamespace(),
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    with pytest.raises(
+        ProviderProtocolViolationError,
+        match="prompt must be non-empty text",
+    ):
+        await adapter.generate(
+            ProviderRequest(instructions="answer", prompt=" ")
+        )
+
+    assert secondary.requests == []
+    snapshot = adapter.routing_snapshot()
+    assert snapshot["provider_failures"] == 1
+    assert snapshot["failover_attempts"] == 0
+    assert snapshot["last_failure_kind"] == "protocol"
+
+
 @pytest.mark.asyncio
 async def test_failover_provider_does_not_remap_explicit_nonprimary_model() -> None:
     primary = _ScriptedFailoverProvider(
