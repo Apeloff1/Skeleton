@@ -859,9 +859,9 @@
       "gap": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "stage": 6,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
         "transport-neutral stream event envelope",
@@ -930,16 +930,8 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
-      "blockers": [
-        "fresh exact-head frontend typecheck/test:operation-stream",
-        "fresh exact-head App Assembly",
-        "independent closure signoff"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
