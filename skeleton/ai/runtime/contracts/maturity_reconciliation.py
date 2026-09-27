@@ -110,6 +110,8 @@ class MaturityReconciliation:
     target_floor: str
     highest_eligible_status: str
     promotion_candidate: str | None
+    current_claim_valid: bool
+    current_claim_blockers: tuple[str, ...]
     target_floor_eligible: bool
     implementation_signed: bool
     verification_signed: bool
@@ -125,6 +127,8 @@ class MaturityReconciliation:
             "target_floor": self.target_floor,
             "highest_eligible_status": self.highest_eligible_status,
             "promotion_candidate": self.promotion_candidate,
+            "current_claim_valid": self.current_claim_valid,
+            "current_claim_blockers": list(self.current_claim_blockers),
             "target_floor_eligible": self.target_floor_eligible,
             "implementation_signed": self.implementation_signed,
             "verification_signed": self.verification_signed,
@@ -293,10 +297,30 @@ def reconcile_volume(
         if eligible and index >= highest_index:
             highest_index = index
 
+    evaluation_by_state = {
+        item.state: item
+        for item in evaluations
+    }
+    current_eval = evaluation_by_state[current]
+    highest_index = current_index
+    if current_eval.eligible:
+        for index in range(current_index + 1, len(MATURITY_ORDER)):
+            next_state = MATURITY_ORDER[index].value
+            if not evaluation_by_state[next_state].eligible:
+                break
+            highest_index = index
+
     highest = MATURITY_ORDER[highest_index].value
-    candidate = highest if highest_index > current_index else None
-    target_eval = next(
-        item for item in evaluations if item.state == target_floor
+    candidate = (
+        highest
+        if current_eval.eligible and highest_index > current_index
+        else None
+    )
+    target_eval = evaluation_by_state[target_floor]
+    floor_reachable = (
+        current_eval.eligible
+        and _MATURITY_INDEX[target_floor] <= highest_index
+        and target_eval.eligible
     )
 
     return MaturityReconciliation(
@@ -307,7 +331,9 @@ def reconcile_volume(
         target_floor=target_floor,
         highest_eligible_status=highest,
         promotion_candidate=candidate,
-        target_floor_eligible=target_eval.eligible,
+        current_claim_valid=current_eval.eligible,
+        current_claim_blockers=current_eval.blockers,
+        target_floor_eligible=floor_reachable,
         implementation_signed=_signed(
             accountability.get("implementation_signoff")
         ),
