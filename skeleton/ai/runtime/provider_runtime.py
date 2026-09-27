@@ -2960,6 +2960,11 @@ class ProviderRegistry:
             status = adapter.status()
             status["active"] = provider_id == self.active_id
             status["fallback"] = provider_id in self._fallback_ids
+            status["routing"] = (
+                self.redundancy_status()
+                if provider_id == self.active_id and self._fallback_ids
+                else None
+            )
             verifier = self._verification_adapter
             status["semantic_verifier_configured"] = bool(
                 verifier is not None
