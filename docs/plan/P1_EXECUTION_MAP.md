@@ -228,3 +228,84 @@ P1 also does not permit reopening completed P0/P1 gaps to create artificial prog
 ## Completion statement
 
 P1 is complete when the 64-volume frontier meets its lane maturity floors, all original functional closure gaps remain closed, terminal production-promotion evidence is exact-head and independently verified, and the remaining 357 volumes are still represented honestly as later work rather than being silently relabeled complete.
+
+## Task-level P1 backlog
+
+The machine backlog [`machine/ai_p1_task_backlog.json`](../../machine/ai_p1_task_backlog.json) expands the six lanes into 32 dependency-ordered tasks. The initial state deliberately exposes only one runnable item: `P1-EVID-01`. Every other task is blocked until its declared evidence/dependency prerequisites are complete.
+
+### P1-L0 — Evidence spine
+
+1. `P1-EVID-01` — canonical evidence identity.
+2. `P1-EVID-02` — maturity reconciliation engine.
+3. `P1-EVID-03` — required-gate authority map.
+4. `P1-EVID-04` — risk/gap evidence binding.
+5. `P1-EVID-05` — reproducibility bundle.
+6. `P1-EVID-06` — scope-freeze and ADR enforcement.
+
+The critical path begins with evidence identity because every later promotion, release bundle, benchmark comparison and distributed qualification needs a common exact-head receipt model.
+
+### P1-L1 — Product truth
+
+1. `P1-PROD-01` — API schema and compatibility registry.
+2. `P1-PROD-02` — streaming projection authority.
+3. `P1-PROD-03` — workspace/product projection contract.
+4. `P1-PROD-04` — pause/resume/cancel/human override.
+5. `P1-PROD-05` — web/desktop tenant and storage boundary.
+
+### P1-L2 — Controlled learning
+
+1. `P1-LEARN-01` — experiment registry.
+2. `P1-LEARN-02` — benchmark registry and contamination controls.
+3. `P1-LEARN-03` — candidate/champion-challenger registry.
+4. `P1-LEARN-04` — shadow-traffic isolation.
+5. `P1-LEARN-05` — specification/reasoning regression corpus.
+6. `P1-LEARN-06` — failure-knowledge pipeline.
+
+### P1-L3 — Release and recovery
+
+1. `P1-REL-01` — release evidence bundle.
+2. `P1-REL-02` — installer/update/repair lifecycle.
+3. `P1-REL-03` — migration and rollback compatibility.
+4. `P1-REL-04` — backup and restore qualification.
+5. `P1-REL-05` — disaster recovery and incident feedback.
+6. `P1-REL-06` — attribution and release notices.
+
+### P1-L4 — Distributed capacity and economics
+
+1. `P1-DIST-01` — remote execution and worker trust.
+2. `P1-DIST-02` — topology-aware model placement/warming.
+3. `P1-DIST-03` — batching and autoscaling controller.
+4. `P1-DIST-04` — load and capacity qualification.
+5. `P1-DIST-05` — quota and budget accounting ledger.
+6. `P1-DIST-06` — forecasting and cost-anomaly loop.
+
+### P1-L5 — Terminal promotion
+
+1. `P1-PROM-01` — aggregate exact-head P1 evidence.
+2. `P1-PROM-02` — terminal failure-journey qualification.
+3. `P1-PROM-03` — independent signed P1 promotion decision.
+
+The validator requires every task to be an ancestor of `P1-PROM-03`; orphan work is rejected. It also rejects task cycles, tasks that claim volumes outside their lane, and ready/in-progress tasks whose prerequisites are not complete.
+
+## Immediate coding order
+
+The implementation order is therefore not ambiguous:
+
+```text
+P1-EVID-01
+  ├── P1-EVID-02 ──> P1-EVID-06
+  └── P1-EVID-03 ──> P1-EVID-04
+          └─────────> P1-EVID-05
+
+After evidence contracts stabilize:
+  P1-L1 product truth  ||  P1-L2 controlled learning
+
+After those interfaces stabilize:
+  P1-L3 release/recovery  ||  P1-L4 distributed capacity
+
+Finally:
+  P1-PROM-01 -> P1-PROM-02 -> P1-PROM-03
+```
+
+The first coding task after the planning lane lands is `P1-EVID-01`: define the canonical evidence receipt and exact-head identity contract. It is intentionally small enough to land independently but foundational enough that later work should not invent competing receipt formats.
+
