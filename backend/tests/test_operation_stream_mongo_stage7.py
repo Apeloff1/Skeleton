@@ -136,8 +136,11 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
                 "mode": {"times": 1},
                 "data": {
                     "failCommands": ["update"],
-                    "errorCode": 91,
-                    "errorLabels": ["RetryableWriteError"],
+                    # WriteConflict is transient but does not tell PyMongo that
+                    # the only replica-set primary has disappeared. This keeps
+                    # the post-failure atomicity read meaningful.
+                    "errorCode": 112,
+                    "errorLabels": ["TransientTransactionError"],
                 },
             }
         )

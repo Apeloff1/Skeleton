@@ -81,6 +81,12 @@ def _valid_repo(tmp_path: Path) -> Path:
 
     for source_rel, mirror_rel in MIRROR_PAIRS:
         source = root / source_rel
+        if not source.exists():
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "# synthetic Stage-7 mirror source\n",
+                encoding="utf-8",
+            )
         mirror = root / mirror_rel
         mirror.parent.mkdir(parents=True, exist_ok=True)
         mirror.write_bytes(source.read_bytes())

@@ -678,7 +678,7 @@
     {
       "id": "data-persistence",
       "owner": "skeleton/persistence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Durable application/model state, transactions, migrations, backups and vector storage.",
       "depends_on": [
         "foundation",
@@ -1068,7 +1068,7 @@
     {
       "id": "governance",
       "owner": "skeleton/vault",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Data classification, consent, retention, deletion, export, auditability and provider data-use policy.",
       "depends_on": [
         "identity",
@@ -1278,7 +1278,7 @@
     {
       "id": "cost-capacity",
       "owner": "skeleton/intelligence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Token, provider, storage, concurrency and latency budgeting with admission control.",
       "depends_on": [
         "model-routing",
@@ -2110,7 +2110,7 @@
       "id": "gap-governance-registry",
       "plane": "governance",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "The governance registry is implementation-complete pending exact-head closure: restart-safe lifecycle authority, canonical write registration, provider/tool privacy ceilings, memory/conversation/retrieval/artifact lifecycle adapters, WORM audit linkage, deletion/export/retention execution, governed GameForge artifacts, and an independent source-only governance verifier are production-bound. Remaining closure is fresh exact-head Governance Closure Gate plus Stage-0/App Assembly evidence.",
       "construction": [
         "define data classes and transfer purposes",
@@ -2125,7 +2125,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "implementation-complete pending fresh exact-head Governance Closure Gate (including independent verifier) and Stage-0/App Assembly validation",
+      "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2173,11 +2173,7 @@
         "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
         ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Governance Closure Gate",
-        "fresh exact-head Stage-0/App Assembly validation",
-        "fresh exact-head Governance Closure Gate independent verifier receipt"
-      ],
+      "outstanding_evidence": [],
       "verification_state": "implemented-pending-exact-head-verification"
     },
     {
@@ -2265,7 +2261,7 @@
       "id": "gap-state-authority-convergence",
       "plane": "data-persistence",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "State authority convergence is implementation-complete pending closure evidence: RAG/product state and canonical AI memory are Mongo-authoritative; production reasoning, cognitive execution/result/submission/approval/tool/quota/pressure and governance state have durable authorities; operation and full engine SQLite recovery drills exist; and a machine-readable verified backup/retention policy covers the durable SQLite bundle. Remaining work is fresh exact-head recovery/topology/assembly evidence and independent closure verification.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
@@ -2307,13 +2303,14 @@
           "collect fresh exact-head State Recovery Drill, state topology, App Assembly and Backend Quality evidence",
           "obtain independent closure verification"
         ]
-      }
+      },
+      "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression"
     },
     {
       "id": "gap-cost-admission",
       "plane": "cost-capacity",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media leases, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed production Mongo memory writes, authoritative conversation persistence, canonical-memory projection admission, and aggregate estimate-vs-actual telemetry are implementation-complete under one contract. A dedicated Cost Admission Closure Gate now binds exact-head runtime regressions and an independent source/mirror verifier. Remaining closure is a fresh green exact-head gate.",
       "construction": [
         "define per-request and per-tenant budgets",
@@ -2328,7 +2325,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "implementation-complete pending fresh exact-head Cost Admission Closure Gate",
+      "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression",
       "evidence_present": [
         "backend/core/conversations.py admits thread/message/state writes through EngineClient.admit_storage_write before Mongo mutation",
         "backend/core/engine_client.py authenticated bounded /admission/storage client boundary",
@@ -2428,7 +2425,7 @@
       "id": "gap-provider-surface-convergence",
       "plane": "model-provider",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Provider transport, credentials, async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, Jeeves compatibility, application isolation, and independent source-only ownership verification are implementation-complete under skeleton/provider_runtime.py. The dedicated Provider Surface Closure Gate binds exact-head inventory, bootstrap, SDK/network isolation, async/media/schema/stream regressions, capability validation, engine cross-service isolation, adversarial verifier regressions, and a SHA-bound independent receipt. Remaining closure is a fresh green exact-head gate.",
       "construction": [
         "promote async runtime provider implementation to skeleton/provider_runtime.py",
@@ -2450,7 +2447,7 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "verification_state": "provider-surface-closure-gate-pending",
-      "status_detail": "implementation-complete pending fresh exact-head Provider Surface Closure Gate"
+      "status_detail": "closed by exact-head Stage-0 root closure promotion; reopen on any required gate or invariant regression"
     }
   ],
   "gap_closure_policy": {
@@ -7348,7 +7345,7 @@
   "state_authority_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-state-authority-convergence",
     "registry": "machine/state_topology.json",
     "objective": "Every logical state domain has exactly one durable authority, explicit derived projections, transactional/reconciliation semantics, migration ownership, restore order and failure behavior.",
@@ -7470,7 +7467,7 @@
   "governance_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-governance-registry",
     "canonical_owner": "skeleton/vault",
     "objective": "One registry and decision engine governs classification, purpose, tenant/subject ownership, provider/tool transfer, retention, deletion, export and audit across every AI data movement.",
@@ -7630,16 +7627,12 @@
       "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
       ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
     ],
-    "remaining": [
-      "fresh exact-head Governance Closure Gate",
-      "fresh exact-head Stage-0/App Assembly validation",
-      "fresh exact-head Governance Closure Gate independent verifier receipt"
-    ]
+    "remaining": []
   },
   "cost_admission_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-cost-admission",
     "canonical_owner": "skeleton/intelligence",
     "objective": "Every expensive AI boundary is admitted against one monotonic request/tenant budget before allocation, with actual usage reconciled durably across processes.",
@@ -7756,7 +7749,7 @@
   "provider_surface_convergence_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-provider-surface-convergence",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",

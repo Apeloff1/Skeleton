@@ -454,7 +454,6 @@
       "migration": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-state-authority-convergence",
       "evidence": [
         "skeleton/contracts/operation.py",
         "skeleton/persistence/operation_store.py",
@@ -824,7 +823,6 @@
       "migration": "preserve record_id, tenant, owner/source identity, classification, purposes, deletion targets, retention, lifecycle state, plan identity, acknowledgements and receipts",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-governance-registry",
       "evidence": [
         "skeleton/vault/data_lifecycle.py",
         "skeleton/vault/governance_registry.py",
