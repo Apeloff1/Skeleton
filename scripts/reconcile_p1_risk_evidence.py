@@ -13,7 +13,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from skeleton.contracts.canonical import EvidenceRef
@@ -478,7 +478,7 @@ def reconcile_repository(
     report: dict[str, Any] = {
         "schema_version": 1,
         "engine": "p1-risk-gap-evidence-binding-v1",
-        "evaluated_at": evaluated_at.astimezone().isoformat(),
+        "evaluated_at": evaluated_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source_digests": before,
         "source_mutation_detected": False,
         "baseline_closure_entry_count": len(closure_entries),
