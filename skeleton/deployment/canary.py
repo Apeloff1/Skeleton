@@ -105,6 +105,13 @@ class CanaryController:
         rollout.status = "promoted"
         return {"action": "promoted", "version": rollout.to_version}
 
+    def rollback(self, rollout_id: str) -> bool:
+        rollout = self._rollouts.get(rollout_id)
+        if rollout and rollout.status in {"in_progress", "paused"}:
+            rollout.status = "rolled_back"
+            return True
+        return False
+
     def pause(self, rollout_id: str) -> bool:
         rollout = self._rollouts.get(rollout_id)
         if rollout and rollout.status == "in_progress":
