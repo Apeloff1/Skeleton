@@ -516,7 +516,10 @@ def evaluate_risk_binding(
         obligation.blocking_by_default
         or binding.severity in {RiskSeverity.HIGH, RiskSeverity.CRITICAL}
     )
-    if binding.disposition is RiskDisposition.NON_BLOCKING:
+    if (
+        binding.disposition is RiskDisposition.NON_BLOCKING
+        and obligation.kind is RiskKind.RISK
+    ):
         blocking = False
 
     return RiskBindingEvaluation(
