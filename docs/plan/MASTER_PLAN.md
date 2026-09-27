@@ -523,6 +523,25 @@ The inheritance is fail-closed. A shorter task-local acceptance list cannot sile
 
 Task completion and engineering-strong capability promotion remain separate claims. Existing signed AIQ completion state is preserved, but it cannot by itself justify `verified`, `hardened` or `production` maturity. Those stronger claims require bound quantitative budgets, executable engineering evidence, compatibility/recovery proof, independent verification and the existing signed-accountability contract.
 
+## 21.7 P1 trustworthy autonomous production map
+
+P0 functional construction and the original three canonical P1 construction gaps are terminal prerequisites, not the whole long-range masterplan. The next maturity program is defined by [`docs/plan/P1_EXECUTION_MAP.md`](P1_EXECUTION_MAP.md), [`machine/ai_p1_execution_map.json`](../../machine/ai_p1_execution_map.json), and [`machine/ai_p1_task_backlog.json`](../../machine/ai_p1_task_backlog.json).
+
+P1 is a bounded **107-volume** trustworthy-production frontier with **44 dependency-ordered tasks** across eight lanes:
+
+1. evidence, accountability and promotion authority;
+2. core intelligence quality and convergence;
+3. safe autonomous action and human control;
+4. product truth and operator surfaces;
+5. controlled learning, evaluation and failure knowledge;
+6. release, installation, recovery and operational qualification;
+7. distributed runtime, capacity and economics;
+8. terminal exact-head independent promotion.
+
+The remaining **314 volumes** stay explicitly deferred. Their existence is not hidden and their planning status does not block P1 unless a hard dependency is discovered and the P1 map is formally amended. P1 completion therefore means the bounded frontier reaches its declared maturity floors with exact-head independent evidence; it does not mean all 421 volumes are complete.
+
+P1 may deepen existing owners and interfaces but may not add a top-level volume, reopen a canonical construction gap for convenience, promote a candidate through self-generated evidence, or substitute target-plan prose for runtime truth.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.

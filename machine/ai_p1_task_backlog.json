@@ -1,0 +1,2626 @@
+{
+  "schema_version": 1,
+  "backlog_version": "1.1.0",
+  "status": "active",
+  "title": "P1 Trustworthy Autonomous Production Task Backlog",
+  "authority": {
+    "execution_map": "machine/ai_p1_execution_map.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "accountability": "machine/ai_build_accountability.json"
+  },
+  "status_values": [
+    "ready",
+    "blocked",
+    "in_progress",
+    "evidence_pending",
+    "done"
+  ],
+  "scheduling_policy": {
+    "start_lane": "P1-L0",
+    "initial_ready_task": "P1-EVID-01",
+    "dependency_rule": "A task may enter ready/in_progress only after every depends_on task is done, except the single declared initial_ready_task.",
+    "concurrency_rule": "Tasks with satisfied dependencies may run concurrently when they do not change the same canonical authority contract.",
+    "promotion_rule": "done means implementation plus task acceptance evidence; maturity promotion remains a separate signed accountability action.",
+    "accountability_materialization_rule": "Planned ACC-P1-* identifiers reserve accountability identity. A task may become in_progress only after its record is materialized in the canonical accountability ledger with a signed start event.",
+    "phase_rule": "A later phase may prototype only where lane/task dependencies are satisfied; maturity promotion never bypasses phase dependencies."
+  },
+  "tasks": [
+    {
+      "task_id": "P1-EVID-01",
+      "lane_id": "P1-L0",
+      "status": "ready",
+      "title": "Canonical evidence identity",
+      "volume_refs": [
+        "VOL-034",
+        "VOL-038",
+        "VOL-078"
+      ],
+      "depends_on": [],
+      "objective": "Define one receipt identity binding git head, config digest, environment, test/verifier identity, timestamps and evidence digest.",
+      "acceptance": [
+        "Exact-head evidence from independent gates can be joined deterministically without filename or log scraping.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "tests/test_observability.py",
+        "tests/test_runtime_observability_bridge.py",
+        "planned:skeleton/provenance",
+        "machine/ai_build_accountability.json",
+        "machine",
+        "scripts",
+        "skeleton/evaluation"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_frontier_observability_correlation.py",
+        "tests/test_orchestration_error_redaction.py",
+        "planned:skeleton/testing/test_provenance_tamper.py",
+        "planned:skeleton/testing/test_canonical_signing.py",
+        "planned:skeleton/testing/test_reproducibility_record.py",
+        "planned:skeleton/testing/test_replay_recipe.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-EVID-02",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Maturity reconciliation engine",
+      "volume_refs": [
+        "VOL-000",
+        "VOL-056",
+        "VOL-080"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Compare masterplan volume claims against implementation paths, tests, evidence and accountability; emit promotion candidates without self-signing them.",
+      "acceptance": [
+        "Candidate promotions are explainable, reversible and cannot mutate signed maturity state.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_build_accountability.json",
+        "machine",
+        "docs/plan",
+        "scripts",
+        "skeleton/testing"
+      ],
+      "test_targets": [
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "planned:skeleton/testing/test_gap_ledger.py",
+        "planned:skeleton/testing/test_gap_closure.py",
+        "planned:skeleton/testing/test_test_architecture.py",
+        "planned:skeleton/testing/test_fixture_policy.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-EVID-03",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Required-gate authority map",
+      "volume_refs": [
+        "VOL-059",
+        "VOL-037"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Define which gates are required for which promotion classes and fail closed on missing, skipped, cancelled or stale evidence.",
+      "acceptance": [
+        "A promotion receipt cannot be valid when any required gate is absent, stale or non-success.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        ".github/workflows",
+        "scripts",
+        "skeleton/testing",
+        "skeleton/intelligence/verification_runtime.py",
+        "planned:skeleton/verification"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_ci_contracts.py",
+        "planned:skeleton/testing/test_merge_readiness.py",
+        "planned:skeleton/testing/test_verification_independence.py",
+        "planned:skeleton/testing/test_postcondition_verification.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-EVID-04",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Risk/gap evidence binding",
+      "volume_refs": [
+        "VOL-036",
+        "VOL-056",
+        "VOL-057"
+      ],
+      "depends_on": [
+        "P1-EVID-01",
+        "P1-EVID-03"
+      ],
+      "objective": "Bind critical/high risks and gaps to executable evidence, owner, expiry/review cadence and accepted-risk disposition.",
+      "acceptance": [
+        "Every blocking P1 risk has executable evidence or a signed, time-bounded accepted-risk record.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "tests/test_adversarial_engine.py",
+        "tests/test_tri_adversarial_engine.py",
+        "planned:skeleton/evaluation/adversarial",
+        "machine",
+        "docs/plan",
+        "scripts"
+      ],
+      "test_targets": [
+        "tests/test_adversarial_judge_isolation.py",
+        "planned:skeleton/testing/test_adversarial_regression_promotion.py",
+        "planned:skeleton/testing/test_gap_ledger.py",
+        "planned:skeleton/testing/test_gap_closure.py",
+        "planned:skeleton/testing/test_risk_register.py",
+        "planned:skeleton/testing/test_risk_acceptance.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-EVID-05",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Reproducibility bundle",
+      "volume_refs": [
+        "VOL-035",
+        "VOL-038",
+        "VOL-078",
+        "VOL-079"
+      ],
+      "depends_on": [
+        "P1-EVID-01",
+        "P1-EVID-03"
+      ],
+      "objective": "Package exact inputs, environment, budgets, tests/evals and receipts needed to reproduce qualifying evidence.",
+      "acceptance": [
+        "Independent rerun can reproduce the maturity evidence or explain deterministic incompatibility.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "eval",
+        "tests",
+        "planned:skeleton/evaluation",
+        "planned:skeleton/provenance",
+        "machine/ai_build_accountability.json",
+        "machine",
+        "scripts",
+        "skeleton/evaluation"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_eval_reproducibility.py",
+        "planned:skeleton/testing/test_benchmark_metadata.py",
+        "planned:skeleton/testing/test_provenance_tamper.py",
+        "planned:skeleton/testing/test_canonical_signing.py",
+        "planned:skeleton/testing/test_reproducibility_record.py",
+        "planned:skeleton/testing/test_replay_recipe.py",
+        "planned:skeleton/testing/test_quality_gate_contracts.py",
+        "planned:skeleton/testing/test_quality_waivers.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-EVID-06",
+      "lane_id": "P1-L0",
+      "status": "blocked",
+      "title": "Scope-freeze and ADR enforcement",
+      "volume_refs": [
+        "VOL-000",
+        "VOL-420"
+      ],
+      "depends_on": [
+        "P1-EVID-02"
+      ],
+      "objective": "Enforce VOL-420 breadth freeze and require a machine-linked ADR for any top-level scope exception.",
+      "acceptance": [
+        "Unapproved new top-level volume or scope bypass fails validation.",
+        "Validator mutations prove stale/missing evidence and gate authority fail closed.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-EVID-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W18",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_build_accountability.json",
+        "docs/plan"
+      ],
+      "test_targets": [
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "planned:skeleton/testing/test_architecture_scope_freeze.py"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "negative_test",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "stale or unjoinable evidence",
+        "missing required gate",
+        "scope authority drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-01",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Quality measurement and routing/context receipt spine",
+      "volume_refs": [
+        "VOL-008",
+        "VOL-009",
+        "VOL-034"
+      ],
+      "depends_on": [
+        "P1-EVID-01"
+      ],
+      "objective": "Bind model routing and compiled-context decisions to reproducible quality, trust, privacy, budget and deadline evidence.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/routing",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/quota.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/sources",
+        "skeleton/observability",
+        "tests/test_observability.py"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_model_routing.py",
+        "planned:skeleton/testing/test_routing_privacy.py",
+        "skeleton/testing/test_context_compiler.py",
+        "planned:skeleton/testing/test_context_trust_geometry.py",
+        "skeleton/testing/test_frontier_observability_correlation.py",
+        "tests/test_orchestration_error_redaction.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-02",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Memory, retrieval and knowledge quality authority",
+      "volume_refs": [
+        "VOL-010",
+        "VOL-011",
+        "VOL-012",
+        "VOL-361",
+        "VOL-362",
+        "VOL-363"
+      ],
+      "depends_on": [
+        "P1-INTEL-01",
+        "P1-EVID-05"
+      ],
+      "objective": "Materialize freshness, provenance, contradiction, interference and quality decisions for memory/retrieval/knowledge with deterministic reconciliation.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "skeleton/memory",
+        "skeleton/vault",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/projection.py",
+        "skeleton/retrieval",
+        "backend/services/rag_service.py"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_memory_promotion.py",
+        "planned:skeleton/testing/test_memory_poisoning.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "skeleton/testing/test_memory_projection.py",
+        "tests/test_memory_reconciliation.py",
+        "tests/test_retrieval_pipeline_internals.py",
+        "tests/test_quad_retrieval_internals.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-03",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Reasoning, search and stopping policy registry",
+      "volume_refs": [
+        "VOL-013",
+        "VOL-248",
+        "VOL-251",
+        "VOL-252",
+        "VOL-253"
+      ],
+      "depends_on": [
+        "P1-INTEL-01"
+      ],
+      "objective": "Make reasoning/search strategy choice, uncertainty, value-of-information and stopping policy explicit, versioned and budget-bounded.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/intelligence/cognitive_runtime.py",
+        "planned:skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai",
+        "skeleton/eval",
+        "skeleton/retrieval",
+        "machine"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_cognitive_stop_policy.py",
+        "planned:skeleton/testing/test_strategy_budget.py",
+        "planned:skeleton/testing/test_uncertainty_representation.py",
+        "planned:skeleton/testing/test_search_strategy_engine.py",
+        "planned:skeleton/testing/test_value_of_information.py",
+        "planned:skeleton/testing/test_stopping_policies.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-04",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Answer and artifact quality pipeline",
+      "volume_refs": [
+        "VOL-254",
+        "VOL-255",
+        "VOL-369"
+      ],
+      "depends_on": [
+        "P1-INTEL-02",
+        "P1-INTEL-03"
+      ],
+      "objective": "Build independent answer/artifact quality gates and reasoning regression tests that do not treat self-confidence as verification.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/eval",
+        "planned:skeleton/artifacts",
+        "benchmarks"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_answer_quality_pipeline.py",
+        "planned:skeleton/testing/test_artifact_quality_pipeline.py",
+        "planned:skeleton/testing/test_reasoning_regressions.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-05",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Plan verifier and static analysis",
+      "volume_refs": [
+        "VOL-014",
+        "VOL-370",
+        "VOL-371",
+        "VOL-372"
+      ],
+      "depends_on": [
+        "P1-INTEL-03",
+        "P1-EVID-04"
+      ],
+      "objective": "Verify plan DAG dependencies, pre/postconditions, capability requirements, budgets, terminal behavior and recovery before execution.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/planning",
+        "planned:skeleton/planning/analyzer.py",
+        "planned:skeleton/planning/simulator.py",
+        "skeleton/ai",
+        "skeleton/eval",
+        "scripts",
+        "skeleton/simulation"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_plan_static_analyzer.py",
+        "planned:skeleton/testing/test_plan_cycles.py",
+        "planned:skeleton/testing/test_plan_verifier.py",
+        "planned:skeleton/testing/test_plan_simulation.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-INTEL-06",
+      "lane_id": "P1-L1",
+      "status": "blocked",
+      "title": "Core intelligence qualification bundle",
+      "volume_refs": [
+        "VOL-362",
+        "VOL-369",
+        "VOL-370"
+      ],
+      "depends_on": [
+        "P1-INTEL-02",
+        "P1-INTEL-04",
+        "P1-INTEL-05"
+      ],
+      "objective": "Aggregate routing/context/memory/retrieval/reasoning/plan evidence into one hardened core-intelligence qualification receipt.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Quality/trust/budget regressions fail promotion on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-INTEL-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "implementation_paths": [
+        "skeleton/eval",
+        "skeleton/ai",
+        "skeleton/memory/reconciliation.py",
+        "benchmarks"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_memory_quality.py",
+        "tests/test_memory_reconciliation.py",
+        "planned:skeleton/testing/test_reasoning_regressions.py",
+        "planned:skeleton/testing/test_plan_verifier.py"
+      ],
+      "evidence_modes": [
+        "quality_eval",
+        "retrieval_eval",
+        "property",
+        "replay"
+      ],
+      "failure_modes": [
+        "stale/poisoned intelligence state",
+        "unbounded reasoning/search",
+        "unsupported quality promotion"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-01",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Canonical privileged tool transaction and sandbox",
+      "volume_refs": [
+        "VOL-015",
+        "VOL-164",
+        "VOL-165"
+      ],
+      "depends_on": [
+        "P1-EVID-03"
+      ],
+      "objective": "Prove lookup, schema, authority, admission, idempotency, sandbox, execution, postcondition and receipt as one fail-closed tool transaction.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "skeleton/skills",
+        "planned:skeleton/tools",
+        "skeleton/automation",
+        "skeleton/security",
+        "skeleton/ai",
+        "machine"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_tool_authorization.py",
+        "skeleton/testing/test_shell_*.py",
+        "planned:skeleton/testing/test_tool_idempotency.py",
+        "planned:skeleton/testing/test_sandbox_runtime.py",
+        "planned:skeleton/testing/test_policy_language.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-02",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Agent identity, handoff and delegation budgets",
+      "volume_refs": [
+        "VOL-016",
+        "VOL-017",
+        "VOL-201",
+        "VOL-202",
+        "VOL-205"
+      ],
+      "depends_on": [
+        "P1-AUTO-01"
+      ],
+      "objective": "Bind agent identity, handoff packets, delegated authority, resource budgets and lease/fencing state to durable execution.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/agents",
+        "tests/test_agent_coordination.py",
+        "planned:skeleton/agents/orchestrator.py",
+        "skeleton/ai/agents",
+        "skeleton/network",
+        "machine",
+        "skeleton/security"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_agent_delegation.py",
+        "planned:skeleton/testing/test_agent_checkpoint.py",
+        "planned:skeleton/testing/test_agent_leases.py",
+        "planned:skeleton/testing/test_agent_conflicts.py",
+        "planned:skeleton/testing/test_agent_communication.py",
+        "planned:skeleton/testing/test_agent_handoff.py",
+        "planned:skeleton/testing/test_delegation_budgets.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-03",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Autonomy levels and de-escalation state machine",
+      "volume_refs": [
+        "VOL-018",
+        "VOL-318",
+        "VOL-320"
+      ],
+      "depends_on": [
+        "P1-AUTO-02",
+        "P1-INTEL-03"
+      ],
+      "objective": "Make autonomy escalation/de-escalation explicit and force uncertainty/failure toward reduced authority rather than silent widening.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/autonomy",
+        "planned:skeleton/persistence/execution_repository.py",
+        "machine",
+        "skeleton/security",
+        "skeleton/ai"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_long_horizon_resume.py",
+        "planned:skeleton/testing/test_goal_drift.py",
+        "planned:skeleton/testing/test_autonomy_levels.py",
+        "planned:skeleton/testing/test_autonomy_deescalation.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-04",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Human override, interrupt and approval receipts",
+      "volume_refs": [
+        "VOL-084",
+        "VOL-256",
+        "VOL-321",
+        "VOL-322"
+      ],
+      "depends_on": [
+        "P1-AUTO-03"
+      ],
+      "objective": "Bind approvals, interrupts, pause/resume and overrides to exact operation identity, arguments, authority, expiry and durable receipts.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/security",
+        "backend",
+        "frontend",
+        "skeleton/runtime"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_human_control.py",
+        "planned:skeleton/testing/test_revocation_propagation.py",
+        "planned:skeleton/testing/test_human_in_loop_gates.py",
+        "planned:skeleton/testing/test_human_override_plane.py",
+        "planned:skeleton/testing/test_interrupt_handling.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-05",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Blast radius, reversibility and adversarial alignment",
+      "volume_refs": [
+        "VOL-025",
+        "VOL-168",
+        "VOL-170",
+        "VOL-207",
+        "VOL-208",
+        "VOL-257",
+        "VOL-258",
+        "VOL-259",
+        "VOL-323",
+        "VOL-324",
+        "VOL-325"
+      ],
+      "depends_on": [
+        "P1-AUTO-03",
+        "P1-EVID-04"
+      ],
+      "objective": "Classify irreversible/high-impact actions and detect goal drift/specification gaming with adversarial and independent review gates.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/safety",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/security",
+        "skeleton/eval",
+        "skeleton/network",
+        "skeleton/ai/agents",
+        "machine/ai_build_accountability.json",
+        "machine"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_safety_high_impact.py",
+        "planned:skeleton/testing/test_safe_degradation.py",
+        "planned:skeleton/testing/test_ai_threat_controls.py",
+        "planned:skeleton/testing/test_zero_trust_internal.py",
+        "planned:skeleton/testing/test_adversarial_reviewer.py",
+        "planned:skeleton/testing/test_independent_verifier.py",
+        "planned:skeleton/testing/test_reversibility_classification.py",
+        "planned:skeleton/testing/test_blast_radius_model.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-AUTO-06",
+      "lane_id": "P1-L2",
+      "status": "blocked",
+      "title": "Safe autonomy qualification bundle",
+      "volume_refs": [
+        "VOL-028",
+        "VOL-208"
+      ],
+      "depends_on": [
+        "P1-AUTO-04",
+        "P1-AUTO-05"
+      ],
+      "objective": "Aggregate authority, tool, agent, approval, de-escalation and adversarial evidence into one hardened safe-autonomy receipt.",
+      "acceptance": [
+        "Task-specific invariants hold under focused positive and negative regression coverage.",
+        "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-AUTO-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/policy",
+        "skeleton/vault/governance_audit.py",
+        "skeleton/eval",
+        "machine/ai_build_accountability.json"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_authority_subset.py",
+        "planned:skeleton/testing/test_approval_expiry.py",
+        "planned:skeleton/testing/test_independent_verifier.py"
+      ],
+      "evidence_modes": [
+        "authority_negative_test",
+        "sandbox",
+        "fault_injection",
+        "human_control"
+      ],
+      "failure_modes": [
+        "authority widening",
+        "duplicate or unreceipted side effect",
+        "failed human interrupt/de-escalation"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROD-01",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "API schema and compatibility registry",
+      "volume_refs": [
+        "VOL-041"
+      ],
+      "depends_on": [
+        "P1-EVID-03"
+      ],
+      "objective": "Inventory externally visible API contracts, versions, producers/consumers and migration/compatibility rules.",
+      "acceptance": [
+        "Breaking API drift is detected before release promotion.",
+        "Reconnect/projection/tenant tests prove product state derives from durable authority.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "implementation_paths": [
+        "backend/routes",
+        "backend/core",
+        "machine/ai_runtime_schemas.json"
+      ],
+      "test_targets": [
+        "planned:backend/tests/test_api_contracts.py",
+        "planned:backend/tests/test_api_idempotency.py"
+      ],
+      "evidence_modes": [
+        "api_contract",
+        "reconnect_test",
+        "tenant_isolation",
+        "platform_test"
+      ],
+      "failure_modes": [
+        "projection becomes authority",
+        "stream reconciliation failure",
+        "tenant identity drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROD-02",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Streaming projection authority",
+      "volume_refs": [
+        "VOL-040",
+        "VOL-042",
+        "VOL-044"
+      ],
+      "depends_on": [
+        "P1-PROD-01",
+        "P1-EVID-01"
+      ],
+      "objective": "Bind cursor/replay/resync and client projection state to durable operation/event authority.",
+      "acceptance": [
+        "Refresh, reconnect, duplicate and out-of-order delivery reconstruct the same durable truth.",
+        "Reconnect/projection/tenant tests prove product state derives from durable authority.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "implementation_paths": [
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "frontend",
+        "skeleton/frontier/operation_stream.py",
+        "backend/routes",
+        "planned:skeleton/product_shell",
+        "planned:skeleton/product/web"
+      ],
+      "test_targets": [
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "planned:frontend operation reducer tests",
+        "planned:frontend product-state reducer tests",
+        "planned:backend/tests/test_product_shell_projection.py",
+        "planned:frontend reconnect tests",
+        "planned:frontend browser-storage policy tests"
+      ],
+      "evidence_modes": [
+        "api_contract",
+        "reconnect_test",
+        "tenant_isolation",
+        "platform_test"
+      ],
+      "failure_modes": [
+        "projection becomes authority",
+        "stream reconciliation failure",
+        "tenant identity drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROD-03",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Workspace and product projection contract",
+      "volume_refs": [
+        "VOL-042",
+        "VOL-045"
+      ],
+      "depends_on": [
+        "P1-PROD-02"
+      ],
+      "objective": "Define product/workspace projection records for progress, blockers, cost, evidence and terminal results.",
+      "acceptance": [
+        "UI projections cannot invent or overwrite canonical operation state.",
+        "Reconnect/projection/tenant tests prove product state derives from durable authority.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "implementation_paths": [
+        "frontend",
+        "backend/routes",
+        "planned:skeleton/product_shell",
+        "backend/core",
+        "skeleton/frontier/operation_stream.py"
+      ],
+      "test_targets": [
+        "planned:frontend product-state reducer tests",
+        "planned:backend/tests/test_product_shell_projection.py",
+        "planned:frontend long-operation state tests",
+        "planned:backend/tests/test_user_control_receipts.py"
+      ],
+      "evidence_modes": [
+        "api_contract",
+        "reconnect_test",
+        "tenant_isolation",
+        "platform_test"
+      ],
+      "failure_modes": [
+        "projection becomes authority",
+        "stream reconciliation failure",
+        "tenant identity drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROD-04",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Operator controls projection",
+      "volume_refs": [
+        "VOL-045"
+      ],
+      "depends_on": [
+        "P1-PROD-03",
+        "P1-AUTO-04"
+      ],
+      "objective": "Project canonical pause/resume/cancel/human-override state into product UX without moving authority into the UI.",
+      "acceptance": [
+        "Control actions survive reconnect/restart and preserve terminal finality.",
+        "Reconnect/projection/tenant tests prove product state derives from durable authority.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "implementation_paths": [
+        "frontend",
+        "backend/core",
+        "skeleton/frontier/operation_stream.py"
+      ],
+      "test_targets": [
+        "planned:frontend long-operation state tests",
+        "planned:backend/tests/test_user_control_receipts.py"
+      ],
+      "evidence_modes": [
+        "api_contract",
+        "reconnect_test",
+        "tenant_isolation",
+        "platform_test"
+      ],
+      "failure_modes": [
+        "projection becomes authority",
+        "stream reconciliation failure",
+        "tenant identity drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROD-05",
+      "lane_id": "P1-L3",
+      "status": "blocked",
+      "title": "Web/desktop tenant and storage boundary",
+      "volume_refs": [
+        "VOL-043",
+        "VOL-044",
+        "VOL-046"
+      ],
+      "depends_on": [
+        "P1-PROD-01",
+        "P1-PROD-02",
+        "P1-AUTO-01"
+      ],
+      "objective": "Propagate tenant identity, permission and storage classification through desktop/web/API/stream boundaries.",
+      "acceptance": [
+        "Cross-tenant, local-storage and permission boundary regressions are executable tests.",
+        "Reconnect/projection/tenant tests prove product state derives from durable authority.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROD-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "implementation_paths": [
+        "desktop",
+        "planned:skeleton/product/desktop",
+        "backend",
+        "frontend",
+        "backend/routes",
+        "planned:skeleton/product/web",
+        "skeleton/security",
+        "skeleton/persistence"
+      ],
+      "test_targets": [
+        "planned:desktop lifecycle tests",
+        "planned:desktop integration permission tests",
+        "planned:frontend reconnect tests",
+        "planned:frontend browser-storage policy tests",
+        "planned:skeleton/testing/test_tenant_isolation.py",
+        "planned:backend/tests/test_tenant_scope.py"
+      ],
+      "evidence_modes": [
+        "api_contract",
+        "reconnect_test",
+        "tenant_isolation",
+        "platform_test"
+      ],
+      "failure_modes": [
+        "projection becomes authority",
+        "stream reconciliation failure",
+        "tenant identity drift"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-01",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Experiment registry",
+      "volume_refs": [
+        "VOL-077"
+      ],
+      "depends_on": [
+        "P1-EVID-01",
+        "P1-INTEL-01"
+      ],
+      "objective": "Define experiment identity, hypotheses, traffic/data eligibility, environment, budgets, metrics and lineage.",
+      "acceptance": [
+        "Experiment results are reproducible and cannot silently change production authority.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "experiments",
+        "skeleton/evaluation",
+        "machine"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_experiment_manifest.py",
+        "planned:skeleton/testing/test_experiment_isolation.py"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-02",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Benchmark registry and contamination controls",
+      "volume_refs": [
+        "VOL-082",
+        "VOL-035"
+      ],
+      "depends_on": [
+        "P1-LEARN-01",
+        "P1-EVID-05",
+        "P1-INTEL-06"
+      ],
+      "objective": "Version benchmark datasets, splits, contamination status, metric policy and environment.",
+      "acceptance": [
+        "Improvement claims fail when benchmark lineage or contamination state is missing.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "benchmarks",
+        "skeleton/eval",
+        "machine",
+        "eval",
+        "tests",
+        "planned:skeleton/evaluation"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_benchmark_registry.py",
+        "planned:benchmark replay tests",
+        "planned:skeleton/testing/test_eval_reproducibility.py",
+        "planned:skeleton/testing/test_benchmark_metadata.py"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-03",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Candidate and champion/challenger registry",
+      "volume_refs": [
+        "VOL-023",
+        "VOL-415"
+      ],
+      "depends_on": [
+        "P1-LEARN-01",
+        "P1-LEARN-02"
+      ],
+      "objective": "Standardize candidate artifacts and incumbent/challenger comparison state with immutable promotion history.",
+      "acceptance": [
+        "Candidate cannot overwrite champion and every promotion has comparative evidence.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/forge",
+        "planned:skeleton/experiments",
+        "machine",
+        "skeleton/eval"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_forge_isolation.py",
+        "planned:skeleton/testing/test_champion_challenger.py",
+        "planned:skeleton/testing/test_champion_challenger_registry.py"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-04",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Shadow traffic isolation",
+      "volume_refs": [
+        "VOL-414"
+      ],
+      "depends_on": [
+        "P1-LEARN-03",
+        "P1-AUTO-05",
+        "P1-PROD-02"
+      ],
+      "objective": "Mirror eligible traffic to candidates with redaction, side-effect suppression and paired-comparison metadata.",
+      "acceptance": [
+        "Shadow execution cannot affect authoritative user outcomes or widen privacy boundaries.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/eval"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_shadow_traffic.py"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-05",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Specification and reasoning regression corpus",
+      "volume_refs": [
+        "VOL-324",
+        "VOL-369",
+        "VOL-083"
+      ],
+      "depends_on": [
+        "P1-LEARN-02",
+        "P1-EVID-04"
+      ],
+      "objective": "Turn adversarial/specification-gaming and reasoning failures into versioned promotion-blocking regressions.",
+      "acceptance": [
+        "Known failure classes block promotion when they regress.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "skeleton/eval",
+        "benchmarks",
+        "skeleton/security",
+        "tests"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_specification_gaming.py",
+        "planned:skeleton/testing/test_reasoning_regressions.py",
+        "planned:skeleton/testing/test_red_team_registry.py",
+        "planned:red-team regression conversion tests"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-LEARN-06",
+      "lane_id": "P1-L4",
+      "status": "blocked",
+      "title": "Failure knowledge pipeline",
+      "volume_refs": [
+        "VOL-419",
+        "VOL-024"
+      ],
+      "depends_on": [
+        "P1-LEARN-05"
+      ],
+      "objective": "Ingest incidents, failed experiments, rejected designs and counterexamples into structured failure knowledge linked to risks/tests.",
+      "acceptance": [
+        "Repeated failures are traceable to regression coverage or explicit non-applicability.",
+        "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-LEARN-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "implementation_paths": [
+        "machine",
+        "docs/plan",
+        "planned:skeleton/learning",
+        "planned:skeleton/experiments"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_knowledge_of_failure.py",
+        "planned:skeleton/testing/test_learning_signal_lineage.py",
+        "planned:skeleton/testing/test_no_direct_self_modify.py"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "shadow",
+        "adversarial",
+        "reproducibility"
+      ],
+      "failure_modes": [
+        "candidate self-promotion",
+        "benchmark leakage",
+        "shadow side effect"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-01",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Release evidence bundle",
+      "volume_refs": [
+        "VOL-060",
+        "VOL-075",
+        "VOL-076"
+      ],
+      "depends_on": [
+        "P1-EVID-05",
+        "P1-PROD-05",
+        "P1-LEARN-03",
+        "P1-AUTO-06"
+      ],
+      "objective": "Bind release artifacts, config, SBOM/provenance, tests/evals, installer metadata and rollback evidence to one digest.",
+      "acceptance": [
+        "Release candidate is reconstructable from its evidence bundle.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "scripts",
+        ".github/workflows",
+        "machine",
+        "planned:skeleton/artifacts",
+        "skeleton/persistence",
+        "planned:skeleton/storage/cas"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_release_provenance.py",
+        "planned:skeleton/testing/test_release_qualification.py",
+        "planned:skeleton/testing/test_artifact_manifest.py",
+        "planned:skeleton/testing/test_artifact_lifecycle.py",
+        "planned:skeleton/testing/test_cas_integrity.py",
+        "planned:skeleton/testing/test_cas_gc.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-02",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Installer/update/repair lifecycle",
+      "volume_refs": [
+        "VOL-047",
+        "VOL-048",
+        "VOL-049",
+        "VOL-050"
+      ],
+      "depends_on": [
+        "P1-REL-01"
+      ],
+      "objective": "Prove clean install, interrupted update, repair, uninstall and residual ownership semantics.",
+      "acceptance": [
+        "Lifecycle operations are idempotent/recoverable and leave no unowned critical state.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "installer",
+        "scripts",
+        "machine",
+        "updater",
+        "repair",
+        "uninstaller"
+      ],
+      "test_targets": [
+        "planned:installer/tests/test_clean_install.py",
+        "planned:installer/tests/test_install_rollback.py",
+        "planned:updater/tests/test_atomic_update.py",
+        "planned:updater/tests/test_update_rollback.py",
+        "planned:repair/tests/test_diagnose_before_mutate.py",
+        "planned:repair/tests/test_repair_reconciliation.py",
+        "planned:uninstaller/tests/test_retention_policy.py",
+        "planned:uninstaller/tests/test_residual_state.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-03",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Migration and rollback compatibility",
+      "volume_refs": [
+        "VOL-048",
+        "VOL-061",
+        "VOL-063",
+        "VOL-062"
+      ],
+      "depends_on": [
+        "P1-REL-01",
+        "P1-REL-02"
+      ],
+      "objective": "Bind schema/config migrations to declared rollback windows and backward-read compatibility.",
+      "acceptance": [
+        "Rollback can read state created by upgraded versions within the declared compatibility window.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "updater",
+        "installer",
+        "machine",
+        "deploy",
+        "scripts",
+        "config",
+        "skeleton",
+        "backend"
+      ],
+      "test_targets": [
+        "planned:updater/tests/test_atomic_update.py",
+        "planned:updater/tests/test_update_rollback.py",
+        "planned:deploy/tests/test_canary_gate.py",
+        "planned:deploy/tests/test_partial_rollback.py",
+        "planned:skeleton/testing/test_config_precedence.py",
+        "planned:skeleton/testing/test_config_validation.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-04",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Backup and restore qualification",
+      "volume_refs": [
+        "VOL-064",
+        "VOL-065"
+      ],
+      "depends_on": [
+        "P1-REL-03"
+      ],
+      "objective": "Define backup coverage, restore dependency order and derived-state rebuild semantics; execute restore drills.",
+      "acceptance": [
+        "Authoritative state restores without semantic loss and derived projections rebuild deterministically.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "backup",
+        "skeleton/persistence",
+        "machine",
+        "recovery",
+        "docs"
+      ],
+      "test_targets": [
+        "planned:backup/tests/test_backup_manifest.py",
+        "planned:backup/tests/test_backup_integrity.py",
+        "planned:recovery/tests/test_recovery_order.py",
+        "planned:recovery/tests/test_post_restore_reconcile.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-05",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Disaster recovery and incident feedback",
+      "volume_refs": [
+        "VOL-065",
+        "VOL-066"
+      ],
+      "depends_on": [
+        "P1-REL-04",
+        "P1-LEARN-06"
+      ],
+      "objective": "Exercise disaster scenarios and route incident/postmortem actions into risk/gap/failure ledgers.",
+      "acceptance": [
+        "DR evidence includes RTO/RPO behavior and every corrective action has accountable follow-up.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "recovery",
+        "backup",
+        "docs",
+        "scripts",
+        "skeleton/observability"
+      ],
+      "test_targets": [
+        "planned:recovery/tests/test_recovery_order.py",
+        "planned:recovery/tests/test_post_restore_reconcile.py",
+        "planned:skeleton/testing/test_break_glass.py",
+        "planned:skeleton/testing/test_incident_evidence.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-REL-06",
+      "lane_id": "P1-L5",
+      "status": "blocked",
+      "title": "Attribution and release notices",
+      "volume_refs": [
+        "VOL-409"
+      ],
+      "depends_on": [
+        "P1-REL-01"
+      ],
+      "objective": "Generate release attribution and notices from provenance/license lineage.",
+      "acceptance": [
+        "Release notices are traceable to exact contributing versions and obligations.",
+        "Clean-machine, rollback and recovery evidence is executable on the exact head.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-REL-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/artifacts",
+        "docs"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_attribution_engine.py"
+      ],
+      "evidence_modes": [
+        "clean_machine",
+        "rollback",
+        "restore_drill",
+        "incident"
+      ],
+      "failure_modes": [
+        "migration/rollback incompatibility",
+        "restore failure",
+        "unreproducible release"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-01",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Remote execution and worker trust",
+      "volume_refs": [
+        "VOL-030",
+        "VOL-398",
+        "VOL-399"
+      ],
+      "depends_on": [
+        "P1-EVID-03",
+        "P1-PROD-05",
+        "P1-AUTO-06"
+      ],
+      "objective": "Define remote execution envelope, worker identity, attestation, leases and fencing.",
+      "acceptance": [
+        "Unattested or stale workers cannot commit authoritative effects.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/distributed",
+        "planned:skeleton/workers",
+        "skeleton/ai",
+        "skeleton/network",
+        "skeleton/security",
+        "skeleton/runtime"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_stale_lease_fencing.py",
+        "planned:skeleton/testing/test_partition_semantics.py",
+        "planned:skeleton/testing/test_remote_execution_protocol.py",
+        "planned:skeleton/testing/test_worker_attestation.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-02",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Topology-aware model placement and warming",
+      "volume_refs": [
+        "VOL-031",
+        "VOL-381",
+        "VOL-382",
+        "VOL-385",
+        "VOL-392",
+        "VOL-397"
+      ],
+      "depends_on": [
+        "P1-DIST-01"
+      ],
+      "objective": "Bind model placement/warming decisions to compute/network topology, readiness and data-boundary constraints.",
+      "acceptance": [
+        "Placement is reproducible and respects hard resource/security constraints.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/compute",
+        "planned:skeleton/hardware",
+        "skeleton/ai",
+        "skeleton/network",
+        "skeleton/runtime",
+        "machine"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_resource_admission.py",
+        "planned:skeleton/testing/test_device_loss.py",
+        "planned:skeleton/testing/test_inference_control_plane.py",
+        "planned:skeleton/testing/test_model_placement.py",
+        "planned:skeleton/testing/test_model_warming.py",
+        "planned:skeleton/testing/test_hardware_topology.py",
+        "planned:skeleton/testing/test_network_topology_awareness.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-03",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Batching and autoscaling controller",
+      "volume_refs": [
+        "VOL-386",
+        "VOL-390"
+      ],
+      "depends_on": [
+        "P1-DIST-02"
+      ],
+      "objective": "Implement deadline-aware continuous batching and autoscaling against measured service objectives.",
+      "acceptance": [
+        "Throughput improvements cannot violate tail-latency, cancellation or quality budgets.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "skeleton/runtime",
+        "skeleton/ai",
+        "skeleton/observability"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_continuous_batching.py",
+        "planned:skeleton/testing/test_inference_autoscaling.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-04",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Load and capacity qualification",
+      "volume_refs": [
+        "VOL-067",
+        "VOL-068",
+        "VOL-391",
+        "VOL-029"
+      ],
+      "depends_on": [
+        "P1-DIST-03"
+      ],
+      "objective": "Define canonical load profiles, saturation points, load shedding and capacity-plan evidence.",
+      "acceptance": [
+        "Capacity exhaustion follows declared degradation policy instead of uncontrolled collapse.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-04",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "benchmarks",
+        "scripts",
+        "skeleton",
+        "skeleton/runtime",
+        "skeleton/observability",
+        "machine",
+        "skeleton/eval"
+      ],
+      "test_targets": [
+        "planned:benchmarks/test_performance_contracts.py",
+        "planned:skeleton/testing/test_performance_budget_schema.py",
+        "planned:skeleton/testing/test_capacity_limits.py",
+        "planned:skeleton/testing/test_admission_thresholds.py",
+        "planned:skeleton/testing/test_inference_load_profiles.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-05",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Quota and budget accounting ledger",
+      "volume_refs": [
+        "VOL-069",
+        "VOL-403",
+        "VOL-404"
+      ],
+      "depends_on": [
+        "P1-DIST-01",
+        "P1-EVID-01"
+      ],
+      "objective": "Unify quota hierarchy with idempotent budget reservation, charge and reconciliation.",
+      "acceptance": [
+        "Duplicate/retry paths cannot double-charge or bypass quota/authority constraints.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-05",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "skeleton/runtime",
+        "machine",
+        "skeleton/persistence"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_cost_budget.py",
+        "planned:skeleton/testing/test_cost_attribution.py",
+        "planned:skeleton/testing/test_compute_quotas.py",
+        "planned:skeleton/testing/test_budget_accounting_ledger.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-DIST-06",
+      "lane_id": "P1-L6",
+      "status": "blocked",
+      "title": "Forecasting and cost anomaly loop",
+      "volume_refs": [
+        "VOL-405",
+        "VOL-406"
+      ],
+      "depends_on": [
+        "P1-DIST-04",
+        "P1-DIST-05"
+      ],
+      "objective": "Backtest demand/capacity/cost forecasts and connect anomalies to accountable incident/workflow handling.",
+      "acceptance": [
+        "Forecast accuracy and anomaly thresholds are measured, versioned and tied to operational action.",
+        "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-DIST-06",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "skeleton/eval"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_forecasting_engine.py",
+        "planned:skeleton/testing/test_cost_anomaly_detection.py"
+      ],
+      "evidence_modes": [
+        "load",
+        "partition",
+        "failover",
+        "cost_reconciliation"
+      ],
+      "failure_modes": [
+        "stale worker commit",
+        "capacity collapse",
+        "budget/accounting divergence"
+      ],
+      "rollback_or_recovery": "No maturity state changes until independent evidence passes; failed implementation remains revertible behind the prior canonical contract.",
+      "promotion_effect": "maturity_candidate"
+    },
+    {
+      "task_id": "P1-PROM-01",
+      "lane_id": "P1-L7",
+      "status": "blocked",
+      "title": "Aggregate exact-head P1 evidence",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-EVID-06",
+        "P1-PROD-04",
+        "P1-PROD-05",
+        "P1-LEARN-04",
+        "P1-LEARN-06",
+        "P1-REL-05",
+        "P1-REL-06",
+        "P1-DIST-06",
+        "P1-INTEL-06",
+        "P1-AUTO-06"
+      ],
+      "objective": "Assemble exact-head lane receipts and maturity results into one terminal P1 evidence package.",
+      "acceptance": [
+        "Every primary frontier volume is represented with required maturity evidence or explicit blocking status.",
+        "Independent exact-head promotion verification passes or records explicit rejection.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-01",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "machine/ai_p1_task_backlog.json"
+      ],
+      "test_targets": [
+        "tests/test_ai_p1_execution_map.py"
+      ],
+      "evidence_modes": [
+        "exact_head_bundle",
+        "independent_verification",
+        "recovery",
+        "adversarial"
+      ],
+      "failure_modes": [
+        "stale lane evidence",
+        "residual critical blocker",
+        "unsigned terminal promotion"
+      ],
+      "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
+      "promotion_effect": "terminal_candidate"
+    },
+    {
+      "task_id": "P1-PROM-02",
+      "lane_id": "P1-L7",
+      "status": "blocked",
+      "title": "Terminal failure-journey qualification",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-PROM-01"
+      ],
+      "objective": "Run clean-machine, rollback, restore, saturation, partition, adversarial, provider-failover and stale-evidence journeys.",
+      "acceptance": [
+        "All mandatory P1 failure families pass on the promotion head or block promotion.",
+        "Independent exact-head promotion verification passes or records explicit rejection.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-02",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "machine/ai_p1_task_backlog.json"
+      ],
+      "test_targets": [
+        "tests/test_ai_p1_execution_map.py"
+      ],
+      "evidence_modes": [
+        "exact_head_bundle",
+        "independent_verification",
+        "recovery",
+        "adversarial"
+      ],
+      "failure_modes": [
+        "stale lane evidence",
+        "residual critical blocker",
+        "unsigned terminal promotion"
+      ],
+      "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
+      "promotion_effect": "terminal_candidate"
+    },
+    {
+      "task_id": "P1-PROM-03",
+      "lane_id": "P1-L7",
+      "status": "blocked",
+      "title": "Independent signed P1 promotion decision",
+      "volume_refs": [],
+      "depends_on": [
+        "P1-PROM-02"
+      ],
+      "objective": "Independently verify all P1 evidence and record signed promotion or explicit rejection without self-certification.",
+      "acceptance": [
+        "Promotion is exact-head, independently verified, signed, and leaves deferred 357-volume work visible.",
+        "Independent exact-head promotion verification passes or records explicit rejection.",
+        "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
+      ],
+      "evidence_refs": [],
+      "accountability_ref": "ACC-P1-PROM-03",
+      "owner_kind": "P1-lane",
+      "priority": "P1",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "implementation_paths": [
+        "machine/ai_p1_task_backlog.json"
+      ],
+      "test_targets": [
+        "tests/test_ai_p1_execution_map.py"
+      ],
+      "evidence_modes": [
+        "exact_head_bundle",
+        "independent_verification",
+        "recovery",
+        "adversarial"
+      ],
+      "failure_modes": [
+        "stale lane evidence",
+        "residual critical blocker",
+        "unsigned terminal promotion"
+      ],
+      "rollback_or_recovery": "Terminal promotion is rejected atomically; no maturity state changes on partial evidence.",
+      "promotion_effect": "terminal_candidate"
+    }
+  ],
+  "summary": {
+    "task_count": 44,
+    "lane_task_counts": {
+      "P1-L0": 6,
+      "P1-L1": 6,
+      "P1-L2": 6,
+      "P1-L3": 5,
+      "P1-L4": 6,
+      "P1-L5": 6,
+      "P1-L6": 6,
+      "P1-L7": 3
+    },
+    "ready_count": 1,
+    "blocked_count": 43,
+    "in_progress_count": 0,
+    "evidence_pending_count": 0,
+    "done_count": 0
+  }
+}
