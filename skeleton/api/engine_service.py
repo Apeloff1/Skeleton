@@ -1317,7 +1317,6 @@ class SQLiteEngineSubmissionStore:
                         existing.tenant_id,
                         existing.idempotency_key,
                         existing.approval_ref,
-                        existing.expires_at,
                     )
                     stable_candidate = (
                         approval.approval_id,
@@ -1329,14 +1328,33 @@ class SQLiteEngineSubmissionStore:
                         approval.tenant_id,
                         approval.idempotency_key,
                         approval.approval_ref,
-                        approval.expires_at,
                     )
                     if stable_existing != stable_candidate:
                         raise EngineSubmissionConflict(
                             "approval idempotency identity was reused differently"
                         )
+                    if existing.expires_at == approval.expires_at:
+                        self._connection.execute("COMMIT")
+                        return existing
+                    if not existing.expired(now=approval.issued_at):
+                        raise EngineSubmissionConflict(
+                            "active approval cannot be renewed with a different expiry"
+                        )
+                    self._connection.execute(
+                        """
+                        UPDATE engine_tool_approval
+                        SET issued_at = ?, expires_at = ?
+                        WHERE namespace = ? AND approval_id = ?
+                        """,
+                        (
+                            approval.issued_at.isoformat(),
+                            approval.expires_at.isoformat(),
+                            self.namespace,
+                            approval.approval_id,
+                        ),
+                    )
                     self._connection.execute("COMMIT")
-                    return existing
+                    return approval
                 self._connection.execute(
                     """
                     INSERT INTO engine_tool_approval(
