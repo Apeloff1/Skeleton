@@ -19,6 +19,9 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/testing/live_engine_process_app.py"
       - "scripts/check_engine_container_boundary.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
       - ".github/workflows/engine-container-boundary.yml"
   workflow_dispatch:
 
@@ -65,6 +68,71 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check -e . httpx==0.28.1
+
+      - name: Assert Stage-5 closure contract consistency
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          gap_id = "gap-engine-application-execution-boundary"
+          dependencies = {
+              "gap-cognitive-execution-loop",
+              "gap-state-authority-convergence",
+              "gap-provider-surface-convergence",
+          }
+
+          construction = json.loads(
+              Path("machine/ai_app_construction.json").read_text(encoding="utf-8")
+          )
+          handoff = json.loads(
+              Path("machine/ai_implementation_handoff.json").read_text(encoding="utf-8")
+          )
+          closure = json.loads(
+              Path("machine/ai_closure_evidence.json").read_text(encoding="utf-8")
+          )
+
+          gap = next(item for item in construction["gap_register"] if item["id"] == gap_id)
+          blueprint = construction["engine_application_boundary_blueprint"]
+          handoff_entry = next(item for item in handoff["entries"] if item["gap"] == gap_id)
+          closure_entry = next(item for item in closure["entries"] if item["gap"] == gap_id)
+
+          if gap.get("status") != "closed":
+              raise SystemExit("Stage-5 construction gap is not closed")
+          if blueprint.get("status") != "closed":
+              raise SystemExit("Stage-5 blueprint is not closed")
+          if handoff_entry.get("implementation_status") != "closed":
+              raise SystemExit("Stage-5 implementation handoff is not closed")
+          if closure_entry.get("closure_decision") != "closed":
+              raise SystemExit("Stage-5 closure decision is not closed")
+          if closure_entry.get("implementation_state") != "closed":
+              raise SystemExit("Stage-5 implementation state is not closed")
+          if closure_entry.get("outstanding_evidence"):
+              raise SystemExit("Stage-5 closure still has outstanding evidence")
+          if closure_entry.get("blockers"):
+              raise SystemExit("Stage-5 closure still has blockers")
+
+          statuses = {
+              item["id"]: item.get("status")
+              for item in construction["gap_register"]
+              if item.get("id") in dependencies
+          }
+          if set(statuses) != dependencies:
+              raise SystemExit("Stage-5 dependency inventory is incomplete")
+          open_dependencies = sorted(
+              gap for gap, status in statuses.items() if status != "closed"
+          )
+          if open_dependencies:
+              raise SystemExit(
+                  "Stage-5 has non-closed dependencies: " + ", ".join(open_dependencies)
+              )
+
+          if set(handoff_entry.get("depends_on") or []) != dependencies:
+              raise SystemExit("Stage-5 handoff dependency graph drift")
+
+          print("Stage-5 closure contract is internally consistent")
+          PY
 
       - name: Build and start canonical engine topology
         run: |
