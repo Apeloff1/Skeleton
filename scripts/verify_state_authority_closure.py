@@ -181,6 +181,10 @@ def _verify_authorities(
     for domain_id, domain in domains.items():
         authority = domain.get("authority")
         store_id = domain.get("physical_store")
+        if domain.get("gap") == "gap-state-authority-convergence":
+            errors.append(
+                f"state-authority gap still owns unbound domain {domain_id}"
+            )
         if authority == "authoritative":
             if domain.get("source_of_truth") is not True:
                 errors.append(
@@ -216,10 +220,6 @@ def _verify_authorities(
                 errors.append(
                     f"authoritative-unbound domain {domain_id} must use an "
                     "unbound physical store"
-                )
-            if domain.get("gap") == "gap-state-authority-convergence":
-                errors.append(
-                    f"state-authority gap still owns unbound domain {domain_id}"
                 )
 
     return declared
