@@ -19,6 +19,10 @@ on:
       - "skeleton/testing/test_engine_execution_service.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_ai_golden_journeys.py"
+      - "skeleton/frontier/operation_stream_store_mongo.py"
+      - "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
+      - "skeleton/testing/test_operation_stream_store_mongo.py"
+      - "backend/core/operation_stream_transport.py"
       - "backend/tests/test_engine_cross_service_closure.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_conversation_governance.py"
@@ -107,6 +111,11 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_ai_golden_journeys.py
+
+      - name: Prove Mongo shared authority transaction capability fencing
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_operation_stream_store_mongo.py
 
       - name: Run approval expiry and restart contracts
         run: >-
