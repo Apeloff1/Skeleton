@@ -1472,7 +1472,8 @@
         "scripts/verify_stage7_golden_journeys.py independently verifies Stage-7 journey coverage, dependency graph, blueprint state and AI-tree mirror parity",
         ".github/workflows/stage7-golden-journeys-closure.yml binds deterministic engine, authenticated cross-service, browser-session and independent verifier evidence to exact PR head",
         "backend/tests/test_operation_stream_mongo_stage7.py uses a real transaction-capable Mongo replica set to prove shared operation/event authority, retryable update failure atomicity and safe retry",
-        "skeleton/testing/test_execution_runtime.py proves provider-response-before-checkpoint crash recovery fails closed without a second provider call"
+        "skeleton/testing/test_execution_runtime.py proves provider-response-before-checkpoint crash recovery fails closed without a second provider call",
+        "Stage-7 gate runs canonical engine process restart, approval restart, admission rehydration, execution database reopen, staged-finalization replay and governance audit restart journeys"
       ],
       "remaining": [
         "collect fresh exact-head Stage-7 Golden Journeys Closure Gate evidence",
