@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = Path("machine/p1_required_gate_authority.json")
 MASTER_PLAN_PATH = Path("machine/ai_master_plan.json")
 EXPECTED_POLICY_ID = "skeleton.p1.required_gate_authority"
+EXPECTED_POLICY_VERSION = "1.0.0"
 EXPECTED_TASK_ID = "P1-EVID-03"
 EXPECTED_ACCOUNTABILITY = "ACC-P1-EVID-03"
 EXPECTED_GATE_COUNT = 22
@@ -50,6 +51,7 @@ _ALLOWED_GROUPS = {
     "security",
 }
 _NAME_RE = re.compile(r"^name:\s*(.+?)\s*$", re.MULTILINE)
+_GATE_ID_RE = re.compile(r"^GATE-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
 
 
 class GateAuthorityValidationError(RuntimeError):
@@ -103,6 +105,10 @@ def validate_authority(
         errors.append("authority schema_version must equal 1")
     if authority.get("policy_id") != EXPECTED_POLICY_ID:
         errors.append("authority policy_id drift")
+    if authority.get("policy_version") != EXPECTED_POLICY_VERSION:
+        errors.append("authority policy_version drift")
+    if authority.get("authority") != str(authority_path):
+        errors.append("authority self-path drift")
     if authority.get("task_id") != EXPECTED_TASK_ID:
         errors.append("authority task_id drift")
     if authority.get("accountability_ref") != EXPECTED_ACCOUNTABILITY:
@@ -139,6 +145,8 @@ def validate_authority(
         group = gate.get("group")
         if not isinstance(gate_id, str) or not gate_id:
             errors.append(f"gate[{index}] missing id")
+        elif not _GATE_ID_RE.fullmatch(gate_id):
+            errors.append(f"invalid gate id: {gate_id}")
         elif gate_id in ids:
             errors.append(f"duplicate gate id: {gate_id}")
         else:
@@ -189,6 +197,7 @@ def validate_authority(
         errors.append("authority groups must be a list")
         groups = []
     declared_groups: dict[str, set[str]] = {}
+    seen_group_names: set[str] = set()
     for row in groups:
         if not isinstance(row, dict):
             errors.append("authority group entries must be objects")
@@ -198,6 +207,10 @@ def validate_authority(
         if name not in _ALLOWED_GROUPS:
             errors.append(f"invalid authority group name: {name!r}")
             continue
+        if name in seen_group_names:
+            errors.append(f"duplicate authority group name: {name}")
+            continue
+        seen_group_names.add(str(name))
         if not isinstance(refs, list) or not refs:
             errors.append(f"group {name}: gate_ids must be non-empty")
             continue
