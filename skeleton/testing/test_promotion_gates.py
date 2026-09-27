@@ -262,6 +262,7 @@ def test_malformed_observation_fails_during_construction() -> None:
     with pytest.raises(PromotionGateError, match="run_attempt"):
         _observation("Gate", run_attempt=0)
 
+
 def test_only_accepted_decision_can_materialize_promotion_evidence() -> None:
     authority = _authority()
     accepted = evaluate_required_gates(
