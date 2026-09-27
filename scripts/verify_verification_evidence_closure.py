@@ -368,9 +368,9 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append(
                 "closed verification gap requires closed handoff state"
             )
-        if blueprint_status != "closed":
+        if blueprint_status != "complete":
             errors.append(
-                "closed verification gap requires closed blueprint state"
+                "closed verification gap requires complete blueprint state"
             )
         if closure_decision != "closed":
             errors.append(
