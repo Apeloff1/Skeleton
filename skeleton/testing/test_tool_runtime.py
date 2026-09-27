@@ -1160,3 +1160,45 @@ async def test_async_tool_privacy_denial_precedes_handler() -> None:
     assert receipt.error_code == "tool_data_ceiling_exceeded"
     assert receipt.governance_decision_ref.startswith("gov-tool-")
     assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_successful_async_postcondition_is_durable_receipt_evidence(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-postcondition-receipts.sqlite3"
+    store = SQLiteToolReceiptStore(path)
+    runtime = AsyncToolRuntime(receipt_store=store)
+    observations = []
+
+    async def handler(_request):
+        return "artifact:verified"
+
+    async def postcondition(request, result_ref):
+        observations.append((request.request_id, result_ref))
+        return result_ref == "artifact:verified"
+
+    await runtime.register(
+        _manifest(),
+        handler,
+        postcondition=postcondition,
+    )
+    request = _request()
+    receipt = await runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert receipt.postcondition_verified is True
+    assert receipt.as_dict()["postcondition_verified"] is True
+    assert observations == [(request.request_id, "artifact:verified")]
+    store.close()
+
+    reopened = SQLiteToolReceiptStore(path)
+    recovered_runtime = AsyncToolRuntime(receipt_store=reopened)
+    recovered = await recovered_runtime.receipt(
+        tenant_id=request.tenant_id,
+        operation_id=request.operation_id,
+        idempotency_key=request.idempotency_key,
+    )
+    assert recovered is not None
+    assert recovered.postcondition_verified is True
+    reopened.close()
