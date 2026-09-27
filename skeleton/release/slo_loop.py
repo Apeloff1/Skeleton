@@ -246,7 +246,7 @@ class ReleaseSLOLoop:
                 p99_latency_ms=p99_latency_ms,
                 quality_score=quality_score,
                 samples=samples,
-                bad=False,
+                bad=None,
                 reason="insufficient canary samples",
             )
             return receipt
@@ -336,7 +336,7 @@ class ReleaseSLOLoop:
         else:
             self.canary.pause(rollout.rollout_id)
             receipt_action = "held"
-            bad = False
+            bad = None
 
         return self._receipt(
             release_id,
@@ -410,11 +410,12 @@ class ReleaseSLOLoop:
         p99_latency_ms: float,
         quality_score: float,
         samples: int,
-        bad: bool,
+        bad: bool | None,
         reason: str,
         operator_id: str = "",
     ) -> ReleaseDecisionReceipt:
-        self.slo.record(self.slo_name, bad=bad)
+        if bad is not None:
+            self.slo.record(self.slo_name, bad=bad)
         receipt = ReleaseDecisionReceipt(
             release_id=release_id,
             rollout_id=state.rollout.rollout_id,
