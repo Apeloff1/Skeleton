@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import json
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 
 class MaturityReconciliationError(ValueError):
@@ -165,6 +165,8 @@ def _field_blockers(
     volume: Mapping[str, Any],
     maturity_policy: Mapping[str, Any],
     state: str,
+    *,
+    reference_validator: Callable[[str, str], bool] | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     executable_fields = {
@@ -180,6 +182,20 @@ def _field_blockers(
                 blockers.append(
                     f"{state}: {field} must contain materialized references"
                 )
+            elif (
+                reference_validator is not None
+                and field in {"implementation_paths", "tests"}
+            ):
+                unresolved = sorted(
+                    str(item)
+                    for item in value
+                    if not reference_validator(field, str(item))
+                )
+                if unresolved:
+                    blockers.append(
+                        f"{state}: {field} contains unresolved repository "
+                        f"references: {','.join(unresolved)}"
+                    )
         elif not _nonempty_sequence(value):
             blockers.append(f"{state}: {field} must be non-empty")
     return blockers
@@ -242,6 +258,7 @@ def reconcile_volume(
     maturity_policy: Mapping[str, Any],
     *,
     target_floor: str,
+    reference_validator: Callable[[str, str], bool] | None = None,
 ) -> MaturityReconciliation:
     """Compute a non-mutating maturity candidate for one canonical volume."""
 
@@ -319,7 +336,12 @@ def reconcile_volume(
     for state in MATURITY_ORDER:
         state_name = state.value
         index = _MATURITY_INDEX[state_name]
-        blockers = _field_blockers(volume, maturity_policy, state_name)
+        blockers = _field_blockers(
+            volume,
+            maturity_policy,
+            state_name,
+            reference_validator=reference_validator,
+        )
         blockers.extend(_accountability_blockers(accountability, state_name))
 
         if index >= _MATURITY_INDEX[MaturityState.HARDENED.value]:
