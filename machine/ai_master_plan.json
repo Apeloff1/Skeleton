@@ -42,7 +42,8 @@
     "p1_scope_freeze_adr_register": "machine/ai_scope_freeze_adrs.json",
     "p1_reproducibility_policy": "machine/p1_reproducibility_policy.json",
     "p1_reproducibility_engine": "scripts/check_p1_reproducibility.py",
-    "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py"
+    "p1_reproducibility_contract": "skeleton/contracts/reproducibility.py",
+    "p1_reasoning_strategy_registry": "machine/p1_reasoning_strategy_registry.json"
   },
   "laws": [
     "durable governed state is authoritative",
