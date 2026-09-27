@@ -227,3 +227,12 @@ def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
     assert '--expected-head "$EXPECTED_SHA"' in workflow
     assert "p1:maturity-reconciliation-report" in workflow
     assert "receipt does not bind reconciliation report" in workflow
+
+def test_canonical_maturity_policy_allows_gap_closure_before_hardening() -> None:
+    master = json.loads(
+        (ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8")
+    )
+    policy = master["volume_maturity_policy"]
+
+    for state in ("scaffolded", "implemented", "integrated", "verified"):
+        assert "gaps" not in policy[state]["required_nonempty_fields"]
