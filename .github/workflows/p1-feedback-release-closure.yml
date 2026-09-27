@@ -1,0 +1,99 @@
+name: P1 Feedback Release Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/learning/promotion.py"
+      - "skeleton/learning/__init__.py"
+      - "skeleton/release/slo_promotion.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/testing/test_feedback_promotion.py"
+      - "skeleton/testing/test_release_slo_promotion.py"
+      - "scripts/verify_p1_feedback_release_closure.py"
+      - "tests/test_p1_feedback_release_independent_verifier.py"
+      - ".github/workflows/p1-feedback-release-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-feedback-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  feedback-release-contracts:
+    name: Feedback and release contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+          "pydantic>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run feedback promotion contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_feedback_promotion.py
+
+      - name: Run release SLO promotion contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_release_slo_promotion.py
+
+  independent-p1-verifier:
+    name: Independent P1 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install verifier dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+
+      - name: Run verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_feedback_release_independent_verifier.py
+
+      - name: Verify exact-head P1 closure surfaces
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_p1_feedback_release_closure.py
+          --evidence-out .p1-feedback-release.json
+          --print-evidence

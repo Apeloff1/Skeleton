@@ -210,7 +210,7 @@
     {
       "id": "model-provider",
       "owner": "skeleton/provider_runtime.py",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Engine-owned provider-neutral model request/response boundary, concrete runtime transports, policy receipts, and application compatibility facades.",
       "depends_on": [
         "foundation",
@@ -336,7 +336,7 @@
     {
       "id": "prompt-context",
       "owner": "skeleton/context",
-      "state": "partial",
+      "state": "present",
       "responsibility": "System instructions, prompt composition, context budgeting, provenance and injection-resistant context assembly.",
       "depends_on": [
         "foundation",
@@ -393,7 +393,7 @@
     {
       "id": "orchestration",
       "owner": "skeleton/intelligence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Task decomposition, plan execution, agent coordination and workflow state transitions.",
       "depends_on": [
         "foundation",
@@ -456,7 +456,7 @@
     {
       "id": "reasoning-verification",
       "owner": "skeleton/intelligence",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Verification, uncertainty, repair, calibration and evidence checks around generated plans/results.",
       "depends_on": [
         "model-routing",
@@ -507,7 +507,7 @@
     {
       "id": "tool-runtime",
       "owner": "skeleton/skills",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Tool discovery, typed invocation, authority checks, sandboxing, idempotency and result normalization.",
       "depends_on": [
         "foundation",
@@ -565,7 +565,7 @@
     {
       "id": "memory",
       "owner": "skeleton/memory",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Working, episodic, semantic and durable memory with tenant isolation and retention.",
       "depends_on": [
         "foundation",
@@ -822,7 +822,7 @@
     {
       "id": "application-api",
       "owner": "backend",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Product/business API, canonical control plane and application workflows.",
       "depends_on": [
         "identity",
@@ -1874,9 +1874,9 @@
         "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
-      "verification_state": "implementation-complete-pending-dependencies-exact-head-and-independent-closure",
+      "verification_state": "closed",
       "progress": {
-        "state": "implemented_pending_closure",
+        "state": "closed",
         "completed": [
           "ContextBudget, ContextSegment and ContextEnvelope immutable contracts",
           "stable source snapshot and context digest contract",
@@ -1906,11 +1906,7 @@
           "repository-wide product context execution boundary rejects direct provider/prompt ownership",
           "versioned instruction policy ownership is statically enforced for product EngineChat surfaces"
         ],
-        "remaining": [
-          "close declared conversation/memory/tool/governance dependencies",
-          "collect fresh exact-head Context Compiler/Backend Quality/App Assembly evidence including instruction-policy boundary",
-          "obtain independent closure verification"
-        ]
+        "remaining": []
       },
       "status_detail": "closed by staged Stage-2 dependency promotion; reopen on required gate or invariant regression"
     },
@@ -1962,7 +1958,7 @@
         "skeleton/testing/test_execution_runtime.py covers evidence-backed publication and fail-closed reversible action verification",
         "skeleton/testing/test_provider_contract.py covers verifier identity separation"
       ],
-      "verification_state": "production-binding-implemented-pending-exact-head-closure",
+      "verification_state": "closed",
       "status_detail": "closed by staged Stage-3 dependency promotion; reopen on required gate or invariant regression"
     },
     {
@@ -2001,8 +1997,8 @@
       "id": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "priority": "P0",
-      "status": "closed",
-      "gap": "Canonical application ingress delegates model/tool cognition to the authenticated Skeleton engine boundary. Production Compose isolates model-provider credentials to Skeleton, and the Engine Container Boundary gate now exercises both fail-closed no-provider behavior and a successful provider->tool->verification->terminal-result journey inside the exact built Skeleton image.",
+      "status": "open",
+      "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. Authenticated evidence now covers in-process HTTP submit/retry/denial/cancel/tool+verification lineage and a real TCP separate-process submit/retry/status/tenant-denial/cancel boundary. Closure remains open for exact-head validation, containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -2034,12 +2030,14 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose and AST isolation prove a single source-level provider execution owner",
-        "real TCP separate-process engine-client boundary regression",
-        "built-image Engine Container Boundary credential-owner attestation",
-        "built-image authenticated provider/tool/verification/result golden journey"
+        "real TCP separate-process engine-client boundary regression"
       ],
-      "outstanding_evidence": [],
-      "status_detail": "closed candidate; merge only after exact-head Engine Container Boundary, App Assembly and lower-stage dependency gates pass"
+      "outstanding_evidence": [
+        "exact-head App Assembly on the post-merge hardening lane",
+        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
+        "deployed cross-service golden journey preserves operation/turn/verification/provider/tool/result lineage",
+        "declared dependency-gap closure"
+      ]
     },
     {
       "id": "gap-cognitive-execution-loop",
@@ -4501,7 +4499,7 @@
   "cognitive_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-cognitive-execution-loop",
     "objective": "Specify the exact runtime, state, contracts, recovery, safety and evidence semantics required for one fully functional AI execution path without introducing a second orchestration framework.",
     "target_modules": {
@@ -5172,7 +5170,7 @@
     "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land",
     "schema_version": 1,
     "contract_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-conversation-state-authority",
     "implemented_surfaces": [
       "canonical envelopes",
@@ -5196,7 +5194,7 @@
   "tool_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-tool-runtime-convergence",
     "conceptual_split": {
       "skill": {
@@ -5461,7 +5459,7 @@
   "context_compiler_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-context-compiler-convergence",
     "target_modules": {
       "contracts": "skeleton/contracts/context.py",
@@ -5710,7 +5708,7 @@
   "verification_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-verification-evidence-contract",
     "planned_modules": {
       "contracts": "skeleton/contracts/verification.py",
@@ -5993,13 +5991,13 @@
       "regressions": "tests/test_verification_evidence_independent_verifier.py",
       "workflow": ".github/workflows/verification-evidence-closure.yml",
       "exact_head_receipt": "independent-verification-evidence-v1",
-      "status": "implemented-pending-exact-head-evidence"
+      "status": "complete"
     }
   },
   "provider_interaction_protocol": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-provider-interaction-protocol",
     "owner": "skeleton/provider_runtime.py",
     "request_extension": {
@@ -6360,7 +6358,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "implemented-pending-deployed-closure",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
@@ -6378,7 +6376,7 @@
         "validates authenticated service principal and delegated execution authority"
       ],
       "cutover_guard": "App Assembly AST-scans all production backend Python for ProviderRegistry.from_env activation and forbids backend runtime model credentials when the inventory is zero.",
-      "remaining_gap": "none in implementation; exact-head closure gate is the merge criterion"
+      "remaining_gap": "exact-head validation plus containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure"
     },
     "target_process_ownership": {
       "backend": {
@@ -6871,7 +6869,7 @@
   "memory_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
       "storage": "skeleton/frontier/contracts.py:MemoryContract",

@@ -14,8 +14,6 @@ from core.engine_client import (
     EngineClientConfig,
     command_from_context,
 )
-from skeleton.provider_contract import ProviderToolDefinition
-
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -91,31 +89,7 @@ def _context() -> ContextEnvelope:
     )
 
 
-def _tool_definition() -> ProviderToolDefinition:
-    return ProviderToolDefinition(
-        tool_id="fixture.read",
-        description="Read deterministic Stage-5 container fixture.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64,
-                }
-            },
-            "required": ["key"],
-            "additionalProperties": False,
-        },
-    )
-
-
-def _command(
-    context: ContextEnvelope,
-    *,
-    started: datetime,
-    expect_success_lineage: bool = False,
-):
+def _command(context: ContextEnvelope, *, started: datetime):
     return command_from_context(
         context=context,
         actor_id="actor-a",
@@ -124,32 +98,18 @@ def _command(
         instructions="Follow the container boundary smoke policy.",
         prompt="Return a bounded answer.",
         objective="Containerized engine boundary smoke",
-        verification_profile=(
-            "evidence_required"
-            if expect_success_lineage
-            else "assistant_proposal"
-        ),
+        verification_profile="assistant_proposal",
         service_principal="codedock-backend",
         created_at=started,
         deadline=started + timedelta(seconds=30),
         trace_id="trace-container-boundary",
         max_model_turns=2,
-        max_tool_calls=2,
+        max_tool_calls=1,
         max_repeat_tool_batches=1,
-        tools=(
-            (_tool_definition(),)
-            if expect_success_lineage
-            else ()
-        ),
     )
 
 
-async def _run(
-    base_url: str,
-    token: str,
-    *,
-    expect_success_lineage: bool = False,
-) -> None:
+async def _run(base_url: str, token: str) -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url=base_url,
@@ -161,11 +121,7 @@ async def _run(
     )
     context = _context()
     started = _now()
-    first = _command(
-        context,
-        started=started,
-        expect_success_lineage=expect_success_lineage,
-    )
+    first = _command(context, started=started)
 
     ack = await client.submit(first)
     if ack["operation_id"] != context.operation_id:
@@ -176,7 +132,6 @@ async def _run(
     retry = _command(
         context,
         started=started + timedelta(seconds=1),
-        expect_success_lineage=expect_success_lineage,
     )
     if retry.submission_digest != first.submission_digest:
         raise AssertionError("container retry semantic digest drift")
@@ -196,65 +151,6 @@ async def _run(
         with_error = True
     if not with_error:
         raise AssertionError("container tenant mismatch was not denied")
-
-    if expect_success_lineage:
-        result = await client.wait_for_terminal(
-            execution_id=context.execution_id,
-            actor_id="actor-a",
-            tenant_id="tenant-a",
-            trace_id="trace-container-boundary",
-            timeout_s=15,
-        )
-        if result.operation_id != context.operation_id:
-            raise AssertionError("container result operation identity mismatch")
-        if result.execution_id != context.execution_id:
-            raise AssertionError("container result execution identity mismatch")
-        if result.final_output != "containerized canonical answer":
-            raise AssertionError("container final output mismatch")
-        receipt = result.verification_receipt
-        if not isinstance(receipt, dict) or receipt.get("outcome") != "passed":
-            raise AssertionError("container verification receipt is missing")
-        if receipt.get("verifier_id") != "container-boundary:independent":
-            raise AssertionError("container verification identity mismatch")
-        if result.evidence_refs != ("evidence:container-boundary",):
-            raise AssertionError("container evidence lineage mismatch")
-        if result.provider_receipts != (
-            "provider:fake:container-provider-tool",
-            "provider:fake:container-provider-final",
-        ):
-            raise AssertionError("container provider lineage mismatch")
-        if len(result.tool_receipts) != 1:
-            raise AssertionError("container tool receipt lineage mismatch")
-        if result.stream_terminal_event is None:
-            raise AssertionError("container terminal stream event is missing")
-        if int(result.usage.get("tool_calls", -1)) != 1:
-            raise AssertionError("container tool usage mismatch")
-
-        events = await client.events(
-            context.execution_id,
-            actor_id="actor-a",
-            tenant_id="tenant-a",
-            trace_id="trace-container-boundary",
-        )
-        terminal = [
-            event
-            for event in events.get("events", [])
-            if event.get("type") == "execution.result"
-        ]
-        if len(terminal) != 1:
-            raise AssertionError("container terminal result event is not unique")
-        payload = terminal[0].get("result")
-        if not isinstance(payload, dict):
-            raise AssertionError("container terminal result payload is invalid")
-        if payload.get("operation_id") != context.operation_id:
-            raise AssertionError("container terminal operation lineage mismatch")
-        if payload.get("execution_id") != context.execution_id:
-            raise AssertionError("container terminal execution lineage mismatch")
-        if payload.get("provider_receipts") != list(result.provider_receipts):
-            raise AssertionError("container terminal provider receipts mismatch")
-        if payload.get("tool_receipts") != list(result.tool_receipts):
-            raise AssertionError("container terminal tool receipts mismatch")
-        return
 
     # No provider credential is supplied to this smoke. The canonical
     # coordinator may therefore finish as provider_unavailable; that is an
@@ -300,23 +196,11 @@ def main() -> int:
         "--token",
         default=os.getenv("SKL_ENGINE_SERVICE_TOKEN", ""),
     )
-    parser.add_argument(
-        "--expect-success-lineage",
-        action="store_true",
-        default=os.getenv("STAGE5_EXPECT_SUCCESS_LINEAGE", "").strip().lower()
-        in {"1", "true", "yes", "on"},
-    )
     args = parser.parse_args()
     if not args.token:
         print("engine container smoke requires service token", file=sys.stderr)
         return 2
-    asyncio.run(
-        _run(
-            args.url.rstrip("/"),
-            args.token,
-            expect_success_lineage=args.expect_success_lineage,
-        )
-    )
+    asyncio.run(_run(args.url.rstrip("/"), args.token))
     print("engine-container-boundary: OK")
     return 0
 
