@@ -169,3 +169,51 @@ def test_reconciliation_rejects_masterplan_authority_pointer_drift(
             tmp_path,
             selected_volumes=("VOL-000",),
         )
+
+def test_repository_resolver_requires_real_or_matching_paths(tmp_path: Path) -> None:
+    module = _module()
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg/module.py").write_text("pass\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_one.py").write_text("pass\n", encoding="utf-8")
+
+    assert module._repository_reference_exists(
+        tmp_path, "implementation_paths", "pkg/module.py"
+    )
+    assert module._repository_reference_exists(
+        tmp_path, "implementation_paths", "pkg"
+    )
+    assert module._repository_reference_exists(
+        tmp_path, "tests", "tests/test_*.py"
+    )
+    assert not module._repository_reference_exists(
+        tmp_path, "implementation_paths", "missing"
+    )
+    assert not module._repository_reference_exists(
+        tmp_path, "implementation_paths", "planned:pkg/future.py"
+    )
+    assert not module._repository_reference_exists(
+        tmp_path, "tests", "../escape.py"
+    )
+
+
+def test_live_reconciliation_surfaces_unresolved_unplanned_paths() -> None:
+    module = _module()
+
+    report = module.reconcile_repository(
+        ROOT,
+        selected_volumes=("VOL-043",),
+    )
+    row = _row(report, "VOL-043")
+    implemented = next(
+        item for item in row["evaluations"]
+        if item["state"] == "implemented"
+    )
+
+    assert implemented["eligible"] is False
+    assert any(
+        "implementation_paths contains unresolved repository references" in blocker
+        and "desktop" in blocker
+        for blocker in implemented["blockers"]
+    )
+
