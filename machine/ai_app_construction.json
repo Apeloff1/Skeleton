@@ -1777,7 +1777,7 @@
           "collect fresh exact-head Conversation Authority Closure Gate evidence after final PR head stabilizes"
         ]
       },
-      "status_detail": "closed by staged dependency closure candidate; reopen on any required gate or invariant regression"
+      "status_detail": "closed by staged dependency-closure promotion; reopen on any required gate or invariant regression"
     },
     {
       "id": "gap-tool-runtime-convergence",
@@ -1840,7 +1840,7 @@
         "backend/tests/test_tool_registry_canonical_delegate.py proves restart-persistent lifecycle metadata, governance fail-closed persistence, capacity deletion acknowledgement, result schema/size enforcement and retention expiry deletion"
       ],
       "outstanding_evidence": [],
-      "status_detail": "closed by staged dependency closure candidate; reopen on any required gate or invariant regression"
+      "status_detail": "closed by staged dependency-closure promotion; reopen on any required gate or invariant regression"
     },
     {
       "id": "gap-context-compiler-convergence",
@@ -2255,7 +2255,7 @@
           "obtain independent closure verification"
         ]
       },
-      "status_detail": "closed by staged dependency closure candidate; reopen on any required gate or invariant regression"
+      "status_detail": "closed by staged dependency-closure promotion; reopen on any required gate or invariant regression"
     },
     {
       "id": "gap-state-authority-convergence",
