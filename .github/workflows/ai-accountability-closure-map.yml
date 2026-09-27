@@ -64,6 +64,36 @@ jobs:
           tests/test_ai_accountability_closure_map.py
           tests/test_ai_accountability_verifier_runner.py
 
+      - name: Re-verify inherited terminal masterplan on exact PR head
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_masterplan_completion.py
+          --evidence-out .stack-masterplan-completion.json
+          --print-evidence
+
+      - name: Assert inherited masterplan remains terminal
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".stack-masterplan-completion.json").read_text(encoding="utf-8")
+          )
+          if receipt.get("head_sha") != os.environ["EXPECTED_SHA"].strip():
+              raise SystemExit("stack masterplan receipt is not exact-head")
+          if receipt.get("verifier") != "independent-masterplan-completion-v1":
+              raise SystemExit("unexpected stack masterplan verifier identity")
+          if receipt.get("actual_gap_count") != 17 or receipt.get("open_gaps"):
+              raise SystemExit("stack no longer contains 17/17 closed masterplan gaps")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("inherited terminal masterplan verification failed")
+          PY
+
       - name: Execute every declared verifier on exact PR head
         env:
           ACCOUNTABILITY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
