@@ -12,8 +12,8 @@
     "rule": "this frontier can require evidence and sequencing but cannot fabricate implementation or verification signoff"
   },
   "queue_snapshot": {
-    "done": 1,
-    "evidence_pending": 6,
+    "done": 7,
+    "evidence_pending": 0,
     "in_progress": 1,
     "pending": 34,
     "total": 42
