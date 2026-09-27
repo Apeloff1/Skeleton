@@ -1997,8 +1997,8 @@
       "id": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "priority": "P0",
-      "status": "open",
-      "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. Authenticated evidence now covers in-process HTTP submit/retry/denial/cancel/tool+verification lineage and a real TCP separate-process submit/retry/status/tenant-denial/cancel boundary. Closure remains open for exact-head validation, containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure.",
+      "status": "closed",
+      "gap": "Canonical application ingress delegates model/tool cognition to the authenticated Skeleton engine boundary. Production Compose isolates model-provider credentials to Skeleton, and the Engine Container Boundary gate now exercises both fail-closed no-provider behavior and a successful provider->tool->verification->terminal-result journey inside the exact built Skeleton image.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -2030,14 +2030,12 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose and AST isolation prove a single source-level provider execution owner",
-        "real TCP separate-process engine-client boundary regression"
+        "real TCP separate-process engine-client boundary regression",
+        "built-image Engine Container Boundary credential-owner attestation",
+        "built-image authenticated provider/tool/verification/result golden journey"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ]
+      "outstanding_evidence": [],
+      "status_detail": "closed candidate; merge only after exact-head Engine Container Boundary, App Assembly and lower-stage dependency gates pass"
     },
     {
       "id": "gap-cognitive-execution-loop",
@@ -6359,7 +6357,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-deployed-closure",
+    "status": "closed",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
@@ -6377,7 +6375,7 @@
         "validates authenticated service principal and delegated execution authority"
       ],
       "cutover_guard": "App Assembly AST-scans all production backend Python for ProviderRegistry.from_env activation and forbids backend runtime model credentials when the inventory is zero.",
-      "remaining_gap": "exact-head validation plus containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure"
+      "remaining_gap": "none in implementation; exact-head closure gate is the merge criterion"
     },
     "target_process_ownership": {
       "backend": {
