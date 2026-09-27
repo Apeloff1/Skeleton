@@ -339,7 +339,16 @@ def evaluate_intelligence_quality(
     reasons: list[str] = []
 
     for row in memories:
-        if row.score < resolved_policy.min_memory_score:
+        score = _finite(row.score, f"memory score:{row.record_id}")
+        if not 0.0 <= score <= 1.0:
+            raise IntelligenceQualityError(
+                f"memory score:{row.record_id} must be in [0, 1]"
+            )
+        if not isinstance(row.action, MemoryAction):
+            raise IntelligenceQualityError(
+                f"memory action:{row.record_id} must be MemoryAction"
+            )
+        if score < resolved_policy.min_memory_score:
             reasons.append(f"memory-quality-below-floor:{row.record_id}")
         if row.action is MemoryAction.TOMBSTONE:
             reasons.append(f"memory-tombstone:{row.record_id}")
@@ -384,9 +393,18 @@ def evaluate_intelligence_quality(
         if row.superseded:
             reasons.append(f"knowledge-superseded:{row.claim_id}")
 
+    if not isinstance(quality_report.accepted, bool):
+        raise IntelligenceQualityError(
+            "quality_report.accepted must be boolean"
+        )
+    quality_score = _finite(quality_report.score, "quality_report.score")
+    if not 0.0 <= quality_score <= 1.0:
+        raise IntelligenceQualityError(
+            "quality_report.score must be in [0, 1]"
+        )
     if not quality_report.accepted:
         reasons.append("independent-quality-rejected")
-    if quality_report.score < resolved_policy.min_independent_quality_score:
+    if quality_score < resolved_policy.min_independent_quality_score:
         reasons.append("independent-quality-below-floor")
 
     memory_payload = [row.to_dict() for row in memories]
