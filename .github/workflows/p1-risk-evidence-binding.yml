@@ -162,6 +162,110 @@ jobs:
           )
           PY
 
+      - name: Emit exact-head EVID-04 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  path = Path(name)
+                  h.update(name.encode("utf-8"))
+                  h.update(b"\0")
+                  h.update(path.read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          report = json.loads(
+              Path(".p1-risk-evidence/report.json").read_text(encoding="utf-8")
+          )
+          refs = [
+              {
+                  "source": "machine/p1_risk_evidence_policy.json",
+                  "digest": hashlib.sha256(
+                      Path("machine/p1_risk_evidence_policy.json").read_bytes()
+                  ).hexdigest(),
+                  "category": "risk_policy",
+              },
+              {
+                  "source": "machine/p1_risk_evidence_bindings.json",
+                  "digest": hashlib.sha256(
+                      Path("machine/p1_risk_evidence_bindings.json").read_bytes()
+                  ).hexdigest(),
+                  "category": "risk_binding_registry",
+              },
+              {
+                  "source": "p1:risk-reconciliation-report",
+                  "digest": report["report_digest"],
+                  "category": "risk_reconciliation",
+              },
+          ]
+          Path(".p1-risk-evidence/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+          Path(".p1-risk-evidence/config.digest").write_text(
+              digest(
+                  [
+                      "machine/p1_risk_evidence_policy.json",
+                      "machine/p1_risk_evidence_bindings.json",
+                      "machine/ai_p1_execution_map.json",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-risk-evidence/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-risk-evidence/verifier.digest").write_text(
+              digest(
+                  [
+                      "scripts/reconcile_p1_risk_evidence.py",
+                      "skeleton/contracts/risk_evidence.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-risk-evidence/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_risk_evidence.py",
+                      "tests/test_p1_risk_evidence_reconciliation.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-EVID-04             --accountability-id ACC-P1-EVID-04             --configuration-digest "$(cat .p1-risk-evidence/config.digest)"             --environment-digest "$(cat .p1-risk-evidence/environment.digest)"             --verifier-id github-actions:p1-risk-evidence-binding             --verifier-digest "$(cat .p1-risk-evidence/verifier.digest)"             --test-manifest-digest "$(cat .p1-risk-evidence/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-risk-evidence/refs.json             --out .p1-risk-evidence/receipt.json             > .p1-risk-evidence/stdout.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-risk-evidence/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("EVID-04 receipt does not bind exact head")
+          if receipt["task_id"] != "P1-EVID-04":
+              raise SystemExit("EVID-04 receipt task identity drift")
+          if receipt["accountability_id"] != "ACC-P1-EVID-04":
+              raise SystemExit("EVID-04 receipt accountability identity drift")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1-EVID-04 evidence receipt OK:",
+              receipt["subject_digest"],
+              receipt["receipt_digest"],
+          )
+          PY
+
       - name: Prove strict terminal mode fails closed while work is unresolved
         run: |
           set -euo pipefail
