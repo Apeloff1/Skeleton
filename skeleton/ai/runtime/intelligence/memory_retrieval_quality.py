@@ -117,6 +117,9 @@ class KnowledgeQualityObservation:
                 raise IntelligenceQualityError(
                     "provenance_refs must contain EvidenceRef"
                 )
+            _text(ref.source, "provenance source", max_length=2048)
+            _sha256(ref.digest, "provenance digest")
+            _text(ref.category, "provenance category", max_length=128)
             normalized[evidence_ref_identity(ref)] = ref
         object.__setattr__(
             self,
