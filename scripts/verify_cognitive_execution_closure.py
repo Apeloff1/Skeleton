@@ -290,7 +290,7 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append("cognitive runtime blueprint gap binding is invalid")
         if blueprint.get("status") not in {
             "implemented-pending-closure",
-            "closed",
+            "complete",
         }:
             errors.append(
                 "cognitive runtime blueprint is not implemented-pending-closure"
@@ -322,6 +322,14 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append(
                 "closed cognitive execution gap has non-closed dependencies: "
                 + ", ".join(open_dependencies)
+            )
+        if implementation_status != "closed":
+            errors.append(
+                "closed cognitive execution gap requires closed handoff"
+            )
+        if not isinstance(blueprint, dict) or blueprint.get("status") != "complete":
+            errors.append(
+                "closed cognitive execution gap requires complete blueprint"
             )
     elif cognitive_status != "open":
         errors.append("cognitive execution construction status is invalid")
