@@ -357,7 +357,6 @@ class DelegationGrant:
             _positive_int(
                 self.delegation_depth,
                 "delegation_depth",
-                allow_zero=True,
             ),
         )
         if self.delegation_depth > self.budget.max_delegation_depth:
@@ -442,6 +441,40 @@ class DelegationCommitDecision:
             category="agent_delegation_authority",
         )
 
+
+
+def derive_child_grant(
+    parent_grant: DelegationGrant,
+    *,
+    delegation_id: str,
+    lease_task_id: str,
+    child: AgentIdentity,
+    budget: DelegationBudget,
+    handoff: HandoffPacket,
+    issued_at: datetime,
+    expires_at: datetime,
+    lease_epoch: int,
+) -> DelegationGrant:
+    """Derive one narrower descendant grant with monotonic delegation depth."""
+
+    if not isinstance(parent_grant, DelegationGrant):
+        raise DelegationContractError("parent_grant must be DelegationGrant")
+    next_depth = parent_grant.delegation_depth + 1
+    if next_depth > parent_grant.budget.max_delegation_depth:
+        raise DelegationContractError("delegation depth exhausted")
+    return DelegationGrant(
+        delegation_id=delegation_id,
+        lease_task_id=lease_task_id,
+        parent=parent_grant.child,
+        child=child,
+        parent_budget=parent_grant.budget,
+        budget=budget,
+        handoff=handoff,
+        issued_at=issued_at,
+        expires_at=expires_at,
+        lease_epoch=lease_epoch,
+        delegation_depth=next_depth,
+    )
 
 def authorize_child_commit(
     grant: DelegationGrant,
