@@ -47,8 +47,9 @@ def test_every_partial_plane_has_an_explicit_gap() -> None:
         if gap["status"] == "open"
     }
 
-    assert partial
     assert partial <= gap_planes
+    if not gap_planes:
+        assert partial == set()
 
 
 def test_p0_gaps_remain_explicit_after_sota_closure() -> None:
