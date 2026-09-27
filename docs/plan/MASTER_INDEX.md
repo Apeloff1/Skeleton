@@ -40,6 +40,10 @@ Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONT
 
 Machine execution frontier: [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
 
+P1 production-promotion execution map: [`P1_EXECUTION_MAP.md`](P1_EXECUTION_MAP.md)
+
+Machine P1 execution map: [`machine/ai_p1_execution_map.json`](../../machine/ai_p1_execution_map.json)
+
 OpenAI OSS assimilation lane: [`OPENAI_OSS_ASSIMILATION_2026-09-25.md`](OPENAI_OSS_ASSIMILATION_2026-09-25.md)
 
 Machine OpenAI OSS provenance: [`machine/openai_oss_assimilation.json`](../../machine/openai_oss_assimilation.json)
@@ -140,12 +144,14 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 40. `machine/ai_engineering_task_matrix.json`
 41. `docs/plan/EXECUTION_FRONTIER_2026-09-24.md`
 42. `machine/ai_execution_frontier_20260924.json`
-43. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
-44. `machine/openai_oss_assimilation.json`
-45. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
-46. `machine/xai_grok_oss_assimilation.json`
+43. `docs/plan/P1_EXECUTION_MAP.md`
+44. `machine/ai_p1_execution_map.json`
+45. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
+46. `machine/openai_oss_assimilation.json`
+47. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
+48. `machine/xai_grok_oss_assimilation.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the current implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–46 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the current implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–44 define the bounded P1 production-promotion frontier over that closed functional core. Items 45–48 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
 
 ## Index laws
 
