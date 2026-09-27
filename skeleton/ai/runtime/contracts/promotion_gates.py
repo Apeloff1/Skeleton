@@ -236,8 +236,13 @@ def evaluate_required_gates(
             "observations must contain GateObservation values"
         )
 
+    required_names = {str(gate["workflow_name"]) for gate in required}
     normalized = sorted(
-        (item.as_dict() for item in raw_observations),
+        (
+            item.as_dict()
+            for item in raw_observations
+            if item.workflow_name in required_names
+        ),
         key=lambda row: (
             row["workflow_name"],
             row["head_sha"],
