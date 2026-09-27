@@ -315,12 +315,18 @@ def operation_runtime_paths(
 def transport_from_env(
     source: Mapping[str, str] | None = None,
 ) -> "OperationStreamTransport":
-    """Create a durable local transport using the canonical environment paths."""
+    """Create the configured durable operation transport authority.
 
-    state_path, stream_path = operation_runtime_paths(source)
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    stream_path.parent.mkdir(parents=True, exist_ok=True)
+    SQLite remains the portable single-host reference. Mongo activates the
+    shared-network authority and requires transaction-capable MongoDB for
+    stream sequence/event atomicity.
+    """
+
     environ = os.environ if source is None else source
+    backend = environ.get(
+        "CODEDOCK_OPERATION_AUTHORITY_BACKEND",
+        "sqlite",
+    ).strip().lower()
     lease_raw = environ.get(
         "CODEDOCK_OPERATION_STREAM_PROJECTION_LEASE_SECONDS",
         "10",
@@ -335,9 +341,73 @@ def transport_from_env(
         raise OperationTransportError(
             "operation stream projection lease must be between 1 and 300 seconds"
         )
+
+    if backend == "sqlite":
+        state_path, stream_path = operation_runtime_paths(environ)
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        stream_path.parent.mkdir(parents=True, exist_ok=True)
+        operation_store: OperationStateStore = SQLiteOperationStore(
+            state_path
+        )
+        event_store: OperationEventStore = SQLiteOperationEventStore(
+            stream_path
+        )
+    elif backend == "mongo":
+        from pymongo import MongoClient
+
+        from skeleton.frontier.operation_stream_store_mongo import (
+            MongoOperationEventStore,
+        )
+        from skeleton.persistence.operation_store_mongo import (
+            MongoOperationStore,
+        )
+
+        uri = environ.get(
+            "CODEDOCK_OPERATION_MONGO_URI",
+            environ.get("SKL_MONGO_URI", "mongodb://localhost:27017"),
+        ).strip()
+        database_name = environ.get(
+            "CODEDOCK_OPERATION_MONGO_DATABASE",
+            environ.get("SKL_MONGO_DATABASE", "skeleton"),
+        ).strip()
+        timeout_raw = environ.get(
+            "CODEDOCK_OPERATION_MONGO_TIMEOUT_MS",
+            environ.get("SKL_MONGO_TIMEOUT_MS", "5000"),
+        ).strip()
+        if not uri or not database_name:
+            raise OperationTransportError(
+                "Mongo operation authority requires URI and database"
+            )
+        try:
+            timeout_ms = int(timeout_raw)
+        except ValueError as exc:
+            raise OperationTransportError(
+                "Mongo operation authority timeout must be an integer"
+            ) from exc
+        if timeout_ms < 100 or timeout_ms > 120_000:
+            raise OperationTransportError(
+                "Mongo operation authority timeout must be between 100 and 120000 ms"
+            )
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=timeout_ms,
+            connectTimeoutMS=timeout_ms,
+        )
+        database = client[database_name]
+        mongo_operations = MongoOperationStore(database)
+        mongo_events = MongoOperationEventStore(database)
+        mongo_operations.ensure_indexes()
+        mongo_events.ensure_indexes()
+        operation_store = mongo_operations
+        event_store = mongo_events
+    else:
+        raise OperationTransportError(
+            "unsupported operation authority backend: " + backend
+        )
+
     return OperationStreamTransport(
-        SQLiteOperationStore(state_path),
-        SQLiteOperationEventStore(stream_path),
+        operation_store,
+        event_store,
         worker_id=_PROCESS_STREAM_WORKER_ID,
         projection_lease_seconds=projection_lease_seconds,
     )
