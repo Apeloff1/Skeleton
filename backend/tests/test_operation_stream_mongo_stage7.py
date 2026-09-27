@@ -50,7 +50,7 @@ def test_stage7_mongo_shared_authority_survives_transient_update_failure() -> No
     database_name = "stage7_golden_" + uuid4().hex
     database = client[database_name]
     namespace = "stage7-" + uuid4().hex
-    operation_id = "op-" + uuid4().hex
+    operation_id = str(uuid4())
     started = _now()
 
     operations = MongoOperationStore(
