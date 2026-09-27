@@ -805,9 +805,9 @@
       "gap": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "stage": 5,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "deadline/trace/budget propagation test",
         "query/result binding test",
@@ -825,7 +825,11 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose plus AST isolation proves Skeleton is sole source-level production provider execution owner",
-        "real TCP separate-process EngineClient submit/retry/status/tenant-denial/cancel regression"
+        "real TCP separate-process EngineClient submit/retry/status/tenant-denial/cancel regression",
+        "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+        "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+        "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+        ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
       ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
@@ -839,17 +843,8 @@
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly proves the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/receipt lineage",
-        "declared dependency-gap closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-provider-surface-convergence"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
