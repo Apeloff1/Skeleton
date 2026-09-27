@@ -625,6 +625,7 @@ class SqliteTenantQuotaLedger:
         category: str,
         delta: UsageEstimate,
         *,
+        max_cost_usd: float | None = None,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
         max_storage_bytes: int | None = None,
@@ -644,6 +645,8 @@ class SqliteTenantQuotaLedger:
             raise QuotaError("unsupported usage category")
         if not isinstance(delta, UsageEstimate):
             raise QuotaError("delta must be UsageEstimate")
+        if max_cost_usd is not None:
+            max_cost_usd = _finite_nonnegative(max_cost_usd, "max_cost_usd")
         for field, value in (
             ("max_tool_calls", max_tool_calls),
             ("max_artifact_bytes", max_artifact_bytes),
@@ -699,6 +702,8 @@ class SqliteTenantQuotaLedger:
 
             observed = self._metered_usage(conn, key)
             prospective = observed.plus(delta_usage)
+            if max_cost_usd is not None and prospective.cost_usd > max_cost_usd:
+                raise QuotaExceeded("operation_budget_exceeded:cost_usd")
             if (
                 max_tool_calls is not None
                 and prospective.tool_calls > max_tool_calls
@@ -851,6 +856,7 @@ class SqliteTenantQuotaLedger:
         event_id: str,
         delta: UsageEstimate,
         *,
+        max_cost_usd: float | None = None,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
         max_storage_bytes: int | None = None,
@@ -862,6 +868,8 @@ class SqliteTenantQuotaLedger:
         event = _required_id(event_id, "event_id")
         if not isinstance(delta, UsageEstimate):
             raise QuotaError("delta must be UsageEstimate")
+        if max_cost_usd is not None:
+            max_cost_usd = _finite_nonnegative(max_cost_usd, "max_cost_usd")
         for field, value in (
             ("max_tool_calls", max_tool_calls),
             ("max_artifact_bytes", max_artifact_bytes),
@@ -910,6 +918,8 @@ class SqliteTenantQuotaLedger:
 
             observed = self._metered_usage(conn, key)
             prospective = observed.plus(delta_usage)
+            if max_cost_usd is not None and prospective.cost_usd > max_cost_usd:
+                raise QuotaExceeded("operation_budget_exceeded:cost_usd")
             if max_tool_calls is not None and prospective.tool_calls > max_tool_calls:
                 raise QuotaExceeded("operation_budget_exceeded:tool_calls")
             if (
