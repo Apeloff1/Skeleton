@@ -6,29 +6,9 @@ Machine authority: [`machine/ai_build_accountability.json`](../../machine/ai_bui
 
 ## Mandatory accountability protocol
 
-Tracked items: **742** (421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, 240 historical/edge/obscure obligations).
+Checkboxes are derived from signed machine state. Do not hand-edit them.
 
-Every tracked item has a completion checkbox. The checkbox is derived machine state and may not be hand-edited.
-
-Every lifecycle/status transition is attributable: actor identity/type, role, RFC3339 UTC timestamp, full git SHA, statement, signature method, and from/to status.
-
-Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`, `git_ssh`, `sigstore`, `ci_oidc`. Unbound/manual attestations do not count.
-
-Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.
-
-## Lifecycle
-
-```text
-[ ] planned / unverified
-  -> signed STARTED event + UTC timestamp + git SHA
-  -> implementation evidence
-  -> implementation sign-off
-  -> independent verification evidence
-  -> verification sign-off
-  -> signed completion / accepted-risk event
-  -> validator
-  -> [x] closed
-```
+Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC.
 
 ## Volumes 000–420
 
@@ -490,13 +470,13 @@ Completion requires implementation sign-off plus independent verification sign-o
 
 ## Atomic AI Build Queue
 
-- [ ] `ACC-AIQ-S0-STATE-01` — AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-STATE-02` — AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-AIQ-S0-STATE-01` — AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:State Recovery Drill** — completed_at_utc: `2026-09-27T05:06:47Z`
+- [x] `ACC-AIQ-S0-STATE-02` — AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:State Recovery Drill** — completed_at_utc: `2026-09-27T05:06:47Z`
 - [x] `ACC-AIQ-S0-STATE-03` — AIQ-S0-STATE-03 Prove authoritative restore first and derived index/cache rebuild second. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:State Recovery Drill** — completed_at_utc: `2026-09-21T19:16:49Z`
-- [ ] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-GOV-03` — AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Governance Closure Gate** — completed_at_utc: `2026-09-27T05:06:47Z`
+- [x] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Governance Closure Gate** — completed_at_utc: `2026-09-27T05:06:47Z`
+- [x] `ACC-AIQ-S0-GOV-03` — AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Governance Closure Gate** — completed_at_utc: `2026-09-27T05:06:47Z`
+- [x] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `done` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Cost Admission Closure Gate** — completed_at_utc: `2026-09-27T05:06:47Z`
 - [ ] `ACC-AIQ-S0-COST-02` — AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-COST-03` — AIQ-S0-COST-03 Add shared cross-process pressure/concurrency coordination and overload shedding. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-PROV-01` — AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -787,8 +767,3 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
-## Audit and correction rule
-
-Git history plus this ledger forms the construction audit trail. Do not rewrite prior sign-offs. Corrections append a superseding signed event tied to a new git revision.
-
-Use `python scripts/ai_accountability.py --help` for the governed signing workflow.
