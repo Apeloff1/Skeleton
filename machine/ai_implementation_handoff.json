@@ -936,7 +936,7 @@
       ],
       "work_package": "WP-P0-VERIFICATION",
       "blueprint": "verification_runtime_blueprint",
-      "implementation_status": "implemented_pending_closure",
+      "implementation_status": "closed",
       "objective": "Converge deterministic, evidence-grounded, action-postcondition and model-assisted verification into one observable receipt contract used by finalization.",
       "target_files": {
         "contracts": [
@@ -1018,12 +1018,10 @@
         "skeleton/testing/test_provider_contract.py covers semantic verifier identity separation",
         "scripts/verify_verification_evidence_closure.py independently audits evidence materialization, verifier isolation, engine binding and mirror parity"
       ],
-      "remaining": [
-        "close declared lower-stage dependency gaps",
-        "collect fresh exact-head Verification Evidence Closure and Cognitive Execution Closure evidence",
-        "obtain independent signoff before changing canonical gap status to closed"
-      ],
-      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
+      "remaining": [],
+      "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence",
+      "outstanding_evidence": [],
+      "blockers": []
     },
     {
       "gap": "gap-cognitive-execution-loop",
