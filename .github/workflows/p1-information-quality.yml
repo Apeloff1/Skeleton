@@ -1,0 +1,200 @@
+name: P1 Information Quality Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/intelligence/information_quality.py"
+      - "skeleton/ai/runtime/intelligence/information_quality.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/memory/reconciliation.py"
+      - "skeleton/retrieval/freshness.py"
+      - "skeleton/retrieval/receipts.py"
+      - "skeleton/retrieval/scope.py"
+      - "skeleton/intelligence/knowledge_base.py"
+      - "skeleton/testing/test_information_quality.py"
+      - "machine/ai_p1_task_backlog.json"
+      - ".github/workflows/p1-information-quality.yml"
+  pull_request:
+    branches:
+      - main
+      - "p1/intel-01-routing-context-receipts-v2-20260927"
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/information_quality.py"
+      - "skeleton/ai/runtime/intelligence/information_quality.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/memory/reconciliation.py"
+      - "skeleton/retrieval/freshness.py"
+      - "skeleton/retrieval/receipts.py"
+      - "skeleton/retrieval/scope.py"
+      - "skeleton/intelligence/knowledge_base.py"
+      - "skeleton/testing/test_information_quality.py"
+      - "machine/ai_p1_task_backlog.json"
+      - ".github/workflows/p1-information-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-information-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate P1 information quality authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Verify canonical AI mirror parity
+        run: >-
+          cmp
+          skeleton/intelligence/information_quality.py
+          skeleton/ai/runtime/intelligence/information_quality.py
+
+      - name: Compile information quality surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/intelligence/information_quality.py
+          skeleton/ai/runtime/intelligence/information_quality.py
+          skeleton/memory/reconciliation.py
+          skeleton/retrieval
+          skeleton/intelligence/knowledge_base.py
+
+      - name: Run INTEL-02 focused regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_information_quality.py
+          tests/test_memory_reconciliation.py
+          tests/test_retrieval_freshness.py
+          tests/test_retrieval_receipts.py
+          tests/test_retrieval_scope.py
+          tests/test_knowledge_base_update.py
+
+      - name: Emit exact-head INTEL-02 evidence receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-intel-02
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence_files = [
+              "skeleton/intelligence/information_quality.py",
+              "skeleton/ai/runtime/intelligence/information_quality.py",
+              "skeleton/testing/test_information_quality.py",
+              "tests/test_memory_reconciliation.py",
+              "tests/test_retrieval_freshness.py",
+              "tests/test_retrieval_receipts.py",
+              "tests/test_retrieval_scope.py",
+              "tests/test_knowledge_base_update.py",
+          ]
+
+          def digest_files(names):
+              h = hashlib.sha256()
+              for name in names:
+                  h.update(name.encode("utf-8"))
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          refs = [
+              {
+                  "source": name,
+                  "digest": hashlib.sha256(Path(name).read_bytes()).hexdigest(),
+                  "category": "repository_state",
+              }
+              for name in evidence_files
+          ]
+          Path(".p1-intel-02/refs.json").write_text(
+              json.dumps(refs, sort_keys=True),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/config.digest").write_text(
+              digest_files(["machine/ai_p1_task_backlog.json"]),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/verifier.digest").write_text(
+              digest_files(
+                  [
+                      "skeleton/intelligence/information_quality.py",
+                      ".github/workflows/p1-information-quality.yml",
+                      "scripts/emit_p1_promotion_evidence.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/tests.digest").write_text(
+              digest_files(
+                  [
+                      "skeleton/testing/test_information_quality.py",
+                      "tests/test_memory_reconciliation.py",
+                      "tests/test_retrieval_freshness.py",
+                      "tests/test_retrieval_receipts.py",
+                      "tests/test_retrieval_scope.py",
+                      "tests/test_knowledge_base_update.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-INTEL-02             --accountability-id ACC-P1-INTEL-02             --configuration-digest "$(cat .p1-intel-02/config.digest)"             --environment-digest "$(cat .p1-intel-02/environment.digest)"             --verifier-id github-actions:p1-information-quality             --verifier-digest "$(cat .p1-intel-02/verifier.digest)"             --test-manifest-digest "$(cat .p1-intel-02/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-intel-02/refs.json             --out .p1-intel-02/receipt.json             > .p1-intel-02/stdout.json
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-intel-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("INTEL-02 receipt does not bind exact head")
+          if receipt["task_id"] != "P1-INTEL-02":
+              raise SystemExit("INTEL-02 task identity drift")
+          if receipt["accountability_id"] != "ACC-P1-INTEL-02":
+              raise SystemExit("INTEL-02 accountability identity drift")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "P1 INTEL-02 evidence receipt OK:",
+              receipt["subject_digest"],
+              receipt["receipt_digest"],
+          )
+          PY
