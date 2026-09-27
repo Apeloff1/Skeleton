@@ -1471,12 +1471,12 @@
         "Stage-6 browser session suite covers reconnect, slow-client replay-gap recovery, cancel-complete race and terminal canonical reconciliation",
         "scripts/verify_stage7_golden_journeys.py independently verifies Stage-7 journey coverage, dependency graph, blueprint state and AI-tree mirror parity",
         ".github/workflows/stage7-golden-journeys-closure.yml binds deterministic engine, authenticated cross-service, browser-session and independent verifier evidence to exact PR head",
-        "backend/tests/test_operation_stream_mongo_stage7.py uses a real transaction-capable Mongo replica set to prove shared operation/event authority, retryable update failure atomicity and safe retry"
+        "backend/tests/test_operation_stream_mongo_stage7.py uses a real transaction-capable Mongo replica set to prove shared operation/event authority, retryable update failure atomicity and safe retry",
+        "skeleton/testing/test_execution_runtime.py proves provider-response-before-checkpoint crash recovery fails closed without a second provider call"
       ],
       "remaining": [
         "collect fresh exact-head Stage-7 Golden Journeys Closure Gate evidence",
         "collect fresh exact-head App Assembly evidence",
-        "inject provider-response-before-checkpoint and process/database restart faults not already covered",
         "close all declared lower-stage dependencies and obtain independent signoff"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
