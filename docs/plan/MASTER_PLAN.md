@@ -727,4 +727,17 @@ The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the
 
 Volume 420 freezes breadth. New discoveries should be inserted as chapters/subchapters under an existing volume. A new top-level volume requires an ADR showing that the requirement cannot be represented cleanly within the frozen domains.
 
+The machine authority for that exception path is `machine/ai_scope_freeze_adrs.json`, validated by `scripts/check_ai_scope_freeze.py`. During active P1 the application policy is **forbid**: an ADR may be proposed, rejected, withdrawn, or approved for a future plan revision, but it cannot add VOL-421+ to the active masterplan.
+
+A future breadth exception must, at minimum:
+
+- analyze at least two existing canonical volumes and explain why each is insufficient;
+- consider a non-expansion alternative;
+- receive distinct architecture-owner and independent-verifier approvals;
+- use identity-bound signatures tied to a full git SHA and materialized evidence;
+- update plan version, master index and depth-pass coverage when eventually applied;
+- formally amend the P1 execution map or occur after terminal P1, rather than bypassing the active 107-volume P1 frontier.
+
+The validator rejects direct top-level insertion, weakened P1 application policy, unknown/duplicate ADR targets, manual/unbound approvals, planned-only approval evidence and any `applied` exception while P1 is active.
+
 From this point the preferred unit of progress is **validated implementation depth** rather than additional architectural surface area.
