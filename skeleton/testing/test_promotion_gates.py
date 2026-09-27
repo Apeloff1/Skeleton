@@ -180,9 +180,14 @@ def test_wrong_event_fails_closed() -> None:
 
 def test_unknown_gate_is_ignored_but_cannot_substitute_for_required_gate() -> None:
     authority = _authority()
-    observations = list(_passing_observations(authority))
-    observations.append(_observation("Untrusted Extra Gate"))
+    baseline_observations = list(_passing_observations(authority))
+    baseline = evaluate_required_gates(
+        authority,
+        baseline_observations,
+        target_sha=HEAD,
+    )
 
+    observations = [*baseline_observations, _observation("Untrusted Extra Gate")]
     decision = evaluate_required_gates(
         authority,
         observations,
@@ -191,6 +196,7 @@ def test_unknown_gate_is_ignored_but_cannot_substitute_for_required_gate() -> No
 
     assert decision.accepted is True
     assert decision.passing_gate_count == 22
+    assert decision.observations_digest == baseline.observations_digest
 
     observations = observations[1:]
     decision = evaluate_required_gates(
