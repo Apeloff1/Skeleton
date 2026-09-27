@@ -8,6 +8,9 @@ on:
     paths:
       - "skeleton/testing/test_ai_golden_journeys.py"
       - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
+      - "skeleton/testing/test_execution_repository.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/api/engine_service.py"
       - "skeleton/ai/runtime/api/engine_service.py"
       - "backend/tests/test_engine_cross_service_closure.py"
@@ -73,6 +76,16 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_engine_cross_service_closure.py
           backend/tests/test_ai_chat_engine_cutover.py
+
+      - name: Run process and database restart fault journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_restart_recovery_uses_durable_submission
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_durable_approval_resumes_effect_once_after_restart
+          skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_rehydrates_execution_admission_after_local_restart
+          skeleton/testing/test_execution_repository.py::test_repository_survives_restart_and_preserves_execution_version
+          skeleton/testing/test_execution_repository.py::test_staged_finalization_survives_restart_and_binds_terminal_lineage
+          skeleton/testing/test_governance_runtime_binding.py::test_server_state_restores_durable_governance_audit_chain
 
   stage7-browser-contracts:
     name: Stage 7 browser stream journeys
