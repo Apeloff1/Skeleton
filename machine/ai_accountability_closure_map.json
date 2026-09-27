@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "map_version": "1.0.0",
+  "status": "active",
+  "objective": "Map every atomic AI build queue task to one closed canonical gap and one independent exact-head verification gate before any accountability sign-off or completion.",
+  "rules": {
+    "queue_task_count": 42,
+    "tasks_per_group": 3,
+    "require_closed_gap": true,
+    "require_closed_handoff": true,
+    "require_closed_closure_evidence": true,
+    "require_exact_head_gate": true,
+    "require_distinct_verification_signer": true,
+    "mutation_policy": "This map and its verifier never mutate ai_build_accountability.json. Sign-off remains a separate signed lifecycle action."
+  },
+  "groups": [
+    {
+      "key": "S0-STATE",
+      "stage": 0,
+      "task_prefix": "AIQ-S0-STATE-",
+      "gap_id": "gap-state-authority-convergence",
+      "workflow": ".github/workflows/state-recovery-drill.yml",
+      "workflow_name": "State Recovery Drill",
+      "verifier_script": "scripts/verify_state_authority_closure.py"
+    },
+    {
+      "key": "S0-GOV",
+      "stage": 0,
+      "task_prefix": "AIQ-S0-GOV-",
+      "gap_id": "gap-governance-registry",
+      "workflow": ".github/workflows/governance-closure.yml",
+      "workflow_name": "Governance Closure Gate",
+      "verifier_script": "scripts/verify_governance_closure.py"
+    },
+    {
+      "key": "S0-COST",
+      "stage": 0,
+      "task_prefix": "AIQ-S0-COST-",
+      "gap_id": "gap-cost-admission",
+      "workflow": ".github/workflows/cost-admission-closure.yml",
+      "workflow_name": "Cost Admission Closure Gate",
+      "verifier_script": "scripts/verify_cost_admission_closure.py"
+    },
+    {
+      "key": "S0-PROV",
+      "stage": 0,
+      "task_prefix": "AIQ-S0-PROV-",
+      "gap_id": "gap-provider-surface-convergence",
+      "workflow": ".github/workflows/provider-surface-closure.yml",
+      "workflow_name": "Provider Surface Closure Gate",
+      "verifier_script": "scripts/verify_provider_surface_closure.py"
+    },
+    {
+      "key": "S1-CONV",
+      "stage": 1,
+      "task_prefix": "AIQ-S1-CONV-",
+      "gap_id": "gap-conversation-state-authority",
+      "workflow": ".github/workflows/conversation-authority-closure.yml",
+      "workflow_name": "Conversation Authority Closure Gate",
+      "verifier_script": null
+    },
+    {
+      "key": "S1-MEM",
+      "stage": 1,
+      "task_prefix": "AIQ-S1-MEM-",
+      "gap_id": "gap-memory-durable-authority",
+      "workflow": ".github/workflows/ai-dependency-closure.yml",
+      "workflow_name": "AI Dependency Closure",
+      "verifier_script": "scripts/verify_ai_dependency_closure.py"
+    },
+    {
+      "key": "S1-TOOL",
+      "stage": 1,
+      "task_prefix": "AIQ-S1-TOOL-",
+      "gap_id": "gap-tool-runtime-convergence",
+      "workflow": ".github/workflows/tool-runtime-closure.yml",
+      "workflow_name": "Tool Runtime Closure Gate",
+      "verifier_script": "scripts/verify_tool_runtime_closure.py"
+    },
+    {
+      "key": "S2-CTX",
+      "stage": 2,
+      "task_prefix": "AIQ-S2-CTX-",
+      "gap_id": "gap-context-compiler-convergence",
+      "workflow": ".github/workflows/context-compiler-closure.yml",
+      "workflow_name": "Context Compiler Closure Gate",
+      "verifier_script": "scripts/verify_context_compiler_closure.py"
+    },
+    {
+      "key": "S2-PROTO",
+      "stage": 2,
+      "task_prefix": "AIQ-S2-PROTO-",
+      "gap_id": "gap-provider-interaction-protocol",
+      "workflow": ".github/workflows/provider-surface-closure.yml",
+      "workflow_name": "Provider Surface Closure Gate",
+      "verifier_script": "scripts/verify_provider_surface_closure.py"
+    },
+    {
+      "key": "S3-VER",
+      "stage": 3,
+      "task_prefix": "AIQ-S3-VER-",
+      "gap_id": "gap-verification-evidence-contract",
+      "workflow": ".github/workflows/verification-evidence-closure.yml",
+      "workflow_name": "Verification Evidence Closure Gate",
+      "verifier_script": "scripts/verify_verification_evidence_closure.py"
+    },
+    {
+      "key": "S4-EXEC",
+      "stage": 4,
+      "task_prefix": "AIQ-S4-EXEC-",
+      "gap_id": "gap-cognitive-execution-loop",
+      "workflow": ".github/workflows/cognitive-execution-closure.yml",
+      "workflow_name": "Cognitive Execution Closure Gate",
+      "verifier_script": "scripts/verify_cognitive_execution_closure.py"
+    },
+    {
+      "key": "S5-ENG",
+      "stage": 5,
+      "task_prefix": "AIQ-S5-ENG-",
+      "gap_id": "gap-engine-application-execution-boundary",
+      "workflow": ".github/workflows/engine-container-boundary.yml",
+      "workflow_name": "Engine Container Boundary",
+      "verifier_script": null
+    },
+    {
+      "key": "S6-STREAM",
+      "stage": 6,
+      "task_prefix": "AIQ-S6-STREAM-",
+      "gap_id": "gap-streaming-protocol",
+      "workflow": ".github/workflows/streaming-protocol-closure.yml",
+      "workflow_name": "Streaming Protocol Closure Gate",
+      "verifier_script": "scripts/verify_streaming_protocol_closure.py"
+    },
+    {
+      "key": "S7-E2E",
+      "stage": 7,
+      "task_prefix": "AIQ-S7-E2E-",
+      "gap_id": "gap-e2e-golden-journeys",
+      "workflow": ".github/workflows/stage7-golden-journeys-closure.yml",
+      "workflow_name": "Stage 7 Golden Journeys Closure Gate",
+      "verifier_script": "scripts/verify_stage7_golden_journeys.py"
+    }
+  ]
+}
