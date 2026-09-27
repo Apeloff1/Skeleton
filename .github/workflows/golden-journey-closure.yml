@@ -1,0 +1,195 @@
+name: Golden Journey Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "masterplan/closure-stage6-browser-journeys-20260927"
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "frontend/services/operationStream.ts"
+      - "frontend/services/operationStreamSession.ts"
+      - "frontend/services/operationStreamReducer.ts"
+      - "frontend/scripts/test-operation-stream-session.mjs"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/package.json"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/ai/runtime/api/engine_service.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_ai_golden_journeys.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_conversation_governance.py"
+      - "scripts/verify_golden_journey_closure.py"
+      - "tests/test_golden_journey_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/golden-journey-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-journey-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-golden-journeys:
+    name: Frontend golden journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Typecheck assembled frontend operation session
+        working-directory: frontend
+        run: yarn typecheck
+
+      - name: Run reducer and browser-session journeys
+        working-directory: frontend
+        run: yarn test:operation-stream
+
+  engine-golden-journeys:
+    name: Engine golden journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused Stage-7 dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+          "bcrypt==4.3.0"
+          "email-validator==2.3.0"
+
+      - name: Run canonical engine golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_ai_golden_journeys.py
+
+      - name: Run approval expiry and restart contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_service.py
+          -k "approval"
+
+      - name: Run provider outage and approval restart contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_coordinator.py
+          -k "provider_unavailable or durable_approval"
+
+      - name: Run authenticated cross-service golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_engine_cross_service_closure.py
+
+      - name: Run governance export and deletion journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_conversation_governance.py
+          -k "governed_export or governed_deletion"
+
+  golden-journey-independent:
+    name: Independent golden journey verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_golden_journey_independent_verifier.py
+
+      - name: Scan exact-head Stage-7 closure
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_golden_journey_closure.py
+          --evidence-out .golden-journey-independent.json
+          --print-evidence
+
+      - name: Assert exact-head independent receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".golden-journey-independent.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("golden journey receipt does not match exact PR head")
+          if receipt.get("verifier") != "independent-golden-journeys-v1":
+              raise SystemExit("unexpected golden journey verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent golden journey verification failed")
+          if len(receipt.get("journey_digests") or {}) < 7:
+              raise SystemExit("golden journey surface coverage is incomplete")
+          if len(receipt.get("dependency_graph") or []) != 13:
+              raise SystemExit("golden journey dependency graph is incomplete")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("golden journey handoff digest is missing")
+          print(
+              "independent Stage-7 exact-head receipt:",
+              expected,
+              "journeys=",
+              len(receipt["journey_digests"]),
+          )
+          PY
