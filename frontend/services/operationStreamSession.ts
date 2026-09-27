@@ -8,14 +8,16 @@
  */
 
 import {
-  OperationClientState,
-  OperationReplayPayload,
-  OperationSnapshot,
-  OperationCanonicalResult,
   createOperationClientState,
   failOperationResync,
   reduceOperationReplay,
-} from './operationStreamReducer';
+} from './operationStreamReducer.ts';
+import type {
+  OperationCanonicalResult,
+  OperationClientState,
+  OperationReplayPayload,
+  OperationSnapshot,
+} from './operationStreamReducer.ts';
 
 export interface OperationSessionCursorStore {
   load(operationId: string, consumerId: string): Promise<number>;
