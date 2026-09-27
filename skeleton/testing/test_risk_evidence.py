@@ -445,4 +445,3 @@ def test_accepted_risk_rejects_unapproved_signature_method() -> None:
             signature_ref="note:1",
             statement="Weak signature methods are forbidden.",
         )
-
