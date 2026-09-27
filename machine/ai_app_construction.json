@@ -1874,9 +1874,9 @@
         "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
-      "verification_state": "implementation-complete-pending-dependencies-exact-head-and-independent-closure",
+      "verification_state": "closed",
       "progress": {
-        "state": "implemented_pending_closure",
+        "state": "closed",
         "completed": [
           "ContextBudget, ContextSegment and ContextEnvelope immutable contracts",
           "stable source snapshot and context digest contract",
@@ -1906,11 +1906,7 @@
           "repository-wide product context execution boundary rejects direct provider/prompt ownership",
           "versioned instruction policy ownership is statically enforced for product EngineChat surfaces"
         ],
-        "remaining": [
-          "close declared conversation/memory/tool/governance dependencies",
-          "collect fresh exact-head Context Compiler/Backend Quality/App Assembly evidence including instruction-policy boundary",
-          "obtain independent closure verification"
-        ]
+        "remaining": []
       },
       "status_detail": "closed by staged Stage-2 dependency promotion; reopen on required gate or invariant regression"
     },
