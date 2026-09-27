@@ -1997,7 +1997,7 @@
       "id": "gap-engine-application-execution-boundary",
       "plane": "engine-api",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. Authenticated evidence now covers in-process HTTP submit/retry/denial/cancel/tool+verification lineage and a real TCP separate-process submit/retry/status/tenant-denial/cancel boundary. Closure remains open for exact-head validation, containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
@@ -2030,14 +2030,14 @@
         "HTTP cancellation race fences late provider success",
         "HTTP golden journey preserves provider/tool/verification/result lineage",
         "canonical Compose and AST isolation prove a single source-level provider execution owner",
-        "real TCP separate-process engine-client boundary regression"
+        "real TCP separate-process engine-client boundary regression",
+        "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+        "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+        "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+        ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
       ],
-      "outstanding_evidence": [
-        "exact-head App Assembly on the post-merge hardening lane",
-        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
-        "deployed cross-service golden journey preserves operation/turn/verification/provider/tool/result lineage",
-        "declared dependency-gap closure"
-      ]
+      "outstanding_evidence": [],
+      "status_detail": "closed by Stage-5 exact-head engine boundary candidate; reopen on process isolation, deployed lineage, App Assembly, or dependency regression"
     },
     {
       "id": "gap-cognitive-execution-loop",
@@ -6358,7 +6358,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-deployed-closure",
+    "status": "complete",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
@@ -6555,7 +6555,14 @@
       "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
-    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
+    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features",
+    "current_evidence": [
+      "backend/tests/test_engine_live_process_boundary.py proves successful provider->tool->provider lineage across a real TCP-separated engine process",
+      "skeleton/testing/live_engine_process_app.py supplies a deterministic engine-owned provider/tool/verifier fixture with no backend provider execution",
+      "scripts/check_engine_container_boundary.py verifies final output, provider/tool/verification/evidence receipts and unique terminal result lineage",
+      ".github/workflows/engine-container-boundary.yml runs the successful lineage journey inside the built read-only Skeleton image"
+    ],
+    "remaining": []
   },
   "realtime_delivery_blueprint": {
     "schema_version": 1,
