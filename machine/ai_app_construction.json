@@ -1682,6 +1682,31 @@
         "ProviderSpeechRequest",
         "ProviderSpeechResponse"
       ]
+    },
+    {
+      "id": "openai-compatible-secondary",
+      "state": "optional",
+      "adapter": "skeleton/provider_runtime.py:OpenAICompatibleSecondaryAdapter",
+      "protocol": "OpenAI-compatible Responses API; text generation only",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [
+        "AI_SECONDARY_API_KEY"
+      ],
+      "required_configuration": [
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL"
+      ],
+      "capabilities": [
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "https-only; distinct provider hostname from primary; no URL credentials; block localhost, metadata endpoints and non-global literal IPs",
+      "execution_owner": "skeleton/provider_runtime.py",
+      "activation_rule": "secondary configuration is all-or-nothing; partial configuration fails closed",
+      "failover_rule": "eligible only after ProviderUnavailableError or ProviderInvocationError; policy/governance/admission failures never fail over",
+      "privacy_ceiling": "confidential-with-tenant; restricted external transfer denied"
     }
   ],
   "gap_policy": {
@@ -2352,7 +2377,7 @@
       "plane": "model-provider",
       "priority": "P1",
       "status": "open",
-      "gap": "The canonical provider boundary is operational with OpenAI, but SOTA availability requires a second declared provider or a deliberate single-provider SLO decision.",
+      "gap": "Provider redundancy is implementation-complete pending exact-head closure: the canonical provider runtime supports one declared optional OpenAI-compatible secondary provider, architecture acknowledgement, distinct-host validation, provider-neutral failover on availability/invocation failures only, explicit model remapping, policy-denial fencing, primary media preservation, and identity-free routing telemetry.",
       "construction": [
         "add second provider only through ProviderAdapter contract or explicitly accept single-provider availability target",
         "declare capabilities, privacy ceiling, credentials and network policy",
@@ -2363,6 +2388,18 @@
         "declared provider contract",
         "provider outage failover test or approved single-provider SLO",
         "routing telemetry"
+      ],
+      "status_detail": "implementation-complete pending Provider Redundancy Closure Gate and outage/quality evidence",
+      "evidence_present": [
+        "skeleton/provider_runtime.py FailoverProviderAdapter routes only availability/invocation failures",
+        "skeleton/provider_runtime.py OpenAICompatibleSecondaryAdapter is the declared optional secondary provider",
+        "ProviderRegistry.from_env fails closed on partial secondary configuration and requires a distinct provider hostname",
+        "ProviderRegistry.redundancy_status exposes identity-free primary/fallback routing counters",
+        "skeleton/testing/test_provider_contract.py covers primary success, outage failover, unavailable skip, policy-denial fencing, explicit-model no-remap, registry routing and fail-closed configuration"
+      ],
+      "outstanding_evidence": [
+        "fresh exact-head Provider Redundancy Closure Gate",
+        "independent source/mirror/declaration verifier receipt"
       ]
     },
     {
@@ -9584,5 +9621,71 @@
     "status": "active",
     "registry_version": "1.0.0",
     "path": "machine/ai_capabilities.json"
+  },
+  "provider_redundancy_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "implemented-pending-closure",
+    "gap": "gap-provider-redundancy",
+    "canonical_owner": "skeleton/provider_runtime.py",
+    "objective": "Preserve model-provider availability without creating a second credential-bearing application runtime or bypassing governance, admission, architecture acknowledgement, or provider-neutral contracts.",
+    "primary_provider": "openai",
+    "optional_secondary_provider": "openai-compatible-secondary",
+    "secondary_configuration": {
+      "required_together": [
+        "AI_SECONDARY_API_KEY",
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL"
+      ],
+      "partial_configuration": "fail-closed",
+      "endpoint_rule": "HTTPS and hostname must differ from the primary provider hostname",
+      "activation": "optional",
+      "privacy_ceiling": "inherits canonical ProviderTransferRequest policy: confidential requires tenant identity; restricted external transfer denied"
+    },
+    "routing": {
+      "owner": "FailoverProviderAdapter",
+      "order": "active provider then declared fallback_ids",
+      "failover_on": [
+        "ProviderUnavailableError",
+        "ProviderInvocationError"
+      ],
+      "never_failover_on": [
+        "ProviderPolicyError",
+        "governance denial",
+        "admission denial",
+        "schema/protocol violation",
+        "explicit non-primary model mapping"
+      ],
+      "model_rule": "implicit or primary-model requests remap to the fallback adapter's declared model; explicitly selected non-primary models do not silently remap",
+      "media_rule": "image/edit/variation/speech remain on the primary adapter until a secondary explicitly declares those capabilities"
+    },
+    "telemetry": {
+      "payload_free": true,
+      "counters": [
+        "primary_attempts",
+        "primary_successes",
+        "failover_attempts",
+        "failover_successes",
+        "provider_failures",
+        "unavailable_skips",
+        "policy_denials"
+      ],
+      "dimensions": [
+        "primary_provider",
+        "fallback_providers",
+        "last_success_provider",
+        "last_failure_kind"
+      ]
+    },
+    "closure_evidence": [
+      "declared secondary provider contract",
+      "primary outage failover regression",
+      "primary unavailable startup/runtime routing regression",
+      "policy denial never fails over regression",
+      "explicit model mismatch never silently remaps regression",
+      "routing telemetry contains no prompt or credential material",
+      "canonical AI runtime mirror parity",
+      "independent redundancy verifier"
+    ]
   }
 }
