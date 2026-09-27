@@ -19,8 +19,15 @@ import {
   operationCursorStorageKey,
   reduceOperationReplay,
 } from './operationStreamReducer';
+import {
+  OperationBrowserSession,
+  OperationBrowserSessionOptions,
+  OperationSessionCursorStore,
+  OperationSessionTransport,
+} from './operationStreamSession';
 
 export * from './operationStreamReducer';
+export * from './operationStreamSession';
 
 function newConsumerId(): string {
   try {
@@ -42,6 +49,138 @@ function newConsumerId(): string {
  */
 export const OPERATION_CONSUMER_ID = newConsumerId();
 const OPERATION_REPLAY_BATCH_LIMIT = 64;
+
+const browserSessionCursorStore: OperationSessionCursorStore = {
+  async load(operationId, consumerId) {
+    try {
+      const raw = await AsyncStorage.getItem(
+        operationCursorStorageKey(operationId, consumerId),
+      );
+      if (!raw || !/^\d+$/.test(raw)) return 0;
+      const value = Number(raw);
+      return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  async save(operationId, consumerId, sequence) {
+    if (!Number.isSafeInteger(sequence) || sequence < 0) {
+      throw new Error('sequence must be a non-negative safe integer');
+    }
+    await AsyncStorage.setItem(
+      operationCursorStorageKey(operationId, consumerId),
+      String(sequence),
+    );
+  },
+
+  async clear(operationId, consumerId) {
+    await AsyncStorage.removeItem(
+      operationCursorStorageKey(operationId, consumerId),
+    );
+  },
+};
+
+const browserSessionTransport: OperationSessionTransport = {
+  async replay(operationId, consumerId, afterSequence, limit, signal) {
+    const path =
+      `/api/operations/${encodeURIComponent(operationId)}/events/replay`
+      + `?consumer_id=${encodeURIComponent(consumerId)}`
+      + `&after_sequence=${afterSequence}&limit=${limit}`;
+    const result = await api.get<OperationReplayPayload>(path, {
+      signal,
+      headers: authHeaders(),
+      retries: 2,
+      timeoutMs: 15_000,
+    });
+    if (!result.ok || !result.data) {
+      return {
+        ok: false as const,
+        replayGap: result.status === 409,
+        error: result.error || `HTTP ${result.status}`,
+      };
+    }
+    return { ok: true as const, payload: result.data };
+  },
+
+  async acknowledge(operationId, consumerId, sequence, signal) {
+    const result = await api.post<any>(
+      `/api/operations/${encodeURIComponent(operationId)}/events/ack`,
+      { consumer_id: consumerId, sequence },
+      {
+        signal,
+        headers: authHeaders(),
+        idempotencyKey:
+          `operation-ack:${operationId}:${consumerId}:${sequence}`,
+        retries: 2,
+        timeoutMs: 15_000,
+      },
+    );
+    return result.ok
+      ? { ok: true }
+      : { ok: false, error: result.error || `HTTP ${result.status}` };
+  },
+
+  async resync(operationId, consumerId, signal) {
+    const path =
+      `/api/operations/${encodeURIComponent(operationId)}/events/resync`
+      + `?consumer_id=${encodeURIComponent(consumerId)}`;
+    const result = await api.get<OperationResyncSnapshotPayload>(path, {
+      signal,
+      headers: authHeaders(),
+      retries: 2,
+      timeoutMs: 15_000,
+    });
+    return result.ok && result.data ? result.data : null;
+  },
+
+  async cancel(operationId, signal) {
+    const result = await api.post<any>(
+      `/api/operations/${encodeURIComponent(operationId)}/cancel`,
+      {},
+      {
+        signal,
+        headers: authHeaders(),
+        idempotencyKey: `cancel:${operationId}`,
+        retries: 2,
+        timeoutMs: 15_000,
+      },
+    );
+    if (!result.ok || !result.data) {
+      return {
+        ok: false,
+        error: result.error || `HTTP ${result.status}`,
+      };
+    }
+    return {
+      ok: true,
+      changed: Boolean(result.data.changed),
+      operation: result.data.operation,
+    };
+  },
+};
+
+export type DefaultOperationBrowserSessionOptions = Omit<
+  OperationBrowserSessionOptions,
+  'consumerId'
+> & {
+  consumerId?: string;
+};
+
+export function createOperationBrowserSession(
+  operationId: string,
+  options: DefaultOperationBrowserSessionOptions = {},
+): OperationBrowserSession {
+  return new OperationBrowserSession(
+    operationId,
+    browserSessionTransport,
+    browserSessionCursorStore,
+    {
+      ...options,
+      consumerId: options.consumerId ?? OPERATION_CONSUMER_ID,
+    },
+  );
+}
 
 export interface FollowOperationOptions {
   signal?: AbortSignal;
