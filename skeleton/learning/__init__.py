@@ -33,6 +33,16 @@ from .evidence import (
     make_provenance,
 )
 from .service import LearningService, LearningSnapshot
+from .promotion import (
+    EvaluationReceipt,
+    ExperimentAssignment,
+    ExperimentSpec,
+    FeedbackEvent,
+    FeedbackLedger,
+    FeedbackPromotionError,
+    FeedbackPromotionPipeline,
+    PromotionReceipt,
+)
 
 __all__ = [
     "AdaptiveTest",
@@ -61,4 +71,12 @@ __all__ = [
     "canonical_fingerprint",
     "empty_calibration",
     "make_provenance",
+    "EvaluationReceipt",
+    "ExperimentAssignment",
+    "ExperimentSpec",
+    "FeedbackEvent",
+    "FeedbackLedger",
+    "FeedbackPromotionError",
+    "FeedbackPromotionPipeline",
+    "PromotionReceipt",
 ]
