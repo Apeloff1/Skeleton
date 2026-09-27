@@ -149,6 +149,13 @@ jobs:
               memory_decisions=(memory,),
               memory_conflicts=(),
               retrieval_receipt=retrieval,
+              retrieval_provenance=(
+                  EvidenceRef(
+                      source="retrieval://fragment-1/source",
+                      digest="c" * 64,
+                      category="retrieval_source",
+                  ),
+              ),
               freshness_by_plane={"lexical": freshness},
               knowledge=(knowledge,),
               quality_report=report,
