@@ -2369,7 +2369,7 @@
       "id": "gap-e2e-golden-journeys",
       "plane": "product-experience",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical deterministic prompt-only, multi-turn, retrieval, read/write tool, approval renewal, artifact, provider-outage, engine-outage, cancel/reconnect, governance export/delete and restart-ambiguity journeys are implementation-complete across the engine, authenticated API and production browser-session seams. Remaining closure is exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff.",
       "construction": [
         "define prompt-only journey",
@@ -2399,14 +2399,15 @@
         "provider-response-before-checkpoint fail-closed recovery with no provider retry",
         "real engine TCP process restart durability journey",
         "real pinned Mongo replica-set transient-failure, cross-worker replay/compaction and cancel-complete race journeys",
-        "Mongo transaction-capability startup preflight"
+        "Mongo transaction-capability startup preflight",
+        ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+        "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+        "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+        "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+        "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Stage-7 Golden Journeys Closure Gate",
-        "fresh exact-head App Assembly",
-        "all declared lower-stage dependency gaps closed and independent signoff"
-      ],
-      "status_detail": "implementation-complete pending exact-head Stage-7/App Assembly evidence, dependency closure and independent signoff"
+      "outstanding_evidence": [],
+      "status_detail": "closed by Stage-7 exact-head final P0 candidate; reopen on golden-journey, streaming, engine-boundary, App Assembly, dependency, or independent-verifier regression"
     },
     {
       "id": "gap-release-slo-loop",
@@ -6710,7 +6711,7 @@
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "complete",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
@@ -6879,12 +6880,14 @@
       "real pinned Mongo replica-set transient-failure atomicity and safe-retry journey",
       "provider-response-before-checkpoint crash fails closed without second provider call",
       "focused process/database restart matrix for engine, approval, admission, execution finalization and governance audit",
-      "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry"
+      "provider response before durable checkpoint crash-window fail-closed recovery with zero provider retry",
+      ".github/workflows/stage7-golden-journeys-closure.yml binds exact-head deterministic engine, authenticated cross-service, browser-session, Mongo and independent golden-journey evidence",
+      "scripts/verify_stage7_golden_journeys.py independently verifies golden-journey coverage, dependency graph and mirror parity",
+      "backend/tests/test_operation_stream_mongo_stage7.py and backend/tests/test_operation_stream_mongo_integration.py prove real replica-set fault, cross-worker replay, compaction and terminal-race behavior",
+      "backend/tests/test_engine_live_process_boundary.py proves successful and restart-safe execution across the real engine process boundary",
+      "frontend/scripts/test-operation-stream-session.mjs proves reconnect, replay-gap recovery, cancel/complete race and terminal-result reconciliation"
     ],
-    "remaining": [
-      "fresh exact-head Stage-7 Golden Journeys Closure Gate and App Assembly evidence",
-      "lower-stage dependency closure and independent signoff"
-    ]
+    "remaining": []
   },
   "memory_runtime_blueprint": {
     "schema_version": 1,
