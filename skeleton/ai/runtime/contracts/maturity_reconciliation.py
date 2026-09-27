@@ -104,8 +104,11 @@ class MaturityEvaluation:
 class MaturityReconciliation:
     volume_key: str
     current_status: str
+    current_implementation_status: str
     accountability_id: str
     accountability_status: str
+    accountability_maturity_status: str | None
+    implementation_status_candidate: str | None
     target_floor: str
     highest_eligible_status: str
     promotion_candidate: str | None
@@ -121,8 +124,11 @@ class MaturityReconciliation:
         return {
             "volume_key": self.volume_key,
             "current_status": self.current_status,
+            "current_implementation_status": self.current_implementation_status,
             "accountability_id": self.accountability_id,
             "accountability_status": self.accountability_status,
+            "accountability_maturity_status": self.accountability_maturity_status,
+            "implementation_status_candidate": self.implementation_status_candidate,
             "target_floor": self.target_floor,
             "highest_eligible_status": self.highest_eligible_status,
             "promotion_candidate": self.promotion_candidate,
@@ -241,12 +247,22 @@ def reconcile_volume(
 
     key = volume.get("key")
     current = volume.get("status")
+    current_implementation = volume.get("implementation_status")
     accountability_id = volume.get("accountability_id")
     if not isinstance(key, str) or not key:
         raise MaturityReconciliationError("volume key is required")
     if current not in _MATURITY_INDEX:
         raise MaturityReconciliationError(
             f"{key}: unsupported current maturity {current!r}"
+        )
+    if current_implementation == "unverified":
+        current_implementation_index = -1
+    elif current_implementation in _MATURITY_INDEX:
+        current_implementation_index = _MATURITY_INDEX[current_implementation]
+    else:
+        raise MaturityReconciliationError(
+            f"{key}: unsupported implementation_status "
+            f"{current_implementation!r}"
         )
     if target_floor not in _MATURITY_INDEX:
         raise MaturityReconciliationError(
@@ -260,6 +276,33 @@ def reconcile_volume(
         raise MaturityReconciliationError(
             f"{key}: accountability record identity mismatch"
         )
+
+    accountability_status = str(accountability.get("status") or "")
+    accountability_rank = _accountability_rank(accountability_status)
+    accountability_maturity_status = (
+        MATURITY_ORDER[accountability_rank].value
+        if accountability_rank >= 0
+        else None
+    )
+    if (
+        current_implementation_index >= 0
+        and accountability_rank < current_implementation_index
+    ):
+        raise MaturityReconciliationError(
+            f"{key}: implementation_status {current_implementation!r} "
+            "exceeds explicit accountability maturity"
+        )
+
+    implementation_candidate: str | None = None
+    for state in MATURITY_ORDER[
+        _MATURITY_INDEX[MaturityState.IMPLEMENTED.value]:
+    ]:
+        state_name = state.value
+        if _accountability_blockers(accountability, state_name):
+            break
+        state_index = _MATURITY_INDEX[state_name]
+        if state_index > current_implementation_index:
+            implementation_candidate = state_name
 
     source_digest = _canonical_digest(
         {
@@ -325,8 +368,11 @@ def reconcile_volume(
     return MaturityReconciliation(
         volume_key=key,
         current_status=current,
+        current_implementation_status=str(current_implementation),
         accountability_id=accountability_id,
-        accountability_status=str(accountability.get("status") or ""),
+        accountability_status=accountability_status,
+        accountability_maturity_status=accountability_maturity_status,
+        implementation_status_candidate=implementation_candidate,
         target_floor=target_floor,
         highest_eligible_status=highest,
         promotion_candidate=candidate,
