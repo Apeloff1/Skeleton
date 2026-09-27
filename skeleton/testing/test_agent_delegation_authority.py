@@ -103,6 +103,7 @@ def _grant(
     return DelegationGrant(
         delegation_id="delegation-1",
         lease_task_id=lease_task_id,
+        parent_authority_digest="4" * 64,
         parent=_parent(),
         child=child or _child(),
         parent_budget=parent_budget or _parent_budget(),
@@ -148,6 +149,7 @@ def test_grant_binds_subset_authority_budget_handoff_and_fence() -> None:
     assert grant.budget.is_subset_of(grant.parent_budget)
     assert payload["handoff_digest"] == grant.handoff.digest
     assert payload["lease_task_id"] == "swarm-task-1"
+    assert payload["parent_authority_digest"] == "4" * 64
     assert len(grant.digest) == 64
     assert len(grant.fencing_token) == 64
 
@@ -241,6 +243,7 @@ def test_descendant_grant_advances_depth_and_cannot_outlive_parent() -> None:
     )
 
     assert child_grant.parent == parent_grant.child
+    assert child_grant.parent_authority_digest == parent_grant.digest
     assert child_grant.delegation_depth == 2
 
     with pytest.raises(DelegationContractError, match="cannot outlive parent"):
