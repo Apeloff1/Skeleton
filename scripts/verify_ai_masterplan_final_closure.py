@@ -40,6 +40,79 @@ EXPECTED_GAPS = (
     "gap-e2e-golden-journeys",
 )
 
+EXPECTED_DEPENDENCIES: dict[str, tuple[str, ...]] = {
+    "gap-state-authority-convergence": (),
+    "gap-governance-registry": (),
+    "gap-cost-admission": (),
+    "gap-provider-surface-convergence": (),
+    "gap-conversation-state-authority": (
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+    ),
+    "gap-memory-durable-authority": (
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+    ),
+    "gap-tool-runtime-convergence": (
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+    ),
+    "gap-context-compiler-convergence": (
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+    ),
+    "gap-provider-interaction-protocol": (
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+    ),
+    "gap-verification-evidence-contract": (
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol",
+    ),
+    "gap-cognitive-execution-loop": (
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+    ),
+    "gap-engine-application-execution-boundary": (
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence",
+    ),
+    "gap-streaming-protocol": (
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence",
+    ),
+    "gap-e2e-golden-journeys": (
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol",
+    ),
+}
+
 
 class VerificationError(RuntimeError):
     """Final closure verification failed."""
@@ -176,6 +249,14 @@ def _verify_closed_record(
     if unknown:
         errors.append(
             f"{gap_id} has unknown dependencies: " + ", ".join(unknown)
+        )
+    expected_dependencies = set(EXPECTED_DEPENDENCIES[gap_id])
+    if set(dependencies) != expected_dependencies:
+        errors.append(
+            f"{gap_id} dependency graph drift: expected "
+            + ", ".join(sorted(expected_dependencies))
+            + "; got "
+            + ", ".join(sorted(set(dependencies)))
         )
 
     return {
