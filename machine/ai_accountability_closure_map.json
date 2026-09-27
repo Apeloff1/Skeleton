@@ -48,7 +48,8 @@
       "gap_id": "gap-provider-surface-convergence",
       "workflow": ".github/workflows/provider-surface-closure.yml",
       "workflow_name": "Provider Surface Closure Gate",
-      "verifier_script": "scripts/verify_provider_surface_closure.py"
+      "verifier_script": "scripts/verify_provider_surface_closure.py",
+      "verifier_binding_token": "provider_surface_convergence_blueprint"
     },
     {
       "key": "S1-CONV",
@@ -64,9 +65,9 @@
       "stage": 1,
       "task_prefix": "AIQ-S1-MEM-",
       "gap_id": "gap-memory-durable-authority",
-      "workflow": ".github/workflows/ai-dependency-closure.yml",
-      "workflow_name": "AI Dependency Closure",
-      "verifier_script": "scripts/verify_ai_dependency_closure.py"
+      "workflow": ".github/workflows/memory-authority-closure.yml",
+      "workflow_name": "Memory Authority Closure Gate",
+      "verifier_script": "scripts/verify_memory_authority_closure.py"
     },
     {
       "key": "S1-TOOL",
@@ -91,9 +92,9 @@
       "stage": 2,
       "task_prefix": "AIQ-S2-PROTO-",
       "gap_id": "gap-provider-interaction-protocol",
-      "workflow": ".github/workflows/provider-surface-closure.yml",
-      "workflow_name": "Provider Surface Closure Gate",
-      "verifier_script": "scripts/verify_provider_surface_closure.py"
+      "workflow": ".github/workflows/provider-protocol-closure.yml",
+      "workflow_name": "Provider Interaction Protocol Closure Gate",
+      "verifier_script": "scripts/verify_provider_protocol_closure.py"
     },
     {
       "key": "S3-VER",
