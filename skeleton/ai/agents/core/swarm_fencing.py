@@ -38,6 +38,11 @@ def assert_fence(runtime: SwarmRuntime, fence: LeaseFence) -> SwarmTask:
         raise LeaseError(
             f"stale lease attempt for {fence.task_id}: expected {task.attempts}, got {fence.attempt}"
         )
+    if task.lease_deadline != fence.deadline:
+        raise LeaseError(
+            f"stale lease deadline for {fence.task_id}: "
+            f"expected {task.lease_deadline}, got {fence.deadline}"
+        )
     return task
 
 
