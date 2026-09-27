@@ -308,4 +308,3 @@ def test_p1_backlog_realizes_lane_dependencies(tmp_path: Path) -> None:
         "P1-L4: lane dependency P1-L3 is not realized in task DAG" in error
         for error in errors
     )
-
