@@ -2394,12 +2394,12 @@
         "browser terminal journey preserves canonical artifact/result/message linkage",
         "configured backend engine outage returns stable engine_unavailable without local provider fallback",
         "Mongo stream authority executes a startup transaction probe and fails closed on standalone/sessionless topology",
-        "shared-network authority assignment occurs only after Mongo transaction capability is proven"
+        "shared-network authority assignment occurs only after Mongo transaction capability is proven",
+        "live Mongo replica-set journey proves shared cross-client stream authority, compaction and reconnect reconstruction"
       ],
       "outstanding_evidence": [
         "exact-head Golden Journey Closure Gate",
         "exact-head App Assembly",
-        "assembled transaction-capable Mongo replica-set integration",
         "deployed assembled frontend/backend/engine topology proof",
         "lower-stage dependency closure and independent signoff"
       ]
@@ -6877,11 +6877,12 @@
       "frontend/scripts/test-conversation-projection.mjs canonical multi-turn refresh reconstruction",
       "frontend browser terminal artifact/result/message linkage journey",
       "backend/tests/test_ai_chat_engine_cutover.py engine outage no-local-fallback journey",
-      "Mongo shared stream authority startup transaction preflight with standalone rejection"
+      "Mongo shared stream authority startup transaction preflight with standalone rejection",
+      "live Mongo replica-set cross-client operation stream authority journey"
     ],
     "remaining": [
       "fresh exact-head Golden Journey Closure and App Assembly evidence",
-      "assembled transaction-capable Mongo replica-set and deployed topology validation",
+      "deployed assembled topology validation",
       "lower-stage dependency closure and independent signoff"
     ]
   },
