@@ -329,9 +329,9 @@
       "gap": "gap-conversation-state-authority",
       "plane": "application-api",
       "stage": 1,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/conversation.py",
         "skeleton/persistence/conversation_repository.py",
@@ -403,16 +403,8 @@
         "browser refresh/reconnect reconstructs the same canonical transcript",
         "conversation retention expiry propagation test"
       ],
-      "outstanding_evidence": [
-        "dependency closure: gap-state-authority-convergence",
-        "dependency closure: gap-governance-registry",
-        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
-      ],
-      "blockers": [
-        "dependency closure: gap-state-authority-convergence",
-        "dependency closure: gap-governance-registry",
-        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -431,9 +423,9 @@
       "gap": "gap-memory-durable-authority",
       "plane": "memory",
       "stage": 1,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_closure",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/persistence/memory_repository.py provides production MongoMemoryRepository with tenant/namespace isolation, idempotency, optimistic versioning, revisions, tombstones, expiry and projection outbox",
         "skeleton/api/server.py binds MongoMemoryRepository + AsyncGovernedMemoryWriter + AsyncMemoryProjectionCoordinator when SKL_MONGO_URI is configured",
@@ -468,18 +460,8 @@
         "retrieval provenance points back to canonical memory records",
         "memory outage produces explicit degraded continuity behavior"
       ],
-      "outstanding_evidence": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
-        "independent verification before canonical closure"
-      ],
-      "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry",
-        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
-        "independent verification before canonical closure"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -498,9 +480,9 @@
       "gap": "gap-tool-runtime-convergence",
       "plane": "tool-runtime",
       "stage": 1,
-      "gap_status": "open",
-      "implementation_state": "implemented_pending_verification",
-      "closure_decision": "open",
+      "gap_status": "closed",
+      "implementation_state": "closed",
+      "closure_decision": "closed",
       "evidence_present": [
         "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
         "skeleton/skills/tool_runtime.py canonical sync/async governed runtime",
@@ -548,15 +530,8 @@
         "compatibility registry delegates to canonical runtime",
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
-      "outstanding_evidence": [
-        "fresh exact-head Tool Runtime Closure Gate"
-      ],
-      "blockers": [
-        "dependency must close: gap-governance-registry",
-        "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "fresh exact-head Tool Runtime Closure Gate"
-      ],
+      "outstanding_evidence": [],
+      "blockers": [],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
