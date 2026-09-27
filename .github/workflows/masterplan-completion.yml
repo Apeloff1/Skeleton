@@ -1,0 +1,109 @@
+name: Masterplan Completion Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_app_construction.json"
+      - "machine/ai_implementation_handoff.json"
+      - "machine/ai_closure_evidence.json"
+      - "scripts/verify_masterplan_completion.py"
+      - "tests/test_masterplan_completion_verifier.py"
+      - ".github/workflows/masterplan-completion.yml"
+      - ".github/workflows/provider-redundancy-closure.yml"
+      - ".github/workflows/p1-feedback-release-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: masterplan-completion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  independent-masterplan-completion:
+    name: Independent terminal masterplan verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run adversarial completion-verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_masterplan_completion_verifier.py
+
+      - name: Verify terminal masterplan on exact head
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_masterplan_completion.py
+          --evidence-out .masterplan-completion.json
+          --print-evidence
+
+      - name: Assert exact-head completion receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".masterplan-completion.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("masterplan receipt head mismatch")
+          if receipt.get("verifier") != "independent-masterplan-completion-v1":
+              raise SystemExit("unexpected masterplan verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("masterplan completion verification failed")
+          if receipt.get("actual_gap_count") != 17:
+              raise SystemExit("masterplan gap inventory is incomplete")
+          if receipt.get("open_gaps"):
+              raise SystemExit("masterplan still contains open gaps")
+          if receipt.get("handoff_gap_count") != 14:
+              raise SystemExit("P0 handoff closure inventory is incomplete")
+          if receipt.get("closure_gap_count") != 14:
+              raise SystemExit("P0 closure-evidence inventory is incomplete")
+          if receipt.get("blueprint_count") != 15:
+              raise SystemExit("canonical terminal blueprint inventory is incomplete")
+          if not all(
+              receipt.get(key)
+              for key in (
+                  "construction_digest",
+                  "handoff_digest",
+                  "closure_digest",
+              )
+          ):
+              raise SystemExit("masterplan completion digests are missing")
+          print(
+              "masterplan completion exact-head receipt:",
+              expected,
+              "gaps=",
+              receipt["actual_gap_count"],
+          )
+          PY
