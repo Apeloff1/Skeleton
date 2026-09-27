@@ -308,6 +308,7 @@ def reconcile_volume(
         {
             "volume": dict(volume),
             "accountability": dict(accountability),
+            "maturity_policy": dict(maturity_policy),
             "target_floor": target_floor,
         }
     )
