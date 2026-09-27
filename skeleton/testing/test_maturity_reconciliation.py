@@ -328,3 +328,29 @@ def test_identity_mismatch_fails_closed() -> None:
             POLICY,
             target_floor="verified",
         )
+
+@pytest.mark.parametrize(
+    "status",
+    ("passing", "done", "closed", "accepted_risk"),
+)
+def test_generic_lifecycle_terminal_does_not_imply_maturity(
+    status: str,
+) -> None:
+    decision = reconcile_volume(
+        _volume(gaps=[]),
+        _accountability(
+            status=status,
+            implementation_signoff=_signoff(True),
+            verification_signoff=_signoff(True),
+            evidence=["ledger:evidence"],
+        ),
+        POLICY,
+        target_floor="production",
+    )
+
+    assert _evaluation(decision, "implemented").eligible is False
+    assert _evaluation(decision, "verified").eligible is False
+    assert _evaluation(decision, "production").eligible is False
+    assert decision.target_floor_eligible is False
+    assert decision.promotion_candidate == "scaffolded"
+
