@@ -32,6 +32,54 @@ POLICY = Path("machine/p1_reproducibility_policy.json")
 EXPECTED_POLICY_ID = "skeleton.p1.reproducibility"
 EXPECTED_TASK_ID = "P1-EVID-05"
 EXPECTED_ACCOUNTABILITY = "ACC-P1-EVID-05"
+EXPECTED_RUNNER_PATHS = {
+    "promotion-evidence-emitter": "scripts/emit_p1_promotion_evidence.py",
+    "provenance-pytest-manifest": "scripts/run_provenance_evidence.py",
+    "p1-reproducibility-verifier": "scripts/check_p1_reproducibility.py",
+}
+EXPECTED_BUDGETS = {
+    "focused-ci": {
+        "id": "focused-ci",
+        "wall_seconds": 900,
+        "cpu_units": 1,
+        "memory_mb": 4096,
+        "retries": 0,
+        "network_policy": "repository-declared",
+    },
+    "independent-replay": {
+        "id": "independent-replay",
+        "wall_seconds": 1200,
+        "cpu_units": 2,
+        "memory_mb": 8192,
+        "retries": 0,
+        "network_policy": "repository-declared",
+    },
+}
+EXPECTED_COMPARISON = {
+    "require_same_repository": True,
+    "require_same_commit_sha": True,
+    "require_same_task_id": True,
+    "require_same_accountability_id": True,
+    "require_same_configuration_digest": True,
+    "require_same_environment_digest": True,
+    "require_same_verifier_id": True,
+    "require_same_verifier_digest": True,
+    "require_same_test_manifest_digest": True,
+    "require_same_runner_id_and_digest": True,
+    "require_same_budget_id_and_digest": True,
+    "require_same_source_date_epoch": True,
+    "require_same_subject_digest": True,
+    "require_same_evidence_digest": True,
+    "run_id_may_differ": True,
+    "run_attempt_may_differ": True,
+    "observed_at_may_differ": True,
+}
+EXPECTED_TERMINAL_POLICY = {
+    "reproduced_required_for_qualifying_evidence": True,
+    "deterministic_incompatibility_is_not_success": True,
+    "failed_replay_is_not_success": True,
+    "bundle_cannot_self_promote": True,
+}
 
 
 class ReproducibilityCliError(RuntimeError):
@@ -213,6 +261,11 @@ def validate_policy(root: Path = ROOT) -> tuple[dict[str, Any], dict[str, Any]]:
             **row,
             "digest": digest,
         }
+    if {
+        key: str(value["path"])
+        for key, value in runner_map.items()
+    } != EXPECTED_RUNNER_PATHS:
+        raise ReproducibilityCliError("reproducibility runner inventory drift")
 
     budget_map: dict[str, dict[str, Any]] = {}
     for row in budgets:
@@ -240,15 +293,18 @@ def validate_policy(root: Path = ROOT) -> tuple[dict[str, Any], dict[str, Any]]:
             **row,
             "digest": canonical_digest(row),
         }
+    if {
+        key: {k: v for k, v in value.items() if k != "digest"}
+        for key, value in budget_map.items()
+    } != EXPECTED_BUDGETS:
+        raise ReproducibilityCliError("reproducibility budget policy drift")
 
     comparison = policy.get("comparison")
     terminal = policy.get("terminal_policy")
-    if not isinstance(comparison, dict) or not comparison:
-        raise ReproducibilityCliError("comparison policy must be non-empty")
-    if not isinstance(terminal, dict) or not terminal:
-        raise ReproducibilityCliError("terminal policy must be non-empty")
-    if terminal.get("bundle_cannot_self_promote") is not True:
-        raise ReproducibilityCliError("bundle self-promotion policy drift")
+    if comparison != EXPECTED_COMPARISON:
+        raise ReproducibilityCliError("reproducibility comparison policy drift")
+    if terminal != EXPECTED_TERMINAL_POLICY:
+        raise ReproducibilityCliError("reproducibility terminal policy drift")
 
     return runner_map, budget_map
 
