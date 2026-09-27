@@ -154,3 +154,25 @@ def test_provider_redundancy_verifier_rejects_missing_outage_regression(
         "provider tests lost redundancy token" in error
         for error in receipt["errors"]
     )
+
+
+
+def test_provider_redundancy_verifier_rejects_missing_protocol_fence_regression(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/testing/test_provider_contract.py"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(
+        "test_failover_provider_never_routes_protocol_violation\n",
+        "",
+    )
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "provider tests lost redundancy token" in error
+        for error in receipt["errors"]
+    )
