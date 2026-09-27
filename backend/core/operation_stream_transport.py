@@ -396,6 +396,7 @@ def transport_from_env(
         database = client[database_name]
         mongo_operations = MongoOperationStore(database)
         mongo_events = MongoOperationEventStore(database)
+        mongo_events.validate_transaction_capability()
         mongo_operations.ensure_indexes()
         mongo_events.ensure_indexes()
         operation_store = mongo_operations
