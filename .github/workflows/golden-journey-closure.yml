@@ -12,6 +12,7 @@ on:
       - "frontend/services/operationStreamReducer.ts"
       - "frontend/scripts/test-operation-stream-session.mjs"
       - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/scripts/test-conversation-projection.mjs"
       - "frontend/package.json"
       - "skeleton/api/engine_service.py"
       - "skeleton/ai/runtime/api/engine_service.py"
@@ -19,6 +20,7 @@ on:
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_ai_golden_journeys.py"
       - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_conversation_governance.py"
       - "scripts/verify_golden_journey_closure.py"
       - "tests/test_golden_journey_independent_verifier.py"
@@ -66,6 +68,10 @@ jobs:
       - name: Run reducer and browser-session journeys
         working-directory: frontend
         run: yarn test:operation-stream
+
+      - name: Run canonical conversation reconstruction journeys
+        working-directory: frontend
+        run: yarn test:conversation
 
   engine-golden-journeys:
     name: Engine golden journeys
@@ -118,6 +124,12 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_engine_cross_service_closure.py
+
+      - name: Run backend engine outage no-fallback journey
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_ai_chat_engine_cutover.py
+          -k "configured_engine_outage_never_falls_back_to_backend_provider"
 
       - name: Run governance export and deletion journeys
         run: >-
