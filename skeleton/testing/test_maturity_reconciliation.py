@@ -417,4 +417,3 @@ def test_source_digest_changes_when_maturity_policy_changes() -> None:
     )
 
     assert changed.source_digest != baseline.source_digest
-
