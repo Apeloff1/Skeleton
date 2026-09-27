@@ -96,7 +96,8 @@ def test_human_ledger_exposes_every_p1_accountability_checkbox() -> None:
     assert "## P1 Trustworthy-Production Tasks" in human
     assert "44 P1 tasks" in human
     for task in backlog["tasks"]:
-        assert f"[ ] \`{task['accountability_ref']}\`" in human
+        marker = "[ ] " + chr(96) + task["accountability_ref"] + chr(96)
+        assert marker in human
 
 
 def test_canonical_accountability_validator_accepts_p1_records() -> None:
