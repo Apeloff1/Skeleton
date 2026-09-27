@@ -363,7 +363,9 @@ def select_reasoning_strategy(
         if not required.issubset(set(strategy.capabilities)):
             continue
         effective = strategy.limits.constrain(request.budget)
-        candidates.append((strategy.priority, strategy.strategy_id, strategy, effective))
+        candidates.append(
+            (strategy.priority, strategy.strategy_id, strategy, effective)
+        )
 
     if not candidates:
         raise ReasoningStrategyError(
