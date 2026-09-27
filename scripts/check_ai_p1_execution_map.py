@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the canonical P1 production-promotion execution map."""
+"""Validate the canonical P1 production-promotion execution map and task DAG."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 MAP_PATH = Path("machine/ai_p1_execution_map.json")
+BACKLOG_PATH = Path("machine/ai_p1_task_backlog.json")
 MASTER_PLAN_PATH = Path("machine/ai_master_plan.json")
 CONSTRUCTION_PATH = Path("machine/ai_app_construction.json")
 BUILD_SEQUENCE_PATH = Path("machine/ai_master_build_sequence.json")
@@ -30,6 +31,7 @@ EXPECTED_LANES = {
     "P1-L5",
 }
 TERMINAL_LANE = "P1-L5"
+TERMINAL_TASK = "P1-PROM-03"
 
 
 class ValidationError(RuntimeError):
@@ -46,7 +48,11 @@ def _load(path: Path) -> dict[str, Any]:
     return value
 
 
-def _cycle_errors(graph: dict[str, set[str]]) -> list[str]:
+def _cycle_errors(
+    graph: dict[str, set[str]],
+    *,
+    label: str,
+) -> list[str]:
     errors: list[str] = []
     state: dict[str, int] = {}
     stack: list[str] = []
@@ -61,7 +67,7 @@ def _cycle_errors(graph: dict[str, set[str]]) -> list[str]:
             except ValueError:
                 start = 0
             cycle = stack[start:] + [node]
-            errors.append("P1 lane dependency cycle: " + " -> ".join(cycle))
+            errors.append(f"{label} dependency cycle: " + " -> ".join(cycle))
             return
         state[node] = 1
         stack.append(node)
@@ -76,9 +82,27 @@ def _cycle_errors(graph: dict[str, set[str]]) -> list[str]:
     return errors
 
 
+def _ancestor_set(
+    graph: dict[str, set[str]],
+    node: str,
+) -> set[str]:
+    found: set[str] = set()
+
+    def walk(current: str) -> None:
+        for dep in graph.get(current, set()):
+            if dep in found:
+                continue
+            found.add(dep)
+            walk(dep)
+
+    walk(node)
+    return found
+
+
 def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     errors: list[str] = []
     p1_map = _load(root / MAP_PATH)
+    backlog = _load(root / BACKLOG_PATH)
     master = _load(root / MASTER_PLAN_PATH)
     construction = _load(root / CONSTRUCTION_PATH)
     sequence = _load(root / BUILD_SEQUENCE_PATH)
@@ -87,6 +111,10 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         errors.append("P1 execution map schema_version must be 1")
     if p1_map.get("status") != "active":
         errors.append("P1 execution map must be active")
+    if backlog.get("schema_version") != 1:
+        errors.append("P1 task backlog schema_version must be 1")
+    if backlog.get("status") != "active":
+        errors.append("P1 task backlog must be active")
 
     volumes = master.get("volumes")
     if not isinstance(volumes, list):
@@ -176,7 +204,8 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         )
 
     primary_owner: dict[str, str] = {}
-    graph: dict[str, set[str]] = {}
+    lane_volume_refs: dict[str, set[str]] = {}
+    lane_graph: dict[str, set[str]] = {}
     all_primary: set[str] = set()
 
     for lane_id, lane in sorted(lane_by_id.items()):
@@ -185,7 +214,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             errors.append(f"{lane_id}: depends_on must be a list")
             deps = []
         dep_set = {str(item) for item in deps}
-        graph[lane_id] = dep_set
+        lane_graph[lane_id] = dep_set
         unknown_deps = dep_set - set(lane_by_id)
         if unknown_deps:
             errors.append(
@@ -198,6 +227,15 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if not isinstance(primary, list):
             errors.append(f"{lane_id}: primary_volume_refs must be a list")
             primary = []
+        supporting = lane.get("supporting_volume_refs")
+        if not isinstance(supporting, list):
+            errors.append(f"{lane_id}: supporting_volume_refs must be a list")
+            supporting = []
+
+        lane_volume_refs[lane_id] = {
+            str(item) for item in [*primary, *supporting]
+        }
+
         for ref in primary:
             ref = str(ref)
             all_primary.add(ref)
@@ -209,11 +247,6 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
                     f"primary P1 volume has multiple owners: {ref} -> {prior},{lane_id}"
                 )
             primary_owner[ref] = lane_id
-
-        supporting = lane.get("supporting_volume_refs")
-        if not isinstance(supporting, list):
-            errors.append(f"{lane_id}: supporting_volume_refs must be a list")
-            supporting = []
         for ref in supporting:
             if str(ref) not in volume_by_ref:
                 errors.append(f"{lane_id}: unknown supporting volume {ref}")
@@ -262,7 +295,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
             elif not isinstance(value, list) or not value:
                 errors.append(f"{lane_id}: {field} must be non-empty")
 
-    errors.extend(_cycle_errors(graph))
+    errors.extend(_cycle_errors(lane_graph, label="P1 lane"))
 
     terminal = lane_by_id.get(TERMINAL_LANE)
     if terminal is not None:
@@ -306,13 +339,167 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         if acceptance.get("signed_accountability_required_for_maturity_promotion") is not True:
             errors.append("P1 signed accountability must gate maturity promotion")
 
+    tasks = backlog.get("tasks")
+    if not isinstance(tasks, list):
+        raise ValidationError("P1 task backlog tasks must be a list")
+    task_by_id = {
+        str(item.get("task_id")): item
+        for item in tasks
+        if isinstance(item, dict) and item.get("task_id")
+    }
+    if len(task_by_id) != len(tasks):
+        errors.append("P1 task IDs must be unique and non-empty")
+
+    status_values = backlog.get("status_values")
+    allowed_status = (
+        {str(item) for item in status_values}
+        if isinstance(status_values, list)
+        else set()
+    )
+    if not allowed_status:
+        errors.append("P1 task backlog status_values must be non-empty")
+
+    task_graph: dict[str, set[str]] = {}
+    lane_task_counts = {lane_id: 0 for lane_id in lane_by_id}
+    accountability_refs: set[str] = set()
+
+    for task_id, task in sorted(task_by_id.items()):
+        lane_id = str(task.get("lane_id") or "")
+        if lane_id not in lane_by_id:
+            errors.append(f"{task_id}: unknown lane {lane_id!r}")
+            allowed_volumes: set[str] = set()
+        else:
+            lane_task_counts[lane_id] += 1
+            allowed_volumes = lane_volume_refs.get(lane_id, set())
+
+        task_status = task.get("status")
+        if task_status not in allowed_status:
+            errors.append(f"{task_id}: invalid status {task_status!r}")
+
+        refs = task.get("volume_refs")
+        if not isinstance(refs, list):
+            errors.append(f"{task_id}: volume_refs must be a list")
+            refs = []
+        for ref in refs:
+            ref = str(ref)
+            if ref not in volume_by_ref:
+                errors.append(f"{task_id}: unknown volume {ref}")
+            if lane_id in lane_by_id and ref not in allowed_volumes:
+                errors.append(
+                    f"{task_id}: volume {ref} is outside {lane_id} primary/supporting scope"
+                )
+        if lane_id == TERMINAL_LANE and refs:
+            errors.append(f"{task_id}: terminal promotion tasks must not own volumes")
+
+        deps = task.get("depends_on")
+        if not isinstance(deps, list):
+            errors.append(f"{task_id}: depends_on must be a list")
+            deps = []
+        dep_set = {str(item) for item in deps}
+        task_graph[task_id] = dep_set
+        unknown = dep_set - set(task_by_id)
+        if unknown:
+            errors.append(
+                f"{task_id}: unknown task dependencies: {','.join(sorted(unknown))}"
+            )
+        if task_id in dep_set:
+            errors.append(f"{task_id}: task cannot depend on itself")
+
+        if not isinstance(task.get("objective"), str) or not task["objective"].strip():
+            errors.append(f"{task_id}: objective must be non-empty")
+        task_acceptance = task.get("acceptance")
+        if not isinstance(task_acceptance, list) or not task_acceptance:
+            errors.append(f"{task_id}: acceptance must be non-empty")
+
+        accountability_ref = task.get("accountability_ref")
+        if not isinstance(accountability_ref, str) or not accountability_ref:
+            errors.append(f"{task_id}: accountability_ref must be non-empty")
+        elif accountability_ref in accountability_refs:
+            errors.append(
+                f"{task_id}: duplicate accountability_ref {accountability_ref}"
+            )
+        else:
+            accountability_refs.add(accountability_ref)
+
+    errors.extend(_cycle_errors(task_graph, label="P1 task"))
+
+    scheduling = backlog.get("scheduling_policy")
+    initial_ready = (
+        str(scheduling.get("initial_ready_task"))
+        if isinstance(scheduling, dict)
+        and scheduling.get("initial_ready_task")
+        else ""
+    )
+    if initial_ready not in task_by_id:
+        errors.append("P1 backlog initial_ready_task must reference a task")
+    elif task_graph.get(initial_ready):
+        errors.append("P1 backlog initial_ready_task must have no dependencies")
+
+    for task_id, task in task_by_id.items():
+        if task.get("status") not in {"ready", "in_progress"}:
+            continue
+        unmet = {
+            dep
+            for dep in task_graph.get(task_id, set())
+            if task_by_id.get(dep, {}).get("status") != "done"
+        }
+        if task_id != initial_ready and unmet:
+            errors.append(
+                f"{task_id}: ready/in_progress with unmet dependencies: "
+                + ",".join(sorted(unmet))
+            )
+
+    if TERMINAL_TASK not in task_by_id:
+        errors.append(f"P1 task backlog missing terminal task {TERMINAL_TASK}")
+    else:
+        ancestors = _ancestor_set(task_graph, TERMINAL_TASK)
+        orphaned = set(task_by_id) - ancestors - {TERMINAL_TASK}
+        if orphaned:
+            errors.append(
+                "P1 tasks do not feed terminal promotion: "
+                + ",".join(sorted(orphaned))
+            )
+
+    for lane_id, count in sorted(lane_task_counts.items()):
+        if count == 0:
+            errors.append(f"{lane_id}: lane has no P1 backlog tasks")
+
+    declared_summary = backlog.get("summary")
+    if not isinstance(declared_summary, dict):
+        errors.append("P1 task backlog summary must be an object")
+    else:
+        if declared_summary.get("task_count") != len(task_by_id):
+            errors.append("P1 task backlog task_count drift")
+        actual_lane_counts = {
+            lane_id: lane_task_counts[lane_id]
+            for lane_id in sorted(lane_task_counts)
+        }
+        declared_lane_counts = declared_summary.get("lane_task_counts")
+        if declared_lane_counts != actual_lane_counts:
+            errors.append("P1 task backlog lane_task_counts drift")
+        ready_count = sum(
+            1 for task in task_by_id.values() if task.get("status") == "ready"
+        )
+        blocked_count = sum(
+            1 for task in task_by_id.values() if task.get("status") == "blocked"
+        )
+        if declared_summary.get("ready_count") != ready_count:
+            errors.append("P1 task backlog ready_count drift")
+        if declared_summary.get("blocked_count") != blocked_count:
+            errors.append("P1 task backlog blocked_count drift")
+
     summary = {
         "ok": not errors,
         "lane_count": len(lane_by_id),
         "primary_volume_count": len(all_primary),
         "deferred_volume_count": len(volume_by_ref) - len(all_primary),
         "canonical_p1_gap_count": len(p1_gap_rows),
+        "task_count": len(task_by_id),
+        "ready_task_count": sum(
+            1 for task in task_by_id.values() if task.get("status") == "ready"
+        ),
         "terminal_lane": TERMINAL_LANE,
+        "terminal_task": TERMINAL_TASK,
     }
     return errors, summary
 
@@ -341,6 +528,7 @@ def main() -> int:
         "P1 execution map: OK "
         f"({summary['lane_count']} lanes; "
         f"{summary['primary_volume_count']} primary volumes; "
+        f"{summary['task_count']} tasks; "
         f"{summary['deferred_volume_count']} deferred)"
     )
     return 0
