@@ -16,6 +16,9 @@ BACKLOG_PATH = Path("machine/ai_p1_task_backlog.json")
 MASTER_PLAN_PATH = Path("machine/ai_master_plan.json")
 CONSTRUCTION_PATH = Path("machine/ai_app_construction.json")
 BUILD_SEQUENCE_PATH = Path("machine/ai_master_build_sequence.json")
+HUMAN_PATH = Path("docs/plan/P1_EXECUTION_MAP.md")
+INDEX_PATH = Path("docs/plan/MASTER_INDEX.md")
+MASTER_HUMAN_PATH = Path("docs/plan/MASTER_PLAN.md")
 
 EXPECTED_P1_GAPS = {
     "gap-feedback-promotion",
@@ -115,6 +118,40 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     master = _load(root / MASTER_PLAN_PATH)
     construction = _load(root / CONSTRUCTION_PATH)
     sequence = _load(root / BUILD_SEQUENCE_PATH)
+
+    for required_path in (HUMAN_PATH, INDEX_PATH, MASTER_HUMAN_PATH):
+        if not (root / required_path).is_file():
+            errors.append(f"missing P1 planning document: {required_path}")
+
+    authority = master.get("authority")
+    if not isinstance(authority, dict):
+        errors.append("master plan authority must be an object")
+    else:
+        expected_authority = {
+            "p1_execution_map": str(MAP_PATH),
+            "p1_execution_map_human": str(HUMAN_PATH),
+            "p1_task_backlog": str(BACKLOG_PATH),
+        }
+        for key, expected in expected_authority.items():
+            if authority.get(key) != expected:
+                errors.append(
+                    f"master plan authority {key} must equal {expected}"
+                )
+
+    if (root / INDEX_PATH).is_file():
+        index_text = (root / INDEX_PATH).read_text(encoding="utf-8")
+        for marker in (
+            "P1_EXECUTION_MAP.md",
+            "ai_p1_execution_map.json",
+            "ai_p1_task_backlog.json",
+        ):
+            if marker not in index_text:
+                errors.append(f"master index missing P1 marker: {marker}")
+
+    if (root / MASTER_HUMAN_PATH).is_file():
+        master_text = (root / MASTER_HUMAN_PATH).read_text(encoding="utf-8")
+        if "## 21.7 P1 trustworthy autonomous production map" not in master_text:
+            errors.append("human master plan missing P1 maturity section")
 
     if p1_map.get("schema_version") != 1:
         errors.append("P1 execution map schema_version must be 1")
