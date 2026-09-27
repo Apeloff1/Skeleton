@@ -290,12 +290,19 @@ def test_knowledge_observation_requires_lineage() -> None:
 def test_document_content_is_digest_bound_not_embedded_in_receipt() -> None:
     observation = _knowledge()
     receipt = _receipt(knowledge_observations=(observation,))
+    changed = observe_knowledge_document(
+        _document(body="restart the service safely"),
+        source_revision="git:abc123",
+        provenance_refs=("source:runbooks/api.md",),
+        stale_after_ns=30_000_000_000,
+    )
+    changed_receipt = _receipt(knowledge_observations=(changed,))
     rendered = repr(receipt.payload())
 
     assert "restart the service" not in rendered
-    assert observation.content_digest in receipt.knowledge_digest or (
-        len(receipt.knowledge_digest) == 64
-    )
+    assert observation.content_digest != changed.content_digest
+    assert receipt.knowledge_digest != changed_receipt.knowledge_digest
+    assert receipt.receipt_digest != changed_receipt.receipt_digest
 
 
 def test_input_order_is_canonical() -> None:
