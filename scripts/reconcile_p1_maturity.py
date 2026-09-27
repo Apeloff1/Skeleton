@@ -68,6 +68,19 @@ def reconcile_repository(
     accountability = _load(paths["accountability"])
     p1_map = _load(paths["p1_execution_map"])
 
+    authority = master.get("authority")
+    if not isinstance(authority, dict):
+        raise ReconciliationError("master plan authority must be an object")
+    expected_authority = {
+        "p1_maturity_reconciliation_engine": str(Path("scripts/reconcile_p1_maturity.py")),
+        "p1_maturity_reconciliation_contract": str(Path("skeleton/contracts/maturity_reconciliation.py")),
+    }
+    for key, expected in expected_authority.items():
+        if authority.get(key) != expected:
+            raise ReconciliationError(
+                f"master plan {key} authority pointer drift"
+            )
+
     volumes = master.get("volumes")
     policy = master.get("volume_maturity_policy")
     records = accountability.get("records")
