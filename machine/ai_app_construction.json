@@ -870,7 +870,7 @@
     {
       "id": "engine-api",
       "owner": "skeleton/api",
-      "state": "partial",
+      "state": "present",
       "responsibility": "Engine-native API for health, orchestration, retrieval, agents and governed engine operations.",
       "depends_on": [
         "identity",
@@ -6355,7 +6355,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "closed",
+    "status": "complete",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
