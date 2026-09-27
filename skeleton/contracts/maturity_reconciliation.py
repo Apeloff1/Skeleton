@@ -75,16 +75,15 @@ def _signed(signoff: object) -> bool:
 
 
 def _accountability_rank(status: object) -> int:
+    """Return rank only for explicit maturity-bearing accountability states.
+
+    Generic lifecycle terminals such as passing/done/closed/accepted_risk are
+    intentionally not aliases for maturity. Completion, risk disposition, and
+    production qualification are different claims and must remain separate.
+    """
     if not isinstance(status, str):
         return -1
-    aliases = {
-        "passing": MaturityState.VERIFIED.value,
-        "done": MaturityState.PRODUCTION.value,
-        "closed": MaturityState.PRODUCTION.value,
-        "accepted_risk": MaturityState.HARDENED.value,
-    }
-    normalized = aliases.get(status.lower(), status.lower())
-    return _MATURITY_INDEX.get(normalized, -1)
+    return _MATURITY_INDEX.get(status.lower(), -1)
 
 
 @dataclass(frozen=True, slots=True)
