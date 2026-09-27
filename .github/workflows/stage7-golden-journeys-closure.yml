@@ -1,0 +1,188 @@
+name: Stage 7 Golden Journeys Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/testing/test_ai_golden_journeys.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/ai/runtime/api/engine_service.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "frontend/services/operationStreamSession.ts"
+      - "frontend/services/operationStream.ts"
+      - "frontend/scripts/test-operation-stream-session.mjs"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "frontend/package.json"
+      - "scripts/verify_stage7_golden_journeys.py"
+      - "tests/test_stage7_golden_journeys_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/stage7-golden-journeys-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage7-golden-journeys-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stage7-golden-contracts:
+    name: Stage 7 golden journey contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused Stage-7 dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Run deterministic engine golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_ai_golden_journeys.py
+
+      - name: Run authenticated cross-service golden journeys
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_engine_cross_service_closure.py
+          backend/tests/test_ai_chat_engine_cutover.py
+
+  stage7-browser-contracts:
+    name: Stage 7 browser stream journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Run reducer and browser-session golden journeys
+        working-directory: frontend
+        run: >-
+          node --test
+          scripts/test-operation-stream-reducer.mjs
+          scripts/test-operation-stream-session.mjs
+
+  stage7-independent:
+    name: Independent Stage 7 golden journey verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_stage7_golden_journeys_independent_verifier.py
+
+      - name: Run independent exact-head Stage-7 scan
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_stage7_golden_journeys.py
+          --evidence-out .stage7-golden-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".stage7-golden-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("Stage-7 receipt does not match exact PR head")
+          if (
+              receipt.get("verifier")
+              != "independent-stage7-golden-journeys-v1"
+          ):
+              raise SystemExit("unexpected Stage-7 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent Stage-7 verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 6:
+              raise SystemExit("Stage-7 boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 1:
+              raise SystemExit("Stage-7 mirror coverage is incomplete")
+          if set(receipt.get("dependency_graph") or []) != {
+              "gap-state-authority-convergence",
+              "gap-governance-registry",
+              "gap-cost-admission",
+              "gap-provider-surface-convergence",
+              "gap-conversation-state-authority",
+              "gap-memory-durable-authority",
+              "gap-tool-runtime-convergence",
+              "gap-context-compiler-convergence",
+              "gap-provider-interaction-protocol",
+              "gap-verification-evidence-contract",
+              "gap-cognitive-execution-loop",
+              "gap-engine-application-execution-boundary",
+              "gap-streaming-protocol",
+          }:
+              raise SystemExit("Stage-7 dependency graph receipt is invalid")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("Stage-7 handoff digest is missing")
+          print(
+              "independent Stage-7 exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+          )
+          PY
