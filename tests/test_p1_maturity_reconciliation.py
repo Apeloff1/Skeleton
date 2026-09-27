@@ -14,6 +14,8 @@ SOURCE_PATHS = (
     ROOT / "machine/ai_master_plan.json",
     ROOT / "machine/ai_build_accountability.json",
     ROOT / "machine/ai_p1_execution_map.json",
+    ROOT / "skeleton/contracts/maturity_reconciliation.py",
+    ROOT / "scripts/reconcile_p1_maturity.py",
 )
 
 
@@ -81,6 +83,9 @@ def test_report_identity_matches_canonical_volume_and_accountability() -> None:
     assert row["target_floor"] == "verified"
     assert len(row["source_digest"]) == 64
     assert isinstance(row["current_claim_valid"], bool)
+    assert row["current_implementation_status"] == "unverified"
+    assert row["accountability_maturity_status"] is None
+    assert row["implementation_status_candidate"] is None
     assert len(row["evaluations"]) == 7
 
 
@@ -111,3 +116,24 @@ def test_reconciliation_rejects_non_p1_volume_selection() -> None:
             ROOT,
             selected_volumes=("VOL-001",),
         )
+
+def test_report_binds_reconciliation_engine_sources() -> None:
+    module = _module()
+
+    report = module.reconcile_repository(
+        ROOT,
+        selected_volumes=("VOL-000",),
+    )
+
+    assert set(report["source_digests"]) == {
+        "master_plan",
+        "accountability",
+        "p1_execution_map",
+        "engine_contract",
+        "engine_runner",
+    }
+    assert all(
+        len(value) == 64
+        for value in report["source_digests"].values()
+    )
+
