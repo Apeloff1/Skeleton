@@ -26,6 +26,7 @@ REQUIRED_RUNTIME_TOKENS = (
     "except ProviderInvocationError as exc:",
     "def redundancy_status(",
     "failover_successes",
+    "secondary provider capability is not declared: image-generation",
 )
 
 REQUIRED_TEST_TOKENS = (
@@ -37,6 +38,7 @@ REQUIRED_TEST_TOKENS = (
     "test_provider_registry_returns_failover_adapter_and_exposes_routing",
     "test_provider_registry_secondary_configuration_fails_closed_when_partial",
     "test_provider_registry_rejects_secondary_on_primary_hostname",
+    "test_declared_secondary_adapter_denies_undeclared_media_capabilities",
 )
 
 
