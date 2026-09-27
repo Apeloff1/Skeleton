@@ -6,9 +6,29 @@ Machine authority: [`machine/ai_build_accountability.json`](../../machine/ai_bui
 
 ## Mandatory accountability protocol
 
-Checkboxes are derived from signed machine state. Do not hand-edit them.
+Tracked items: **742** (421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, 240 historical/edge/obscure obligations).
 
-Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC.
+Every tracked item has a completion checkbox. The checkbox is derived machine state and may not be hand-edited.
+
+Every lifecycle/status transition is attributable: actor identity/type, role, RFC3339 UTC timestamp, full git SHA, statement, signature method, and from/to status.
+
+Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`, `git_ssh`, `sigstore`, `ci_oidc`. Unbound/manual attestations do not count.
+
+Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.
+
+## Lifecycle
+
+```text
+[ ] planned / unverified
+  -> signed STARTED event + UTC timestamp + git SHA
+  -> implementation evidence
+  -> implementation sign-off
+  -> independent verification evidence
+  -> verification sign-off
+  -> signed completion / accepted-risk event
+  -> validator
+  -> [x] closed
+```
 
 ## Volumes 000–420
 
@@ -767,3 +787,8 @@ Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, o
 - [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
+## Audit and correction rule
+
+Git history plus this ledger forms the construction audit trail. Do not rewrite prior sign-offs. Corrections append a superseding signed event tied to a new git revision.
+
+Use `python scripts/ai_accountability.py --help` for the governed signing workflow.
