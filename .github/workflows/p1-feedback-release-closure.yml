@@ -1,6 +1,20 @@
 name: P1 Feedback Release Closure Gate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/learning/promotion.py"
+      - "skeleton/learning/__init__.py"
+      - "skeleton/release/slo_promotion.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/testing/test_feedback_promotion.py"
+      - "skeleton/testing/test_release_slo_promotion.py"
+      - "scripts/verify_p1_feedback_release_closure.py"
+      - "tests/test_p1_feedback_release_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - ".github/workflows/p1-feedback-release-closure.yml"
   pull_request:
     branches:
       - main
