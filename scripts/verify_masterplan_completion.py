@@ -41,6 +41,31 @@ EXPECTED_GAPS = {
     "gap-provider-surface-convergence",
 }
 
+P1_GAPS = {
+    "gap-feedback-promotion",
+    "gap-provider-redundancy",
+    "gap-release-slo-loop",
+}
+P0_GAPS = EXPECTED_GAPS - P1_GAPS
+
+REQUIRED_BLUEPRINTS = {
+    "cognitive_runtime_blueprint": "gap-cognitive-execution-loop",
+    "conversation_runtime_contract": "gap-conversation-state-authority",
+    "tool_runtime_blueprint": "gap-tool-runtime-convergence",
+    "context_compiler_blueprint": "gap-context-compiler-convergence",
+    "verification_runtime_blueprint": "gap-verification-evidence-contract",
+    "provider_interaction_protocol": "gap-provider-interaction-protocol",
+    "engine_application_boundary_blueprint": "gap-engine-application-execution-boundary",
+    "realtime_delivery_blueprint": "gap-streaming-protocol",
+    "golden_journey_blueprint": "gap-e2e-golden-journeys",
+    "memory_runtime_blueprint": "gap-memory-durable-authority",
+    "state_authority_blueprint": "gap-state-authority-convergence",
+    "governance_runtime_blueprint": "gap-governance-registry",
+    "cost_admission_blueprint": "gap-cost-admission",
+    "provider_surface_convergence_blueprint": "gap-provider-surface-convergence",
+    "provider_redundancy_blueprint": "gap-provider-redundancy",
+}
+
 TERMINAL_BLUEPRINT_STATUSES = {"closed", "complete"}
 
 
@@ -117,6 +142,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         for item in handoff_entries
         if isinstance(item, dict) and item.get("gap")
     }
+    missing_handoffs = sorted(P0_GAPS - set(handoff_by_gap))
+    if missing_handoffs:
+        errors.append(
+            "P0 implementation handoffs missing: " + ", ".join(missing_handoffs)
+        )
     for gap_id, entry in sorted(handoff_by_gap.items()):
         if gap_id not in EXPECTED_GAPS:
             continue
@@ -138,6 +168,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         for item in closure_entries
         if isinstance(item, dict) and item.get("gap")
     }
+    missing_closure = sorted(P0_GAPS - set(closure_by_gap))
+    if missing_closure:
+        errors.append(
+            "P0 closure evidence records missing: " + ", ".join(missing_closure)
+        )
     for gap_id, entry in sorted(closure_by_gap.items()):
         if gap_id not in EXPECTED_GAPS:
             continue
@@ -153,16 +188,20 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 errors.append(f"{gap_id} closure still has {field}")
 
     blueprint_rows: dict[str, dict[str, Any]] = {}
-    for name, value in construction.items():
+    for name, expected_gap in REQUIRED_BLUEPRINTS.items():
+        value = construction.get(name)
         if not isinstance(value, dict):
-            continue
-        gap_id = value.get("gap")
-        if gap_id not in EXPECTED_GAPS:
+            errors.append(f"required blueprint is missing: {name}")
             continue
         blueprint_rows[name] = value
+        if value.get("gap") != expected_gap:
+            errors.append(
+                f"{name} gap binding drift: expected {expected_gap}, "
+                f"got {value.get('gap')!r}"
+            )
         if value.get("status") not in TERMINAL_BLUEPRINT_STATUSES:
             errors.append(
-                f"{name} for {gap_id} has non-terminal status "
+                f"{name} for {expected_gap} has non-terminal status "
                 f"{value.get('status')!r}"
             )
 
