@@ -64,6 +64,28 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "verification-receipt",
         "verification_receipt=",
         "_verify_and_finalize",
+        "tool_verification_evidence",
+        "_tool_verification_material",
+        "postcondition_observed",
+        "semantic_verification_adapter",
+        "verification_blocked",
+        "verification_abstained",
+        "verification_disposition",
+    ),
+    "skeleton/skills/tool_runtime.py": (
+        "verification_metadata",
+        "postcondition is not None",
+        "ToolExecutionReceipt",
+    ),
+    "skeleton/provider_runtime.py": (
+        "AI_VERIFICATION_MODEL",
+        "verification_adapter_for",
+        "same_provider",
+        "same_model",
+    ),
+    "skeleton/api/engine_runtime.py": (
+        "semantic_verification_adapter",
+        "verification_adapter_for(provider)",
     ),
     "skeleton/skills/verification.py": (
         "observe_tool_postcondition",
@@ -102,6 +124,18 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
     (
         "skeleton/intelligence/execution_runtime.py",
         "skeleton/ai/runtime/intelligence/execution_runtime.py",
+    ),
+    (
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/ai/runtime/skills/tool_runtime.py",
+    ),
+    (
+        "skeleton/provider_runtime.py",
+        "skeleton/ai/runtime/provider_runtime.py",
+    ),
+    (
+        "skeleton/api/engine_runtime.py",
+        "skeleton/ai/runtime/api/engine_runtime.py",
     ),
     (
         "skeleton/skills/verification.py",

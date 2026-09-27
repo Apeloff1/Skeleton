@@ -635,7 +635,6 @@ class ToolExecutionReceipt:
     data_class: str = "internal"
     transfer_purpose: str = "tool-execution"
     governance_decision_ref: str | None = None
-    postcondition_verified: bool = False
     metered_tool_calls: int = 1
     schema_version: int = TOOL_CONTRACT_SCHEMA_VERSION
 
@@ -701,8 +700,6 @@ class ToolExecutionReceipt:
                 "governance_decision_ref",
                 max_length=256,
             )
-        if not isinstance(self.postcondition_verified, bool):
-            raise ToolContractError("postcondition_verified must be boolean")
         if (
             isinstance(self.metered_tool_calls, bool)
             or not isinstance(self.metered_tool_calls, int)
@@ -735,7 +732,6 @@ class ToolExecutionReceipt:
             "data_class": self.data_class,
             "transfer_purpose": self.transfer_purpose,
             "governance_decision_ref": self.governance_decision_ref,
-            "postcondition_verified": self.postcondition_verified,
             "metered_tool_calls": self.metered_tool_calls,
         }
 

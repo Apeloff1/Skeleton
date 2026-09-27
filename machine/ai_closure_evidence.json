@@ -744,7 +744,7 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
@@ -759,7 +759,13 @@
         ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
         "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
-        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt",
+        "durable tool results are materialized into canonical EvidenceReference values before verification",
+        "successful explicit tool postconditions become canonical PostconditionObservation values",
+        "semantic verifier role is separately configured through AI_VERIFICATION_MODEL and same provider+model identity is rejected as independent",
+        "canonical engine injects the isolated semantic verifier into cognitive execution",
+        "publish/qualified/abstain/block finalization dispositions are enforced in execution finalization",
+        "independent closure verifier audits evidence materialization, semantic isolation, engine binding and canonical AI mirror parity"
       ],
       "closure_evidence_required": [
         "structural verification tests",
@@ -787,22 +793,14 @@
         ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
       "outstanding_evidence": [
-        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
-        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
-        "production action verification consumes durable tool receipts and explicit postcondition observations",
-        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass",
-        "fresh exact-head Cognitive Execution Closure Gate including semantic verification regressions",
-        "fresh exact-head Verification Evidence Closure Gate receipt",
-        "declared dependency-gap closure"
+        "fresh exact-head Verification Evidence Closure Gate",
+        "fresh exact-head Cognitive Execution Closure Gate",
+        "declared lower-stage dependency closure and independent signoff"
       ],
       "blockers": [
-        "dependency must close: gap-context-compiler-convergence",
-        "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-provider-interaction-protocol",
-        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
-        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
-        "production action verification consumes durable tool receipts and explicit postcondition observations",
-        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass"
+        "fresh exact-head Verification Evidence Closure Gate",
+        "fresh exact-head Cognitive Execution Closure Gate",
+        "declared lower-stage dependency closure and independent signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -967,7 +965,7 @@
       "plane": "streaming-realtime",
       "stage": 6,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
@@ -1015,7 +1013,15 @@
         "backend/tests/test_operation_stream_route.py cross-worker reconnect and slow-client API journeys",
         "fenced expiring projection lease with generation-based stale-worker fencing",
         "cross-worker API reconnect journey over shared durable cursor state",
-        "operation-local slow-client replay isolation"
+        "operation-local slow-client replay isolation",
+        "Mongo shared-network operation authority with atomic state/outbox mutation merged in PR #2030",
+        "Mongo transactional operation-event authority with replay/consumer/lease/compaction semantics merged in PR #2030",
+        "environment-selectable SQLite or Mongo operation authority with fail-closed backend validation",
+        "injectable production browser operation session bound to authenticated API and per-consumer AsyncStorage cursor",
+        "browser-session reconnect, replay-gap recovery, cancel-complete race and terminal snapshot reconciliation regressions",
+        "shared-network Mongo operation and stream authorities landed on main via #2030",
+        "production browser-session runtime binds replay, durable cursor, resync, cancellation and bounded follow",
+        "browser journey regressions cover disconnect/reconnect, slow-client compaction-gap recovery and cancel/complete terminal races"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -1027,21 +1033,14 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
-        "browser-level disconnect/reconnect automation against assembled topology",
-        "browser-level slow-client/backpressure automation against assembled topology",
-        "browser-level cancel-complete automation against assembled topology"
+        "fresh exact-head frontend typecheck/test:operation-stream",
+        "fresh exact-head App Assembly",
+        "independent closure signoff"
       ],
       "blockers": [
-        "dependency must close: gap-cognitive-execution-loop",
-        "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-state-authority-convergence",
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
-        "browser-level disconnect/reconnect automation against assembled topology",
-        "browser-level slow-client/backpressure automation against assembled topology",
-        "browser-level cancel-complete automation against assembled topology"
+        "fresh exact-head frontend typecheck/test:operation-stream",
+        "fresh exact-head App Assembly",
+        "independent closure signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",

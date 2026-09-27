@@ -1912,7 +1912,7 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
             result_text = resolved.strip()
-            manifest, _postcondition_registered = (
+            manifest, postcondition_observed = (
                 await self.tool_runtime.verification_metadata(call.tool_id)
             )
             receipt_ids.append(receipt.receipt_id)
@@ -1943,9 +1943,7 @@ class CognitiveExecutionRuntime:
                         "side_effect_class": (
                             manifest.side_effect_class.value
                         ),
-                        "postcondition_observed": (
-                            receipt.postcondition_verified
-                        ),
+                        "postcondition_observed": postcondition_observed,
                         "observed_at": receipt.finished_at.isoformat(),
                         "execution_id": receipt.execution_id,
                         "turn_id": receipt.turn_id,
@@ -2359,12 +2357,8 @@ class CognitiveExecutionRuntime:
             externally_observable_action=externally_observable,
         )
 
-        exact_evidence_match = any(
-            item.content_digest
-            == hashlib.sha256(candidate.strip().encode("utf-8")).hexdigest()
-            for item in evidence
-        )
-        semantic_required = (
+        semantic = None
+        if (
             assessment.policy.level >= VerificationLevel.INDEPENDENT
             or (
                 execution.request.context_policy.get(
@@ -2372,14 +2366,10 @@ class CognitiveExecutionRuntime:
                 )
                 is True
             )
-            or (bool(evidence) and not exact_evidence_match)
-        )
-        semantic = None
-        semantic_missing = False
-        if semantic_required:
+        ):
             adapter = self.semantic_verification_adapter
             if adapter is None:
-                semantic_missing = True
+                semantic = None
             else:
                 semantic = await SemanticVerificationRuntime(adapter).finalize(
                     claim,
@@ -2408,16 +2398,12 @@ class CognitiveExecutionRuntime:
         self.repository.remember_verification_receipt(canonical_receipt)
 
         disposition = (
-            FinalizationDisposition.BLOCK
-            if semantic_missing
+            semantic.disposition
+            if semantic is not None
             else (
-                semantic.disposition
-                if semantic is not None
-                else (
-                    FinalizationDisposition.PUBLISH
-                    if assessment.policy_satisfied
-                    else FinalizationDisposition.BLOCK
-                )
+                FinalizationDisposition.PUBLISH
+                if assessment.policy_satisfied
+                else FinalizationDisposition.BLOCK
             )
         )
         receipt = canonical_receipt.as_dict()
@@ -2429,10 +2415,6 @@ class CognitiveExecutionRuntime:
                 "disposition": disposition.value,
                 "action_effect": action_effect,
                 "externally_observable_action": externally_observable,
-                "semantic_required": semantic_required,
-                "semantic_available": (
-                    self.semantic_verification_adapter is not None
-                ),
                 "policy": {
                     "level": int(assessment.policy.level),
                     "required_modes": list(
@@ -2451,13 +2433,7 @@ class CognitiveExecutionRuntime:
                 },
             }
         )
-        if semantic_missing:
-            receipt["semantic"] = {
-                "rounds": [],
-                "repair_lineage": [],
-                "issues": ["semantic_verifier_required_but_unavailable"],
-            }
-        elif semantic is not None:
+        if semantic is not None:
             receipt["semantic"] = {
                 "rounds": [
                     {
@@ -2595,11 +2571,27 @@ class CognitiveExecutionRuntime:
         final_output = verification.final_output or candidate.strip()
 
         if disposition == "block":
+            receipt = verification.as_dict()
+            claim_kind = str(receipt.get("claim_kind") or "")
+            risk = str(receipt.get("risk") or "")
+            semantic_block = isinstance(receipt.get("semantic"), Mapping)
+            explicit_block = (
+                semantic_block
+                or claim_kind == ClaimKind.ACTION_OUTCOME.value
+                or risk in {
+                    VerificationRisk.HIGH.value,
+                    VerificationRisk.CRITICAL.value,
+                }
+            )
             return self._finalize_non_success(
                 execution,
                 payload,
                 status="failed",
-                error_code="verification_failed",
+                error_code=(
+                    "verification_blocked"
+                    if explicit_block
+                    else "verification_failed"
+                ),
                 now=now,
                 verification=verification,
             )

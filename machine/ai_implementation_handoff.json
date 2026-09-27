@@ -959,7 +959,7 @@
       ],
       "work_package": "WP-P0-VERIFICATION",
       "blueprint": "verification_runtime_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Converge deterministic, evidence-grounded, action-postcondition and model-assisted verification into one observable receipt contract used by finalization.",
       "target_files": {
         "contracts": [
@@ -1031,14 +1031,20 @@
         ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
         "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
         "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
-        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt",
+        "skeleton/intelligence/execution_runtime.py materializes durable tool results into EvidenceReference values before finalization",
+        "skeleton/intelligence/execution_runtime.py converts observed tool postconditions into canonical PostconditionObservation values",
+        "skeleton/intelligence/execution_runtime.py maps publish/qualified/abstain/block dispositions into terminal execution semantics",
+        "skeleton/provider_runtime.py configures a distinct AI_VERIFICATION_MODEL semantic verifier and rejects same provider+model identity as independent",
+        "skeleton/api/engine_runtime.py injects the isolated semantic verifier into canonical cognitive execution",
+        "skeleton/testing/test_execution_runtime.py covers evidence-backed read-tool publication and fail-closed reversible actions",
+        "skeleton/testing/test_provider_contract.py covers semantic verifier identity separation",
+        "scripts/verify_verification_evidence_closure.py independently audits evidence materialization, verifier isolation, engine binding and mirror parity"
       ],
       "remaining": [
-        "materialize authorized execution evidence into EvidenceReference values in production finalization",
-        "wire SemanticVerificationRuntime through the canonical production provider adapter when policy requires independent semantic verification",
-        "bind durable tool receipts and postcondition observations into production action verification",
-        "integrate qualified/abstain/repair/block disposition handling into execution finalization",
-        "collect fresh exact-head Verification Evidence/Cognitive Execution closure evidence and close lower-stage dependencies"
+        "close declared lower-stage dependency gaps",
+        "collect fresh exact-head Verification Evidence Closure and Cognitive Execution Closure evidence",
+        "obtain independent signoff before changing canonical gap status to closed"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
@@ -1260,7 +1266,7 @@
       ],
       "work_package": "WP-P0-STREAM",
       "blueprint": "realtime_delivery_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
@@ -1360,14 +1366,24 @@
         "slow-client API replay remains operation-local and does not block unrelated operations",
         "fenced expiring per-operation projection lease with crash-safe takeover",
         "generation fencing makes stale release/renew inert after worker takeover",
-        "cross-worker API cursor replay and slow-client isolation journeys"
+        "cross-worker API cursor replay and slow-client isolation journeys",
+        "backend/core/operation_stream_transport.py defines runtime-checkable OperationStateStore and OperationEventStore contracts so shared-network authorities can replace local SQLite without changing replay semantics",
+        "backend/tests/test_operation_stream_transport.py enforces complete durable store adapter contracts and rejects partial backends",
+        "merged PR #2030 adds MongoOperationStore shared-network operation authority with atomic state plus embedded outbox mutation",
+        "merged PR #2030 adds MongoOperationEventStore with transaction-fenced sequence/event writes, replay, consumer checkpoints, compaction and projection leases",
+        "backend transport selects SQLite reference or Mongo shared-network authority through CODEDOCK_OPERATION_AUTHORITY_BACKEND",
+        "frontend/services/operationStreamSession.ts provides an injectable production browser-session replay/resync/cancel runtime",
+        "frontend/services/operationStream.ts binds the browser-session runtime to authenticated product API and AsyncStorage",
+        "frontend/scripts/test-operation-stream-session.mjs covers browser disconnect/reconnect cursor continuity, compacted slow-client resync, cancel-complete terminal races and terminal snapshot reconciliation",
+        "frontend test:operation-stream now executes reducer and browser-session journey suites",
+        "frontend/services/operationStreamSession.ts provides an injectable production browser-session runtime for replay, cursor durability, resync, follow and cancellation",
+        "frontend/services/operationStream.ts binds the session runtime to authenticated production API and AsyncStorage adapters",
+        "frontend/scripts/test-operation-stream-session.mjs executes disconnect/reconnect, compaction-gap recovery and cancel/complete race journeys",
+        "frontend/package.json includes browser-session journeys in test:operation-stream"
       ],
       "remaining": [
-        "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",
-        "cross-host/shared-network stream authority beyond the file-backed reference store",
-        "browser-level disconnect/reconnect automation against assembled topology",
-        "browser-level slow-client/backpressure automation against assembled topology",
-        "browser-level cancel-complete automation against assembled topology"
+        "collect fresh exact-head frontend typecheck/test:operation-stream and App Assembly evidence",
+        "obtain independent signoff before changing canonical gap status to closed"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },

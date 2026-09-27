@@ -85,9 +85,6 @@ def _receipt_from_json(raw: object) -> ToolExecutionReceipt:
         governance_decision_ref=payload.get(
             "governance_decision_ref"
         ),
-        postcondition_verified=bool(
-            payload.get("postcondition_verified", False)
-        ),
         metered_tool_calls=int(payload.get("metered_tool_calls", 1)),
         schema_version=int(payload.get("schema_version", 1)),
     )
