@@ -529,7 +529,7 @@ def build_information_quality_receipt(
     memory_decisions: Iterable[MemoryDecision] = (),
     memory_conflicts: Iterable[MemoryConflictSet] = (),
     retrieval_receipt: RetrievalReceipt | None = None,
-    retrieval_freshness: Mapping[str, PlaneFreshness] = {},
+    retrieval_freshness: Mapping[str, PlaneFreshness] | None = None,
     knowledge_observations: Iterable[KnowledgeObservation] = (),
     now: float,
     now_ns: int,
@@ -554,7 +554,7 @@ def build_information_quality_receipt(
         retrieval_blockers,
     ) = _retrieval_state(
         retrieval_receipt,
-        retrieval_freshness,
+        {} if retrieval_freshness is None else retrieval_freshness,
         now=now,
         policy=resolved_policy,
     )
