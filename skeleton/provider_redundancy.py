@@ -14,7 +14,11 @@ import hashlib
 import json
 from typing import Any
 
-from skeleton.provider_runtime import ProviderRegistry, ProviderUnavailableError
+from skeleton.provider_runtime import (
+    ProviderAdapter,
+    ProviderRegistry,
+    ProviderUnavailableError,
+)
 
 
 class ProviderAvailabilityStrategy(str, Enum):
@@ -236,6 +240,11 @@ class ProviderAvailabilityController:
         if receipt.selected_provider is None:
             raise ProviderUnavailableError(receipt.reason)
         return receipt
+
+    def require_adapter(self) -> tuple[ProviderAdapter, ProviderRouteReceipt]:
+        receipt = self.require_route()
+        assert receipt.selected_provider is not None
+        return self.registry.require(receipt.selected_provider), receipt
 
     def telemetry(self) -> dict[str, Any]:
         return {
