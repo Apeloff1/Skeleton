@@ -608,7 +608,6 @@
       "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "skeleton/skills/tool_contract.py",
         "skeleton/skills/tool_runtime.py",
@@ -639,7 +638,6 @@
       "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "skeleton/api/engine_authority.py",
         "skeleton/api/engine_service.py",
@@ -729,7 +727,6 @@
       "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/contracts/conversation.py",
@@ -761,7 +758,6 @@
       "migration": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/contracts/conversation.py",
@@ -852,7 +848,6 @@
       "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-memory-durable-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/frontier/memory.py",
