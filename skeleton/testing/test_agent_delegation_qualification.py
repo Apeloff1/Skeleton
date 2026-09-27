@@ -417,3 +417,15 @@ def test_live_lease_identity_is_digest_bound() -> None:
     assert changed.accepted is True
     assert baseline.live_lease_digest != changed.live_lease_digest
     assert baseline.decision_digest != changed.decision_digest
+
+def test_rejects_authority_exactly_at_expiry_boundary() -> None:
+    parent = _parent(expires_at=NOW)
+    decision = _qualify(parent=parent)
+    assert decision.accepted is False
+    assert "parent-authority-expired" in decision.reasons
+
+    child = _child(expires_at=NOW)
+    decision = _qualify(child=child)
+    assert decision.accepted is False
+    assert "child-authority-expired" in decision.reasons
+
