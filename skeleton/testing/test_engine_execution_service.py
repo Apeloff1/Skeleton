@@ -824,6 +824,79 @@ def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> Non
 
 
 
+def test_expired_persisted_approval_can_be_safely_reauthorized(
+    tmp_path,
+) -> None:
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        _command(),
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+    pending = service.pending_tool_approvals(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    row = pending[0]
+
+    first = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key=row["idempotency_key"],
+        expires_at=_now() + timedelta(seconds=1),
+        now=_now(),
+    )
+    expired_at = _now() + timedelta(seconds=2)
+    assert service.active_approval_refs(
+        "exec-1",
+        now=expired_at,
+    ) == {}
+
+    renewed = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key=row["idempotency_key"],
+        expires_at=_now() + timedelta(minutes=5),
+        now=expired_at,
+    )
+
+    assert renewed.approval_id == first.approval_id
+    assert renewed.approval_ref == first.approval_ref
+    assert renewed.issued_at == expired_at
+    assert renewed.expires_at > first.expires_at
+    assert service.active_approval_refs(
+        "exec-1",
+        now=expired_at,
+    ) == {call.call_id: renewed.approval_ref}
+
+    restarted = _service_with_approval_scope(tmp_path)
+    persisted = restarted.submissions.approvals(
+        "exec-1",
+        now=expired_at,
+    )
+    assert persisted == (renewed,)
+    assert restarted.active_approval_refs(
+        "exec-1",
+        now=expired_at,
+    ) == {call.call_id: renewed.approval_ref}
+
+
 def test_expired_delegation_blocks_mutating_access_but_allows_audit_reads(
     tmp_path,
 ) -> None:
