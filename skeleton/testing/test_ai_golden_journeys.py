@@ -30,6 +30,7 @@ from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
     EngineExecutionService,
+    EngineSubmissionConflict,
     SQLiteEngineSubmissionStore,
 )
 from skeleton.api.server import ServerState
@@ -965,7 +966,10 @@ async def test_stage7_expired_approval_can_be_renewed_without_widening_identity(
     assert renewed.approval_ref == initial.approval_ref
     assert renewed.expires_at > initial.expires_at
 
-    with pytest.raises(Exception, match="active approval cannot be widened"):
+    with pytest.raises(
+        EngineSubmissionConflict,
+        match="active approval cannot be widened",
+    ):
         service.submissions.remember_approval(
             type(renewed)(
                 approval_id=renewed.approval_id,
