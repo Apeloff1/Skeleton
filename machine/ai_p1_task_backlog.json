@@ -1042,7 +1042,10 @@
         "skeleton/ai/agents",
         "skeleton/network",
         "machine",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/agents/delegation.py",
+        "skeleton/ai/agents/core/delegation.py",
+        ".github/workflows/p1-agent-delegation-authority.yml"
       ],
       "test_targets": [
         "planned:skeleton/testing/test_agent_delegation.py",
@@ -1051,7 +1054,8 @@
         "planned:skeleton/testing/test_agent_conflicts.py",
         "planned:skeleton/testing/test_agent_communication.py",
         "planned:skeleton/testing/test_agent_handoff.py",
-        "planned:skeleton/testing/test_delegation_budgets.py"
+        "planned:skeleton/testing/test_delegation_budgets.py",
+        "skeleton/testing/test_agent_delegation_authority.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
