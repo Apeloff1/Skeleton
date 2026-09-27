@@ -1336,3 +1336,26 @@ def test_declared_secondary_adapter_identity_is_stable() -> None:
 
     assert adapter.provider_id == "openai-compatible-secondary"
     assert adapter.model == "secondary-model"
+
+
+
+@pytest.mark.asyncio
+async def test_declared_secondary_adapter_denies_undeclared_media_capabilities() -> None:
+    adapter = OpenAICompatibleSecondaryAdapter(
+        api_key="secondary-key",
+        model="secondary-model",
+        base_url="https://provider.example/v1",
+        client=SimpleNamespace(),
+    )
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="image-generation",
+    ):
+        await adapter.generate_image(ProviderImageRequest(prompt="diagram"))
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="speech-synthesis",
+    ):
+        await adapter.synthesize_speech(ProviderSpeechRequest(text="hello"))
