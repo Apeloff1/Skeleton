@@ -312,4 +312,3 @@ def test_policy_rejects_accepted_risk_signature_method_drift(
         match="accepted-risk signature method policy drift",
     ):
         reconcile_repository(root, evaluated_at=NOW)
-
