@@ -327,7 +327,7 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
         if blueprint_status not in {
             "in-progress",
             "implemented-pending-closure",
-            "closed",
+            "complete",
         }:
             errors.append(
                 "verification runtime blueprint status is invalid"

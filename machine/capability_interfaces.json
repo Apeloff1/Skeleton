@@ -1477,7 +1477,7 @@
         "self-confidence non-authority tests",
         "verification receipt lineage tests"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:feedback-learning->evaluation",
@@ -3067,7 +3067,7 @@
         "fallback ceiling preservation",
         "deterministic no-route behavior"
       ],
-      "status": "partial"
+      "status": "present"
     },
     {
       "id": "runtime_dependency:reasoning-verification->orchestration",
