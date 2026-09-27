@@ -95,6 +95,14 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
         "skeleton/api/engine_service.py",
         "skeleton/ai/runtime/api/engine_service.py",
     ),
+    (
+        "skeleton/frontier/operation_stream_store_mongo.py",
+        "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py",
+    ),
+    (
+        "skeleton/persistence/operation_store_mongo.py",
+        "skeleton/ai/runtime/persistence/operation_store_mongo.py",
+    ),
 )
 
 EXPECTED_DEPENDENCIES = {
