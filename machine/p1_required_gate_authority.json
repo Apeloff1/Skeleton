@@ -49,6 +49,20 @@
       ]
     },
     {
+      "id": "GATE-P1-GATE-AUTHORITY",
+      "workflow_name": "P1 Required Gate Authority Gate",
+      "workflow_file": ".github/workflows/p1-required-gate-authority.yml",
+      "group": "evidence",
+      "purpose": "Validates the terminal P1 required-gate policy and fail-closed exact-head observation evaluator.",
+      "required_for_terminal_p1_promotion": true,
+      "accepted_statuses": [
+        "completed"
+      ],
+      "accepted_conclusions": [
+        "success"
+      ]
+    },
+    {
       "id": "GATE-SECRET-SCANNING",
       "workflow_name": "Secret scanning",
       "workflow_file": ".github/workflows/secret-scanning.yml",
@@ -326,6 +340,7 @@
       "name": "evidence",
       "gate_ids": [
         "GATE-P1-EVIDENCE",
+        "GATE-P1-GATE-AUTHORITY",
         "GATE-ACCOUNTABILITY",
         "GATE-P1-MAP",
         "GATE-PROVENANCE"
@@ -389,7 +404,7 @@
     }
   ],
   "terminal_policy": {
-    "required_gate_count": 21,
+    "required_gate_count": 22,
     "accepted_status": "completed",
     "accepted_conclusion": "success",
     "all_required_gates_must_pass": true,
