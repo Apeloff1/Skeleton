@@ -15,6 +15,7 @@ from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.provider_contract import (
     FinishReason,
+    ProviderArchitectureReceipt,
     ProviderProtocolError,
     ProviderToolCall,
     ProviderToolDefinition,
@@ -22,15 +23,19 @@ from skeleton.provider_contract import (
     load_provider_architecture,
 )
 from skeleton.provider_runtime import (
+    FailoverProviderAdapter,
+    OpenAICompatibleSecondaryAdapter,
     OpenAIProviderAdapter,
     OpenAISyncProviderAdapter,
     ProviderAdapter,
     ProviderImageRequest,
     ProviderInvocationError,
+    ProviderPolicyError,
     ProviderRegistry,
     ProviderRequest,
     ProviderResponse,
     ProviderSpeechRequest,
+    ProviderUnavailableError,
     provider_response_deltas,
 )
 
@@ -1085,3 +1090,284 @@ def test_provider_registry_requires_distinct_semantic_verifier_identity() -> Non
     )
 
     assert unsafe_registry.verification_adapter_for(generator) is None
+
+
+
+class _ScriptedFailoverProvider(ProviderAdapter):
+    def __init__(
+        self,
+        provider_id: str,
+        model: str,
+        outcomes: list[ProviderResponse | Exception],
+        *,
+        available: bool = True,
+    ) -> None:
+        self.provider_id = provider_id
+        self.model = model
+        self._outcomes = list(outcomes)
+        self._available = available
+        self.requests: list[ProviderRequest] = []
+
+    @property
+    def available(self) -> bool:
+        return self._available
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        self.requests.append(request)
+        if not self._outcomes:
+            raise AssertionError("unexpected provider call")
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def _provider_receipt(provider_id: str) -> ProviderArchitectureReceipt:
+    return ProviderArchitectureReceipt(
+        provider_id=provider_id,
+        architecture_tag="test-architecture",
+        construction_version="test-construction",
+        contract_digest="a" * 64,
+        manual_path="docs/AI_APP_CONSTRUCTION_MANUAL.md",
+        required_documents=("machine/ai_app_construction.json",),
+    )
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_uses_primary_without_touching_secondary() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderResponse(text="primary", provider="primary", model="primary-model")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    response = await adapter.generate(
+        ProviderRequest(instructions="answer", prompt="hello")
+    )
+
+    assert response.provider == "primary"
+    assert len(primary.requests) == 1
+    assert secondary.requests == []
+    assert adapter.routing_snapshot()["primary_successes"] == 1
+    assert adapter.routing_snapshot()["failover_attempts"] == 0
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_routes_invocation_failure_to_secondary_model() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderInvocationError("primary outage")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    response = await adapter.generate(
+        ProviderRequest(
+            instructions="answer",
+            prompt="hello",
+            model="primary-model",
+        )
+    )
+
+    assert response.provider == "secondary"
+    assert secondary.requests[0].model == "secondary-model"
+    snapshot = adapter.routing_snapshot()
+    assert snapshot["primary_attempts"] == 1
+    assert snapshot["failover_attempts"] == 1
+    assert snapshot["failover_successes"] == 1
+    assert snapshot["provider_failures"] == 1
+    assert snapshot["last_success_provider"] == "secondary"
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_skips_unavailable_primary() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [],
+        available=False,
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    response = await adapter.generate(
+        ProviderRequest(instructions="answer", prompt="hello")
+    )
+
+    assert response.provider == "secondary"
+    assert primary.requests == []
+    assert adapter.routing_snapshot()["unavailable_skips"] == 1
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_never_routes_policy_denial() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderPolicyError("governance denied")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    with pytest.raises(ProviderPolicyError, match="governance denied"):
+        await adapter.generate(
+            ProviderRequest(instructions="answer", prompt="hello")
+        )
+
+    assert secondary.requests == []
+    assert adapter.routing_snapshot()["policy_denials"] == 1
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_does_not_remap_explicit_nonprimary_model() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderInvocationError("primary outage")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    with pytest.raises(ProviderInvocationError, match="all declared"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="answer",
+                prompt="hello",
+                model="special-primary-model",
+            )
+        )
+
+    assert secondary.requests == []
+
+
+@pytest.mark.asyncio
+async def test_provider_registry_returns_failover_adapter_and_exposes_routing() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderUnavailableError("primary unavailable")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    registry = ProviderRegistry(
+        [primary, secondary],
+        active="primary",
+        fallback_ids=("secondary",),
+        architecture_loader=_provider_receipt,
+    )
+
+    routed = registry.require_active()
+    assert isinstance(routed, FailoverProviderAdapter)
+    response = await routed.generate(
+        ProviderRequest(instructions="answer", prompt="hello")
+    )
+
+    assert response.provider == "secondary"
+    status = registry.redundancy_status()
+    assert status["enabled"] is True
+    assert status["primary_provider"] == "primary"
+    assert status["fallback_providers"] == ["secondary"]
+    assert status["routing"]["failover_successes"] == 1
+    assert "hello" not in json.dumps(status)
+
+
+def test_provider_registry_secondary_configuration_fails_closed_when_partial(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AI_SECONDARY_API_KEY", "secondary-key")
+    monkeypatch.delenv("AI_SECONDARY_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_SECONDARY_MODEL", raising=False)
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="secondary provider configuration is incomplete",
+    ):
+        ProviderRegistry.from_env()
+
+
+def test_provider_registry_rejects_secondary_on_primary_hostname(monkeypatch) -> None:
+    monkeypatch.setenv("AI_SECONDARY_API_KEY", "secondary-key")
+    monkeypatch.setenv(
+        "AI_SECONDARY_BASE_URL",
+        "https://api.openai.com/v1",
+    )
+    monkeypatch.setenv("AI_SECONDARY_MODEL", "secondary-model")
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="distinct provider hostname",
+    ):
+        ProviderRegistry.from_env()
+
+
+def test_declared_secondary_has_mandatory_runtime_architecture_receipt() -> None:
+    receipt = load_provider_architecture(
+        "openai-compatible-secondary",
+        provider_family="runtime_model",
+    )
+
+    assert receipt.provider_id == "openai-compatible-secondary"
+    assert receipt.provider_family == "runtime_model"
+    assert receipt.architecture_tag
+    assert receipt.contract_digest
+
+
+def test_declared_secondary_adapter_identity_is_stable() -> None:
+    adapter = OpenAICompatibleSecondaryAdapter(
+        api_key="secondary-key",
+        model="secondary-model",
+        base_url="https://provider.example/v1",
+        client=SimpleNamespace(),
+    )
+
+    assert adapter.provider_id == "openai-compatible-secondary"
+    assert adapter.model == "secondary-model"
+
+
+
+@pytest.mark.asyncio
+async def test_declared_secondary_adapter_denies_undeclared_media_capabilities() -> None:
+    adapter = OpenAICompatibleSecondaryAdapter(
+        api_key="secondary-key",
+        model="secondary-model",
+        base_url="https://provider.example/v1",
+        client=SimpleNamespace(),
+    )
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="image-generation",
+    ):
+        await adapter.generate_image(ProviderImageRequest(prompt="diagram"))
+
+    with pytest.raises(
+        ProviderUnavailableError,
+        match="speech-synthesis",
+    ):
+        await adapter.synthesize_speech(ProviderSpeechRequest(text="hello"))
