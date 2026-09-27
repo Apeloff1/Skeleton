@@ -1,0 +1,136 @@
+name: P1 Maturity Reconciliation Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/testing/test_maturity_reconciliation.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-maturity-reconciliation.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/testing/test_maturity_reconciliation.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-maturity-reconciliation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-maturity-reconciliation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate non-mutating P1 maturity reconciliation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused reconciliation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate canonical planning and accountability inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run maturity reconciliation regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_maturity_reconciliation.py
+          tests/test_p1_maturity_reconciliation.py
+
+      - name: Reconcile full P1 primary frontier
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-maturity
+          python scripts/reconcile_p1_maturity.py             --out .p1-maturity/report.json
+
+      - name: Assert deterministic non-mutating report
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-maturity/report.json").read_text(encoding="utf-8")
+          )
+          if report["source_mutation_detected"] is not False:
+              raise SystemExit("reconciliation mutated canonical source state")
+          if report["volume_count"] != 107:
+              raise SystemExit("P1 primary frontier count drift")
+          expected_sources = {
+              "master_plan",
+              "accountability",
+              "p1_execution_map",
+              "engine_contract",
+              "engine_runner",
+          }
+          if set(report["source_digests"]) != expected_sources:
+              raise SystemExit("reconciliation source identity drift")
+          if any(len(value) != 64 for value in report["source_digests"].values()):
+              raise SystemExit("invalid reconciliation source digest")
+          if len(report.get("report_digest", "")) != 64:
+              raise SystemExit("invalid reconciliation report digest")
+          for row in report["records"]:
+              if (
+                  row["implementation_status_candidate"] is not None
+                  and row["accountability_maturity_status"] is None
+              ):
+                  raise SystemExit(
+                      "implementation candidate lacks explicit accountability maturity"
+                  )
+          print(
+              "P1 maturity reconciliation OK:",
+              report["volume_count"],
+              report["promotion_candidate_count"],
+              report["target_floor_eligible_count"],
+              report["report_digest"],
+          )
+          PY
