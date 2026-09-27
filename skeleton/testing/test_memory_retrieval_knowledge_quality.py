@@ -529,3 +529,38 @@ def test_memory_contradiction_requires_explicit_resolution() -> None:
     )
     assert resolved.accepted is True
     assert "memory-contradiction-unresolved:memory-a" not in resolved.reasons
+
+def test_decision_identity_is_stable_until_freshness_class_changes() -> None:
+    baseline = _evaluate(observed_at=NOW)
+    same_class = _evaluate(observed_at=NOW + 100.0)
+
+    assert baseline.observed_at != same_class.observed_at
+    assert baseline.freshness_digest == same_class.freshness_digest
+    assert baseline.decision_digest == same_class.decision_digest
+
+    crossed = _evaluate(observed_at=NOW + 901.0)
+    assert crossed.accepted is False
+    assert "retrieval-stale:lexical" in crossed.reasons
+    assert crossed.freshness_digest != baseline.freshness_digest
+    assert crossed.decision_digest != baseline.decision_digest
+
+
+def test_knowledge_content_is_digest_bound_without_embedding_content() -> None:
+    baseline = _knowledge()
+    changed = replace(baseline, content_digest="d" * 64)
+
+    baseline_decision = _evaluate(knowledge=(baseline,))
+    changed_decision = _evaluate(knowledge=(changed,))
+
+    assert baseline.payload()["content_digest"] == "b" * 64
+    assert set(baseline.payload()) == {
+        "claim_id",
+        "content_digest",
+        "updated_at",
+        "contradiction_count",
+        "superseded",
+        "provenance_refs",
+    }
+    assert baseline_decision.knowledge_digest != changed_decision.knowledge_digest
+    assert baseline_decision.decision_digest != changed_decision.decision_digest
+
