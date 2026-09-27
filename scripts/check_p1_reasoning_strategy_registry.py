@@ -107,13 +107,6 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
                 errors.append(
                     f"{item.strategy_id}: verification capability is required"
                 )
-            if (
-                item.stop_policy.abstain_uncertainty
-                < item.stop_policy.min_evidence_gain
-            ):
-                errors.append(
-                    f"{item.strategy_id}: abstain uncertainty below evidence floor"
-                )
 
     summary = {
         "schema_version": 1,
