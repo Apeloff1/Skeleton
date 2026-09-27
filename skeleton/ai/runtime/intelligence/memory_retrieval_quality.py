@@ -62,6 +62,37 @@ def _text(value: object, field: str, *, max_length: int = 2048) -> str:
     return normalized
 
 
+def _evidence_refs(
+    values: Iterable[EvidenceRef],
+    field: str,
+) -> tuple[EvidenceRef, ...]:
+    if isinstance(values, (str, bytes)):
+        raise IntelligenceQualityError(f"{field} must contain EvidenceRef")
+    normalized: dict[str, EvidenceRef] = {}
+    for ref in values:
+        if not isinstance(ref, EvidenceRef):
+            raise IntelligenceQualityError(f"{field} must contain EvidenceRef")
+        _text(ref.source, f"{field} source", max_length=2048)
+        _sha256(ref.digest, f"{field} digest")
+        _text(ref.category, f"{field} category", max_length=128)
+        normalized[evidence_ref_identity(ref)] = ref
+    if not normalized:
+        raise IntelligenceQualityError(f"{field} requires evidence references")
+    return tuple(normalized[key] for key in sorted(normalized))
+
+
+def _evidence_payload(values: tuple[EvidenceRef, ...]) -> list[dict[str, str]]:
+    return [
+        {
+            "identity": evidence_ref_identity(ref),
+            "source": ref.source,
+            "digest": ref.digest,
+            "category": ref.category,
+        }
+        for ref in values
+    ]
+
+
 def _canonical_digest(payload: Any) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -107,24 +138,14 @@ class KnowledgeQualityObservation:
             )
         if not isinstance(self.superseded, bool):
             raise IntelligenceQualityError("superseded must be boolean")
-        if not isinstance(self.provenance_refs, tuple) or not self.provenance_refs:
+        if not isinstance(self.provenance_refs, tuple):
             raise IntelligenceQualityError(
                 "knowledge claims require provenance references"
             )
-        normalized: dict[str, EvidenceRef] = {}
-        for ref in self.provenance_refs:
-            if not isinstance(ref, EvidenceRef):
-                raise IntelligenceQualityError(
-                    "provenance_refs must contain EvidenceRef"
-                )
-            _text(ref.source, "provenance source", max_length=2048)
-            _sha256(ref.digest, "provenance digest")
-            _text(ref.category, "provenance category", max_length=128)
-            normalized[evidence_ref_identity(ref)] = ref
         object.__setattr__(
             self,
             "provenance_refs",
-            tuple(normalized[key] for key in sorted(normalized)),
+            _evidence_refs(self.provenance_refs, "knowledge provenance"),
         )
 
     def payload(self) -> dict[str, Any]:
@@ -134,21 +155,15 @@ class KnowledgeQualityObservation:
             "updated_at": self.updated_at,
             "contradiction_count": self.contradiction_count,
             "superseded": self.superseded,
-            "provenance_refs": [
-                {
-                    "identity": evidence_ref_identity(ref),
-                    "source": ref.source,
-                    "digest": ref.digest,
-                    "category": ref.category,
-                }
-                for ref in self.provenance_refs
-            ],
+            "provenance_refs": _evidence_payload(self.provenance_refs),
         }
 
 
 @dataclass(frozen=True, slots=True)
 class IntelligenceQualityPolicy:
     min_memory_score: float = 0.45
+    min_memory_freshness: float = 0.25
+    min_memory_evidence: float = 0.10
     min_independent_quality_score: float = 0.70
     max_knowledge_age_s: float = 30.0 * 24.0 * 3600.0
     allow_partial_retrieval: bool = False
@@ -156,7 +171,12 @@ class IntelligenceQualityPolicy:
     allow_memory_review: bool = False
 
     def __post_init__(self) -> None:
-        for field in ("min_memory_score", "min_independent_quality_score"):
+        for field in (
+            "min_memory_score",
+            "min_memory_freshness",
+            "min_memory_evidence",
+            "min_independent_quality_score",
+        ):
             value = _finite(getattr(self, field), field)
             if not 0.0 <= value <= 1.0:
                 raise IntelligenceQualityError(f"{field} must be in [0, 1]")
@@ -178,6 +198,8 @@ class IntelligenceQualityPolicy:
     def payload(self) -> dict[str, Any]:
         return {
             "min_memory_score": self.min_memory_score,
+            "min_memory_freshness": self.min_memory_freshness,
+            "min_memory_evidence": self.min_memory_evidence,
             "min_independent_quality_score": self.min_independent_quality_score,
             "max_knowledge_age_s": self.max_knowledge_age_s,
             "allow_partial_retrieval": self.allow_partial_retrieval,
@@ -193,6 +215,7 @@ class IntelligenceQualityDecision:
     memory_digest: str
     conflict_digest: str
     retrieval_digest: str
+    retrieval_provenance_digest: str
     freshness_digest: str
     knowledge_digest: str
     quality_digest: str
@@ -215,6 +238,7 @@ class IntelligenceQualityDecision:
             "memory_digest",
             "conflict_digest",
             "retrieval_digest",
+            "retrieval_provenance_digest",
             "freshness_digest",
             "knowledge_digest",
             "quality_digest",
@@ -243,6 +267,7 @@ class IntelligenceQualityDecision:
             "memory_digest": self.memory_digest,
             "conflict_digest": self.conflict_digest,
             "retrieval_digest": self.retrieval_digest,
+            "retrieval_provenance_digest": self.retrieval_provenance_digest,
             "freshness_digest": self.freshness_digest,
             "knowledge_digest": self.knowledge_digest,
             "quality_digest": self.quality_digest,
@@ -275,6 +300,7 @@ def evaluate_intelligence_quality(
     memory_decisions: Iterable[MemoryDecision],
     memory_conflicts: Iterable[MemoryConflictSet],
     retrieval_receipt: RetrievalReceipt,
+    retrieval_provenance: Iterable[EvidenceRef],
     freshness_by_plane: Mapping[str, PlaneFreshness],
     knowledge: Iterable[KnowledgeQualityObservation],
     quality_report: QualityReport,
@@ -289,6 +315,10 @@ def evaluate_intelligence_quality(
         raise IntelligenceQualityError("observed_at must be non-negative")
     if not isinstance(retrieval_receipt, RetrievalReceipt):
         raise TypeError("retrieval_receipt must be RetrievalReceipt")
+    retrieval_evidence = _evidence_refs(
+        retrieval_provenance,
+        "retrieval provenance",
+    )
     if not isinstance(quality_report, QualityReport):
         raise TypeError("quality_report must be QualityReport")
     if not isinstance(freshness_by_plane, Mapping):
@@ -340,6 +370,20 @@ def evaluate_intelligence_quality(
 
     reasons: list[str] = []
 
+    resolved_conflict_records: set[str] = set()
+    superseded_conflict_records: set[str] = set()
+    for conflict in conflicts:
+        if conflict.resolution is MemoryConflictResolution.UNRESOLVED:
+            reasons.append(f"memory-conflict-unresolved:{conflict.conflict_id}")
+            continue
+        candidate_ids = {row.record_id for row in conflict.candidates}
+        if conflict.resolution is MemoryConflictResolution.KEEP_BOTH:
+            resolved_conflict_records.update(candidate_ids)
+        elif conflict.resolution is MemoryConflictResolution.SUPERSEDE:
+            if conflict.winner_id is not None:
+                resolved_conflict_records.add(conflict.winner_id)
+            superseded_conflict_records.update(conflict.superseded_ids)
+
     for row in memories:
         score = _finite(row.score, f"memory score:{row.record_id}")
         if not 0.0 <= score <= 1.0:
@@ -350,8 +394,46 @@ def evaluate_intelligence_quality(
             raise IntelligenceQualityError(
                 f"memory action:{row.record_id} must be MemoryAction"
             )
+        if not isinstance(row.reasons, tuple) or any(
+            not isinstance(reason, str) or not reason
+            for reason in row.reasons
+        ):
+            raise IntelligenceQualityError(
+                f"memory reasons:{row.record_id} are malformed"
+            )
+        if not isinstance(row.signals, tuple):
+            raise IntelligenceQualityError(
+                f"memory signals:{row.record_id} are malformed"
+            )
+        signals: dict[str, float] = {}
+        for name, raw_value in row.signals:
+            key = _text(name, f"memory signal name:{row.record_id}", max_length=64)
+            if key in signals:
+                raise IntelligenceQualityError(
+                    f"memory signals:{row.record_id} contain duplicates"
+                )
+            value = _finite(
+                raw_value,
+                f"memory signal:{row.record_id}:{key}",
+            )
+            if not 0.0 <= value <= 1.0:
+                raise IntelligenceQualityError(
+                    f"memory signal:{row.record_id}:{key} must be in [0, 1]"
+                )
+            signals[key] = value
+        required_signals = {"freshness", "utility", "evidence", "contradiction"}
+        if set(signals) != required_signals:
+            raise IntelligenceQualityError(
+                f"memory signals:{row.record_id} must contain "
+                "freshness, utility, evidence, contradiction"
+            )
+
         if score < resolved_policy.min_memory_score:
             reasons.append(f"memory-quality-below-floor:{row.record_id}")
+        if signals["freshness"] < resolved_policy.min_memory_freshness:
+            reasons.append(f"memory-stale:{row.record_id}")
+        if signals["evidence"] < resolved_policy.min_memory_evidence:
+            reasons.append(f"memory-provenance-missing:{row.record_id}")
         if row.action is MemoryAction.TOMBSTONE:
             reasons.append(f"memory-tombstone:{row.record_id}")
         if (
@@ -359,10 +441,15 @@ def evaluate_intelligence_quality(
             and not resolved_policy.allow_memory_review
         ):
             reasons.append(f"memory-review-required:{row.record_id}")
-
-    for conflict in conflicts:
-        if conflict.resolution is MemoryConflictResolution.UNRESOLVED:
-            reasons.append(f"memory-conflict-unresolved:{conflict.conflict_id}")
+        if row.record_id in superseded_conflict_records:
+            reasons.append(f"memory-conflict-superseded:{row.record_id}")
+        if (
+            signals["contradiction"] > 0.0
+            or "contradicted" in row.reasons
+        ) and row.record_id not in resolved_conflict_records:
+            reasons.append(
+                f"memory-contradiction-unresolved:{row.record_id}"
+            )
 
     if retrieval_receipt.partial and not resolved_policy.allow_partial_retrieval:
         reasons.append("retrieval-partial")
@@ -438,6 +525,9 @@ def evaluate_intelligence_quality(
         memory_digest=_canonical_digest(memory_payload),
         conflict_digest=_canonical_digest(conflict_payload),
         retrieval_digest=_canonical_digest(retrieval_receipt.to_dict()),
+        retrieval_provenance_digest=_canonical_digest(
+            _evidence_payload(retrieval_evidence)
+        ),
         freshness_digest=_canonical_digest(freshness_payload),
         knowledge_digest=_canonical_digest(knowledge_payload),
         quality_digest=_canonical_digest(quality_report.to_dict()),
