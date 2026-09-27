@@ -1,0 +1,5 @@
+The residual measures distance from equilibrium.
+Lower residual means coherent structure.
+Attention routes capacity to important tokens.
+Memory on disk outlives the context window.
+A baseline model must train and generate text.
