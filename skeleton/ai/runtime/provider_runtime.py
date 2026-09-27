@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import asyncio
 from collections import deque
 from collections.abc import Sequence as SequenceABC
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import base64
@@ -89,6 +89,10 @@ class ProviderInvocationError(ProviderError):
     """Raised when a configured provider fails to return usable output."""
 
 
+class ProviderProtocolViolationError(ProviderInvocationError):
+    """Raised when provider output violates the normalized protocol contract."""
+
+
 class ProviderPolicyError(ProviderError):
     """Raised when governance or admission denies provider-bound work."""
 
@@ -98,15 +102,19 @@ def _read_provider_json(response: Any) -> Mapping[str, Any]:
 
     raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
     if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
-        raise ProviderInvocationError("model provider response exceeded size limit")
+        raise ProviderProtocolViolationError(
+            "model provider response exceeded size limit"
+        )
     try:
         payload = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned malformed JSON"
         ) from exc
     if not isinstance(payload, Mapping):
-        raise ProviderInvocationError("model provider returned malformed JSON")
+        raise ProviderProtocolViolationError(
+            "model provider returned malformed JSON"
+        )
     return payload
 
 
@@ -441,6 +449,207 @@ class ProviderAdapter(ABC):
         )
 
 
+@dataclass(slots=True)
+class ProviderRoutingTelemetry:
+    """Identity-free counters for provider routing and failover decisions."""
+
+    primary_attempts: int = 0
+    primary_successes: int = 0
+    failover_attempts: int = 0
+    failover_successes: int = 0
+    provider_failures: int = 0
+    unavailable_skips: int = 0
+    policy_denials: int = 0
+    last_success_provider: str | None = None
+    last_failure_kind: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "primary_attempts": self.primary_attempts,
+            "primary_successes": self.primary_successes,
+            "failover_attempts": self.failover_attempts,
+            "failover_successes": self.failover_successes,
+            "provider_failures": self.provider_failures,
+            "unavailable_skips": self.unavailable_skips,
+            "policy_denials": self.policy_denials,
+            "last_success_provider": self.last_success_provider,
+            "last_failure_kind": self.last_failure_kind,
+        }
+
+
+class FailoverProviderAdapter(ProviderAdapter):
+    """Provider-neutral text failover across declared canonical adapters.
+
+    Failover is deliberately narrow: only provider availability/invocation
+    failures can advance to another route. Governance, admission, schema and
+    other policy failures are terminal and never get converted into a provider
+    routing opportunity.
+    """
+
+    def __init__(
+        self,
+        primary: ProviderAdapter,
+        fallbacks: Sequence[ProviderAdapter],
+    ) -> None:
+        if not isinstance(primary, ProviderAdapter):
+            raise TypeError("primary must implement ProviderAdapter")
+        normalized = tuple(fallbacks)
+        if not normalized:
+            raise ValueError("at least one fallback provider is required")
+        seen = {primary.provider_id}
+        for adapter in normalized:
+            if not isinstance(adapter, ProviderAdapter):
+                raise TypeError("fallbacks must implement ProviderAdapter")
+            if adapter.provider_id in seen:
+                raise ValueError("provider failover identities must be unique")
+            seen.add(adapter.provider_id)
+        self.primary = primary
+        self.fallbacks = normalized
+        self.provider_id = primary.provider_id
+        self.model = primary.model
+        self._telemetry = ProviderRoutingTelemetry()
+
+    @property
+    def available(self) -> bool:
+        return any(
+            adapter.available for adapter in (self.primary, *self.fallbacks)
+        )
+
+    def routing_snapshot(self) -> dict[str, Any]:
+        payload = self._telemetry.as_dict()
+        payload.update(
+            {
+                "primary_provider": self.primary.provider_id,
+                "fallback_providers": [
+                    adapter.provider_id for adapter in self.fallbacks
+                ],
+                "available": self.available,
+            }
+        )
+        return payload
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "id": self.provider_id,
+            "model": self.model,
+            "available": self.available,
+            "routing": self.routing_snapshot(),
+        }
+
+    def _request_for(
+        self,
+        adapter: ProviderAdapter,
+        request: ProviderRequest,
+    ) -> ProviderRequest | None:
+        if adapter is self.primary:
+            return request
+        if request.model is not None and request.model != self.primary.model:
+            return None
+        return replace(request, model=adapter.model)
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        last_error: ProviderError | None = None
+        for index, adapter in enumerate((self.primary, *self.fallbacks)):
+            routed = self._request_for(adapter, request)
+            if routed is None:
+                continue
+            if not adapter.available:
+                self._telemetry.unavailable_skips += 1
+                self._telemetry.last_failure_kind = "unavailable"
+                continue
+            if index == 0:
+                self._telemetry.primary_attempts += 1
+            else:
+                self._telemetry.failover_attempts += 1
+            try:
+                response = await adapter.generate(routed)
+            except ProviderPolicyError:
+                self._telemetry.policy_denials += 1
+                self._telemetry.last_failure_kind = "policy"
+                raise
+            except ProviderProtocolViolationError:
+                self._telemetry.provider_failures += 1
+                self._telemetry.last_failure_kind = "protocol"
+                raise
+            except ProviderUnavailableError as exc:
+                self._telemetry.provider_failures += 1
+                self._telemetry.last_failure_kind = "unavailable"
+                last_error = exc
+                continue
+            except ProviderInvocationError as exc:
+                self._telemetry.provider_failures += 1
+                self._telemetry.last_failure_kind = "invocation"
+                last_error = exc
+                continue
+            if index == 0:
+                self._telemetry.primary_successes += 1
+            else:
+                self._telemetry.failover_successes += 1
+            self._telemetry.last_success_provider = response.provider
+            self._telemetry.last_failure_kind = None
+            return response
+
+        if isinstance(last_error, ProviderInvocationError):
+            raise ProviderInvocationError(
+                "all declared model providers failed"
+            ) from last_error
+        raise ProviderUnavailableError(
+            "no declared model provider is available"
+        ) from last_error
+
+    async def generate_image(
+        self,
+        request: ProviderImageRequest,
+    ) -> ProviderImageResponse:
+        return await self.primary.generate_image(request)
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        count: int = 1,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        return await self.primary.create_image_variation(
+            image,
+            count=count,
+            size=size,
+            data_class=data_class,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        return await self.primary.edit_image(
+            image,
+            prompt=prompt,
+            mask=mask,
+            size=size,
+            data_class=data_class,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+        )
+
+    async def synthesize_speech(
+        self,
+        request: ProviderSpeechRequest,
+    ) -> ProviderSpeechResponse:
+        return await self.primary.synthesize_speech(request)
+
+
 def _normalize_history_item(item: Mapping[str, Any] | Any) -> AIMessage | None:
     if not isinstance(item, Mapping):
         return None
@@ -720,11 +929,11 @@ def _provider_tool_call_from_item(
         or ""
     ).strip()
     if not call_id or not tool_id:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned malformed tool call"
         )
     if tool_id not in offered_tool_ids:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned an unoffered tool call"
         )
     raw_arguments = _provider_field(item, "arguments", {})
@@ -732,13 +941,13 @@ def _provider_tool_call_from_item(
         try:
             parsed_arguments = json.loads(raw_arguments)
         except json.JSONDecodeError as exc:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned malformed tool arguments"
             ) from exc
     else:
         parsed_arguments = raw_arguments
     if not isinstance(parsed_arguments, Mapping):
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider tool arguments must be a JSON object"
         )
     try:
@@ -748,7 +957,7 @@ def _provider_tool_call_from_item(
             arguments=dict(parsed_arguments),
         )
     except ProviderProtocolError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned invalid normalized tool call"
         ) from exc
 
@@ -769,13 +978,13 @@ def _extract_provider_tool_calls(
         if call is None:
             continue
         if call.call_id in seen:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned duplicate tool call id"
             )
         seen.add(call.call_id)
         calls.append(call)
         if len(calls) > 256:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned too many tool calls"
             )
     return tuple(calls)
@@ -790,7 +999,7 @@ def _extract_provider_structured_output(
     parsed = _provider_field(response, "output_parsed", None)
     if parsed is not None:
         if not isinstance(parsed, Mapping):
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider structured output is not an object"
             )
         return _strict_json_object(
@@ -802,11 +1011,11 @@ def _extract_provider_structured_output(
     try:
         value = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider structured output is invalid JSON"
         ) from exc
     if not isinstance(value, Mapping):
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider structured output is not an object"
         )
     return _strict_json_object(
@@ -869,7 +1078,7 @@ def _normalized_provider_usage(
             usage_source=source,
         )
     except ProviderProtocolError as exc:
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "model provider returned invalid usage metadata"
         ) from exc
 
@@ -950,7 +1159,7 @@ def _normalize_provider_interaction(
             FinishReason.CANCELLED,
             FinishReason.DEADLINE,
         }:
-            raise ProviderInvocationError(
+            raise ProviderProtocolViolationError(
                 "model provider returned no normalized output"
             )
     return normalized_text, structured, tool_calls, finish, usage
@@ -991,15 +1200,15 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     """Validate provider-neutral request fields before any provider I/O."""
 
     if not isinstance(request.prompt, str) or not request.prompt.strip():
-        raise ProviderInvocationError("model provider prompt must be non-empty text")
+        raise ProviderProtocolViolationError("model provider prompt must be non-empty text")
 
     for message in request.history:
         if not isinstance(message, AIMessage):
-            raise ProviderInvocationError("model provider history contains an invalid message")
+            raise ProviderProtocolViolationError("model provider history contains an invalid message")
         if message.role not in _ALLOWED_HISTORY_ROLES:
-            raise ProviderInvocationError("model provider history contains an invalid role")
+            raise ProviderProtocolViolationError("model provider history contains an invalid role")
         if not isinstance(message.content, str) or not message.content.strip():
-            raise ProviderInvocationError("model provider history contains empty content")
+            raise ProviderProtocolViolationError("model provider history contains empty content")
 
     max_output_tokens = request.max_output_tokens
     if max_output_tokens is not None and (
@@ -1007,17 +1216,17 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         or not isinstance(max_output_tokens, int)
         or max_output_tokens <= 0
     ):
-        raise ProviderInvocationError("max_output_tokens must be a positive integer")
+        raise ProviderProtocolViolationError("max_output_tokens must be a positive integer")
 
     if request.model is None:
         model = default_model
     elif not isinstance(request.model, str) or not request.model.strip():
-        raise ProviderInvocationError("model provider model must be non-empty text")
+        raise ProviderProtocolViolationError("model provider model must be non-empty text")
     else:
         model = request.model.strip()
 
     if not model:
-        raise ProviderInvocationError("model provider model must be non-empty text")
+        raise ProviderProtocolViolationError("model provider model must be non-empty text")
 
     if not isinstance(request.purpose, str) or not request.purpose.strip():
         raise ProviderPolicyError("model provider transfer purpose is invalid")
@@ -1191,7 +1400,7 @@ def provider_request_from_context(
 
     projection = project_provider_context(envelope)
     if not projection.prompt.strip():
-        raise ProviderInvocationError(
+        raise ProviderProtocolViolationError(
             "compiled context requires a final canonical user message"
         )
 
@@ -2163,6 +2372,82 @@ class OpenAIProviderAdapter(ProviderAdapter):
         )
 
 
+class OpenAICompatibleSecondaryAdapter(OpenAIProviderAdapter):
+    """Optional declared text-only secondary provider using Responses semantics."""
+
+    provider_id = "openai-compatible-secondary"
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        base_url: str,
+        timeout_seconds: float = 45.0,
+        max_retries: int = 2,
+        client: Any | None = None,
+        admission_runtime: AdmissionRuntime | None = None,
+    ) -> None:
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            client=client,
+            admission_runtime=admission_runtime,
+        )
+
+    async def generate_image(
+        self,
+        request: ProviderImageRequest,
+    ) -> ProviderImageResponse:
+        del request
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-generation"
+        )
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        count: int = 1,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, count, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-variation"
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: image-editing"
+        )
+
+    async def synthesize_speech(
+        self,
+        request: ProviderSpeechRequest,
+    ) -> ProviderSpeechResponse:
+        del request
+        raise ProviderUnavailableError(
+            "secondary provider capability is not declared: speech-synthesis"
+        )
+
+
 class OpenAISyncProviderAdapter:
     """Dependency-free synchronous OpenAI Responses API adapter.
 
@@ -2234,7 +2519,7 @@ class OpenAISyncProviderAdapter:
     @staticmethod
     def _extract_response_text(payload: Any) -> str | None:
         if not isinstance(payload, Mapping):
-            raise ProviderInvocationError("model provider returned malformed JSON")
+            raise ProviderProtocolViolationError("model provider returned malformed JSON")
 
         direct = payload.get("output_text")
         if isinstance(direct, str) and direct.strip():
@@ -2242,7 +2527,9 @@ class OpenAISyncProviderAdapter:
 
         output = payload.get("output")
         if not isinstance(output, list):
-            raise ProviderInvocationError("model provider returned malformed response")
+            raise ProviderProtocolViolationError(
+                "model provider returned malformed response"
+            )
 
         fragments: list[str] = []
         for item in output:
@@ -2453,13 +2740,37 @@ class ProviderRegistry:
         *,
         active: str,
         verification_adapter: ProviderAdapter | None = None,
+        fallback_ids: Sequence[str] = (),
         architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
     ) -> None:
-        self._adapters = {adapter.provider_id: adapter for adapter in adapters}
+        normalized_adapters = tuple(adapters)
+        self._adapters = {
+            adapter.provider_id: adapter for adapter in normalized_adapters
+        }
+        if len(self._adapters) != len(normalized_adapters):
+            raise ValueError("provider ids must be unique")
         self.active_id = active.strip().lower()
+        normalized_fallbacks = tuple(
+            str(item).strip().lower() for item in fallback_ids
+        )
+        if len(set(normalized_fallbacks)) != len(normalized_fallbacks):
+            raise ValueError("fallback provider ids must be unique")
+        if self.active_id in normalized_fallbacks:
+            raise ValueError("active provider cannot also be a fallback")
+        unknown = [
+            provider_id
+            for provider_id in normalized_fallbacks
+            if provider_id not in self._adapters
+        ]
+        if unknown:
+            raise ValueError(
+                "fallback provider is not registered: " + ", ".join(unknown)
+            )
+        self._fallback_ids = normalized_fallbacks
         self._verification_adapter = verification_adapter
         self._architecture_loader = architecture_loader
         self._architecture_receipts: dict[str, ProviderArchitectureReceipt] = {}
+        self._failover_adapter: FailoverProviderAdapter | None = None
 
     @classmethod
     def from_env(
@@ -2475,6 +2786,52 @@ class ProviderRegistry:
             max_retries=retries,
             admission_runtime=admission_runtime,
         )
+        adapters: list[ProviderAdapter] = [adapter]
+        fallback_ids: tuple[str, ...] = ()
+
+        secondary_values = {
+            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
+            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
+            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
+        }
+        configured_secondary = any(secondary_values.values())
+        if configured_secondary:
+            missing = [
+                key for key, value in secondary_values.items() if not value
+            ]
+            if missing:
+                raise ProviderUnavailableError(
+                    "secondary provider configuration is incomplete: "
+                    + ", ".join(sorted(missing))
+                )
+            secondary_url = _validate_provider_base_url(
+                secondary_values["base_url"]
+            )
+            primary_url = _validate_provider_base_url(
+                adapter.base_url or _DEFAULT_OPENAI_BASE_URL
+            )
+            if (
+                urlsplit(secondary_url).hostname or ""
+            ).rstrip(".").lower() == (
+                urlsplit(primary_url).hostname or ""
+            ).rstrip(".").lower():
+                raise ProviderUnavailableError(
+                    "secondary provider must use a distinct provider hostname"
+                )
+            secondary = OpenAICompatibleSecondaryAdapter(
+                api_key=secondary_values["api_key"],
+                model=secondary_values["model"],
+                base_url=secondary_url,
+                timeout_seconds=timeout,
+                max_retries=retries,
+                admission_runtime=admission_runtime,
+            )
+            adapters.append(secondary)
+            if active == secondary.provider_id:
+                fallback_ids = (adapter.provider_id,)
+            else:
+                fallback_ids = (secondary.provider_id,)
+
         verification_model = os.getenv(
             "AI_VERIFICATION_MODEL",
             "",
@@ -2490,9 +2847,10 @@ class ProviderRegistry:
                 admission_runtime=admission_runtime,
             )
         return cls(
-            [adapter],
+            adapters,
             active=active,
             verification_adapter=verification_adapter,
+            fallback_ids=fallback_ids,
         )
 
     @property
@@ -2519,22 +2877,61 @@ class ProviderRegistry:
     @property
     def available(self) -> bool:
         adapter = self.active
-        if adapter is None or not adapter.available:
+        if adapter is None:
             return False
-        try:
-            self._architecture_receipt(self.active_id)
-        except ProviderUnavailableError:
-            return False
-        return True
+        candidate_ids = (self.active_id, *self._fallback_ids)
+        for provider_id in candidate_ids:
+            candidate = self._adapters[provider_id]
+            try:
+                self._architecture_receipt(provider_id)
+            except ProviderUnavailableError:
+                continue
+            if candidate.available:
+                return True
+        return False
 
     def require_active(self) -> ProviderAdapter:
         adapter = self.active
         if adapter is None:
-            raise ProviderUnavailableError(f"unsupported AI provider: {self.active_id}")
+            raise ProviderUnavailableError(
+                f"unsupported AI provider: {self.active_id}"
+            )
         self._architecture_receipt(self.active_id)
+        fallbacks: list[ProviderAdapter] = []
+        for provider_id in self._fallback_ids:
+            self._architecture_receipt(provider_id)
+            fallbacks.append(self._adapters[provider_id])
+
+        if fallbacks:
+            if self._failover_adapter is None:
+                self._failover_adapter = FailoverProviderAdapter(
+                    adapter,
+                    tuple(fallbacks),
+                )
+            if not self._failover_adapter.available:
+                raise ProviderUnavailableError(
+                    "no declared AI provider is configured"
+                )
+            return self._failover_adapter
+
         if not adapter.available:
-            raise ProviderUnavailableError(f"AI provider is not configured: {self.active_id}")
+            raise ProviderUnavailableError(
+                f"AI provider is not configured: {self.active_id}"
+            )
         return adapter
+
+    def redundancy_status(self) -> dict[str, Any]:
+        routing = (
+            self._failover_adapter.routing_snapshot()
+            if self._failover_adapter is not None
+            else None
+        )
+        return {
+            "enabled": bool(self._fallback_ids),
+            "primary_provider": self.active_id,
+            "fallback_providers": list(self._fallback_ids),
+            "routing": routing,
+        }
 
     def verification_adapter_for(
         self,
@@ -2576,6 +2973,12 @@ class ProviderRegistry:
         for provider_id, adapter in sorted(self._adapters.items()):
             status = adapter.status()
             status["active"] = provider_id == self.active_id
+            status["fallback"] = provider_id in self._fallback_ids
+            status["routing"] = (
+                self.redundancy_status()
+                if provider_id == self.active_id and self._fallback_ids
+                else None
+            )
             verifier = self._verification_adapter
             status["semantic_verifier_configured"] = bool(
                 verifier is not None
@@ -2626,6 +3029,8 @@ __all__ = [
     "ProviderToolCall",
     "ProviderToolDefinition",
     "ProviderUsage",
+    "FailoverProviderAdapter",
+    "OpenAICompatibleSecondaryAdapter",
     "OpenAIProviderAdapter",
     "OpenAISyncProviderAdapter",
     "ProviderAdapter",
@@ -2633,9 +3038,11 @@ __all__ = [
     "ProviderImageRequest",
     "ProviderImageResponse",
     "ProviderInvocationError",
+    "ProviderProtocolViolationError",
     "ProviderPolicyError",
     "ProviderRegistry",
     "ProviderRequest",
+    "ProviderRoutingTelemetry",
     "ProviderResponse",
     "ProviderSpeechRequest",
     "ProviderSpeechResponse",
