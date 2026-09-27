@@ -1468,11 +1468,14 @@
         "skeleton/testing/test_engine_execution_service.py proves expired approval reauthorization survives restart",
         "backend/tests/test_conversation_governance.py covers governed export and ordered deletion",
         ".github/workflows/golden-journey-closure.yml binds frontend, engine, governance and independent Stage-7 exact-head evidence",
-        "scripts/verify_golden_journey_closure.py independently binds required journey surfaces and dependency graph"
+        "scripts/verify_golden_journey_closure.py independently binds required journey surfaces and dependency graph",
+        "MongoOperationEventStore performs a real transactional read preflight before shared authority cutover",
+        "backend transport invokes Mongo transaction-capability preflight before indexes or production authority assignment",
+        "skeleton/testing/test_operation_stream_store_mongo.py proves transaction-capable acceptance and standalone/sessionless fail-closed rejection"
       ],
       "remaining": [
         "collect fresh exact-head Golden Journey Closure Gate and App Assembly evidence",
-        "run transaction-capable Mongo replica-set and deployed assembled-topology journey proof",
+        "run assembled transaction-capable Mongo replica-set and deployed frontend/backend/engine topology proof",
         "close all declared lower-stage dependency gaps",
         "obtain independent signoff before canonical Stage-7 closure"
       ],
