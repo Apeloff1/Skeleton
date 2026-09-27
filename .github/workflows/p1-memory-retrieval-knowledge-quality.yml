@@ -1,0 +1,261 @@
+name: P1 Memory Retrieval Knowledge Quality Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/intelligence/memory_retrieval_quality.py"
+      - "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/memory/reconciliation.py"
+      - "skeleton/retrieval/receipts.py"
+      - "skeleton/retrieval/freshness.py"
+      - "skeleton/intelligence/quality.py"
+      - "skeleton/testing/test_memory_retrieval_knowledge_quality.py"
+      - ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/memory_retrieval_quality.py"
+      - "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/memory/reconciliation.py"
+      - "skeleton/retrieval/receipts.py"
+      - "skeleton/retrieval/freshness.py"
+      - "skeleton/intelligence/quality.py"
+      - "skeleton/testing/test_memory_retrieval_knowledge_quality.py"
+      - ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-intel-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate memory retrieval knowledge quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Run quality authority regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_memory_retrieval_knowledge_quality.py
+          tests/test_memory_reconciliation.py
+          tests/test_retrieval_receipts.py
+          tests/test_retrieval_freshness.py
+
+      - name: Build accepted INTEL-02 quality decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-intel-02
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.intelligence.memory_retrieval_quality import (
+              KnowledgeQualityObservation,
+              evaluate_intelligence_quality,
+          )
+          from skeleton.intelligence.quality import QualityReport
+          from skeleton.memory.reconciliation import MemoryAction, MemoryDecision
+          from skeleton.retrieval.freshness import PlaneFreshness
+          from skeleton.retrieval.receipts import RetrievalReceipt
+
+          now = 1_800_000_000.0
+          memory = MemoryDecision(
+              record_id="ci-memory",
+              action=MemoryAction.RETAIN,
+              score=0.91,
+              reasons=(),
+              signals=(
+                  ("freshness", 0.95),
+                  ("utility", 0.82),
+                  ("evidence", 0.90),
+                  ("contradiction", 0.0),
+              ),
+          )
+          retrieval = RetrievalReceipt(
+              receipt_id="ci-retrieval",
+              query_digest="ci-query",
+              generation=1,
+              scope_digest="ci-scope",
+              considered_planes=("lexical",),
+              candidate_planes=("lexical",),
+              failed_planes=(),
+              fragment_planes=(("fragment-1", ("lexical",)),),
+              partial=False,
+              created_ns=1,
+              source="live",
+          )
+          freshness = PlaneFreshness(
+              plane="lexical",
+              index_version="index-ci",
+              source_revision="revision-ci",
+              indexed_at=now - 10.0,
+              stale_after_s=300.0,
+          )
+          knowledge = KnowledgeQualityObservation(
+              claim_id="ci-claim",
+              content_digest="a" * 64,
+              provenance_refs=(
+                  EvidenceRef(
+                      source="ci://knowledge/source",
+                      digest="b" * 64,
+                      category="knowledge_source",
+                  ),
+              ),
+              updated_at=now - 10.0,
+          )
+          report = QualityReport(
+              accepted=True,
+              reason="independent CI quality",
+              score=0.95,
+          )
+          decision = evaluate_intelligence_quality(
+              memory_decisions=(memory,),
+              memory_conflicts=(),
+              retrieval_receipt=retrieval,
+              retrieval_provenance=(
+                  EvidenceRef(
+                      source="retrieval://fragment-1/source",
+                      digest="c" * 64,
+                      category="retrieval_source",
+                  ),
+              ),
+              freshness_by_plane={"lexical": freshness},
+              knowledge=(knowledge,),
+              quality_report=report,
+              observed_at=now,
+          )
+          if not decision.accepted:
+              raise SystemExit(f"INTEL-02 fixture rejected: {decision.reasons}")
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-intel-02/decision.json").write_text(
+              json.dumps(
+                  {
+                      **decision.payload(),
+                      "decision_digest": decision.decision_digest,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/refs.json").write_text(
+              json.dumps(
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      }
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head INTEL-02 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-intel-02/config.digest").write_text(
+              hashlib.sha256(b"p1-intel-02-policy-v1").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/environment.digest").write_text(
+              hashlib.sha256(b"ubuntu-24.04|python-3.11.16|intel-02").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/verifier.digest").write_text(
+              digest(
+                  [
+                      "skeleton/intelligence/memory_retrieval_quality.py",
+                      ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-02/tests.digest").write_text(
+              digest(
+                  [
+                      "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+                      "tests/test_memory_reconciliation.py",
+                      "tests/test_retrieval_receipts.py",
+                      "tests/test_retrieval_freshness.py",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          PY
+          python scripts/emit_p1_promotion_evidence.py             --repository Apeloff1/Skeleton             --commit-sha "$EXPECTED_SHA"             --expected-head "$EXPECTED_SHA"             --task-id P1-INTEL-02             --accountability-id ACC-P1-INTEL-02             --configuration-digest "$(cat .p1-intel-02/config.digest)"             --environment-digest "$(cat .p1-intel-02/environment.digest)"             --verifier-id github-actions:p1-memory-retrieval-knowledge-quality             --verifier-digest "$(cat .p1-intel-02/verifier.digest)"             --test-manifest-digest "$(cat .p1-intel-02/tests.digest)"             --run-id "$RUN_IDENTITY"             --run-attempt "$RUN_ATTEMPT"             --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --evidence-file .p1-intel-02/refs.json             --out .p1-intel-02/receipt.json             > .p1-intel-02/stdout.json
+
+      - name: Assert exact-head receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-intel-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("INTEL-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-INTEL-02":
+              raise SystemExit("INTEL-02 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-INTEL-02":
+              raise SystemExit("INTEL-02 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("INTEL-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY
