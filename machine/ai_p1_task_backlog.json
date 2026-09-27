@@ -1640,7 +1640,8 @@
       ],
       "depends_on": [
         "P1-LEARN-03",
-        "P1-AUTO-05"
+        "P1-AUTO-05",
+        "P1-PROD-02"
       ],
       "objective": "Mirror eligible traffic to candidates with redaction, side-effect suppression and paired-comparison metadata.",
       "acceptance": [
