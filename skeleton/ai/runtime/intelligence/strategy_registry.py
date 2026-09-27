@@ -221,6 +221,10 @@ class ReasoningPolicy:
             raise ReasoningPolicyError(
                 "require_verification_for_high_risk must be boolean"
             )
+        if self.require_verification_for_high_risk is not True:
+            raise ReasoningPolicyError(
+                "high-risk verification cannot be disabled"
+            )
         if self.schema_version != REASONING_POLICY_SCHEMA_VERSION:
             raise ReasoningPolicyError("unsupported policy schema version")
 
