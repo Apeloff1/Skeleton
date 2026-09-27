@@ -468,7 +468,8 @@
         "scripts/state_recovery_drill.py",
         "skeleton/testing/test_state_recovery_drill.py",
         ".github/workflows/state-recovery-drill.yml"
-      ]
+      ],
+      "gap": "gap-state-authority-convergence"
     },
     {
       "id": "operation-event-stream",
@@ -575,7 +576,6 @@
       "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/contracts/ai_execution.py",
         "skeleton/persistence/execution_repository.py",
@@ -608,7 +608,6 @@
       "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "skeleton/skills/tool_contract.py",
         "skeleton/skills/tool_runtime.py",
@@ -639,7 +638,6 @@
       "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "skeleton/api/engine_authority.py",
         "skeleton/api/engine_service.py",
@@ -668,7 +666,6 @@
       "migration": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/intelligence/admission.py",
         "skeleton/intelligence/admission_runtime.py",
@@ -699,7 +696,6 @@
       "migration": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
       "evidence": [
         "skeleton/contracts/ai_execution.py",
         "skeleton/persistence/execution_repository.py",
@@ -729,7 +725,6 @@
       "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/contracts/conversation.py",
@@ -761,7 +756,6 @@
       "migration": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/contracts/conversation.py",
@@ -779,11 +773,11 @@
     {
       "id": "verification-receipt-ledger",
       "owner_plane": "reasoning-verification",
-      "physical_store": "verification-evidence-unbound",
-      "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; ai_verification_receipt",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -791,15 +785,19 @@
       "transaction_scope": "immutable verification receipt commit per candidate/turn with bounded repair lineage",
       "consistency": "one receipt version is immutable; later repair creates a new turn/receipt; final result references the selected terminal receipt",
       "retention": "operation/evaluation/governance policy controlled; raw hidden reasoning is not retained",
-      "backup_restore": "required after durable repository binding because finalization/evaluation can depend on receipt identity",
-      "migration": "preserve verification id, operation/execution/turn/candidate lineage, outcome/reason codes, claim/postcondition checks and evidence refs",
+      "backup_restore": "restore engine_execution.sqlite before resumed/finalized execution; verification receipts are durable authoritative state and must retain receipt/execution/operation/result lineage",
+      "migration": "preserve verification receipt identity, claim/execution/operation/result lineage, digest, outcome/reason codes, evidence/postcondition checks and verified timestamp",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-verification-evidence-contract",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/intelligence/verification.py",
-        "skeleton/intelligence/verifier.py"
+        "skeleton/contracts/verification.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "docker-compose.yml",
+        "machine/state_backup_policy.json"
       ]
     },
     {
@@ -852,7 +850,6 @@
       "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-memory-durable-authority",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/frontier/memory.py",
@@ -869,7 +866,8 @@
         "skeleton/testing/test_governance_runtime_binding.py",
         "pyproject.toml",
         "skeleton/vault/lifecycle_adapters.py"
-      ]
+      ],
+      "gap": "gap-memory-durable-authority"
     }
   ],
   "state_flows": [

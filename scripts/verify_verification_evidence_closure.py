@@ -274,7 +274,8 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             + ", ".join(sorted(actual))
         )
 
-    if entry.get("implementation_status") not in {
+    handoff_status = str(entry.get("implementation_status") or "")
+    if handoff_status not in {
         "in_progress",
         "implemented_pending_closure",
         "implementation-complete",
@@ -318,17 +319,39 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
         )
 
     blueprint = construction.get("verification_runtime_blueprint")
+    blueprint_status = "missing"
     if not isinstance(blueprint, dict):
         errors.append("verification_runtime_blueprint is missing")
     else:
-        if blueprint.get("status") not in {
+        blueprint_status = str(blueprint.get("status") or "")
+        if blueprint_status not in {
             "in-progress",
             "implemented-pending-closure",
-            "closed",
+            "complete",
         }:
             errors.append(
                 "verification runtime blueprint status is invalid"
             )
+
+    closure_payload = _load_json(
+        root / "machine/ai_closure_evidence.json"
+    )
+    closure_entry = _find_entry(closure_payload, gap_id)
+    closure_decision = "missing"
+    closure_impl_state = "missing"
+    closure_gap_status = "missing"
+    if closure_entry is None:
+        errors.append("verification closure-evidence entry is missing")
+    else:
+        closure_decision = str(
+            closure_entry.get("closure_decision") or ""
+        )
+        closure_impl_state = str(
+            closure_entry.get("implementation_state") or ""
+        )
+        closure_gap_status = str(
+            closure_entry.get("gap_status") or ""
+        )
 
     if gap_status == "closed":
         open_dependencies = sorted(
@@ -340,6 +363,26 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append(
                 "closed verification gap has non-closed dependencies: "
                 + ", ".join(open_dependencies)
+            )
+        if handoff_status != "closed":
+            errors.append(
+                "closed verification gap requires closed handoff state"
+            )
+        if blueprint_status != "complete":
+            errors.append(
+                "closed verification gap requires complete blueprint state"
+            )
+        if closure_decision != "closed":
+            errors.append(
+                "closed verification gap requires closed closure decision"
+            )
+        if closure_impl_state != "closed":
+            errors.append(
+                "closed verification gap requires closed closure implementation state"
+            )
+        if closure_gap_status != "closed":
+            errors.append(
+                "closed verification gap requires closed closure gap status"
             )
     elif gap_status not in {"open", "in-progress"}:
         errors.append("verification construction status is invalid")
