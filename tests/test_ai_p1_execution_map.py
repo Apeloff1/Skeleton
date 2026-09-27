@@ -292,3 +292,20 @@ def test_p1_backlog_rejects_uncovered_primary_volume(tmp_path: Path) -> None:
         for error in errors
     )
 
+def test_p1_backlog_realizes_lane_dependencies(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+
+    def weaken(payload: dict) -> None:
+        task = next(
+            item for item in payload["tasks"] if item["task_id"] == "P1-LEARN-04"
+        )
+        task["depends_on"].remove("P1-PROD-02")
+
+    _mutate(root, BACKLOG_PATH, weaken)
+    errors, _ = validate_repository(root)
+
+    assert any(
+        "P1-L4: lane dependency P1-L3 is not realized in task DAG" in error
+        for error in errors
+    )
+
