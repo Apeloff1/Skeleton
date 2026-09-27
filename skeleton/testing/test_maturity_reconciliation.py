@@ -18,7 +18,6 @@ POLICY = {
             "capabilities",
             "contracts",
             "risks",
-            "gaps",
         ]
     },
     "implemented": {
@@ -29,7 +28,6 @@ POLICY = {
             "implementation_paths",
             "tests",
             "risks",
-            "gaps",
         ]
     },
     "integrated": {
@@ -41,7 +39,6 @@ POLICY = {
             "tests",
             "evaluations",
             "risks",
-            "gaps",
         ]
     },
     "verified": {
@@ -54,7 +51,6 @@ POLICY = {
             "evaluations",
             "evidence",
             "risks",
-            "gaps",
         ]
     },
     "hardened": {
@@ -478,3 +474,10 @@ def test_materialized_production_can_raise_implementation_status_contiguously() 
         for state in ("implemented", "integrated", "verified", "hardened", "production")
     )
     assert decision.implementation_status_candidate == "production"
+
+def test_linear_maturity_policy_does_not_require_open_gaps() -> None:
+    for state in ("scaffolded", "implemented", "integrated", "verified"):
+        assert "gaps" not in POLICY[state]["required_nonempty_fields"]
+
+    for state in ("hardened", "production"):
+        assert "gaps" not in POLICY[state]["required_nonempty_fields"]
