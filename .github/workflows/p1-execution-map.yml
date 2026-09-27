@@ -1,0 +1,71 @@
+name: P1 Execution Map Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_master_build_sequence.json"
+      - "scripts/check_ai_p1_execution_map.py"
+      - "skeleton/testing/test_ai_p1_execution_map.py"
+      - "docs/plan/P1_EXECUTION_MAP.md"
+      - "docs/plan/MASTER_INDEX.md"
+      - ".github/workflows/p1-execution-map.yml"
+  pull_request:
+    branches:
+      - main
+      - masterplan/p1-postmerge-assurance-20260927
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_master_build_sequence.json"
+      - "scripts/check_ai_p1_execution_map.py"
+      - "skeleton/testing/test_ai_p1_execution_map.py"
+      - "docs/plan/P1_EXECUTION_MAP.md"
+      - "docs/plan/MASTER_INDEX.md"
+      - ".github/workflows/p1-execution-map.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-execution-map-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate P1 execution map
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused validation runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Validate canonical P1 map
+        run: python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run P1 map regression tests
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_p1_execution_map.py
