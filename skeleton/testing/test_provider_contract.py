@@ -31,11 +31,13 @@ from skeleton.provider_runtime import (
     ProviderImageRequest,
     ProviderInvocationError,
     ProviderPolicyError,
+    ProviderProtocolViolationError,
     ProviderRegistry,
     ProviderRequest,
     ProviderResponse,
     ProviderSpeechRequest,
     ProviderUnavailableError,
+    _read_provider_json,
     provider_response_deltas,
 )
 
@@ -1235,6 +1237,48 @@ async def test_failover_provider_never_routes_policy_denial() -> None:
 
     assert secondary.requests == []
     assert adapter.routing_snapshot()["policy_denials"] == 1
+
+
+
+def test_malformed_provider_json_is_terminal_protocol_violation() -> None:
+    class _MalformedResponse:
+        def read(self, _limit: int) -> bytes:
+            return b"{"
+
+    with pytest.raises(
+        ProviderProtocolViolationError,
+        match="malformed JSON",
+    ):
+        _read_provider_json(_MalformedResponse())
+
+
+@pytest.mark.asyncio
+async def test_failover_provider_never_routes_protocol_violation() -> None:
+    primary = _ScriptedFailoverProvider(
+        "primary",
+        "primary-model",
+        [ProviderProtocolViolationError("malformed provider payload")],
+    )
+    secondary = _ScriptedFailoverProvider(
+        "secondary",
+        "secondary-model",
+        [ProviderResponse(text="secondary", provider="secondary", model="secondary-model")],
+    )
+    adapter = FailoverProviderAdapter(primary, (secondary,))
+
+    with pytest.raises(
+        ProviderProtocolViolationError,
+        match="malformed provider payload",
+    ):
+        await adapter.generate(
+            ProviderRequest(instructions="answer", prompt="hello")
+        )
+
+    assert secondary.requests == []
+    snapshot = adapter.routing_snapshot()
+    assert snapshot["provider_failures"] == 1
+    assert snapshot["failover_attempts"] == 0
+    assert snapshot["last_failure_kind"] == "protocol"
 
 
 @pytest.mark.asyncio
