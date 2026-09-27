@@ -20,6 +20,7 @@ def _copy_fixture(tmp_path: Path) -> None:
         {
             "machine/ai_app_construction.json",
             "machine/ai_implementation_handoff.json",
+            "machine/ai_closure_evidence.json",
         }
     )
     for source_rel, mirror_rel in MIRROR_PAIRS:
@@ -90,7 +91,7 @@ def test_verification_evidence_verifier_rejects_false_closed_state(
 
     assert receipt["valid"] is False
     assert any(
-        "closed verification gap has non-closed dependencies" in item
+        "closed verification gap requires closed" in item
         for item in receipt["errors"]
     )
 
