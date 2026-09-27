@@ -966,19 +966,19 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "skeleton/skills",
-        "planned:skeleton/tools",
-        "skeleton/automation",
-        "skeleton/security",
-        "skeleton/ai",
-        "machine"
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/ai/runtime/skills/privileged_transaction.py",
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/shells/isolation.py",
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_tool_authorization.py",
-        "skeleton/testing/test_shell_*.py",
-        "planned:skeleton/testing/test_tool_idempotency.py",
-        "planned:skeleton/testing/test_sandbox_runtime.py",
-        "planned:skeleton/testing/test_policy_language.py"
+        "skeleton/testing/test_privileged_tool_transaction.py",
+        "skeleton/testing/test_tool_runtime_contracts.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_shell_isolation.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
