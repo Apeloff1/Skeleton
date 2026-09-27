@@ -1699,7 +1699,7 @@
       "id": "gap-conversation-state-authority",
       "plane": "application-api",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical conversation authority, terminal-result assistant commit/replay, crash-resumable user turns, serialized pending-turn concurrency, engine-backed regeneration, Jeeves legacy-to-canonical migration, browser reconstruction, durable engine-result lineage, governed delete/export/retention, and bounded cross-plane lifecycle propagation are implemented. Remaining closure is lower-stage dependency closure plus fresh exact-head evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
@@ -1776,13 +1776,14 @@
           "close gap-state-authority-convergence and gap-governance-registry",
           "collect fresh exact-head Conversation Authority Closure Gate evidence after final PR head stabilizes"
         ]
-      }
+      },
+      "status_detail": "closed by staged Stage-1 dependency promotion; reopen on required gate or invariant regression"
     },
     {
       "id": "gap-tool-runtime-convergence",
       "plane": "tool-runtime",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical typed tool contracts, governed sync/async execution, durable lineage/idempotency fencing, adapter-owned privileged/read surfaces, rich manifest governance, minimal enabled-only provider projection, manifest-aware admission/cost metering, per-tool concurrency, compatibility delegation, and lifecycle-governed durable results are implementation-complete. A dedicated Tool Runtime Closure Gate now binds exact-head runtime/delegation/lineage tests and an independent source/mirror/dependency verifier. Remaining closure is the declared Stage-0 dependency closures plus a fresh green exact-head gate.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
@@ -1838,10 +1839,8 @@
         "backend/services/tool_registry.py durable tool results enforce manifest output schema/result size, retention deadlines and lifecycle-aware capacity deletion",
         "backend/tests/test_tool_registry_canonical_delegate.py proves restart-persistent lifecycle metadata, governance fail-closed persistence, capacity deletion acknowledgement, result schema/size enforcement and retention expiry deletion"
       ],
-      "outstanding_evidence": [
-        "dependency closure and fresh exact-head Tool Runtime Closure Gate"
-      ],
-      "status_detail": "implementation-complete pending gap-governance-registry, gap-cost-admission, gap-provider-surface-convergence and fresh exact-head Tool Runtime Closure Gate"
+      "outstanding_evidence": [],
+      "status_detail": "closed by staged Stage-1 dependency promotion; reopen on required gate or invariant regression"
     },
     {
       "id": "gap-context-compiler-convergence",
@@ -2200,7 +2199,7 @@
       "id": "gap-memory-durable-authority",
       "plane": "memory",
       "priority": "P0",
-      "status": "open",
+      "status": "closed",
       "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. The cognitive engine accepts only explicit verified-final-output memory intents and commits them after verification through governed writeback. /ai/chat now exposes an explicit authenticated memory_policy opt-in that delegates engine:memory only for verified final output and fails closed when the canonical engine is unavailable. Destructive Mongo recovery includes canonical memory, revisions/idempotency/outbox and rebuilds only active derived memory. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, and independent verification.",
       "construction": [
         "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
@@ -2255,7 +2254,8 @@
           "collect fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR head stabilizes",
           "obtain independent closure verification"
         ]
-      }
+      },
+      "status_detail": "closed by staged Stage-1 dependency promotion; reopen on required gate or invariant regression"
     },
     {
       "id": "gap-state-authority-convergence",
@@ -5171,7 +5171,7 @@
     "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land",
     "schema_version": 1,
     "contract_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-conversation-state-authority",
     "implemented_surfaces": [
       "canonical envelopes",
@@ -5190,15 +5190,12 @@
       "crash-resumable canonical pending turns",
       "serialized pending-turn concurrency and retryable optimistic conflicts"
     ],
-    "remaining_surfaces": [
-      "declared dependency closure",
-      "fresh exact-head closure evidence after final PR stabilization"
-    ]
+    "remaining_surfaces": []
   },
   "tool_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-tool-runtime-convergence",
     "conceptual_split": {
       "skill": {
@@ -5458,10 +5455,7 @@
       "scripts/verify_tool_runtime_closure.py independently verifies manifest/lineage/admission/delegation ownership, forbidden privileged registry drift, AI-tree mirror parity and dependency graph",
       "Tool Runtime Closure Gate runs canonical runtime, durable receipt, backend delegation, boundary and cognitive lineage/minimal projection regressions"
     ],
-    "remaining": [
-      "close gap-governance-registry, gap-cost-admission and gap-provider-surface-convergence",
-      "collect fresh exact-head Tool Runtime Closure Gate evidence"
-    ]
+    "remaining": []
   },
   "context_compiler_blueprint": {
     "schema_version": 1,
@@ -6888,7 +6882,7 @@
   "memory_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
       "storage": "skeleton/frontier/contracts.py:MemoryContract",
@@ -7102,11 +7096,7 @@
       "canonical-engine-only verified memory opt-in",
       "assistant-message memory reference propagation"
     ],
-    "remaining_surfaces": [
-      "fresh exact-head validation after final PR stabilization",
-      "declared dependency closure",
-      "independent closure verification"
-    ]
+    "remaining_surfaces": []
   },
   "functional_ai_dependency_graph": {
     "schema_version": 1,
