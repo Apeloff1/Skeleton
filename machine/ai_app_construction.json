@@ -2078,8 +2078,8 @@
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
-      "status": "open",
-      "gap": "Shared-network operation/stream authorities and production browser reconnect/resync/cancel session semantics are implemented. Remaining work is exact-head assembled validation and independent closure signoff.",
+      "status": "closed",
+      "gap": "Shared-network operation/stream authorities, durable replay/compaction/terminal fencing, production browser reconnect/resync/cancel semantics, frontend type safety, and independent closure verification are implementation-complete. Exact-head Streaming Protocol Closure Gate plus App Assembly are the merge criteria.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
@@ -2100,7 +2100,15 @@
         "OperationBrowserSession binds browser replay, persistent cursor, authoritative resync and cancellation",
         "browser journey tests cover reconnect, slow-client replay-gap recovery and cancel/complete race fencing"
       ],
-      "verification_state": "implemented-pending-exact-head-closure"
+      "verification_state": "closed-candidate-exact-head-gated",
+      "status_detail": "closed candidate; reopen on any backend stream, frontend typecheck/browser journey, mirror, dependency or App Assembly regression",
+      "outstanding_evidence": [],
+      "evidence_present": [
+        "Streaming Protocol Closure Gate runs canonical backend stream/store/route/multiworker contracts on exact PR head",
+        "Streaming Protocol Closure Gate installs frontend dependencies, runs yarn typecheck and test:operation-stream on exact PR head",
+        "scripts/verify_streaming_protocol_closure.py independently verifies Stage-6 source boundaries, canonical AI mirrors, dependency graph and closed-state consistency",
+        "tests/test_streaming_protocol_independent_verifier.py adversarially verifies missing journey, mirror drift and dependency/closure drift rejection"
+      ]
     },
     {
       "id": "gap-governance-registry",
@@ -6558,7 +6566,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implemented-pending-closure",
+    "status": "closed",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
@@ -6683,7 +6691,13 @@
       "browser-session compacted slow-client authoritative resync journey",
       "browser-session cancel-complete terminal race journey",
       "authoritative terminal snapshot canonical-result reconciliation"
-    ]
+    ],
+    "closure_gate": "Streaming Protocol Closure Gate must pass on the exact PR head with backend contracts, frontend typecheck/browser journeys and independent source/mirror/dependency verification.",
+    "current_evidence": [
+      "exact-head Streaming Protocol Closure Gate",
+      "independent Stage-6 streaming verifier"
+    ],
+    "remaining": []
   },
   "golden_journey_blueprint": {
     "schema_version": 1,
