@@ -93,7 +93,7 @@ def test_bridge_rejects_merge_ref_only_verification_gate(tmp_path: Path) -> None
     source = workflow.read_text(encoding="utf-8")
     source = source.replace(
         "          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n",
-        "",
+        "          ref: ${{ github.sha }}\n",
     )
     workflow.write_text(source, encoding="utf-8")
 
@@ -102,7 +102,7 @@ def test_bridge_rejects_merge_ref_only_verification_gate(tmp_path: Path) -> None
     assert receipt["valid"] is False
     assert any(
         "engine-container-boundary.yml" in error
-        and "exact PR head" in error
+        and "checkout ref must explicitly use pull_request.head.sha" in error
         for error in receipt["errors"]
     )
 
