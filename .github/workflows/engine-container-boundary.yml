@@ -100,8 +100,8 @@ jobs:
 
           if gap.get("status") != "closed":
               raise SystemExit("Stage-5 construction gap is not closed")
-          if blueprint.get("status") != "closed":
-              raise SystemExit("Stage-5 blueprint is not closed")
+          if blueprint.get("status") != "complete":
+              raise SystemExit("Stage-5 blueprint is not complete")
           if handoff_entry.get("implementation_status") != "closed":
               raise SystemExit("Stage-5 implementation handoff is not closed")
           if closure_entry.get("closure_decision") != "closed":
