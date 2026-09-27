@@ -7,6 +7,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/testing/test_ai_golden_journeys.py"
+      - "skeleton/testing/test_execution_runtime.py"
       - "skeleton/api/engine_service.py"
       - "skeleton/ai/runtime/api/engine_service.py"
       - "backend/tests/test_engine_cross_service_closure.py"
@@ -65,6 +66,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_ai_golden_journeys.py
+          skeleton/testing/test_execution_runtime.py::test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry
 
       - name: Run authenticated cross-service golden journeys
         run: >-
