@@ -123,6 +123,7 @@ def test_emitter_rejects_unknown_evidence_fields(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     module = _load_module()
+    args = _args(tmp_path)
     evidence_file = tmp_path / "evidence.json"
     evidence_file.write_text(
         json.dumps(
@@ -137,9 +138,6 @@ def test_emitter_rejects_unknown_evidence_fields(
         ),
         encoding="utf-8",
     )
-    args = _args(tmp_path)
-    idx = args.index("--evidence-file")
-    args[idx + 1] = str(evidence_file)
 
     assert module.main(args) == 1
 
@@ -151,11 +149,9 @@ def test_emitter_rejects_non_array_evidence(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     module = _load_module()
+    args = _args(tmp_path)
     evidence_file = tmp_path / "evidence.json"
     evidence_file.write_text("{}", encoding="utf-8")
-    args = _args(tmp_path)
-    idx = args.index("--evidence-file")
-    args[idx + 1] = str(evidence_file)
 
     assert module.main(args) == 1
 
