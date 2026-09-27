@@ -20,7 +20,6 @@ on:
   pull_request:
     branches:
       - main
-      - "p1/intel-01-routing-context-receipts-v2-20260927"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/intelligence/information_quality.py"
