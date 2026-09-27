@@ -127,6 +127,8 @@ jobs:
               raise SystemExit("unexpected verifier-runner identity")
           if receipt.get("verifier_count") != 14:
               raise SystemExit("accountability verifier inventory must contain 14 groups")
+          if receipt.get("verifier_identity_count") != 14:
+              raise SystemExit("accountability verifier identities must be 14/14 distinct")
           if receipt.get("passed_count") != 14 or receipt.get("failures"):
               raise SystemExit("not every declared accountability verifier passed")
           results = receipt.get("results") or []
@@ -136,6 +138,9 @@ jobs:
               raise SystemExit("a child verifier receipt is not exact-head")
           if any(not result.get("receipt_digest") for result in results):
               raise SystemExit("a child verifier receipt digest is missing")
+          identities = [result.get("receipt_verifier") for result in results]
+          if any(not identity for identity in identities) or len(set(identities)) != 14:
+              raise SystemExit("child verifier identities are missing or reused")
           if receipt.get("valid") is not True:
               raise SystemExit("accountability verifier runner is invalid")
           PY
