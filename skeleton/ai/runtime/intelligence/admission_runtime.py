@@ -463,6 +463,10 @@ class AdmissionRuntime:
                 )
 
             decision = active.lease.decision
+            max_cost_usd = float(
+                decision.estimated.cost_usd
+                + float(decision.remaining["cost_usd"])
+            )
             max_tool_calls = int(
                 decision.estimated.tool_calls
                 + int(decision.remaining["tool_calls"])
@@ -481,6 +485,7 @@ class AdmissionRuntime:
                     event_id,
                     category,
                     delta,
+                    max_cost_usd=max_cost_usd,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
                     max_storage_bytes=max_storage_bytes,
@@ -674,6 +679,10 @@ class AdmissionRuntime:
                     "quota ledger does not support durable unknown usage"
                 )
             decision = active.lease.decision
+            max_cost_usd = float(
+                decision.estimated.cost_usd
+                + float(decision.remaining["cost_usd"])
+            )
             max_tool_calls = int(
                 decision.estimated.tool_calls
                 + int(decision.remaining["tool_calls"])
@@ -691,6 +700,7 @@ class AdmissionRuntime:
                     reservation.reservation_id,
                     event,
                     delta,
+                    max_cost_usd=max_cost_usd,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
                     max_storage_bytes=max_storage_bytes,
