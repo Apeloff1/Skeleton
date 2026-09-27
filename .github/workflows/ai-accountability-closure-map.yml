@@ -13,7 +13,9 @@ on:
       - "scripts/ai_accountability.py"
       - "scripts/check_ai_build_accountability.py"
       - "scripts/verify_ai_accountability_closure_map.py"
+      - "scripts/verify_*.py"
       - "tests/test_ai_accountability_closure_map.py"
+      - "tests/test_*verifier*.py"
       - ".github/workflows/*closure*.yml"
       - ".github/workflows/state-recovery-drill.yml"
       - ".github/workflows/engine-container-boundary.yml"
@@ -96,6 +98,13 @@ jobs:
               raise SystemExit("not every atomic queue task is mapped")
           if receipt.get("group_count") != 14:
               raise SystemExit("accountability map must contain exactly 14 gap groups")
+          groups = receipt.get("groups") or []
+          if len(groups) != 14 or any(
+              not group.get("verifier_script") for group in groups
+          ):
+              raise SystemExit(
+                  "every accountability group must bind an independent verifier"
+              )
           counts = receipt.get("candidate_counts") or {}
           if sum(int(value) for value in counts.values()) != 42:
               raise SystemExit("candidate-state accounting does not cover all tasks")
