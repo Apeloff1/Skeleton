@@ -2093,20 +2093,27 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "scripts",
-        ".github/workflows",
-        "machine",
-        "planned:skeleton/artifacts",
-        "skeleton/persistence",
-        "planned:skeleton/storage/cas"
+        "skeleton/release/evidence.py",
+        "skeleton/release/qualification.py",
+        "skeleton/release/__init__.py",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/app/assembly.py",
+        "skeleton/app/installer.py",
+        "backend/core/tenant_storage_boundary.py",
+        "skeleton/agents/safe_autonomy.py",
+        "skeleton/eval/champion_registry.py",
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_release_provenance.py",
-        "planned:skeleton/testing/test_release_qualification.py",
-        "planned:skeleton/testing/test_artifact_manifest.py",
-        "planned:skeleton/testing/test_artifact_lifecycle.py",
-        "planned:skeleton/testing/test_cas_integrity.py",
-        "planned:skeleton/testing/test_cas_gc.py"
+        "skeleton/testing/test_release_qualification.py",
+        "skeleton/testing/test_release_evidence.py",
+        "skeleton/testing/test_reproducibility.py",
+        "skeleton/testing/test_app_assembly.py",
+        "skeleton/testing/test_app_installer.py",
+        "skeleton/testing/test_windows_installer.py",
+        "backend/tests/test_tenant_storage_boundary.py",
+        "skeleton/testing/test_safe_autonomy_bundle.py",
+        "skeleton/testing/test_champion_registry.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2158,22 +2165,19 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "installer",
-        "scripts",
-        "machine",
-        "updater",
-        "repair",
-        "uninstaller"
+        "skeleton/release/lifecycle.py",
+        "skeleton/release/qualification.py",
+        "skeleton/release/__init__.py",
+        "skeleton/app/installer.py",
+        "skeleton/app/setup_runtime.py",
+        "skeleton/app/windows_launcher.py",
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
       "test_targets": [
-        "planned:installer/tests/test_clean_install.py",
-        "planned:installer/tests/test_install_rollback.py",
-        "planned:updater/tests/test_atomic_update.py",
-        "planned:updater/tests/test_update_rollback.py",
-        "planned:repair/tests/test_diagnose_before_mutate.py",
-        "planned:repair/tests/test_repair_reconciliation.py",
-        "planned:uninstaller/tests/test_retention_policy.py",
-        "planned:uninstaller/tests/test_residual_state.py"
+        "skeleton/testing/test_installer_lifecycle.py",
+        "skeleton/testing/test_release_qualification.py",
+        "skeleton/testing/test_app_installer.py",
+        "skeleton/testing/test_windows_installer.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2226,22 +2230,17 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "updater",
-        "installer",
-        "machine",
-        "deploy",
-        "scripts",
-        "config",
-        "skeleton",
-        "backend"
+        "skeleton/release/migration.py",
+        "skeleton/release/lifecycle.py",
+        "skeleton/release/qualification.py",
+        "skeleton/release/__init__.py",
+        "skeleton/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "test_targets": [
-        "planned:updater/tests/test_atomic_update.py",
-        "planned:updater/tests/test_update_rollback.py",
-        "planned:deploy/tests/test_canary_gate.py",
-        "planned:deploy/tests/test_partial_rollback.py",
-        "planned:skeleton/testing/test_config_precedence.py",
-        "planned:skeleton/testing/test_config_validation.py"
+        "skeleton/testing/test_migration_rollback_compatibility.py",
+        "skeleton/testing/test_installer_lifecycle.py",
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2291,17 +2290,18 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "backup",
-        "skeleton/persistence",
-        "machine",
-        "recovery",
-        "docs"
+        "skeleton/release/restore.py",
+        "skeleton/release/migration.py",
+        "skeleton/release/lifecycle.py",
+        "skeleton/release/__init__.py",
+        "skeleton/persistence/snapshots.py",
+        "skeleton/persistence/operation_store.py",
+        ".github/workflows/p1-backup-restore-qualification.yml"
       ],
       "test_targets": [
-        "planned:backup/tests/test_backup_manifest.py",
-        "planned:backup/tests/test_backup_integrity.py",
-        "planned:recovery/tests/test_recovery_order.py",
-        "planned:recovery/tests/test_post_restore_reconcile.py"
+        "skeleton/testing/test_backup_restore_qualification.py",
+        "skeleton/testing/test_backup_restore_integration.py",
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2352,17 +2352,19 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "recovery",
-        "backup",
-        "docs",
-        "scripts",
-        "skeleton/observability"
+        "skeleton/release/disaster_recovery.py",
+        "skeleton/release/restore.py",
+        "skeleton/release/__init__.py",
+        "skeleton/eval/failure_knowledge.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
       "test_targets": [
-        "planned:recovery/tests/test_recovery_order.py",
-        "planned:recovery/tests/test_post_restore_reconcile.py",
-        "planned:skeleton/testing/test_break_glass.py",
-        "planned:skeleton/testing/test_incident_evidence.py"
+        "skeleton/testing/test_disaster_recovery_qualification.py",
+        "skeleton/testing/test_backup_restore_qualification.py",
+        "skeleton/testing/test_backup_restore_integration.py",
+        "skeleton/testing/test_failure_knowledge.py",
+        "skeleton/testing/test_state_recovery_drill.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2411,11 +2413,16 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "docs"
+        "machine/p1_release_attribution.json",
+        "scripts/check_p1_release_attribution.py",
+        "skeleton/release/attribution.py",
+        "skeleton/release/__init__.py",
+        ".github/workflows/p1-release-attribution.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_attribution_engine.py"
+        "skeleton/testing/test_release_attribution.py",
+        "tests/test_p1_release_attribution.py",
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evidence_modes": [
         "clean_machine",
