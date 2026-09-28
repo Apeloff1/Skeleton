@@ -73,6 +73,19 @@ def test_expired_exception_fails_closed() -> None:
         )
 
 
+def test_future_exception_cannot_prearm_a_bypass() -> None:
+    with pytest.raises(checker.SecurityExceptionPolicyError, match="starts in the future"):
+        checker.validate_registry(
+            _registry(
+                _valid_exception(
+                    starts_on="2026-10-01",
+                    expires_on="2026-10-20",
+                )
+            ),
+            today=date(2026, 9, 28),
+        )
+
+
 def test_exception_lifetime_cannot_exceed_thirty_days() -> None:
     with pytest.raises(checker.SecurityExceptionPolicyError, match="30-day"):
         checker.validate_registry(
@@ -94,6 +107,7 @@ def test_exception_lifetime_cannot_exceed_thirty_days() -> None:
         ["backend/**"],
         ["/backend/routes.py"],
         ["backend/../secrets.txt"],
+        ["backend/routes.py\nother"],
     ],
 )
 def test_scope_must_be_exact_and_narrow(scope: list[str]) -> None:
