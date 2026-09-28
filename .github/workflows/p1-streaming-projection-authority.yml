@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "backend/core/operation_projection.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_projection.py"
@@ -19,6 +20,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "backend/core/operation_projection.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_projection.py"
