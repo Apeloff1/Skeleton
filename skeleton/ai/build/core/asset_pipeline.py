@@ -25,6 +25,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from skeleton.build.incremental_graph import (
     IncrementalBuildGraph,
+    IncrementalGraphError,
     NodeSpec,
     build_incremental_graph,
 )
@@ -239,7 +240,7 @@ def build_asset_pipeline(
 
     try:
         graph = build_incremental_graph(graph_specs)
-    except Exception as exc:
+    except IncrementalGraphError as exc:
         raise AssetPipelineError("asset dependency graph is invalid") from exc
 
     graph_nodes = graph.node_map()
@@ -308,7 +309,7 @@ def plan_asset_rebuild(
     if seed_set:
         try:
             affected = pipeline.graph.invalidate(sorted(seed_set))
-        except Exception as exc:
+        except IncrementalGraphError as exc:
             raise AssetPipelineError("asset invalidation failed") from exc
     else:
         affected = frozenset()
