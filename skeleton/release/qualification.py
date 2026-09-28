@@ -443,6 +443,10 @@ def qualify_release_candidate(
             "release_evidence.provenance.digest",
         )
 
+    if reproducibility.task_id != "P1-EVID-05":
+        reasons.append("reproducibility-task-identity-mismatch")
+    if reproducibility.accountability_id != "ACC-P1-EVID-05":
+        reasons.append("reproducibility-accountability-identity-mismatch")
     if reproducibility.commit_sha != commit:
         reasons.append("reproducibility-commit-mismatch")
 
