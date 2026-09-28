@@ -157,15 +157,7 @@ def build_packets(
             }
         )
 
-        implementation_prerequisites = [
-            action
-            for action in required_actions
-            if action not in {
-                "implementation_signoff",
-                "independent_verification_signoff",
-                "accountability_maturity_status",
-            }
-        ]
+        implementation_prerequisites: list[str] = []
         verification_prerequisites = [
             action
             for action in required_actions
