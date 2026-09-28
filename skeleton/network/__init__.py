@@ -4,6 +4,25 @@ This package holds replication and rollback primitives that later transport,
 session, and engine adapters can consume. It does not open sockets.
 """
 
+from skeleton.network.remote_execution import (
+    REMOTE_EXECUTION_ACCOUNTABILITY_ID,
+    REMOTE_EXECUTION_SCHEMA_VERSION,
+    REMOTE_EXECUTION_TASK_ID,
+    RemoteExecutionCommitDecision,
+    RemoteExecutionError,
+    RemoteExecutionFence,
+    RemoteExecutionGrantDecision,
+    RemoteExecutionRequest,
+    RemoteExecutionResult,
+    RemoteResultStatus,
+    WorkerAttestation,
+    issue_remote_execution_fence,
+    lease_digest,
+    qualify_remote_execution,
+    qualify_remote_execution_commit,
+    worker_identity_digest,
+)
+
 from skeleton.network.replication import (
     SCHEMA_VERSION,
     Ack,
@@ -46,4 +65,20 @@ __all__ = [
     "canonical_dumps",
     "frame_digest",
     "state_digest",
+    "REMOTE_EXECUTION_ACCOUNTABILITY_ID",
+    "REMOTE_EXECUTION_SCHEMA_VERSION",
+    "REMOTE_EXECUTION_TASK_ID",
+    "RemoteExecutionCommitDecision",
+    "RemoteExecutionError",
+    "RemoteExecutionFence",
+    "RemoteExecutionGrantDecision",
+    "RemoteExecutionRequest",
+    "RemoteExecutionResult",
+    "RemoteResultStatus",
+    "WorkerAttestation",
+    "issue_remote_execution_fence",
+    "lease_digest",
+    "qualify_remote_execution",
+    "qualify_remote_execution_commit",
+    "worker_identity_digest",
 ]
