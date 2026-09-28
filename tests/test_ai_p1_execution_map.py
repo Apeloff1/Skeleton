@@ -845,19 +845,32 @@ RELEASE_LANE_TASKS = (
 )
 
 
-def test_release_lane_paths_are_materialized_before_evidence_binding() -> None:
+RELEASE_LANE_EVIDENCE_HEAD = "45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+RELEASE_LANE_EVIDENCE = {
+    "P1-REL-01": ("36472597938", ("109098309453",)),
+    "P1-REL-02": ("36472597852", ("109098309291",)),
+    "P1-REL-03": ("36472598086", ("109098310186",)),
+    "P1-REL-04": ("36472597665", ("109098308997",)),
+    "P1-REL-05": ("36472598089", ("109098310079",)),
+    "P1-REL-06": ("36472598091", ("109098309784",)),
+}
+
+
+def test_release_lane_uses_materialized_exact_head_evidence() -> None:
     payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
     task_by_id = {task["task_id"]: task for task in payload["tasks"]}
 
     for task_id in RELEASE_LANE_TASKS:
         task = task_by_id[task_id]
 
-        for field in ("implementation_paths", "test_targets"):
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
             assert task[field]
             assert all(
                 not str(reference).startswith("planned:")
                 for reference in task[field]
             )
+
+        for field in ("implementation_paths", "test_targets"):
             for reference in task[field]:
                 assert (ROOT / reference).is_file(), (
                     task_id,
@@ -865,7 +878,20 @@ def test_release_lane_paths_are_materialized_before_evidence_binding() -> None:
                     reference,
                 )
 
-        assert task["evidence_refs"] == []
+        run_id, job_ids = RELEASE_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{RELEASE_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + RELEASE_LANE_EVIDENCE_HEAD
+        ) in evidence
+
         assert task["status"] == "blocked"
         assert task["accountability_status"] == "planned"
         assert task["implementation_signed"] is False
