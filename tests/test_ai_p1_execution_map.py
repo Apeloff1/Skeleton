@@ -1026,3 +1026,74 @@ def test_distributed_lane_dependency_chain_is_preserved() -> None:
         "P1-DIST-04",
         "P1-DIST-05",
     ]
+
+
+def test_terminal_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-terminal-evidence-bundle.yml",
+        ".github/workflows/p1-terminal-failure-journeys.yml",
+        ".github/workflows/p1-independent-promotion-decision.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
+
+
+TERMINAL_LANE_TASKS = (
+    "P1-PROM-01",
+    "P1-PROM-02",
+    "P1-PROM-03",
+)
+
+
+def test_terminal_lane_paths_are_materialized_without_promotion() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in TERMINAL_LANE_TASKS:
+        task = task_by_id[task_id]
+
+        for field in ("implementation_paths", "test_targets"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        assert task["evidence_refs"] == []
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_terminal_lane_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-PROM-01"]["depends_on"] == [
+        "P1-EVID-06",
+        "P1-PROD-04",
+        "P1-PROD-05",
+        "P1-LEARN-04",
+        "P1-LEARN-06",
+        "P1-REL-05",
+        "P1-REL-06",
+        "P1-DIST-06",
+        "P1-INTEL-06",
+        "P1-AUTO-06",
+    ]
+    assert task_by_id["P1-PROM-02"]["depends_on"] == ["P1-PROM-01"]
+    assert task_by_id["P1-PROM-03"]["depends_on"] == ["P1-PROM-02"]
