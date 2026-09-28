@@ -870,3 +870,87 @@ def test_release_lane_dependency_chain_is_preserved() -> None:
         "P1-LEARN-06",
     ]
     assert task_by_id["P1-REL-06"]["depends_on"] == ["P1-REL-01"]
+
+
+
+def test_distributed_economics_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-remote-worker-trust.yml",
+        ".github/workflows/p1-model-placement.yml",
+        ".github/workflows/p1-batching-autoscaling.yml",
+        ".github/workflows/p1-capacity-qualification.yml",
+        ".github/workflows/p1-budget-accounting.yml",
+        ".github/workflows/p1-forecast-anomaly-loop.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
+
+
+DISTRIBUTED_ECONOMICS_TASKS = (
+    "P1-DIST-01",
+    "P1-DIST-02",
+    "P1-DIST-03",
+    "P1-DIST-04",
+    "P1-DIST-05",
+    "P1-DIST-06",
+)
+
+
+def test_distributed_economics_paths_are_materialized_before_evidence_binding() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in DISTRIBUTED_ECONOMICS_TASKS:
+        task = task_by_id[task_id]
+        for field in ("implementation_paths", "test_targets"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        assert task["evidence_refs"] == []
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_distributed_economics_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-DIST-01"]["depends_on"] == ["P1-AUTO-02"]
+    assert task_by_id["P1-DIST-02"]["depends_on"] == [
+        "P1-DIST-01",
+        "P1-INTEL-01",
+    ]
+    assert task_by_id["P1-DIST-03"]["depends_on"] == [
+        "P1-DIST-02",
+        "P1-AUTO-03",
+    ]
+    assert task_by_id["P1-DIST-04"]["depends_on"] == [
+        "P1-DIST-03",
+        "P1-EVID-05",
+    ]
+    assert task_by_id["P1-DIST-05"]["depends_on"] == [
+        "P1-DIST-04",
+        "P1-EVID-01",
+    ]
+    assert task_by_id["P1-DIST-06"]["depends_on"] == [
+        "P1-DIST-04",
+        "P1-DIST-05",
+    ]
