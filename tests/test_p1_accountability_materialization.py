@@ -46,10 +46,24 @@ def test_all_p1_tasks_have_materialized_accountability_records() -> None:
         rid = task["accountability_ref"]
         assert rid == f"ACC-{task['task_id']}"
         assert rid in records
-        assert records[rid]["status"] == "planned"
-        assert records[rid]["baseline_status"] == "planned"
-        assert records[rid]["checkbox"] is False
-        assert records[rid]["history"] == []
+
+        record = records[rid]
+        assert record["baseline_status"] == "planned"
+        assert task["accountability_status"] == record["status"]
+        assert task["completion_checkbox"] == record["checkbox"]
+        assert task["completion_checkbox_mark"] == record["checkbox_mark"]
+        assert task["implementation_signed"] == bool(
+            record["implementation_signoff"]["signed"]
+        )
+        assert task["verification_signed"] == bool(
+            record["verification_signoff"]["signed"]
+        )
+
+        if record["status"] == record["baseline_status"]:
+            assert record["history"] == []
+        else:
+            assert record["history"]
+            assert record["history"][-1]["to_status"] == record["status"]
 
 
 def test_scheduling_state_is_separate_from_signed_accountability_state() -> None:
@@ -61,16 +75,26 @@ def test_scheduling_state_is_separate_from_signed_accountability_state() -> None
     by_id = {task["task_id"]: task for task in backlog["tasks"]}
 
     assert by_id["P1-EVID-01"]["status"] == "ready"
-    assert by_id["P1-EVID-01"]["accountability_status"] == "planned"
     assert by_id["P1-EVID-02"]["status"] == "blocked"
-    assert by_id["P1-EVID-02"]["accountability_status"] == "planned"
 
     for task in backlog["tasks"]:
         assert task["accountability_required"] is True
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
+        assert task["status"] in {"ready", "blocked"}
+        assert task["accountability_status"] in {
+            "planned",
+            "in_progress",
+            "evidence_pending",
+            "done",
+        }
+        assert task["completion_checkbox_mark"] == (
+            "[x]" if task["completion_checkbox"] else "[ ]"
+        )
+        if task["verification_signed"]:
+            assert task["implementation_signed"] is True
+        if task["completion_checkbox"]:
+            assert task["implementation_signed"] is True
+            assert task["verification_signed"] is True
+            assert task["accountability_status"] == "done"
 
 
 def test_accountability_lifecycle_maps_p1_tasks_like_executable_tasks() -> None:
@@ -96,7 +120,13 @@ def test_human_ledger_exposes_every_p1_accountability_checkbox() -> None:
     assert "## P1 Trustworthy-Production Tasks" in human
     assert "44 P1 tasks" in human
     for task in backlog["tasks"]:
-        marker = "[ ] " + chr(96) + task["accountability_ref"] + chr(96)
+        marker = (
+            task["completion_checkbox_mark"]
+            + " "
+            + chr(96)
+            + task["accountability_ref"]
+            + chr(96)
+        )
         assert marker in human
 
 
