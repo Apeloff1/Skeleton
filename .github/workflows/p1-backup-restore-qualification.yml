@@ -19,6 +19,7 @@ on:
   pull_request:
     branches:
       - main
+      - p1/learn-lane-materialize-20260928
       - p1/rel-03-migration-rollback-compatibility-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
