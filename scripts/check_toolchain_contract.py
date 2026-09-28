@@ -30,6 +30,7 @@ SECURITY_SCRIPTS = (
     "check_sast_security.py",
     "check_js_process_alias_safety.py",
     "check_workflow_security.py",
+    "check_security_exceptions.py",
     "check_secret_hygiene.py",
     "check_malware_iocs.py",
 )
@@ -39,6 +40,7 @@ SECURITY_TESTS = (
     "test_sast_security_gate.py",
     "test_js_process_alias_safety.py",
     "test_workflow_security_gate.py",
+    "test_security_exception_policy.py",
     "test_secret_hygiene_gate.py",
     "test_malware_ioc_gate.py",
 )
@@ -48,6 +50,7 @@ SECURITY_HOOKS = (
     "repository-sast-safety",
     "javascript-process-alias-safety",
     "workflow-security",
+    "security-exception-policy",
     "repository-secret-hygiene",
     "repository-malware-ioc",
     "backend-security-regressions",
