@@ -23,6 +23,7 @@ from skeleton.build.remote_build import (
     toolchain_manifest_digest,
     verify_remote_receipt,
     verify_transfer_chunks,
+    validate_remote_plan,
 )
 
 from skeleton.build.incremental_graph import (
@@ -56,6 +57,7 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "validate_remote_plan",
     "verify_transfer_chunks",
     "verify_remote_receipt",
     "toolchain_manifest_digest",
