@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/disaster_recovery.py"
       - "skeleton/release/restore.py"
       - "skeleton/release/__init__.py"
@@ -22,6 +23,7 @@ on:
       - p1/rel-04-backup-restore-qualification-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/disaster_recovery.py"
       - "skeleton/release/restore.py"
       - "skeleton/release/__init__.py"
