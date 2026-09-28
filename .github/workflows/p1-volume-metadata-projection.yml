@@ -65,6 +65,8 @@ jobs:
           "pytest>=8,<9"
           "pydantic[email]>=2.13.5"
           "pydantic-settings>=2.15.0"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
 
       - name: Compile projection and maturity engines
         run: |
