@@ -964,6 +964,11 @@ class PlanExecutionAdmission:
     plan_digest: str
     qualification_digest: str
     policy_digest: str
+    planner_id: str
+    planner_digest: str
+    verifier_id: str
+    verifier_digest: str
+    independent_verification: bool
     requested_step_ids: tuple[str, ...]
     completed_step_ids: tuple[str, ...]
     privileged_step_ids: tuple[str, ...]
@@ -986,11 +991,27 @@ class PlanExecutionAdmission:
             "plan_digest",
             "qualification_digest",
             "policy_digest",
+            "planner_digest",
+            "verifier_digest",
         ):
             object.__setattr__(
                 self,
                 field,
                 _plan_sha256(getattr(self, field), field),
+            )
+        object.__setattr__(
+            self,
+            "planner_id",
+            _plan_token(self.planner_id, "planner_id"),
+        )
+        object.__setattr__(
+            self,
+            "verifier_id",
+            _plan_token(self.verifier_id, "verifier_id"),
+        )
+        if not isinstance(self.independent_verification, bool):
+            raise PlanStaticVerifierError(
+                "independent_verification must be boolean"
             )
         object.__setattr__(
             self,
@@ -1048,6 +1069,11 @@ class PlanExecutionAdmission:
             "plan_digest": self.plan_digest,
             "qualification_digest": self.qualification_digest,
             "policy_digest": self.policy_digest,
+            "planner_id": self.planner_id,
+            "planner_digest": self.planner_digest,
+            "verifier_id": self.verifier_id,
+            "verifier_digest": self.verifier_digest,
+            "independent_verification": self.independent_verification,
             "requested_step_ids": list(self.requested_step_ids),
             "completed_step_ids": list(self.completed_step_ids),
             "privileged_step_ids": list(self.privileged_step_ids),
@@ -1081,6 +1107,10 @@ def admit_plan_execution(
     plan: StaticPlanDefinition,
     verification_policy: PlanVerificationPolicy,
     qualification: PlanQualificationDecision,
+    planner_id: str,
+    planner_digest: str,
+    verifier_id: str,
+    verifier_digest: str,
     requested_step_ids: Iterable[str],
     completed_step_ids: Iterable[str] = (),
 ) -> PlanExecutionAdmission:
@@ -1101,6 +1131,14 @@ def admit_plan_execution(
             "qualification must be PlanQualificationDecision"
         )
 
+    planner = _plan_token(planner_id, "planner_id")
+    planner_hash = _plan_sha256(planner_digest, "planner_digest")
+    verifier = _plan_token(verifier_id, "verifier_id")
+    verifier_hash = _plan_sha256(verifier_digest, "verifier_digest")
+    independent = (
+        planner != verifier
+        and planner_hash != verifier_hash
+    )
     requested = _plan_token_sequence(
         requested_step_ids,
         "requested_step_ids",
@@ -1122,6 +1160,11 @@ def admit_plan_execution(
         reasons.append("qualification-policy-digest-mismatch")
     if not qualification.accepted:
         reasons.append("plan-qualification-rejected")
+    if plan.risk in {
+        ReasoningRisk.HIGH,
+        ReasoningRisk.CRITICAL,
+    } and not independent:
+        reasons.append("verifier-not-independent-of-planner")
 
     missing = sorted(set(requested) - set(steps))
     if missing:
@@ -1204,6 +1247,11 @@ def admit_plan_execution(
         plan_digest=plan.digest,
         qualification_digest=qualification.decision_digest,
         policy_digest=verification_policy.digest,
+        planner_id=planner,
+        planner_digest=planner_hash,
+        verifier_id=verifier,
+        verifier_digest=verifier_hash,
+        independent_verification=independent,
         requested_step_ids=requested,
         completed_step_ids=completed,
         privileged_step_ids=privileged,
