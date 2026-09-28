@@ -1,0 +1,131 @@
+name: P1 Volume Metadata Projection Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_volume_metadata.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "tests/test_p1_volume_metadata_projection.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-volume-metadata-projection.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_volume_metadata.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "skeleton/contracts/maturity_reconciliation.py"
+      - "tests/test_p1_volume_metadata_projection.py"
+      - "tests/test_p1_maturity_reconciliation.py"
+      - ".github/workflows/p1-volume-metadata-projection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-volume-metadata:
+    runs-on: ubuntu-24.04
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      PYTHONPATH: ".:backend"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 1
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+
+      - name: Compile projection and maturity engines
+        run: |
+          python -m py_compile             scripts/reconcile_p1_volume_metadata.py             scripts/reconcile_p1_maturity.py             skeleton/contracts/maturity_reconciliation.py
+
+      - name: Check deterministic volume projection
+        run: |
+          mkdir -p .p1-volume-metadata
+          python scripts/reconcile_p1_volume_metadata.py             --check             --report .p1-volume-metadata/projection.json
+
+      - name: Validate canonical masterplan
+        run: python scripts/check_ai_master_plan.py
+
+      - name: Run projection and reconciliation regressions
+        run: |
+          python -m pytest -q --noconftest             tests/test_p1_volume_metadata_projection.py             tests/test_p1_maturity_reconciliation.py
+
+      - name: Reconcile maturity without mutation
+        run: |
+          python scripts/reconcile_p1_maturity.py             --out .p1-volume-metadata/maturity.json
+
+      - name: Assert only accountability and gap blockers remain
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-volume-metadata/maturity.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["volume_count"] != 107:
+              raise SystemExit("unexpected P1 primary volume count")
+          if report["target_floor_eligible_count"] != 3:
+              raise SystemExit("metadata projection changed target-floor eligibility")
+
+          eligible = {
+              row["volume_key"]
+              for row in report["records"]
+              if row["target_floor_eligible"] is True
+          }
+          if eligible != {"VOL-013", "VOL-014", "VOL-253"}:
+              raise SystemExit(
+                  "unexpected target-floor eligible set: "
+                  + ",".join(sorted(eligible))
+              )
+
+          forbidden = (
+              "must contain materialized references",
+              "contains unresolved repository references",
+          )
+          for row in report["records"]:
+              target = next(
+                  item
+                  for item in row["evaluations"]
+                  if item["state"] == row["target_floor"]
+              )
+              bad = [
+                  blocker
+                  for blocker in target["blockers"]
+                  if any(marker in blocker for marker in forbidden)
+              ]
+              if bad:
+                  raise SystemExit(
+                      f"{row['volume_key']}: metadata blockers remain: {bad}"
+                  )
+
+          print(
+              "P1 primary volume metadata projection: "
+              "107 materialized, 3 target-floor eligible, "
+              "no self-promotion"
+          )
+          PY
