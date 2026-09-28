@@ -123,6 +123,10 @@ def test_privileged_step_requires_exact_qualified_admission() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("write",),
     )
 
@@ -152,6 +156,10 @@ def test_rejected_plan_cannot_gain_privileged_admission() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=rejected,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("write",),
     )
 
@@ -177,6 +185,10 @@ def test_under_specified_privileged_step_is_not_admitted() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("write",),
     )
 
@@ -244,6 +256,10 @@ def test_execution_admission_is_step_scoped() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("inspect",),
     )
 
@@ -265,6 +281,10 @@ def test_stale_plan_digest_cannot_reuse_admission() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("write",),
     )
     changed = StaticPlanDefinition(
