@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/eval/failure_knowledge.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/failure_knowledge.py"
       - "skeleton/eval/regression_corpus.py"
       - "skeleton/contracts/risk_evidence.py"
@@ -25,6 +26,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/eval/failure_knowledge.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/failure_knowledge.py"
       - "skeleton/eval/regression_corpus.py"
       - "skeleton/contracts/risk_evidence.py"
