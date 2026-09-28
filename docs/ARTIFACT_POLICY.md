@@ -51,6 +51,28 @@ Build workflows should publish these as CI/release artifacts with source commit,
 
 Use external object/model storage when the asset is large, frequently replaced, or not necessary to review source changes. Source code must pin enough metadata to reproduce retrieval: immutable version/object identifier, SHA-256, source/provider locator, license/redistribution status, and deterministic download/build instructions. Do not depend on an unversioned `latest` URL for required development or release inputs.
 
+## Git-object fetch-on-demand manifests
+
+For grandfathered large blobs that are already preserved in immutable Git history but should no longer occupy the current tree, use a sibling `<original-path>.git-artifact.json` manifest. This is distinct from the `.artifact.json` LFS provenance sidecar above.
+
+The manifest binds the exact repository-relative destination path, immutable source commit, Git blob OID, exact byte size, and artifact kind. Validation proves that the declared blob is the object at that exact path in the source commit; an arbitrary same-size blob elsewhere in history is not accepted.
+
+Validate all metadata without materializing the large file:
+
+```bash
+python scripts/restore_tracked_artifact.py --check-only path/to/file.git-artifact.json
+```
+
+Restore on demand:
+
+```bash
+python scripts/restore_tracked_artifact.py path/to/file.git-artifact.json
+```
+
+The command refuses traversal/symlink escapes, malformed or duplicate manifest keys, non-commit source objects, wrong object type, source-path/OID drift, and byte-size drift. If the destination already exists it fails closed unless the caller explicitly supplies `--overwrite`. In a shallow clone, only the exact immutable source commit is fetched before verification.
+
+This lane is for current-tree extraction of already-versioned legacy debt. It is not permission to add new oversized Git blobs; new assets still follow the placement table above.
+
 ## Generated/runtime state
 
 Generated caches, runtime vaults, package-manager stores, test caches, and build outputs must not become tracked source. `.gitignore` remains the first line of defense; the artifact policy is the fail-closed backstop for force-added files and ignore drift.
