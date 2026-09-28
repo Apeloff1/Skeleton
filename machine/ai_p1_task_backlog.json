@@ -970,7 +970,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005732",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1040,7 +1045,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1053,22 +1063,17 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "planned:skeleton/agents",
-        "tests/test_agent_coordination.py",
-        "planned:skeleton/agents/orchestrator.py",
-        "skeleton/ai/agents",
-        "skeleton/network",
-        "machine",
-        "skeleton/security"
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_agent_delegation.py",
-        "planned:skeleton/testing/test_agent_checkpoint.py",
-        "planned:skeleton/testing/test_agent_leases.py",
-        "planned:skeleton/testing/test_agent_conflicts.py",
-        "planned:skeleton/testing/test_agent_communication.py",
-        "planned:skeleton/testing/test_agent_handoff.py",
-        "planned:skeleton/testing/test_delegation_budgets.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
@@ -1110,7 +1115,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005856",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1123,17 +1133,16 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "planned:skeleton/autonomy",
-        "planned:skeleton/persistence/execution_repository.py",
-        "machine",
-        "skeleton/security",
-        "skeleton/ai"
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/ai/agents/core/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_long_horizon_resume.py",
-        "planned:skeleton/testing/test_goal_drift.py",
-        "planned:skeleton/testing/test_autonomy_levels.py",
-        "planned:skeleton/testing/test_autonomy_deescalation.py"
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
@@ -1175,7 +1184,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006960",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1188,18 +1202,18 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/security",
-        "backend",
-        "frontend",
-        "skeleton/runtime"
+        "skeleton/agents/human_control.py",
+        "skeleton/ai/agents/core/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-human-control.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_human_control.py",
-        "planned:skeleton/testing/test_revocation_propagation.py",
-        "planned:skeleton/testing/test_human_in_loop_gates.py",
-        "planned:skeleton/testing/test_human_override_plane.py",
-        "planned:skeleton/testing/test_interrupt_handling.py"
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
@@ -1249,7 +1263,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1262,24 +1281,20 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "planned:skeleton/safety",
-        "skeleton/intelligence/verification_runtime.py",
-        "skeleton/security",
-        "skeleton/eval",
-        "skeleton/network",
-        "skeleton/ai/agents",
-        "machine/ai_build_accountability.json",
-        "machine"
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_safety_high_impact.py",
-        "planned:skeleton/testing/test_safe_degradation.py",
-        "planned:skeleton/testing/test_ai_threat_controls.py",
-        "planned:skeleton/testing/test_zero_trust_internal.py",
-        "planned:skeleton/testing/test_adversarial_reviewer.py",
-        "planned:skeleton/testing/test_independent_verifier.py",
-        "planned:skeleton/testing/test_reversibility_classification.py",
-        "planned:skeleton/testing/test_blast_radius_model.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
@@ -1320,7 +1335,12 @@
         "Authority, replay and failure-injection tests prove no privilege or side-effect widening.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006336",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413031",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "accountability_ref": "ACC-P1-AUTO-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1333,15 +1353,24 @@
         "WP-W20"
       ],
       "implementation_paths": [
-        "planned:skeleton/policy",
-        "skeleton/vault/governance_audit.py",
-        "skeleton/eval",
-        "machine/ai_build_accountability.json"
+        "skeleton/agents/safe_autonomy.py",
+        "skeleton/ai/agents/core/safe_autonomy.py",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-safe-autonomy-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_authority_subset.py",
-        "planned:skeleton/testing/test_approval_expiry.py",
-        "planned:skeleton/testing/test_independent_verifier.py"
+        "skeleton/testing/test_safe_autonomy_bundle.py",
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_privileged_tool_transaction.py"
       ],
       "evidence_modes": [
         "authority_negative_test",
