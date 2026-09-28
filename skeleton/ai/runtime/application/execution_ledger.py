@@ -54,12 +54,34 @@ class ExecutionLedger:
         self._trim()
         return record
 
-    def complete(self, execution_id: str, success: bool, evidence: Mapping[str, Any] | None = None) -> ExecutionRecord:
+    def complete(
+        self,
+        execution_id: str,
+        success: bool,
+        evidence: Mapping[str, Any] | None = None,
+        *,
+        retryable: bool = False,
+    ) -> ExecutionRecord:
+        if not isinstance(success, bool):
+            raise TypeError("success must be boolean")
+        if not isinstance(retryable, bool):
+            raise TypeError("retryable must be boolean")
+        if success and retryable:
+            raise ValueError("successful execution cannot be retryable")
         current = self._records[execution_id]
+        status = (
+            ExecutionStatus.SUCCEEDED
+            if success
+            else (
+                ExecutionStatus.RETRYABLE
+                if retryable
+                else ExecutionStatus.FAILED
+            )
+        )
         updated = ExecutionRecord(
             execution_id=current.execution_id,
             command=current.command,
-            status=ExecutionStatus.SUCCEEDED if success else ExecutionStatus.FAILED,
+            status=status,
             created_at=current.created_at,
             attempts=current.attempts,
             evidence=dict(evidence or {}),
@@ -69,6 +91,11 @@ class ExecutionLedger:
 
     def get(self, execution_id: str) -> ExecutionRecord | None:
         return self._records.get(execution_id)
+
+    def snapshot(self) -> tuple[ExecutionRecord, ...]:
+        """Return the bounded ledger in deterministic insertion order."""
+
+        return tuple(self._records.values())
 
     def _trim(self) -> None:
         while len(self._records) > self._max_records:
