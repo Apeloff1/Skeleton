@@ -6,6 +6,19 @@ It does not generate assets, call models, upload releases, or import Godot
 artifacts.
 """
 
+from skeleton.assets.incremental_pipeline import (
+    PIPELINE_SCHEMA,
+    AssetPipelinePlan,
+    AssetPipelineState,
+    AssetRecipe,
+    AssetSnapshot,
+    IncrementalAssetError,
+    PackageSnapshot,
+    finalize_asset_pipeline,
+    parse_asset_pipeline_state,
+    plan_asset_pipeline,
+)
+
 from skeleton.assets.manifest import (
     SCHEMA_VERSION,
     AssetIdentity,
@@ -43,6 +56,16 @@ from skeleton.assets.manifest import (
 )
 
 __all__ = [
+    "PIPELINE_SCHEMA",
+    "AssetPipelinePlan",
+    "AssetPipelineState",
+    "AssetRecipe",
+    "AssetSnapshot",
+    "IncrementalAssetError",
+    "PackageSnapshot",
+    "finalize_asset_pipeline",
+    "parse_asset_pipeline_state",
+    "plan_asset_pipeline",
     "SCHEMA_VERSION",
     "AssetIdentity",
     "AssetManifest",
