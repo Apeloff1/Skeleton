@@ -1,0 +1,110 @@
+name: P1 Accountability Candidate Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/maturity-volume-materialization-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/build_p1_accountability_candidates.py"
+      - "tests/test_p1_accountability_candidates.py"
+      - ".github/workflows/p1-accountability-candidates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-accountability-candidates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate non-authoritative accountability review candidates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Compile candidate engine
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/build_p1_accountability_candidates.py
+
+      - name: Run candidate regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_accountability_candidates.py
+
+      - name: Generate review-only candidate packet
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-accountability-review
+          before="$(sha256sum machine/ai_build_accountability.json | awk '{print $1}')"
+          python scripts/build_p1_accountability_candidates.py             --out .p1-accountability-review/candidates.json
+          after="$(sha256sum machine/ai_build_accountability.json | awk '{print $1}')"
+          test "$before" = "$after"
+
+      - name: Assert review boundary
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(
+              Path(".p1-accountability-review/candidates.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert payload["primary_volume_count"] == 107
+          assert payload["authoritative"] is False
+          assert payload["may_apply"] is False
+          assert payload["signatures_created"] == 0
+          assert payload["review_state_counts"] == {
+              "already_target_floor_eligible": 3,
+              "implementation_review_ready": 104,
+          }
+          eligible = {
+              packet["volume_key"]
+              for packet in payload["packets"]
+              if packet["review_state"] == "already_target_floor_eligible"
+          }
+          assert eligible == {"VOL-013", "VOL-014", "VOL-253"}
+          for packet in payload["packets"]:
+              assert packet["authoritative"] is False
+              assert packet["may_apply"] is False
+              assert packet["packet_digest"]
+          print(
+              "P1 accountability review candidates OK:",
+              payload["review_state_counts"],
+              payload["report_digest"],
+          )
+          PY
