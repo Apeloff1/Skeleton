@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/contracts/p1_failure_journeys.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/contracts/p1_failure_journeys.py"
       - "machine/p1_terminal_failure_journeys.json"
       - "scripts/check_p1_terminal_failure_journeys.py"
@@ -20,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/contracts/p1_failure_journeys.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/contracts/p1_failure_journeys.py"
       - "machine/p1_terminal_failure_journeys.json"
       - "scripts/check_p1_terminal_failure_journeys.py"
