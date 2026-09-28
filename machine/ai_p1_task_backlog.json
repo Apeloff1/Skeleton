@@ -1805,7 +1805,6 @@
         "tests/test_p1_benchmark_registry.py",
         "skeleton/testing/test_experiment_registry.py",
         "skeleton/testing/test_reproducibility.py",
-        "tests/test_p1_experiment_registry.py",
         "tests/test_p1_reproducibility_bundle.py"
       ],
       "evidence_modes": [
@@ -1871,8 +1870,7 @@
         "skeleton/testing/test_champion_registry.py",
         "tests/test_p1_champion_registry.py",
         "skeleton/testing/test_benchmark_registry.py",
-        "skeleton/testing/test_experiment_registry.py",
-        "skeleton/testing/test_reproducibility.py"
+        "skeleton/testing/test_experiment_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1991,6 +1989,7 @@
         "skeleton/eval/regression_corpus.py",
         "skeleton/ai/evaluation/regression_corpus.py",
         "skeleton/contracts/risk_evidence.py",
+        "skeleton/eval/benchmark_registry.py",
         "machine/p1_regression_corpus.json",
         "scripts/check_p1_regression_corpus.py",
         ".github/workflows/p1-regression-corpus.yml"
@@ -2055,17 +2054,15 @@
         "skeleton/eval/regression_corpus.py",
         "skeleton/contracts/risk_evidence.py",
         "machine/p1_failure_knowledge.json",
-        "machine/p1_regression_corpus.json",
         "scripts/check_p1_failure_knowledge.py",
-        "scripts/check_p1_regression_corpus.py",
         ".github/workflows/p1-failure-knowledge.yml"
       ],
       "test_targets": [
         "skeleton/testing/test_failure_knowledge.py",
         "tests/test_p1_failure_knowledge.py",
-        "skeleton/testing/test_risk_evidence.py",
         "skeleton/testing/test_regression_corpus.py",
-        "tests/test_p1_regression_corpus.py"
+        "tests/test_p1_regression_corpus.py",
+        "skeleton/testing/test_risk_evidence.py"
       ],
       "evidence_modes": [
         "benchmark",
