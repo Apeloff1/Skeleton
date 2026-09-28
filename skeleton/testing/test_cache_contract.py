@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -345,3 +347,25 @@ def test_cli_rejects_duplicate_material_name(capsys: pytest.CaptureFixture[str])
         ]
     ) == 1
     assert "duplicate CLI material name" in capsys.readouterr().out
+
+
+def test_repository_cli_wrapper_runs_without_installed_package() -> None:
+    root = Path(__file__).resolve().parents[2]
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/cache_contract.py",
+            "key",
+            "--domain",
+            "assets",
+            "--material",
+            "content=asset-digest",
+        ],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert completed.stderr == ""
+    assert completed.stdout.strip().startswith("skeleton-cache-v1-assets-")
