@@ -1430,7 +1430,6 @@
       ],
       "test_targets": [
         "backend/tests/test_api_contract_registry.py",
-        "tests/test_api_contract_registry.py",
         "tests/test_p1_api_contract_registry.py"
       ],
       "evidence_modes": [
@@ -1492,11 +1491,8 @@
       ],
       "test_targets": [
         "backend/tests/test_operation_projection.py",
-        "tests/test_operation_projection.py",
         "backend/tests/test_operation_stream_transport.py",
-        "tests/test_operation_stream_transport.py",
         "backend/tests/test_operation_stream_route.py",
-        "tests/test_operation_stream_route.py",
         "skeleton/testing/test_operation_stream.py"
       ],
       "evidence_modes": [
@@ -1556,9 +1552,7 @@
       ],
       "test_targets": [
         "backend/tests/test_product_shell_projection.py",
-        "tests/test_product_shell_projection.py",
         "backend/tests/test_operation_projection.py",
-        "tests/test_operation_projection.py",
         "frontend/scripts/test-product-projection.mjs",
         "frontend/scripts/test-operation-stream-reducer.mjs"
       ],
@@ -1621,9 +1615,7 @@
       ],
       "test_targets": [
         "backend/tests/test_user_control_receipts.py",
-        "tests/test_user_control_receipts.py",
         "backend/tests/test_workspace_projection.py",
-        "tests/test_workspace_projection.py",
         "frontend/scripts/test-operator-control-projection.mjs",
         "skeleton/testing/test_human_control.py"
       ],
@@ -1686,7 +1678,6 @@
       ],
       "test_targets": [
         "backend/tests/test_tenant_storage_boundary.py",
-        "tests/test_tenant_storage_boundary.py",
         "frontend/scripts/test-tenant-storage-boundary.mjs"
       ],
       "evidence_modes": [
