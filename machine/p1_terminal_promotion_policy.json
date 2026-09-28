@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task_id": "P1-PROM-03",
+  "accountability_ref": "ACC-P1-PROM-03",
+  "authority": "machine/p1_terminal_promotion_policy.json",
+  "task_backlog_authority": "machine/ai_p1_task_backlog.json",
+  "prom01_policy_authority": "machine/p1_terminal_evidence_policy.json",
+  "prom02_policy_authority": "machine/p1_terminal_failure_journeys.json",
+  "require_exact_head": true,
+  "require_independent_verifier": true,
+  "external_signature_required_for_promotion": true,
+  "allow_explicit_rejection_without_signature": true,
+  "ci_may_generate_promotion_signature": false,
+  "allowed_signer_types": [
+    "human",
+    "ci",
+    "service"
+  ],
+  "forbidden_signer_types": [
+    "agent"
+  ],
+  "allowed_signature_methods": [
+    "ci_oidc",
+    "git_gpg",
+    "git_ssh",
+    "github_identity",
+    "sigstore"
+  ],
+  "signature_ref_required_methods": [
+    "ci_oidc",
+    "git_gpg",
+    "git_ssh",
+    "sigstore"
+  ],
+  "implementation_signer_id": "chatgpt:gpt-5.6-sol",
+  "promotion_requires": [
+    "PROM-01 accepted and promotion_ready",
+    "PROM-02 accepted and linked to the same PROM-01 decision digest",
+    "PROM-01 and PROM-02 bound to the exact target head",
+    "zero terminal promotion blockers",
+    "independent verifier identity distinct from implementation signer",
+    "identity-bound signature over the exact promotion subject digest"
+  ],
+  "rejection_requires": [
+    "exact-head PROM-01 and PROM-02 evidence is structurally valid",
+    "all rejection reasons are materialized in the decision payload",
+    "promotion_authority and signed_promotion remain false"
+  ]
+}
