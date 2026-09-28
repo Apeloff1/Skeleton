@@ -1,0 +1,493 @@
+name: P1 Champion Challenger Registry Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/eval/champion_registry.py"
+      - "skeleton/ai/evaluation/champion_registry.py"
+      - "skeleton/eval/benchmark_registry.py"
+      - "skeleton/eval/experiment_registry.py"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_champion_registry.py"
+      - "machine/p1_champion_registry.json"
+      - "scripts/check_p1_champion_registry.py"
+      - "tests/test_p1_champion_registry.py"
+      - ".github/workflows/p1-champion-registry.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/eval/champion_registry.py"
+      - "skeleton/ai/evaluation/champion_registry.py"
+      - "skeleton/eval/benchmark_registry.py"
+      - "skeleton/eval/experiment_registry.py"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_champion_registry.py"
+      - "machine/p1_champion_registry.json"
+      - "scripts/check_p1_champion_registry.py"
+      - "tests/test_p1_champion_registry.py"
+      - ".github/workflows/p1-champion-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-champion-registry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate immutable champion challenger history
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile LEARN-03 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/eval/champion_registry.py
+          skeleton/ai/evaluation/champion_registry.py
+          scripts/check_p1_champion_registry.py
+
+      - name: Validate machine champion registry
+        run: >-
+          python scripts/check_p1_champion_registry.py
+          --out .p1-champion-registry.json
+          --print-summary
+
+      - name: Run LEARN-01 through LEARN-03 and EVID-05 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_experiment_registry.py
+          skeleton/testing/test_reproducibility.py
+          skeleton/testing/test_benchmark_registry.py
+          skeleton/testing/test_champion_registry.py
+          tests/test_p1_experiment_registry.py
+          tests/test_p1_reproducibility_bundle.py
+          tests/test_p1_benchmark_registry.py
+          tests/test_p1_champion_registry.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted LEARN-03 promotion evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-learn-03
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.reproducibility import ReproducibilityBundle
+          from skeleton.eval.benchmark_registry import (
+              BenchmarkDataset,
+              BenchmarkEnvironment,
+              BenchmarkManifest,
+              BenchmarkMetric,
+              BenchmarkScoreObservation,
+              BenchmarkSplit,
+              BenchmarkSplitRole,
+              ContaminationStatus,
+              evaluate_improvement_claim,
+              qualify_benchmark,
+          )
+          from skeleton.eval.champion_registry import (
+              CandidateArtifact,
+              ChampionRegistry,
+              apply_promotion,
+              evaluate_promotion,
+              qualify_candidate_artifact,
+          )
+          from skeleton.eval.experiment_registry import (
+              ExperimentBudget,
+              ExperimentEligibility,
+              ExperimentManifest,
+              ExperimentMetric,
+              MetricDirection,
+              TrafficMode,
+          )
+
+          head = os.environ["EXPECTED_SHA"]
+          repro = ReproducibilityBundle(
+              repository="Apeloff1/Skeleton",
+              commit_sha=head,
+              task_id="P1-EVID-05",
+              accountability_id="ACC-P1-EVID-05",
+              configuration_digest="1" * 64,
+              environment_digest="2" * 64,
+              verifier_id="github-actions:p1-champion-registry",
+              verifier_digest="3" * 64,
+              test_manifest_digest="4" * 64,
+              runner_id="ubuntu2404",
+              runner_digest="5" * 64,
+              budget_id="learn03",
+              budget_digest="6" * 64,
+              source_date_epoch=1_800_000_000,
+              expected_subject_digest="7" * 64,
+              expected_evidence_digest="8" * 64,
+              inputs=(
+                  EvidenceRef(
+                      source="ci://learn-03/repro-input",
+                      digest="9" * 64,
+                      category="candidate_input",
+                  ),
+              ),
+          )
+          experiment = ExperimentManifest(
+              experiment_id="learn03-ci",
+              hypothesis="Challenger improves independent holdout quality.",
+              owner="p1-learning",
+              source_commit=head,
+              environment_id="eval-ci",
+              candidate_ref="candidate:v2",
+              eligibility=ExperimentEligibility(
+                  traffic_mode=TrafficMode.OFFLINE,
+                  max_traffic_fraction=0.0,
+                  allowed_data_classes=("public",),
+              ),
+              budget=ExperimentBudget(
+                  max_samples=1000,
+                  max_tokens=1_000_000,
+                  max_cost_units=20.0,
+                  max_wall_time_s=1800.0,
+              ),
+              metrics=(
+                  ExperimentMetric(
+                      metric_id="quality.acceptance",
+                      direction=MetricDirection.MAXIMIZE,
+                      minimum_samples=50,
+                      source="independent-eval",
+                      independent=True,
+                  ),
+              ),
+          )
+          dataset = BenchmarkDataset(
+              dataset_id="quality-suite",
+              version="v1",
+              source_ref="ci://quality-suite/v1",
+              source_digest="a" * 64,
+              content_digest="b" * 64,
+              license_id="internal-test",
+          )
+          split = BenchmarkSplit(
+              split_id="holdout.v1",
+              role=BenchmarkSplitRole.HOLDOUT,
+              dataset_digest=dataset.digest,
+              content_digest="c" * 64,
+              sample_count=100,
+              contamination_status=ContaminationStatus.CLEAN,
+              contamination_evidence=(
+                  EvidenceRef(
+                      source="ci://contamination-scan",
+                      digest="d" * 64,
+                      category="contamination_scan",
+                  ),
+              ),
+          )
+          metric = BenchmarkMetric(
+              metric_id="quality.acceptance",
+              direction=MetricDirection.MAXIMIZE,
+              minimum_samples=50,
+              evaluator_id="independent-eval",
+              evaluator_digest="e" * 64,
+              independent=True,
+          )
+          benchmark = BenchmarkManifest(
+              benchmark_id="quality-holdout",
+              version="v1",
+              datasets=(dataset,),
+              splits=(split,),
+              metrics=(metric,),
+              primary_metric_id=metric.metric_id,
+              environment=BenchmarkEnvironment(
+                  environment_id=experiment.environment_id,
+                  environment_digest=repro.environment_digest,
+                  runner_digest=repro.runner_digest,
+                  dependency_lock_digest="f" * 64,
+                  source_date_epoch=repro.source_date_epoch,
+              ),
+              experiment_manifest_digest=experiment.manifest_digest,
+              reproducibility_bundle_digest=repro.bundle_digest,
+              tags=("quality", "holdout"),
+          )
+          benchmark_qualification = qualify_benchmark(
+              manifest=benchmark,
+              experiment=experiment,
+              reproducibility=repro,
+              evaluated_split_ids=(split.split_id,),
+          )
+          if not benchmark_qualification.accepted:
+              raise SystemExit(
+                  "LEARN-03 benchmark qualification rejected: "
+                  + repr(benchmark_qualification.reasons)
+              )
+
+          champion = CandidateArtifact(
+              candidate_id="candidate-v1",
+              version="v1",
+              candidate_ref="candidate:v1",
+              artifact_digest="0" * 64,
+              source_commit="0" * 40,
+              experiment_manifest_digest="1" * 64,
+              benchmark_manifest_digest="2" * 64,
+              benchmark_qualification_digest="3" * 64,
+              reproducibility_bundle_digest="4" * 64,
+              tags=("champion",),
+          )
+          challenger = CandidateArtifact(
+              candidate_id="candidate-v2",
+              version="v2",
+              candidate_ref=experiment.candidate_ref,
+              artifact_digest="5" * 64,
+              source_commit=experiment.source_commit,
+              experiment_manifest_digest=experiment.manifest_digest,
+              benchmark_manifest_digest=benchmark.manifest_digest,
+              benchmark_qualification_digest=(
+                  benchmark_qualification.decision_digest
+              ),
+              reproducibility_bundle_digest=repro.bundle_digest,
+              parent_candidate_digest=champion.candidate_digest,
+              tags=("challenger",),
+          )
+          candidate_qualification = qualify_candidate_artifact(
+              candidate=challenger,
+              experiment=experiment,
+              benchmark=benchmark,
+              benchmark_qualification=benchmark_qualification,
+              reproducibility=repro,
+          )
+          if not candidate_qualification.accepted:
+              raise SystemExit(
+                  "LEARN-03 candidate rejected: "
+                  + repr(candidate_qualification.reasons)
+              )
+
+          baseline = BenchmarkScoreObservation(
+              benchmark_manifest_digest=benchmark.manifest_digest,
+              split_id=split.split_id,
+              metric_id=metric.metric_id,
+              candidate_ref=champion.candidate_ref,
+              score=0.80,
+              sample_count=100,
+              evaluator_id=metric.evaluator_id,
+              evaluator_digest=metric.evaluator_digest,
+              independent=True,
+          )
+          candidate = BenchmarkScoreObservation(
+              benchmark_manifest_digest=benchmark.manifest_digest,
+              split_id=split.split_id,
+              metric_id=metric.metric_id,
+              candidate_ref=challenger.candidate_ref,
+              score=0.90,
+              sample_count=100,
+              evaluator_id=metric.evaluator_id,
+              evaluator_digest=metric.evaluator_digest,
+              independent=True,
+          )
+          claim = evaluate_improvement_claim(
+              manifest=benchmark,
+              qualification=benchmark_qualification,
+              experiment=experiment,
+              baseline=baseline,
+              candidate=candidate,
+          )
+          if not claim.accepted:
+              raise SystemExit(
+                  "LEARN-03 comparative claim rejected: "
+                  + repr(claim.reasons)
+              )
+
+          registry = ChampionRegistry(
+              registry_id="core-model",
+              candidates=(champion, challenger),
+              initial_champion_digest=champion.candidate_digest,
+          )
+          promotion = evaluate_promotion(
+              registry=registry,
+              challenger=challenger,
+              candidate_qualification=candidate_qualification,
+              benchmark_qualification=benchmark_qualification,
+              improvement_claim=claim,
+              baseline_observation=baseline,
+              candidate_observation=candidate,
+          )
+          if not promotion.accepted:
+              raise SystemExit(
+                  "LEARN-03 promotion rejected: "
+                  + repr(promotion.reasons)
+              )
+          advanced = apply_promotion(registry, promotion)
+          if advanced.current_champion_digest != challenger.candidate_digest:
+              raise SystemExit("LEARN-03 champion did not advance")
+          if registry.current_champion_digest != champion.candidate_digest:
+              raise SystemExit("LEARN-03 mutated incumbent registry")
+
+          refs = (
+              candidate_qualification.accepted_evidence_ref(),
+              promotion.accepted_evidence_ref(),
+          )
+          Path(".p1-learn-03/promotion.json").write_text(
+              json.dumps(
+                  promotion.payload(),
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-learn-03/registry.json").write_text(
+              json.dumps(
+                  {
+                      "before_digest": registry.registry_digest,
+                      "after_digest": advanced.registry_digest,
+                      "initial_champion": registry.current_champion_digest,
+                      "current_champion": advanced.current_champion_digest,
+                      "transition_digest": (
+                          advanced.transitions[-1].transition_digest
+                      ),
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-learn-03/refs.json").write_text(
+              json.dumps(
+                  [
+                      {
+                          "source": item.source,
+                          "digest": item.digest,
+                          "category": item.category,
+                      }
+                      for item in refs
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head LEARN-03 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-learn-03/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-learn-03-champion-registry-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-03/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|learn-03"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-03/verifier.digest").write_text(
+              digest([
+                  "skeleton/eval/champion_registry.py",
+                  "skeleton/eval/benchmark_registry.py",
+                  "skeleton/eval/experiment_registry.py",
+                  "skeleton/contracts/reproducibility.py",
+                  "machine/p1_champion_registry.json",
+                  "scripts/check_p1_champion_registry.py",
+                  ".github/workflows/p1-champion-registry.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-03/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_champion_registry.py",
+                  "skeleton/testing/test_benchmark_registry.py",
+                  "skeleton/testing/test_experiment_registry.py",
+                  "skeleton/testing/test_reproducibility.py",
+                  "tests/test_p1_champion_registry.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-LEARN-03 \
+            --accountability-id ACC-P1-LEARN-03 \
+            --configuration-digest "$(cat .p1-learn-03/config.digest)" \
+            --environment-digest "$(cat .p1-learn-03/environment.digest)" \
+            --verifier-id github-actions:p1-champion-registry \
+            --verifier-digest "$(cat .p1-learn-03/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-learn-03/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-learn-03/refs.json \
+            --out .p1-learn-03/receipt.json \
+            > .p1-learn-03/stdout.json
+
+      - name: Assert exact-head LEARN-03 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-learn-03/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("LEARN-03 receipt head mismatch")
+          if receipt["task_id"] != "P1-LEARN-03":
+              raise SystemExit("LEARN-03 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-LEARN-03":
+              raise SystemExit("LEARN-03 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("LEARN-03 exact-head receipt OK", receipt["receipt_digest"])
+          PY

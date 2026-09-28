@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "task_id": "P1-LEARN-03",
+  "accountability_ref": "ACC-P1-LEARN-03",
+  "authority": "machine/p1_champion_registry.json",
+  "policy": {
+    "production_authority": false,
+    "candidate_self_promotion": false,
+    "comparative_evidence_required": true,
+    "immutable_candidate_identity": true,
+    "immutable_initial_champion": true,
+    "append_only_transitions": true,
+    "transition_hash_chain_required": true,
+    "exact_benchmark_binding": true,
+    "exact_reproducibility_binding": true
+  },
+  "registries": []
+}

@@ -31,6 +31,18 @@ __all__ = [
     "ExperimentRegistryError",
     "MetricDirection",
     "TrafficMode",
+    "CHAMPION_REGISTRY_ACCOUNTABILITY_ID",
+    "CHAMPION_REGISTRY_SCHEMA_VERSION",
+    "CHAMPION_REGISTRY_TASK_ID",
+    "CandidateArtifact",
+    "CandidateQualificationDecision",
+    "ChampionRegistry",
+    "ChampionRegistryError",
+    "PromotionDecision",
+    "PromotionTransition",
+    "apply_promotion",
+    "evaluate_promotion",
+    "qualify_candidate_artifact",
     "BENCHMARK_REGISTRY_ACCOUNTABILITY_ID",
     "BENCHMARK_REGISTRY_SCHEMA_VERSION",
     "BENCHMARK_REGISTRY_TASK_ID",
@@ -49,6 +61,21 @@ __all__ = [
     "evaluate_improvement_claim",
     "qualify_benchmark",
 ]
+
+from skeleton.eval.champion_registry import (
+    CHAMPION_REGISTRY_ACCOUNTABILITY_ID,
+    CHAMPION_REGISTRY_SCHEMA_VERSION,
+    CHAMPION_REGISTRY_TASK_ID,
+    CandidateArtifact,
+    CandidateQualificationDecision,
+    ChampionRegistry,
+    ChampionRegistryError,
+    PromotionDecision,
+    PromotionTransition,
+    apply_promotion,
+    evaluate_promotion,
+    qualify_candidate_artifact,
+)
 
 from skeleton.eval.benchmark_registry import (
     BENCHMARK_REGISTRY_ACCOUNTABILITY_ID,
