@@ -36,9 +36,22 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile policy gate
-        run: python -m compileall -q scripts/check_artifact_policy.py tests/test_artifact_policy.py
+        run: python -m compileall -q scripts/check_artifact_policy.py scripts/restore_tracked_artifact.py tests/test_artifact_policy.py tests/test_tracked_artifact_restore.py
       - name: Run policy regressions
-        run: python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+        run: |
+          python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+          python -m unittest discover -s tests -p 'test_tracked_artifact_restore.py' -q
+      - name: Validate externalized Git artifact manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' manifest; do
+            python scripts/restore_tracked_artifact.py --check-only "$manifest"
+            count=$((count + 1))
+          done < <(find . -type f -name '*.git-artifact.json' -print0 | sort -z)
+          echo "validated_git_artifact_manifests=$count"
+
       - name: Enforce artifact policy
         shell: bash
         run: |
