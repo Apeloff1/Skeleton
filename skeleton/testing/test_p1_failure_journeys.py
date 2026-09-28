@@ -10,11 +10,11 @@ from skeleton.contracts.p1_failure_journeys import (
     P1FailureJourneyError,
     qualify_p1_failure_journeys,
 )
+from skeleton.contracts.p1_terminal_evidence import P1TerminalEvidenceDecision
 
 
 REPOSITORY = "Apeloff1/Skeleton"
 HEAD = "a" * 40
-PROM01 = "b" * 64
 FAMILIES = (
     "adversarial",
     "clean_machine",
@@ -61,6 +61,24 @@ def _observations() -> tuple[FailureJourneyObservation, ...]:
     return tuple(_observation(family) for family in FAMILIES)
 
 
+def _prom01(**overrides: object) -> P1TerminalEvidenceDecision:
+    values: dict[str, object] = {
+        "accepted": True,
+        "promotion_ready": False,
+        "reasons": (),
+        "promotion_blockers": (),
+        "repository": REPOSITORY,
+        "commit_sha": HEAD,
+        "task_evidence": (),
+        "maturity_report_digest": "b" * 64,
+        "maturity_coverage_digest": "c" * 64,
+        "primary_volume_count": 1,
+        "blocking_volume_keys": (),
+    }
+    values.update(overrides)
+    return P1TerminalEvidenceDecision(**values)
+
+
 def _qualify(observations=None, **overrides):
     values = {
         "observations": _observations() if observations is None else observations,
@@ -69,7 +87,7 @@ def _qualify(observations=None, **overrides):
         "required_families": FAMILIES,
         "required_journey_classes": tuple(sorted(CLASSES)),
         "journey_class_families": CLASSES,
-        "prom01_bundle_digest": PROM01,
+        "prom01_bundle": _prom01(),
     }
     values.update(overrides)
     return qualify_p1_failure_journeys(**values)
@@ -166,3 +184,30 @@ def test_rejected_decision_cannot_materialize_evidence() -> None:
         match="cannot become promotion evidence",
     ):
         decision.accepted_evidence_ref()
+
+
+def test_rejected_prom01_bundle_rejects() -> None:
+    decision = _qualify(
+        prom01_bundle=_prom01(
+            accepted=False,
+            reasons=("fixture-rejected",),
+        )
+    )
+    assert decision.accepted is False
+    assert "prom01-bundle-rejected" in decision.reasons
+
+
+def test_prom01_repository_mismatch_rejects() -> None:
+    decision = _qualify(
+        prom01_bundle=_prom01(repository="Other/Skeleton")
+    )
+    assert decision.accepted is False
+    assert "prom01-repository-mismatch" in decision.reasons
+
+
+def test_prom01_exact_head_mismatch_rejects() -> None:
+    decision = _qualify(
+        prom01_bundle=_prom01(commit_sha="f" * 40)
+    )
+    assert decision.accepted is False
+    assert "prom01-exact-head-mismatch" in decision.reasons
