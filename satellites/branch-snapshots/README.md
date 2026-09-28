@@ -10,5 +10,6 @@ Security rules:
 - Promote code into a canonical maintained package before executing or shipping it.
 - A promoted component must receive a fresh maintained dependency manifest, current vulnerability audit, tests, and the normal merge-readiness/security gates.
 - Never restore canonical package-manager filenames below this directory. `scripts/check_archived_dependency_surface.py` and the Dependency Surface Guard reject them.
+- Oversized historical binary/media/backup payloads are omitted from the working tree. Their immutable baseline commit, Git blob ID, and byte size are recorded in `machine/large_artifact_archive.json`; use `scripts/check_large_artifact_archive.py --verify-history` for forensic verification.
 
 This keeps historical provenance intact without multiplying live dependency alerts or making stale dependency graphs accidentally executable. Git history retains the original canonical filenames and exact imported bytes; the working tree exposes only clearly quarantined evidence names.
