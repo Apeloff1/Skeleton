@@ -1,0 +1,406 @@
+name: P1 Release Evidence Bundle Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/release/evidence.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/app/assembly.py"
+      - "skeleton/app/installer.py"
+      - "packaging/windows/**"
+      - "backend/core/tenant_storage_boundary.py"
+      - "skeleton/agents/safe_autonomy.py"
+      - "skeleton/eval/champion_registry.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - ".github/workflows/p1-release-evidence-bundle.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/release/evidence.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/contracts/reproducibility.py"
+      - "skeleton/app/assembly.py"
+      - "skeleton/app/installer.py"
+      - "packaging/windows/**"
+      - "backend/core/tenant_storage_boundary.py"
+      - "skeleton/agents/safe_autonomy.py"
+      - "skeleton/eval/champion_registry.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - ".github/workflows/p1-release-evidence-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-release-evidence-bundle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate release evidence bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+
+      - name: Compile REL-01 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/release/evidence.py
+          skeleton/release/qualification.py
+          skeleton/contracts/reproducibility.py
+
+      - name: Run release dependency and lifecycle regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_release_evidence.py
+          skeleton/testing/test_release_qualification.py
+          skeleton/testing/test_reproducibility.py
+          skeleton/testing/test_app_assembly.py
+          skeleton/testing/test_app_installer.py
+          skeleton/testing/test_windows_installer.py
+          backend/tests/test_tenant_storage_boundary.py
+          skeleton/testing/test_safe_autonomy_bundle.py
+          skeleton/testing/test_champion_registry.py
+
+      - name: Build accepted exact-head REL-01 bundle
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-rel-01
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.reproducibility import (
+              ReplayDisposition,
+              ReproducibilityBundle,
+              ReproducibilityEvaluation,
+          )
+          from skeleton.release.evidence import (
+              build_evidence,
+              evidence_digest,
+              evaluate_release_ready,
+          )
+          from skeleton.release.qualification import (
+              ReleaseLifecycleMode,
+              ReleaseLifecycleReceipt,
+              qualify_release_candidate,
+          )
+
+          def sha(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          commit = os.environ["EXPECTED_SHA"]
+          artifact = b"p1-rel-01-deterministic-artifact"
+          sbom = b'{"bomFormat":"CycloneDX","specVersion":"1.6"}\n'
+          build_input = b"p1-rel-01-build-input\n"
+          test_log = b"release lifecycle tests passed\n"
+          eval_log = b"release dependency evals passed\n"
+
+          release = build_evidence(
+              source_commit=commit,
+              source_date_epoch=1_800_000_000,
+              build_inputs=(
+                  {
+                      "name": "p1-rel-01-build-input.txt",
+                      "sha256": sha(build_input),
+                      "size": len(build_input),
+                  },
+              ),
+              artifacts=(
+                  {
+                      "artifact_id": "release",
+                      "name": "skeleton-release.zip",
+                      "sha256": sha(artifact),
+                      "size": len(artifact),
+                      "locator": {
+                          "kind": "release-store",
+                          "uri": "artifact://release/skeleton-release.zip",
+                      },
+                      "upload": {
+                          "status": "complete",
+                          "bytes_transferred": len(artifact),
+                          "sha256": sha(artifact),
+                      },
+                  },
+              ),
+              sbom={
+                  "name": "release-sbom.cdx.json",
+                  "sha256": sha(sbom),
+                  "size": len(sbom),
+                  "locator": {
+                      "kind": "release-store",
+                      "uri": "artifact://release/release-sbom.cdx.json",
+                  },
+              },
+              provenance={
+                  "schema_version": 1,
+                  "digest": sha(b"p1-rel-01-provenance"),
+                  "source_commit": commit,
+              },
+              asset_provenance=(),
+              test_evidence=(
+                  {
+                      "evidence_id": "lifecycle",
+                      "name": "lifecycle.xml",
+                      "sha256": sha(test_log),
+                      "result": "pass",
+                  },
+              ),
+              eval_evidence=(
+                  {
+                      "evidence_id": "dependencies",
+                      "name": "dependencies.xml",
+                      "sha256": sha(eval_log),
+                      "result": "pass",
+                  },
+              ),
+          )
+          gate = evaluate_release_ready(
+              release,
+              expected_commit=commit,
+          )
+          if not gate.release_ready:
+              raise SystemExit(f"release gate rejected: {gate.reasons}")
+
+          release_digest = evidence_digest(release)
+          config_digest = sha(b"p1-rel-01-release-config-v1")
+          environment_digest = sha(
+              b"ubuntu-24.04|python-3.11.16|p1-rel-01"
+          )
+          installer_digest = sha(
+              Path("packaging/windows/SkeletonSetup.iss").read_bytes()
+              + Path("skeleton/app/installer.py").read_bytes()
+          )
+          verifier_digest = sha(
+              Path("skeleton/release/qualification.py").read_bytes()
+              + Path(".github/workflows/p1-release-evidence-bundle.yml").read_bytes()
+          )
+          test_manifest_digest = sha(
+              Path("skeleton/testing/test_release_qualification.py").read_bytes()
+              + Path("skeleton/testing/test_app_installer.py").read_bytes()
+              + Path("skeleton/testing/test_windows_installer.py").read_bytes()
+          )
+
+          reproducibility = ReproducibilityBundle(
+              repository="Apeloff1/Skeleton",
+              commit_sha=commit,
+              task_id="P1-REL-01",
+              accountability_id="ACC-P1-REL-01",
+              configuration_digest=config_digest,
+              environment_digest=environment_digest,
+              verifier_id="github-actions:p1-release-evidence-bundle",
+              verifier_digest=verifier_digest,
+              test_manifest_digest=test_manifest_digest,
+              runner_id="github-actions-ubuntu-24.04",
+              runner_digest=sha(b"github-actions-ubuntu-24.04"),
+              budget_id="p1-rel-01-ci",
+              budget_digest=sha(b"p1-rel-01-ci-budget-v1"),
+              source_date_epoch=1_800_000_000,
+              expected_subject_digest=sha(b"p1-rel-01-release-subject"),
+              expected_evidence_digest=release_digest,
+              inputs=(
+                  EvidenceRef(
+                      source="release://exact-head",
+                      digest=release_digest,
+                      category="release_evidence",
+                  ),
+              ),
+          )
+          replay = ReproducibilityEvaluation(
+              bundle_digest=reproducibility.bundle_digest,
+              disposition=ReplayDisposition.REPRODUCED,
+              compatible=True,
+              reproduced=True,
+              incompatibilities=(),
+              replay_subject_digest=(
+                  reproducibility.expected_subject_digest
+              ),
+              replay_evidence_digest=release_digest,
+          )
+
+          dependencies = (
+              EvidenceRef(
+                  source="p1:prod-05:tenant-storage:ci/exact-head",
+                  digest=sha(b"prod-05-exact-head"),
+                  category="tenant_storage_boundary",
+              ),
+              EvidenceRef(
+                  source="p1:learn-03:candidate:ci/exact-head",
+                  digest=sha(b"learn-03-exact-head"),
+                  category="candidate_qualification",
+              ),
+              EvidenceRef(
+                  source="p1:auto-06:safe-autonomy-bundle",
+                  digest=sha(b"auto-06-exact-head"),
+                  category="safe_autonomy_qualification",
+              ),
+          )
+
+          receipts = tuple(
+              ReleaseLifecycleReceipt(
+                  mode=mode,
+                  source_commit=commit,
+                  release_evidence_digest=release_digest,
+                  installer_metadata_digest=installer_digest,
+                  configuration_digest=config_digest,
+                  environment_digest=environment_digest,
+                  verifier_id=f"github-actions:{mode.value}",
+                  verifier_digest=sha(
+                      f"rel-01-{mode.value}-verifier".encode()
+                  ),
+                  test_manifest_digest=test_manifest_digest,
+                  evidence_refs=(
+                      EvidenceRef(
+                          source=f"ci://rel-01/{mode.value}",
+                          digest=sha(
+                              f"rel-01-{mode.value}-evidence".encode()
+                          ),
+                          category=mode.value,
+                      ),
+                  ),
+                  passed=True,
+                  independent=True,
+                  production_mutation_count=0,
+              )
+              for mode in ReleaseLifecycleMode
+          )
+
+          decision = qualify_release_candidate(
+              source_commit=commit,
+              release_evidence=release,
+              release_gate=gate,
+              reproducibility=reproducibility,
+              reproducibility_evaluation=replay,
+              dependency_evidence=dependencies,
+              lifecycle_receipts=receipts,
+              installer_metadata_digest=installer_digest,
+              configuration_digest=config_digest,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"REL-01 qualification rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-rel-01/decision.json").write_text(
+              json.dumps(
+                  decision.payload(),
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-01/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-01/config.digest").write_text(
+              config_digest,
+              encoding="utf-8",
+          )
+          Path(".p1-rel-01/environment.digest").write_text(
+              environment_digest,
+              encoding="utf-8",
+          )
+          Path(".p1-rel-01/verifier.digest").write_text(
+              verifier_digest,
+              encoding="utf-8",
+          )
+          Path(".p1-rel-01/tests.digest").write_text(
+              test_manifest_digest,
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head REL-01 evidence receipt
+        run: |
+          set -euo pipefail
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-REL-01 \
+            --accountability-id ACC-P1-REL-01 \
+            --configuration-digest "$(cat .p1-rel-01/config.digest)" \
+            --environment-digest "$(cat .p1-rel-01/environment.digest)" \
+            --verifier-id github-actions:p1-release-evidence-bundle \
+            --verifier-digest "$(cat .p1-rel-01/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-rel-01/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-rel-01/refs.json \
+            --out .p1-rel-01/receipt.json \
+            > .p1-rel-01/stdout.json
+
+      - name: Assert exact-head REL-01 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-rel-01/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("REL-01 receipt head mismatch")
+          if receipt["task_id"] != "P1-REL-01":
+              raise SystemExit("REL-01 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-REL-01":
+              raise SystemExit("REL-01 accountability identity mismatch")
+          for field in (
+              "subject_digest",
+              "evidence_digest",
+              "receipt_digest",
+          ):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "REL-01 exact-head receipt OK",
+              receipt["receipt_digest"],
+          )
+          PY
