@@ -8,6 +8,7 @@ on:
     branches: [main, master]
     paths:
       - ".emergent/cron/**"
+      - ".github/security/security-exceptions.json"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
@@ -33,6 +34,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - ".emergent/cron/**"
+      - ".github/security/security-exceptions.json"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
