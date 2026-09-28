@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/observability/forecasting.py"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"
@@ -19,6 +20,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/observability/forecasting.py"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"
