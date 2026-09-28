@@ -11,7 +11,10 @@ from skeleton.intelligence.core_intelligence import (
 from skeleton.intelligence.memory_retrieval_quality import (
     IntelligenceQualityDecision,
 )
-from skeleton.intelligence.output_quality import AnswerArtifactQualityDecision
+from skeleton.intelligence.output_quality import (
+    AnswerArtifactQualityDecision,
+    OutputDisposition,
+)
 from skeleton.intelligence.plan_verifier import PlanQualificationDecision
 from skeleton.intelligence.routing_context_receipt import RoutingContextReceipt
 from skeleton.intelligence.strategy_registry import (
@@ -107,6 +110,14 @@ def _output(**overrides: object) -> AnswerArtifactQualityDecision:
         "policy_digest": "d" * 64,
     }
     values.update(overrides)
+    values.setdefault(
+        "disposition",
+        (
+            OutputDisposition.QUALIFIED
+            if values["accepted"]
+            else OutputDisposition.BLOCKED
+        ),
+    )
     return AnswerArtifactQualityDecision(**values)
 
 
@@ -272,6 +283,7 @@ def test_output_quality_rejection_blocks() -> None:
     output = replace(
         output,
         accepted=False,
+        disposition=OutputDisposition.BLOCKED,
         reasons=("answer-quality-rejected",),
     )
 

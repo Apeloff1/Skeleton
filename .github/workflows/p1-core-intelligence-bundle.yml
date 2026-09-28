@@ -106,6 +106,7 @@ jobs:
           )
           from skeleton.intelligence.output_quality import (
               AnswerArtifactQualityDecision,
+              OutputDisposition,
           )
           from skeleton.intelligence.plan_verifier import (
               PlanQualificationDecision,
@@ -182,6 +183,7 @@ jobs:
           )
           output = AnswerArtifactQualityDecision(
               accepted=True,
+              disposition=OutputDisposition.QUALIFIED,
               reasons=(),
               answer_evaluation_digest="a" * 64,
               artifact_evaluation_digests=("b" * 64,),

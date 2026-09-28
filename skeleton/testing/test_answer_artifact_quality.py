@@ -4,12 +4,16 @@ import pytest
 
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.output_quality import (
+    ArtifactType,
+    ChangeImpact,
     IndependentQualityEvaluation,
+    OutputDisposition,
     OutputKind,
     OutputQualityError,
     OutputQualityPolicy,
     ReasoningRegressionObservation,
     evaluate_answer_artifact_quality,
+    required_artifact_gates,
 )
 from skeleton.intelligence.quality import QualityReport
 
@@ -47,6 +51,17 @@ def _evaluation(
     independent: bool = True,
     metadata: dict | None = None,
 ) -> IndependentQualityEvaluation:
+    artifact_kwargs = {}
+    if kind is OutputKind.ARTIFACT:
+        artifact_kwargs = {
+            "artifact_type": ArtifactType.CODE,
+            "change_impact": ChangeImpact.MEDIUM,
+            "published_subject_digest": char * 64,
+            "gate_ids": required_artifact_gates(
+                ArtifactType.CODE,
+                ChangeImpact.MEDIUM,
+            ),
+        }
     return IndependentQualityEvaluation(
         kind=kind,
         subject_id=subject_id,
@@ -56,6 +71,7 @@ def _evaluation(
         report=_report(score=score, accepted=accepted, metadata=metadata),
         evidence_refs=(_ref(f"quality://{subject_id}", "f"),),
         independent=independent,
+        **artifact_kwargs,
     )
 
 
@@ -350,3 +366,125 @@ def test_policy_can_raise_quality_floor_without_changing_evidence() -> None:
     assert failing.accepted is False
     assert passing.answer_evaluation_digest == failing.answer_evaluation_digest
     assert passing.policy_digest != failing.policy_digest
+
+
+def test_answer_outcomes_distinguish_qualified_abstained_and_blocked() -> None:
+    answer = _evaluation(OutputKind.ANSWER, "answer-1", "a")
+    regression = _regression()
+
+    qualified = evaluate_answer_artifact_quality(
+        answer=answer,
+        reasoning_regressions=(regression,),
+    )
+    abstained = evaluate_answer_artifact_quality(
+        answer=answer,
+        reasoning_regressions=(regression,),
+        answer_disposition=OutputDisposition.ABSTAINED,
+    )
+    blocked = evaluate_answer_artifact_quality(
+        answer=answer,
+        reasoning_regressions=(regression,),
+        answer_disposition=OutputDisposition.BLOCKED,
+    )
+
+    assert qualified.disposition is OutputDisposition.QUALIFIED
+    assert qualified.accepted is True
+    assert qualified.payload()["publication_allowed"] is True
+    assert abstained.disposition is OutputDisposition.ABSTAINED
+    assert abstained.accepted is False
+    assert "answer-abstained" in abstained.reasons
+    assert abstained.payload()["publication_allowed"] is False
+    assert blocked.disposition is OutputDisposition.BLOCKED
+    assert blocked.accepted is False
+    assert "answer-explicitly-blocked" in blocked.reasons
+
+
+def test_artifact_requires_type_and_change_impact_gate_profile() -> None:
+    answer = _evaluation(OutputKind.ANSWER, "answer-1", "a")
+    regression = _regression()
+    artifact = IndependentQualityEvaluation(
+        kind=OutputKind.ARTIFACT,
+        subject_id="artifact-critical",
+        subject_digest="b" * 64,
+        evaluator_id="eval:artifact-critical",
+        evaluator_digest="e" * 64,
+        report=_report(),
+        evidence_refs=(_ref("quality://artifact-critical", "f"),),
+        artifact_type=ArtifactType.CONFIGURATION,
+        change_impact=ChangeImpact.CRITICAL,
+        published_subject_digest="b" * 64,
+        gate_ids=("schema", "rollback"),
+    )
+
+    decision = evaluate_answer_artifact_quality(
+        answer=answer,
+        artifacts=(artifact,),
+        expected_artifact_digests=(artifact.subject_digest,),
+        reasoning_regressions=(regression,),
+    )
+
+    assert decision.accepted is False
+    reason = next(
+        item
+        for item in decision.reasons
+        if item.startswith("artifact-required-gates-missing:")
+    )
+    assert "security" in reason
+    assert "independent-release" in reason
+
+
+def test_artifact_under_test_must_equal_published_artifact() -> None:
+    answer = _evaluation(OutputKind.ANSWER, "answer-1", "a")
+    regression = _regression()
+    artifact = IndependentQualityEvaluation(
+        kind=OutputKind.ARTIFACT,
+        subject_id="artifact-versioned",
+        subject_digest="b" * 64,
+        evaluator_id="eval:artifact-versioned",
+        evaluator_digest="e" * 64,
+        report=_report(),
+        evidence_refs=(_ref("quality://artifact-versioned", "f"),),
+        artifact_type=ArtifactType.CODE,
+        change_impact=ChangeImpact.HIGH,
+        published_subject_digest="c" * 64,
+        gate_ids=required_artifact_gates(
+            ArtifactType.CODE,
+            ChangeImpact.HIGH,
+        ),
+    )
+
+    decision = evaluate_answer_artifact_quality(
+        answer=answer,
+        artifacts=(artifact,),
+        expected_artifact_digests=(artifact.subject_digest,),
+        reasoning_regressions=(regression,),
+    )
+
+    assert decision.accepted is False
+    assert (
+        "artifact-published-digest-mismatch:artifact-versioned"
+        in decision.reasons
+    )
+
+
+def test_artifact_gate_registry_varies_by_type_and_impact() -> None:
+    code_low = set(
+        required_artifact_gates(ArtifactType.CODE, ChangeImpact.LOW)
+    )
+    code_critical = set(
+        required_artifact_gates(
+            ArtifactType.CODE,
+            ChangeImpact.CRITICAL,
+        )
+    )
+    document_low = set(
+        required_artifact_gates(
+            ArtifactType.DOCUMENT,
+            ChangeImpact.LOW,
+        )
+    )
+
+    assert code_low == {"static-analysis", "tests"}
+    assert document_low == {"factuality", "link-integrity"}
+    assert code_low < code_critical
+    assert {"security", "rollback", "independent-release"} <= code_critical
