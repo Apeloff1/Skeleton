@@ -44,7 +44,10 @@ def test_foundational_depth_pass_is_nonempty() -> None:
     for volume in data["volumes"][:41]:
         assert volume["depth_pass"] == "DP-000-040"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_foundational_depth_doc_exists_and_spans_000_040() -> None:
@@ -60,7 +63,10 @@ def test_sequential_depth_pass_041_080_is_nonempty() -> None:
     for volume in data["volumes"][41:81]:
         assert volume["depth_pass"] == "DP-041-080"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_041_080() -> None:
@@ -76,7 +82,10 @@ def test_sequential_depth_pass_081_120_is_nonempty() -> None:
     for volume in data["volumes"][81:121]:
         assert volume["depth_pass"] == "DP-081-120"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_081_120() -> None:
@@ -92,7 +101,10 @@ def test_sequential_depth_pass_121_160_is_nonempty() -> None:
     for volume in data["volumes"][121:161]:
         assert volume["depth_pass"] == "DP-121-160"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_121_160() -> None:
@@ -108,7 +120,10 @@ def test_sequential_depth_pass_161_200_is_nonempty() -> None:
     for volume in data["volumes"][161:201]:
         assert volume["depth_pass"] == "DP-161-200"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_161_200() -> None:
@@ -124,7 +139,10 @@ def test_sequential_depth_pass_201_240_is_nonempty() -> None:
     for volume in data["volumes"][201:241]:
         assert volume["depth_pass"] == "DP-201-240"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_201_240() -> None:
@@ -140,7 +158,10 @@ def test_sequential_depth_pass_241_280_is_nonempty() -> None:
     for volume in data["volumes"][241:281]:
         assert volume["depth_pass"] == "DP-241-280"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_241_280() -> None:
@@ -156,7 +177,10 @@ def test_sequential_depth_pass_281_320_is_nonempty() -> None:
     for volume in data["volumes"][281:321]:
         assert volume["depth_pass"] == "DP-281-320"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_281_320() -> None:
@@ -172,7 +196,10 @@ def test_sequential_depth_pass_321_360_is_nonempty() -> None:
     for volume in data["volumes"][321:361]:
         assert volume["depth_pass"] == "DP-321-360"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_321_360() -> None:
@@ -210,7 +237,10 @@ def test_sequential_depth_pass_361_400_is_nonempty() -> None:
     for volume in data["volumes"][361:401]:
         assert volume["depth_pass"] == "DP-361-400"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_sequential_depth_doc_exists_and_spans_361_400() -> None:
@@ -226,7 +256,10 @@ def test_final_depth_pass_401_420_is_nonempty() -> None:
     for volume in data["volumes"][401:421]:
         assert volume["depth_pass"] == "DP-401-420"
         for field in depth["required_nonempty_fields"]:
-            assert volume[field], (volume["key"], field)
+            if checker._depth_field_requires_nonempty(volume, field):
+                assert volume[field], (volume["key"], field)
+            else:
+                assert isinstance(volume[field], list)
 
 
 def test_final_depth_doc_closes_at_scope_freeze() -> None:
@@ -274,3 +307,27 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
     assert "breadth_freeze.p1_application_policy must equal forbid" in errors
     assert "authority.p1_scope_freeze_adr_register path drifted" in errors
 
+
+
+def test_closed_gaps_require_hardened_implementation_status() -> None:
+    data = checker.load_plan()
+
+    hardened = json.loads(json.dumps(data))
+    hardened_volume = hardened["volumes"][13]
+    hardened_volume["implementation_status"] = "hardened"
+    hardened_volume["gaps"] = []
+    hardened_errors = checker.validate(hardened)
+    assert not any(
+        error == "VOL-013: depth pass requires non-empty gaps"
+        for error in hardened_errors
+    )
+
+    integrated = json.loads(json.dumps(data))
+    integrated_volume = integrated["volumes"][13]
+    integrated_volume["implementation_status"] = "integrated"
+    integrated_volume["gaps"] = []
+    integrated_errors = checker.validate(integrated)
+    assert (
+        "VOL-013: depth pass requires non-empty gaps"
+        in integrated_errors
+    )
