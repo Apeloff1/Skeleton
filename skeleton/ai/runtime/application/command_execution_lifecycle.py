@@ -18,19 +18,38 @@ class CommandExecutionLifecycle:
     def __init__(self, ledger: ExecutionLedger | None = None) -> None:
         self.ledger = ledger or ExecutionLedger()
 
-    def begin(self, command: str, payload: Mapping[str, Any] | None = None) -> str:
-        return self.ledger.begin(command=command, payload=dict(payload or {}))
+    def begin(
+        self,
+        command: str,
+        payload: Mapping[str, Any] | None = None,
+    ) -> str:
+        # Payload content belongs to command evidence, not ledger identity.
+        # The ledger owns execution identity and returns the canonical record.
+        _ = payload
+        record = self.ledger.begin(command=command)
+        return record.execution_id
 
-    def succeed(self, execution_id: str, result: Mapping[str, Any]) -> None:
+    def succeed(
+        self,
+        execution_id: str,
+        result: Mapping[str, Any],
+    ) -> None:
         self.ledger.complete(
             execution_id,
-            status="succeeded",
+            success=True,
             evidence={"result_keys": sorted(result.keys())},
         )
 
-    def fail(self, execution_id: str, error: str, *, retryable: bool = False) -> None:
+    def fail(
+        self,
+        execution_id: str,
+        error: str,
+        *,
+        retryable: bool = False,
+    ) -> None:
         self.ledger.complete(
             execution_id,
-            status="retryable" if retryable else "failed",
+            success=False,
+            retryable=retryable,
             evidence={"error": error},
         )
