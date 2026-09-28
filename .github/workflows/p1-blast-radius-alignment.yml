@@ -1,0 +1,361 @@
+name: P1 Blast Radius Alignment Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/agents/blast_radius.py"
+      - "skeleton/ai/agents/core/blast_radius.py"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/agents/autonomy_control.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_blast_radius_alignment.py"
+      - ".github/workflows/p1-blast-radius-alignment.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/auto-04-human-control-receipts-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/agents/blast_radius.py"
+      - "skeleton/ai/agents/core/blast_radius.py"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/agents/autonomy_control.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_blast_radius_alignment.py"
+      - ".github/workflows/p1-blast-radius-alignment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-blast-radius-alignment-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate blast radius and alignment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile AUTO-05 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/agents/blast_radius.py
+          skeleton/ai/agents/core/blast_radius.py
+
+      - name: Run AUTO-05 through AUTO-02 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_blast_radius_alignment.py
+          skeleton/testing/test_human_control.py
+          skeleton/testing/test_autonomy_deescalation.py
+          skeleton/testing/test_agent_delegation_qualification.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted high-impact AUTO-05 decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-auto-05
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          from skeleton.agents.autonomy_control import AutonomyLevel, AutonomyState
+          from skeleton.agents.blast_radius import (
+              ActionRiskProfile,
+              AdversarialAlignmentReport,
+              ReversibilityClass,
+              qualify_blast_radius,
+          )
+          from skeleton.agents.human_control import (
+              HumanControlAction,
+              HumanControlCommand,
+              HumanControlState,
+              evaluate_human_control,
+          )
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.risk_evidence import (
+              RiskDisposition,
+              RiskEvidenceBinding,
+              RiskKind,
+              RiskObligation,
+              RiskSeverity,
+              evaluate_risk_binding,
+              make_obligation_id,
+          )
+
+          now = 1_800_000_000.0
+          instant = datetime.fromtimestamp(now, tz=timezone.utc)
+          action_digest = "a" * 64
+          authority_digest = "b" * 64
+
+          profile = ActionRiskProfile(
+              operation_id="ci-operation",
+              execution_id="ci-execution",
+              agent_id="ci-agent",
+              action_digest=action_digest,
+              authority_digest=authority_digest,
+              affected_tenants=1,
+              affected_resources=8,
+              reversibility=ReversibilityClass.RECOVERABLE,
+              writes_persistent_state=True,
+              externally_observable=True,
+              privileged=True,
+              destructive=False,
+              sensitive_data=False,
+              recovery_plan_digest="c" * 64,
+              rollback_test_digest="d" * 64,
+          )
+          alignment = AdversarialAlignmentReport(
+              operation_id=profile.operation_id,
+              execution_id=profile.execution_id,
+              agent_id=profile.agent_id,
+              action_digest=profile.action_digest,
+              authority_digest=profile.authority_digest,
+              verifier_id="verifier:ci-independent",
+              verifier_digest="e" * 64,
+              independent=True,
+              goal_drift_detected=False,
+              specification_gaming_detected=False,
+              policy_conflict_detected=False,
+              deceptive_behavior_detected=False,
+              unresolved_counterexamples=0,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://adversarial-review",
+                      digest="1" * 64,
+                      category="adversarial",
+                  ),
+              ),
+              observed_at=now - 10.0,
+              expires_at=now + 300.0,
+          )
+
+          autonomy = AutonomyState(
+              operation_id=profile.operation_id,
+              execution_id=profile.execution_id,
+              agent_id=profile.agent_id,
+              level=AutonomyLevel.DELEGATED,
+              delegation_digest=profile.authority_digest,
+              version=1,
+          )
+          human_state = HumanControlState(
+              operation_id=autonomy.operation_id,
+              execution_id=autonomy.execution_id,
+              agent_id=autonomy.agent_id,
+              autonomy_state_digest=autonomy.digest,
+              authority_digest=profile.authority_digest,
+              level=autonomy.level,
+              version=1,
+          )
+          human_command = HumanControlCommand(
+              operation_id=human_state.operation_id,
+              execution_id=human_state.execution_id,
+              agent_id=human_state.agent_id,
+              action=HumanControlAction.APPROVE,
+              arguments_digest=profile.action_digest,
+              authority_digest=human_state.authority_digest,
+              state_digest=human_state.digest,
+              state_version=human_state.version,
+              issuer_id="human:ci-operator",
+              issuer_digest="f" * 64,
+              issued_at=now - 10.0,
+              expires_at=now + 300.0,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://human-high-impact-approval",
+                      digest="2" * 64,
+                      category="human_control_authorization",
+                  ),
+              ),
+              requested_level=AutonomyLevel.AUTONOMOUS,
+              independent=True,
+          )
+          human = evaluate_human_control(
+              state=human_state,
+              command=human_command,
+              autonomy_state=autonomy,
+              observed_at=now,
+          )
+          if not human.accepted:
+              raise SystemExit(f"human fixture rejected: {human.reasons}")
+
+          statement = "High-impact privileged action requires adversarial evidence."
+          obligation = RiskObligation(
+              obligation_id=make_obligation_id(
+                  RiskKind.ADVERSARIAL,
+                  "AUTO-05",
+                  statement,
+              ),
+              kind=RiskKind.ADVERSARIAL,
+              source_ref="AUTO-05",
+              statement=statement,
+              source_digest="3" * 64,
+              default_severity=RiskSeverity.HIGH,
+              blocking_by_default=True,
+              required_evidence_modes=("adversarial",),
+          )
+          binding = RiskEvidenceBinding(
+              obligation_id=obligation.obligation_id,
+              obligation_digest=obligation.obligation_digest,
+              owner_id="p1:auto-05",
+              severity=RiskSeverity.HIGH,
+              disposition=RiskDisposition.EVIDENCE,
+              bound_at=instant - timedelta(minutes=5),
+              review_at=instant + timedelta(days=7),
+              evidence=alignment.evidence_refs,
+          )
+          risk = evaluate_risk_binding(
+              obligation,
+              binding,
+              evaluated_at=instant,
+          )
+          if not risk.resolved:
+              raise SystemExit(f"risk fixture unresolved: {risk.blockers}")
+
+          decision = qualify_blast_radius(
+              profile=profile,
+              alignment=alignment,
+              observed_at=now,
+              risk_evaluation=risk,
+              human_approval=human,
+          )
+          if not decision.accepted:
+              raise SystemExit(f"AUTO-05 fixture rejected: {decision.reasons}")
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-auto-05/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-auto-05/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head AUTO-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-auto-05/config.digest").write_text(
+              hashlib.sha256(b"p1-auto-05-blast-radius-v1").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-05/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|auto-05"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-05/verifier.digest").write_text(
+              digest([
+                  "skeleton/agents/blast_radius.py",
+                  "skeleton/contracts/risk_evidence.py",
+                  ".github/workflows/p1-blast-radius-alignment.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-auto-05/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_blast_radius_alignment.py",
+                  "skeleton/testing/test_human_control.py",
+                  "skeleton/testing/test_autonomy_deescalation.py",
+                  "skeleton/testing/test_agent_delegation_qualification.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-AUTO-05 \
+            --accountability-id ACC-P1-AUTO-05 \
+            --configuration-digest "$(cat .p1-auto-05/config.digest)" \
+            --environment-digest "$(cat .p1-auto-05/environment.digest)" \
+            --verifier-id github-actions:p1-blast-radius-alignment \
+            --verifier-digest "$(cat .p1-auto-05/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-auto-05/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-auto-05/refs.json \
+            --out .p1-auto-05/receipt.json \
+            > .p1-auto-05/stdout.json
+
+      - name: Assert exact-head AUTO-05 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-auto-05/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AUTO-05 receipt head mismatch")
+          if receipt["task_id"] != "P1-AUTO-05":
+              raise SystemExit("AUTO-05 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-AUTO-05":
+              raise SystemExit("AUTO-05 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("AUTO-05 exact-head receipt OK", receipt["receipt_digest"])
+          PY
