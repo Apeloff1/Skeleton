@@ -69,8 +69,8 @@
   "inventory_expectations": {
     "p1_primary_volume_count": 107,
     "volume_risk_count": 281,
-    "volume_gap_count": 202,
+    "volume_gap_count": 208,
     "applicable_adversarial_axis_count": 24,
-    "total_obligation_count": 507
+    "total_obligation_count": 513
   }
 }
