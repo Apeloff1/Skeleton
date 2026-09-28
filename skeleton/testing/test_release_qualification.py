@@ -529,6 +529,41 @@ def test_lifecycle_receipt_requires_exact_mode_evidence() -> None:
         )
 
 
+
+@pytest.mark.parametrize(
+    ("field", "value", "reason"),
+    (
+        (
+            "task_id",
+            "P1-REL-01",
+            "reproducibility-task-identity-mismatch",
+        ),
+        (
+            "accountability_id",
+            "ACC-P1-REL-01",
+            "reproducibility-accountability-identity-mismatch",
+        ),
+    ),
+)
+def test_reproducibility_must_bind_exact_evid05_identity(
+    field: str,
+    value: str,
+    reason: str,
+) -> None:
+    evidence = _release_evidence()
+    reproducibility = replace(
+        _reproducibility(evidence_digest(evidence)),
+        **{field: value},
+    )
+    decision = _qualify(
+        release_evidence=evidence,
+        reproducibility=reproducibility,
+    )
+
+    assert decision.accepted is False
+    assert reason in decision.reasons
+
+
 def test_rejected_release_cannot_materialize_promotion_evidence() -> None:
     evidence = _release_evidence()
     gate = _release_gate(evidence, release_ready=False)
