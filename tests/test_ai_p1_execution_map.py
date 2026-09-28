@@ -501,3 +501,22 @@ def test_evidence_governance_gates_watch_p1_backlog_changes() -> None:
         assert (
             trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
         ), workflow
+
+
+
+def test_safe_autonomy_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-privileged-tool-transaction.yml",
+        ".github/workflows/p1-agent-delegation-qualification.yml",
+        ".github/workflows/p1-autonomy-deescalation.yml",
+        ".github/workflows/p1-human-control.yml",
+        ".github/workflows/p1-blast-radius-alignment.yml",
+        ".github/workflows/p1-safe-autonomy-bundle.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
