@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "backend/core/operator_control_projection.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/core/workspace_projection.py"
       - "backend/tests/test_user_control_receipts.py"
       - "backend/tests/test_workspace_projection.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "backend/core/operator_control_projection.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/core/workspace_projection.py"
       - "backend/tests/test_user_control_receipts.py"
       - "backend/tests/test_workspace_projection.py"
