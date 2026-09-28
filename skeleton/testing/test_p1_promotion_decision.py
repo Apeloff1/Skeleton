@@ -55,6 +55,7 @@ def _intent(
             deferred_volume_refs=deferred,
             explicit_blockers=(),
             signer_id="release-authority:independent",
+            signer_type="service",
             signer_identity_digest="3" * 64,
             public_key_fingerprint="4" * 64,
         )
@@ -77,6 +78,7 @@ def _signature(intent: P1PromotionIntent, **overrides):
         "commit_sha": intent.commit_sha,
         "intent_digest": intent.intent_digest,
         "signer_id": intent.signer_id,
+        "signer_type": intent.signer_type,
         "signer_identity_digest": intent.signer_identity_digest,
         "public_key_fingerprint": intent.public_key_fingerprint,
         "signature_digest": "5" * 64,
@@ -163,6 +165,10 @@ def test_verified_independent_signature_grants_terminal_candidate() -> None:
             {"signer_identity_digest": "0" * 64},
             "signature-identity-digest-mismatch",
         ),
+        (
+            {"signer_type": "human"},
+            "signature-signer-type-mismatch",
+        ),
         ({"verified": False}, "signature-not-verified"),
         (
             {"independent": False},
@@ -191,6 +197,28 @@ def test_signature_substitution_fails_closed(
     assert decision.accepted is False
     assert reason in decision.reasons
     assert decision.promotion_granted is False
+
+
+def test_agent_signer_type_is_forbidden() -> None:
+    prom02 = _prom02()
+    with pytest.raises(
+        P1PromotionDecisionError,
+        match="agent signers are forbidden",
+    ):
+        P1PromotionIntent(
+            repository=REPO,
+            commit_sha=HEAD,
+            prom02_decision_digest=prom02.decision_digest,
+            prom02_accepted=prom02.accepted,
+            prom01_bundle_digest=prom02.prom01_bundle_digest,
+            prom01_promotion_ready=prom02.prom01_promotion_ready,
+            disposition=PromotionDisposition.PROMOTE,
+            deferred_volume_refs=DEFERRED,
+            signer_id="agent:self",
+            signer_type="agent",
+            signer_identity_digest="3" * 64,
+            public_key_fingerprint="4" * 64,
+        )
 
 
 def test_signer_cannot_verify_own_signature() -> None:
