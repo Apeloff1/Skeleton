@@ -2,6 +2,7 @@
   "schema_version": 1,
   "manager": "mise",
   "manager_config": ".mise.toml",
+  "bootstrap_command": "mise run bootstrap",
   "installed_toolchains": {
     "python": "3.11.16",
     "node": "24.20.0",
@@ -12,7 +13,18 @@
     "git_minimum": "2.40"
   },
   "supported_hosts": {
-    "systems": ["Linux", "Darwin", "Windows"],
-    "architectures": ["x86_64", "amd64", "AMD64", "arm64", "aarch64", "ARM64"]
+    "systems": [
+      "Linux",
+      "Darwin",
+      "Windows"
+    ],
+    "architectures": [
+      "x86_64",
+      "amd64",
+      "AMD64",
+      "arm64",
+      "aarch64",
+      "ARM64"
+    ]
   }
 }
