@@ -71,6 +71,35 @@ python scripts/check_artifact_policy.py --all
 
 Existing large/binary tracked files are migration debt until moved to the correct lane. When migrating an existing asset: identify every consumer, record checksum/source/license provenance, move it to LFS or external/release storage, update reproducible fetch/build instructions, and validate a fresh checkout/build without hidden local files. History rewriting is optional cleanup and must not substitute for making the current tree reproducible.
 
+## History-backed legacy artifacts
+
+A small number of grandfathered branch-snapshot payloads are removed from the
+current tree under issue #807/B006 and retained only through immutable Git
+history metadata in `machine/large_artifacts.json`. Each catalog entry pins the
+source commit/path, Git blob OID, audited SHA-256, byte count, mode, provenance
+note, and redistribution status.
+
+List available payloads without materializing them:
+
+```bash
+python scripts/materialize_large_artifact.py --list
+```
+
+Restore one declared historical path only when explicitly needed:
+
+```bash
+python scripts/materialize_large_artifact.py \
+  --artifact godot-snapshot-binary \
+  --destination satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot
+```
+
+The command uses only locally available Git history by default and fails closed
+if the pinned source commit/object is absent. `--fetch-history` is the explicit
+opt-in for a bounded fetch of the immutable source commit. Bytes are written to
+a temporary file, checked against the declared size and SHA-256, and atomically
+published only after integrity verification. Materialized paths are ignored and
+must not be recommitted.
+
 ## Pull-request expectations
 
 A PR introducing a new large asset must explain why the chosen storage lane is correct. For LFS/external assets, reviewers should verify provenance and license before merge. For generated release outputs, the PR should change the build recipe—not commit the output itself.
