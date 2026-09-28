@@ -378,6 +378,11 @@ def main() -> int:
         "Backend Quality scanner coverage drifted",
         failures,
     )
+    require(
+        ".github/security/security-exceptions.json" in backend_quality,
+        "Backend Quality must trigger on security exception registry changes",
+        failures,
+    )
     require_all(
         backend_quality,
         SECURITY_TESTS,
