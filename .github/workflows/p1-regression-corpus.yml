@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/eval/regression_corpus.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/regression_corpus.py"
       - "skeleton/contracts/risk_evidence.py"
       - "skeleton/eval/__init__.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/eval/regression_corpus.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/regression_corpus.py"
       - "skeleton/contracts/risk_evidence.py"
       - "skeleton/eval/__init__.py"
