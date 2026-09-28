@@ -1,0 +1,325 @@
+name: P1 Installer Lifecycle Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/app/installer.py"
+      - "skeleton/app/setup_runtime.py"
+      - "skeleton/app/windows_launcher.py"
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/testing/test_installer_lifecycle.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - "skeleton/testing/test_app_installer.py"
+      - "skeleton/testing/test_windows_installer.py"
+      - ".github/workflows/p1-installer-lifecycle.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/rel-01-release-evidence-bundle-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/app/installer.py"
+      - "skeleton/app/setup_runtime.py"
+      - "skeleton/app/windows_launcher.py"
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/testing/test_installer_lifecycle.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - "skeleton/testing/test_app_installer.py"
+      - "skeleton/testing/test_windows_installer.py"
+      - ".github/workflows/p1-installer-lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-installer-lifecycle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate install update repair uninstall lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile REL-01 and REL-02 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/release/qualification.py
+          skeleton/release/lifecycle.py
+          skeleton/app/installer.py
+
+      - name: Run release and installer lifecycle regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_release_qualification.py
+          skeleton/testing/test_installer_lifecycle.py
+          skeleton/testing/test_app_installer.py
+          skeleton/testing/test_windows_installer.py
+
+      - name: Build accepted exact-head REL-02 lifecycle
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-rel-02
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.release.lifecycle import (
+              InstallerLifecycleReceipt,
+              InstallerLifecycleScenario,
+              qualify_installer_lifecycle,
+          )
+          from skeleton.release.qualification import (
+              ReleaseQualificationDecision,
+          )
+
+          def sha(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          commit = os.environ["EXPECTED_SHA"]
+          installer_digest = sha(
+              Path("packaging/windows/SkeletonSetup.iss").read_bytes()
+              + Path("skeleton/app/installer.py").read_bytes()
+              + Path("skeleton/app/windows_launcher.py").read_bytes()
+          )
+          release = ReleaseQualificationDecision(
+              accepted=True,
+              reasons=(),
+              source_commit=commit,
+              release_evidence_digest=sha(b"rel-01-release-evidence"),
+              reproducibility_bundle_digest=sha(b"rel-01-repro-bundle"),
+              reproducibility_evaluation_digest=sha(b"rel-01-repro-eval"),
+              dependency_evidence_digest=sha(b"rel-01-dependencies"),
+              sbom_digest=sha(b"rel-01-sbom"),
+              provenance_digest=sha(b"rel-01-provenance"),
+              installer_metadata_digest=installer_digest,
+              configuration_digest=sha(b"rel-01-config"),
+              lifecycle_receipt_digests=(sha(b"rel-01-lifecycle"),),
+          )
+
+          target_version = "16.0.0"
+          ownership = sha(b"rel-02-ownership-policy-v1")
+          retention = sha(b"rel-02-retention-policy-v1")
+          old_snapshot = sha(b"installed-v15")
+          target_snapshot = sha(b"installed-v16")
+          empty_snapshot = sha(b"not-installed")
+          uninstalled_snapshot = sha(b"uninstalled-user-data-retained")
+          retained_user_data = sha(b"retained-user-data-manifest")
+
+          def receipt(
+              scenario,
+              *,
+              before,
+              after,
+              rollback=None,
+              retained=None,
+              interrupted=False,
+              recovered=False,
+          ):
+              return InstallerLifecycleReceipt(
+                  scenario=scenario,
+                  source_commit=commit,
+                  release_qualification_digest=release.decision_digest,
+                  installer_metadata_digest=installer_digest,
+                  target_version=target_version,
+                  before_snapshot_digest=before,
+                  after_snapshot_digest=after,
+                  expected_target_snapshot_digest=target_snapshot,
+                  rollback_snapshot_digest=rollback,
+                  retained_user_data_digest=retained,
+                  ownership_policy_digest=ownership,
+                  retention_policy_digest=retention,
+                  verifier_id=f"github-actions:{scenario.value}",
+                  verifier_digest=sha(
+                      f"rel-02-{scenario.value}-verifier".encode()
+                  ),
+                  test_manifest_digest=sha(
+                      f"rel-02-{scenario.value}-tests".encode()
+                  ),
+                  evidence_refs=(
+                      EvidenceRef(
+                          source=f"ci://rel-02/{scenario.value}",
+                          digest=sha(
+                              f"rel-02-{scenario.value}-evidence".encode()
+                          ),
+                          category=scenario.value,
+                      ),
+                  ),
+                  passed=True,
+                  independent=True,
+                  interrupted=interrupted,
+                  recovered=recovered,
+                  production_mutation_count=0,
+                  application_owned_residual_count=0,
+                  unowned_critical_count=0,
+              )
+
+          receipts = (
+              receipt(
+                  InstallerLifecycleScenario.CLEAN_INSTALL,
+                  before=empty_snapshot,
+                  after=target_snapshot,
+              ),
+              receipt(
+                  InstallerLifecycleScenario.UPDATE,
+                  before=old_snapshot,
+                  after=target_snapshot,
+              ),
+              receipt(
+                  InstallerLifecycleScenario.INTERRUPTED_UPDATE,
+                  before=old_snapshot,
+                  after=old_snapshot,
+                  rollback=old_snapshot,
+                  interrupted=True,
+                  recovered=True,
+              ),
+              receipt(
+                  InstallerLifecycleScenario.REPAIR,
+                  before=sha(b"damaged-v16"),
+                  after=target_snapshot,
+              ),
+              receipt(
+                  InstallerLifecycleScenario.REPAIR_REPEAT,
+                  before=target_snapshot,
+                  after=target_snapshot,
+              ),
+              receipt(
+                  InstallerLifecycleScenario.UNINSTALL,
+                  before=target_snapshot,
+                  after=uninstalled_snapshot,
+                  retained=retained_user_data,
+              ),
+          )
+
+          decision = qualify_installer_lifecycle(
+              release_qualification=release,
+              receipts=receipts,
+              installer_metadata_digest=installer_digest,
+              target_version=target_version,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"REL-02 lifecycle rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-rel-02/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-02/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-rel-02/config.digest").write_text(
+              sha(b"p1-rel-02-installer-lifecycle-v1"),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-02/environment.digest").write_text(
+              sha(b"ubuntu-24.04|python-3.11.16|rel-02"),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-02/verifier.digest").write_text(
+              sha(
+                  Path("skeleton/release/lifecycle.py").read_bytes()
+                  + Path(".github/workflows/p1-installer-lifecycle.yml").read_bytes()
+              ),
+              encoding="utf-8",
+          )
+          Path(".p1-rel-02/tests.digest").write_text(
+              sha(
+                  Path("skeleton/testing/test_installer_lifecycle.py").read_bytes()
+                  + Path("skeleton/testing/test_app_installer.py").read_bytes()
+                  + Path("skeleton/testing/test_windows_installer.py").read_bytes()
+              ),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head REL-02 evidence receipt
+        run: |
+          set -euo pipefail
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-REL-02 \
+            --accountability-id ACC-P1-REL-02 \
+            --configuration-digest "$(cat .p1-rel-02/config.digest)" \
+            --environment-digest "$(cat .p1-rel-02/environment.digest)" \
+            --verifier-id github-actions:p1-installer-lifecycle \
+            --verifier-digest "$(cat .p1-rel-02/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-rel-02/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-rel-02/refs.json \
+            --out .p1-rel-02/receipt.json \
+            > .p1-rel-02/stdout.json
+
+      - name: Assert exact-head REL-02 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-rel-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("REL-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-REL-02":
+              raise SystemExit("REL-02 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-REL-02":
+              raise SystemExit("REL-02 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("REL-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY

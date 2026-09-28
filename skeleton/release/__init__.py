@@ -57,6 +57,14 @@ __all__ = [
     "ReleaseQualificationDecision",
     "ReleaseQualificationError",
     "qualify_release_candidate",
+    "INSTALLER_LIFECYCLE_ACCOUNTABILITY_ID",
+    "INSTALLER_LIFECYCLE_SCHEMA_VERSION",
+    "INSTALLER_LIFECYCLE_TASK_ID",
+    "InstallerLifecycleError",
+    "InstallerLifecycleQualificationDecision",
+    "InstallerLifecycleReceipt",
+    "InstallerLifecycleScenario",
+    "qualify_installer_lifecycle",
 ]
 
 from skeleton.release.slo_promotion import (
@@ -67,6 +75,17 @@ from skeleton.release.slo_promotion import (
     ReleasePromotionError,
     ReleaseSLOPolicy,
     ReleaseSLOPromotionController,
+)
+
+from skeleton.release.lifecycle import (
+    INSTALLER_LIFECYCLE_ACCOUNTABILITY_ID,
+    INSTALLER_LIFECYCLE_SCHEMA_VERSION,
+    INSTALLER_LIFECYCLE_TASK_ID,
+    InstallerLifecycleError,
+    InstallerLifecycleQualificationDecision,
+    InstallerLifecycleReceipt,
+    InstallerLifecycleScenario,
+    qualify_installer_lifecycle,
 )
 
 from skeleton.release.qualification import (
