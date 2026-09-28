@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "path": "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.bson",
+  "source_commit": "7e0f257edbd1783f9b2ea346bebda8830a0ae8b6",
+  "blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+  "size_bytes": 14595602,
+  "kind": "mongo-backup"
+}
