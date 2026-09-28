@@ -96,6 +96,7 @@ jobs:
           skeleton/testing/test_installer_lifecycle.py
           skeleton/testing/test_backup_restore_qualification.py
           skeleton/testing/test_jeeves_durable_side_effect_quarantine.py
+          skeleton/testing/test_frontier_checkpoint_binding_versions.py
           skeleton/testing/test_provider_stream_reliability_profiles.py
           skeleton/testing/test_human_control.py
           skeleton/testing/test_autonomy_deescalation.py
