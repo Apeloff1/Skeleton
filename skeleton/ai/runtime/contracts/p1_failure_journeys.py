@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping
 
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.contracts.p1_terminal_evidence import (
+    P1_TERMINAL_REQUIRED_TASKS,
     P1TerminalEvidenceDecision,
 )
 
@@ -463,6 +464,28 @@ def qualify_p1_failure_journeys(
         reasons.append("terminal-exact-head-mismatch")
     if terminal_evidence.promotion_blockers:
         reasons.append("terminal-promotion-blockers-present")
+
+    expected_terminal_tasks = dict(P1_TERMINAL_REQUIRED_TASKS)
+    observed_terminal_tasks: dict[str, str] = {}
+    for item in terminal_evidence.task_evidence:
+        if item.task_id in observed_terminal_tasks:
+            reasons.append(
+                f"terminal-duplicate-task:{item.task_id}"
+            )
+            continue
+        observed_terminal_tasks[item.task_id] = item.accountability_id
+    for task_id, accountability_id in P1_TERMINAL_REQUIRED_TASKS:
+        observed = observed_terminal_tasks.get(task_id)
+        if observed is None:
+            reasons.append(f"terminal-missing-task:{task_id}")
+        elif observed != accountability_id:
+            reasons.append(
+                f"terminal-accountability-mismatch:{task_id}"
+            )
+    for task_id in sorted(
+        set(observed_terminal_tasks) - set(expected_terminal_tasks)
+    ):
+        reasons.append(f"terminal-unknown-task:{task_id}")
 
     if isinstance(receipts, (str, bytes)):
         raise TypeError(
