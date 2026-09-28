@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/release/restore.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/migration.py"
       - "skeleton/release/lifecycle.py"
       - "skeleton/release/__init__.py"
@@ -22,6 +23,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/release/restore.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/migration.py"
       - "skeleton/release/lifecycle.py"
       - "skeleton/release/__init__.py"
