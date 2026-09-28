@@ -16,6 +16,10 @@ from skeleton.contracts.p1_failure_journeys import (
     P1FailureJourneyError,
     qualify_p1_failure_journeys,
 )
+from skeleton.contracts.p1_terminal_evidence import (
+    P1TerminalEvidenceDecision,
+    TerminalTaskEvidence,
+)
 from scripts.check_p1_terminal_failure_journeys import (
     POLICY_PATH,
     ROOT,
@@ -71,6 +75,45 @@ def build_bundle(
         raise FailureJourneyBuildError(
             "PROM-01 decision digest missing or malformed"
         )
+    task_evidence_raw = prom01.get("task_evidence")
+    if not isinstance(task_evidence_raw, list):
+        raise FailureJourneyBuildError(
+            "PROM-01 task_evidence missing or malformed"
+        )
+    prom01_decision = P1TerminalEvidenceDecision(
+        accepted=prom01.get("accepted"),
+        promotion_ready=prom01.get("promotion_ready"),
+        reasons=tuple(prom01.get("reasons") or ()),
+        promotion_blockers=tuple(
+            prom01.get("promotion_blockers") or ()
+        ),
+        repository=prom01.get("repository"),
+        commit_sha=prom01.get("commit_sha"),
+        task_evidence=tuple(
+            TerminalTaskEvidence(
+                task_id=row["task_id"],
+                accountability_id=row["accountability_id"],
+                subject_digest=row["subject_digest"],
+                receipt_digest=row["receipt_digest"],
+                evidence_digest=row["evidence_digest"],
+            )
+            for row in task_evidence_raw
+        ),
+        maturity_report_digest=prom01.get(
+            "maturity_report_digest"
+        ),
+        maturity_coverage_digest=prom01.get(
+            "maturity_coverage_digest"
+        ),
+        primary_volume_count=prom01.get("primary_volume_count"),
+        blocking_volume_keys=tuple(
+            prom01.get("blocking_volume_keys") or ()
+        ),
+    )
+    if prom01_decision.decision_digest != prom01_digest:
+        raise FailureJourneyBuildError(
+            "PROM-01 decision digest mismatch"
+        )
 
     shared_paths = [
         "skeleton/contracts/p1_failure_journeys.py",
@@ -123,7 +166,7 @@ def build_bundle(
             str(key): tuple(str(item) for item in value)
             for key, value in policy["journey_classes"].items()
         },
-        prom01_bundle_digest=prom01_digest,
+        prom01_bundle=prom01_decision,
     )
     if not decision.accepted:
         raise FailureJourneyBuildError(
