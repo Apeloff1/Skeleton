@@ -25,6 +25,17 @@ from skeleton.agents.autonomy_control import (
     TransitionDisposition,
     evaluate_autonomy_transition,
 )
+from skeleton.agents.human_control import (
+    HUMAN_CONTROL_ACCOUNTABILITY_ID,
+    HUMAN_CONTROL_SCHEMA_VERSION,
+    HUMAN_CONTROL_TASK_ID,
+    HumanControlAction,
+    HumanControlCommand,
+    HumanControlDecision,
+    HumanControlError,
+    HumanControlState,
+    evaluate_human_control,
+)
 from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
@@ -74,6 +85,10 @@ __all__ = [
     "AUTONOMY_CONTROL_TASK_ID", "AutonomyAuthorization", "AutonomyControlError",
     "AutonomyLevel", "AutonomyPolicy", "AutonomySignal", "AutonomyState",
     "AutonomyTransitionDecision", "TransitionDisposition", "evaluate_autonomy_transition",
+    "HUMAN_CONTROL_ACCOUNTABILITY_ID", "HUMAN_CONTROL_SCHEMA_VERSION",
+    "HUMAN_CONTROL_TASK_ID", "HumanControlAction", "HumanControlCommand",
+    "HumanControlDecision", "HumanControlError", "HumanControlState",
+    "evaluate_human_control",
     "AGENT_DELEGATION_ACCOUNTABILITY_ID", "AGENT_DELEGATION_SCHEMA_VERSION",
     "AGENT_DELEGATION_TASK_ID", "AgentDelegationAuthority", "AgentDelegationDecision",
     "AgentDelegationError", "DelegationBudget", "qualify_agent_delegation",
