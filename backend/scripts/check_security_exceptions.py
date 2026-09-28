@@ -20,6 +20,7 @@ DEFAULT_REGISTRY = ROOT / ".github" / "security" / "security-exceptions.json"
 SCHEMA = 1
 MAX_EXCEPTIONS = 100
 MAX_SCOPE_ITEMS = 16
+MAX_REVIEWERS = 8
 MAX_DURATION_DAYS = 30
 MAX_TEXT = 1024
 
@@ -139,7 +140,7 @@ def _validate_scope(value: Any) -> tuple[str, ...]:
 
 
 def _validate_reviewers(value: Any) -> tuple[str, ...]:
-    if not isinstance(value, list) or not value or len(value) > 8:
+    if not isinstance(value, list) or not value or len(value) > MAX_REVIEWERS:
         raise SecurityExceptionPolicyError(
             "approved_by must be a non-empty bounded reviewer list"
         )
@@ -162,7 +163,7 @@ def _validate_reviewers(value: Any) -> tuple[str, ...]:
     return tuple(sorted(reviewers))
 
 
-def validate_registry(
+def validate_registry(  # noqa: PLR0912, PLR0915
     payload: dict[str, Any],
     *,
     today: date | None = None,
