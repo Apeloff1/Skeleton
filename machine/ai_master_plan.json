@@ -948,7 +948,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "hardened",
       "requirements": [
         "Select bounded cognitive strategies based on task, risk, budget and available evidence.",
         "Record structured decision state sufficient for replay/eval without depending on hidden reasoning text.",
@@ -966,27 +966,32 @@
         "StopDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/intelligence/cognitive_runtime.py",
-        "planned:skeleton/intelligence/strategy_registry.py"
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/core_intelligence.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cognitive_stop_policy.py",
-        "planned:skeleton/testing/test_strategy_budget.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evaluations": [
-        "planned:strategy selection quality/cost eval",
-        "planned:looping adversarial scenarios"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "risks": [
         "unbounded reasoning loops",
         "self-confidence treated as verification",
         "strategy selection overfits benchmark"
       ],
-      "gaps": [
-        "materialize cognitive runtime contracts",
-        "build replayable strategy evaluation harness"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -1000,7 +1005,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "hardened",
       "requirements": [
         "Represent plans as dependency DAGs with preconditions, postconditions, capabilities, budgets and deadlines.",
         "Statically detect cycles, unreachable nodes, missing capabilities and absent terminal behavior.",
@@ -1018,28 +1023,38 @@
         "PlanValidationResult"
       ],
       "implementation_paths": [
-        "planned:skeleton/planning",
-        "planned:skeleton/planning/analyzer.py",
-        "planned:skeleton/planning/simulator.py"
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/ai/runtime/intelligence/plan_verifier.py",
+        "skeleton/intelligence/strategy_registry.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_plan_static_analyzer.py",
-        "planned:skeleton/testing/test_plan_cycles.py"
+        "skeleton/testing/test_plan_static_analyzer.py",
+        "skeleton/testing/test_plan_cycles.py",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py"
       ],
       "evaluations": [
-        "planned:plan success/calibration eval",
-        "planned:specification-gaming plan suite"
+        ".github/workflows/p1-plan-verification.yml",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/testing/test_plan_static_analyzer.py",
+        "skeleton/testing/test_plan_cycles.py",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py",
+        ".github/workflows/p1-plan-verification.yml",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
+        "https://github.com/Apeloff1/Skeleton/commit/8dc9e313566284c83b2401783015fb5638536f6e",
+        "https://github.com/Apeloff1/Skeleton/commit/54bc9871f5516ab5593754786ddb1d327fed1088"
+      ],
       "risks": [
         "invalid plans reaching execution",
         "goal drift",
         "scheduler optimization violating hard constraints"
       ],
-      "gaps": [
-        "workflow IR/DSL compiler needs implementation",
-        "formalizable invariants need selection"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-014",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
