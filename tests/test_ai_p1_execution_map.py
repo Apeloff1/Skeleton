@@ -1050,19 +1050,29 @@ TERMINAL_LANE_TASKS = (
 )
 
 
-def test_terminal_lane_paths_are_materialized_without_promotion() -> None:
+TERMINAL_LANE_EVIDENCE_HEAD = "8d8119e7ceaadca3755b22423ee7d480585f146c"
+TERMINAL_LANE_EVIDENCE = {
+    "P1-PROM-01": ("36474185989", ("109103654056",)),
+    "P1-PROM-02": ("36474186005", ("109103654402",)),
+    "P1-PROM-03": ("36474185902", ("109103653532",)),
+}
+
+
+def test_terminal_lane_uses_exact_head_evidence_without_promotion() -> None:
     payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
     task_by_id = {task["task_id"]: task for task in payload["tasks"]}
 
     for task_id in TERMINAL_LANE_TASKS:
         task = task_by_id[task_id]
 
-        for field in ("implementation_paths", "test_targets"):
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
             assert task[field]
             assert all(
                 not str(reference).startswith("planned:")
                 for reference in task[field]
             )
+
+        for field in ("implementation_paths", "test_targets"):
             for reference in task[field]:
                 assert (ROOT / reference).is_file(), (
                     task_id,
@@ -1070,7 +1080,20 @@ def test_terminal_lane_paths_are_materialized_without_promotion() -> None:
                     reference,
                 )
 
-        assert task["evidence_refs"] == []
+        run_id, job_ids = TERMINAL_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{TERMINAL_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + TERMINAL_LANE_EVIDENCE_HEAD
+        ) in evidence
+
         assert task["status"] == "blocked"
         assert task["accountability_status"] == "planned"
         assert task["implementation_signed"] is False
