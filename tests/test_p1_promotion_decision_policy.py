@@ -48,6 +48,9 @@ def test_repository_policy_is_valid_and_derives_deferred_scope() -> None:
         == report["deferred_volume_count"]
     )
     assert report["signature_method"] == "ed25519"
+    assert report["allowed_signer_types"] == ["human", "ci", "service"]
+    assert report["forbidden_signer_types"] == ["agent"]
+    assert report["ci_generated_signature_may_finalize_promotion"] is False
     assert report["maturity_mutation"] is False
 
 
@@ -145,3 +148,31 @@ def test_prom02_cannot_gain_signature_authority(
         match="unexpectedly signs promotion",
     ):
         validate_repository(tmp_path)
+
+def test_agent_signer_cannot_be_enabled(tmp_path: Path) -> None:
+    _copy_authorities(tmp_path)
+    policy = _load(tmp_path, POLICY)
+    policy["allowed_signer_types"].append("agent")
+    _write(tmp_path, POLICY, policy)
+
+    with pytest.raises(
+        PromotionDecisionPolicyError,
+        match="allowed signer types drift",
+    ):
+        validate_repository(tmp_path)
+
+
+def test_ci_generated_signature_cannot_finalize_promotion(
+    tmp_path: Path,
+) -> None:
+    _copy_authorities(tmp_path)
+    policy = _load(tmp_path, POLICY)
+    policy["ci_generated_signature_may_finalize_promotion"] = True
+    _write(tmp_path, POLICY, policy)
+
+    with pytest.raises(
+        PromotionDecisionPolicyError,
+        match="must not finalize promotion",
+    ):
+        validate_repository(tmp_path)
+
