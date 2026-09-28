@@ -515,7 +515,7 @@ class AnswerArtifactQualityDecision:
             or self.disposition is not OutputDisposition.QUALIFIED
         ):
             raise OutputQualityError(
-                "only qualified output quality decision can become promotion evidence"
+                "non-qualified output quality decision cannot become promotion evidence"
             )
         return EvidenceRef(
             source=_text(source, "source", maximum=2048),
