@@ -47,4 +47,3 @@ def test_retryable_failure_preserves_retryable_status():
     assert records[0].evidence == {
         "error": "temporary provider failure"
     }
-
