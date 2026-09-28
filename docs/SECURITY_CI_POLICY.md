@@ -74,6 +74,8 @@ Security exceptions are exceptional, narrow, time-bounded, and reviewable. An ex
 
 Do not use blanket path exclusions, repository-wide `continue-on-error`, unconditional `|| true`, or permanent allowlists to make a red security signal green. Expired exceptions must fail validation or be removed before further merge/release work.
 
+The machine-enforced registry is `.github/security/security-exceptions.json`. Every entry must name the exact control and exact non-wildcard scope, owner, tracking issue, review PR, reviewer identity, compensating control, start date, and expiration date. `backend/scripts/check_security_exceptions.py` rejects malformed, duplicate, over-broad, unreviewed, longer-than-30-day, or expired entries, and the canonical quality gate runs that validator before merge/release validation.
+
 Flaky-test quarantine is separately constrained by `.github/ci/flaky-quarantine.json`; a flaky label is not a security exception and must not suppress a deterministic security failure.
 
 ## Emergency merge override
