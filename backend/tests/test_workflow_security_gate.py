@@ -317,3 +317,148 @@ def test_rejects_flow_style_services_fail_closed(tmp_path: Path) -> None:
         f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    services: {{db: {{image: postgres@sha256:{DOCKER_DIGEST}}}}}\n    steps:\n      - run: echo unsafe\n",
     )
     assert any("flow-style services configuration is forbidden" in finding for finding in findings)
+
+
+def test_rejects_direct_secret_context_in_run_shell(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: curl -H 'Authorization: Bearer ${{ secrets.API_TOKEN }}' https://example.invalid\n",
+    )
+    assert any("direct secrets context interpolation" in finding for finding in findings)
+
+
+def test_rejects_direct_github_token_context_in_run_shell(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: echo '${{ github.token }}'\n",
+    )
+    assert any("direct GitHub token context interpolation" in finding for finding in findings)
+
+
+def test_allows_secret_context_only_through_nonprinting_env_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - env:\n          API_TOKEN: ${{ secrets.API_TOKEN }}\n"
+        "        run: python scripts/use_token.py\n",
+    )
+    assert findings == []
+
+
+def test_rejects_printing_secret_like_environment_variable(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - env:\n          API_TOKEN: ${{ secrets.API_TOKEN }}\n"
+        "        run: printf '%s\\n' \"$API_TOKEN\"\n",
+    )
+    assert any("printing secret-like environment variables" in finding for finding in findings)
+
+
+def test_rejects_printing_authorization_header(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: echo 'Authorization: redacted'\n",
+    )
+    assert any("printing authorization headers is forbidden" in finding for finding in findings)
+
+
+def test_rejects_shell_xtrace(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: |\n          set -euxo pipefail\n          echo safe\n",
+    )
+    assert any("shell xtrace is forbidden" in finding for finding in findings)
+
+
+def test_rejects_bare_environment_dump(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: printenv\n",
+    )
+    assert any("environment-dump commands are forbidden" in finding for finding in findings)
+
+
+def test_allows_printing_non_sensitive_environment_variable(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - env:\n          BUILD_SHA: abc\n        run: echo \"$BUILD_SHA\"\n",
+    )
+    assert findings == []
+
+
+def test_rejects_shell_invocation_xtrace_modes(tmp_path: Path) -> None:
+    for command in (
+        "set -x",
+        "set -o xtrace",
+        "bash -x script.sh",
+        "sh -eux script.sh",
+        "bash -o xtrace script.sh",
+        "/bin/bash -x script.sh",
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+            "      - run: |\n          " + command + "\n",
+        )
+        assert any("shell xtrace is forbidden" in finding for finding in findings)
+
+
+def test_rejects_raw_error_and_credential_output_sinks(tmp_path: Path) -> None:
+    for command in (
+        'cat "$PRIVATE_KEY"',
+        'head "$SESSION_KEY"',
+        'tail "$ERROR_PAYLOAD"',
+        'tee output.txt <<< "$TRACEBACK"',
+        'printf "%s\\n" "$RESPONSE_BODY"',
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+            "      - run: |\n          " + command + "\n",
+        )
+        assert any(
+            "printing secret-like environment variables" in finding
+            for finding in findings
+        )
+
+
+def test_rejects_verbose_or_trace_curl(tmp_path: Path) -> None:
+    for command in (
+        "curl -v https://example.invalid",
+        "curl -sSv https://example.invalid",
+        "curl -vL https://example.invalid",
+        "curl --verbose https://example.invalid",
+        "curl --trace-ascii - https://example.invalid",
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+            "      - run: |\n          " + command + "\n",
+        )
+        assert any("verbose/trace curl is forbidden" in finding for finding in findings)
+
+
+def test_sensitive_auth_name_precision(tmp_path: Path) -> None:
+    safe = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: echo \"$auth_dir\"\n",
+    )
+    assert safe == []
+
+    unsafe = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n"
+        "      - run: echo \"$AUTH_HEADER\"\n",
+    )
+    assert any(
+        "printing secret-like environment variables" in finding
+        for finding in unsafe
+    )
