@@ -33,6 +33,18 @@ from skeleton.build.incremental_graph import (
     build_incremental_graph,
 )
 
+from skeleton.build.build_observability import (
+    OBSERVABILITY_SCHEMA,
+    BuildBudgetDecision,
+    BuildObservabilityError,
+    BuildRegressionBudget,
+    BuildTelemetry,
+    NodeObservation,
+    NodeRegressionBudget,
+    evaluate_build_budget,
+    observe_build,
+)
+
 from skeleton.build.parallel_scheduler import (
     BuildEvidence,
     ParallelBuildPlan,
@@ -63,6 +75,15 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "observe_build",
+    "evaluate_build_budget",
+    "NodeRegressionBudget",
+    "NodeObservation",
+    "BuildTelemetry",
+    "BuildRegressionBudget",
+    "BuildObservabilityError",
+    "BuildBudgetDecision",
+    "OBSERVABILITY_SCHEMA",
     "aggregate_build_evidence",
     "plan_parallel_build",
     "TargetEvidence",
