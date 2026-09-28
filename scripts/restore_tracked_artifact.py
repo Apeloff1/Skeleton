@@ -60,6 +60,15 @@ def _run_git(
         ) from exc
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ArtifactRestoreError(f"duplicate manifest key: {key}")
+        payload[key] = value
+    return payload
+
+
 def _load_manifest(path: Path) -> dict[str, Any]:
     try:
         raw = path.read_bytes()
@@ -68,7 +77,10 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     if len(raw) > MAX_MANIFEST_BYTES:
         raise ArtifactRestoreError("manifest exceeds maximum size")
     try:
-        payload = json.loads(raw.decode("utf-8"))
+        payload = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ArtifactRestoreError("manifest is not valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
@@ -133,6 +145,17 @@ def validate_manifest(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _object_exists(repo_root: Path, object_id: str) -> bool:
+    probe = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-e", object_id],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return probe.returncode == 0
+
+
 def _ensure_blob(
     repo_root: Path,
     *,
@@ -140,14 +163,9 @@ def _ensure_blob(
     source_commit: str,
     remote: str,
 ) -> None:
-    probe = subprocess.run(
-        ["git", "-C", str(repo_root), "cat-file", "-e", blob_oid],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    if probe.returncode != 0:
+    if not _object_exists(repo_root, source_commit) or not _object_exists(
+        repo_root, blob_oid
+    ):
         if not remote or remote.startswith("-"):
             raise ArtifactRestoreError("remote name is invalid")
         _run_git(
@@ -155,6 +173,10 @@ def _ensure_blob(
             ["fetch", "--no-tags", "--depth=1", remote, source_commit],
             stdout=subprocess.DEVNULL,
         )
+
+    commit_type = _run_git(repo_root, ["cat-file", "-t", source_commit]).stdout
+    if commit_type.strip() != b"commit":
+        raise ArtifactRestoreError("manifest source_commit is not a Git commit")
 
     object_type = _run_git(repo_root, ["cat-file", "-t", blob_oid]).stdout
     if object_type.strip() != b"blob":
