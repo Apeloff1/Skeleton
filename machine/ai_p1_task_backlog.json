@@ -1409,7 +1409,12 @@
         "Reconnect/projection/tenant tests prove product state derives from durable authority.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087842649",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488333",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "accountability_ref": "ACC-P1-PROD-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1472,7 +1477,12 @@
         "Reconnect/projection/tenant tests prove product state derives from durable authority.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843241",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "accountability_ref": "ACC-P1-PROD-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1533,7 +1543,12 @@
         "Reconnect/projection/tenant tests prove product state derives from durable authority.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087842827",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488382",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "accountability_ref": "ACC-P1-PROD-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1594,7 +1609,13 @@
         "Reconnect/projection/tenant tests prove product state derives from durable authority.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843767",
+        "github-actions-job:109087844354",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488469",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "accountability_ref": "ACC-P1-PROD-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1660,7 +1681,13 @@
         "Reconnect/projection/tenant tests prove product state derives from durable authority.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087845062",
+        "github-actions-job:109087845157",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "accountability_ref": "ACC-P1-PROD-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
