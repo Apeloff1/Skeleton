@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/eval/shadow_traffic.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/shadow_traffic.py"
       - "skeleton/eval/champion_registry.py"
       - "skeleton/agents/blast_radius.py"
@@ -20,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/eval/shadow_traffic.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/evaluation/shadow_traffic.py"
       - "skeleton/eval/champion_registry.py"
       - "skeleton/agents/blast_radius.py"
