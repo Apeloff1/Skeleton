@@ -1,0 +1,261 @@
+name: P1 Streaming Projection Authority Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/operation_projection.py"
+      - "backend/core/operation_stream_transport.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_operation_projection.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
+      - "skeleton/frontier/operation_stream.py"
+      - ".github/workflows/p1-streaming-projection-authority.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/operation_projection.py"
+      - "backend/core/operation_stream_transport.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_operation_projection.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
+      - "skeleton/frontier/operation_stream.py"
+      - ".github/workflows/p1-streaming-projection-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-streaming-projection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate durable client projection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused stream runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+
+      - name: Compile PROD-02 contract
+        run: python -m compileall -q backend/core/operation_projection.py
+
+      - name: Run stream and projection regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_operation_stream.py
+          backend/tests/test_operation_stream_transport.py
+          backend/tests/test_operation_stream_route.py
+          backend/tests/test_operation_projection.py
+
+      - name: Build accepted PROD-02 projection receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prod-02
+          python - <<'PY'
+          import json
+          import tempfile
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          from uuid import uuid4
+
+          from core.operation_projection import (
+              apply_projection_events,
+              start_projection,
+              verify_projection_authority,
+          )
+          from core.operation_stream_transport import OperationStreamTransport
+          from skeleton.contracts.operation import OperationEnvelope, OperationState
+          from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
+          from skeleton.persistence.operation_store import SQLiteOperationStore
+
+          now = datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc)
+          root = Path(tempfile.mkdtemp(prefix="p1-prod-02-"))
+          operations = SQLiteOperationStore(root / "operations.sqlite")
+          events = SQLiteOperationEventStore(root / "events.sqlite")
+          transport = OperationStreamTransport(
+              operations,
+              events,
+              worker_id="ci-projection-worker",
+          )
+          operation = OperationEnvelope(
+              operation_id=str(uuid4()),
+              tenant_id="ci-tenant",
+              actor_id="ci-actor",
+              capability="chat",
+              created_at=now,
+              deadline=now + timedelta(minutes=10),
+              idempotency_key="p1-prod-02-ci",
+              trace_id="ci-projection-trace",
+          )
+          current = operations.create(operation, now=now)
+          for index, state in enumerate(
+              (
+                  OperationState.VALIDATED,
+                  OperationState.AUTHORIZED,
+                  OperationState.ADMITTED,
+                  OperationState.RUNNING,
+                  OperationState.COMPLETED,
+              ),
+              start=1,
+          ):
+              current = operations.transition(
+                  operation.operation_id,
+                  state,
+                  expected_version=current.version,
+                  now=now + timedelta(seconds=index),
+              )
+          batch = transport.replay(
+              operation.operation_id,
+              tenant_id=operation.tenant_id,
+              after_sequence=0,
+              limit=64,
+          )
+          projection = apply_projection_events(
+              start_projection(current),
+              batch.events,
+          )
+          decision = verify_projection_authority(projection, current)
+          if not decision.accepted:
+              raise SystemExit(
+                  f"PROD-02 projection fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-prod-02/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-prod-02/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          operations.close()
+          events.close()
+          PY
+
+      - name: Emit exact-head PROD-02 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prod-02/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-prod-02-streaming-projection-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-02/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|prod-02"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-02/verifier.digest").write_text(
+              digest([
+                  "backend/core/operation_projection.py",
+                  "backend/core/operation_stream_transport.py",
+                  "backend/routes/operation_stream.py",
+                  "skeleton/frontier/operation_stream.py",
+                  ".github/workflows/p1-streaming-projection-authority.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-02/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_operation_stream.py",
+                  "backend/tests/test_operation_stream_transport.py",
+                  "backend/tests/test_operation_stream_route.py",
+                  "backend/tests/test_operation_projection.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-PROD-02 \
+            --accountability-id ACC-P1-PROD-02 \
+            --configuration-digest "$(cat .p1-prod-02/config.digest)" \
+            --environment-digest "$(cat .p1-prod-02/environment.digest)" \
+            --verifier-id github-actions:p1-streaming-projection-authority \
+            --verifier-digest "$(cat .p1-prod-02/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-prod-02/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-prod-02/refs.json \
+            --out .p1-prod-02/receipt.json \
+            > .p1-prod-02/stdout.json
+
+      - name: Assert exact-head PROD-02 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prod-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROD-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROD-02":
+              raise SystemExit("PROD-02 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROD-02":
+              raise SystemExit("PROD-02 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("PROD-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY
