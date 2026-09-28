@@ -94,9 +94,9 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
     assert report["inventory"] == {
         "p1_primary_volume_count": 107,
         "volume_risk_count": 281,
-        "volume_gap_count": 214,
+        "volume_gap_count": 210,
         "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 519,
+        "total_obligation_count": 515,
     }
     assert report["binding_count"] == 0
     assert report["resolved_count"] == 0
