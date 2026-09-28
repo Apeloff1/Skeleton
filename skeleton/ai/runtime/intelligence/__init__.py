@@ -105,6 +105,14 @@ from skeleton.intelligence.plan_verifier import (
     qualify_static_plan,
     simulate_static_plan,
 )
+from skeleton.intelligence.core_intelligence import (
+    CORE_INTELLIGENCE_ACCOUNTABILITY_ID,
+    CORE_INTELLIGENCE_SCHEMA_VERSION,
+    CORE_INTELLIGENCE_TASK_ID,
+    CoreIntelligenceError,
+    CoreIntelligenceQualification,
+    qualify_core_intelligence,
+)
 from skeleton.intelligence.memory_retrieval_quality import (
     INTEL_QUALITY_ACCOUNTABILITY_ID,
     INTEL_QUALITY_SCHEMA_VERSION,
@@ -252,6 +260,12 @@ __all__ = [
     "analyze_static_plan",
     "qualify_static_plan",
     "simulate_static_plan",
+    "CORE_INTELLIGENCE_ACCOUNTABILITY_ID",
+    "CORE_INTELLIGENCE_SCHEMA_VERSION",
+    "CORE_INTELLIGENCE_TASK_ID",
+    "CoreIntelligenceError",
+    "CoreIntelligenceQualification",
+    "qualify_core_intelligence",
     "INTEL_QUALITY_ACCOUNTABILITY_ID",
     "INTEL_QUALITY_SCHEMA_VERSION",
     "INTEL_QUALITY_TASK_ID",
