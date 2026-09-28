@@ -1732,13 +1732,14 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "experiments",
-        "skeleton/evaluation",
-        "machine"
+        "skeleton/eval/experiment_registry.py",
+        "machine/p1_experiment_registry.json",
+        "scripts/check_p1_experiment_registry.py",
+        ".github/workflows/p1-experiment-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_experiment_manifest.py",
-        "planned:skeleton/testing/test_experiment_isolation.py"
+        "skeleton/testing/test_experiment_registry.py",
+        "tests/test_p1_experiment_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1791,18 +1792,21 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/eval",
-        "machine",
-        "eval",
-        "tests",
-        "planned:skeleton/evaluation"
+        "skeleton/eval/benchmark_registry.py",
+        "skeleton/ai/evaluation/benchmark_registry.py",
+        "skeleton/eval/experiment_registry.py",
+        "skeleton/contracts/reproducibility.py",
+        "machine/p1_benchmark_registry.json",
+        "scripts/check_p1_benchmark_registry.py",
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_benchmark_registry.py",
-        "planned:benchmark replay tests",
-        "planned:skeleton/testing/test_eval_reproducibility.py",
-        "planned:skeleton/testing/test_benchmark_metadata.py"
+        "skeleton/testing/test_benchmark_registry.py",
+        "tests/test_p1_benchmark_registry.py",
+        "skeleton/testing/test_experiment_registry.py",
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_experiment_registry.py",
+        "tests/test_p1_reproducibility_bundle.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1854,15 +1858,21 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "planned:skeleton/forge",
-        "planned:skeleton/experiments",
-        "machine",
-        "skeleton/eval"
+        "skeleton/eval/champion_registry.py",
+        "skeleton/ai/evaluation/champion_registry.py",
+        "skeleton/eval/benchmark_registry.py",
+        "skeleton/eval/experiment_registry.py",
+        "skeleton/contracts/reproducibility.py",
+        "machine/p1_champion_registry.json",
+        "scripts/check_p1_champion_registry.py",
+        ".github/workflows/p1-champion-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_forge_isolation.py",
-        "planned:skeleton/testing/test_champion_challenger.py",
-        "planned:skeleton/testing/test_champion_challenger_registry.py"
+        "skeleton/testing/test_champion_registry.py",
+        "tests/test_p1_champion_registry.py",
+        "skeleton/testing/test_benchmark_registry.py",
+        "skeleton/testing/test_experiment_registry.py",
+        "skeleton/testing/test_reproducibility.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1914,11 +1924,18 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval/shadow_traffic.py",
+        "skeleton/ai/evaluation/shadow_traffic.py",
+        "skeleton/eval/champion_registry.py",
+        "skeleton/agents/blast_radius.py",
+        "backend/core/operation_projection.py",
+        ".github/workflows/p1-shadow-traffic-isolation.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_shadow_traffic.py"
+        "skeleton/testing/test_shadow_traffic.py",
+        "skeleton/testing/test_champion_registry.py",
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "backend/tests/test_operation_projection.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1971,16 +1988,18 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "benchmarks",
-        "skeleton/security",
-        "tests"
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/ai/evaluation/regression_corpus.py",
+        "skeleton/contracts/risk_evidence.py",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_specification_gaming.py",
-        "planned:skeleton/testing/test_reasoning_regressions.py",
-        "planned:skeleton/testing/test_red_team_registry.py",
-        "planned:red-team regression conversion tests"
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py",
+        "skeleton/testing/test_risk_evidence.py",
+        "skeleton/testing/test_benchmark_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -2031,15 +2050,22 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "planned:skeleton/learning",
-        "planned:skeleton/experiments"
+        "skeleton/eval/failure_knowledge.py",
+        "skeleton/ai/evaluation/failure_knowledge.py",
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/contracts/risk_evidence.py",
+        "machine/p1_failure_knowledge.json",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_failure_knowledge.py",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_knowledge_of_failure.py",
-        "planned:skeleton/testing/test_learning_signal_lineage.py",
-        "planned:skeleton/testing/test_no_direct_self_modify.py"
+        "skeleton/testing/test_failure_knowledge.py",
+        "tests/test_p1_failure_knowledge.py",
+        "skeleton/testing/test_risk_evidence.py",
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py"
       ],
       "evidence_modes": [
         "benchmark",
