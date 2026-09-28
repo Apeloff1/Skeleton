@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .canonical import CanonicalEnvelope, EvidenceRef, Identity
 from .task_identity import derive_task_identity
-from .replay_guard import ReplayGuard
+from .replay_guard import ReplayGuard, ReplayGuardError
 
 
 class MigrationContractError(AssertionError):
@@ -40,9 +40,17 @@ def validate_migration_chain() -> str:
         raise MigrationContractError("missing task identity")
 
     guard = ReplayGuard()
-    if not guard.accept(envelope.digest):
-        raise MigrationContractError("first envelope rejected")
-    if guard.accept(envelope.digest):
+    accepted_digest = guard.accept(envelope)
+    if accepted_digest != envelope.digest:
+        raise MigrationContractError("first envelope digest drift")
+    if not guard.contains(envelope):
+        raise MigrationContractError("accepted envelope missing from replay guard")
+
+    try:
+        guard.accept(envelope)
+    except ReplayGuardError:
+        pass
+    else:
         raise MigrationContractError("duplicate envelope accepted")
 
     return task_id
