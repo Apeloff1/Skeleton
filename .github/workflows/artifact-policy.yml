@@ -36,9 +36,13 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile policy gate
-        run: python -m compileall -q scripts/check_artifact_policy.py tests/test_artifact_policy.py
+        run: python -m compileall -q scripts/check_artifact_policy.py scripts/artifact_reference.py tests/test_artifact_policy.py tests/test_artifact_reference.py
       - name: Run policy regressions
         run: python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+      - name: Run artifact reference regressions
+        run: python -m unittest discover -s tests -p 'test_artifact_reference.py' -q
+      - name: Verify immutable artifact references
+        run: python scripts/artifact_reference.py --check
       - name: Enforce artifact policy
         shell: bash
         run: |

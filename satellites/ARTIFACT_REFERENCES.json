@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "source_commit": "8aa947f24a4a11b8c91fa52214d45fe5a8c18043",
+  "artifacts": [
+    {
+      "id": "frontier-godot",
+      "target_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot",
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot",
+      "git_blob_oid": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size_bytes": 103604344,
+      "mode": "100755"
+    },
+    {
+      "id": "control-plane-godot",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/godot",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/godot",
+      "git_blob_oid": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size_bytes": 103604344,
+      "mode": "100755"
+    },
+    {
+      "id": "epistemic-godot",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/godot",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/godot",
+      "git_blob_oid": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size_bytes": 103604344,
+      "mode": "100755"
+    },
+    {
+      "id": "frontier-trailer",
+      "target_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "git_blob_oid": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size_bytes": 29450632,
+      "mode": "100644"
+    },
+    {
+      "id": "control-plane-trailer",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "git_blob_oid": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size_bytes": 29450632,
+      "mode": "100644"
+    },
+    {
+      "id": "epistemic-trailer",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "git_blob_oid": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size_bytes": 29450632,
+      "mode": "100644"
+    },
+    {
+      "id": "frontier-quiz-backup",
+      "target_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "git_blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size_bytes": 14595602,
+      "mode": "100644"
+    },
+    {
+      "id": "control-plane-quiz-backup",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "git_blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size_bytes": 14595602,
+      "mode": "100644"
+    },
+    {
+      "id": "epistemic-quiz-backup",
+      "target_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "source_path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "git_blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size_bytes": 14595602,
+      "mode": "100644"
+    }
+  ]
+}
