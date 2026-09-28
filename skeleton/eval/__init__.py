@@ -60,6 +60,13 @@ __all__ = [
     "ImprovementClaimDecision",
     "evaluate_improvement_claim",
     "qualify_benchmark",
+    "SHADOW_TRAFFIC_ACCOUNTABILITY_ID",
+    "SHADOW_TRAFFIC_SCHEMA_VERSION",
+    "SHADOW_TRAFFIC_TASK_ID",
+    "ShadowTrafficDecision",
+    "ShadowTrafficError",
+    "ShadowTrafficObservation",
+    "qualify_shadow_traffic",
 ]
 
 from skeleton.eval.champion_registry import (
@@ -95,6 +102,16 @@ from skeleton.eval.benchmark_registry import (
     ImprovementClaimDecision,
     evaluate_improvement_claim,
     qualify_benchmark,
+)
+
+from skeleton.eval.shadow_traffic import (
+    SHADOW_TRAFFIC_ACCOUNTABILITY_ID,
+    SHADOW_TRAFFIC_SCHEMA_VERSION,
+    SHADOW_TRAFFIC_TASK_ID,
+    ShadowTrafficDecision,
+    ShadowTrafficError,
+    ShadowTrafficObservation,
+    qualify_shadow_traffic,
 )
 
 from skeleton.eval.experiment_registry import (
