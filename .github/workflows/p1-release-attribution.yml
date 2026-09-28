@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "machine/p1_release_attribution.json"
       - "scripts/check_p1_release_attribution.py"
       - "skeleton/release/attribution.py"
@@ -17,6 +18,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "machine/p1_release_attribution.json"
       - "scripts/check_p1_release_attribution.py"
       - "skeleton/release/attribution.py"
