@@ -75,6 +75,16 @@ __all__ = [
     "MigrationPlan",
     "MigrationSpec",
     "qualify_migration_compatibility",
+    "BACKUP_RESTORE_ACCOUNTABILITY_ID",
+    "BACKUP_RESTORE_SCHEMA_VERSION",
+    "BACKUP_RESTORE_TASK_ID",
+    "BackupComponent",
+    "BackupComponentRole",
+    "BackupManifest",
+    "BackupRestoreError",
+    "BackupRestoreQualificationDecision",
+    "RestoreComponentReceipt",
+    "qualify_backup_restore",
 ]
 
 from skeleton.release.slo_promotion import (
@@ -85,6 +95,19 @@ from skeleton.release.slo_promotion import (
     ReleasePromotionError,
     ReleaseSLOPolicy,
     ReleaseSLOPromotionController,
+)
+
+from skeleton.release.restore import (
+    BACKUP_RESTORE_ACCOUNTABILITY_ID,
+    BACKUP_RESTORE_SCHEMA_VERSION,
+    BACKUP_RESTORE_TASK_ID,
+    BackupComponent,
+    BackupComponentRole,
+    BackupManifest,
+    BackupRestoreError,
+    BackupRestoreQualificationDecision,
+    RestoreComponentReceipt,
+    qualify_backup_restore,
 )
 
 from skeleton.release.migration import (
