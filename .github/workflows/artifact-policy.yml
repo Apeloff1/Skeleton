@@ -36,9 +36,11 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile policy gate
-        run: python -m compileall -q scripts/check_artifact_policy.py tests/test_artifact_policy.py
+        run: python -m compileall -q scripts/check_artifact_policy.py scripts/check_large_artifact_archive.py tests/test_artifact_policy.py tests/test_large_artifact_archive.py
       - name: Run policy regressions
-        run: python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+        run: |
+          python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+          python -m unittest discover -s tests -p 'test_large_artifact_archive.py' -q
       - name: Enforce artifact policy
         shell: bash
         run: |
@@ -48,3 +50,4 @@ jobs:
           else
             python scripts/check_artifact_policy.py --all
           fi
+          python scripts/check_large_artifact_archive.py
