@@ -116,6 +116,8 @@ def _validate_scope(value: Any) -> tuple[str, ...]:
         item = _required_text(raw, field="scope item")
         if item in seen:
             raise SecurityExceptionPolicyError(f"duplicate scope item: {item}")
+        if "\n" in item:
+            raise SecurityExceptionPolicyError("scope item cannot contain newlines")
         if item in {".", "/", "*", "**"}:
             raise SecurityExceptionPolicyError("scope cannot target the whole repository")
         if "*" in item or "?" in item or "[" in item or "]" in item:
@@ -231,6 +233,10 @@ def validate_registry(
 
         starts_on = _parse_date(raw["starts_on"], field="starts_on")
         expires_on = _parse_date(raw["expires_on"], field="expires_on")
+        if starts_on > current:
+            raise SecurityExceptionPolicyError(
+                f"{exception_id} starts in the future"
+            )
         if expires_on < starts_on:
             raise SecurityExceptionPolicyError(
                 f"{exception_id} expires before it starts"
