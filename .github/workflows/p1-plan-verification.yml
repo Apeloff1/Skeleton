@@ -283,6 +283,10 @@ jobs:
               plan=plan,
               verification_policy=verifier,
               qualification=decision,
+              planner_id="planner:ci-intel-05",
+              planner_digest=reasoning.digest,
+              verifier_id="verifier:ci-intel-05",
+              verifier_digest=verifier.digest,
               requested_step_ids=("apply", "verify"),
               completed_step_ids=("inspect",),
           )
@@ -292,6 +296,8 @@ jobs:
               )
           if admission.privileged_step_ids != ("apply",):
               raise SystemExit("INTEL-05 privileged step classification drift")
+          if admission.independent_verification is not True:
+              raise SystemExit("INTEL-05 planner/verifier independence missing")
           require_privileged_execution_admission(
               admission,
               plan=plan,
