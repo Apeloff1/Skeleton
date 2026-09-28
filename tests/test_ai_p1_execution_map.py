@@ -632,3 +632,22 @@ def test_learning_lane_gates_watch_p1_backlog_changes() -> None:
         assert (
             trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
         ), workflow
+
+
+
+def test_release_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        ".github/workflows/p1-installer-lifecycle.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml",
+        ".github/workflows/p1-backup-restore-qualification.yml",
+        ".github/workflows/p1-disaster-recovery-feedback.yml",
+        ".github/workflows/p1-release-attribution.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
