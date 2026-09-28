@@ -150,6 +150,31 @@ def test_execution_spec_order_does_not_change_plan_identity() -> None:
     )
 
 
+def test_forged_plan_derived_fields_fail_closed() -> None:
+    plan = _plan()
+    first = plan.jobs[0]
+
+    with pytest.raises(RemoteBuildError, match="plan fingerprint"):
+        plan.ready_jobs()
+
+    forged_plan = replace(plan, plan_fingerprint="0" * 64)
+    with pytest.raises(RemoteBuildError, match="plan fingerprint"):
+        forged_plan.ready_jobs()
+
+    forged_job = replace(first, network_access=True)
+    forged_jobs = (forged_job, *plan.jobs[1:])
+    with pytest.raises(RemoteBuildError, match="authority/provenance"):
+        replace(plan, jobs=forged_jobs).ready_jobs()
+
+
+def test_completed_job_set_must_be_dependency_closed() -> None:
+    plan = _plan()
+    by_node = plan.node_job_map()
+
+    with pytest.raises(RemoteBuildError, match="dependency-closed"):
+        plan.ready_jobs([by_node["compile-a"].job_id])
+
+
 def test_source_toolchain_or_command_change_changes_job_identity() -> None:
     graph = _graph()
     specs = [_spec(node_id) for node_id in graph.topological_order]
