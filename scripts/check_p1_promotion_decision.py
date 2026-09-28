@@ -34,12 +34,7 @@ EXPECTED_SIGNATURE_METHODS = [
     "sigstore",
     "ci_oidc",
 ]
-EXPECTED_SIGNATURE_REF_METHODS = [
-    "git_gpg",
-    "git_ssh",
-    "sigstore",
-    "ci_oidc",
-]
+EXPECTED_SIGNATURE_REF_METHODS = list(EXPECTED_SIGNATURE_METHODS)
 EXPECTED_IMPLEMENTATION_PATHS = {
     "machine/p1_promotion_decision_policy.json",
     "skeleton/contracts/p1_promotion_decision.py",
