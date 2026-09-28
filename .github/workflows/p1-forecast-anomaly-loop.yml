@@ -1,0 +1,372 @@
+name: P1 Forecast Anomaly Loop Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/observability/forecasting.py"
+      - "skeleton/ai/runtime/observability/forecasting.py"
+      - "skeleton/observability/budget_accounting.py"
+      - "skeleton/mesh/capacity_qualification.py"
+      - "skeleton/observability/__init__.py"
+      - "skeleton/ai/runtime/observability/__init__.py"
+      - "skeleton/testing/test_forecasting_engine.py"
+      - "skeleton/testing/test_cost_anomaly_detection.py"
+      - ".github/workflows/p1-forecast-anomaly-loop.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/observability/forecasting.py"
+      - "skeleton/ai/runtime/observability/forecasting.py"
+      - "skeleton/observability/budget_accounting.py"
+      - "skeleton/mesh/capacity_qualification.py"
+      - "skeleton/observability/__init__.py"
+      - "skeleton/ai/runtime/observability/__init__.py"
+      - "skeleton/testing/test_forecasting_engine.py"
+      - "skeleton/testing/test_cost_anomaly_detection.py"
+      - ".github/workflows/p1-forecast-anomaly-loop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-forecast-anomaly-loop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate forecasting and anomaly action loop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile DIST-06 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/observability/forecasting.py
+          skeleton/ai/runtime/observability/forecasting.py
+
+      - name: Run DIST-04 through DIST-06 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_capacity_qualification.py
+          skeleton/testing/test_budget_accounting_ledger.py
+          skeleton/testing/test_forecasting_engine.py
+          skeleton/testing/test_cost_anomaly_detection.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted actionable DIST-06 evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-dist-06
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.mesh.capacity_qualification import (
+              CapacityDisposition,
+              CapacityQualificationDecision,
+          )
+          from skeleton.observability.budget_accounting import (
+              BudgetAccountingDecision,
+          )
+          from skeleton.observability.forecasting import (
+              AccountableActionReceipt,
+              ActionDisposition,
+              AnomalySeverity,
+              ForecastMetric,
+              ForecastModelKind,
+              ForecastObservation,
+              ForecastPolicy,
+              ForecastSeries,
+              backtest_forecast,
+              classify_cost_anomaly,
+              cost_anomaly_identity,
+              qualify_forecasting_loop,
+          )
+
+          now = 1_800_001_000.0
+          policy = ForecastPolicy(
+              policy_id="dist-06-ci",
+              version=1,
+              model_kind=ForecastModelKind.LINEAR_TREND,
+              training_window=4,
+              min_backtest_points=4,
+              horizon_steps=2,
+              max_mape=0.05,
+              max_absolute_error=1.0,
+              anomaly_relative_error=0.10,
+              high_anomaly_relative_error=0.25,
+              critical_anomaly_relative_error=0.50,
+              require_action_from=AnomalySeverity.HIGH,
+          )
+
+          def series(metric, values, unit):
+              return ForecastSeries(
+                  series_id=f"ci-{metric.value}",
+                  metric=metric,
+                  unit=unit,
+                  interval_s=60.0,
+                  observations=tuple(
+                      ForecastObservation(
+                          observed_at=1_800_000_000.0 + index * 60.0,
+                          value=value,
+                          evidence_refs=(
+                              EvidenceRef(
+                                  source=f"ci://dist-06/{metric.value}/{index}",
+                                  digest=f"{(index + 1) % 10}" * 64,
+                                  category="forecast_observation",
+                              ),
+                          ),
+                      )
+                      for index, value in enumerate(values)
+                  ),
+              )
+
+          demand = backtest_forecast(
+              series=series(
+                  ForecastMetric.DEMAND,
+                  [100, 110, 120, 130, 140, 150, 160, 170],
+                  "requests",
+              ),
+              policy=policy,
+          )
+          capacity_forecast = backtest_forecast(
+              series=series(
+                  ForecastMetric.CAPACITY,
+                  [2, 3, 4, 5, 6, 7, 8, 9],
+                  "workers",
+              ),
+              policy=policy,
+          )
+          cost = backtest_forecast(
+              series=series(
+                  ForecastMetric.COST,
+                  [1, 2, 3, 4, 5, 6, 7, 8],
+                  "usd",
+              ),
+              policy=policy,
+          )
+          for name, decision in (
+              ("demand", demand),
+              ("capacity", capacity_forecast),
+              ("cost", cost),
+          ):
+              if not decision.accepted:
+                  raise SystemExit(
+                      f"{name} backtest rejected: {decision.reasons}"
+                  )
+
+          observed_cost = cost.forecast[0].value * 1.30
+          anomaly_digest = cost_anomaly_identity(
+              cost_backtest=cost,
+              policy=policy,
+              observed_cost=observed_cost,
+          )
+          action = AccountableActionReceipt(
+              action_id="dist-06-ci-action",
+              owner_id="oncall-finops",
+              workflow_ref="workflow:cost-anomaly",
+              incident_ref="incident:dist-06-ci",
+              anomaly_digest=anomaly_digest,
+              created_at=now,
+              due_at=now + 3600.0,
+              disposition=ActionDisposition.OPEN,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://dist-06/incident-action",
+                      digest="a" * 64,
+                      category="incident_action",
+                  ),
+              ),
+              independent=True,
+          )
+          anomaly = classify_cost_anomaly(
+              cost_backtest=cost,
+              policy=policy,
+              observed_cost=observed_cost,
+              action_receipt=action,
+          )
+          if anomaly.severity is not AnomalySeverity.HIGH:
+              raise SystemExit(
+                  f"expected high anomaly, got {anomaly.severity.value}"
+              )
+
+          capacity = CapacityQualificationDecision(
+              accepted=True,
+              reasons=(),
+              disposition=CapacityDisposition.HEALTHY,
+              profile_digest="1" * 64,
+              autoscaling_decision_digest="2" * 64,
+              observation_digest="3" * 64,
+              queue_utilization=0.50,
+              cost_reconciliation_error_usd=0.0,
+          )
+          budget = BudgetAccountingDecision(
+              accepted=True,
+              reasons=(),
+              tenant_id="ci-tenant",
+              window_id="ci-window",
+              operation_id="ci-operation",
+              reservation_id="ci-reservation",
+              reservation_digest="4" * 64,
+              completion_digest="5" * 64,
+              snapshot_digest="6" * 64,
+              actual_usage_digest="7" * 64,
+              usage_event_count=3,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://dist-06/budget-accounting",
+                      digest="8" * 64,
+                      category="cost_reconciliation",
+                  ),
+              ),
+          )
+          decision = qualify_forecasting_loop(
+              capacity_decision=capacity,
+              budget_decision=budget,
+              demand_backtest=demand,
+              capacity_backtest=capacity_forecast,
+              cost_backtest=cost,
+              anomaly_decision=anomaly,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"DIST-06 fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-dist-06/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-dist-06/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head DIST-06 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-dist-06/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-dist-06-forecast-anomaly-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-06/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|dist-06"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-06/verifier.digest").write_text(
+              digest([
+                  "skeleton/observability/forecasting.py",
+                  "skeleton/mesh/capacity_qualification.py",
+                  "skeleton/observability/budget_accounting.py",
+                  ".github/workflows/p1-forecast-anomaly-loop.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-06/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_capacity_qualification.py",
+                  "skeleton/testing/test_budget_accounting_ledger.py",
+                  "skeleton/testing/test_forecasting_engine.py",
+                  "skeleton/testing/test_cost_anomaly_detection.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-DIST-06 \
+            --accountability-id ACC-P1-DIST-06 \
+            --configuration-digest "$(cat .p1-dist-06/config.digest)" \
+            --environment-digest "$(cat .p1-dist-06/environment.digest)" \
+            --verifier-id github-actions:p1-forecast-anomaly-loop \
+            --verifier-digest "$(cat .p1-dist-06/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-dist-06/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-dist-06/refs.json \
+            --out .p1-dist-06/receipt.json \
+            > .p1-dist-06/stdout.json
+
+      - name: Assert exact-head DIST-06 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-dist-06/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("DIST-06 receipt head mismatch")
+          if receipt["task_id"] != "P1-DIST-06":
+              raise SystemExit("DIST-06 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-DIST-06":
+              raise SystemExit("DIST-06 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("DIST-06 exact-head receipt OK", receipt["receipt_digest"])
+          PY
