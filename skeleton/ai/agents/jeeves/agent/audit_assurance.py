@@ -86,6 +86,10 @@ class FrontierExecutionReplayVerifier(ExecutionReplayVerifier):
             "transition_model_fingerprint",
             "transition_model_lineage_hash",
             "world_model_fingerprint",
+            "semantic_learning_scope_fingerprint",
+            "semantic_plane_fingerprint",
+            "semantic_runtime_state_fingerprint",
+            "semantic_topology_learning_fingerprint",
         ),
         AuditEventKind.RUN_RESUMED: (
             "audit_head",
@@ -218,25 +222,52 @@ class FrontierExecutionReplayVerifier(ExecutionReplayVerifier):
         version = payload.get("frontier_binding_version")
         if version is None:
             return
-        if version != 2:
+        supported_versions = (2, 5)
+        if version not in supported_versions:
             issues.append(
                 ReplayIssue(
                     ReplayIssueKind.CHECKPOINT_MISMATCH,
                     entry.sequence,
                     None,
                     "unsupported frontier checkpoint binding version",
-                    2,
+                    list(supported_versions),
                     version,
                 )
             )
             return
-        required = (
+
+        required = [
             "runtime_guard_policy",
             "transition_model_fingerprint",
             "transition_model_lineage_count",
             "transition_model_lineage_hash",
             "world_model_fingerprint",
-        )
+        ]
+        fingerprint_fields = [
+            "runtime_guard_policy",
+            "transition_model_fingerprint",
+            "transition_model_lineage_hash",
+            "world_model_fingerprint",
+        ]
+        if version == 5:
+            required.extend(
+                [
+                    "semantic_scoping_enabled",
+                    "semantic_learning_scope_fingerprint",
+                    "semantic_plane_fingerprint",
+                    "semantic_runtime_state_fingerprint",
+                    "semantic_topology_learning_fingerprint",
+                ]
+            )
+            fingerprint_fields.extend(
+                [
+                    "semantic_learning_scope_fingerprint",
+                    "semantic_plane_fingerprint",
+                    "semantic_runtime_state_fingerprint",
+                    "semantic_topology_learning_fingerprint",
+                ]
+            )
+
         for field_name in required:
             if field_name not in payload:
                 issues.append(
@@ -247,6 +278,7 @@ class FrontierExecutionReplayVerifier(ExecutionReplayVerifier):
                         f"frontier checkpoint binding is missing {field_name}",
                     )
                 )
+
         lineage_count = payload.get("transition_model_lineage_count")
         if (
             isinstance(lineage_count, bool)
@@ -263,12 +295,23 @@ class FrontierExecutionReplayVerifier(ExecutionReplayVerifier):
                     lineage_count,
                 )
             )
-        for field_name in (
-            "runtime_guard_policy",
-            "transition_model_fingerprint",
-            "transition_model_lineage_hash",
-            "world_model_fingerprint",
+
+        if version == 5 and not isinstance(
+            payload.get("semantic_scoping_enabled"),
+            bool,
         ):
+            issues.append(
+                ReplayIssue(
+                    ReplayIssueKind.CHECKPOINT_MISMATCH,
+                    entry.sequence,
+                    None,
+                    "frontier checkpoint semantic_scoping_enabled must be boolean",
+                    "boolean",
+                    payload.get("semantic_scoping_enabled"),
+                )
+            )
+
+        for field_name in fingerprint_fields:
             value = payload.get(field_name)
             if value is not None and not cls._is_sha256(value):
                 issues.append(
