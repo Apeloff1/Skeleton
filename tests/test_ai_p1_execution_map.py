@@ -420,3 +420,16 @@ def test_upstream_evidence_reconciliation_preserves_dependency_order() -> None:
         "P1-EVID-05",
     ]
     assert task_by_id["P1-INTEL-03"]["depends_on"] == ["P1-INTEL-01"]
+
+
+
+def test_upstream_domain_gates_watch_p1_backlog_evidence_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        assert text.count('"machine/ai_p1_task_backlog.json"') == 2, workflow
