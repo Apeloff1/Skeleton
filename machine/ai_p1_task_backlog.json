@@ -1745,7 +1745,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096150349",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954405",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1806,7 +1811,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147549",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954538",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1866,7 +1876,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096146862",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1926,7 +1941,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147623",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954568",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1984,7 +2004,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147873",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2043,7 +2068,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096149360",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
