@@ -1,0 +1,350 @@
+name: P1 Workspace Projection Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/operation_projection.py"
+      - "backend/core/workspace_projection.py"
+      - "backend/tests/test_operation_projection.py"
+      - "backend/tests/test_workspace_projection.py"
+      - "frontend/src/product/workspaceProjection.ts"
+      - ".github/workflows/p1-workspace-projection.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/operation_projection.py"
+      - "backend/core/workspace_projection.py"
+      - "backend/tests/test_operation_projection.py"
+      - "backend/tests/test_workspace_projection.py"
+      - "frontend/src/product/workspaceProjection.ts"
+      - ".github/workflows/p1-workspace-projection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-workspace-projection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Validate workspace projection authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+
+      - name: Compile PROD-03 contracts
+        run: >-
+          python -m compileall -q
+          backend/core/operation_projection.py
+          backend/core/workspace_projection.py
+
+      - name: Run projection regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_operation_projection.py
+          backend/tests/test_workspace_projection.py
+
+      - name: Build accepted PROD-03 workspace projection
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prod-03
+          python - <<'PY'
+          import json
+          import tempfile
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          from uuid import uuid4
+
+          from core.operation_projection import (
+              apply_projection_events,
+              start_projection,
+              verify_projection_authority,
+          )
+          from core.operation_stream_transport import OperationStreamTransport
+          from core.workspace_projection import (
+              CostProjection,
+              ProgressProjection,
+              TerminalResultProjection,
+              build_workspace_projection,
+              verify_workspace_projection,
+          )
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.operation import OperationEnvelope, OperationState
+          from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
+          from skeleton.persistence.operation_store import SQLiteOperationStore
+
+          now = datetime(2026, 9, 28, 13, 0, tzinfo=timezone.utc)
+          root = Path(tempfile.mkdtemp(prefix="p1-prod-03-"))
+          operations = SQLiteOperationStore(root / "operations.sqlite")
+          events = SQLiteOperationEventStore(root / "events.sqlite")
+          transport = OperationStreamTransport(
+              operations,
+              events,
+              worker_id="ci-workspace-projection",
+          )
+          operation = OperationEnvelope(
+              operation_id=str(uuid4()),
+              tenant_id="ci-tenant",
+              actor_id="ci-actor",
+              capability="chat",
+              created_at=now,
+              deadline=now + timedelta(minutes=20),
+              idempotency_key="p1-prod-03-ci",
+              trace_id="ci-workspace-trace",
+          )
+          current = operations.create(operation, now=now)
+          for index, state in enumerate(
+              (
+                  OperationState.VALIDATED,
+                  OperationState.AUTHORIZED,
+                  OperationState.ADMITTED,
+                  OperationState.RUNNING,
+                  OperationState.COMPLETED,
+              ),
+              start=1,
+          ):
+              current = operations.transition(
+                  operation.operation_id,
+                  state,
+                  expected_version=current.version,
+                  now=now + timedelta(seconds=index),
+              )
+          batch = transport.replay(
+              operation.operation_id,
+              tenant_id=operation.tenant_id,
+              after_sequence=0,
+              limit=64,
+          )
+          operation_projection = apply_projection_events(
+              start_projection(current),
+              batch.events,
+          )
+          authority = verify_projection_authority(
+              operation_projection,
+              current,
+          )
+          if not authority.accepted:
+              raise SystemExit(
+                  f"PROD-02 authority rejected: {authority.reasons}"
+              )
+
+          workspace = build_workspace_projection(
+              operation_projection=operation_projection,
+              authority=authority,
+              progress=ProgressProjection(
+                  completed_units=10,
+                  total_units=10,
+                  label="Complete",
+                  evidence=EvidenceRef(
+                      source="ci://prod-03/progress",
+                      digest="1" * 64,
+                      category="operation_progress",
+                  ),
+              ),
+              cost=CostProjection(
+                  spent_units=1.0,
+                  remaining_units=0.0,
+                  unit="cost-unit",
+                  evidence=EvidenceRef(
+                      source="ci://prod-03/cost",
+                      digest="2" * 64,
+                      category="operation_cost",
+                  ),
+              ),
+              evidence=(
+                  EvidenceRef(
+                      source="ci://prod-03/evidence",
+                      digest="3" * 64,
+                      category="quality",
+                  ),
+              ),
+              terminal_result=TerminalResultProjection(
+                  summary="Operation completed with verified result.",
+                  result=EvidenceRef(
+                      source="ci://prod-03/result",
+                      digest="4" * 64,
+                      category="operation_result",
+                  ),
+              ),
+          )
+          decision = verify_workspace_projection(
+              workspace,
+              operation_projection,
+              authority,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"PROD-03 fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-prod-03/workspace.json").write_text(
+              json.dumps(workspace.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-prod-03/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-prod-03/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          operations.close()
+          events.close()
+          PY
+
+      - name: Emit exact-head PROD-03 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prod-03/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-prod-03-workspace-projection-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-03/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|prod-03"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-03/verifier.digest").write_text(
+              digest([
+                  "backend/core/operation_projection.py",
+                  "backend/core/workspace_projection.py",
+                  "frontend/src/product/workspaceProjection.ts",
+                  ".github/workflows/p1-workspace-projection.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-03/tests.digest").write_text(
+              digest([
+                  "backend/tests/test_operation_projection.py",
+                  "backend/tests/test_workspace_projection.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-PROD-03 \
+            --accountability-id ACC-P1-PROD-03 \
+            --configuration-digest "$(cat .p1-prod-03/config.digest)" \
+            --environment-digest "$(cat .p1-prod-03/environment.digest)" \
+            --verifier-id github-actions:p1-workspace-projection \
+            --verifier-digest "$(cat .p1-prod-03/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-prod-03/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-prod-03/refs.json \
+            --out .p1-prod-03/receipt.json \
+            > .p1-prod-03/stdout.json
+
+      - name: Assert exact-head PROD-03 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prod-03/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROD-03 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROD-03":
+              raise SystemExit("PROD-03 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROD-03":
+              raise SystemExit("PROD-03 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("PROD-03 exact-head receipt OK", receipt["receipt_digest"])
+          PY
+
+  frontend:
+    name: Validate frontend workspace projection decoder
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Apply reviewed local patches
+        working-directory: frontend
+        run: node ./scripts/patch-node-modules.js
+
+      - name: Typecheck workspace projection surface
+        working-directory: frontend
+        run: yarn typecheck
