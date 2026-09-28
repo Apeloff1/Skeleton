@@ -225,6 +225,7 @@ jobs:
           tests/test_repo_machine_catalog.py
           tests/test_repo_machine_sota.py
           tests/test_autonomous_supervisor.py
+          tests/test_autonomous_builder_e2e_contract.py
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
