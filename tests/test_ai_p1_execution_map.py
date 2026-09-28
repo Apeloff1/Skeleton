@@ -951,19 +951,32 @@ DISTRIBUTED_LANE_TASKS = (
 )
 
 
-def test_distributed_lane_paths_are_materialized_before_evidence_binding() -> None:
+DISTRIBUTED_LANE_EVIDENCE_HEAD = "0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+DISTRIBUTED_LANE_EVIDENCE = {
+    "P1-DIST-01": ("36473820961", ("109102424893",)),
+    "P1-DIST-02": ("36473821015", ("109102424008",)),
+    "P1-DIST-03": ("36473821066", ("109102423944",)),
+    "P1-DIST-04": ("36473820988", ("109102424598",)),
+    "P1-DIST-05": ("36473820997", ("109102424353",)),
+    "P1-DIST-06": ("36473821029", ("109102424052",)),
+}
+
+
+def test_distributed_lane_uses_materialized_exact_head_evidence() -> None:
     payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
     task_by_id = {task["task_id"]: task for task in payload["tasks"]}
 
     for task_id in DISTRIBUTED_LANE_TASKS:
         task = task_by_id[task_id]
 
-        for field in ("implementation_paths", "test_targets"):
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
             assert task[field]
             assert all(
                 not str(reference).startswith("planned:")
                 for reference in task[field]
             )
+
+        for field in ("implementation_paths", "test_targets"):
             for reference in task[field]:
                 assert (ROOT / reference).is_file(), (
                     task_id,
@@ -971,7 +984,20 @@ def test_distributed_lane_paths_are_materialized_before_evidence_binding() -> No
                     reference,
                 )
 
-        assert task["evidence_refs"] == []
+        run_id, job_ids = DISTRIBUTED_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{DISTRIBUTED_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + DISTRIBUTED_LANE_EVIDENCE_HEAD
+        ) in evidence
+
         assert task["status"] == "blocked"
         assert task["accountability_status"] == "planned"
         assert task["implementation_signed"] is False
