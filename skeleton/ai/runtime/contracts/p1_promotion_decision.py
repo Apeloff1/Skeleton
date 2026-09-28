@@ -26,6 +26,7 @@ P1_PROMOTION_DECISION_SCHEMA_VERSION = 1
 P1_PROMOTION_DECISION_TASK_ID = "P1-PROM-03"
 P1_PROMOTION_DECISION_ACCOUNTABILITY_ID = "ACC-P1-PROM-03"
 P1_PROMOTION_SIGNATURE_METHOD = "ed25519"
+P1_PROMOTION_ALLOWED_SIGNER_TYPES = ("human", "ci", "service")
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA64_RE = re.compile(r"^[0-9a-f]{64}$")
 _VOLUME_RE = re.compile(r"^VOL-[0-9]{3}$")
@@ -125,6 +126,7 @@ class P1PromotionIntent:
     deferred_volume_refs: tuple[str, ...]
     explicit_blockers: tuple[str, ...] = ()
     signer_id: str | None = None
+    signer_type: str | None = None
     signer_identity_digest: str | None = None
     public_key_fingerprint: str | None = None
     signature_method: str = P1_PROMOTION_SIGNATURE_METHOD
@@ -184,6 +186,7 @@ class P1PromotionIntent:
 
         signature_fields = (
             self.signer_id,
+            self.signer_type,
             self.signer_identity_digest,
             self.public_key_fingerprint,
         )
@@ -203,6 +206,16 @@ class P1PromotionIntent:
                 "signer_id",
                 _text(self.signer_id, "signer_id", maximum=256),
             )
+            signer_type = _text(
+                self.signer_type,
+                "signer_type",
+                maximum=32,
+            )
+            if signer_type not in P1_PROMOTION_ALLOWED_SIGNER_TYPES:
+                raise P1PromotionDecisionError(
+                    "signer_type must be human, ci, or service; agent signers are forbidden"
+                )
+            object.__setattr__(self, "signer_type", signer_type)
             object.__setattr__(
                 self,
                 "signer_identity_digest",
@@ -273,6 +286,7 @@ class P1PromotionIntent:
             "deferred_volume_digest": self.deferred_volume_digest,
             "explicit_blockers": list(self.explicit_blockers),
             "signer_id": self.signer_id,
+            "signer_type": self.signer_type,
             "signer_identity_digest": self.signer_identity_digest,
             "public_key_fingerprint": self.public_key_fingerprint,
             "signature_method": self.signature_method,
@@ -313,6 +327,7 @@ class P1PromotionIntent:
                 raw.get("explicit_blockers") or ()
             ),
             signer_id=raw.get("signer_id"),
+            signer_type=raw.get("signer_type"),
             signer_identity_digest=raw.get(
                 "signer_identity_digest"
             ),
@@ -332,6 +347,7 @@ class IndependentSignatureObservation:
     commit_sha: str
     intent_digest: str
     signer_id: str
+    signer_type: str
     signer_identity_digest: str
     public_key_fingerprint: str
     signature_digest: str
@@ -373,6 +389,16 @@ class IndependentSignatureObservation:
             "signer_id",
             _text(self.signer_id, "signer_id", maximum=256),
         )
+        signer_type = _text(
+            self.signer_type,
+            "signer_type",
+            maximum=32,
+        )
+        if signer_type not in P1_PROMOTION_ALLOWED_SIGNER_TYPES:
+            raise P1PromotionDecisionError(
+                "signature signer_type must be human, ci, or service; agent signers are forbidden"
+            )
+        object.__setattr__(self, "signer_type", signer_type)
         object.__setattr__(
             self,
             "verifier_id",
@@ -401,6 +427,7 @@ class IndependentSignatureObservation:
             "commit_sha": self.commit_sha,
             "intent_digest": self.intent_digest,
             "signer_id": self.signer_id,
+            "signer_type": self.signer_type,
             "signer_identity_digest": self.signer_identity_digest,
             "public_key_fingerprint": self.public_key_fingerprint,
             "signature_digest": self.signature_digest,
@@ -429,6 +456,7 @@ class IndependentSignatureObservation:
             commit_sha=raw.get("commit_sha"),
             intent_digest=raw.get("intent_digest"),
             signer_id=raw.get("signer_id"),
+            signer_type=raw.get("signer_type"),
             signer_identity_digest=raw.get(
                 "signer_identity_digest"
             ),
@@ -665,6 +693,10 @@ def finalize_p1_promotion_decision(
             reasons.append("signature-signer-not-declared")
         elif signature.signer_id != intent.signer_id:
             reasons.append("signature-signer-id-mismatch")
+        if intent.signer_type is None:
+            reasons.append("signature-signer-type-not-declared")
+        elif signature.signer_type != intent.signer_type:
+            reasons.append("signature-signer-type-mismatch")
         if intent.signer_identity_digest is None:
             reasons.append("signature-identity-not-declared")
         elif (
@@ -730,6 +762,7 @@ def finalize_p1_promotion_decision(
 
 
 __all__ = [
+    "P1_PROMOTION_ALLOWED_SIGNER_TYPES",
     "P1_PROMOTION_DECISION_ACCOUNTABILITY_ID",
     "P1_PROMOTION_DECISION_SCHEMA_VERSION",
     "P1_PROMOTION_SIGNATURE_METHOD",
