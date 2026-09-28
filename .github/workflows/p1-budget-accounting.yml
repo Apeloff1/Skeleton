@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/observability/budget_accounting.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/observability/budget_accounting.py"
       - "skeleton/intelligence/quota.py"
       - "skeleton/intelligence/quota_sqlite.py"
@@ -18,6 +19,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/observability/budget_accounting.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/observability/budget_accounting.py"
       - "skeleton/intelligence/quota.py"
       - "skeleton/intelligence/quota_sqlite.py"
