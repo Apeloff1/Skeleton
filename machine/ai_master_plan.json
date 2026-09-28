@@ -12885,23 +12885,36 @@
         "AnswerDecision"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_answer_quality_pipeline.py"
+        "skeleton/testing/test_answer_artifact_quality.py"
       ],
       "evaluations": [
-        "planned:known-error corpus"
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        "skeleton/testing/test_answer_artifact_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014996463",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "risks": [
         "self-verification bias",
         "repair loop unbounded"
       ],
       "gaps": [
-        "compose verifier stages",
-        "bind quality vector"
+        "implementation accountability signoff pending",
+        "independent verification signoff pending"
       ],
       "accountability_id": "ACC-VOL-254",
       "completion_checkbox": false,
@@ -12932,23 +12945,36 @@
         "ArtifactQualityResult"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "skeleton/eval"
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_artifact_quality_pipeline.py"
+        "skeleton/testing/test_answer_artifact_quality.py"
       ],
       "evaluations": [
-        "planned:corrupt/stale artifact evaluation"
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        "skeleton/testing/test_answer_artifact_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014996463",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "risks": [
         "tested artifact differs from output",
         "missing type-specific checks"
       ],
       "gaps": [
-        "define gate registry",
-        "bind artifact lifecycle"
+        "implementation accountability signoff pending",
+        "independent verification signoff pending"
       ],
       "accountability_id": "ACC-VOL-255",
       "completion_checkbox": false,
@@ -18364,23 +18390,44 @@
         "PlanApproval"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/ai/runtime/intelligence/plan_verifier.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_plan_verifier.py"
+        "skeleton/testing/test_plan_static_analyzer.py",
+        "skeleton/testing/test_plan_cycles.py",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py"
       ],
       "evaluations": [
-        "planned:known-bad plan corpus"
+        ".github/workflows/p1-plan-verification.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/ai/runtime/intelligence/plan_verifier.py",
+        "skeleton/testing/test_plan_static_analyzer.py",
+        "skeleton/testing/test_plan_cycles.py",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        ".github/workflows/p1-plan-verification.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014992325",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945672",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "risks": [
         "self-verification bias",
         "missed dependency"
       ],
       "gaps": [
-        "define verifier rules",
-        "bind execution admission"
+        "implementation accountability signoff pending",
+        "independent verification signoff pending"
       ],
       "accountability_id": "ACC-VOL-370",
       "completion_checkbox": false,

@@ -236,3 +236,193 @@ def test_canonical_maturity_policy_allows_gap_closure_before_hardening() -> None
 
     for state in ("scaffolded", "implemented", "integrated", "verified"):
         assert "gaps" not in policy[state]["required_nonempty_fields"]
+
+
+
+@pytest.mark.parametrize(
+    "volume_key",
+    ("VOL-254", "VOL-255", "VOL-370"),
+)
+def test_live_quality_and_plan_volumes_use_materialized_references(
+    volume_key: str,
+) -> None:
+    master = json.loads(
+        (ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8")
+    )
+    volume = next(
+        row for row in master["volumes"]
+        if row["key"] == volume_key
+    )
+
+    for field in ("implementation_paths", "tests", "evaluations"):
+        assert volume[field]
+        assert all(
+            not str(reference).startswith("planned:")
+            for reference in volume[field]
+        )
+    assert set(volume["gaps"]) == {
+        "implementation accountability signoff pending",
+        "independent verification signoff pending",
+    }
+    assert volume["status"] == "specified"
+    assert volume["implementation_status"] == "unverified"
+    assert volume["evidence"]
+    assert all(
+        not str(reference).startswith("planned:")
+        for reference in volume["evidence"]
+    )
+    assert any(
+        str(reference).startswith("git-head:")
+        for reference in volume["evidence"]
+    )
+    assert any(
+        "/actions/runs/" in str(reference)
+        for reference in volume["evidence"]
+    )
+    assert any(
+        "/commit/" in str(reference)
+        for reference in volume["evidence"]
+    )
+
+
+@pytest.mark.parametrize(
+    "volume_key",
+    ("VOL-254", "VOL-255", "VOL-370"),
+)
+def test_live_quality_and_plan_reconciliation_is_blocked_only_by_accountability_before_evidence(
+    volume_key: str,
+) -> None:
+    module = _module()
+    report = module.reconcile_repository(
+        ROOT,
+        selected_volumes=(volume_key,),
+    )
+    row = _row(report, volume_key)
+    implemented = next(
+        item for item in row["evaluations"]
+        if item["state"] == "implemented"
+    )
+    integrated = next(
+        item for item in row["evaluations"]
+        if item["state"] == "integrated"
+    )
+    verified = next(
+        item for item in row["evaluations"]
+        if item["state"] == "verified"
+    )
+
+    assert implemented["eligible"] is False
+    assert set(implemented["blockers"]) == {
+        "implemented: accountability status is below implemented",
+        "implemented: implementation accountability is unsigned",
+    }
+    for evaluation in (integrated, verified):
+        assert not any(
+            "unresolved repository references" in blocker
+            or "must contain materialized references" in blocker
+            for blocker in evaluation["blockers"]
+        )
+    assert any(
+        "independent verification is unsigned" in blocker
+        for blocker in verified["blockers"]
+    )
+    hardened = next(
+        item for item in row["evaluations"]
+        if item["state"] == "hardened"
+    )
+    assert any(
+        "unresolved volume gaps remain" in blocker
+        for blocker in hardened["blockers"]
+    )
+    assert row["implementation_status_candidate"] is None
+    assert row["target_floor_eligible"] is False
+
+
+
+QUALITY_PLAN_EVIDENCE_HEAD = "0338bd4519e33e574ced4705b414f4b7345b4a7b"
+
+
+@pytest.mark.parametrize(
+    ("volume_key", "domain_run_id", "domain_job_id"),
+    (
+        ("VOL-254", "36447945816", "109014996463"),
+        ("VOL-255", "36447945816", "109014996463"),
+        ("VOL-370", "36447945672", "109014992325"),
+    ),
+)
+def test_quality_and_plan_volume_evidence_is_bound_to_one_exact_head(
+    volume_key: str,
+    domain_run_id: str,
+    domain_job_id: str,
+) -> None:
+    master = json.loads(
+        (ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8")
+    )
+    volume = next(
+        row for row in master["volumes"]
+        if row["key"] == volume_key
+    )
+    evidence = set(volume["evidence"])
+
+    assert f"git-head:{QUALITY_PLAN_EVIDENCE_HEAD}" in evidence
+    assert (
+        "https://github.com/Apeloff1/Skeleton/commit/"
+        + QUALITY_PLAN_EVIDENCE_HEAD
+    ) in evidence
+    assert (
+        "https://github.com/Apeloff1/Skeleton/actions/runs/"
+        + domain_run_id
+    ) in evidence
+    assert f"github-actions-job:{domain_job_id}" in evidence
+    assert (
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487"
+        in evidence
+    )
+    assert "github-actions-job:109014994255" in evidence
+
+
+
+@pytest.mark.parametrize(
+    ("task_id", "domain_run_id"),
+    (
+        ("P1-INTEL-04", "36447945816"),
+        ("P1-INTEL-05", "36447945672"),
+        ("P1-INTEL-06", "36447945487"),
+    ),
+)
+def test_intelligence_tasks_bind_materialized_exact_head_evidence_without_self_promotion(
+    task_id: str,
+    domain_run_id: str,
+) -> None:
+    backlog = json.loads(
+        (ROOT / "machine/ai_p1_task_backlog.json").read_text(encoding="utf-8")
+    )
+    task = next(
+        row for row in backlog["tasks"]
+        if row["task_id"] == task_id
+    )
+
+    for field in ("implementation_paths", "test_targets", "evidence_refs"):
+        assert task[field]
+        assert all(
+            not str(reference).startswith("planned:")
+            for reference in task[field]
+        )
+
+    evidence = set(task["evidence_refs"])
+    assert f"git-head:{QUALITY_PLAN_EVIDENCE_HEAD}" in evidence
+    assert (
+        "https://github.com/Apeloff1/Skeleton/actions/runs/"
+        + domain_run_id
+    ) in evidence
+    assert (
+        "https://github.com/Apeloff1/Skeleton/commit/"
+        + QUALITY_PLAN_EVIDENCE_HEAD
+    ) in evidence
+
+    assert task["status"] == "blocked"
+    assert task["accountability_status"] == "planned"
+    assert task["implementation_signed"] is False
+    assert task["verification_signed"] is False
+    assert task["completion_checkbox"] is False
+    assert task["promotion_effect"] == "maturity_candidate"

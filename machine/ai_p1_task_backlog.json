@@ -746,7 +746,14 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014996463",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "accountability_ref": "ACC-P1-INTEL-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -763,15 +770,14 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval",
-        "planned:skeleton/artifacts",
-        "benchmarks"
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_answer_quality_pipeline.py",
-        "planned:skeleton/testing/test_artifact_quality_pipeline.py",
-        "planned:skeleton/testing/test_reasoning_regressions.py"
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -814,7 +820,14 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014992325",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945672",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "accountability_ref": "ACC-P1-INTEL-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -831,19 +844,18 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "planned:skeleton/planning",
-        "planned:skeleton/planning/analyzer.py",
-        "planned:skeleton/planning/simulator.py",
-        "skeleton/ai",
-        "skeleton/eval",
-        "scripts",
-        "skeleton/simulation"
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/ai/runtime/intelligence/plan_verifier.py",
+        ".github/workflows/p1-plan-verification.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_plan_static_analyzer.py",
-        "planned:skeleton/testing/test_plan_cycles.py",
-        "planned:skeleton/testing/test_plan_verifier.py",
-        "planned:skeleton/testing/test_plan_simulation.py"
+        "skeleton/testing/test_plan_static_analyzer.py",
+        "skeleton/testing/test_plan_cycles.py",
+        "skeleton/testing/test_plan_simulation.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -886,7 +898,12 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
+      ],
       "accountability_ref": "ACC-P1-INTEL-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -903,16 +920,23 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "skeleton/ai",
-        "skeleton/memory/reconciliation.py",
-        "benchmarks"
+        "skeleton/intelligence/core_intelligence.py",
+        "skeleton/ai/runtime/intelligence/core_intelligence.py",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/intelligence/plan_verifier.py",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_memory_quality.py",
-        "tests/test_memory_reconciliation.py",
-        "planned:skeleton/testing/test_reasoning_regressions.py",
-        "planned:skeleton/testing/test_plan_verifier.py"
+        "skeleton/testing/test_routing_context_receipt.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evidence_modes": [
         "quality_eval",
