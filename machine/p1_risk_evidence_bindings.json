@@ -5,6 +5,211 @@
   "status": "active",
   "task_id": "P1-EVID-04",
   "accountability_ref": "ACC-P1-EVID-04",
-  "records": [],
+  "records": [
+    {
+      "obligation_id": "P1-GAP-VOL-047:gap:c05917d472-9743acc54597c970",
+      "obligation_digest": "c602f487cb11f5545d92e9ee1bbb6e6993099ade7591394ab1c0f8a8fd1a5ece",
+      "owner_id": "ACC-VOL-047",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-047:gap:c05917d472-9743acc54597c970:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "104f5a56fbc46c2df1d118c1b3835ad7b91c1f4753ca5456c7ce2edd9d8f886a",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-047:gap:dae485b0ab-95433d6f502b10b0",
+      "obligation_digest": "a9ae8ccf8d1847cd8e272d7d8b7f2c0aa23220c3f389e660068e6dabede22a29",
+      "owner_id": "ACC-VOL-047",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-047:gap:dae485b0ab-95433d6f502b10b0:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "792d98825c3e4ae3b40a945127375beed5d76f2152e4da49624740ed63105a6a",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-048:gap:9320a616bf-26130b42bc6434d2",
+      "obligation_digest": "aa3ce51a18f31eb7a143c4bc9837e8d48aab749d22b9a2f2c28d5683e36322fd",
+      "owner_id": "ACC-VOL-048",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-048:gap:9320a616bf-26130b42bc6434d2:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "3a808656d791984fe524a8e89255fff4daf66856b6c9db5de6fcd0ec92652d8b",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-048:gap:b7d2e51ff3-ceec1b6b658f6fb9",
+      "obligation_digest": "d17eba81c1a087c6d6a244d73457bcfab9dacb3c079637779f90d30502fa7953",
+      "owner_id": "ACC-VOL-048",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-048:gap:b7d2e51ff3-ceec1b6b658f6fb9:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "be1cec4f9861ac84be51681b7d8877dc4362fdc4f4adf3621f761a9dd09d2acf",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-050:gap:0e5bfbf1cd-e783002e5d6bf21e",
+      "obligation_digest": "6222469c707b45739c3fdfbf42ad53270841e08e9917a8d65bb2791fb3dfb399",
+      "owner_id": "ACC-VOL-050",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-050:gap:0e5bfbf1cd-e783002e5d6bf21e:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "2404d65a8306b96445c9dd192694fc4cd7b8b57086af11823a0af37c43215bdf",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-050:gap:8c4209a970-14e49691a16c75c4",
+      "obligation_digest": "d5df7c6fee440c9ca4f1276ad30032a4e4c3db02ccbe4b21ead48af501c18337",
+      "owner_id": "ACC-VOL-050",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-050:gap:8c4209a970-14e49691a16c75c4:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "f7b45e3c0d01f622097287414e81088e89b7d551a3393f4b7e4f0b6a91327f3b",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-060:gap:8d82de7c5e-5b80c23b01246bc9",
+      "obligation_digest": "0f548054d44c4fda90caa24ca9921794b76b5a667d1fa6bcf7d3915e47799eea",
+      "owner_id": "ACC-VOL-060",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-060:gap:8d82de7c5e-5b80c23b01246bc9:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "0e8b581b494f96947ba7994b8314e0986a58fdb1975ebdfba90f670e91fe91fa",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-060:gap:e5adc9105d-d9e41a36a8a16b79",
+      "obligation_digest": "ec3e5c4dcec8200ba2f2bf21c8c95b9d1758a2aaaabd5540e37d43ee7af4d235",
+      "owner_id": "ACC-VOL-060",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-060:gap:e5adc9105d-d9e41a36a8a16b79:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "d21d1e9fe5f630afb84314f25712dd0e50e57e977b9d601e0da231860cd1b210",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-064:gap:3465cee76d-5bcf48a4515fe8c0",
+      "obligation_digest": "e130d041877464a9fe5fa4d726ce413530fcd1241b65e69ab9153e8b26a25c6e",
+      "owner_id": "ACC-VOL-064",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-064:gap:3465cee76d-5bcf48a4515fe8c0:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "ad5e4720bb768e156f54f7e7e2e49065dcb277fcd7a938e48d76e8c80ef5152b",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-065:gap:d78a7ae8f2-00ea556518764aa8",
+      "obligation_digest": "3c0a2bf86ccf9a1233e3db67b706ca097a299d33ccf910a48646b113ef5b9a51",
+      "owner_id": "ACC-VOL-065",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-065:gap:d78a7ae8f2-00ea556518764aa8:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "df3f7aa3aeb090ba3c564496211ed7a1cd43c0463849848cfcf8b097af3872d0",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-066:gap:72b45b8cdd-f18f5667520fec01",
+      "obligation_digest": "d28afe357a5d0f65ffef6420d7fbbf388413c7918e6de440a66d035d317cbfd1",
+      "owner_id": "ACC-VOL-066",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-066:gap:72b45b8cdd-f18f5667520fec01:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "b73e059b5925d85acceb87b953c402169d05944de294b852328b95776c10ed33",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-409:gap:23600aaf31-77db6101b7514063",
+      "obligation_digest": "549261b68d1c06c4f987677d0c9104c408174fb7d86730e6e25fc60bfa3fbe9e",
+      "owner_id": "ACC-VOL-409",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-28T20:34:16Z",
+      "review_at": "2026-10-28T20:34:16Z",
+      "evidence": [
+        {
+          "source": "p1:release-gap-batch1:P1-GAP-VOL-409:gap:23600aaf31-77db6101b7514063:cca2769f760d6bb703ad9153fd1cb4752e3c244c",
+          "digest": "a67e2b3db04264412768ac5208cb955f2378b1ef46600ee7a27295b966f2bc3b",
+          "category": "release_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    }
+  ],
   "note": "Bindings are intentionally empty at engine introduction. Reconciliation reports unresolved obligations; records are added only with real evidence or signed, time-bounded accepted-risk dispositions."
 }
