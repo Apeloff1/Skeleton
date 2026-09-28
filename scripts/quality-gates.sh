@@ -254,6 +254,11 @@ python scripts/check_archived_dependency_surface.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_archived_dependency_surface.py
 
+printf '\n== Large artifact working-tree archive ==\n'
+python scripts/check_large_artifact_archive.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  tests/test_large_artifact_archive.py
+
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
