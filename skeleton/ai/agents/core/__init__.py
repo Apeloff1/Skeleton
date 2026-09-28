@@ -36,6 +36,20 @@ from skeleton.agents.human_control import (
     HumanControlState,
     evaluate_human_control,
 )
+from skeleton.agents.blast_radius import (
+    BLAST_RADIUS_ACCOUNTABILITY_ID,
+    BLAST_RADIUS_SCHEMA_VERSION,
+    BLAST_RADIUS_TASK_ID,
+    ActionRiskProfile,
+    AdversarialAlignmentReport,
+    BlastRadiusDecision,
+    BlastRadiusError,
+    BlastRadiusPolicy,
+    ImpactClass,
+    ReversibilityClass,
+    classify_impact,
+    qualify_blast_radius,
+)
 from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
@@ -89,6 +103,10 @@ __all__ = [
     "HUMAN_CONTROL_TASK_ID", "HumanControlAction", "HumanControlCommand",
     "HumanControlDecision", "HumanControlError", "HumanControlState",
     "evaluate_human_control",
+    "BLAST_RADIUS_ACCOUNTABILITY_ID", "BLAST_RADIUS_SCHEMA_VERSION",
+    "BLAST_RADIUS_TASK_ID", "ActionRiskProfile", "AdversarialAlignmentReport",
+    "BlastRadiusDecision", "BlastRadiusError", "BlastRadiusPolicy", "ImpactClass",
+    "ReversibilityClass", "classify_impact", "qualify_blast_radius",
     "AGENT_DELEGATION_ACCOUNTABILITY_ID", "AGENT_DELEGATION_SCHEMA_VERSION",
     "AGENT_DELEGATION_TASK_ID", "AgentDelegationAuthority", "AgentDelegationDecision",
     "AgentDelegationError", "DelegationBudget", "qualify_agent_delegation",
