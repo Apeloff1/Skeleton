@@ -88,6 +88,8 @@ def test_exception_over_thirty_days_is_rejected(tmp_path: Path) -> None:
         "backend/**",
         "backend/[ab].py",
         r"backend\auth.py",
+        "backend//auth.py",
+        "backend/auth.py\nother",
     ],
 )
 def test_broad_or_ambiguous_scope_is_rejected(tmp_path: Path, scope: str) -> None:
@@ -147,6 +149,35 @@ def test_review_identity_is_required(tmp_path: Path, field: str) -> None:
         _registry(_entry(**{field: "not a valid login!"})),
     )
     with pytest.raises(checker.SecurityExceptionPolicyError, match="GitHub-style login"):
+        checker.validate_file(path, today=TODAY)
+
+
+def test_exception_owner_cannot_self_approve(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "registry.json",
+        _registry(_entry(owner="@Owner", approved_by="@owner")),
+    )
+    with pytest.raises(checker.SecurityExceptionPolicyError, match="independent"):
+        checker.validate_file(path, today=TODAY)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("reason", "too short"),
+        ("compensating_control", "too short"),
+    ],
+)
+def test_reason_and_compensating_control_must_be_substantive(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    path = _write(
+        tmp_path / "registry.json",
+        _registry(_entry(**{field: value})),
+    )
+    with pytest.raises(checker.SecurityExceptionPolicyError, match="at least 20"):
         checker.validate_file(path, today=TODAY)
 
 
