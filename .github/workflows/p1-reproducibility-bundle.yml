@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "machine/p1_reproducibility_policy.json"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"
@@ -20,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/p1_reproducibility_policy.json"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"

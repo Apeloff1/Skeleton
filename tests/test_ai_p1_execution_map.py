@@ -308,3 +308,131 @@ def test_p1_backlog_realizes_lane_dependencies(tmp_path: Path) -> None:
         "P1-L4: lane dependency P1-L3 is not realized in task DAG" in error
         for error in errors
     )
+
+
+
+UPSTREAM_P1_EVIDENCE = {
+    "P1-EVID-01": (
+        "ready",
+        "1a66b2212c438cdc8d77ba912160d46682775a94",
+        "36453604824",
+        "109034199882",
+    ),
+    "P1-EVID-03": (
+        "blocked",
+        "1a66b2212c438cdc8d77ba912160d46682775a94",
+        "36453604787",
+        "109034199390",
+    ),
+    "P1-EVID-04": (
+        "blocked",
+        "1a66b2212c438cdc8d77ba912160d46682775a94",
+        "36453604812",
+        "109034199375",
+    ),
+    "P1-EVID-05": (
+        "blocked",
+        "52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "36352236430",
+        "108713003767",
+    ),
+    "P1-INTEL-01": (
+        "blocked",
+        "1a66b2212c438cdc8d77ba912160d46682775a94",
+        "36453604716",
+        "109034199166",
+    ),
+    "P1-INTEL-02": (
+        "blocked",
+        "939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "36359213635",
+        "108732888770",
+    ),
+    "P1-INTEL-03": (
+        "blocked",
+        "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "36356867896",
+        "108726229944",
+    ),
+}
+
+
+def test_upstream_p1_dependency_evidence_is_materialized_and_exact_head() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id, (status, head, run_id, job_id) in UPSTREAM_P1_EVIDENCE.items():
+        task = task_by_id[task_id]
+
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+
+        for field in ("implementation_paths", "test_targets"):
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{head}" in evidence
+        assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/commit/{head}"
+            in evidence
+        )
+
+        assert task["status"] == status
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["promotion_effect"] == "maturity_candidate"
+
+
+def test_upstream_evidence_reconciliation_preserves_dependency_order() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-EVID-01"]["depends_on"] == []
+    assert task_by_id["P1-EVID-03"]["depends_on"] == ["P1-EVID-01"]
+    assert task_by_id["P1-EVID-04"]["depends_on"] == [
+        "P1-EVID-01",
+        "P1-EVID-03",
+    ]
+    assert task_by_id["P1-EVID-05"]["depends_on"] == [
+        "P1-EVID-01",
+        "P1-EVID-03",
+    ]
+    assert task_by_id["P1-INTEL-01"]["depends_on"] == ["P1-EVID-01"]
+    assert task_by_id["P1-INTEL-02"]["depends_on"] == [
+        "P1-INTEL-01",
+        "P1-EVID-05",
+    ]
+    assert task_by_id["P1-INTEL-03"]["depends_on"] == ["P1-INTEL-01"]
+
+
+
+def test_upstream_domain_gates_watch_p1_backlog_evidence_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow

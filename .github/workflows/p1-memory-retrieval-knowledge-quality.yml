@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/intelligence/memory_retrieval_quality.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py"
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/intelligence/memory_retrieval_quality.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py"
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"

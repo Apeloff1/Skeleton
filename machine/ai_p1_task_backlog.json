@@ -42,7 +42,12 @@
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199882",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-EVID-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -59,22 +64,21 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "tests/test_observability.py",
-        "tests/test_runtime_observability_bridge.py",
-        "planned:skeleton/provenance",
+        "skeleton/contracts/canonical.py",
+        "skeleton/contracts/evidence_ingestion.py",
+        "skeleton/contracts/promotion_evidence.py",
+        "scripts/emit_p1_promotion_evidence.py",
+        "scripts/ai_accountability.py",
+        "scripts/check_ai_build_accountability.py",
         "machine/ai_build_accountability.json",
-        "machine",
-        "scripts",
-        "skeleton/evaluation"
+        "machine/ai_p1_task_backlog.json",
+        ".github/workflows/p1-evidence-identity.yml"
       ],
       "test_targets": [
-        "skeleton/testing/test_frontier_observability_correlation.py",
-        "tests/test_orchestration_error_redaction.py",
-        "planned:skeleton/testing/test_provenance_tamper.py",
-        "planned:skeleton/testing/test_canonical_signing.py",
-        "planned:skeleton/testing/test_reproducibility_record.py",
-        "planned:skeleton/testing/test_replay_recipe.py"
+        "skeleton/testing/test_evidence_ingestion.py",
+        "skeleton/testing/test_promotion_evidence.py",
+        "tests/test_p1_promotion_evidence_emitter.py",
+        "tests/test_p1_accountability_materialization.py"
       ],
       "evidence_modes": [
         "contract",
@@ -200,7 +204,12 @@
         "Unknown workflow observations cannot change the canonical observation digest or substitute for a required gate.",
         "Only an all-required-gates accepted decision may materialize promotion evidence."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199390",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-EVID-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -217,23 +226,13 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        ".github/workflows",
-        "scripts",
-        "skeleton/testing",
-        "skeleton/intelligence/verification_runtime.py",
-        "planned:skeleton/verification",
         "machine/p1_required_gate_authority.json",
         "skeleton/contracts/promotion_gates.py",
         "skeleton/ai/runtime/contracts/promotion_gates.py",
         "scripts/check_p1_required_gate_authority.py",
-        ".github/workflows/p1-required-gate-authority.yml",
-        ".github/workflows/p1-evidence-identity.yml"
+        ".github/workflows/p1-required-gate-authority.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_ci_contracts.py",
-        "planned:skeleton/testing/test_merge_readiness.py",
-        "planned:skeleton/testing/test_verification_independence.py",
-        "planned:skeleton/testing/test_postcondition_verification.py",
         "skeleton/testing/test_promotion_gates.py",
         "tests/test_p1_required_gate_authority.py"
       ],
@@ -281,7 +280,12 @@
         "Unclassified risks remain unresolved; blocking gaps/adversarial obligations cannot be downgraded to non-blocking metadata.",
         "High/critical accepted-risk dispositions require a human identity and canonical identity-bound signature method."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199375",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-EVID-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -298,12 +302,6 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "tests/test_adversarial_engine.py",
-        "tests/test_tri_adversarial_engine.py",
-        "planned:skeleton/evaluation/adversarial",
-        "machine",
-        "docs/plan",
-        "scripts",
         "machine/p1_risk_evidence_policy.json",
         "machine/p1_risk_evidence_bindings.json",
         "skeleton/contracts/risk_evidence.py",
@@ -312,12 +310,6 @@
         ".github/workflows/p1-risk-evidence-binding.yml"
       ],
       "test_targets": [
-        "tests/test_adversarial_judge_isolation.py",
-        "planned:skeleton/testing/test_adversarial_regression_promotion.py",
-        "planned:skeleton/testing/test_gap_ledger.py",
-        "planned:skeleton/testing/test_gap_closure.py",
-        "planned:skeleton/testing/test_risk_register.py",
-        "planned:skeleton/testing/test_risk_acceptance.py",
         "skeleton/testing/test_risk_evidence.py",
         "tests/test_p1_risk_evidence_reconciliation.py"
       ],
@@ -365,7 +357,13 @@
         "Failed replay under runner, budget or epoch drift is classified incompatible before execution failure.",
         "Reproducibility evidence remains non-authoritative and cannot self-promote maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+      ],
       "accountability_ref": "ACC-P1-EVID-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -382,29 +380,14 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "eval",
-        "tests",
-        "planned:skeleton/evaluation",
-        "planned:skeleton/provenance",
-        "machine/ai_build_accountability.json",
-        "machine",
-        "scripts",
-        "skeleton/evaluation",
         "machine/p1_reproducibility_policy.json",
         "skeleton/contracts/reproducibility.py",
         "skeleton/ai/runtime/contracts/reproducibility.py",
         "scripts/check_p1_reproducibility.py",
+        "scripts/run_provenance_evidence.py",
         ".github/workflows/p1-reproducibility-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_eval_reproducibility.py",
-        "planned:skeleton/testing/test_benchmark_metadata.py",
-        "planned:skeleton/testing/test_provenance_tamper.py",
-        "planned:skeleton/testing/test_canonical_signing.py",
-        "planned:skeleton/testing/test_reproducibility_record.py",
-        "planned:skeleton/testing/test_replay_recipe.py",
-        "planned:skeleton/testing/test_quality_gate_contracts.py",
-        "planned:skeleton/testing/test_quality_waivers.py",
         "skeleton/testing/test_reproducibility.py",
         "tests/test_p1_reproducibility_bundle.py"
       ],
@@ -517,7 +500,12 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199166",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-INTEL-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -538,18 +526,15 @@
         "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
         "skeleton/frontier/model_routing.py",
         "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/quality.py",
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
-        "skeleton/intelligence/quality.py",
-        "skeleton/observability",
         ".github/workflows/p1-intel-routing-context.yml"
       ],
       "test_targets": [
         "skeleton/testing/test_routing_context_receipt.py",
         "tests/test_model_routing.py",
-        "skeleton/testing/test_context_compiler.py",
-        "skeleton/testing/test_frontier_observability_correlation.py",
-        "tests/test_orchestration_error_redaction.py"
+        "skeleton/testing/test_context_compiler.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -597,7 +582,13 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
+      ],
       "accountability_ref": "ACC-P1-INTEL-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -614,24 +605,19 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "skeleton/memory",
-        "skeleton/vault",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
         "skeleton/memory/reconciliation.py",
-        "skeleton/contracts/memory_record.py",
-        "skeleton/persistence/memory_repository.py",
-        "skeleton/memory/projection.py",
-        "skeleton/retrieval",
-        "backend/services/rag_service.py"
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_memory_promotion.py",
-        "planned:skeleton/testing/test_memory_poisoning.py",
-        "skeleton/testing/test_memory_repository.py",
-        "skeleton/testing/test_mongo_memory_repository.py",
-        "skeleton/testing/test_memory_projection.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
         "tests/test_memory_reconciliation.py",
-        "tests/test_retrieval_pipeline_internals.py",
-        "tests/test_quad_retrieval_internals.py"
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py"
       ],
       "evidence_modes": [
         "quality_eval",
@@ -674,7 +660,13 @@
         "Quality/trust/budget regressions fail promotion on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "accountability_ref": "ACC-P1-INTEL-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -691,20 +683,16 @@
         "WP-W18"
       ],
       "implementation_paths": [
-        "planned:skeleton/intelligence/cognitive_runtime.py",
-        "planned:skeleton/intelligence/strategy_registry.py",
-        "skeleton/ai",
-        "skeleton/eval",
-        "skeleton/retrieval",
-        "machine"
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_cognitive_stop_policy.py",
-        "planned:skeleton/testing/test_strategy_budget.py",
-        "planned:skeleton/testing/test_uncertainty_representation.py",
-        "planned:skeleton/testing/test_search_strategy_engine.py",
-        "planned:skeleton/testing/test_value_of_information.py",
-        "planned:skeleton/testing/test_stopping_policies.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evidence_modes": [
         "quality_eval",

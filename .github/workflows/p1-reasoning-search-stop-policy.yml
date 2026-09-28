@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/intelligence/strategy_registry.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/intelligence/strategy_registry.py"
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
@@ -19,6 +20,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/intelligence/strategy_registry.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/intelligence/strategy_registry.py"
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
