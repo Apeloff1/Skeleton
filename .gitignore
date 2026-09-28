@@ -176,3 +176,11 @@ chronicle/persistkv.json
 
 # WORM vault audit chain (runtime durable ledger)
 data/vault/
+
+# Audited legacy snapshot payloads are fetch-on-demand from immutable history.
+# See machine/large_artifacts.json and scripts/materialize_large_artifact.py.
+satellites/branch-snapshots/*/backend/godot
+satellites/branch-snapshots/*/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4
+satellites/branch-snapshots/*/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4
+memory/mongo_backup/test_database/interactive_quizzes.bson
+satellites/branch-snapshots/*/memory/mongo_backup/test_database/interactive_quizzes.bson
