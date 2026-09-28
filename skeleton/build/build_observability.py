@@ -14,7 +14,11 @@ import json
 from typing import Any, Iterable, Mapping
 
 from skeleton.build.incremental_graph import IncrementalBuildGraph
-from skeleton.build.parallel_scheduler import ParallelBuildPlan
+from skeleton.build.parallel_scheduler import (
+    ParallelBuildPlan,
+    ParallelSchedulerError,
+    plan_parallel_build,
+)
 from skeleton.kernel.errors import SkeletonError
 
 
@@ -155,6 +159,7 @@ def observe_build(
         raise BuildObservabilityError("plan must be a ParallelBuildPlan")
     if plan.graph_fingerprint != graph.fingerprint:
         raise BuildObservabilityError("plan graph fingerprint does not match graph")
+    _validate_plan_binding(graph, plan)
 
     expected = tuple(plan.selected_targets)
     expected_set = set(expected)
@@ -284,6 +289,38 @@ def evaluate_build_budget(
         telemetry_digest=telemetry.telemetry_digest,
         budget_digest=checked.budget_digest,
     )
+
+
+def _validate_plan_binding(
+    graph: IncrementalBuildGraph,
+    plan: ParallelBuildPlan,
+) -> None:
+    resources: dict[str, Any] = {}
+    for wave in plan.waves:
+        for target in wave.targets:
+            if target.node_id in resources:
+                raise BuildObservabilityError(
+                    "plan contains duplicate scheduled node",
+                    context={"node_id": target.node_id},
+                )
+            resources[target.node_id] = target.resources
+
+    try:
+        expected = plan_parallel_build(
+            graph,
+            resources=resources,
+            targets=plan.requested_targets,
+            capacity=plan.capacity,
+            max_parallel=plan.max_parallel,
+        )
+    except ParallelSchedulerError as exc:
+        raise BuildObservabilityError(
+            "plan failed canonical scheduler validation"
+        ) from exc
+    if plan != expected:
+        raise BuildObservabilityError(
+            "plan derived fields drifted from canonical scheduler output"
+        )
 
 
 def _critical_path(
