@@ -1,0 +1,294 @@
+name: P1 Terminal Failure Journey Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/contracts/p1_failure_journeys.py"
+      - "skeleton/ai/runtime/contracts/p1_failure_journeys.py"
+      - "machine/p1_terminal_failure_journeys.json"
+      - "scripts/check_p1_terminal_failure_journeys.py"
+      - "scripts/build_p1_terminal_failure_journeys.py"
+      - "skeleton/testing/test_p1_failure_journeys.py"
+      - "tests/test_p1_terminal_failure_journeys_policy.py"
+      - ".github/workflows/p1-terminal-failure-journeys.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/maturity-intel-specialized-253-255-370-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/p1_failure_journeys.py"
+      - "skeleton/ai/runtime/contracts/p1_failure_journeys.py"
+      - "machine/p1_terminal_failure_journeys.json"
+      - "scripts/check_p1_terminal_failure_journeys.py"
+      - "scripts/build_p1_terminal_failure_journeys.py"
+      - "skeleton/testing/test_p1_failure_journeys.py"
+      - "tests/test_p1_terminal_failure_journeys_policy.py"
+      - ".github/workflows/p1-terminal-failure-journeys.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-terminal-failure-journeys-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate terminal failure journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install terminal journey runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "pytest>=8,<9"
+
+      - name: Compile PROM-02 contracts and builders
+        run: >-
+          python -m compileall -q
+          skeleton/contracts/p1_failure_journeys.py
+          skeleton/ai/runtime/contracts/p1_failure_journeys.py
+          scripts/check_p1_terminal_failure_journeys.py
+          scripts/build_p1_terminal_failure_journeys.py
+
+      - name: Validate PROM-01 and PROM-02 policies
+        run: |
+          python scripts/check_p1_terminal_evidence_policy.py --print-summary
+          python scripts/check_p1_terminal_failure_journeys.py --print-summary
+
+      - name: Run PROM-02 contract mutations
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_p1_failure_journeys.py
+
+      - name: Run PROM-02 policy mutations
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_terminal_failure_journeys_policy.py
+
+      - name: Run canonical skeleton failure families
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_state_recovery_drill.py
+          skeleton/testing/test_installer_lifecycle.py
+          skeleton/testing/test_backup_restore_qualification.py
+          skeleton/testing/test_jeeves_durable_side_effect_quarantine.py
+          skeleton/testing/test_provider_stream_reliability_profiles.py
+          skeleton/testing/test_human_control.py
+          skeleton/testing/test_autonomy_deescalation.py
+          skeleton/testing/test_migration_rollback_compatibility.py
+          skeleton/testing/test_release_qualification.py
+          skeleton/testing/test_capacity_qualification.py
+          skeleton/testing/test_swarm_exact_lease_atomicity.py
+          skeleton/testing/test_swarm_failover.py
+          skeleton/testing/test_benchmark_registry.py
+          skeleton/testing/test_blast_radius_alignment.py
+          skeleton/testing/test_risk_evidence.py
+          skeleton/testing/test_memory_retrieval_knowledge_quality.py
+          skeleton/testing/test_agent_delegation_qualification.py
+
+      - name: Run backend delivery and provider failure families
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_operation_projection.py
+          backend/tests/test_operation_stream_transport.py
+          backend/tests/test_operation_stream_route.py
+          backend/tests/test_ai_provider_reliability.py
+
+      - name: Run repository-root failure families
+        run: |
+          python -m pytest -q --noconftest tests/application/test_runtime_lifecycle_failure_contract.py
+          python -m pytest -q --noconftest tests/test_control_plane_queue_backpressure.py
+          python -m pytest -q --noconftest tests/test_p1_required_gate_authority.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Rebuild exact-head PROM-01 dependency
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-02
+          python scripts/reconcile_p1_maturity.py \
+            --out .p1-prom-02/maturity.json
+          python scripts/build_p1_terminal_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --maturity-report .p1-prom-02/maturity.json \
+            --out .p1-prom-02/prom01.json \
+            --refs-out .p1-prom-02/prom01-refs.json
+
+      - name: Build exact-head PROM-02 journey bundle
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_terminal_failure_journeys.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom01-bundle .p1-prom-02/prom01.json \
+            --out .p1-prom-02/bundle.json \
+            --refs-out .p1-prom-02/refs.json
+
+      - name: Assert terminal journey bundle
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          prom01 = json.loads(
+              Path(".p1-prom-02/prom01.json").read_text(encoding="utf-8")
+          )
+          bundle = json.loads(
+              Path(".p1-prom-02/bundle.json").read_text(encoding="utf-8")
+          )
+          if prom01["accepted"] is not True:
+              raise SystemExit("PROM-01 dependency rejected")
+          if prom01["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROM-01 exact-head mismatch")
+          if bundle["accepted"] is not True:
+              raise SystemExit("PROM-02 failure journey bundle rejected")
+          if bundle["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROM-02 exact-head mismatch")
+          if bundle["prom01_bundle_digest"] != prom01["decision_digest"]:
+              raise SystemExit("PROM-02 PROM-01 dependency digest mismatch")
+          if bundle["observation_count"] != 16:
+              raise SystemExit("PROM-02 failure family count mismatch")
+          if len(bundle["required_journey_classes"]) != 8:
+              raise SystemExit("PROM-02 journey class count mismatch")
+          if bundle["promotion_authority"] is not False:
+              raise SystemExit("PROM-02 cannot carry promotion authority")
+          if bundle["signed_promotion"] is not False:
+              raise SystemExit("PROM-02 cannot sign promotion")
+          print(
+              "PROM-02 terminal journeys accepted",
+              bundle["decision_digest"],
+          )
+          PY
+
+      - name: Emit exact-head PROM-02 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          policy = json.loads(
+              Path("machine/p1_terminal_failure_journeys.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          all_tests = sorted({
+              path
+              for row in policy["failure_families"]
+              for path in row["test_paths"]
+          })
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prom-02/config.digest").write_text(
+              hashlib.sha256(
+                  Path("machine/p1_terminal_failure_journeys.json").read_bytes()
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-02/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|prom-02"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-02/verifier.digest").write_text(
+              digest([
+                  "skeleton/contracts/p1_failure_journeys.py",
+                  "scripts/check_p1_terminal_failure_journeys.py",
+                  "scripts/build_p1_terminal_failure_journeys.py",
+                  "machine/p1_terminal_failure_journeys.json",
+                  "scripts/build_p1_terminal_evidence.py",
+                  "scripts/reconcile_p1_maturity.py",
+                  ".github/workflows/p1-terminal-failure-journeys.yml",
+                  *all_tests,
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-02/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_p1_failure_journeys.py",
+                  "tests/test_p1_terminal_failure_journeys_policy.py",
+                  *all_tests,
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-PROM-02 \
+            --accountability-id ACC-P1-PROM-02 \
+            --configuration-digest "$(cat .p1-prom-02/config.digest)" \
+            --environment-digest "$(cat .p1-prom-02/environment.digest)" \
+            --verifier-id github-actions:p1-terminal-failure-journeys \
+            --verifier-digest "$(cat .p1-prom-02/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-prom-02/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-prom-02/refs.json \
+            --out .p1-prom-02/receipt.json \
+            > .p1-prom-02/receipt.stdout.json
+
+      - name: Assert exact-head PROM-02 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prom-02/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROM-02 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROM-02":
+              raise SystemExit("PROM-02 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROM-02":
+              raise SystemExit("PROM-02 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("PROM-02 exact-head receipt OK", receipt["receipt_digest"])
+          PY

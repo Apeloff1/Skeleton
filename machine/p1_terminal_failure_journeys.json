@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "task_id": "P1-PROM-02",
+  "accountability_ref": "ACC-P1-PROM-02",
+  "authority": "machine/p1_terminal_failure_journeys.json",
+  "execution_map_authority": "machine/ai_p1_execution_map.json",
+  "task_backlog_authority": "machine/ai_p1_task_backlog.json",
+  "prom01_policy_authority": "machine/p1_terminal_evidence_policy.json",
+  "promotion_authority": false,
+  "signed_promotion": false,
+  "require_exact_head": true,
+  "require_independent_verification": true,
+  "journey_classes": {
+    "clean-machine": [
+      "restart/crash"
+    ],
+    "rollback": [
+      "rollback/migration incompatibility"
+    ],
+    "restore": [
+      "restart/crash"
+    ],
+    "saturation": [
+      "capacity exhaustion/backpressure"
+    ],
+    "partition": [
+      "network partition/stale lease"
+    ],
+    "adversarial": [
+      "benchmark leakage/specification gaming",
+      "goal drift/specification gaming",
+      "malicious or stale evidence"
+    ],
+    "provider-failover": [
+      "provider outage/failover"
+    ],
+    "stale-evidence": [
+      "malicious or stale evidence",
+      "stale or conflicting memory/retrieval evidence"
+    ]
+  },
+  "failure_families": [
+    {
+      "family": "restart/crash",
+      "test_paths": [
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/testing/test_installer_lifecycle.py",
+        "skeleton/testing/test_backup_restore_qualification.py"
+      ]
+    },
+    {
+      "family": "partial commit",
+      "test_paths": [
+        "tests/application/test_runtime_lifecycle_failure_contract.py",
+        "skeleton/testing/test_jeeves_durable_side_effect_quarantine.py"
+      ]
+    },
+    {
+      "family": "duplicate/reordered delivery",
+      "test_paths": [
+        "backend/tests/test_operation_projection.py",
+        "backend/tests/test_operation_stream_transport.py"
+      ]
+    },
+    {
+      "family": "provider outage/failover",
+      "test_paths": [
+        "backend/tests/test_ai_provider_reliability.py",
+        "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      ]
+    },
+    {
+      "family": "policy denial/revocation",
+      "test_paths": [
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py"
+      ]
+    },
+    {
+      "family": "stream disconnect/resync",
+      "test_paths": [
+        "backend/tests/test_operation_projection.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py"
+      ]
+    },
+    {
+      "family": "rollback/migration incompatibility",
+      "test_paths": [
+        "skeleton/testing/test_migration_rollback_compatibility.py",
+        "skeleton/testing/test_release_qualification.py"
+      ]
+    },
+    {
+      "family": "capacity exhaustion/backpressure",
+      "test_paths": [
+        "skeleton/testing/test_capacity_qualification.py",
+        "tests/test_control_plane_queue_backpressure.py"
+      ]
+    },
+    {
+      "family": "network partition/stale lease",
+      "test_paths": [
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_failover.py"
+      ]
+    },
+    {
+      "family": "benchmark leakage/specification gaming",
+      "test_paths": [
+        "skeleton/testing/test_benchmark_registry.py",
+        "skeleton/testing/test_blast_radius_alignment.py"
+      ]
+    },
+    {
+      "family": "malicious or stale evidence",
+      "test_paths": [
+        "skeleton/testing/test_risk_evidence.py",
+        "tests/test_p1_required_gate_authority.py"
+      ]
+    },
+    {
+      "family": "stale or conflicting memory/retrieval evidence",
+      "test_paths": [
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py"
+      ]
+    },
+    {
+      "family": "authority escalation or expired approval",
+      "test_paths": [
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
+      ]
+    },
+    {
+      "family": "goal drift/specification gaming",
+      "test_paths": [
+        "skeleton/testing/test_blast_radius_alignment.py"
+      ]
+    },
+    {
+      "family": "duplicate external side effect",
+      "test_paths": [
+        "skeleton/testing/test_jeeves_durable_side_effect_quarantine.py"
+      ]
+    },
+    {
+      "family": "human interrupt during autonomous execution",
+      "test_paths": [
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py"
+      ]
+    }
+  ]
+}
