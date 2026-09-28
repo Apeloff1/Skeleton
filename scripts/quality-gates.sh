@@ -228,6 +228,9 @@ python backend/scripts/check_sast_security.py
 printf '\n== Core/tooling Python high-confidence SAST ==\n'
 python scripts/check_repository_python_sast.py
 
+printf '\n== Security exception policy ==\n'
+python backend/scripts/check_security_exceptions.py
+
 printf '\n== JavaScript child_process alias safety ==\n'
 python backend/scripts/check_js_process_alias_safety.py
 
@@ -287,6 +290,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_unbulk_decompression_security.py \
   backend/tests/test_repository_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
+  backend/tests/test_security_exception_policy.py \
   backend/tests/test_live_scraper_network_security.py \
   backend/tests/test_free_api_network_security.py \
   backend/tests/test_ai_reader_error_redaction.py \
