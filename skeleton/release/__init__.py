@@ -94,6 +94,15 @@ __all__ = [
     "DisasterScenario",
     "IncidentCorrectiveAction",
     "qualify_disaster_recovery",
+    "RELEASE_ATTRIBUTION_ACCOUNTABILITY_ID",
+    "RELEASE_ATTRIBUTION_SCHEMA_VERSION",
+    "RELEASE_ATTRIBUTION_TASK_ID",
+    "AttributionEntry",
+    "ReleaseAttributionDecision",
+    "ReleaseAttributionError",
+    "ReleaseAttributionManifest",
+    "qualify_release_attribution",
+    "render_release_notice",
 ]
 
 from skeleton.release.slo_promotion import (
@@ -164,4 +173,17 @@ from skeleton.release.qualification import (
     ReleaseQualificationDecision,
     ReleaseQualificationError,
     qualify_release_candidate,
+)
+
+
+from skeleton.release.attribution import (
+    RELEASE_ATTRIBUTION_ACCOUNTABILITY_ID,
+    RELEASE_ATTRIBUTION_SCHEMA_VERSION,
+    RELEASE_ATTRIBUTION_TASK_ID,
+    AttributionEntry,
+    ReleaseAttributionDecision,
+    ReleaseAttributionError,
+    ReleaseAttributionManifest,
+    qualify_release_attribution,
+    render_release_notice,
 )
