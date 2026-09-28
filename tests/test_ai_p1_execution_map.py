@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import shutil
 
+import pytest
+
 from scripts.check_ai_p1_execution_map import (
     BACKLOG_PATH,
     BUILD_SEQUENCE_PATH,
