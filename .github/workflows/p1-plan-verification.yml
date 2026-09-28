@@ -114,8 +114,10 @@ jobs:
               PlanStep,
               PlanVerificationPolicy,
               StaticPlanDefinition,
+              admit_plan_execution,
               analyze_static_plan,
               qualify_static_plan,
+              require_privileged_execution_admission,
               simulate_static_plan,
           )
           from skeleton.intelligence.strategy_registry import (
@@ -277,18 +279,47 @@ jobs:
           )
           if not decision.accepted:
               raise SystemExit(f"INTEL-05 fixture rejected: {decision.reasons}")
+          admission = admit_plan_execution(
+              plan=plan,
+              verification_policy=verifier,
+              qualification=decision,
+              requested_step_ids=("apply", "verify"),
+          )
+          if not admission.accepted:
+              raise SystemExit(
+                  f"INTEL-05 execution admission rejected: {admission.reasons}"
+              )
+          if admission.privileged_step_ids != ("apply",):
+              raise SystemExit("INTEL-05 privileged step classification drift")
+          require_privileged_execution_admission(
+              admission,
+              plan=plan,
+              step_id="apply",
+          )
           evidence = decision.accepted_evidence_ref()
+          admission_evidence = admission.accepted_evidence_ref()
           Path(".p1-intel-05/decision.json").write_text(
               json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
+          Path(".p1-intel-05/admission.json").write_text(
+              json.dumps(admission.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
           Path(".p1-intel-05/refs.json").write_text(
               json.dumps(
-                  [{
-                      "source": evidence.source,
-                      "digest": evidence.digest,
-                      "category": evidence.category,
-                  }],
+                  [
+                      {
+                          "source": evidence.source,
+                          "digest": evidence.digest,
+                          "category": evidence.category,
+                      },
+                      {
+                          "source": admission_evidence.source,
+                          "digest": admission_evidence.digest,
+                          "category": admission_evidence.category,
+                      },
+                  ],
                   indent=2,
                   sort_keys=True,
               ) + "\n",
