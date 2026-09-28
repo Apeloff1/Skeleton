@@ -15,6 +15,8 @@ from typing import Any, Iterable, Mapping
 
 from skeleton.build.incremental_graph import IncrementalBuildGraph
 from skeleton.build.parallel_scheduler import (
+    MAX_PARALLEL,
+    MAX_WAVES,
     ParallelBuildPlan,
     ParallelSchedulerError,
     plan_parallel_build,
@@ -26,6 +28,8 @@ OBSERVABILITY_SCHEMA = 1
 CACHE_STATES = frozenset({"hit", "miss", "disabled"})
 MAX_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 MAX_MEMORY_BYTES = 1 << 50
+MAX_WAVE_ELAPSED_MS = MAX_DURATION_MS * MAX_WAVES
+MAX_PARALLEL_MEMORY_BYTES = MAX_MEMORY_BYTES * MAX_PARALLEL
 MAX_RATIO_PPM = 1_000_000
 MAX_NODE_BUDGETS = 4096
 
@@ -459,12 +463,12 @@ def _coerce_budget(raw: BuildRegressionBudget) -> BuildRegressionBudget:
         max_wave_elapsed_ms=_bounded_int(
             raw.max_wave_elapsed_ms,
             field="max_wave_elapsed_ms",
-            maximum=MAX_DURATION_MS,
+            maximum=MAX_WAVE_ELAPSED_MS,
         ),
         max_peak_parallel_memory_bytes=_bounded_int(
             raw.max_peak_parallel_memory_bytes,
             field="max_peak_parallel_memory_bytes",
-            maximum=MAX_MEMORY_BYTES,
+            maximum=MAX_PARALLEL_MEMORY_BYTES,
         ),
         min_cache_hit_ratio_ppm=_bounded_int(
             raw.min_cache_hit_ratio_ppm,
@@ -526,6 +530,8 @@ def _digest(value: Any) -> str:
 
 __all__ = [
     "OBSERVABILITY_SCHEMA",
+    "MAX_WAVE_ELAPSED_MS",
+    "MAX_PARALLEL_MEMORY_BYTES",
     "BuildBudgetDecision",
     "BuildObservabilityError",
     "BuildRegressionBudget",
