@@ -37,6 +37,7 @@
     "ci_oidc"
   ],
   "signature_ref_required_for": [
+    "github_identity",
     "git_gpg",
     "git_ssh",
     "sigstore",
