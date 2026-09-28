@@ -1,16 +1,20 @@
 # complete
 
-Refactored landing for Jeeves AGB workstreams on Apeloff1/Skeleton.
+Jeeves AGB landing tree on Apeloff1/Skeleton.
 
-## Packages
-- `cbm26-agent` — local consumer agent loop
-- `cbm26-ai` — baseline language model + **full context stack integrated**
-- `master-omega` — functional lattice core
+## Trees
+- `cbm26-agent` — planner, WM, store, BM25, CLI
+- `cbm26-ai` — transformer + n-gram + context 2026/2027
+- `master-omega` — conductor that boots the agent and runs cycles
 
-## Integrated AI
+## Run
+```bash
+node complete/cbm26-agent/src/cli.js status
+node complete/master-omega/bin/run-cycle.js "The residual"
+```
+
 ```js
 import { createIntegratedAI } from "./cbm26-ai/src/index.js";
-const sys = await createIntegratedAI();
-await sys.turn("The residual");
-sys.snapshot();
+import { createCBM26 } from "./cbm26-agent/src/index.js";
+import { createSystem } from "./master-omega/src/index.js";
 ```

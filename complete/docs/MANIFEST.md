@@ -3,5 +3,5 @@
 | Path | Role |
 |------|------|
 | complete/cbm26-agent | Consumer agent loop |
-| complete/cbm26-ai | Baseline language model |
-| complete/master-omega | Context/tensor/runtime lattice |
+| complete/cbm26-ai | Baseline LM + context stack |
+| complete/master-omega | Cycle conductor |
