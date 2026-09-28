@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/observability/forecasting.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"
       - "skeleton/mesh/capacity_qualification.py"
@@ -20,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/observability/forecasting.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"
       - "skeleton/mesh/capacity_qualification.py"
