@@ -432,12 +432,12 @@ class OutputQualityPolicy:
 @dataclass(frozen=True, slots=True)
 class AnswerArtifactQualityDecision:
     accepted: bool
-    disposition: OutputDisposition
     reasons: tuple[str, ...]
     answer_evaluation_digest: str
     artifact_evaluation_digests: tuple[str, ...]
     regression_digests: tuple[str, ...]
     policy_digest: str
+    disposition: OutputDisposition | None = None
     task_id: str = OUTPUT_QUALITY_TASK_ID
     accountability_id: str = OUTPUT_QUALITY_ACCOUNTABILITY_ID
     schema_version: int = OUTPUT_QUALITY_SCHEMA_VERSION
@@ -445,14 +445,27 @@ class AnswerArtifactQualityDecision:
     def __post_init__(self) -> None:
         if not isinstance(self.accepted, bool):
             raise OutputQualityError("accepted must be boolean")
-        try:
+        if self.disposition is None:
             object.__setattr__(
                 self,
                 "disposition",
-                OutputDisposition(self.disposition),
+                (
+                    OutputDisposition.QUALIFIED
+                    if self.accepted
+                    else OutputDisposition.BLOCKED
+                ),
             )
-        except ValueError as exc:
-            raise OutputQualityError("invalid output disposition") from exc
+        else:
+            try:
+                object.__setattr__(
+                    self,
+                    "disposition",
+                    OutputDisposition(self.disposition),
+                )
+            except ValueError as exc:
+                raise OutputQualityError(
+                    "invalid output disposition"
+                ) from exc
         if self.accepted != (
             self.disposition is OutputDisposition.QUALIFIED
         ):
