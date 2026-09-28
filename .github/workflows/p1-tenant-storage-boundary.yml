@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "backend/core/tenant_storage_boundary.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/tests/test_tenant_storage_boundary.py"
       - "frontend/src/product/tenantStorageBoundary.ts"
       - "frontend/src/auth/gameforgeAuth.ts"
@@ -17,6 +18,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "backend/core/tenant_storage_boundary.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/tests/test_tenant_storage_boundary.py"
       - "frontend/src/product/tenantStorageBoundary.ts"
       - "frontend/src/auth/gameforgeAuth.ts"
