@@ -561,6 +561,13 @@ class PlanVerificationPolicy:
     max_total_wall_time_s: float
     require_terminal_leaves: bool = True
     allow_irreversible: bool = False
+    privileged_capabilities: tuple[str, ...] = (
+        "admin",
+        "network.egress",
+        "repo.write",
+        "secrets.read",
+        "shell.exec",
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -623,6 +630,14 @@ class PlanVerificationPolicy:
                 raise PlanStaticVerifierError(
                     f"{field} must be boolean"
                 )
+        object.__setattr__(
+            self,
+            "privileged_capabilities",
+            _plan_tokens(
+                self.privileged_capabilities,
+                "privileged_capabilities",
+            ),
+        )
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -635,6 +650,9 @@ class PlanVerificationPolicy:
             "max_total_wall_time_s": self.max_total_wall_time_s,
             "require_terminal_leaves": self.require_terminal_leaves,
             "allow_irreversible": self.allow_irreversible,
+            "privileged_capabilities": list(
+                self.privileged_capabilities
+            ),
         }
 
     @property
@@ -936,6 +954,245 @@ class PlanQualificationDecision:
             source=_plan_token(source, "source"),
             digest=self.decision_digest,
             category="plan_verification",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PlanExecutionAdmission:
+    accepted: bool
+    reasons: tuple[str, ...]
+    plan_digest: str
+    qualification_digest: str
+    policy_digest: str
+    requested_step_ids: tuple[str, ...]
+    privileged_step_ids: tuple[str, ...]
+    required_capabilities: tuple[str, ...]
+    task_id: str = PLAN_VERIFIER_TASK_ID
+    accountability_id: str = PLAN_VERIFIER_ACCOUNTABILITY_ID
+    schema_version: int = PLAN_VERIFIER_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.accepted, bool):
+            raise PlanStaticVerifierError("accepted must be boolean")
+        if not isinstance(self.reasons, tuple) or any(
+            not isinstance(item, str) or not item
+            for item in self.reasons
+        ):
+            raise PlanStaticVerifierError(
+                "reasons must contain non-empty strings"
+            )
+        for field in (
+            "plan_digest",
+            "qualification_digest",
+            "policy_digest",
+        ):
+            object.__setattr__(
+                self,
+                field,
+                _plan_sha256(getattr(self, field), field),
+            )
+        object.__setattr__(
+            self,
+            "requested_step_ids",
+            _plan_token_sequence(
+                self.requested_step_ids,
+                "requested_step_ids",
+                allow_empty=False,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "privileged_step_ids",
+            _plan_tokens(
+                self.privileged_step_ids,
+                "privileged_step_ids",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "required_capabilities",
+            _plan_tokens(
+                self.required_capabilities,
+                "required_capabilities",
+            ),
+        )
+        if self.task_id != PLAN_VERIFIER_TASK_ID:
+            raise PlanStaticVerifierError("task_id drift")
+        if self.accountability_id != PLAN_VERIFIER_ACCOUNTABILITY_ID:
+            raise PlanStaticVerifierError("accountability_id drift")
+        if self.schema_version != PLAN_VERIFIER_SCHEMA_VERSION:
+            raise PlanStaticVerifierError("unsupported schema version")
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "task_id": self.task_id,
+            "accountability_id": self.accountability_id,
+            "accepted": self.accepted,
+            "reasons": list(self.reasons),
+            "plan_digest": self.plan_digest,
+            "qualification_digest": self.qualification_digest,
+            "policy_digest": self.policy_digest,
+            "requested_step_ids": list(self.requested_step_ids),
+            "privileged_step_ids": list(self.privileged_step_ids),
+            "required_capabilities": list(
+                self.required_capabilities
+            ),
+        }
+
+    @property
+    def decision_digest(self) -> str:
+        return _plan_digest(self.payload())
+
+    def accepted_evidence_ref(
+        self,
+        *,
+        source: str = "p1:intel-05:execution-admission",
+    ) -> EvidenceRef:
+        if not self.accepted:
+            raise PlanStaticVerifierError(
+                "rejected execution admission cannot become evidence"
+            )
+        return EvidenceRef(
+            source=_plan_token(source, "source"),
+            digest=self.decision_digest,
+            category="plan_execution_admission",
+        )
+
+
+def admit_plan_execution(
+    *,
+    plan: StaticPlanDefinition,
+    verification_policy: PlanVerificationPolicy,
+    qualification: PlanQualificationDecision,
+    requested_step_ids: Iterable[str],
+) -> PlanExecutionAdmission:
+    if not isinstance(plan, StaticPlanDefinition):
+        raise TypeError("plan must be StaticPlanDefinition")
+    if not isinstance(
+        verification_policy,
+        PlanVerificationPolicy,
+    ):
+        raise TypeError(
+            "verification_policy must be PlanVerificationPolicy"
+        )
+    if not isinstance(
+        qualification,
+        PlanQualificationDecision,
+    ):
+        raise TypeError(
+            "qualification must be PlanQualificationDecision"
+        )
+
+    requested = _plan_token_sequence(
+        requested_step_ids,
+        "requested_step_ids",
+        allow_empty=False,
+    )
+    steps = {step.step_id: step for step in plan.steps}
+    reasons: list[str] = []
+
+    if qualification.plan_digest != plan.digest:
+        reasons.append("qualification-plan-digest-mismatch")
+    if (
+        qualification.verification_policy_digest
+        != verification_policy.digest
+    ):
+        reasons.append("qualification-policy-digest-mismatch")
+    if not qualification.accepted:
+        reasons.append("plan-qualification-rejected")
+
+    missing = sorted(set(requested) - set(steps))
+    if missing:
+        reasons.append(
+            "unknown-execution-steps:" + ",".join(missing)
+        )
+
+    known = tuple(
+        steps[step_id]
+        for step_id in requested
+        if step_id in steps
+    )
+    privileged_caps = set(
+        verification_policy.privileged_capabilities
+    )
+    privileged = tuple(
+        sorted(
+            step.step_id
+            for step in known
+            if step.side_effect
+            or privileged_caps.intersection(
+                step.required_capabilities
+            )
+        )
+    )
+    required_capabilities = tuple(
+        sorted(
+            {
+                capability
+                for step in known
+                for capability in step.required_capabilities
+            }
+        )
+    )
+
+    for step in known:
+        is_privileged = (
+            step.side_effect
+            or bool(
+                privileged_caps.intersection(
+                    step.required_capabilities
+                )
+            )
+        )
+        if not is_privileged:
+            continue
+        if not step.required_capabilities:
+            reasons.append(
+                f"privileged-step-capability-missing:{step.step_id}"
+            )
+        if not step.postconditions:
+            reasons.append(
+                f"privileged-step-postcondition-missing:{step.step_id}"
+            )
+
+    normalized = tuple(sorted(set(reasons)))
+    return PlanExecutionAdmission(
+        accepted=not normalized,
+        reasons=normalized,
+        plan_digest=plan.digest,
+        qualification_digest=qualification.decision_digest,
+        policy_digest=verification_policy.digest,
+        requested_step_ids=requested,
+        privileged_step_ids=privileged,
+        required_capabilities=required_capabilities,
+    )
+
+
+def require_privileged_execution_admission(
+    admission: PlanExecutionAdmission,
+    *,
+    plan: StaticPlanDefinition,
+    step_id: str,
+) -> None:
+    if not isinstance(admission, PlanExecutionAdmission):
+        raise TypeError(
+            "admission must be PlanExecutionAdmission"
+        )
+    if not isinstance(plan, StaticPlanDefinition):
+        raise TypeError("plan must be StaticPlanDefinition")
+    step = _plan_token(step_id, "step_id")
+    if not admission.accepted:
+        raise PlanStaticVerifierError(
+            "privileged execution admission rejected"
+        )
+    if admission.plan_digest != plan.digest:
+        raise PlanStaticVerifierError(
+            "privileged execution admission plan mismatch"
+        )
+    if step not in admission.requested_step_ids:
+        raise PlanStaticVerifierError(
+            "step is outside execution admission"
         )
 
 
