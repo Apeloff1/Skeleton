@@ -1,0 +1,90 @@
+name: Legacy Artifact Hash Audit
+
+on:
+  push:
+    branches:
+      - audit/807-legacy-artifact-hashes
+    paths:
+      - ".github/workflows/legacy-artifact-hash-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legacy-artifact-hash-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11.16"
+      - name: Verify legacy blob identity and compute SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          from pathlib import Path
+          import subprocess
+
+          EXPECTED = {
+              "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot": (
+                  103_604_344,
+                  "0462da7140794edeaecc6f7582aa93048d37bc7b",
+              ),
+              "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4": (
+                  29_450_632,
+                  "01ca1a298c794bd5ab677cbe439c39763768ded3",
+              ),
+              "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4": (
+                  9_892_206,
+                  "8e77f53a2fae621772d7666bf7cfc5491aca1df9",
+              ),
+              "memory/mongo_backup/test_database/interactive_quizzes.bson": (
+                  14_595_602,
+                  "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+              ),
+          }
+
+          for raw_path, (expected_size, expected_oid) in EXPECTED.items():
+              path = Path(raw_path)
+              observed_size = path.stat().st_size
+              if observed_size != expected_size:
+                  raise SystemExit(
+                      f"size mismatch for {raw_path}: {observed_size} != {expected_size}"
+                  )
+
+              observed_oid = subprocess.run(
+                  ["git", "hash-object", "--", raw_path],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  text=True,
+              ).stdout.strip()
+              if observed_oid != expected_oid:
+                  raise SystemExit(
+                      f"git oid mismatch for {raw_path}: {observed_oid} != {expected_oid}"
+                  )
+
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+
+              print(
+                  "ARTIFACT\t"
+                  f"{raw_path}\t"
+                  f"{observed_size}\t"
+                  f"{observed_oid}\t"
+                  f"{digest.hexdigest()}"
+              )
+          PY
