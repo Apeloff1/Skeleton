@@ -28,9 +28,7 @@ _SIGNER_TYPES = frozenset({"human", "agent", "ci", "service"})
 _SIGNATURE_METHODS = frozenset(
     {"github_identity", "git_gpg", "git_ssh", "sigstore", "ci_oidc"}
 )
-_STRONG_SIGNATURE_REF_METHODS = frozenset(
-    {"git_gpg", "git_ssh", "sigstore", "ci_oidc"}
-)
+_SIGNATURE_REF_METHODS = frozenset(_SIGNATURE_METHODS)
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA64_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -173,7 +171,7 @@ class P1PromotionAttestation:
                 "signature_ref",
                 _text(self.signature_ref, "signature_ref", maximum=2048),
             )
-        if method in _STRONG_SIGNATURE_REF_METHODS and self.signature_ref is None:
+        if method in _SIGNATURE_REF_METHODS and self.signature_ref is None:
             raise P1PromotionDecisionError(
                 f"{method} attestation requires signature_ref"
             )
@@ -462,6 +460,11 @@ def decide_p1_promotion(
             == verification_attestation.verifier_digest
         ):
             reasons.append("verification-implementation-not-independent")
+        if (
+            implementation_attestation.signature_ref
+            == verification_attestation.signature_ref
+        ):
+            reasons.append("verification-signature-ref-not-independent")
         if _utc_datetime(verification_attestation.signed_at_utc) < _utc_datetime(
             implementation_attestation.signed_at_utc
         ):
