@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "baseline_git_sha": "7e0f257edbd1783f9b2ea346bebda8830a0ae8b6",
+  "threshold_bytes": 10485760,
+  "policy": "docs/ARTIFACT_POLICY.md",
+  "recovery": "recover from the pinned baseline commit using the recorded path",
+  "entries": [
+    {
+      "path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot",
+      "blob_sha": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size": 103604344,
+      "classification": "branch-snapshot-archival-binary",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "backend/godot.artifact.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/godot",
+      "blob_sha": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size": 103604344,
+      "classification": "branch-snapshot-archival-binary",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "backend/godot.artifact.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/godot",
+      "blob_sha": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "size": 103604344,
+      "classification": "branch-snapshot-archival-binary",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "backend/godot.artifact.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "blob_sha": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size": 29450632,
+      "classification": "branch-snapshot-archival-media",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": null
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "blob_sha": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size": 29450632,
+      "classification": "branch-snapshot-archival-media",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": null
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
+      "blob_sha": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "size": 29450632,
+      "classification": "branch-snapshot-archival-media",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": null
+    },
+    {
+      "path": "memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "blob_sha": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size": 14595602,
+      "classification": "legacy-runtime-backup",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "memory/mongo_backup/test_database/interactive_quizzes.metadata.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "blob_sha": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size": 14595602,
+      "classification": "branch-snapshot-archival-backup",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.metadata.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "blob_sha": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size": 14595602,
+      "classification": "branch-snapshot-archival-backup",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/memory/mongo_backup/test_database/interactive_quizzes.metadata.json"
+    },
+    {
+      "path": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "blob_sha": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "size": 14595602,
+      "classification": "branch-snapshot-archival-backup",
+      "required_for_build": false,
+      "recovery": "git-history",
+      "replacement_reference": "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/memory/mongo_backup/test_database/interactive_quizzes.metadata.json"
+    }
+  ]
+}
