@@ -91,6 +91,7 @@ def build_intent(
     disposition: PromotionDisposition,
     blockers: tuple[str, ...],
     signer_id: str | None,
+    signer_type: str | None,
     signer_identity_digest: str | None,
     public_key_fingerprint: str | None,
 ) -> P1PromotionIntent:
@@ -116,6 +117,7 @@ def build_intent(
         ),
         explicit_blockers=blockers,
         signer_id=signer_id,
+        signer_type=signer_type,
         signer_identity_digest=signer_identity_digest,
         public_key_fingerprint=public_key_fingerprint,
     )
@@ -141,6 +143,10 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
     )
     parser.add_argument("--signer-id")
+    parser.add_argument(
+        "--signer-type",
+        choices=("human", "ci", "service"),
+    )
     parser.add_argument("--signer-identity-digest")
     parser.add_argument("--public-key-fingerprint")
     parser.add_argument("--out", type=Path, required=True)
@@ -161,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             blockers=tuple(args.blocker),
             signer_id=args.signer_id,
+            signer_type=args.signer_type,
             signer_identity_digest=args.signer_identity_digest,
             public_key_fingerprint=args.public_key_fingerprint,
         )
