@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/agents/human_control.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/human_control.py"
       - "skeleton/agents/autonomy_control.py"
       - "skeleton/agents/delegation_qualification.py"
@@ -20,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/agents/human_control.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/human_control.py"
       - "skeleton/agents/autonomy_control.py"
       - "skeleton/agents/delegation_qualification.py"
