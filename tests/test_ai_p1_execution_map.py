@@ -436,3 +436,63 @@ def test_upstream_domain_gates_watch_p1_backlog_evidence_changes() -> None:
         assert (
             trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
         ), workflow
+
+
+
+@pytest.mark.parametrize(
+    ("task_id", "run_id", "job_id"),
+    (
+        ("P1-EVID-02", "36453604802", "109034199519"),
+        ("P1-EVID-06", "36453604810", "109034204451"),
+    ),
+)
+def test_evid_02_06_use_materialized_exact_head_evidence(
+    task_id: str,
+    run_id: str,
+    job_id: str,
+) -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task = next(row for row in payload["tasks"] if row["task_id"] == task_id)
+
+    for field in ("implementation_paths", "test_targets", "evidence_refs"):
+        assert task[field]
+        assert all(
+            not str(reference).startswith("planned:")
+            for reference in task[field]
+        )
+
+    for field in ("implementation_paths", "test_targets"):
+        for reference in task[field]:
+            path = ROOT / reference
+            assert path.exists(), (task_id, field, reference)
+
+    evidence = set(task["evidence_refs"])
+    head = "1a66b2212c438cdc8d77ba912160d46682775a94"
+    assert f"git-head:{head}" in evidence
+    assert f"github-actions-job:{job_id}" in evidence
+    assert (
+        f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+        in evidence
+    )
+    assert (
+        f"https://github.com/Apeloff1/Skeleton/commit/{head}"
+        in evidence
+    )
+
+    assert task["status"] == "blocked"
+    assert task["accountability_status"] == "planned"
+    assert task["implementation_signed"] is False
+    assert task["verification_signed"] is False
+    assert task["completion_checkbox"] is False
+    assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_scope_freeze_gate_watches_p1_backlog_evidence_changes() -> None:
+    text = (
+        ROOT / ".github/workflows/p1-scope-freeze.yml"
+    ).read_text(encoding="utf-8")
+    trigger_section = text.split("  workflow_dispatch:", 1)[0]
+
+    assert (
+        trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+    )
