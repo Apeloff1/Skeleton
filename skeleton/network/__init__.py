@@ -4,6 +4,20 @@ This package holds replication and rollback primitives that later transport,
 session, and engine adapters can consume. It does not open sockets.
 """
 
+from skeleton.network.model_placement import (
+    MODEL_PLACEMENT_ACCOUNTABILITY_ID,
+    MODEL_PLACEMENT_SCHEMA_VERSION,
+    MODEL_PLACEMENT_TASK_ID,
+    ModelPlacementDecision,
+    ModelPlacementError,
+    ModelPlacementRequest,
+    ModelWarmAuthorizationDecision,
+    ModelWarmObservation,
+    WarmReadiness,
+    qualify_model_placement,
+    qualify_model_warmup,
+)
+
 from skeleton.network.remote_execution import (
     REMOTE_EXECUTION_ACCOUNTABILITY_ID,
     REMOTE_EXECUTION_SCHEMA_VERSION,
@@ -81,4 +95,15 @@ __all__ = [
     "qualify_remote_execution",
     "qualify_remote_execution_commit",
     "worker_identity_digest",
+    "MODEL_PLACEMENT_ACCOUNTABILITY_ID",
+    "MODEL_PLACEMENT_SCHEMA_VERSION",
+    "MODEL_PLACEMENT_TASK_ID",
+    "ModelPlacementDecision",
+    "ModelPlacementError",
+    "ModelPlacementRequest",
+    "ModelWarmAuthorizationDecision",
+    "ModelWarmObservation",
+    "WarmReadiness",
+    "qualify_model_placement",
+    "qualify_model_warmup",
 ]
