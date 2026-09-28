@@ -6,13 +6,16 @@ import pytest
 
 from skeleton.contracts.risk_evidence import RiskBindingEvaluation
 from skeleton.intelligence.plan_verifier import (
+    PlanExecutionAdmission,
     PlanStaticVerifierError,
     PlanStep,
     PlanVerificationPolicy,
     SimulationDisposition,
     StaticPlanDefinition,
+    admit_plan_execution,
     analyze_static_plan,
     qualify_static_plan,
+    require_privileged_execution_admission,
     simulate_static_plan,
 )
 from skeleton.intelligence.strategy_registry import (
@@ -313,3 +316,202 @@ def test_rejected_qualification_cannot_materialize_promotion_evidence() -> None:
     assert decision.accepted is False
     with pytest.raises(PlanStaticVerifierError, match="cannot become promotion"):
         decision.accepted_evidence_ref()
+
+
+
+def _privileged_fixture():
+    reasoning = _reasoning_policy()
+    stopping = _stopping(reasoning)
+    verifier = PlanVerificationPolicy(
+        policy_id="p1-intel-05-privileged",
+        version=1,
+        allowed_capabilities=(
+            "repo.read",
+            "repo.write",
+            "tests.run",
+        ),
+        max_steps=4,
+        max_total_tokens=3000,
+        max_total_cost_units=10.0,
+        max_total_wall_time_s=120.0,
+    )
+    plan = StaticPlanDefinition(
+        plan_id="privileged-plan",
+        version=1,
+        steps=(
+            PlanStep(
+                step_id="inspect",
+                postconditions=("repo.inspected",),
+                required_capabilities=("repo.read",),
+            ),
+            PlanStep(
+                step_id="apply",
+                depends_on=("inspect",),
+                preconditions=("repo.inspected",),
+                postconditions=("change.applied",),
+                required_capabilities=("repo.write",),
+                side_effect=True,
+                recovery_plan_digest="1" * 64,
+                rollback_test_digest="2" * 64,
+            ),
+            PlanStep(
+                step_id="verify",
+                depends_on=("apply",),
+                preconditions=("change.applied",),
+                postconditions=("tests.green",),
+                required_capabilities=("tests.run",),
+                terminal=True,
+            ),
+        ),
+        initial_facts=(),
+        reasoning_policy_digest=reasoning.digest,
+        planning_history_digest=stopping.history_digest,
+        risk=ReasoningRisk.HIGH,
+    )
+    analysis = analyze_static_plan(plan, verifier)
+    simulation = simulate_static_plan(
+        plan,
+        analysis,
+        available_capabilities=(
+            "repo.read",
+            "repo.write",
+            "tests.run",
+        ),
+    )
+    qualification = qualify_static_plan(
+        plan=plan,
+        verification_policy=verifier,
+        reasoning_policy=reasoning,
+        analysis=analysis,
+        simulation=simulation,
+        stopping=stopping,
+        risk_evaluation=_risk(),
+    )
+    return verifier, plan, qualification
+
+
+def test_privileged_step_requires_exact_qualified_execution_admission() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    assert qualification.accepted is True
+
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=verifier,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+
+    assert isinstance(admission, PlanExecutionAdmission)
+    assert admission.accepted is True
+    assert admission.privileged_step_ids == ("apply",)
+    assert admission.required_capabilities == ("repo.write",)
+    require_privileged_execution_admission(
+        admission,
+        plan=plan,
+        step_id="apply",
+    )
+    evidence = admission.accepted_evidence_ref()
+    assert evidence.category == "plan_execution_admission"
+
+
+def test_rejected_plan_cannot_admit_privileged_execution() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    rejected = replace(
+        qualification,
+        accepted=False,
+        reasons=("forced-rejection",),
+    )
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=verifier,
+        qualification=rejected,
+        requested_step_ids=("apply",),
+    )
+
+    assert admission.accepted is False
+    assert "plan-qualification-rejected" in admission.reasons
+    with pytest.raises(
+        PlanStaticVerifierError,
+        match="admission rejected",
+    ):
+        require_privileged_execution_admission(
+            admission,
+            plan=plan,
+            step_id="apply",
+        )
+
+
+def test_execution_admission_is_bound_to_exact_plan_and_policy() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    drifted_plan = replace(
+        plan,
+        plan_id="privileged-plan-v2",
+    )
+    admission = admit_plan_execution(
+        plan=drifted_plan,
+        verification_policy=verifier,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+    assert admission.accepted is False
+    assert "qualification-plan-digest-mismatch" in admission.reasons
+
+    drifted_policy = replace(
+        verifier,
+        max_total_tokens=verifier.max_total_tokens + 1,
+    )
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=drifted_policy,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+    assert admission.accepted is False
+    assert "qualification-policy-digest-mismatch" in admission.reasons
+
+
+def test_under_specified_privileged_step_fails_admission() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    under_specified = replace(
+        plan.steps[1],
+        postconditions=(),
+    )
+    weakened = replace(
+        plan,
+        steps=(
+            plan.steps[0],
+            under_specified,
+            plan.steps[2],
+        ),
+    )
+    admission = admit_plan_execution(
+        plan=weakened,
+        verification_policy=verifier,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+    assert admission.accepted is False
+    assert (
+        "privileged-step-postcondition-missing:apply"
+        in admission.reasons
+    )
+
+
+def test_step_outside_admission_cannot_execute() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=verifier,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+
+    with pytest.raises(
+        PlanStaticVerifierError,
+        match="outside execution admission",
+    ):
+        require_privileged_execution_admission(
+            admission,
+            plan=plan,
+            step_id="verify",
+        )
