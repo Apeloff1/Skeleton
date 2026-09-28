@@ -73,6 +73,45 @@ UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+SECRET_RUN_EXPRESSION_RE = re.compile(
+    r"\$\{\{\s*secrets\.[^}]+\}\}",
+    re.IGNORECASE,
+)
+XTRACE_RE = re.compile(
+    r"(?:^|[;&|]\s*)(?:"
+    r"set\s+(?:-[A-Za-z]*x[A-Za-z]*\b|-o\s+xtrace\b)"
+    r"|(?:bash|sh)\s+-[A-Za-z]*x[A-Za-z]*\b"
+    r")",
+    re.IGNORECASE | re.MULTILINE,
+)
+SENSITIVE_SHELL_NAME_RE = re.compile(
+    r"(?:"
+    r"TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|"
+    r"AUTH(?:ORIZATION)?|API[_-]?KEY|PRIVATE[_-]?KEY|"
+    r"SIGNED[_-]?URL|SESSION[_-]?KEY|"
+    r"TRACEBACK|EXCEPTION|ERROR[_-]?(?:BODY|PAYLOAD|LOG)|"
+    r"RESPONSE[_-]?BODY"
+    r")",
+    re.IGNORECASE,
+)
+SHELL_VARIABLE_RE = re.compile(
+    r"\$(?:\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\}|"
+    r"(?P<plain>[A-Za-z_][A-Za-z0-9_]*))"
+)
+OUTPUT_SINK_RE = re.compile(
+    r"^(?:echo|printf|printenv|cat|head|tail|tee)\b(?P<rest>.*)$",
+    re.IGNORECASE,
+)
+CURL_VERBOSE_RE = re.compile(
+    r"\bcurl\b[^\n]*(?:"
+    r"\s-v(?:\s|$)|"
+    r"\s--verbose(?:\s|$)|"
+    r"\s--trace(?:-ascii)?(?:\s|=|$)"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def workflow_files() -> list[Path]:
     return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
 
@@ -341,6 +380,57 @@ def _untrusted_expression(fragment: str) -> str | None:
     return None
 
 
+
+def _workflow_output_violations(
+    lines: list[str],
+    path_name: str,
+) -> list[str]:
+    """Reject shell patterns that can disclose workflow credentials or raw error payloads."""
+    findings: list[str] = []
+    for number, fragment in hardened_run_fragments(lines):
+        if SECRET_RUN_EXPRESSION_RE.search(fragment):
+            findings.append(
+                f"{path_name}:{number}: direct secrets.* interpolation in run shell is forbidden; pass the secret through env and never print it"
+            )
+        if XTRACE_RE.search(fragment):
+            findings.append(
+                f"{path_name}:{number}: shell xtrace is forbidden because expanded commands can disclose credentials"
+            )
+        if CURL_VERBOSE_RE.search(fragment):
+            findings.append(
+                f"{path_name}:{number}: verbose/trace curl is forbidden because request headers and signed URLs can reach logs"
+            )
+
+        for offset, raw_line in enumerate(fragment.splitlines()):
+            command = raw_line.strip()
+            if not command or command.startswith("#"):
+                continue
+            line_number = number + offset
+            bare = command.split("#", 1)[0].strip()
+            if bare in {"env", "printenv", "set"}:
+                findings.append(
+                    f"{path_name}:{line_number}: dumping the shell environment is forbidden in workflow logs"
+                )
+                continue
+            if re.match(r"^(?:declare|export)\s+-p(?:\s|$)", bare):
+                findings.append(
+                    f"{path_name}:{line_number}: dumping exported shell state is forbidden in workflow logs"
+                )
+                continue
+
+            sink = OUTPUT_SINK_RE.match(bare)
+            if sink is None:
+                continue
+            for variable in SHELL_VARIABLE_RE.finditer(sink.group("rest")):
+                name = variable.group("braced") or variable.group("plain") or ""
+                if SENSITIVE_SHELL_NAME_RE.search(name):
+                    findings.append(
+                        f"{path_name}:{line_number}: output of sensitive shell variable {name} is forbidden"
+                    )
+                    break
+    return findings
+
+
 def violations(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
@@ -400,6 +490,8 @@ def violations(path: Path) -> list[str]:
             findings.append(
                 f"{path.name}:{number}: direct {label} interpolation in run shell is forbidden; pass it through env instead"
             )
+
+    findings.extend(_workflow_output_violations(lines, path.name))
 
     if not has_top_level_permissions:
         findings.append(f"{path.name}: missing explicit top-level permissions block")
