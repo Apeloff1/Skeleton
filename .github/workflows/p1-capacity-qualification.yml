@@ -1,0 +1,272 @@
+name: P1 Capacity Qualification Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/mesh/capacity_qualification.py"
+      - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
+      - "skeleton/mesh/batching_autoscaling.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/resilience/load_shedder.py"
+      - "skeleton/testing/test_capacity_qualification.py"
+      - ".github/workflows/p1-capacity-qualification.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/mesh/capacity_qualification.py"
+      - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
+      - "skeleton/mesh/batching_autoscaling.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/resilience/load_shedder.py"
+      - "skeleton/testing/test_capacity_qualification.py"
+      - ".github/workflows/p1-capacity-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-capacity-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate load and capacity qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile DIST-04 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/mesh/capacity_qualification.py
+          skeleton/ai/runtime/distributed/mesh/capacity_qualification.py
+
+      - name: Run DIST-01 through DIST-04 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_remote_execution_protocol.py
+          skeleton/testing/test_model_placement.py
+          skeleton/testing/test_continuous_batching.py
+          skeleton/testing/test_inference_autoscaling.py
+          skeleton/testing/test_capacity_qualification.py
+          skeleton/testing/test_cost_admission.py
+          tests/test_capacity_bounds.py
+          tests/test_saturation_metrics_schema.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted saturated DIST-04 evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-dist-04
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.mesh.batching_autoscaling import AutoscalingDecision
+          from skeleton.mesh.capacity_qualification import (
+              CapacityObservation,
+              LoadCapacityProfile,
+              qualify_capacity,
+          )
+          from skeleton.shells.worker_scaling import ScalingAction
+
+          now = 1_800_000_000.0
+          profile = LoadCapacityProfile(
+              profile_id="dist-04-ci",
+              max_workers=4,
+              max_queue_depth=100,
+              target_p99_latency_ms=500.0,
+              max_error_rate=0.05,
+              max_cancellation_rate=0.02,
+              max_measured_cost_usd=10.0,
+              max_cost_reconciliation_error_usd=0.05,
+              observation_max_age_s=60.0,
+          )
+          autoscaling = AutoscalingDecision(
+              accepted=True,
+              reasons=(),
+              action=ScalingAction.HOLD,
+              current_workers=4,
+              desired_workers=4,
+              placement_decision_digest="1" * 64,
+              observation_digest="2" * 64,
+              policy_digest="3" * 64,
+          )
+          observation = CapacityObservation(
+              profile_digest=profile.profile_digest,
+              autoscaling_decision_digest=autoscaling.decision_digest,
+              observed_at=now - 5.0,
+              healthy_workers=4,
+              queue_depth=120,
+              p99_latency_ms=450.0,
+              error_rate=0.01,
+              cancellation_rate=0.0,
+              offered_requests=100,
+              completed_requests=90,
+              rejected_requests=0,
+              shed_requests=10,
+              partition_events=1,
+              stale_worker_commits=0,
+              measured_cost_usd=2.0,
+              accounted_cost_usd=2.0,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://dist-04/load-partition",
+                      digest="4" * 64,
+                      category="load",
+                  ),
+              ),
+              independent=True,
+          )
+          decision = qualify_capacity(
+              profile=profile,
+              autoscaling_decision=autoscaling,
+              observation=observation,
+              observed_at=now,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"DIST-04 fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-dist-04/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-dist-04/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head DIST-04 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-dist-04/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-dist-04-capacity-qualification-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-04/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|dist-04"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-04/verifier.digest").write_text(
+              digest([
+                  "skeleton/mesh/capacity_qualification.py",
+                  "skeleton/mesh/batching_autoscaling.py",
+                  "skeleton/intelligence/admission.py",
+                  "skeleton/resilience/load_shedder.py",
+                  ".github/workflows/p1-capacity-qualification.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-dist-04/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_capacity_qualification.py",
+                  "skeleton/testing/test_remote_execution_protocol.py",
+                  "skeleton/testing/test_model_placement.py",
+                  "skeleton/testing/test_continuous_batching.py",
+                  "skeleton/testing/test_inference_autoscaling.py",
+                  "skeleton/testing/test_cost_admission.py",
+                  "tests/test_capacity_bounds.py",
+                  "tests/test_saturation_metrics_schema.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-DIST-04 \
+            --accountability-id ACC-P1-DIST-04 \
+            --configuration-digest "$(cat .p1-dist-04/config.digest)" \
+            --environment-digest "$(cat .p1-dist-04/environment.digest)" \
+            --verifier-id github-actions:p1-capacity-qualification \
+            --verifier-digest "$(cat .p1-dist-04/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-dist-04/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-dist-04/refs.json \
+            --out .p1-dist-04/receipt.json \
+            > .p1-dist-04/stdout.json
+
+      - name: Assert exact-head DIST-04 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-dist-04/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("DIST-04 receipt head mismatch")
+          if receipt["task_id"] != "P1-DIST-04":
+              raise SystemExit("DIST-04 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-DIST-04":
+              raise SystemExit("DIST-04 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("DIST-04 exact-head receipt OK", receipt["receipt_digest"])
+          PY
