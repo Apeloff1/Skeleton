@@ -120,9 +120,18 @@ def _path_scope(value: Any, field: str) -> str:
         raise SecurityExceptionPolicyError(
             f"{field} must be an exact repository path/component without globs"
         )
+    if "\n" in scope:
+        raise SecurityExceptionPolicyError(f"{field} contains unsafe control characters")
     path = PurePosixPath(scope)
-    if path.is_absolute() or scope in {".", ".."} or any(part in {"", ".", ".."} for part in path.parts):
-        raise SecurityExceptionPolicyError(f"{field} must stay within the repository")
+    if (
+        path.is_absolute()
+        or scope in {".", ".."}
+        or any(part in {"", ".", ".."} for part in path.parts)
+        or path.as_posix() != scope
+    ):
+        raise SecurityExceptionPolicyError(
+            f"{field} must be a canonical path within the repository"
+        )
     if len(path.parts) == 1 and path.parts[0] in {"backend", "frontend", "skeleton", "scripts", ".github"}:
         raise SecurityExceptionPolicyError(
             f"{field} is too broad; name a narrower path/component"
@@ -156,10 +165,25 @@ def validate_registry(payload: dict[str, Any], *, today: date) -> tuple[str, ...
         seen_ids.add(exception_id)
 
         _text(raw["control"], f"{field}.control", max_length=160)
-        _text(raw["reason"], f"{field}.reason")
-        _text(raw["compensating_control"], f"{field}.compensating_control")
-        _login(raw["owner"], f"{field}.owner")
-        _login(raw["approved_by"], f"{field}.approved_by")
+        reason = _text(raw["reason"], f"{field}.reason")
+        compensating = _text(
+            raw["compensating_control"],
+            f"{field}.compensating_control",
+        )
+        if len(reason) < 20:
+            raise SecurityExceptionPolicyError(
+                f"{field}.reason must explain the exception in at least 20 characters"
+            )
+        if len(compensating) < 20:
+            raise SecurityExceptionPolicyError(
+                f"{field}.compensating_control must explain the fallback in at least 20 characters"
+            )
+        owner = _login(raw["owner"], f"{field}.owner")
+        approved_by = _login(raw["approved_by"], f"{field}.approved_by")
+        if owner.lstrip("@").lower() == approved_by.lstrip("@").lower():
+            raise SecurityExceptionPolicyError(
+                f"{field}.approved_by must be independent from owner"
+            )
 
         issue = raw["tracking_issue"]
         if isinstance(issue, bool) or not isinstance(issue, int) or issue <= 0:
