@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/mesh/capacity_qualification.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
       - "skeleton/mesh/batching_autoscaling.py"
       - "skeleton/intelligence/admission.py"
@@ -18,6 +19,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/mesh/capacity_qualification.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
       - "skeleton/mesh/batching_autoscaling.py"
       - "skeleton/intelligence/admission.py"
