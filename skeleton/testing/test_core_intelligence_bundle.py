@@ -283,6 +283,7 @@ def test_output_quality_rejection_blocks() -> None:
     output = replace(
         output,
         accepted=False,
+        disposition=OutputDisposition.BLOCKED,
         reasons=("answer-quality-rejected",),
     )
 
