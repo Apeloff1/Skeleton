@@ -733,19 +733,32 @@ LEARNING_LANE_TASKS = (
 )
 
 
-def test_learning_lane_paths_are_materialized_before_evidence_binding() -> None:
+LEARNING_LANE_EVIDENCE_HEAD = "5cd48394f45623b057228a26bbee7ca9c7b27676"
+LEARNING_LANE_EVIDENCE = {
+    "P1-LEARN-01": ("36471954405", ("109096150349",)),
+    "P1-LEARN-02": ("36471954538", ("109096147549",)),
+    "P1-LEARN-03": ("36471954486", ("109096146862",)),
+    "P1-LEARN-04": ("36471954568", ("109096147623",)),
+    "P1-LEARN-05": ("36471954790", ("109096147873",)),
+    "P1-LEARN-06": ("36471954446", ("109096149360",)),
+}
+
+
+def test_learning_lane_uses_materialized_exact_head_evidence() -> None:
     payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
     task_by_id = {task["task_id"]: task for task in payload["tasks"]}
 
     for task_id in LEARNING_LANE_TASKS:
         task = task_by_id[task_id]
 
-        for field in ("implementation_paths", "test_targets"):
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
             assert task[field]
             assert all(
                 not str(reference).startswith("planned:")
                 for reference in task[field]
             )
+
+        for field in ("implementation_paths", "test_targets"):
             for reference in task[field]:
                 assert (ROOT / reference).is_file(), (
                     task_id,
@@ -753,7 +766,20 @@ def test_learning_lane_paths_are_materialized_before_evidence_binding() -> None:
                     reference,
                 )
 
-        assert task["evidence_refs"] == []
+        run_id, job_ids = LEARNING_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{LEARNING_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + LEARNING_LANE_EVIDENCE_HEAD
+        ) in evidence
+
         assert task["status"] == "blocked"
         assert task["accountability_status"] == "planned"
         assert task["implementation_signed"] is False
