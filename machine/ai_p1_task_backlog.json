@@ -2881,7 +2881,7 @@
       ],
       "objective": "Independently verify all P1 evidence and record signed promotion or explicit rejection without self-certification.",
       "acceptance": [
-        "Promotion is exact-head, independently verified, signed, and leaves deferred 357-volume work visible.",
+        "Promotion is exact-head, independently verified, signed, and leaves the exact deferred-volume complement visible from the execution-map authority.",
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
@@ -2895,10 +2895,17 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "machine/p1_promotion_decision_policy.json",
+        "skeleton/contracts/p1_promotion_decision.py",
+        "skeleton/ai/runtime/contracts/p1_promotion_decision.py",
+        "scripts/check_p1_promotion_decision.py",
+        "scripts/build_p1_promotion_decision.py",
+        "scripts/emit_p1_promotion_attestation.py",
+        ".github/workflows/p1-signed-promotion-decision.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_promotion_decision.py",
+        "tests/test_p1_promotion_decision_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
