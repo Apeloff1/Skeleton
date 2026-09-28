@@ -161,6 +161,35 @@ def _ensure_blob(
         raise ArtifactRestoreError("manifest object is not a Git blob")
 
 
+def check_artifact_manifest(
+    manifest_path: Path,
+    *,
+    repo_root: Path | None = None,
+    remote: str = "origin",
+) -> dict[str, Any]:
+    payload = validate_manifest(_load_manifest(manifest_path))
+    root = (repo_root.resolve() if repo_root is not None else _discover_repo_root(manifest_path))
+    if not (root / ".git").exists():
+        raise ArtifactRestoreError(f"repository root has no .git directory: {root}")
+
+    _ensure_blob(
+        root,
+        blob_oid=payload["blob_oid"],
+        source_commit=payload["source_commit"],
+        remote=remote,
+    )
+    raw_size = _run_git(root, ["cat-file", "-s", payload["blob_oid"]]).stdout.strip()
+    try:
+        object_size = int(raw_size)
+    except ValueError as exc:
+        raise ArtifactRestoreError("git returned a non-integer blob size") from exc
+    if object_size != payload["size_bytes"]:
+        raise ArtifactRestoreError(
+            f"artifact object size mismatch: expected {payload['size_bytes']}, got {object_size}"
+        )
+    return payload
+
+
 def _git_blob_oid(path: Path, size_bytes: int) -> str:
     digest = hashlib.sha1(usedforsecurity=False)
     digest.update(f"blob {size_bytes}\0".encode("ascii"))
@@ -187,11 +216,12 @@ def restore_artifact(
     remote: str = "origin",
     overwrite: bool = False,
 ) -> Path:
-    payload = validate_manifest(_load_manifest(manifest_path))
+    payload = check_artifact_manifest(
+        manifest_path,
+        repo_root=repo_root,
+        remote=remote,
+    )
     root = (repo_root.resolve() if repo_root is not None else _discover_repo_root(manifest_path))
-    if not (root / ".git").exists():
-        raise ArtifactRestoreError(f"repository root has no .git directory: {root}")
-
     relative = payload["path"]
     destination = root / relative
     destination_parent = destination.parent
@@ -261,12 +291,29 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path)
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="validate manifest and Git object type/size without materializing",
+    )
     return parser
 
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = _parser().parse_args(list(argv) if argv is not None else None)
     try:
+        if args.check_only:
+            payload = check_artifact_manifest(
+                args.manifest,
+                repo_root=args.repo_root,
+                remote=args.remote,
+            )
+            print(
+                f"{payload['path']}: {payload['blob_oid']} "
+                f"({payload['size_bytes']} bytes)"
+            )
+            return 0
+
         restored = restore_artifact(
             args.manifest,
             repo_root=args.repo_root,
