@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/network/remote_execution.py"
       - "skeleton/ai/runtime/distributed/network/remote_execution.py"
       - "skeleton/network/__init__.py"
@@ -20,6 +21,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/network/remote_execution.py"
       - "skeleton/ai/runtime/distributed/network/remote_execution.py"
       - "skeleton/network/__init__.py"
