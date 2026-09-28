@@ -2136,7 +2136,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309453",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2192,7 +2197,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2249,7 +2259,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2305,7 +2320,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098308997",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2361,7 +2381,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310079",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2414,7 +2439,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309784",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598091",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
