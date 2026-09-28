@@ -8,7 +8,7 @@ not silently infer or manufacture exceptions from comments or labels.
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -181,7 +181,7 @@ def validate_registry(
     if len(raw_entries) > MAX_EXCEPTIONS:
         raise SecurityExceptionPolicyError("too many active security exceptions")
 
-    current = today or date.today()
+    current = today or datetime.now(timezone.utc).date()
     validated: list[dict[str, Any]] = []
     ids: set[str] = set()
 
