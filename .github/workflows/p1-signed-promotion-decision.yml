@@ -1,0 +1,459 @@
+name: P1 Signed Promotion Decision Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/prom-02-terminal-failure-journeys-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/p1_promotion_decision.py"
+      - "skeleton/ai/runtime/contracts/p1_promotion_decision.py"
+      - "skeleton/testing/test_p1_promotion_decision.py"
+      - "machine/p1_promotion_decision_policy.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/p1_terminal_failure_journeys.json"
+      - "scripts/check_p1_promotion_decision.py"
+      - "scripts/build_p1_promotion_decision.py"
+      - "scripts/emit_p1_promotion_attestation.py"
+      - "tests/test_p1_promotion_decision_policy.py"
+      - ".github/workflows/p1-signed-promotion-decision.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/contracts/p1_promotion_decision.py"
+      - "skeleton/ai/runtime/contracts/p1_promotion_decision.py"
+      - "machine/p1_promotion_decision_policy.json"
+      - "scripts/check_p1_promotion_decision.py"
+      - "scripts/build_p1_promotion_decision.py"
+      - "scripts/emit_p1_promotion_attestation.py"
+      - ".github/workflows/p1-signed-promotion-decision.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-signed-promotion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONPATH: ".:backend"
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+  EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+  RUN_IDENTITY: "${{ github.run_id }}"
+  RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+jobs:
+  subject:
+    name: Build exact-head promotion subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      subject_digest: ${{ steps.subject.outputs.subject_digest }}
+      evidence_digest: ${{ steps.subject.outputs.evidence_digest }}
+      prom02_b64: ${{ steps.subject.outputs.prom02_b64 }}
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install terminal promotion runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "pytest>=8,<9"
+          "httpx==0.28.1"
+          "bcrypt>=4,<5"
+          "PyJWT>=2,<3"
+          "email-validator>=2,<3"
+          "python-dotenv>=1,<2"
+
+      - name: Compile promotion contracts
+        run: >-
+          python -m compileall -q
+          skeleton/contracts/p1_promotion_decision.py
+          skeleton/ai/runtime/contracts/p1_promotion_decision.py
+          scripts/check_p1_promotion_decision.py
+          scripts/build_p1_promotion_decision.py
+          scripts/emit_p1_promotion_attestation.py
+
+      - name: Validate promotion authorities
+        run: |
+          python scripts/check_ai_p1_execution_map.py
+          python scripts/check_p1_terminal_evidence_policy.py --print-summary
+          python scripts/check_p1_terminal_failure_journeys.py --print-summary
+          python scripts/check_p1_promotion_decision.py --print-summary
+          python scripts/check_ai_file_tree.py
+
+      - name: Run PROM-03 contract and policy mutations
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_p1_promotion_decision.py
+          python -m pytest -q --noconftest tests/test_p1_promotion_decision_policy.py
+
+      - name: Rebuild exact-head PROM-01 and PROM-02 evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-03
+          python scripts/reconcile_p1_maturity.py \
+            --out .p1-prom-03/maturity.json
+          python scripts/build_p1_terminal_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --maturity-report .p1-prom-03/maturity.json \
+            --out .p1-prom-03/prom01.json \
+            --refs-out .p1-prom-03/prom01-refs.json
+          python scripts/build_p1_terminal_failure_journeys.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom01-bundle .p1-prom-03/prom01.json \
+            --out .p1-prom-03/prom02.json \
+            --refs-out .p1-prom-03/prom02-refs.json
+
+      - name: Build unsigned subject and explicit rejection
+        id: subject
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_promotion_decision.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom02-bundle .p1-prom-03/prom02.json \
+            --subject-out .p1-prom-03/subject.json \
+            --out .p1-prom-03/unsigned-decision.json
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import base64
+          import hashlib
+          import json
+          from pathlib import Path
+
+          subject = json.loads(
+              Path(".p1-prom-03/subject.json").read_text(encoding="utf-8")
+          )
+          decision = json.loads(
+              Path(".p1-prom-03/unsigned-decision.json").read_text(encoding="utf-8")
+          )
+          prom02_path = Path(".p1-prom-03/prom02.json")
+          policy_digest = hashlib.sha256(
+              Path("machine/p1_promotion_decision_policy.json").read_bytes()
+          ).hexdigest()
+          subject_digest = hashlib.sha256(
+              json.dumps(
+                  subject,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=False,
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          evidence = {
+              "prom02_decision_digest": subject["prom02_decision_digest"],
+              "subject_digest": subject_digest,
+              "policy_digest": policy_digest,
+          }
+          evidence_digest = hashlib.sha256(
+              json.dumps(
+                  evidence,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=False,
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+          if decision["promoted"] is not False:
+              raise SystemExit("unsigned PROM-03 decision must be explicit rejection")
+          expected = {
+              "missing-implementation-attestation",
+              "missing-verification-attestation",
+          }
+          if set(decision["reasons"]) != expected:
+              raise SystemExit("unsigned PROM-03 rejection reasons drifted")
+          print(f"subject_digest={subject_digest}")
+          print(f"evidence_digest={evidence_digest}")
+          print(
+              "prom02_b64="
+              + base64.b64encode(prom02_path.read_bytes()).decode("ascii")
+          )
+          PY
+
+  implementation:
+    name: Implementation promotion signoff
+    needs: subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      attestation_b64: ${{ steps.attest.outputs.attestation_b64 }}
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install implementation verifier runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]" "pytest>=8,<9"
+
+      - name: Verify implementation contract
+        run: |
+          python scripts/check_p1_promotion_decision.py
+          python -m pytest -q --noconftest skeleton/testing/test_p1_promotion_decision.py
+
+      - name: Emit implementation attestation
+        id: attest
+        env:
+          SUBJECT_DIGEST: ${{ needs.subject.outputs.subject_digest }}
+          EVIDENCE_DIGEST: ${{ needs.subject.outputs.evidence_digest }}
+          SIGNATURE_REF: "github://actions/Apeloff1/Skeleton/${{ github.run_id }}/${{ github.run_attempt }}/implementation"
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-03
+          verifier_digest="$(
+            python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          paths = [
+              "skeleton/contracts/p1_promotion_decision.py",
+              "scripts/build_p1_promotion_decision.py",
+              "skeleton/testing/test_p1_promotion_decision.py",
+          ]
+          h = hashlib.sha256()
+          for path in paths:
+              h.update(path.encode())
+              h.update(b"\0")
+              h.update(Path(path).read_bytes())
+              h.update(b"\0")
+          print(h.hexdigest())
+          PY
+          )"
+          python scripts/emit_p1_promotion_attestation.py \
+            --phase implementation \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --subject-digest "$SUBJECT_DIGEST" \
+            --signer-id github-actions:p1-prom-03:implementation \
+            --signer-type ci \
+            --role promotion-implementation \
+            --signed-at-utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --signature-method github_identity \
+            --signature-ref "$SIGNATURE_REF" \
+            --verifier-digest "$verifier_digest" \
+            --evidence-digest "$EVIDENCE_DIGEST" \
+            --out .p1-prom-03/implementation.json \
+            > .p1-prom-03/implementation.stdout.json
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import base64
+          from pathlib import Path
+          print(
+              "attestation_b64="
+              + base64.b64encode(
+                  Path(".p1-prom-03/implementation.json").read_bytes()
+              ).decode("ascii")
+          )
+          PY
+
+  verification:
+    name: Independent promotion verification
+    needs: [subject, implementation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      attestation_b64: ${{ steps.attest.outputs.attestation_b64 }}
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]" "pytest>=8,<9"
+
+      - name: Independently verify authority and policy
+        run: |
+          python scripts/check_ai_p1_execution_map.py
+          python scripts/check_p1_promotion_decision.py
+          python scripts/check_ai_file_tree.py
+          python -m pytest -q --noconftest tests/test_p1_promotion_decision_policy.py
+
+      - name: Emit independent verification attestation
+        id: attest
+        env:
+          SUBJECT_DIGEST: ${{ needs.subject.outputs.subject_digest }}
+          EVIDENCE_DIGEST: ${{ needs.subject.outputs.evidence_digest }}
+          SIGNATURE_REF: "github://actions/Apeloff1/Skeleton/${{ github.run_id }}/${{ github.run_attempt }}/verification"
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-03
+          verifier_digest="$(
+            python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          paths = [
+              "machine/p1_promotion_decision_policy.json",
+              "scripts/check_p1_promotion_decision.py",
+              "tests/test_p1_promotion_decision_policy.py",
+              "machine/ai_p1_execution_map.json",
+          ]
+          h = hashlib.sha256()
+          for path in paths:
+              h.update(path.encode())
+              h.update(b"\0")
+              h.update(Path(path).read_bytes())
+              h.update(b"\0")
+          print(h.hexdigest())
+          PY
+          )"
+          python scripts/emit_p1_promotion_attestation.py \
+            --phase verification \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --subject-digest "$SUBJECT_DIGEST" \
+            --signer-id github-actions:p1-prom-03:independent-verifier \
+            --signer-type ci \
+            --role independent-promotion-verification \
+            --signed-at-utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --signature-method github_identity \
+            --signature-ref "$SIGNATURE_REF" \
+            --verifier-digest "$verifier_digest" \
+            --evidence-digest "$EVIDENCE_DIGEST" \
+            --out .p1-prom-03/verification.json \
+            > .p1-prom-03/verification.stdout.json
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import base64
+          from pathlib import Path
+          print(
+              "attestation_b64="
+              + base64.b64encode(
+                  Path(".p1-prom-03/verification.json").read_bytes()
+              ).decode("ascii")
+          )
+          PY
+
+  decision:
+    name: Assert signed bounded P1 promotion
+    needs: [subject, implementation, verification]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install decision runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Restore exact evidence and attestations
+        env:
+          PROM02_B64: ${{ needs.subject.outputs.prom02_b64 }}
+          IMPLEMENTATION_B64: ${{ needs.implementation.outputs.attestation_b64 }}
+          VERIFICATION_B64: ${{ needs.verification.outputs.attestation_b64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-03
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          rows = {
+              "prom02.json": os.environ["PROM02_B64"],
+              "implementation.json": os.environ["IMPLEMENTATION_B64"],
+              "verification.json": os.environ["VERIFICATION_B64"],
+          }
+          for name, value in rows.items():
+              Path(".p1-prom-03", name).write_bytes(base64.b64decode(value))
+          PY
+
+      - name: Build and assert final signed decision
+        env:
+          SUBJECT_DIGEST: ${{ needs.subject.outputs.subject_digest }}
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_promotion_decision.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom02-bundle .p1-prom-03/prom02.json \
+            --implementation-attestation .p1-prom-03/implementation.json \
+            --verification-attestation .p1-prom-03/verification.json \
+            --subject-out .p1-prom-03/final-subject.json \
+            --out .p1-prom-03/final-decision.json \
+            --require-promotion
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          subject = json.loads(
+              Path(".p1-prom-03/final-subject.json").read_text(encoding="utf-8")
+          )
+          decision = json.loads(
+              Path(".p1-prom-03/final-decision.json").read_text(encoding="utf-8")
+          )
+          subject_digest = hashlib.sha256(
+              json.dumps(
+                  subject,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=False,
+                  allow_nan=False,
+              ).encode("utf-8")
+          ).hexdigest()
+
+          if subject_digest != os.environ["SUBJECT_DIGEST"]:
+              raise SystemExit("PROM-03 subject drift between jobs")
+          if decision["promoted"] is not True:
+              raise SystemExit("PROM-03 did not promote bounded P1 frontier")
+          if decision["p1_promotion_authority"] is not True:
+              raise SystemExit("PROM-03 missing bounded P1 promotion authority")
+          if decision["signed_promotion"] is not True:
+              raise SystemExit("PROM-03 missing signed promotion")
+          if decision["masterplan_maturity_authority"] is not False:
+              raise SystemExit("PROM-03 illegally escalated masterplan authority")
+          if (
+              decision["primary_volume_count"]
+              + decision["deferred_volume_count"]
+              != decision["masterplan_volume_count"]
+          ):
+              raise SystemExit("PROM-03 scope no longer covers the masterplan partition")
+          print(
+              "PROM-03 signed bounded P1 promotion accepted",
+              decision["decision_digest"],
+          )
+          PY
