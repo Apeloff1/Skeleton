@@ -26,6 +26,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from skeleton.build.incremental_graph import (
     IncrementalBuildGraph,
     IncrementalGraphError,
+    MAX_INPUT_KEYS,
     NodeSpec,
     build_incremental_graph,
 )
@@ -35,7 +36,7 @@ from skeleton.kernel.errors import SkeletonError
 ASSET_PIPELINE_SCHEMA = 1
 ASSET_PIPELINE_ALGORITHM = "sha256"
 MAX_ASSETS = 4096
-MAX_INPUTS_PER_CLASS = 128
+MAX_INPUTS_PER_CLASS = MAX_INPUT_KEYS
 MAX_PACKAGES_PER_ASSET = 64
 MAX_CHANGE_KEYS = 16384
 MAX_ID_LENGTH = 256
@@ -193,6 +194,16 @@ def build_asset_pipeline(
         sources = _normalize_digest_map(spec.sources or {}, field="sources")
         config = _normalize_digest_map(spec.config or {}, field="config")
         tools = _normalize_digest_map(spec.tools or {}, field="tools")
+        total_inputs = len(sources) + len(config) + len(tools)
+        if total_inputs > MAX_INPUT_KEYS:
+            raise AssetPipelineError(
+                "asset input count exceeds incremental graph limit",
+                context={
+                    "asset_id": spec.asset_id,
+                    "inputs": total_inputs,
+                    "max_inputs": MAX_INPUT_KEYS,
+                },
+            )
         dependencies = _normalize_ids(
             spec.dependencies,
             field="dependencies",
