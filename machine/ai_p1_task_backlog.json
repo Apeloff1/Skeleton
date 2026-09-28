@@ -1420,13 +1420,18 @@
         "WP-W24"
       ],
       "implementation_paths": [
-        "backend/routes",
-        "backend/core",
-        "machine/ai_runtime_schemas.json"
+        "backend/core/api_contract_registry.py",
+        "backend/core/routes_registry.py",
+        "backend/routes/operation_stream.py",
+        "machine/p1_api_contract_registry.json",
+        "machine/ai_runtime_schemas.json",
+        "scripts/check_p1_api_contract_registry.py",
+        ".github/workflows/p1-api-contract-registry.yml"
       ],
       "test_targets": [
-        "planned:backend/tests/test_api_contracts.py",
-        "planned:backend/tests/test_api_idempotency.py"
+        "backend/tests/test_api_contract_registry.py",
+        "tests/test_api_contract_registry.py",
+        "tests/test_p1_api_contract_registry.py"
       ],
       "evidence_modes": [
         "api_contract",
@@ -1479,22 +1484,20 @@
         "WP-W24"
       ],
       "implementation_paths": [
+        "backend/core/operation_projection.py",
         "backend/core/operation_stream_transport.py",
         "backend/routes/operation_stream.py",
-        "frontend",
         "skeleton/frontier/operation_stream.py",
-        "backend/routes",
-        "planned:skeleton/product_shell",
-        "planned:skeleton/product/web"
+        ".github/workflows/p1-streaming-projection-authority.yml"
       ],
       "test_targets": [
+        "backend/tests/test_operation_projection.py",
+        "tests/test_operation_projection.py",
         "backend/tests/test_operation_stream_transport.py",
+        "tests/test_operation_stream_transport.py",
         "backend/tests/test_operation_stream_route.py",
-        "planned:frontend operation reducer tests",
-        "planned:frontend product-state reducer tests",
-        "planned:backend/tests/test_product_shell_projection.py",
-        "planned:frontend reconnect tests",
-        "planned:frontend browser-storage policy tests"
+        "tests/test_operation_stream_route.py",
+        "skeleton/testing/test_operation_stream.py"
       ],
       "evidence_modes": [
         "api_contract",
@@ -1545,17 +1548,19 @@
         "WP-W24"
       ],
       "implementation_paths": [
-        "frontend",
-        "backend/routes",
-        "planned:skeleton/product_shell",
-        "backend/core",
-        "skeleton/frontier/operation_stream.py"
+        "backend/core/product_shell_projection.py",
+        "backend/core/operation_projection.py",
+        "frontend/services/productProjection.ts",
+        "frontend/services/operationStreamReducer.ts",
+        ".github/workflows/p1-product-workspace-projection.yml"
       ],
       "test_targets": [
-        "planned:frontend product-state reducer tests",
-        "planned:backend/tests/test_product_shell_projection.py",
-        "planned:frontend long-operation state tests",
-        "planned:backend/tests/test_user_control_receipts.py"
+        "backend/tests/test_product_shell_projection.py",
+        "tests/test_product_shell_projection.py",
+        "backend/tests/test_operation_projection.py",
+        "tests/test_operation_projection.py",
+        "frontend/scripts/test-product-projection.mjs",
+        "frontend/scripts/test-operation-stream-reducer.mjs"
       ],
       "evidence_modes": [
         "api_contract",
@@ -1606,13 +1611,21 @@
         "WP-W24"
       ],
       "implementation_paths": [
-        "frontend",
-        "backend/core",
-        "skeleton/frontier/operation_stream.py"
+        "backend/core/operator_control_projection.py",
+        "backend/core/workspace_projection.py",
+        "frontend/src/product/operatorControlProjection.ts",
+        "frontend/src/product/workspaceProjection.ts",
+        "skeleton/agents/human_control.py",
+        "skeleton/contracts/operation.py",
+        ".github/workflows/p1-operator-control-projection.yml"
       ],
       "test_targets": [
-        "planned:frontend long-operation state tests",
-        "planned:backend/tests/test_user_control_receipts.py"
+        "backend/tests/test_user_control_receipts.py",
+        "tests/test_user_control_receipts.py",
+        "backend/tests/test_workspace_projection.py",
+        "tests/test_workspace_projection.py",
+        "frontend/scripts/test-operator-control-projection.mjs",
+        "skeleton/testing/test_human_control.py"
       ],
       "evidence_modes": [
         "api_contract",
@@ -1666,22 +1679,15 @@
         "WP-W24"
       ],
       "implementation_paths": [
-        "desktop",
-        "planned:skeleton/product/desktop",
-        "backend",
-        "frontend",
-        "backend/routes",
-        "planned:skeleton/product/web",
-        "skeleton/security",
-        "skeleton/persistence"
+        "backend/core/tenant_storage_boundary.py",
+        "frontend/src/product/tenantStorageBoundary.ts",
+        "frontend/src/auth/gameforgeAuth.ts",
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
       "test_targets": [
-        "planned:desktop lifecycle tests",
-        "planned:desktop integration permission tests",
-        "planned:frontend reconnect tests",
-        "planned:frontend browser-storage policy tests",
-        "planned:skeleton/testing/test_tenant_isolation.py",
-        "planned:backend/tests/test_tenant_scope.py"
+        "backend/tests/test_tenant_storage_boundary.py",
+        "tests/test_tenant_storage_boundary.py",
+        "frontend/scripts/test-tenant-storage-boundary.mjs"
       ],
       "evidence_modes": [
         "api_contract",
