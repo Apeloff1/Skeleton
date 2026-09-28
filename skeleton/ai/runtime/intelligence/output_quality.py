@@ -34,6 +34,66 @@ class OutputKind(str, Enum):
     ARTIFACT = "artifact"
 
 
+class OutputDisposition(str, Enum):
+    BLOCKED = "blocked"
+    QUALIFIED = "qualified"
+    ABSTAINED = "abstained"
+
+
+class ArtifactType(str, Enum):
+    CODE = "code"
+    DOCUMENT = "document"
+    DATA = "data"
+    MODEL = "model"
+    CONFIGURATION = "configuration"
+    BINARY = "binary"
+
+
+class ChangeImpact(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+_ARTIFACT_TYPE_GATES: dict[ArtifactType, tuple[str, ...]] = {
+    ArtifactType.CODE: ("static-analysis", "tests"),
+    ArtifactType.DOCUMENT: ("factuality", "link-integrity"),
+    ArtifactType.DATA: ("schema", "provenance"),
+    ArtifactType.MODEL: ("evaluation", "safety"),
+    ArtifactType.CONFIGURATION: ("schema", "rollback"),
+    ArtifactType.BINARY: ("provenance", "malware"),
+}
+_IMPACT_GATES: dict[ChangeImpact, tuple[str, ...]] = {
+    ChangeImpact.LOW: (),
+    ChangeImpact.MEDIUM: ("change-impact-review",),
+    ChangeImpact.HIGH: ("change-impact-review", "security", "rollback"),
+    ChangeImpact.CRITICAL: (
+        "change-impact-review",
+        "security",
+        "rollback",
+        "independent-release",
+    ),
+}
+
+
+def required_artifact_gates(
+    artifact_type: ArtifactType | str,
+    change_impact: ChangeImpact | str,
+) -> tuple[str, ...]:
+    try:
+        kind = ArtifactType(artifact_type)
+        impact = ChangeImpact(change_impact)
+    except ValueError as exc:
+        raise OutputQualityError("invalid artifact gate profile") from exc
+    return tuple(
+        sorted(
+            set(_ARTIFACT_TYPE_GATES[kind])
+            | set(_IMPACT_GATES[impact])
+        )
+    )
+
+
 def _text(value: object, field: str, *, maximum: int = 2048) -> str:
     if not isinstance(value, str) or not value.strip():
         raise OutputQualityError(f"{field} must be non-empty")
@@ -135,6 +195,10 @@ class IndependentQualityEvaluation:
     report: QualityReport
     evidence_refs: tuple[EvidenceRef, ...]
     independent: bool = True
+    artifact_type: ArtifactType | None = None
+    change_impact: ChangeImpact | None = None
+    published_subject_digest: str | None = None
+    gate_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         try:
@@ -165,6 +229,61 @@ class IndependentQualityEvaluation:
             "evidence_refs",
             _refs(self.evidence_refs, "quality evidence"),
         )
+        if self.kind is OutputKind.ARTIFACT:
+            if self.artifact_type is None or self.change_impact is None:
+                raise OutputQualityError(
+                    "artifact evaluation requires artifact_type and change_impact"
+                )
+            try:
+                object.__setattr__(
+                    self,
+                    "artifact_type",
+                    ArtifactType(self.artifact_type),
+                )
+                object.__setattr__(
+                    self,
+                    "change_impact",
+                    ChangeImpact(self.change_impact),
+                )
+            except ValueError as exc:
+                raise OutputQualityError(
+                    "invalid artifact type or change impact"
+                ) from exc
+            if self.published_subject_digest is None:
+                raise OutputQualityError(
+                    "artifact evaluation requires published_subject_digest"
+                )
+            object.__setattr__(
+                self,
+                "published_subject_digest",
+                _sha256(
+                    self.published_subject_digest,
+                    "published_subject_digest",
+                ),
+            )
+            gates = tuple(
+                sorted(
+                    {
+                        _text(item, "gate_id", maximum=128)
+                        for item in self.gate_ids
+                    }
+                )
+            )
+            if not gates:
+                raise OutputQualityError(
+                    "artifact evaluation requires gate_ids"
+                )
+            object.__setattr__(self, "gate_ids", gates)
+        else:
+            if (
+                self.artifact_type is not None
+                or self.change_impact is not None
+                or self.published_subject_digest is not None
+                or self.gate_ids
+            ):
+                raise OutputQualityError(
+                    "answer evaluation cannot carry artifact gate metadata"
+                )
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -174,6 +293,18 @@ class IndependentQualityEvaluation:
             "evaluator_id": self.evaluator_id,
             "evaluator_digest": self.evaluator_digest,
             "independent": self.independent,
+            "artifact_type": (
+                self.artifact_type.value
+                if self.artifact_type is not None
+                else None
+            ),
+            "change_impact": (
+                self.change_impact.value
+                if self.change_impact is not None
+                else None
+            ),
+            "published_subject_digest": self.published_subject_digest,
+            "gate_ids": list(self.gate_ids),
             "report": _quality_report_payload(self.report),
             "evidence_refs": _refs_payload(self.evidence_refs),
         }
@@ -258,6 +389,8 @@ class OutputQualityPolicy:
     min_artifact_score: float = 0.80
     require_reasoning_regression: bool = True
     require_independent: bool = True
+    require_artifact_publication_binding: bool = True
+    require_artifact_gate_coverage: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -268,7 +401,12 @@ class OutputQualityPolicy:
             "min_artifact_score",
             _score(self.min_artifact_score, "min_artifact_score"),
         )
-        for field in ("require_reasoning_regression", "require_independent"):
+        for field in (
+            "require_reasoning_regression",
+            "require_independent",
+            "require_artifact_publication_binding",
+            "require_artifact_gate_coverage",
+        ):
             if not isinstance(getattr(self, field), bool):
                 raise OutputQualityError(f"{field} must be boolean")
 
@@ -278,6 +416,12 @@ class OutputQualityPolicy:
             "min_artifact_score": self.min_artifact_score,
             "require_reasoning_regression": self.require_reasoning_regression,
             "require_independent": self.require_independent,
+            "require_artifact_publication_binding": (
+                self.require_artifact_publication_binding
+            ),
+            "require_artifact_gate_coverage": (
+                self.require_artifact_gate_coverage
+            ),
         }
 
     @property
@@ -288,6 +432,7 @@ class OutputQualityPolicy:
 @dataclass(frozen=True, slots=True)
 class AnswerArtifactQualityDecision:
     accepted: bool
+    disposition: OutputDisposition
     reasons: tuple[str, ...]
     answer_evaluation_digest: str
     artifact_evaluation_digests: tuple[str, ...]
@@ -300,6 +445,20 @@ class AnswerArtifactQualityDecision:
     def __post_init__(self) -> None:
         if not isinstance(self.accepted, bool):
             raise OutputQualityError("accepted must be boolean")
+        try:
+            object.__setattr__(
+                self,
+                "disposition",
+                OutputDisposition(self.disposition),
+            )
+        except ValueError as exc:
+            raise OutputQualityError("invalid output disposition") from exc
+        if self.accepted != (
+            self.disposition is OutputDisposition.QUALIFIED
+        ):
+            raise OutputQualityError(
+                "accepted must exactly match qualified disposition"
+            )
         if not isinstance(self.reasons, tuple) or any(
             not isinstance(item, str) or not item for item in self.reasons
         ):
@@ -331,6 +490,10 @@ class AnswerArtifactQualityDecision:
             "task_id": self.task_id,
             "accountability_id": self.accountability_id,
             "accepted": self.accepted,
+            "disposition": self.disposition.value,
+            "publication_allowed": (
+                self.disposition is OutputDisposition.QUALIFIED
+            ),
             "reasons": list(self.reasons),
             "answer_evaluation_digest": self.answer_evaluation_digest,
             "artifact_evaluation_digests": list(self.artifact_evaluation_digests),
@@ -347,9 +510,12 @@ class AnswerArtifactQualityDecision:
         *,
         source: str = "p1:intel-04:answer-artifact-quality",
     ) -> EvidenceRef:
-        if not self.accepted:
+        if (
+            not self.accepted
+            or self.disposition is not OutputDisposition.QUALIFIED
+        ):
             raise OutputQualityError(
-                "rejected output quality decision cannot become promotion evidence"
+                "only qualified output quality decision can become promotion evidence"
             )
         return EvidenceRef(
             source=_text(source, "source", maximum=2048),
@@ -365,6 +531,7 @@ def evaluate_answer_artifact_quality(
     expected_artifact_digests: Iterable[str] = (),
     reasoning_regressions: Iterable[ReasoningRegressionObservation] = (),
     policy: OutputQualityPolicy | None = None,
+    answer_disposition: OutputDisposition = OutputDisposition.QUALIFIED,
 ) -> AnswerArtifactQualityDecision:
     if not isinstance(answer, IndependentQualityEvaluation):
         raise TypeError("answer must be IndependentQualityEvaluation")
@@ -373,6 +540,10 @@ def evaluate_answer_artifact_quality(
     active_policy = policy or OutputQualityPolicy()
     if not isinstance(active_policy, OutputQualityPolicy):
         raise TypeError("policy must be OutputQualityPolicy")
+    try:
+        requested_disposition = OutputDisposition(answer_disposition)
+    except ValueError as exc:
+        raise OutputQualityError("invalid answer_disposition") from exc
 
     artifact_items = tuple(artifacts)
     if any(not isinstance(item, IndependentQualityEvaluation) for item in artifact_items):
@@ -423,6 +594,28 @@ def evaluate_answer_artifact_quality(
             reasons.append(f"artifact-quality-rejected:{item.subject_id}")
         if item.report.score < active_policy.min_artifact_score:
             reasons.append(f"artifact-quality-below-threshold:{item.subject_id}")
+        if (
+            active_policy.require_artifact_publication_binding
+            and item.published_subject_digest != item.subject_digest
+        ):
+            reasons.append(
+                f"artifact-published-digest-mismatch:{item.subject_id}"
+            )
+        if active_policy.require_artifact_gate_coverage:
+            required = set(
+                required_artifact_gates(
+                    item.artifact_type,
+                    item.change_impact,
+                )
+            )
+            missing_gates = sorted(required - set(item.gate_ids))
+            if missing_gates:
+                reasons.append(
+                    "artifact-required-gates-missing:"
+                    + item.subject_id
+                    + ":"
+                    + ",".join(missing_gates)
+                )
 
     if active_policy.require_reasoning_regression and not regressions:
         reasons.append("reasoning-regression-evidence-missing")
@@ -432,9 +625,23 @@ def evaluate_answer_artifact_quality(
         if not item.passed:
             reasons.append(f"reasoning-regression-exceeded:{item.suite_id}")
 
+    if requested_disposition is OutputDisposition.ABSTAINED:
+        reasons.append("answer-abstained")
+        final_disposition = OutputDisposition.ABSTAINED
+    elif requested_disposition is OutputDisposition.BLOCKED:
+        reasons.append("answer-explicitly-blocked")
+        final_disposition = OutputDisposition.BLOCKED
+    else:
+        final_disposition = (
+            OutputDisposition.QUALIFIED
+            if not reasons
+            else OutputDisposition.BLOCKED
+        )
+
     normalized = tuple(sorted(set(reasons)))
     return AnswerArtifactQualityDecision(
-        accepted=not normalized,
+        accepted=final_disposition is OutputDisposition.QUALIFIED,
+        disposition=final_disposition,
         reasons=normalized,
         answer_evaluation_digest=answer.digest,
         artifact_evaluation_digests=tuple(item.digest for item in artifact_items),
@@ -448,10 +655,14 @@ __all__ = [
     "OUTPUT_QUALITY_SCHEMA_VERSION",
     "OUTPUT_QUALITY_TASK_ID",
     "AnswerArtifactQualityDecision",
+    "ArtifactType",
+    "ChangeImpact",
     "IndependentQualityEvaluation",
+    "OutputDisposition",
     "OutputKind",
     "OutputQualityError",
     "OutputQualityPolicy",
     "ReasoningRegressionObservation",
     "evaluate_answer_artifact_quality",
+    "required_artifact_gates",
 ]
