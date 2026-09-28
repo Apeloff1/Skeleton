@@ -398,6 +398,10 @@ def test_privileged_step_requires_exact_qualified_execution_admission() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -426,6 +430,10 @@ def test_rejected_plan_cannot_admit_privileged_execution() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=rejected,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -453,6 +461,10 @@ def test_execution_admission_is_bound_to_exact_plan_and_policy() -> None:
         plan=drifted_plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -467,6 +479,10 @@ def test_execution_admission_is_bound_to_exact_plan_and_policy() -> None:
         plan=plan,
         verification_policy=drifted_policy,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -492,6 +508,10 @@ def test_under_specified_privileged_step_fails_admission() -> None:
         plan=weakened,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -508,6 +528,10 @@ def test_step_outside_admission_cannot_execute() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
         completed_step_ids=("inspect",),
     )
@@ -530,6 +554,10 @@ def test_privileged_execution_admission_requires_dependency_closure() -> None:
         plan=plan,
         verification_policy=verifier,
         qualification=qualification,
+        planner_id="planner:intel-05",
+        planner_digest="5" * 64,
+        verifier_id="verifier:intel-05",
+        verifier_digest="6" * 64,
         requested_step_ids=("apply",),
     )
 
@@ -538,3 +566,23 @@ def test_privileged_execution_admission_requires_dependency_closure() -> None:
         "execution-dependency-missing:apply:inspect"
         in admission.reasons
     )
+
+
+
+def test_high_risk_plan_rejects_self_verification_identity() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=verifier,
+        qualification=qualification,
+        planner_id="actor:self",
+        planner_digest="7" * 64,
+        verifier_id="actor:self",
+        verifier_digest="7" * 64,
+        requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
+    )
+
+    assert admission.accepted is False
+    assert "verifier-not-independent-of-planner" in admission.reasons
+    assert admission.independent_verification is False
