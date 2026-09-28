@@ -178,6 +178,17 @@ def check_artifact_manifest(
         source_commit=payload["source_commit"],
         remote=remote,
     )
+
+    source_spec = f"{payload['source_commit']}:{payload['path'].as_posix()}"
+    source_oid = _run_git(root, ["rev-parse", source_spec]).stdout.decode(
+        "ascii", errors="strict"
+    ).strip()
+    if source_oid != payload["blob_oid"]:
+        raise ArtifactRestoreError(
+            "manifest blob does not match source-commit path: "
+            f"expected {payload['blob_oid']}, got {source_oid}"
+        )
+
     raw_size = _run_git(root, ["cat-file", "-s", payload["blob_oid"]]).stdout.strip()
     try:
         object_size = int(raw_size)
