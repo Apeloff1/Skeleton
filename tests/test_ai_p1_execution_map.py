@@ -651,3 +651,22 @@ def test_release_lane_gates_watch_p1_backlog_changes() -> None:
         assert (
             trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
         ), workflow
+
+
+
+def test_distributed_economics_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-remote-worker-trust.yml",
+        ".github/workflows/p1-model-placement.yml",
+        ".github/workflows/p1-batching-autoscaling.yml",
+        ".github/workflows/p1-capacity-qualification.yml",
+        ".github/workflows/p1-budget-accounting.yml",
+        ".github/workflows/p1-forecast-anomaly-loop.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
