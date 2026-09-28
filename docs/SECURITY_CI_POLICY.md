@@ -72,6 +72,8 @@ Security exceptions are exceptional, narrow, time-bounded, and reviewable. An ex
 - linked tracking issue;
 - explicit expiration date, normally no more than 30 days.
 
+Active exceptions must be registered in `.github/ci/security-exceptions.json`. The canonical quality gate runs `backend/scripts/check_security_exceptions.py`, which fails closed on malformed or duplicate entries, missing ownership/review/tracking metadata, broad or wildcard scopes, future approvals, expired entries, or durations longer than 30 days. An empty registry is the normal state.
+
 Do not use blanket path exclusions, repository-wide `continue-on-error`, unconditional `|| true`, or permanent allowlists to make a red security signal green. Expired exceptions must fail validation or be removed before further merge/release work.
 
 Flaky-test quarantine is separately constrained by `.github/ci/flaky-quarantine.json`; a flaky label is not a security exception and must not suppress a deterministic security failure.

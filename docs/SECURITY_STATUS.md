@@ -70,7 +70,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | Cross-plane threat model | `docs/SECURITY_CI_POLICY.md` | Implemented | Must be updated when new trust boundaries are introduced. |
 | Incident response and evidence preservation | `docs/SECURITY_CI_POLICY.md` | Implemented | Provider/runtime evidence retention is external to the repository. |
 | Emergency merge override procedure | `docs/SECURITY_CI_POLICY.md` | Implemented | Actual bypass authority and branch-rule restoration are admin operations. |
-| Security exceptions | `docs/SECURITY_CI_POLICY.md` | Implemented policy | Enforcement of every future exception still requires review discipline and regression coverage. |
+| Security exceptions | `.github/ci/security-exceptions.json`; `backend/scripts/check_security_exceptions.py`; `docs/SECURITY_CI_POLICY.md` | Canonical | Empty-by-default registry; canonical quality gates reject malformed, unreviewed, broad, expired, or >30-day exceptions. Scanner-specific bypasses must not create parallel permanent allowlists. |
 
 ## External and admin-only blockers
 
