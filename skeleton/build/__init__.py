@@ -5,6 +5,18 @@ This package is additive. Hidden network-command classification lives in
 is a sibling concern and is not defined here.
 """
 
+from skeleton.build.asset_pipeline import (
+    ASSET_PIPELINE_ALGORITHM,
+    ASSET_PIPELINE_SCHEMA,
+    AssetDescriptor,
+    AssetPipeline,
+    AssetPipelineError,
+    AssetRebuildPlan,
+    AssetSpec,
+    build_asset_pipeline,
+    plan_asset_rebuild,
+)
+
 from skeleton.build.cache_contract import (
     CACHE_ALGORITHM,
     CACHE_KEY_PREFIX,
@@ -50,6 +62,15 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "plan_asset_rebuild",
+    "build_asset_pipeline",
+    "AssetSpec",
+    "AssetRebuildPlan",
+    "AssetPipelineError",
+    "AssetPipeline",
+    "AssetDescriptor",
+    "ASSET_PIPELINE_SCHEMA",
+    "ASSET_PIPELINE_ALGORITHM",
     "plan_eviction",
     "build_cache_key",
     "EvictionPolicy",
