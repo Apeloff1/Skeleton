@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "task_id": "P1-PROM-03",
+  "accountability_ref": "ACC-P1-PROM-03",
+  "authority": "machine/p1_promotion_decision_policy.json",
+  "execution_map_authority": "machine/ai_p1_execution_map.json",
+  "task_backlog_authority": "machine/ai_p1_task_backlog.json",
+  "prom02_policy_authority": "machine/p1_terminal_failure_journeys.json",
+  "promotion_scope": "bounded_p1_frontier",
+  "p1_promotion_authority": true,
+  "masterplan_maturity_authority": false,
+  "require_exact_head": true,
+  "require_prom02_acceptance": true,
+  "require_prom01_promotion_ready": true,
+  "require_independent_signers": true,
+  "require_distinct_verifier_digests": true,
+  "require_identical_evidence_digest": true,
+  "required_signoff_phases": [
+    "implementation",
+    "verification"
+  ],
+  "required_roles": {
+    "implementation": "promotion-implementation",
+    "verification": "independent-promotion-verification"
+  },
+  "allowed_signer_types": [
+    "human",
+    "agent",
+    "ci",
+    "service"
+  ],
+  "allowed_signature_methods": [
+    "github_identity",
+    "git_gpg",
+    "git_ssh",
+    "sigstore",
+    "ci_oidc"
+  ],
+  "signature_ref_required_for": [
+    "git_gpg",
+    "git_ssh",
+    "sigstore",
+    "ci_oidc"
+  ],
+  "deferred_scope_contract": {
+    "source": "machine/ai_p1_execution_map.json#scope_summary.deferred_volume_refs",
+    "count_source": "machine/ai_p1_execution_map.json#scope_summary.deferred_volume_count",
+    "masterplan_count_source": "machine/ai_p1_execution_map.json#scope_summary.masterplan_volume_count",
+    "primary_count_source": "machine/ai_p1_execution_map.json#scope_summary.primary_p1_frontier_volume_count",
+    "rule": "Promotion must bind the exact deferred-volume complement from the current execution-map authority; no numeric deferred count may be independently hard-coded as promotion truth."
+  },
+  "rejection_policy": {
+    "explicit_rejection_is_valid": true,
+    "missing_or_invalid_signoff_rejects": true,
+    "stale_head_rejects": true,
+    "maturity_blocker_rejects": true,
+    "scope_drift_rejects": true,
+    "mutation_on_rejection": false
+  }
+}
