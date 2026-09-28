@@ -2514,18 +2514,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/distributed",
-        "planned:skeleton/workers",
-        "skeleton/ai",
-        "skeleton/network",
-        "skeleton/security",
-        "skeleton/runtime"
+        "skeleton/network/remote_execution.py",
+        "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_stale_lease_fencing.py",
-        "planned:skeleton/testing/test_partition_semantics.py",
-        "planned:skeleton/testing/test_remote_execution_protocol.py",
-        "planned:skeleton/testing/test_worker_attestation.py"
+        "skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evidence_modes": [
         "load",
@@ -2579,21 +2573,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/compute",
-        "planned:skeleton/hardware",
-        "skeleton/ai",
-        "skeleton/network",
-        "skeleton/runtime",
-        "machine"
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_resource_admission.py",
-        "planned:skeleton/testing/test_device_loss.py",
-        "planned:skeleton/testing/test_inference_control_plane.py",
-        "planned:skeleton/testing/test_model_placement.py",
-        "planned:skeleton/testing/test_model_warming.py",
-        "planned:skeleton/testing/test_hardware_topology.py",
-        "planned:skeleton/testing/test_network_topology_awareness.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evidence_modes": [
         "load",
@@ -2643,13 +2628,13 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai",
-        "skeleton/observability"
+        "skeleton/mesh/batching_autoscaling.py",
+        "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py",
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_continuous_batching.py",
-        "planned:skeleton/testing/test_inference_autoscaling.py"
+        "skeleton/testing/test_continuous_batching.py",
+        "skeleton/testing/test_inference_autoscaling.py"
       ],
       "evidence_modes": [
         "load",
@@ -2701,20 +2686,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "scripts",
-        "skeleton",
-        "skeleton/runtime",
-        "skeleton/observability",
-        "machine",
-        "skeleton/eval"
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "test_targets": [
-        "planned:benchmarks/test_performance_contracts.py",
-        "planned:skeleton/testing/test_performance_budget_schema.py",
-        "planned:skeleton/testing/test_capacity_limits.py",
-        "planned:skeleton/testing/test_admission_thresholds.py",
-        "planned:skeleton/testing/test_inference_load_profiles.py"
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evidence_modes": [
         "load",
@@ -2766,16 +2743,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "skeleton/runtime",
-        "machine",
-        "skeleton/persistence"
+        "skeleton/observability/budget_accounting.py",
+        "skeleton/ai/runtime/observability/budget_accounting.py",
+        ".github/workflows/p1-budget-accounting.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_cost_budget.py",
-        "planned:skeleton/testing/test_cost_attribution.py",
-        "planned:skeleton/testing/test_compute_quotas.py",
-        "planned:skeleton/testing/test_budget_accounting_ledger.py"
+        "skeleton/testing/test_budget_accounting_ledger.py"
       ],
       "evidence_modes": [
         "load",
@@ -2826,12 +2799,13 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "skeleton/eval"
+        "skeleton/observability/forecasting.py",
+        "skeleton/ai/runtime/observability/forecasting.py",
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_forecasting_engine.py",
-        "planned:skeleton/testing/test_cost_anomaly_detection.py"
+        "skeleton/testing/test_forecasting_engine.py",
+        "skeleton/testing/test_cost_anomaly_detection.py"
       ],
       "evidence_modes": [
         "load",
