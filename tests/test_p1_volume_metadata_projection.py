@@ -149,3 +149,61 @@ def test_projection_does_not_touch_accountability_file() -> None:
     module.project_repository(ROOT)
 
     assert accountability.read_bytes() == before
+
+
+def _maturity_module() -> ModuleType:
+    script = ROOT / "scripts/reconcile_p1_maturity.py"
+    spec = importlib.util.spec_from_file_location(
+        "reconcile_p1_maturity_for_metadata_projection",
+        script,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_projection_eliminates_primary_volume_metadata_blockers() -> None:
+    module = _maturity_module()
+    report = module.reconcile_repository(ROOT)
+
+    assert report["volume_count"] == 107
+    assert report["target_floor_eligible_count"] == 3
+
+    forbidden = (
+        "must contain materialized references",
+        "contains unresolved repository references",
+    )
+    for row in report["records"]:
+        target = next(
+            item
+            for item in row["evaluations"]
+            if item["state"] == row["target_floor"]
+        )
+        assert not any(
+            marker in blocker
+            for blocker in target["blockers"]
+            for marker in forbidden
+        ), (row["volume_key"], target["blockers"])
+
+
+def test_projection_does_not_self_promote_primary_volumes() -> None:
+    module = _maturity_module()
+    report = module.reconcile_repository(ROOT)
+
+    eligible = {
+        row["volume_key"]
+        for row in report["records"]
+        if row["target_floor_eligible"] is True
+    }
+    assert eligible == {"VOL-013", "VOL-014", "VOL-253"}
+
+    for row in report["records"]:
+        if row["volume_key"] in eligible:
+            continue
+        assert row["target_floor_eligible"] is False
+        assert (
+            row["implementation_signed"] is False
+            or row["verification_signed"] is False
+            or row["current_status"] != row["target_floor"]
+        )
