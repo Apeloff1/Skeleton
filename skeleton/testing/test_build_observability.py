@@ -7,6 +7,8 @@ from dataclasses import replace
 import pytest
 
 from skeleton.build.build_observability import (
+    MAX_MEMORY_BYTES,
+    MAX_DURATION_MS,
     BuildObservabilityError,
     BuildRegressionBudget,
     NodeObservation,
@@ -246,6 +248,19 @@ def test_tampered_derived_telemetry_fails_closed() -> None:
 
     with pytest.raises(BuildObservabilityError, match="derived metrics drifted"):
         evaluate_build_budget(tampered, budget, graph=graph, plan=plan)
+
+
+def test_aggregate_budget_bounds_can_exceed_single_node_bounds() -> None:
+    telemetry = observe_build(_graph(), _plan(), _observations())
+    budget = BuildRegressionBudget(
+        max_critical_path_ms=MAX_DURATION_MS,
+        max_wave_elapsed_ms=MAX_DURATION_MS + 1,
+        max_peak_parallel_memory_bytes=MAX_MEMORY_BYTES + 1,
+    )
+
+    decision = evaluate_build_budget(telemetry, budget, graph=_graph(), plan=_plan())
+
+    assert decision.accepted is True
 
 
 def test_duplicate_node_budgets_fail_closed() -> None:
