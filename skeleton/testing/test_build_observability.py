@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from skeleton.build.build_observability import (
@@ -113,6 +115,25 @@ def test_observations_must_cover_exact_plan_once() -> None:
             graph,
             plan,
             [*rows, NodeObservation("other", 1, 1, "miss")],
+        )
+
+
+def test_tampered_plan_derived_fields_fail_closed() -> None:
+    graph = _graph()
+    plan = _plan()
+
+    with pytest.raises(BuildObservabilityError, match="derived fields drifted"):
+        observe_build(
+            graph,
+            replace(plan, plan_fingerprint="0" * 64),
+            _observations(),
+        )
+
+    with pytest.raises(BuildObservabilityError, match="derived fields drifted"):
+        observe_build(
+            graph,
+            replace(plan, waves=tuple(reversed(plan.waves))),
+            _observations(),
         )
 
 
