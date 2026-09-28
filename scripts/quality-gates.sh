@@ -257,6 +257,9 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
+printf '\n== Security exception governance ==\n'
+python backend/scripts/check_security_exceptions.py
+
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
 
@@ -315,6 +318,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_pr_churn_control.py \
   backend/tests/test_queue_drain_workflow.py \
   backend/tests/test_secret_hygiene_gate.py \
+  backend/tests/test_security_exception_policy.py \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_developer_tooling_security.py \
