@@ -317,3 +317,72 @@ def test_rejects_flow_style_services_fail_closed(tmp_path: Path) -> None:
         f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    services: {{db: {{image: postgres@sha256:{DOCKER_DIGEST}}}}}\n    steps:\n      - run: echo unsafe\n",
     )
     assert any("flow-style services configuration is forbidden" in finding for finding in findings)
+
+def test_rejects_direct_secret_interpolation_in_run_shell(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: curl -H \"Authorization: Bearer ${{ secrets.API_TOKEN }}\" https://example.invalid\n",
+    )
+    assert any("direct secrets.* interpolation" in finding for finding in findings)
+
+
+def test_allows_secret_context_only_at_environment_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - env:\n          API_TOKEN: ${{ secrets.API_TOKEN }}\n        run: tool --token \"$API_TOKEN\"\n",
+    )
+    assert findings == []
+
+
+def test_rejects_shell_xtrace_modes(tmp_path: Path) -> None:
+    for command in ("set -x", "set -euxo pipefail", "set -o xtrace", "bash -x script.sh"):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: |\n          " + command + "\n",
+        )
+        assert any("shell xtrace is forbidden" in finding for finding in findings)
+
+
+def test_rejects_sensitive_variable_output_sinks(tmp_path: Path) -> None:
+    for command in (
+        'echo "$GITHUB_TOKEN"',
+        "printf '%s\\n' \"$AUTH_HEADER\"",
+        'cat "$SIGNED_URL"',
+        'tail "$ERROR_PAYLOAD"',
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: |\n          " + command + "\n",
+        )
+        assert any("output of sensitive shell variable" in finding for finding in findings)
+
+
+def test_rejects_environment_and_export_dumps(tmp_path: Path) -> None:
+    for command in ("env", "printenv", "set", "declare -p", "export -p"):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: |\n          " + command + "\n",
+        )
+        assert any("dumping" in finding for finding in findings)
+
+
+def test_rejects_verbose_or_trace_curl(tmp_path: Path) -> None:
+    for command in (
+        "curl -v https://example.invalid",
+        "curl --verbose https://example.invalid",
+        "curl --trace-ascii - https://example.invalid",
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: |\n          " + command + "\n",
+        )
+        assert any("verbose/trace curl is forbidden" in finding for finding in findings)
+
+
+def test_allows_safe_status_output(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: |\n          echo \"build complete\"\n          printf '%s\\n' \"$BUILD_SHA\"\n",
+    )
+    assert findings == []
+
