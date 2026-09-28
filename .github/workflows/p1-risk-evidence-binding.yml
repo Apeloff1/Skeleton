@@ -132,9 +132,9 @@ jobs:
           expected = {
               "p1_primary_volume_count": 107,
               "volume_risk_count": 281,
-              "volume_gap_count": 210,
+              "volume_gap_count": 208,
               "applicable_adversarial_axis_count": 24,
-              "total_obligation_count": 515,
+              "total_obligation_count": 513,
           }
           if report["inventory"] != expected:
               raise SystemExit(
@@ -149,7 +149,7 @@ jobs:
               raise SystemExit(
                   "risk obligations were resolved without governed evidence"
               )
-          if report["unresolved_blocking_count"] != 515:
+          if report["unresolved_blocking_count"] != 513:
               raise SystemExit("unexpected unresolved blocking obligation count")
           if report["unclassified_count"] != 281:
               raise SystemExit("unexpected unclassified risk count")

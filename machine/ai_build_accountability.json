@@ -10391,40 +10391,116 @@
       "id": "ACC-VOL-253",
       "type": "volume",
       "title": "VOL-253 Stopping Policies",
-      "status": "unverified",
+      "status": "hardened",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-27T22:54:07Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-27T22:54:07Z",
+        "git_sha": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "skeleton/intelligence/strategy_registry.py",
+          "skeleton/ai/runtime/intelligence/strategy_registry.py",
+          "skeleton/testing/test_reasoning_strategy_registry.py"
+        ],
+        "statement": "Implemented explicit externally evaluable stopping dispositions, budget/time/token/cost bounds, uncertainty and value-of-information thresholds, stall detection, and high-risk verification/abstention behavior.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:P1 Reasoning Search Stop Policy Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-27T22:57:02Z",
+        "git_sha": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+          "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          ".github/workflows/p1-reasoning-search-stop-policy.yml",
+          "skeleton/testing/test_reasoning_strategy_registry.py"
+        ],
+        "statement": "Independent P1 Reasoning Search Stop Policy Gate passed stopping, budget, uncertainty, high-risk verification, and replayable policy/history regressions.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-27T22:57:02Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-27T22:54:07Z",
+          "git_sha": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "statement": "Begin evidence-backed VOL-253 maturity reconciliation from landed P1 implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-27T22:54:07Z",
+          "git_sha": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "statement": "Implemented explicit externally evaluable stopping dispositions, budget/time/token/cost bounds, uncertainty and value-of-information thresholds, stall detection, and high-risk verification/abstention behavior.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+            "skeleton/intelligence/strategy_registry.py",
+            "skeleton/ai/runtime/intelligence/strategy_registry.py",
+            "skeleton/testing/test_reasoning_strategy_registry.py"
+          ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:P1 Reasoning Search Stop Policy Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-27T22:57:02Z",
+          "git_sha": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "statement": "Independent P1 Reasoning Search Stop Policy Gate passed stopping, budget, uncertainty, high-risk verification, and replayable policy/history regressions.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+          "from_status": "evidence_pending",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+            "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml",
+            "skeleton/testing/test_reasoning_strategy_registry.py"
+          ]
+        }
+      ],
+      "evidence": [
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py"
+      ],
       "baseline_status": "unverified"
     },
     {

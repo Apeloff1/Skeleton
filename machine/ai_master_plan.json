@@ -12818,7 +12818,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "hardened",
       "requirements": [
         "Stop conditions are explicit and externally enforceable.",
         "High-risk unresolved uncertainty can force abstain/escalate rather than output."
@@ -12834,24 +12834,28 @@
         "StopReason"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "machine"
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_stopping_policies.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py"
       ],
       "evaluations": [
-        "planned:runaway-loop evaluation"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "risks": [
         "never-ending work",
         "premature stop"
       ],
-      "gaps": [
-        "define policy classes",
-        "bind to cognition/agents"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-253",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
