@@ -1,0 +1,386 @@
+name: P1 Plan Verification Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/intelligence/plan_verifier.py"
+      - "skeleton/ai/runtime/intelligence/plan_verifier.py"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/testing/test_plan_static_analyzer.py"
+      - "skeleton/testing/test_plan_cycles.py"
+      - "skeleton/testing/test_plan_simulation.py"
+      - "skeleton/testing/test_plan_qualification.py"
+      - ".github/workflows/p1-plan-verification.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/plan_verifier.py"
+      - "skeleton/ai/runtime/intelligence/plan_verifier.py"
+      - "skeleton/intelligence/strategy_registry.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/intelligence/__init__.py"
+      - "skeleton/ai/runtime/intelligence/__init__.py"
+      - "skeleton/testing/test_plan_static_analyzer.py"
+      - "skeleton/testing/test_plan_cycles.py"
+      - "skeleton/testing/test_plan_simulation.py"
+      - "skeleton/testing/test_plan_qualification.py"
+      - ".github/workflows/p1-plan-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-plan-verification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate plan static analysis and simulation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile INTEL-05 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/intelligence/plan_verifier.py
+          skeleton/ai/runtime/intelligence/plan_verifier.py
+
+      - name: Run legacy and P1 plan verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_plan_verifier.py
+          skeleton/testing/test_cognition_plan_verifier.py
+          skeleton/testing/test_plan_static_analyzer.py
+          skeleton/testing/test_plan_cycles.py
+          skeleton/testing/test_plan_simulation.py
+          skeleton/testing/test_plan_qualification.py
+          skeleton/testing/test_reasoning_strategy_registry.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted high-risk INTEL-05 decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-intel-05
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.risk_evidence import (
+              RiskDisposition,
+              RiskEvidenceBinding,
+              RiskKind,
+              RiskObligation,
+              RiskSeverity,
+              evaluate_risk_binding,
+              make_obligation_id,
+          )
+          from skeleton.intelligence.plan_verifier import (
+              PlanStep,
+              PlanVerificationPolicy,
+              StaticPlanDefinition,
+              analyze_static_plan,
+              qualify_static_plan,
+              simulate_static_plan,
+          )
+          from skeleton.intelligence.strategy_registry import (
+              ReasoningPolicy,
+              ReasoningRisk,
+              ReasoningStrategy,
+              StopDisposition,
+              StoppingDecision,
+          )
+
+          now = datetime.now(timezone.utc)
+          reasoning = ReasoningPolicy(
+              policy_id="p1-intel-05-ci",
+              version=1,
+              allowed_strategies=(
+                  ReasoningStrategy.DIRECT,
+                  ReasoningStrategy.VERIFY,
+              ),
+              default_strategy=ReasoningStrategy.DIRECT,
+              max_steps=6,
+              max_tokens=6000,
+              max_cost_units=12.0,
+              max_wall_time_s=120.0,
+              min_value_of_information=0.10,
+              completion_confidence=0.85,
+              max_uncertainty=0.50,
+              max_stall_steps=2,
+              require_verification_for_high_risk=True,
+          )
+          stopping = StoppingDecision(
+              disposition=StopDisposition.COMPLETE,
+              reason="planning-qualified",
+              policy_digest=reasoning.digest,
+              history_digest="b" * 64,
+              steps_remaining=2,
+              tokens_remaining=1200,
+              cost_remaining=2.0,
+              time_remaining_s=30.0,
+          )
+          verifier = PlanVerificationPolicy(
+              policy_id="p1-intel-05-ci-verifier",
+              version=1,
+              allowed_capabilities=(
+                  "repo.read",
+                  "repo.write",
+                  "tests.run",
+              ),
+              max_steps=8,
+              max_total_tokens=8000,
+              max_total_cost_units=20.0,
+              max_total_wall_time_s=300.0,
+          )
+          plan = StaticPlanDefinition(
+              plan_id="ci-plan",
+              version=1,
+              steps=(
+                  PlanStep(
+                      step_id="inspect",
+                      postconditions=("repo.inspected",),
+                      required_capabilities=("repo.read",),
+                      max_tokens=400,
+                      max_cost_units=1.0,
+                      max_wall_time_s=10.0,
+                  ),
+                  PlanStep(
+                      step_id="apply",
+                      depends_on=("inspect",),
+                      preconditions=("repo.inspected",),
+                      postconditions=("change.applied",),
+                      required_capabilities=("repo.write",),
+                      max_tokens=800,
+                      max_cost_units=2.0,
+                      max_wall_time_s=30.0,
+                      side_effect=True,
+                      recovery_plan_digest="1" * 64,
+                      rollback_test_digest="2" * 64,
+                  ),
+                  PlanStep(
+                      step_id="verify",
+                      depends_on=("apply",),
+                      preconditions=("change.applied",),
+                      postconditions=("tests.green",),
+                      required_capabilities=("tests.run",),
+                      max_tokens=600,
+                      max_cost_units=1.5,
+                      max_wall_time_s=30.0,
+                      terminal=True,
+                  ),
+              ),
+              initial_facts=("request.valid",),
+              reasoning_policy_digest=reasoning.digest,
+              planning_history_digest=stopping.history_digest,
+              risk=ReasoningRisk.HIGH,
+          )
+          analysis = analyze_static_plan(plan, verifier)
+          if not analysis.accepted:
+              raise SystemExit(f"INTEL-05 static fixture rejected: {analysis.reasons}")
+          simulation = simulate_static_plan(
+              plan,
+              analysis,
+              available_capabilities=(
+                  "repo.read",
+                  "repo.write",
+                  "tests.run",
+              ),
+          )
+          if not simulation.accepted:
+              raise SystemExit(
+                  f"INTEL-05 simulation fixture rejected: {simulation.reasons}"
+              )
+
+          statement = "High-risk plan qualification requires executable risk evidence."
+          obligation = RiskObligation(
+              obligation_id=make_obligation_id(
+                  RiskKind.RISK,
+                  "INTEL-05",
+                  statement,
+              ),
+              kind=RiskKind.RISK,
+              source_ref="INTEL-05",
+              statement=statement,
+              source_digest="3" * 64,
+              default_severity=RiskSeverity.HIGH,
+              blocking_by_default=True,
+              required_evidence_modes=("plan_verification",),
+          )
+          binding = RiskEvidenceBinding(
+              obligation_id=obligation.obligation_id,
+              obligation_digest=obligation.obligation_digest,
+              owner_id="p1:intel-05",
+              severity=RiskSeverity.HIGH,
+              disposition=RiskDisposition.EVIDENCE,
+              bound_at=now - timedelta(minutes=5),
+              review_at=now + timedelta(days=7),
+              evidence=(
+                  EvidenceRef(
+                      source="ci://intel-05-risk-evidence",
+                      digest="4" * 64,
+                      category="plan_verification",
+                  ),
+              ),
+          )
+          risk = evaluate_risk_binding(
+              obligation,
+              binding,
+              evaluated_at=now,
+          )
+          if not risk.resolved:
+              raise SystemExit(f"INTEL-05 risk fixture unresolved: {risk.blockers}")
+
+          decision = qualify_static_plan(
+              plan=plan,
+              verification_policy=verifier,
+              reasoning_policy=reasoning,
+              analysis=analysis,
+              simulation=simulation,
+              stopping=stopping,
+              risk_evaluation=risk,
+          )
+          if not decision.accepted:
+              raise SystemExit(f"INTEL-05 fixture rejected: {decision.reasons}")
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-intel-05/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head INTEL-05 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-intel-05/config.digest").write_text(
+              hashlib.sha256(b"p1-intel-05-plan-verifier-v1").hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|intel-05"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/verifier.digest").write_text(
+              digest([
+                  "skeleton/intelligence/plan_verifier.py",
+                  "skeleton/intelligence/strategy_registry.py",
+                  "skeleton/contracts/risk_evidence.py",
+                  ".github/workflows/p1-plan-verification.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-intel-05/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_plan_verifier.py",
+                  "skeleton/testing/test_cognition_plan_verifier.py",
+                  "skeleton/testing/test_plan_static_analyzer.py",
+                  "skeleton/testing/test_plan_cycles.py",
+                  "skeleton/testing/test_plan_simulation.py",
+                  "skeleton/testing/test_plan_qualification.py",
+                  "skeleton/testing/test_reasoning_strategy_registry.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-INTEL-05 \
+            --accountability-id ACC-P1-INTEL-05 \
+            --configuration-digest "$(cat .p1-intel-05/config.digest)" \
+            --environment-digest "$(cat .p1-intel-05/environment.digest)" \
+            --verifier-id github-actions:p1-plan-verification \
+            --verifier-digest "$(cat .p1-intel-05/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-intel-05/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-intel-05/refs.json \
+            --out .p1-intel-05/receipt.json \
+            > .p1-intel-05/stdout.json
+
+      - name: Assert exact-head INTEL-05 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-intel-05/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("INTEL-05 receipt head mismatch")
+          if receipt["task_id"] != "P1-INTEL-05":
+              raise SystemExit("INTEL-05 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-INTEL-05":
+              raise SystemExit("INTEL-05 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("INTEL-05 exact-head receipt OK", receipt["receipt_digest"])
+          PY
