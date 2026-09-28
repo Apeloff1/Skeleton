@@ -2891,10 +2891,16 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_terminal_evidence.py",
+        "skeleton/ai/runtime/contracts/p1_terminal_evidence.py",
+        "machine/p1_terminal_evidence_policy.json",
+        "scripts/check_p1_terminal_evidence_policy.py",
+        "scripts/build_p1_terminal_evidence.py",
+        ".github/workflows/p1-terminal-evidence-bundle.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_terminal_evidence.py",
+        "tests/test_p1_terminal_evidence_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
@@ -2941,10 +2947,17 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_failure_journeys.py",
+        "skeleton/ai/runtime/contracts/p1_failure_journeys.py",
+        "machine/p1_terminal_failure_journeys.json",
+        "scripts/check_p1_terminal_failure_journeys.py",
+        "scripts/build_p1_terminal_failure_journeys.py",
+        ".github/workflows/p1-terminal-failure-journeys.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_failure_journeys.py",
+        "tests/test_p1_terminal_failure_journey_builder.py",
+        "tests/test_p1_terminal_failure_journeys_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
@@ -2991,10 +3004,18 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_promotion_decision.py",
+        "skeleton/ai/runtime/contracts/p1_promotion_decision.py",
+        "machine/p1_promotion_decision_policy.json",
+        "scripts/check_p1_promotion_decision_policy.py",
+        "scripts/build_p1_promotion_intent.py",
+        "scripts/verify_p1_promotion_signature.py",
+        "scripts/finalize_p1_promotion_decision.py",
+        ".github/workflows/p1-independent-promotion-decision.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_promotion_decision.py",
+        "tests/test_p1_promotion_decision_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
