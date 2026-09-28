@@ -50,6 +50,14 @@ from skeleton.agents.blast_radius import (
     classify_impact,
     qualify_blast_radius,
 )
+from skeleton.agents.safe_autonomy import (
+    SAFE_AUTONOMY_ACCOUNTABILITY_ID,
+    SAFE_AUTONOMY_SCHEMA_VERSION,
+    SAFE_AUTONOMY_TASK_ID,
+    SafeAutonomyDecision,
+    SafeAutonomyError,
+    qualify_safe_autonomy,
+)
 from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
@@ -107,6 +115,9 @@ __all__ = [
     "BLAST_RADIUS_TASK_ID", "ActionRiskProfile", "AdversarialAlignmentReport",
     "BlastRadiusDecision", "BlastRadiusError", "BlastRadiusPolicy", "ImpactClass",
     "ReversibilityClass", "classify_impact", "qualify_blast_radius",
+    "SAFE_AUTONOMY_ACCOUNTABILITY_ID", "SAFE_AUTONOMY_SCHEMA_VERSION",
+    "SAFE_AUTONOMY_TASK_ID", "SafeAutonomyDecision", "SafeAutonomyError",
+    "qualify_safe_autonomy",
     "AGENT_DELEGATION_ACCOUNTABILITY_ID", "AGENT_DELEGATION_SCHEMA_VERSION",
     "AGENT_DELEGATION_TASK_ID", "AgentDelegationAuthority", "AgentDelegationDecision",
     "AgentDelegationError", "DelegationBudget", "qualify_agent_delegation",
