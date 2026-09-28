@@ -284,6 +284,7 @@ jobs:
               verification_policy=verifier,
               qualification=decision,
               requested_step_ids=("apply", "verify"),
+              completed_step_ids=("inspect",),
           )
           if not admission.accepted:
               raise SystemExit(
