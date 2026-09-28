@@ -100,9 +100,9 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
     }
     assert report["binding_count"] == 0
     assert report["resolved_count"] == 0
-    assert report["unresolved_blocking_count"] == 519
+    assert report["unresolved_blocking_count"] == 515
     assert report["unclassified_count"] == 281
-    assert report["disposition_counts"] == {"unbound": 519}
+    assert report["disposition_counts"] == {"unbound": 515}
     assert report["non_authoritative"] is True
     assert report["source_mutation_detected"] is False
     assert len(report["report_digest"]) == 64
@@ -229,7 +229,7 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 518
+    assert report["unresolved_blocking_count"] == 514
     assert report["unclassified_count"] == 280
 
 
