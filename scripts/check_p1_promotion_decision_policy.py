@@ -74,6 +74,9 @@ def validate_repository(
             "signature_method",
             "allow_unsigned_explicit_rejection",
             "signer_verifier_must_differ",
+            "allowed_signer_types",
+            "forbidden_signer_types",
+            "ci_generated_signature_may_finalize_promotion",
             "deferred_scope_must_match_execution_map",
             "maturity_mutation",
             "promotion_effect"
@@ -132,6 +135,25 @@ def validate_repository(
     if policy.get("signer_verifier_must_differ") is not True:
         raise PromotionDecisionPolicyError(
             "signer/verifier independence required"
+        )
+    if policy.get("allowed_signer_types") != [
+        "human",
+        "ci",
+        "service",
+    ]:
+        raise PromotionDecisionPolicyError(
+            "allowed signer types drift"
+        )
+    if policy.get("forbidden_signer_types") != ["agent"]:
+        raise PromotionDecisionPolicyError(
+            "agent signer prohibition drift"
+        )
+    if (
+        policy.get("ci_generated_signature_may_finalize_promotion")
+        is not False
+    ):
+        raise PromotionDecisionPolicyError(
+            "CI-generated signature must not finalize promotion"
         )
     if (
         policy.get("deferred_scope_must_match_execution_map")
@@ -251,6 +273,9 @@ def validate_repository(
         "masterplan_volume_count": total,
         "primary_p1_frontier_volume_count": primary,
         "signature_method": "ed25519",
+        "allowed_signer_types": policy["allowed_signer_types"],
+        "forbidden_signer_types": policy["forbidden_signer_types"],
+        "ci_generated_signature_may_finalize_promotion": False,
         "maturity_mutation": False,
         "valid": True,
     }
