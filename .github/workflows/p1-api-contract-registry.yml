@@ -7,6 +7,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/core/routes_registry.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_api_contract_registry.py"
@@ -20,6 +21,7 @@ on:
       - main
     paths:
       - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_api_contract_registry.py"
       - "machine/p1_api_contract_registry.json"
