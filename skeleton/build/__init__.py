@@ -1,9 +1,18 @@
-"""Static build audits.
+"""Deterministic build planning, cache identity, and static network audits."""
 
-This package is additive. Hidden network-command classification lives in
-``network_audit``. Content-addressed incremental graph compilation (#940)
-is a sibling concern and is not defined here.
-"""
+from skeleton.build.cache_contract import (
+    CACHE_ALGORITHM,
+    CACHE_POLICY_SCHEMA,
+    REQUIRED_DOMAINS,
+    CacheContractError,
+    CacheDomainPolicy,
+    CacheEntry,
+    CacheKey,
+    CachePolicy,
+    compile_cache_key,
+    load_policy,
+    plan_evictions,
+)
 
 from skeleton.build.incremental_graph import (
     FINGERPRINT_ALGORITHM,
@@ -36,6 +45,17 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "plan_evictions",
+    "load_policy",
+    "compile_cache_key",
+    "CachePolicy",
+    "CacheKey",
+    "CacheEntry",
+    "CacheDomainPolicy",
+    "CacheContractError",
+    "REQUIRED_DOMAINS",
+    "CACHE_POLICY_SCHEMA",
+    "CACHE_ALGORITHM",
     "build_incremental_graph",
     "NodeSpec",
     "IncrementalGraphError",
