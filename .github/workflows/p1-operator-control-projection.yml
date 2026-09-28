@@ -1,0 +1,325 @@
+name: P1 Operator Control Projection Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/operator_control_projection.py"
+      - "backend/core/workspace_projection.py"
+      - "backend/tests/test_user_control_receipts.py"
+      - "backend/tests/test_workspace_projection.py"
+      - "frontend/src/product/operatorControlProjection.ts"
+      - "frontend/src/product/workspaceProjection.ts"
+      - "frontend/scripts/test-operator-control-projection.mjs"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/contracts/operation.py"
+      - ".github/workflows/p1-operator-control-projection.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/operator_control_projection.py"
+      - "backend/core/workspace_projection.py"
+      - "backend/tests/test_user_control_receipts.py"
+      - "backend/tests/test_workspace_projection.py"
+      - "frontend/src/product/operatorControlProjection.ts"
+      - "frontend/src/product/workspaceProjection.ts"
+      - "frontend/scripts/test-operator-control-projection.mjs"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/contracts/operation.py"
+      - ".github/workflows/p1-operator-control-projection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-operator-control-projection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Validate canonical operator control projection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+
+      - name: Compile PROD-04 contract
+        run: >-
+          python -m compileall -q
+          backend/core/operator_control_projection.py
+
+      - name: Run AUTO-04 through PROD-04 regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_human_control.py
+          backend/tests/test_workspace_projection.py
+          backend/tests/test_user_control_receipts.py
+
+      - name: Build accepted PROD-04 operator-control receipt
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prod-04
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from core.operator_control_projection import (
+              build_operator_control_projection,
+              verify_operator_control_projection,
+          )
+          from core.workspace_projection import (
+              WorkspaceProjection,
+              WorkspaceProjectionDecision,
+          )
+          from skeleton.agents.autonomy_control import AutonomyLevel
+          from skeleton.agents.human_control import (
+              HumanControlAction,
+              HumanControlDecision,
+          )
+          from skeleton.contracts.canonical import EvidenceRef
+          from skeleton.contracts.operation import OperationState
+
+          workspace = WorkspaceProjection(
+              operation_id="ci-operation",
+              tenant_id="ci-tenant",
+              trace_id="ci-trace",
+              canonical_state=OperationState.RUNNING,
+              operation_version=5,
+              cursor_sequence=5,
+              terminal=False,
+              operation_projection_digest="1" * 64,
+              projection_authority_digest="2" * 64,
+          )
+          workspace_decision = WorkspaceProjectionDecision(
+              accepted=True,
+              reasons=(),
+              workspace_projection_digest=workspace.projection_digest,
+              operation_projection_digest="1" * 64,
+              projection_authority_digest="2" * 64,
+              operation_id=workspace.operation_id,
+              tenant_id=workspace.tenant_id,
+              operation_version=workspace.operation_version,
+              cursor_sequence=workspace.cursor_sequence,
+          )
+          human = HumanControlDecision(
+              accepted=True,
+              action=HumanControlAction.PAUSE,
+              reasons=(),
+              operation_id=workspace.operation_id,
+              execution_id="ci-execution",
+              agent_id="ci-agent",
+              arguments_digest="3" * 64,
+              state_digest="4" * 64,
+              command_digest="5" * 64,
+              autonomy_state_digest="6" * 64,
+              authority_digest="7" * 64,
+              from_level=AutonomyLevel.DELEGATED,
+              requested_level=None,
+              next_level=AutonomyLevel.OBSERVE,
+              next_paused=True,
+              next_interrupted=False,
+              current_version=4,
+              next_version=5,
+              issuer_id="human:ci-operator",
+              issuer_digest="8" * 64,
+              expires_at=1_800_000_300.0,
+              evidence_refs=(
+                  EvidenceRef(
+                      source="ci://prod-04/pause",
+                      digest="9" * 64,
+                      category="human_control_authorization",
+                  ),
+              ),
+              independent=True,
+              observed_at=1_800_000_000.0,
+              previous_receipt_digest=None,
+          )
+          projection = build_operator_control_projection(
+              workspace=workspace,
+              workspace_decision=workspace_decision,
+              human_control=human,
+          )
+          decision = verify_operator_control_projection(
+              projection,
+              workspace,
+              workspace_decision,
+              human,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"PROD-04 fixture rejected: {decision.reasons}"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-prod-04/projection.json").write_text(
+              json.dumps(projection.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-prod-04/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-prod-04/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head PROD-04 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prod-04/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-prod-04-operator-control-projection-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-04/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|node-24|prod-04"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-04/verifier.digest").write_text(
+              digest([
+                  "backend/core/operator_control_projection.py",
+                  "backend/core/workspace_projection.py",
+                  "skeleton/agents/human_control.py",
+                  "frontend/src/product/operatorControlProjection.ts",
+                  ".github/workflows/p1-operator-control-projection.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-prod-04/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_human_control.py",
+                  "backend/tests/test_workspace_projection.py",
+                  "backend/tests/test_user_control_receipts.py",
+                  "frontend/scripts/test-operator-control-projection.mjs",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-PROD-04 \
+            --accountability-id ACC-P1-PROD-04 \
+            --configuration-digest "$(cat .p1-prod-04/config.digest)" \
+            --environment-digest "$(cat .p1-prod-04/environment.digest)" \
+            --verifier-id github-actions:p1-operator-control-projection \
+            --verifier-digest "$(cat .p1-prod-04/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-prod-04/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-prod-04/refs.json \
+            --out .p1-prod-04/receipt.json \
+            > .p1-prod-04/stdout.json
+
+      - name: Assert exact-head PROD-04 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prod-04/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROD-04 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROD-04":
+              raise SystemExit("PROD-04 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROD-04":
+              raise SystemExit("PROD-04 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print("PROD-04 exact-head receipt OK", receipt["receipt_digest"])
+          PY
+
+  frontend:
+    name: Validate operator controls in product decoder
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Apply reviewed local patches
+        working-directory: frontend
+        run: node ./scripts/patch-node-modules.js
+
+      - name: Run operator-control decoder tests
+        working-directory: frontend
+        run: node --test scripts/test-operator-control-projection.mjs
+
+      - name: Typecheck operator-control surface
+        working-directory: frontend
+        run: yarn typecheck
