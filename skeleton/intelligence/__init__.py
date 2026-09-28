@@ -87,6 +87,16 @@ from skeleton.intelligence.strategy_registry import (
     evaluate_stopping,
     select_strategy,
 )
+from skeleton.intelligence.memory_retrieval_quality import (
+    INTEL_QUALITY_ACCOUNTABILITY_ID,
+    INTEL_QUALITY_SCHEMA_VERSION,
+    INTEL_QUALITY_TASK_ID,
+    IntelligenceQualityDecision,
+    IntelligenceQualityError,
+    IntelligenceQualityPolicy,
+    KnowledgeQualityObservation,
+    evaluate_intelligence_quality,
+)
 from skeleton.intelligence.routing_context_receipt import (
     ROUTING_CONTEXT_ACCOUNTABILITY_ID,
     ROUTING_CONTEXT_RECEIPT_SCHEMA_VERSION,
@@ -196,6 +206,14 @@ __all__ = [
     "StrategySelection",
     "evaluate_stopping",
     "select_strategy",
+    "INTEL_QUALITY_ACCOUNTABILITY_ID",
+    "INTEL_QUALITY_SCHEMA_VERSION",
+    "INTEL_QUALITY_TASK_ID",
+    "IntelligenceQualityDecision",
+    "IntelligenceQualityError",
+    "IntelligenceQualityPolicy",
+    "KnowledgeQualityObservation",
+    "evaluate_intelligence_quality",
     "ROUTING_CONTEXT_ACCOUNTABILITY_ID",
     "ROUTING_CONTEXT_RECEIPT_SCHEMA_VERSION",
     "ROUTING_CONTEXT_TASK_ID",
