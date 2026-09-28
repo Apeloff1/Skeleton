@@ -31,6 +31,16 @@ __all__ = [
     "ExperimentRegistryError",
     "MetricDirection",
     "TrafficMode",
+    "CHAMPION_REGISTRY_ACCOUNTABILITY_ID",
+    "CHAMPION_REGISTRY_SCHEMA_VERSION",
+    "CHAMPION_REGISTRY_TASK_ID",
+    "CandidateArtifact",
+    "ChampionChallengerDecision",
+    "ChampionDecisionOutcome",
+    "ChampionRegistry",
+    "ChampionRegistryError",
+    "build_champion_decision",
+    "qualify_candidate",
     "BENCHMARK_REGISTRY_ACCOUNTABILITY_ID",
     "BENCHMARK_REGISTRY_SCHEMA_VERSION",
     "BENCHMARK_REGISTRY_TASK_ID",
@@ -50,6 +60,21 @@ __all__ = [
     "qualify_benchmark",
 ]
 
+from skeleton.eval.champion_registry import (
+    CHAMPION_REGISTRY_ACCOUNTABILITY_ID,
+    CHAMPION_REGISTRY_SCHEMA_VERSION,
+    CHAMPION_REGISTRY_TASK_ID,
+    CandidateArtifact,
+    CandidateQualificationDecision,
+    ChampionRegistry,
+    ChampionRegistryError,
+    PromotionDecision,
+    PromotionTransition,
+    apply_promotion,
+    evaluate_promotion,
+    qualify_candidate_artifact,
+)
+
 from skeleton.eval.benchmark_registry import (
     BENCHMARK_REGISTRY_ACCOUNTABILITY_ID,
     BENCHMARK_REGISTRY_SCHEMA_VERSION,
@@ -68,6 +93,19 @@ from skeleton.eval.benchmark_registry import (
     ImprovementClaimDecision,
     evaluate_improvement_claim,
     qualify_benchmark,
+)
+
+from skeleton.eval.champion_challenger import (
+    CHAMPION_REGISTRY_ACCOUNTABILITY_ID,
+    CHAMPION_REGISTRY_SCHEMA_VERSION,
+    CHAMPION_REGISTRY_TASK_ID,
+    CandidateArtifact,
+    ChampionChallengerDecision,
+    ChampionDecisionOutcome,
+    ChampionRegistry,
+    ChampionRegistryError,
+    build_champion_decision,
+    qualify_candidate,
 )
 
 from skeleton.eval.experiment_registry import (
