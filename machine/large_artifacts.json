@@ -1,17 +1,21 @@
 {
   "schema": 1,
   "repository": "Apeloff1/Skeleton",
-  "source_commit": "7e0f257edbd1783f9b2ea346bebda8830a0ae8b6",
+  "source_commit": "8aa947f24a4a11b8c91fa52214d45fe5a8c18043",
   "git_object_format": "sha1",
+  "integrity_algorithm": "sha256",
+  "fetch_strategy": "immutable-git-history",
   "artifacts": [
     {
       "id": "godot-snapshot-binary",
       "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot",
       "git_blob_oid": "0462da7140794edeaecc6f7582aa93048d37bc7b",
+      "sha256": "8b8d7c6089d8b4238e6ec872f027ef1a4bfc5241ddb5f8aec452b058368d255b",
       "size_bytes": 103604344,
       "media_type": "application/x-executable",
       "license": "MIT",
-      "provenance_note": "Historical Godot engine binary formerly duplicated across three branch snapshots.",
+      "redistribution_status": "upstream-license-applies",
+      "provenance_note": "Historical Godot engine binary formerly duplicated across three branch snapshots. Materialize only when reconstructing a legacy snapshot.",
       "destinations": [
         "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/godot",
         "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/godot",
@@ -23,9 +27,11 @@
       "id": "ember-vanguard-presskit-trailer",
       "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
       "git_blob_oid": "01ca1a298c794bd5ab677cbe439c39763768ded3",
+      "sha256": "cffc7dbbd26fe7b0dd6914120ced914821f875f31e651ad89d818789027adeab",
       "size_bytes": 29450632,
       "media_type": "video/mp4",
       "license": "NOASSERTION",
+      "redistribution_status": "do-not-redistribute-without-license-review",
       "provenance_note": "Historical press-kit media retained in immutable Git history; redistribution terms were not encoded in the snapshot.",
       "destinations": [
         "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_trailer.mp4",
@@ -35,13 +41,32 @@
       "mode": "0644"
     },
     {
+      "id": "ember-vanguard-presskit-showcase",
+      "source_path": "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4",
+      "git_blob_oid": "8e77f53a2fae621772d7666bf7cfc5491aca1df9",
+      "sha256": "5f895609c8e37948fafbbf7b05726e413a5b913b6850a84182ad8741b2b4263f",
+      "size_bytes": 9892206,
+      "media_type": "video/mp4",
+      "license": "NOASSERTION",
+      "redistribution_status": "do-not-redistribute-without-license-review",
+      "provenance_note": "Historical press-kit showcase duplicated across three branch snapshots; retained only as immutable-history metadata.",
+      "destinations": [
+        "satellites/branch-snapshots/codex-frontier-runtime-integration/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4",
+        "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4",
+        "satellites/branch-snapshots/codex-jeeves-epistemic-engine-next/backend/artifacts_media/Ember_Vanguard-presskit-75248005_showcase.mp4"
+      ],
+      "mode": "0644"
+    },
+    {
       "id": "interactive-quizzes-mongo-fixture",
       "source_path": "memory/mongo_backup/test_database/interactive_quizzes.bson",
       "git_blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "sha256": "4630940970532b4b0e0cfe8964b5fc93333fa2057376e41d37a2ee7c0e4aaf13",
       "size_bytes": 14595602,
       "media_type": "application/bson",
       "license": "NOASSERTION",
-      "provenance_note": "Historical test-database dump retained in immutable Git history; use only when explicitly reconstructing legacy fixtures.",
+      "redistribution_status": "internal-historical-data-do-not-redistribute",
+      "provenance_note": "Historical test-database dump retained in immutable Git history; materialize only for explicit legacy-fixture reconstruction.",
       "destinations": [
         "memory/mongo_backup/test_database/interactive_quizzes.bson",
         "satellites/branch-snapshots/codex-frontier-runtime-integration/memory/mongo_backup/test_database/interactive_quizzes.bson",
