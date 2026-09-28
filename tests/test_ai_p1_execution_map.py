@@ -651,3 +651,65 @@ def test_release_lane_gates_watch_p1_backlog_changes() -> None:
         assert (
             trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
         ), workflow
+
+
+
+RELEASE_LANE_TASKS = (
+    "P1-REL-01",
+    "P1-REL-02",
+    "P1-REL-03",
+    "P1-REL-04",
+    "P1-REL-05",
+    "P1-REL-06",
+)
+
+
+def test_release_lane_paths_are_materialized_before_evidence_binding() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in RELEASE_LANE_TASKS:
+        task = task_by_id[task_id]
+        for field in ("implementation_paths", "test_targets"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        assert task["evidence_refs"] == []
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_release_lane_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-REL-01"]["depends_on"] == [
+        "P1-EVID-05",
+        "P1-PROD-05",
+        "P1-LEARN-03",
+        "P1-AUTO-06",
+    ]
+    assert task_by_id["P1-REL-02"]["depends_on"] == ["P1-REL-01"]
+    assert task_by_id["P1-REL-03"]["depends_on"] == [
+        "P1-REL-01",
+        "P1-REL-02",
+    ]
+    assert task_by_id["P1-REL-04"]["depends_on"] == ["P1-REL-03"]
+    assert task_by_id["P1-REL-05"]["depends_on"] == [
+        "P1-REL-04",
+        "P1-LEARN-06",
+    ]
+    assert task_by_id["P1-REL-06"]["depends_on"] == ["P1-REL-01"]
