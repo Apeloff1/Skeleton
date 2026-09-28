@@ -18,6 +18,7 @@ on:
   pull_request:
     branches:
       - main
+      - p1/release-lane-materialize-20260928
       - p1/dist-02-model-placement-warming-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
