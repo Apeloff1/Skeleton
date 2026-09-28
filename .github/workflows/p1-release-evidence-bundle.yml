@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/evidence.py"
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"
@@ -22,6 +23,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/evidence.py"
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"
