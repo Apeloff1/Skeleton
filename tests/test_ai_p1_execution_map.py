@@ -489,12 +489,15 @@ def test_evid_02_06_use_materialized_exact_head_evidence(
     assert task["completion_checkbox_mark"] == "[ ]"
 
 
-def test_scope_freeze_gate_watches_p1_backlog_evidence_changes() -> None:
-    text = (
-        ROOT / ".github/workflows/p1-scope-freeze.yml"
-    ).read_text(encoding="utf-8")
-    trigger_section = text.split("  workflow_dispatch:", 1)[0]
-
-    assert (
-        trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+def test_evidence_governance_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-scope-freeze.yml",
     )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
