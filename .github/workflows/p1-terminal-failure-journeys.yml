@@ -65,6 +65,11 @@ jobs:
           python -m pip install --disable-pip-version-check
           -e ".[dev]"
           "pytest>=8,<9"
+          "httpx==0.28.1"
+          "bcrypt>=4,<5"
+          "PyJWT>=2,<3"
+          "email-validator>=2,<3"
+          "python-dotenv>=1,<2"
 
       - name: Compile PROM-02 contracts and builders
         run: >-
