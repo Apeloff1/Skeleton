@@ -984,6 +984,14 @@ def cost_anomaly_identity(
         )
     if not isinstance(policy, ForecastPolicy):
         raise TypeError("policy must be ForecastPolicy")
+    if cost_backtest.metric is not ForecastMetric.COST:
+        raise ForecastingError("cost_backtest must have cost metric")
+    if cost_backtest.policy_digest != policy.policy_digest:
+        raise ForecastingError("cost backtest policy digest mismatch")
+    if not cost_backtest.accepted:
+        raise ForecastingError(
+            "rejected cost backtest cannot identify anomaly"
+        )
     observed = _nonnegative(observed_cost, "observed_cost")
     expected = cost_backtest.forecast[0].value
     error = abs(observed - expected)
