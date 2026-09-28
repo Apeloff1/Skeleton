@@ -432,4 +432,7 @@ def test_upstream_domain_gates_watch_p1_backlog_evidence_changes() -> None:
 
     for workflow in workflows:
         text = (ROOT / workflow).read_text(encoding="utf-8")
-        assert text.count('"machine/ai_p1_task_backlog.json"') == 2, workflow
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
