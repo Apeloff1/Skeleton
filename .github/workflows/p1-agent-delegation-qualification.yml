@@ -8,6 +8,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/agents/delegation_qualification.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/delegation_qualification.py"
       - "skeleton/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"
@@ -18,6 +19,7 @@ on:
       - main
     paths:
       - "skeleton/agents/delegation_qualification.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/delegation_qualification.py"
       - "skeleton/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"

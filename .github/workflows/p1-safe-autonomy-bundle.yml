@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/agents/safe_autonomy.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/safe_autonomy.py"
       - "skeleton/agents/blast_radius.py"
       - "skeleton/agents/human_control.py"
@@ -23,6 +24,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/agents/safe_autonomy.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/safe_autonomy.py"
       - "skeleton/agents/blast_radius.py"
       - "skeleton/agents/human_control.py"
