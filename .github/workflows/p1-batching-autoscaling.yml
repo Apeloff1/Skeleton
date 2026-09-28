@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/mesh/batching_autoscaling.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py"
       - "skeleton/network/model_placement.py"
       - "skeleton/shells/worker_scaling.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/mesh/batching_autoscaling.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py"
       - "skeleton/network/model_placement.py"
       - "skeleton/shells/worker_scaling.py"
