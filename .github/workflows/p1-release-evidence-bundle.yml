@@ -220,8 +220,8 @@ jobs:
           reproducibility = ReproducibilityBundle(
               repository="Apeloff1/Skeleton",
               commit_sha=commit,
-              task_id="P1-REL-01",
-              accountability_id="ACC-P1-REL-01",
+              task_id="P1-EVID-05",
+              accountability_id="ACC-P1-EVID-05",
               configuration_digest=config_digest,
               environment_digest=environment_digest,
               verifier_id="github-actions:p1-release-evidence-bundle",
