@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/contracts/p1_terminal_evidence.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/contracts/p1_terminal_evidence.py"
       - "machine/p1_terminal_evidence_policy.json"
       - "scripts/check_p1_terminal_evidence_policy.py"
@@ -21,6 +22,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/contracts/p1_terminal_evidence.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/contracts/p1_terminal_evidence.py"
       - "machine/p1_terminal_evidence_policy.json"
       - "scripts/check_p1_terminal_evidence_policy.py"
