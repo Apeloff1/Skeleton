@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "skeleton/network/model_placement.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/network/model_placement.py"
       - "skeleton/network/remote_execution.py"
       - "skeleton/network/__init__.py"
@@ -23,6 +24,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/network/model_placement.py"
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/runtime/distributed/network/model_placement.py"
       - "skeleton/network/remote_execution.py"
       - "skeleton/network/__init__.py"
