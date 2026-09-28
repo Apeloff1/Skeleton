@@ -71,6 +71,20 @@ __all__ = [
     "RegressionQualificationDecision",
     "SafeOutcome",
     "qualify_regression_corpus",
+    "FAILURE_KNOWLEDGE_ACCOUNTABILITY_ID",
+    "FAILURE_KNOWLEDGE_SCHEMA_VERSION",
+    "FAILURE_KNOWLEDGE_TASK_ID",
+    "FailureDisposition",
+    "FailureKnowledgeError",
+    "FailureKnowledgeLedger",
+    "FailureKnowledgeQualificationDecision",
+    "FailureKnowledgeRecord",
+    "FailureSourceKind",
+    "LearningSignal",
+    "LearningSignalKind",
+    "NonApplicabilityDecision",
+    "learning_signal_for",
+    "qualify_failure_knowledge",
 ]
 
 from skeleton.eval.champion_registry import (
@@ -134,4 +148,21 @@ from skeleton.eval.regression_corpus import (
     RegressionQualificationDecision,
     SafeOutcome,
     qualify_regression_corpus,
+)
+
+from skeleton.eval.failure_knowledge import (
+    FAILURE_KNOWLEDGE_ACCOUNTABILITY_ID,
+    FAILURE_KNOWLEDGE_SCHEMA_VERSION,
+    FAILURE_KNOWLEDGE_TASK_ID,
+    FailureDisposition,
+    FailureKnowledgeError,
+    FailureKnowledgeLedger,
+    FailureKnowledgeQualificationDecision,
+    FailureKnowledgeRecord,
+    FailureSourceKind,
+    LearningSignal,
+    LearningSignalKind,
+    NonApplicabilityDecision,
+    learning_signal_for,
+    qualify_failure_knowledge,
 )

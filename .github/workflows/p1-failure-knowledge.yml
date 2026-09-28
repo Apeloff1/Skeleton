@@ -1,0 +1,257 @@
+name: P1 Failure Knowledge Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/eval/failure_knowledge.py"
+      - "skeleton/ai/evaluation/failure_knowledge.py"
+      - "skeleton/eval/regression_corpus.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_failure_knowledge.py"
+      - "machine/p1_failure_knowledge.json"
+      - "machine/p1_regression_corpus.json"
+      - "scripts/check_p1_failure_knowledge.py"
+      - "scripts/check_p1_regression_corpus.py"
+      - "tests/test_p1_failure_knowledge.py"
+      - ".github/workflows/p1-failure-knowledge.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/learn-05-regression-corpus-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/eval/failure_knowledge.py"
+      - "skeleton/ai/evaluation/failure_knowledge.py"
+      - "skeleton/eval/regression_corpus.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/eval/__init__.py"
+      - "skeleton/ai/evaluation/__init__.py"
+      - "skeleton/testing/test_failure_knowledge.py"
+      - "machine/p1_failure_knowledge.json"
+      - "machine/p1_regression_corpus.json"
+      - "scripts/check_p1_failure_knowledge.py"
+      - "scripts/check_p1_regression_corpus.py"
+      - "tests/test_p1_failure_knowledge.py"
+      - ".github/workflows/p1-failure-knowledge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-failure-knowledge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate structured failure knowledge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile LEARN-06 contracts
+        run: >-
+          python -m compileall -q
+          skeleton/eval/failure_knowledge.py
+          skeleton/ai/evaluation/failure_knowledge.py
+          scripts/check_p1_failure_knowledge.py
+
+      - name: Validate canonical failure knowledge
+        run: >-
+          python scripts/check_p1_failure_knowledge.py
+          --print-summary
+
+      - name: Run EVID-04, LEARN-05 and LEARN-06 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_risk_evidence.py
+          skeleton/testing/test_regression_corpus.py
+          skeleton/testing/test_failure_knowledge.py
+          tests/test_p1_regression_corpus.py
+          tests/test_p1_failure_knowledge.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Build accepted LEARN-06 failure knowledge decision
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-learn-06
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from scripts.check_p1_failure_knowledge import load_ledger
+          from scripts.check_p1_regression_corpus import load_corpus
+          from skeleton.contracts.risk_evidence import RiskBindingEvaluation
+          from skeleton.eval.failure_knowledge import (
+              qualify_failure_knowledge,
+          )
+
+          _, ledger = load_ledger()
+          _, corpus = load_corpus()
+          risks = {
+              record.risk_obligation_id: RiskBindingEvaluation(
+                  obligation_id=record.risk_obligation_id,
+                  obligation_digest=record.risk_obligation_digest,
+                  resolved=True,
+                  blocking=True,
+                  severity="high",
+                  disposition="evidence",
+                  blockers=(),
+              )
+              for record in ledger.records
+          }
+          decision = qualify_failure_knowledge(
+              ledger=ledger,
+              regression_corpus=corpus,
+              risk_evaluations=risks,
+          )
+          if not decision.accepted:
+              raise SystemExit(
+                  f"LEARN-06 fixture rejected: {decision.reasons}"
+              )
+          if len(decision.signal_digests) != len(ledger.records):
+              raise SystemExit(
+                  "every failure record must emit one bounded learning signal"
+              )
+          evidence = decision.accepted_evidence_ref()
+          Path(".p1-learn-06/decision.json").write_text(
+              json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          Path(".p1-learn-06/refs.json").write_text(
+              json.dumps(
+                  [{
+                      "source": evidence.source,
+                      "digest": evidence.digest,
+                      "category": evidence.category,
+                  }],
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Emit exact-head LEARN-06 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-learn-06/config.digest").write_text(
+              hashlib.sha256(
+                  b"p1-learn-06-failure-knowledge-v1"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-06/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|learn-06"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-06/verifier.digest").write_text(
+              digest([
+                  "skeleton/eval/failure_knowledge.py",
+                  "skeleton/eval/regression_corpus.py",
+                  "skeleton/contracts/risk_evidence.py",
+                  "machine/p1_failure_knowledge.json",
+                  "machine/p1_regression_corpus.json",
+                  "scripts/check_p1_failure_knowledge.py",
+                  ".github/workflows/p1-failure-knowledge.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-learn-06/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_risk_evidence.py",
+                  "skeleton/testing/test_regression_corpus.py",
+                  "skeleton/testing/test_failure_knowledge.py",
+                  "tests/test_p1_regression_corpus.py",
+                  "tests/test_p1_failure_knowledge.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-LEARN-06 \
+            --accountability-id ACC-P1-LEARN-06 \
+            --configuration-digest "$(cat .p1-learn-06/config.digest)" \
+            --environment-digest "$(cat .p1-learn-06/environment.digest)" \
+            --verifier-id github-actions:p1-failure-knowledge \
+            --verifier-digest "$(cat .p1-learn-06/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-learn-06/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-learn-06/refs.json \
+            --out .p1-learn-06/receipt.json \
+            > .p1-learn-06/stdout.json
+
+      - name: Assert exact-head LEARN-06 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-learn-06/receipt.json").read_text(encoding="utf-8")
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("LEARN-06 receipt head mismatch")
+          if receipt["task_id"] != "P1-LEARN-06":
+              raise SystemExit("LEARN-06 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-LEARN-06":
+              raise SystemExit("LEARN-06 accountability identity mismatch")
+          for field in ("subject_digest", "evidence_digest", "receipt_digest"):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "LEARN-06 exact-head receipt OK",
+              receipt["receipt_digest"],
+          )
+          PY
