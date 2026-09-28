@@ -83,10 +83,14 @@ jobs:
 
           from skeleton.contracts.canonical import EvidenceRef
           from skeleton.intelligence.output_quality import (
+              ArtifactType,
+              ChangeImpact,
               IndependentQualityEvaluation,
+              OutputDisposition,
               OutputKind,
               ReasoningRegressionObservation,
               evaluate_answer_artifact_quality,
+              required_artifact_gates,
           )
           from skeleton.intelligence.quality import QualityReport
 
@@ -126,6 +130,13 @@ jobs:
                   metadata={"rubric": "artifact-v1"},
               ),
               evidence_refs=(ref("ci://artifact-quality", "f"),),
+              artifact_type=ArtifactType.CODE,
+              change_impact=ChangeImpact.CRITICAL,
+              published_subject_digest="d" * 64,
+              gate_ids=required_artifact_gates(
+                  ArtifactType.CODE,
+                  ChangeImpact.CRITICAL,
+              ),
           )
           regression = ReasoningRegressionObservation(
               suite_id="ci-reasoning-regression",
@@ -146,6 +157,10 @@ jobs:
           )
           if not decision.accepted:
               raise SystemExit(f"INTEL-04 fixture rejected: {decision.reasons}")
+          if decision.disposition is not OutputDisposition.QUALIFIED:
+              raise SystemExit("INTEL-04 fixture did not qualify")
+          if decision.payload()["publication_allowed"] is not True:
+              raise SystemExit("INTEL-04 qualified output is not publishable")
           evidence = decision.accepted_evidence_ref()
           Path(".p1-intel-04/decision.json").write_text(
               json.dumps(decision.payload(), indent=2, sort_keys=True) + "\n",
