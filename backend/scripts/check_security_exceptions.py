@@ -136,7 +136,7 @@ def _validate_scope(value: Any) -> tuple[str, ...]:
     return tuple(sorted(normalized))
 
 
-def _validate_reviewers(value: Any, *, owner: str) -> tuple[str, ...]:
+def _validate_reviewers(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not value or len(value) > 8:
         raise SecurityExceptionPolicyError(
             "approved_by must be a non-empty bounded reviewer list"
@@ -227,7 +227,7 @@ def validate_registry(
 
         tracking_issue = _positive_int(raw["tracking_issue"], field="tracking_issue")
         review_pr = _positive_int(raw["review_pr"], field="review_pr")
-        approved_by = _validate_reviewers(raw["approved_by"], owner=owner)
+        approved_by = _validate_reviewers(raw["approved_by"])
 
         starts_on = _parse_date(raw["starts_on"], field="starts_on")
         expires_on = _parse_date(raw["expires_on"], field="expires_on")
