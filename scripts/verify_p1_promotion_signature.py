@@ -69,6 +69,7 @@ def verify_signature(
     public_key_path: Path,
     signature_path: Path,
     signer_id: str,
+    signer_type: str,
     signer_identity_digest: str,
     verifier_id: str,
 ) -> IndependentSignatureObservation:
@@ -87,6 +88,10 @@ def verify_signature(
     if signer_id != intent.signer_id:
         raise PromotionSignatureVerificationError(
             "signer ID does not match intent"
+        )
+    if signer_type != intent.signer_type:
+        raise PromotionSignatureVerificationError(
+            "signer type does not match intent"
         )
     if signer_identity_digest != intent.signer_identity_digest:
         raise PromotionSignatureVerificationError(
@@ -138,6 +143,7 @@ def verify_signature(
         commit_sha=intent.commit_sha,
         intent_digest=intent.intent_digest,
         signer_id=signer_id,
+        signer_type=signer_type,
         signer_identity_digest=signer_identity_digest,
         public_key_fingerprint=fingerprint,
         signature_digest=hashlib.sha256(signature).hexdigest(),
@@ -157,6 +163,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--signature", type=Path, required=True)
     parser.add_argument("--signer-id", required=True)
     parser.add_argument(
+        "--signer-type",
+        choices=("human", "ci", "service"),
+        required=True,
+    )
+    parser.add_argument(
         "--signer-identity-digest",
         required=True,
     )
@@ -174,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
             public_key_path=args.public_key,
             signature_path=args.signature,
             signer_id=args.signer_id,
+            signer_type=args.signer_type,
             signer_identity_digest=args.signer_identity_digest,
             verifier_id=args.verifier_id,
         )
