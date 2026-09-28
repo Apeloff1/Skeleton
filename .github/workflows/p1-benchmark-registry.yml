@@ -256,9 +256,9 @@ jobs:
           claim = evaluate_improvement_claim(
               manifest=manifest,
               qualification=qualification,
+              experiment=experiment,
               baseline=baseline,
               candidate=candidate,
-              expected_candidate_ref=experiment.candidate_ref,
           )
           if not claim.accepted:
               raise SystemExit(
