@@ -27,6 +27,26 @@ DEPTH_401_420 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_401_420.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
+_CLOSED_GAP_IMPLEMENTATION_STATES = {"hardened", "production"}
+
+
+def _depth_field_requires_nonempty(
+    volume: dict[str, object],
+    field: str,
+) -> bool:
+    """Depth passes require gaps until implementation is hardened.
+
+    A permanently non-empty gaps field would make the master-plan depth
+    contract impossible to reconcile with the maturity contract, which
+    correctly requires hardened/production implementations to have no
+    unresolved gaps.
+    """
+
+    return not (
+        field == "gaps"
+        and volume.get("implementation_status")
+        in _CLOSED_GAP_IMPLEMENTATION_STATES
+    )
 EXPECTED_COUNT = EXPECTED_LAST - EXPECTED_FIRST + 1
 
 
@@ -170,7 +190,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-000-040 marker")
                     for field in fields:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp2 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-041-080"), None)
@@ -188,7 +214,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-041-080 marker")
                     for field in fields2:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp3 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-081-120"), None)
@@ -206,7 +238,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-081-120 marker")
                     for field in fields3:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp4 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-121-160"), None)
@@ -224,7 +262,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-121-160 marker")
                     for field in fields4:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp5 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-161-200"), None)
@@ -242,7 +286,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-161-200 marker")
                     for field in fields5:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp6 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-201-240"), None)
@@ -260,7 +310,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-201-240 marker")
                     for field in fields6:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp7 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-241-280"), None)
@@ -278,7 +334,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-241-280 marker")
                     for field in fields7:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp8 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-281-320"), None)
@@ -296,7 +358,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-281-320 marker")
                     for field in fields8:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp9 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-321-360"), None)
@@ -314,7 +382,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-321-360 marker")
                     for field in fields9:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp10 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-361-400"), None)
@@ -332,7 +406,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-361-400 marker")
                     for field in fields10:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
         dp11 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-401-420"), None)
@@ -350,7 +430,13 @@ def validate(data: dict) -> list[str]:
                         errors.append(f"{volume.get('key', '?')}: missing DP-401-420 marker")
                     for field in fields11:
                         value = volume.get(field)
-                        if not isinstance(value, list) or not value:
+                        if (
+                            not isinstance(value, list)
+                            or (
+                                _depth_field_requires_nonempty(volume, field)
+                                and not value
+                            )
+                        ):
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
     depth_coverage: dict[int, list[str]] = {volume_id: [] for volume_id in range(EXPECTED_FIRST, EXPECTED_LAST + 1)}
