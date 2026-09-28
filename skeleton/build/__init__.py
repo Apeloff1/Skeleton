@@ -5,6 +5,20 @@ This package is additive. Hidden network-command classification lives in
 is a sibling concern and is not defined here.
 """
 
+from skeleton.build.cache_contract import (
+    CACHE_ALGORITHM,
+    CACHE_KEY_PREFIX,
+    CACHE_KINDS,
+    CACHE_SCHEMA,
+    CacheContractError,
+    CacheEntry,
+    CacheKey,
+    EvictionPlan,
+    EvictionPolicy,
+    build_cache_key,
+    plan_eviction,
+)
+
 from skeleton.build.incremental_graph import (
     FINGERPRINT_ALGORITHM,
     GRAPH_SCHEMA,
@@ -36,6 +50,17 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "plan_eviction",
+    "build_cache_key",
+    "EvictionPolicy",
+    "EvictionPlan",
+    "CacheKey",
+    "CacheEntry",
+    "CacheContractError",
+    "CACHE_SCHEMA",
+    "CACHE_KINDS",
+    "CACHE_KEY_PREFIX",
+    "CACHE_ALGORITHM",
     "build_incremental_graph",
     "NodeSpec",
     "IncrementalGraphError",
