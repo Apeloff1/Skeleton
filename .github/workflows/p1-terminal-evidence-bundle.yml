@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/contracts/p1_terminal_evidence.py"
       - "skeleton/ai/runtime/contracts/p1_terminal_evidence.py"
       - "machine/p1_terminal_evidence_policy.json"
@@ -20,6 +21,7 @@ on:
       - p1/dist-06-forecast-anomaly-loop-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/contracts/p1_terminal_evidence.py"
       - "skeleton/ai/runtime/contracts/p1_terminal_evidence.py"
       - "machine/p1_terminal_evidence_policy.json"
