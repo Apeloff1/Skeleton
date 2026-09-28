@@ -595,3 +595,21 @@ def test_safe_autonomy_lane_dependency_chain_is_preserved() -> None:
         "P1-AUTO-04",
         "P1-AUTO-05",
     ]
+
+
+
+def test_product_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-api-contract-registry.yml",
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        ".github/workflows/p1-product-workspace-projection.yml",
+        ".github/workflows/p1-operator-control-projection.yml",
+        ".github/workflows/p1-tenant-storage-boundary.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
