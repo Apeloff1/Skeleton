@@ -13,5 +13,14 @@
   "signer_verifier_must_differ": true,
   "deferred_scope_must_match_execution_map": true,
   "maturity_mutation": false,
-  "promotion_effect": "terminal_candidate"
+  "promotion_effect": "terminal_candidate",
+  "allowed_signer_types": [
+    "human",
+    "ci",
+    "service"
+  ],
+  "forbidden_signer_types": [
+    "agent"
+  ],
+  "ci_generated_signature_may_finalize_promotion": false
 }
