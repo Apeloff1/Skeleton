@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from core.user_control_receipts import SQLiteHumanControlReceiptStore
 from core.workspace_projection import (
     WorkspaceProjection,
     WorkspaceProjectionDecision,
@@ -654,6 +655,59 @@ def verify_operator_control_projection(
     )
 
 
+
+def build_operator_control_projection_from_store(
+    *,
+    store: SQLiteHumanControlReceiptStore,
+    tenant_id: str,
+    execution_id: str,
+    workspace: WorkspaceProjection,
+    workspace_decision: WorkspaceProjectionDecision,
+) -> OperatorControlProjection:
+    """Rebuild operator UI state from restart-safe accepted control history."""
+
+    if not isinstance(store, SQLiteHumanControlReceiptStore):
+        raise TypeError("store must be SQLiteHumanControlReceiptStore")
+    chain = store.chain(
+        tenant_id=tenant_id,
+        operation_id=workspace.operation_id,
+        execution_id=execution_id,
+    )
+    latest = None if not chain else chain[-1]
+    return build_operator_control_projection(
+        workspace=workspace,
+        workspace_decision=workspace_decision,
+        human_control=latest,
+    )
+
+
+def verify_operator_control_projection_from_store(
+    projection: OperatorControlProjection,
+    *,
+    store: SQLiteHumanControlReceiptStore,
+    tenant_id: str,
+    execution_id: str,
+    workspace: WorkspaceProjection,
+    workspace_decision: WorkspaceProjectionDecision,
+) -> OperatorControlProjectionDecision:
+    """Verify cached operator UI state against durable receipt + workspace authority."""
+
+    if not isinstance(store, SQLiteHumanControlReceiptStore):
+        raise TypeError("store must be SQLiteHumanControlReceiptStore")
+    chain = store.chain(
+        tenant_id=tenant_id,
+        operation_id=workspace.operation_id,
+        execution_id=execution_id,
+    )
+    latest = None if not chain else chain[-1]
+    return verify_operator_control_projection(
+        projection,
+        workspace,
+        workspace_decision,
+        latest,
+    )
+
+
 __all__ = [
     "OPERATOR_CONTROL_ACCOUNTABILITY_ID",
     "OPERATOR_CONTROL_SCHEMA_VERSION",
@@ -662,5 +716,7 @@ __all__ = [
     "OperatorControlProjectionDecision",
     "OperatorControlProjectionError",
     "build_operator_control_projection",
+    "build_operator_control_projection_from_store",
     "verify_operator_control_projection",
+    "verify_operator_control_projection_from_store",
 ]
