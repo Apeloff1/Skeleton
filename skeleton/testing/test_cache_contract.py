@@ -112,6 +112,7 @@ def test_platform_is_explicit_not_implicitly_host_derived() -> None:
         {"materials": {}},
         {"materials": {"x": 1}},
         {"toolchain": {}},
+        {"config": []},
     ],
 )
 def test_malformed_cache_key_inputs_fail_closed(kwargs: dict[str, object]) -> None:
