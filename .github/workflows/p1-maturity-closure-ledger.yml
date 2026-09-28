@@ -1,0 +1,128 @@
+name: P1 Maturity Closure Ledger Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/maturity-volume-materialization-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_maturity.py"
+      - "scripts/build_p1_maturity_closure_ledger.py"
+      - "tests/test_p1_maturity_closure_ledger.py"
+      - ".github/workflows/p1-maturity-closure-ledger.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-maturity-closure-ledger-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate non-authoritative P1 maturity closure ledger
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused reconciliation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile closure engines
+        run: |
+          python -m py_compile             scripts/reconcile_p1_maturity.py             scripts/build_p1_maturity_closure_ledger.py             skeleton/contracts/maturity_reconciliation.py
+
+      - name: Validate projection and planning inputs
+        run: |
+          python scripts/reconcile_p1_volume_metadata.py --check
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run closure ledger regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_maturity_closure_ledger.py
+          tests/test_p1_volume_metadata_projection.py
+
+      - name: Build deterministic closure ledger
+        run: |
+          mkdir -p .p1-closure
+          python scripts/build_p1_maturity_closure_ledger.py             --out .p1-closure/ledger.json
+
+      - name: Assert closure boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          ledger = json.loads(
+              Path(".p1-closure/ledger.json").read_text(encoding="utf-8")
+          )
+          if ledger["primary_volume_count"] != 107:
+              raise SystemExit("P1 primary volume count drift")
+          if ledger["target_floor_eligible_count"] != 3:
+              raise SystemExit("unexpected target-floor eligible count")
+          if ledger["blocked_volume_count"] != 104:
+              raise SystemExit("unexpected blocked-volume count")
+          if ledger["target_floor_eligible_volume_keys"] != [
+              "VOL-013",
+              "VOL-014",
+              "VOL-253",
+          ]:
+              raise SystemExit("unexpected eligible-volume set")
+          if ledger["promotion_authority"] is not False:
+              raise SystemExit("closure ledger cannot carry promotion authority")
+          if ledger["may_self_sign"] is not False:
+              raise SystemExit("closure ledger cannot self-sign")
+          if ledger["may_mutate_maturity"] is not False:
+              raise SystemExit("closure ledger cannot mutate maturity")
+          if len(ledger["ledger_digest"]) != 64:
+              raise SystemExit("invalid closure ledger digest")
+          for row in ledger["records"]:
+              if row["target_floor_eligible"]:
+                  if row["required_actions"]:
+                      raise SystemExit(
+                          f"{row['volume_key']}: eligible row has closure actions"
+                      )
+              elif not row["required_actions"]:
+                  raise SystemExit(
+                      f"{row['volume_key']}: blocked row lacks closure actions"
+                  )
+          print(
+              "P1 maturity closure ledger OK:",
+              ledger["target_floor_eligible_count"],
+              "eligible /",
+              ledger["blocked_volume_count"],
+              "blocked",
+              ledger["required_action_counts"],
+          )
+          PY
