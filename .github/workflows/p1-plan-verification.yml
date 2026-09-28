@@ -15,6 +15,7 @@ on:
       - "skeleton/testing/test_plan_cycles.py"
       - "skeleton/testing/test_plan_simulation.py"
       - "skeleton/testing/test_plan_qualification.py"
+      - "skeleton/testing/test_plan_execution_admission.py"
       - ".github/workflows/p1-plan-verification.yml"
   pull_request:
     branches:
@@ -31,6 +32,7 @@ on:
       - "skeleton/testing/test_plan_cycles.py"
       - "skeleton/testing/test_plan_simulation.py"
       - "skeleton/testing/test_plan_qualification.py"
+      - "skeleton/testing/test_plan_execution_admission.py"
       - ".github/workflows/p1-plan-verification.yml"
   workflow_dispatch:
 
@@ -86,6 +88,7 @@ jobs:
           skeleton/testing/test_plan_cycles.py
           skeleton/testing/test_plan_simulation.py
           skeleton/testing/test_plan_qualification.py
+          skeleton/testing/test_plan_execution_admission.py
           skeleton/testing/test_reasoning_strategy_registry.py
 
       - name: Validate canonical AI file tree parity
@@ -377,6 +380,7 @@ jobs:
                   "skeleton/testing/test_plan_cycles.py",
                   "skeleton/testing/test_plan_simulation.py",
                   "skeleton/testing/test_plan_qualification.py",
+                  "skeleton/testing/test_plan_execution_admission.py",
                   "skeleton/testing/test_reasoning_strategy_registry.py",
               ]),
               encoding="utf-8",
