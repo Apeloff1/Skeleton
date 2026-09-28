@@ -954,3 +954,19 @@ def test_distributed_economics_dependency_chain_is_preserved() -> None:
         "P1-DIST-04",
         "P1-DIST-05",
     ]
+
+
+
+def test_terminal_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-terminal-evidence-bundle.yml",
+        ".github/workflows/p1-terminal-failure-journeys.yml",
+        ".github/workflows/p1-independent-promotion-decision.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
