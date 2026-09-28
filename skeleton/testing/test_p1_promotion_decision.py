@@ -73,7 +73,11 @@ def _attestation(
             else "2026-09-28T15:05:00Z"
         ),
         signature_method="github_identity",
-        signature_ref=None,
+        signature_ref=(
+            "github://actions/prom03/verification/run-2"
+            if verification
+            else "github://actions/prom03/implementation/run-1"
+        ),
         verifier_digest=verifier_digest,
         evidence_digest=evidence_digest,
     )
@@ -295,3 +299,40 @@ def test_strong_signature_method_requires_signature_reference() -> None:
             verifier_digest="d" * 64,
             evidence_digest="e" * 64,
         )
+
+
+def test_same_signature_reference_cannot_claim_independence() -> None:
+    prom02 = _prom02()
+    shared_ref = "github://actions/prom03/shared/run"
+    implementation = _attestation(
+        prom02,
+        phase="implementation",
+        signer_id="builder",
+        verifier_digest="d" * 64,
+    )
+    verification = _attestation(
+        prom02,
+        phase="verification",
+        signer_id="verifier",
+        verifier_digest="f" * 64,
+    )
+    implementation = P1PromotionAttestation(
+        **{
+            **implementation.payload(),
+            "signature_ref": shared_ref,
+        }
+    )
+    verification = P1PromotionAttestation(
+        **{
+            **verification.payload(),
+            "signature_ref": shared_ref,
+        }
+    )
+
+    decision = _decide(
+        prom02,
+        implementation=implementation,
+        verification=verification,
+    )
+    assert decision.promoted is False
+    assert "verification-signature-ref-not-independent" in decision.reasons
