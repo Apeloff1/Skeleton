@@ -79,6 +79,14 @@ class BatchPlan:
     ) -> tuple[BatchSpec, ...]:
         """Return dependency-satisfied unfinished batches in canonical order."""
         completed_set = _validated_batch_id_set(completed, label="completed")
+        by_id = self.by_id
+        for batch_id in completed_set:
+            missing = set(by_id[batch_id].depends_on) - completed_set
+            if missing:
+                raise BatchPlanError(
+                    f"completed evidence for {batch_id} is missing dependencies: "
+                    f"{sorted(missing)}"
+                )
         if max_wave is not None:
             if isinstance(max_wave, bool) or not isinstance(max_wave, int):
                 raise BatchPlanError("max_wave must be an integer")
@@ -206,6 +214,15 @@ def _validate_graph(batches: tuple[BatchSpec, ...]) -> None:
             raise BatchPlanError(
                 f"{batch.id} references unknown dependencies: {sorted(unknown)}"
             )
+        later_wave = [
+            dependency
+            for dependency in batch.depends_on
+            if by_id[dependency].wave > batch.wave
+        ]
+        if later_wave:
+            raise BatchPlanError(
+                f"{batch.id} depends on later-wave batches: {later_wave}"
+            )
     if any(count != BATCHES_PER_LANE for count in lane_counts.values()):
         raise BatchPlanError(
             "each canonical lane must own exactly ten batches"
@@ -233,7 +250,11 @@ def _validate_graph(batches: tuple[BatchSpec, ...]) -> None:
 
 def _validated_batch_id_set(values: Iterable[str], *, label: str) -> set[str]:
     result: set[str] = set()
-    for value in values:
+    for index, value in enumerate(values, start=1):
+        if index > BATCH_COUNT:
+            raise BatchPlanError(
+                f"{label} contains more than {BATCH_COUNT} batch ids"
+            )
         if not isinstance(value, str) or BATCH_ID_RE.fullmatch(value) is None:
             raise BatchPlanError(f"{label} contains an invalid batch id")
         if value not in {f"B{number:03d}" for number in range(1, BATCH_COUNT + 1)}:
@@ -270,10 +291,16 @@ def load_plan(path: Path = PLAN_PATH) -> BatchPlan:
         raise BatchPlanError("batch plan root must be an object")
     if set(payload) != {"schema", "batch_count", "execution_model", "batches"}:
         raise BatchPlanError("batch plan root has an invalid field set")
-    if payload["schema"] != SCHEMA_VERSION:
+    schema = payload["schema"]
+    if isinstance(schema, bool) or not isinstance(schema, int) or schema != SCHEMA_VERSION:
         raise BatchPlanError("unsupported batch plan schema")
-    if payload["batch_count"] != BATCH_COUNT:
-        raise BatchPlanError("batch_count must equal 100")
+    batch_count = payload["batch_count"]
+    if (
+        isinstance(batch_count, bool)
+        or not isinstance(batch_count, int)
+        or batch_count != BATCH_COUNT
+    ):
+        raise BatchPlanError("batch_count must equal integer 100")
 
     execution_model = _bounded_text(
         payload["execution_model"],
