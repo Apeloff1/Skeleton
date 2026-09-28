@@ -156,6 +156,33 @@ def test_duplicate_dependency_fails_closed(tmp_path: Path) -> None:
         load_plan(_write(tmp_path, payload))
 
 
+def test_root_numeric_types_must_be_exact_integers(tmp_path: Path) -> None:
+    payload = _payload()
+    payload["schema"] = 2.0
+    with pytest.raises(BatchPlanError, match="schema"):
+        load_plan(_write(tmp_path, payload))
+
+    payload = _payload()
+    payload["batch_count"] = 100.0
+    with pytest.raises(BatchPlanError, match="integer 100"):
+        load_plan(_write(tmp_path, payload))
+
+
+def test_dependency_cannot_point_to_later_wave(tmp_path: Path) -> None:
+    payload = _payload()
+    payload["batches"][0]["depends_on"] = ["B009"]
+
+    with pytest.raises(BatchPlanError, match="later-wave"):
+        load_plan(_write(tmp_path, payload))
+
+
+def test_ready_rejects_dependency_incomplete_completion_evidence() -> None:
+    plan = load_plan()
+
+    with pytest.raises(BatchPlanError, match="missing dependencies"):
+        plan.ready(["B005"])
+
+
 def test_batch_id_order_drift_fails_closed(tmp_path: Path) -> None:
     payload = _payload()
     payload["batches"][0], payload["batches"][1] = (
