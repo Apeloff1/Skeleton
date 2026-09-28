@@ -2881,7 +2881,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103654056",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474185989",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2937,7 +2942,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103654402",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474186005",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2994,7 +3004,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103653532",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474185902",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
