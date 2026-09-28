@@ -227,6 +227,28 @@ def test_malformed_specs_fail_closed(spec: dict[str, object]) -> None:
         build_asset_pipeline([spec])
 
 
+def test_combined_asset_inputs_respect_graph_input_bound() -> None:
+    many_sources = {
+        f"assets/source-{index}.bin": _digest(f"source-{index}")
+        for index in range(20)
+    }
+    many_tools = {
+        f"tool-{index}": _digest(f"tool-{index}")
+        for index in range(13)
+    }
+
+    with pytest.raises(AssetPipelineError, match="input count exceeds"):
+        build_asset_pipeline(
+            [
+                AssetSpec(
+                    "too-many-inputs",
+                    sources=many_sources,
+                    tools=many_tools,
+                )
+            ]
+        )
+
+
 def test_duplicate_asset_id_fails_closed() -> None:
     with pytest.raises(AssetPipelineError, match="duplicate asset id"):
         build_asset_pipeline(
