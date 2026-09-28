@@ -15,6 +15,10 @@ const KEY = 'gameforge_auth_token';
 const EMERGENT_AUTH = 'https://auth.emergentagent.com/';
 
 let _token = '';
+let _tenantIdentityCache: {
+  token: string;
+  identity: { tenantId: string; principalId: string };
+} | null = null;
 
 export function getAuthToken(): string {
   return _token;
@@ -25,6 +29,7 @@ export function authHeaders(extra: Record<string, string> = {}): Record<string, 
 }
 
 async function persist(token: string) {
+  if (token !== _token) _tenantIdentityCache = null;
   _token = token;
   try {
     if (Platform.OS === 'web') {
@@ -54,6 +59,73 @@ export interface MeResult {
   user: any;
 }
 
+export type StorageTenantIdentity = {
+  tenantId: string;
+  principalId: string;
+};
+
+function storageIdentityFromUser(user: any): StorageTenantIdentity {
+  const tenantId = String(
+    user?.tenant_id || user?.email || '',
+  ).trim();
+  const principalId = String(
+    user?.email || user?.tenant_id || '',
+  ).trim();
+  if (!tenantId || !principalId) {
+    throw new Error('Authenticated tenant identity is unavailable.');
+  }
+  return { tenantId, principalId };
+}
+
+/**
+ * Resolve the same tenant identity used by backend operation authorization.
+ * Network/auth ambiguity fails closed; it never falls back into anonymous
+ * storage merely because /auth/me was unreachable.
+ */
+export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdentity> {
+  const stored = _token || (await loadStored());
+  _token = stored;
+
+  if (
+    _tenantIdentityCache
+    && _tenantIdentityCache.token === stored
+  ) {
+    return _tenantIdentityCache.identity;
+  }
+
+  const r = await api.get<any>(
+    '/api/auth/me',
+    stored ? { headers: authHeaders() } : {},
+  );
+  if (r.status === 401) {
+    await persist('');
+    throw new Error('Tenant identity is no longer authenticated.');
+  }
+  if (!r.ok || !r.data) {
+    throw new Error('Tenant identity could not be verified.');
+  }
+
+  const authenticated = Boolean(r.data.authenticated);
+  const enforced = Boolean(r.data.enforced);
+  let identity: StorageTenantIdentity;
+  if (authenticated) {
+    identity = storageIdentityFromUser(r.data.user);
+  } else if (!enforced) {
+    identity = {
+      tenantId: 'anonymous',
+      principalId: 'anonymous',
+    };
+  } else {
+    throw new Error('Authenticated tenant identity is required.');
+  }
+
+  _tenantIdentityCache = {
+    token: stored,
+    identity,
+  };
+  return identity;
+}
+
 /** Validate the current token against the backend. Clears it on 401. */
 export async function checkMe(): Promise<MeResult> {
   const stored = _token || (await loadStored());
@@ -62,6 +134,26 @@ export async function checkMe(): Promise<MeResult> {
   if (!r.ok) return { authenticated: false, enforced: false, role: 'anonymous', user: null };
   if (r.status === 401) { await persist(''); }
   const authed = !!r.data?.authenticated;
+  if (authed) {
+    try {
+      _tenantIdentityCache = {
+        token: stored,
+        identity: storageIdentityFromUser(r.data?.user),
+      };
+    } catch {
+      _tenantIdentityCache = null;
+    }
+  } else if (!r.data?.enforced) {
+    _tenantIdentityCache = {
+      token: stored,
+      identity: {
+        tenantId: 'anonymous',
+        principalId: 'anonymous',
+      },
+    };
+  } else {
+    _tenantIdentityCache = null;
+  }
   return {
     authenticated: authed,
     enforced: !!r.data?.enforced,
