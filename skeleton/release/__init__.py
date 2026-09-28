@@ -65,6 +65,16 @@ __all__ = [
     "InstallerLifecycleReceipt",
     "InstallerLifecycleScenario",
     "qualify_installer_lifecycle",
+    "MIGRATION_COMPATIBILITY_ACCOUNTABILITY_ID",
+    "MIGRATION_COMPATIBILITY_SCHEMA_VERSION",
+    "MIGRATION_COMPATIBILITY_TASK_ID",
+    "MigrationCompatibilityDecision",
+    "MigrationCompatibilityError",
+    "MigrationCompatibilityReceipt",
+    "MigrationKind",
+    "MigrationPlan",
+    "MigrationSpec",
+    "qualify_migration_compatibility",
 ]
 
 from skeleton.release.slo_promotion import (
@@ -75,6 +85,19 @@ from skeleton.release.slo_promotion import (
     ReleasePromotionError,
     ReleaseSLOPolicy,
     ReleaseSLOPromotionController,
+)
+
+from skeleton.release.migration import (
+    MIGRATION_COMPATIBILITY_ACCOUNTABILITY_ID,
+    MIGRATION_COMPATIBILITY_SCHEMA_VERSION,
+    MIGRATION_COMPATIBILITY_TASK_ID,
+    MigrationCompatibilityDecision,
+    MigrationCompatibilityError,
+    MigrationCompatibilityReceipt,
+    MigrationKind,
+    MigrationPlan,
+    MigrationSpec,
+    qualify_migration_compatibility,
 )
 
 from skeleton.release.lifecycle import (
