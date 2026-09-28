@@ -11,6 +11,20 @@ from skeleton.agents.delegation_qualification import (
     DelegationBudget,
     qualify_agent_delegation,
 )
+from skeleton.agents.autonomy_control import (
+    AUTONOMY_CONTROL_ACCOUNTABILITY_ID,
+    AUTONOMY_CONTROL_SCHEMA_VERSION,
+    AUTONOMY_CONTROL_TASK_ID,
+    AutonomyAuthorization,
+    AutonomyControlError,
+    AutonomyLevel,
+    AutonomyPolicy,
+    AutonomySignal,
+    AutonomyState,
+    AutonomyTransitionDecision,
+    TransitionDisposition,
+    evaluate_autonomy_transition,
+)
 from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
@@ -56,6 +70,10 @@ from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSna
 
 __all__ = [
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
+    "AUTONOMY_CONTROL_ACCOUNTABILITY_ID", "AUTONOMY_CONTROL_SCHEMA_VERSION",
+    "AUTONOMY_CONTROL_TASK_ID", "AutonomyAuthorization", "AutonomyControlError",
+    "AutonomyLevel", "AutonomyPolicy", "AutonomySignal", "AutonomyState",
+    "AutonomyTransitionDecision", "TransitionDisposition", "evaluate_autonomy_transition",
     "AGENT_DELEGATION_ACCOUNTABILITY_ID", "AGENT_DELEGATION_SCHEMA_VERSION",
     "AGENT_DELEGATION_TASK_ID", "AgentDelegationAuthority", "AgentDelegationDecision",
     "AgentDelegationError", "DelegationBudget", "qualify_agent_delegation",
