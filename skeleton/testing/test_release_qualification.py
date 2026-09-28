@@ -123,8 +123,8 @@ def _repro(
     values: dict[str, object] = {
         "repository": "Apeloff1/Skeleton",
         "commit_sha": COMMIT,
-        "task_id": "P1-REL-01",
-        "accountability_id": "ACC-P1-REL-01",
+        "task_id": "P1-EVID-05",
+        "accountability_id": "ACC-P1-EVID-05",
         "configuration_digest": CONFIG_DIGEST,
         "environment_digest": ENVIRONMENT_DIGEST,
         "verifier_id": "verifier:release-replay",
@@ -552,7 +552,7 @@ def test_reproducibility_must_bind_exact_evid05_identity(
 ) -> None:
     evidence = _release_evidence()
     reproducibility = replace(
-        _reproducibility(evidence_digest(evidence)),
+        _repro(evidence_digest(evidence)),
         **{field: value},
     )
     decision = _qualify(
