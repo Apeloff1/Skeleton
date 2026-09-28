@@ -197,7 +197,7 @@ def test_repository_resolver_requires_real_or_matching_paths(tmp_path: Path) -> 
     )
 
 
-def test_live_reconciliation_surfaces_planned_paths_as_nonmaterialized() -> None:
+def test_live_reconciliation_uses_materialized_vol043_without_self_promotion() -> None:
     module = _module()
 
     report = module.reconcile_repository(
@@ -211,10 +211,15 @@ def test_live_reconciliation_surfaces_planned_paths_as_nonmaterialized() -> None
     )
 
     assert implemented["eligible"] is False
-    assert any(
-        "implementation_paths must contain materialized references" in blocker
+    assert not any(
+        "must contain materialized references" in blocker
+        or "contains unresolved repository references" in blocker
         for blocker in implemented["blockers"]
     )
+    assert {
+        "implemented: implementation accountability is unsigned",
+        "implemented: accountability status is below implemented",
+    } <= set(implemented["blockers"])
     assert row["promotion_candidate"] == "scaffolded"
 
 def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:

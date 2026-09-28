@@ -229,17 +229,40 @@
         "docs/plan/MASTER_PLAN.md",
         "docs/plan/MASTER_INDEX.md",
         "machine/ai_master_plan.json",
-        "machine/ai_build_accountability.json"
+        "machine/ai_build_accountability.json",
+        "machine",
+        "docs/plan",
+        "scripts",
+        "skeleton/testing",
+        "skeleton/contracts/maturity_reconciliation.py",
+        "skeleton/ai/runtime/contracts/maturity_reconciliation.py",
+        "scripts/reconcile_p1_maturity.py",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml",
+        "machine/ai_scope_freeze_adrs.json",
+        "scripts/check_ai_scope_freeze.py",
+        ".github/workflows/p1-scope-freeze.yml"
       ],
       "tests": [
         "scripts/check_ai_master_plan.py",
-        "skeleton/testing/test_ai_master_plan.py"
+        "skeleton/testing/test_ai_master_plan.py",
+        "skeleton/testing/test_maturity_reconciliation.py",
+        "tests/test_p1_maturity_reconciliation.py",
+        "skeleton/testing/test_architecture_scope_freeze.py"
       ],
       "evaluations": [
-        "planned:plan-authority drift mutation suite",
-        "planned:breadth-freeze bypass negative tests"
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-scope-freeze.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199519",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034204451",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810"
+      ],
       "risks": [
         "human/machine plan divergence",
         "status inflation without evidence",
@@ -659,19 +682,30 @@
         "RouteDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/routing",
         "skeleton/intelligence/admission.py",
-        "skeleton/intelligence/quota.py"
+        "skeleton/intelligence/quota.py",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
+        "skeleton/frontier/model_routing.py",
+        "skeleton/intelligence/quality.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_routing.py",
-        "planned:skeleton/testing/test_routing_privacy.py"
+        "skeleton/testing/test_routing_context_receipt.py",
+        "tests/test_model_routing.py",
+        "skeleton/testing/test_context_compiler.py"
       ],
       "evaluations": [
-        "planned:router regret evaluation",
-        "planned:provider outage/fallback benchmark"
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199166",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "fallback changes privacy boundary",
         "cost optimizer degrades quality silently",
@@ -714,17 +748,28 @@
       "implementation_paths": [
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
-        "skeleton/context/sources"
+        "skeleton/context/sources",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
+        "skeleton/frontier/model_routing.py",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
       "tests": [
         "skeleton/testing/test_context_compiler.py",
-        "planned:skeleton/testing/test_context_trust_geometry.py"
+        "skeleton/testing/test_routing_context_receipt.py",
+        "tests/test_model_routing.py"
       ],
       "evaluations": [
-        "planned:long-context policy-retention eval",
-        "planned:injection-under-compression adversarial eval"
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199166",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "policy trimmed from long context",
         "instruction laundering",
@@ -770,19 +815,25 @@
         "skeleton/memory/reconciliation.py",
         "skeleton/contracts/memory_record.py",
         "skeleton/persistence/memory_repository.py",
-        "skeleton/memory/projection.py"
+        "skeleton/memory/projection.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_promotion.py",
-        "planned:skeleton/testing/test_memory_poisoning.py",
         "skeleton/testing/test_memory_repository.py",
         "skeleton/testing/test_mongo_memory_repository.py",
         "skeleton/testing/test_memory_projection.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py"
       ],
       "evaluations": [
-        "planned:memory usefulness/interference evaluation",
-        "planned:long-horizon stale-memory regression"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "evidence": [
         "skeleton/contracts/memory_record.py",
@@ -792,7 +843,12 @@
         "skeleton/testing/test_memory_repository.py",
         "skeleton/testing/test_mongo_memory_repository.py",
         "skeleton/testing/test_memory_projection.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
       ],
       "risks": [
         "memory poisoning",
@@ -843,7 +899,12 @@
         "skeleton/retrieval/freshness.py",
         "skeleton/retrieval/receipts.py",
         "skeleton/retrieval/scope.py",
-        "skeleton/retrieval/plane_health.py"
+        "skeleton/retrieval/plane_health.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "tests": [
         "tests/test_retrieval_pipeline_internals.py",
@@ -854,11 +915,12 @@
         "tests/test_canonical_reranker.py",
         "tests/test_index_checkpoint.py",
         "tests/test_retrieval_plane_health.py",
-        "tests/test_fusion_lineage.py"
+        "tests/test_fusion_lineage.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_memory_reconciliation.py"
       ],
       "evaluations": [
-        "planned:retrieval relevance/freshness suite",
-        "planned:poisoning and stale-index adversarial eval"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "evidence": [
         "skeleton/retrieval/reranker_contract.py",
@@ -870,7 +932,12 @@
         "tests/test_canonical_reranker.py",
         "tests/test_index_checkpoint.py",
         "tests/test_retrieval_scope.py",
-        "tests/test_retrieval_freshness.py"
+        "tests/test_retrieval_freshness.py",
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
       ],
       "risks": [
         "stale index",
@@ -914,18 +981,30 @@
         "KnowledgeSnapshot"
       ],
       "implementation_paths": [
-        "planned:skeleton/knowledge",
-        "planned:skeleton/knowledge/reconciliation.py"
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_claim_scope_time.py",
-        "planned:skeleton/testing/test_knowledge_contradictions.py"
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_memory_reconciliation.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py"
       ],
       "evaluations": [
-        "planned:temporal QA consistency eval",
-        "planned:contradiction reconciliation eval"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
+      ],
       "risks": [
         "false reconciliation",
         "scope/time mismatch",
@@ -968,11 +1047,16 @@
       "implementation_paths": [
         "skeleton/intelligence/strategy_registry.py",
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
-        "skeleton/intelligence/core_intelligence.py"
+        "skeleton/intelligence/core_intelligence.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "tests": [
         "skeleton/testing/test_reasoning_strategy_registry.py",
-        "skeleton/testing/test_core_intelligence_bundle.py"
+        "skeleton/testing/test_core_intelligence_bundle.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evaluations": [
         ".github/workflows/p1-reasoning-search-stop-policy.yml",
@@ -984,7 +1068,9 @@
         ".github/workflows/p1-reasoning-search-stop-policy.yml",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944"
       ],
       "risks": [
         "unbounded reasoning loops",
@@ -1025,18 +1111,23 @@
       "implementation_paths": [
         "skeleton/intelligence/plan_verifier.py",
         "skeleton/ai/runtime/intelligence/plan_verifier.py",
-        "skeleton/intelligence/strategy_registry.py"
+        "skeleton/intelligence/strategy_registry.py",
+        ".github/workflows/p1-plan-verification.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "tests": [
         "skeleton/testing/test_plan_static_analyzer.py",
         "skeleton/testing/test_plan_cycles.py",
         "skeleton/testing/test_plan_simulation.py",
-        "skeleton/testing/test_plan_qualification.py"
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evaluations": [
         ".github/workflows/p1-plan-verification.yml",
         "skeleton/testing/test_plan_simulation.py",
-        "skeleton/testing/test_plan_qualification.py"
+        "skeleton/testing/test_plan_qualification.py",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "evidence": [
         "skeleton/intelligence/plan_verifier.py",
@@ -1047,7 +1138,13 @@
         ".github/workflows/p1-plan-verification.yml",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
         "https://github.com/Apeloff1/Skeleton/commit/8dc9e313566284c83b2401783015fb5638536f6e",
-        "https://github.com/Apeloff1/Skeleton/commit/54bc9871f5516ab5593754786ddb1d327fed1088"
+        "https://github.com/Apeloff1/Skeleton/commit/54bc9871f5516ab5593754786ddb1d327fed1088",
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014992325",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945672",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
       ],
       "risks": [
         "invalid plans reaching execution",
@@ -1088,19 +1185,33 @@
       ],
       "implementation_paths": [
         "skeleton/skills",
-        "planned:skeleton/tools",
-        "skeleton/automation"
+        "skeleton/automation",
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/ai/runtime/skills/privileged_transaction.py",
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/shells/isolation.py",
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tool_authorization.py",
         "skeleton/testing/test_shell_*.py",
-        "planned:skeleton/testing/test_tool_idempotency.py"
+        "skeleton/testing/test_privileged_tool_transaction.py",
+        "skeleton/testing/test_tool_runtime.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_shell_ai_isolation_sandbox.py",
+        "tests/test_governed_tool_journey.py",
+        "tests/test_tool_runtime_independent_verifier.py"
       ],
       "evaluations": [
-        "planned:tool misuse adversarial suite",
-        "planned:postcondition verification coverage"
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005732",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "tool description prompt injection",
         "shell/path/network injection",
@@ -1141,18 +1252,28 @@
         "AgentCheckpoint"
       ],
       "implementation_paths": [
-        "planned:skeleton/agents",
-        "tests/test_agent_coordination.py"
+        "tests/test_agent_coordination.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_delegation.py",
-        "planned:skeleton/testing/test_agent_checkpoint.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evaluations": [
-        "planned:agent-task completion eval",
-        "planned:authority-escalation adversarial eval"
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "authority creep",
         "orphan agents",
@@ -1193,18 +1314,28 @@
         "ConflictRecord"
       ],
       "implementation_paths": [
-        "planned:skeleton/agents/orchestrator.py",
-        "tests/test_agent_coordination.py"
+        "tests/test_agent_coordination.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_leases.py",
-        "planned:skeleton/testing/test_agent_conflicts.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evaluations": [
-        "planned:swarm coordination eval",
-        "planned:false-consensus adversarial eval"
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "false consensus",
         "deadlock/livelock",
@@ -1246,18 +1377,26 @@
         "OverrideDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/autonomy",
-        "planned:skeleton/persistence/execution_repository.py"
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/ai/agents/core/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_long_horizon_resume.py",
-        "planned:skeleton/testing/test_goal_drift.py"
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:multi-hour simulated task suite",
-        "planned:restart/recovery autonomy eval"
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005856",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "zombie work",
         "budget leakage",
@@ -1507,18 +1646,25 @@
         "PromotionProposal"
       ],
       "implementation_paths": [
-        "planned:skeleton/forge",
-        "planned:skeleton/experiments"
+        "skeleton/eval/champion_registry.py",
+        "skeleton/ai/evaluation/champion_registry.py",
+        "machine/p1_champion_registry.json",
+        "scripts/check_p1_champion_registry.py",
+        ".github/workflows/p1-champion-registry.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_forge_isolation.py",
-        "planned:skeleton/testing/test_champion_challenger.py"
+        "skeleton/testing/test_champion_registry.py",
+        "tests/test_p1_champion_registry.py"
       ],
       "evaluations": [
-        "planned:candidate quality/cost benchmark",
-        "planned:reward-hacking adversarial eval"
+        ".github/workflows/p1-champion-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096146862",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "candidate escapes sandbox",
         "metric gaming",
@@ -1559,18 +1705,25 @@
         "PromotionDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/learning",
-        "planned:skeleton/experiments"
+        "skeleton/eval/failure_knowledge.py",
+        "skeleton/ai/evaluation/failure_knowledge.py",
+        "machine/p1_failure_knowledge.json",
+        "scripts/check_p1_failure_knowledge.py",
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_learning_signal_lineage.py",
-        "planned:skeleton/testing/test_no_direct_self_modify.py"
+        "skeleton/testing/test_failure_knowledge.py",
+        "tests/test_p1_failure_knowledge.py"
       ],
       "evaluations": [
-        "planned:offline-to-online transfer eval",
-        "planned:feedback-loop stability eval"
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096149360",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "self-reinforcing bad feedback",
         "silent behavior drift",
@@ -1611,18 +1764,31 @@
         "EscalationRequest"
       ],
       "implementation_paths": [
-        "planned:skeleton/safety",
-        "skeleton/intelligence/verification_runtime.py"
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_safety_high_impact.py",
-        "planned:skeleton/testing/test_safe_degradation.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:hazard coverage review",
-        "planned:false-positive/false-negative calibration"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "overblocking legitimate tasks",
         "underblocking dangerous actions",
@@ -1774,18 +1940,35 @@
         "PolicyDecision"
       ],
       "implementation_paths": [
-        "planned:skeleton/policy",
-        "skeleton/vault/governance_audit.py"
+        "skeleton/vault/governance_audit.py",
+        "skeleton/agents/safe_autonomy.py",
+        "skeleton/ai/agents/core/safe_autonomy.py",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-safe-autonomy-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_authority_subset.py",
-        "planned:skeleton/testing/test_approval_expiry.py"
+        "skeleton/testing/test_safe_autonomy_bundle.py",
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_privileged_tool_transaction.py"
       ],
       "evaluations": [
-        "planned:policy decision consistency eval",
-        "planned:revocation propagation drill"
+        ".github/workflows/p1-safe-autonomy-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006336",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413031",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "stale grants",
         "approval fatigue",
@@ -1828,18 +2011,25 @@
       ],
       "implementation_paths": [
         "skeleton/reliability",
-        "planned:skeleton/runtime/resilience"
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "tests": [
         "skeleton/testing/test_orchestration_reliability_profiles.py",
         "skeleton/testing/test_state_reliability_profiles.py",
-        "skeleton/testing/test_api_gateway_reliability_profiles.py"
+        "skeleton/testing/test_api_gateway_reliability_profiles.py",
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evaluations": [
-        "planned:retry-storm chaos suite",
-        "planned:error-budget/SLO evaluation"
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424598",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "retry storms",
         "thundering herd",
@@ -1881,18 +2071,22 @@
         "RemoteExecutionRequest"
       ],
       "implementation_paths": [
-        "planned:skeleton/distributed",
-        "planned:skeleton/workers"
+        "skeleton/network/remote_execution.py",
+        "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_stale_lease_fencing.py",
-        "planned:skeleton/testing/test_partition_semantics.py"
+        "skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evaluations": [
-        "planned:network-partition chaos suite",
-        "planned:distributed recovery eval"
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424893",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "split brain",
         "clock/order confusion",
@@ -1934,18 +2128,22 @@
         "CapacityReservation"
       ],
       "implementation_paths": [
-        "planned:skeleton/compute",
-        "planned:skeleton/hardware"
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_resource_admission.py",
-        "planned:skeleton/testing/test_device_loss.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:capacity calibration",
-        "planned:heterogeneous-placement benchmark"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "VRAM fragmentation",
         "stale capacity",
@@ -2095,17 +2293,48 @@
       "implementation_paths": [
         "skeleton/observability",
         "tests/test_observability.py",
-        "tests/test_runtime_observability_bridge.py"
+        "tests/test_runtime_observability_bridge.py",
+        "skeleton/contracts/canonical.py",
+        "skeleton/contracts/evidence_ingestion.py",
+        "skeleton/contracts/promotion_evidence.py",
+        "scripts/emit_p1_promotion_evidence.py",
+        "scripts/ai_accountability.py",
+        "scripts/check_ai_build_accountability.py",
+        "machine/ai_build_accountability.json",
+        "machine/ai_p1_task_backlog.json",
+        ".github/workflows/p1-evidence-identity.yml",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
+        "skeleton/frontier/model_routing.py",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/quality.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
       "tests": [
         "skeleton/testing/test_frontier_observability_correlation.py",
-        "tests/test_orchestration_error_redaction.py"
+        "tests/test_orchestration_error_redaction.py",
+        "skeleton/testing/test_evidence_ingestion.py",
+        "skeleton/testing/test_promotion_evidence.py",
+        "tests/test_p1_promotion_evidence_emitter.py",
+        "tests/test_p1_accountability_materialization.py",
+        "skeleton/testing/test_routing_context_receipt.py",
+        "tests/test_model_routing.py",
+        "skeleton/testing/test_context_compiler.py"
       ],
       "evaluations": [
-        "planned:trace completeness evaluation",
-        "planned:observability overhead benchmark"
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-intel-routing-context.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199882",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199166",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716"
+      ],
       "risks": [
         "secret leakage in telemetry",
         "missing spans hide failure",
@@ -2148,17 +2377,39 @@
       "implementation_paths": [
         "eval",
         "tests",
-        "planned:skeleton/evaluation"
+        "machine/p1_reproducibility_policy.json",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/ai/runtime/contracts/reproducibility.py",
+        "scripts/check_p1_reproducibility.py",
+        "scripts/run_provenance_evidence.py",
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        "skeleton/eval/benchmark_registry.py",
+        "skeleton/ai/evaluation/benchmark_registry.py",
+        "machine/p1_benchmark_registry.json",
+        "scripts/check_p1_benchmark_registry.py",
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_eval_reproducibility.py",
-        "planned:skeleton/testing/test_benchmark_metadata.py"
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_reproducibility_bundle.py",
+        "skeleton/testing/test_benchmark_registry.py",
+        "tests/test_p1_benchmark_registry.py"
       ],
       "evaluations": [
-        "planned:baseline reproduction suite",
-        "planned:confidence-interval/stability analysis"
+        ".github/workflows/p1-reproducibility-bundle.yml",
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625",
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147549",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954538",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "benchmark cherry-picking",
         "contamination",
@@ -2202,17 +2453,27 @@
       "implementation_paths": [
         "tests/test_adversarial_engine.py",
         "tests/test_tri_adversarial_engine.py",
-        "planned:skeleton/evaluation/adversarial"
+        "machine/p1_risk_evidence_policy.json",
+        "machine/p1_risk_evidence_bindings.json",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/ai/runtime/contracts/risk_evidence.py",
+        "scripts/reconcile_p1_risk_evidence.py",
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
       "tests": [
         "tests/test_adversarial_judge_isolation.py",
-        "planned:skeleton/testing/test_adversarial_regression_promotion.py"
+        "skeleton/testing/test_risk_evidence.py",
+        "tests/test_p1_risk_evidence_reconciliation.py"
       ],
       "evaluations": [
-        "planned:attack coverage and novelty evaluation",
-        "planned:judge-correlation analysis"
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199375",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "evaluator leakage",
         "attack overfitting",
@@ -2254,17 +2515,25 @@
       ],
       "implementation_paths": [
         "skeleton/intelligence/verification_runtime.py",
-        "planned:skeleton/verification"
+        "machine/p1_required_gate_authority.json",
+        "skeleton/contracts/promotion_gates.py",
+        "skeleton/ai/runtime/contracts/promotion_gates.py",
+        "scripts/check_p1_required_gate_authority.py",
+        ".github/workflows/p1-required-gate-authority.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_verification_independence.py",
-        "planned:skeleton/testing/test_postcondition_verification.py"
+        "skeleton/testing/test_promotion_gates.py",
+        "tests/test_p1_required_gate_authority.py"
       ],
       "evaluations": [
-        "planned:verifier calibration",
-        "planned:generator-verifier correlation eval"
+        ".github/workflows/p1-required-gate-authority.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199390",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "self-confidence treated as proof",
         "correlated verifier failure",
@@ -2305,18 +2574,45 @@
         "CanonicalizationProfile"
       ],
       "implementation_paths": [
-        "planned:skeleton/provenance",
-        "machine/ai_build_accountability.json"
+        "machine/ai_build_accountability.json",
+        "skeleton/contracts/canonical.py",
+        "skeleton/contracts/evidence_ingestion.py",
+        "skeleton/contracts/promotion_evidence.py",
+        "scripts/emit_p1_promotion_evidence.py",
+        "scripts/ai_accountability.py",
+        "scripts/check_ai_build_accountability.py",
+        "machine/ai_p1_task_backlog.json",
+        ".github/workflows/p1-evidence-identity.yml",
+        "machine/p1_reproducibility_policy.json",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/ai/runtime/contracts/reproducibility.py",
+        "scripts/check_p1_reproducibility.py",
+        "scripts/run_provenance_evidence.py",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_provenance_tamper.py",
-        "planned:skeleton/testing/test_canonical_signing.py"
+        "skeleton/testing/test_evidence_ingestion.py",
+        "skeleton/testing/test_promotion_evidence.py",
+        "tests/test_p1_promotion_evidence_emitter.py",
+        "tests/test_p1_accountability_materialization.py",
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_reproducibility_bundle.py"
       ],
       "evaluations": [
-        "planned:lineage completeness evaluation",
-        "planned:tamper-evidence drill"
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199882",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+      ],
       "risks": [
         "canonicalization mismatch",
         "missing lineage edge",
@@ -2414,18 +2710,25 @@
         "backend/core/operation_stream_transport.py",
         "backend/routes/operation_stream.py",
         "frontend",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/operation_stream.py",
+        "backend/core/operation_projection.py",
+        ".github/workflows/p1-streaming-projection-authority.yml"
       ],
       "tests": [
         "backend/tests/test_operation_stream_transport.py",
         "backend/tests/test_operation_stream_route.py",
-        "planned:frontend operation reducer tests"
+        "backend/tests/test_operation_projection.py",
+        "skeleton/testing/test_operation_stream.py"
       ],
       "evaluations": [
-        "planned:disconnect/reconnect matrix",
-        "planned:slow-client/cancel-race E2E"
+        ".github/workflows/p1-streaming-projection-authority.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843241",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "risks": [
         "cursor compaction gap",
         "duplicate provisional content",
@@ -2469,17 +2772,27 @@
       "implementation_paths": [
         "backend/routes",
         "backend/core",
-        "machine/ai_runtime_schemas.json"
+        "machine/ai_runtime_schemas.json",
+        "backend/core/api_contract_registry.py",
+        "backend/core/routes_registry.py",
+        "backend/routes/operation_stream.py",
+        "machine/p1_api_contract_registry.json",
+        "scripts/check_p1_api_contract_registry.py",
+        ".github/workflows/p1-api-contract-registry.yml"
       ],
       "tests": [
-        "planned:backend/tests/test_api_contracts.py",
-        "planned:backend/tests/test_api_idempotency.py"
+        "backend/tests/test_api_contract_registry.py",
+        "tests/test_p1_api_contract_registry.py"
       ],
       "evaluations": [
-        "planned:API compatibility matrix",
-        "planned:retry/idempotency fault evaluation"
+        ".github/workflows/p1-api-contract-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087842649",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488333",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "risks": [
         "version drift",
         "ambiguous retry duplicates mutation",
@@ -2521,17 +2834,37 @@
       "implementation_paths": [
         "frontend",
         "backend/routes",
-        "planned:skeleton/product_shell"
+        "backend/core/operation_projection.py",
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "skeleton/frontier/operation_stream.py",
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        "backend/core/product_shell_projection.py",
+        "frontend/services/productProjection.ts",
+        "frontend/services/operationStreamReducer.ts",
+        ".github/workflows/p1-product-workspace-projection.yml"
       ],
       "tests": [
-        "planned:frontend product-state reducer tests",
-        "planned:backend/tests/test_product_shell_projection.py"
+        "backend/tests/test_operation_projection.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "skeleton/testing/test_operation_stream.py",
+        "backend/tests/test_product_shell_projection.py",
+        "frontend/scripts/test-product-projection.mjs",
+        "frontend/scripts/test-operation-stream-reducer.mjs"
       ],
       "evaluations": [
-        "planned:stale-client/resync E2E",
-        "planned:degraded-runtime UX evaluation"
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        ".github/workflows/p1-product-workspace-projection.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843241",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087842827",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488382"
+      ],
       "risks": [
         "UI becomes authoritative",
         "stale optimistic state",
@@ -2571,19 +2904,26 @@
         "DesktopRuntimeHandshake"
       ],
       "implementation_paths": [
-        "desktop",
-        "planned:skeleton/product/desktop",
-        "backend"
+        "backend",
+        "backend/core/tenant_storage_boundary.py",
+        "frontend/src/product/tenantStorageBoundary.ts",
+        "frontend/src/auth/gameforgeAuth.ts",
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
       "tests": [
-        "planned:desktop lifecycle tests",
-        "planned:desktop integration permission tests"
+        "backend/tests/test_tenant_storage_boundary.py",
+        "frontend/scripts/test-tenant-storage-boundary.mjs"
       ],
       "evaluations": [
-        "planned:clean-machine desktop E2E",
-        "planned:crash/update/rollback evaluation"
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087845062",
+        "github-actions-job:109087845157",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "risks": [
         "privilege leakage",
         "version skew",
@@ -2625,17 +2965,37 @@
       "implementation_paths": [
         "frontend",
         "backend/routes",
-        "planned:skeleton/product/web"
+        "backend/core/operation_projection.py",
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "skeleton/frontier/operation_stream.py",
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        "backend/core/tenant_storage_boundary.py",
+        "frontend/src/product/tenantStorageBoundary.ts",
+        "frontend/src/auth/gameforgeAuth.ts",
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
       "tests": [
-        "planned:frontend reconnect tests",
-        "planned:frontend browser-storage policy tests"
+        "backend/tests/test_operation_projection.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "skeleton/testing/test_operation_stream.py",
+        "backend/tests/test_tenant_storage_boundary.py",
+        "frontend/scripts/test-tenant-storage-boundary.mjs"
       ],
       "evaluations": [
-        "planned:refresh/reconnect E2E",
-        "planned:multi-tab concurrency evaluation"
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843241",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488267",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087845062",
+        "github-actions-job:109087845157",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639"
+      ],
       "risks": [
         "stale browser state",
         "cross-tenant cache leakage",
@@ -2677,17 +3037,43 @@
       "implementation_paths": [
         "frontend",
         "backend/core",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/operation_stream.py",
+        "backend/core/product_shell_projection.py",
+        "backend/core/operation_projection.py",
+        "frontend/services/productProjection.ts",
+        "frontend/services/operationStreamReducer.ts",
+        ".github/workflows/p1-product-workspace-projection.yml",
+        "backend/core/operator_control_projection.py",
+        "backend/core/workspace_projection.py",
+        "frontend/src/product/operatorControlProjection.ts",
+        "frontend/src/product/workspaceProjection.ts",
+        "skeleton/agents/human_control.py",
+        "skeleton/contracts/operation.py",
+        ".github/workflows/p1-operator-control-projection.yml"
       ],
       "tests": [
-        "planned:frontend long-operation state tests",
-        "planned:backend/tests/test_user_control_receipts.py"
+        "backend/tests/test_product_shell_projection.py",
+        "backend/tests/test_operation_projection.py",
+        "frontend/scripts/test-product-projection.mjs",
+        "frontend/scripts/test-operation-stream-reducer.mjs",
+        "backend/tests/test_user_control_receipts.py",
+        "backend/tests/test_workspace_projection.py",
+        "frontend/scripts/test-operator-control-projection.mjs",
+        "skeleton/testing/test_human_control.py"
       ],
       "evaluations": [
-        "planned:cancel/complete race UX evaluation",
-        "planned:reconnect progress integrity E2E"
+        ".github/workflows/p1-product-workspace-projection.yml",
+        ".github/workflows/p1-operator-control-projection.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087842827",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488382",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087843767",
+        "github-actions-job:109087844354",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488469"
+      ],
       "risks": [
         "false progress",
         "terminal-state race",
@@ -2730,17 +3116,26 @@
       "implementation_paths": [
         "skeleton/security",
         "skeleton/persistence",
-        "backend"
+        "backend",
+        "backend/core/tenant_storage_boundary.py",
+        "frontend/src/product/tenantStorageBoundary.ts",
+        "frontend/src/auth/gameforgeAuth.ts",
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_tenant_isolation.py",
-        "planned:backend/tests/test_tenant_scope.py"
+        "backend/tests/test_tenant_storage_boundary.py",
+        "frontend/scripts/test-tenant-storage-boundary.mjs"
       ],
       "evaluations": [
-        "planned:cross-tenant adversarial suite",
-        "planned:cache/index isolation evaluation"
+        ".github/workflows/p1-tenant-storage-boundary.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:b5c084b467882913f51b96c945e5eccb27a2e8c7",
+        "github-actions-job:109087845062",
+        "github-actions-job:109087845157",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36469488639",
+        "https://github.com/Apeloff1/Skeleton/commit/b5c084b467882913f51b96c945e5eccb27a2e8c7"
+      ],
       "risks": [
         "cross-tenant data leak",
         "shared cache poisoning",
@@ -2780,19 +3175,23 @@
         "InstallReceipt"
       ],
       "implementation_paths": [
-        "installer",
         "scripts",
-        "machine"
+        "machine",
+        "skeleton/release/lifecycle.py",
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
       "tests": [
-        "planned:installer/tests/test_clean_install.py",
-        "planned:installer/tests/test_install_rollback.py"
+        "skeleton/testing/test_installer_lifecycle.py"
       ],
       "evaluations": [
-        "planned:clean-machine matrix",
-        "planned:interrupted-install fault evaluation"
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "partial install",
         "unsigned/tampered artifact",
@@ -2833,19 +3232,30 @@
         "UpdateReceipt"
       ],
       "implementation_paths": [
-        "updater",
-        "installer",
-        "machine"
+        "machine",
+        "skeleton/release/lifecycle.py",
+        ".github/workflows/p1-installer-lifecycle.yml",
+        "skeleton/release/migration.py",
+        "skeleton/contracts/migration_tests.py",
+        "skeleton/ai/runtime/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
-        "planned:updater/tests/test_atomic_update.py",
-        "planned:updater/tests/test_update_rollback.py"
+        "skeleton/testing/test_installer_lifecycle.py",
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evaluations": [
-        "planned:mixed-version matrix",
-        "planned:power-loss/update interruption evaluation"
+        ".github/workflows/p1-installer-lifecycle.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086"
+      ],
       "risks": [
         "migration failure",
         "mixed-version drift",
@@ -2886,19 +3296,23 @@
         "RepairReceipt"
       ],
       "implementation_paths": [
-        "repair",
         "scripts",
-        "machine"
+        "machine",
+        "skeleton/release/lifecycle.py",
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
       "tests": [
-        "planned:repair/tests/test_diagnose_before_mutate.py",
-        "planned:repair/tests/test_repair_reconciliation.py"
+        "skeleton/testing/test_installer_lifecycle.py"
       ],
       "evaluations": [
-        "planned:corruption fault matrix",
-        "planned:repair idempotency evaluation"
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "destructive over-repair",
         "tampered repair source",
@@ -2938,19 +3352,22 @@
         "ResidualStateReport"
       ],
       "implementation_paths": [
-        "uninstaller",
-        "installer",
-        "scripts"
+        "scripts",
+        "skeleton/release/lifecycle.py",
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
       "tests": [
-        "planned:uninstaller/tests/test_retention_policy.py",
-        "planned:uninstaller/tests/test_residual_state.py"
+        "skeleton/testing/test_installer_lifecycle.py"
       ],
       "evaluations": [
-        "planned:shared-resource uninstall matrix",
-        "planned:partial-uninstall recovery evaluation"
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "user-data deletion",
         "orphaned service/secret",
@@ -3252,17 +3669,45 @@
       "implementation_paths": [
         "machine",
         "docs/plan",
-        "scripts"
+        "scripts",
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_build_accountability.json",
+        "skeleton/testing",
+        "skeleton/contracts/maturity_reconciliation.py",
+        "skeleton/ai/runtime/contracts/maturity_reconciliation.py",
+        "scripts/reconcile_p1_maturity.py",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml",
+        "machine/p1_risk_evidence_policy.json",
+        "machine/p1_risk_evidence_bindings.json",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/ai/runtime/contracts/risk_evidence.py",
+        "scripts/reconcile_p1_risk_evidence.py",
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_gap_ledger.py",
-        "planned:skeleton/testing/test_gap_closure.py"
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "skeleton/testing/test_maturity_reconciliation.py",
+        "tests/test_p1_maturity_reconciliation.py",
+        "skeleton/testing/test_risk_evidence.py",
+        "tests/test_p1_risk_evidence_reconciliation.py"
       ],
       "evaluations": [
-        "planned:orphan-gap audit",
-        "planned:duplicate-gap reconciliation evaluation"
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199519",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199375",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812"
+      ],
       "risks": [
         "orphan gaps",
         "status inflation",
@@ -3304,17 +3749,27 @@
       "implementation_paths": [
         "machine",
         "docs/plan",
-        "scripts"
+        "scripts",
+        "machine/p1_risk_evidence_policy.json",
+        "machine/p1_risk_evidence_bindings.json",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/ai/runtime/contracts/risk_evidence.py",
+        "scripts/reconcile_p1_risk_evidence.py",
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_risk_register.py",
-        "planned:skeleton/testing/test_risk_acceptance.py"
+        "skeleton/testing/test_risk_evidence.py",
+        "tests/test_p1_risk_evidence_reconciliation.py"
       ],
       "evaluations": [
-        "planned:risk-control orphan audit",
-        "planned:release-blocking risk evaluation"
+        ".github/workflows/p1-risk-evidence-binding.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199375",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "critical risk hidden by aggregate status",
         "stale risk owner",
@@ -3408,17 +3863,26 @@
       "implementation_paths": [
         ".github/workflows",
         "scripts",
-        "skeleton/testing"
+        "skeleton/testing",
+        "machine/p1_required_gate_authority.json",
+        "skeleton/contracts/promotion_gates.py",
+        "skeleton/ai/runtime/contracts/promotion_gates.py",
+        "scripts/check_p1_required_gate_authority.py",
+        ".github/workflows/p1-required-gate-authority.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_ci_contracts.py",
-        "planned:skeleton/testing/test_merge_readiness.py"
+        "skeleton/testing/test_promotion_gates.py",
+        "tests/test_p1_required_gate_authority.py"
       ],
       "evaluations": [
-        "planned:cancel/skip semantics matrix",
-        "planned:flaky-gate quarantine evaluation"
+        ".github/workflows/p1-required-gate-authority.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199390",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "false green aggregation",
         "workflow duplication congestion",
@@ -3460,17 +3924,22 @@
       "implementation_paths": [
         "scripts",
         ".github/workflows",
-        "machine"
+        "machine",
+        "skeleton/release/qualification.py",
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_release_provenance.py",
-        "planned:skeleton/testing/test_release_qualification.py"
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evaluations": [
-        "planned:rebuild reproducibility check",
-        "planned:artifact tamper verification"
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309453",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "tested/source artifact mismatch",
         "unsigned artifact",
@@ -3510,19 +3979,25 @@
         "DeploymentReceipt"
       ],
       "implementation_paths": [
-        "deploy",
         "scripts",
-        "machine"
+        "machine",
+        "skeleton/release/migration.py",
+        "skeleton/contracts/migration_tests.py",
+        "skeleton/ai/runtime/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
-        "planned:deploy/tests/test_canary_gate.py",
-        "planned:deploy/tests/test_partial_rollback.py"
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evaluations": [
-        "planned:mixed-version rollout evaluation",
-        "planned:failed-canary recovery drill"
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "incompatible mixed fleet",
         "bad health signal",
@@ -3563,18 +4038,24 @@
       ],
       "implementation_paths": [
         "pyproject.toml",
-        "config",
-        "scripts"
+        "scripts",
+        "skeleton/release/migration.py",
+        "skeleton/contracts/migration_tests.py",
+        "skeleton/ai/runtime/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_environment_specs.py",
-        "planned:skeleton/testing/test_environment_policy.py"
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evaluations": [
-        "planned:clean-env bootstrap matrix",
-        "planned:hidden dependency evaluation"
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "environment drift",
         "secret leakage",
@@ -3614,19 +4095,25 @@
         "EffectiveConfig"
       ],
       "implementation_paths": [
-        "config",
         "skeleton",
-        "backend"
+        "backend",
+        "skeleton/release/migration.py",
+        "skeleton/contracts/migration_tests.py",
+        "skeleton/ai/runtime/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_config_precedence.py",
-        "planned:skeleton/testing/test_config_validation.py"
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evaluations": [
-        "planned:unknown-key/security-default evaluation",
-        "planned:reload race evaluation"
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "silent unknown key",
         "unsafe default",
@@ -3666,19 +4153,24 @@
         "RestoreCompatibility"
       ],
       "implementation_paths": [
-        "backup",
         "skeleton/persistence",
-        "machine"
+        "machine",
+        "skeleton/release/restore.py",
+        ".github/workflows/p1-backup-restore-qualification.yml"
       ],
       "tests": [
-        "planned:backup/tests/test_backup_manifest.py",
-        "planned:backup/tests/test_backup_integrity.py"
+        "skeleton/testing/test_backup_restore_integration.py",
+        "skeleton/testing/test_backup_restore_qualification.py"
       ],
       "evaluations": [
-        "planned:restore sampling evaluation",
-        "planned:retention/deletion propagation test"
+        ".github/workflows/p1-backup-restore-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098308997",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "unrestorable backup",
         "missing authoritative state",
@@ -3718,19 +4210,29 @@
         "RecoveryDrillEvidence"
       ],
       "implementation_paths": [
-        "recovery",
-        "backup",
-        "docs"
+        "docs",
+        "skeleton/release/restore.py",
+        ".github/workflows/p1-backup-restore-qualification.yml",
+        "skeleton/release/disaster_recovery.py",
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
       "tests": [
-        "planned:recovery/tests/test_recovery_order.py",
-        "planned:recovery/tests/test_post_restore_reconcile.py"
+        "skeleton/testing/test_backup_restore_integration.py",
+        "skeleton/testing/test_backup_restore_qualification.py",
+        "skeleton/testing/test_disaster_recovery_qualification.py"
       ],
       "evaluations": [
-        "planned:full-loss DR drill",
-        "planned:recovery dependency-cycle evaluation"
+        ".github/workflows/p1-backup-restore-qualification.yml",
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098308997",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310079",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089"
+      ],
       "risks": [
         "stale authority resurrection",
         "recovery deadlock",
@@ -3773,17 +4275,22 @@
       "implementation_paths": [
         "docs",
         "scripts",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/release/disaster_recovery.py",
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_break_glass.py",
-        "planned:skeleton/testing/test_incident_evidence.py"
+        "skeleton/testing/test_disaster_recovery_qualification.py"
       ],
       "evaluations": [
-        "planned:telemetry-loss incident drill",
-        "planned:compromised-credential containment exercise"
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310079",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "persistent emergency privilege",
         "evidence loss",
@@ -3823,19 +4330,24 @@
         "ProfileArtifact"
       ],
       "implementation_paths": [
-        "benchmarks",
         "scripts",
-        "skeleton"
+        "skeleton",
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "tests": [
-        "planned:benchmarks/test_performance_contracts.py",
-        "planned:skeleton/testing/test_performance_budget_schema.py"
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evaluations": [
-        "planned:tail-latency characterization",
-        "planned:optimization correctness regression"
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424598",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "benchmark unrepresentative",
         "tail latency regression",
@@ -3875,19 +4387,24 @@
         "AdmissionThreshold"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
         "skeleton/observability",
-        "machine"
+        "machine",
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_capacity_limits.py",
-        "planned:skeleton/testing/test_admission_thresholds.py"
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evaluations": [
-        "planned:saturation/load-shed evaluation",
-        "planned:capacity forecast backtest"
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424598",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "resource exhaustion",
         "unbounded queues",
@@ -3928,18 +4445,23 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "skeleton/runtime",
-        "machine"
+        "machine",
+        "skeleton/observability/budget_accounting.py",
+        "skeleton/ai/runtime/observability/budget_accounting.py",
+        ".github/workflows/p1-budget-accounting.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cost_budget.py",
-        "planned:skeleton/testing/test_cost_attribution.py"
+        "skeleton/testing/test_budget_accounting_ledger.py"
       ],
       "evaluations": [
-        "planned:runaway-retry cost fault test",
-        "planned:quality-vs-cost evaluation"
+        ".github/workflows/p1-budget-accounting.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424353",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "unbounded spend",
         "misattributed cost",
@@ -4239,19 +4761,23 @@
         "ArtifactManifest"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
         "machine",
-        "skeleton/persistence"
+        "skeleton/persistence",
+        "skeleton/release/qualification.py",
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_artifact_manifest.py",
-        "planned:skeleton/testing/test_artifact_lifecycle.py"
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evaluations": [
-        "planned:overwrite/lineage evaluation",
-        "planned:artifact corruption recovery test"
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309453",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "lost lineage",
         "mutable overwrite",
@@ -4291,19 +4817,22 @@
         "ReachabilityRoot"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
         "skeleton/persistence",
-        "planned:skeleton/storage/cas"
+        "skeleton/release/qualification.py",
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cas_integrity.py",
-        "planned:skeleton/testing/test_cas_gc.py"
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evaluations": [
-        "planned:hash/canonicalization evaluation",
-        "planned:GC reachability fault test"
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309453",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "canonicalization mismatch",
         "live-object deletion",
@@ -4343,19 +4872,26 @@
         "ExperimentResult"
       ],
       "implementation_paths": [
-        "experiments",
-        "skeleton/evaluation",
-        "machine"
+        "machine",
+        "skeleton/eval/experiment_registry.py",
+        "skeleton/ai/evaluation/experiment_registry.py",
+        "machine/p1_experiment_registry.json",
+        "scripts/check_p1_experiment_registry.py",
+        ".github/workflows/p1-experiment-registry.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_experiment_manifest.py",
-        "planned:skeleton/testing/test_experiment_isolation.py"
+        "skeleton/testing/test_experiment_registry.py",
+        "tests/test_p1_experiment_registry.py"
       ],
       "evaluations": [
-        "planned:repeated-run reproducibility",
-        "planned:optional-stopping/p-hacking guard evaluation"
+        ".github/workflows/p1-experiment-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096150349",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954405",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "production contamination",
         "selection bias",
@@ -4397,17 +4933,45 @@
       "implementation_paths": [
         "machine",
         "scripts",
-        "skeleton/evaluation"
+        "skeleton/contracts/canonical.py",
+        "skeleton/contracts/evidence_ingestion.py",
+        "skeleton/contracts/promotion_evidence.py",
+        "scripts/emit_p1_promotion_evidence.py",
+        "scripts/ai_accountability.py",
+        "scripts/check_ai_build_accountability.py",
+        "machine/ai_build_accountability.json",
+        "machine/ai_p1_task_backlog.json",
+        ".github/workflows/p1-evidence-identity.yml",
+        "machine/p1_reproducibility_policy.json",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/ai/runtime/contracts/reproducibility.py",
+        "scripts/check_p1_reproducibility.py",
+        "scripts/run_provenance_evidence.py",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_reproducibility_record.py",
-        "planned:skeleton/testing/test_replay_recipe.py"
+        "skeleton/testing/test_evidence_ingestion.py",
+        "skeleton/testing/test_promotion_evidence.py",
+        "tests/test_p1_promotion_evidence_emitter.py",
+        "tests/test_p1_accountability_materialization.py",
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_reproducibility_bundle.py"
       ],
       "evaluations": [
-        "planned:cold-environment replay",
-        "planned:nondeterminism tolerance evaluation"
+        ".github/workflows/p1-evidence-identity.yml",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199882",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+      ],
       "risks": [
         "hidden dependency",
         "untracked seed/config",
@@ -4449,17 +5013,28 @@
       "implementation_paths": [
         "scripts",
         "skeleton/testing",
-        ".github/workflows"
+        ".github/workflows",
+        "machine/p1_reproducibility_policy.json",
+        "skeleton/contracts/reproducibility.py",
+        "skeleton/ai/runtime/contracts/reproducibility.py",
+        "scripts/check_p1_reproducibility.py",
+        "scripts/run_provenance_evidence.py",
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_quality_gate_contracts.py",
-        "planned:skeleton/testing/test_quality_waivers.py"
+        "skeleton/testing/test_reproducibility.py",
+        "tests/test_p1_reproducibility_bundle.py"
       ],
       "evaluations": [
-        "planned:mutant-defect detection evaluation",
-        "planned:gate-noise/waiver audit"
+        ".github/workflows/p1-reproducibility-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+      ],
       "risks": [
         "false confidence from static gates",
         "waiver accumulation",
@@ -4501,17 +5076,36 @@
       "implementation_paths": [
         "skeleton/testing",
         "backend/tests",
-        "frontend"
+        "frontend",
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_build_accountability.json",
+        "machine",
+        "docs/plan",
+        "scripts",
+        "skeleton/contracts/maturity_reconciliation.py",
+        "skeleton/ai/runtime/contracts/maturity_reconciliation.py",
+        "scripts/reconcile_p1_maturity.py",
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_test_architecture.py",
-        "planned:skeleton/testing/test_fixture_policy.py"
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "skeleton/testing/test_maturity_reconciliation.py",
+        "tests/test_p1_maturity_reconciliation.py"
       ],
       "evaluations": [
-        "planned:mutation score baseline",
-        "planned:flake/retry masking evaluation"
+        ".github/workflows/p1-maturity-reconciliation.yml",
+        ".github/workflows/p1-evidence-identity.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199519",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "implementation-coupled tests",
         "flake normalization",
@@ -4603,19 +5197,27 @@
         "BenchmarkResult"
       ],
       "implementation_paths": [
-        "benchmarks",
         "skeleton/eval",
-        "machine"
+        "machine",
+        "skeleton/eval/benchmark_registry.py",
+        "skeleton/ai/evaluation/benchmark_registry.py",
+        "machine/p1_benchmark_registry.json",
+        "scripts/check_p1_benchmark_registry.py",
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_benchmark_registry.py",
-        "planned:benchmark replay tests"
+        "skeleton/testing/test_benchmark_registry.py",
+        "tests/test_p1_benchmark_registry.py"
       ],
       "evaluations": [
-        "planned:baseline significance evaluation",
-        "planned:contamination probe suite"
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147549",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954538",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "benchmark leakage",
         "cherry-picked baselines",
@@ -4657,17 +5259,26 @@
       "implementation_paths": [
         "skeleton/security",
         "skeleton/eval",
-        "tests"
+        "tests",
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/ai/evaluation/regression_corpus.py",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_red_team_registry.py",
-        "planned:red-team regression conversion tests"
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py"
       ],
       "evaluations": [
-        "planned:multi-axis adversarial campaign",
-        "planned:mitigation bypass retest"
+        ".github/workflows/p1-regression-corpus.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147873",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "unsafe campaign execution",
         "untracked finding",
@@ -4709,17 +5320,29 @@
       "implementation_paths": [
         "skeleton/ai",
         "skeleton/security",
-        "backend"
+        "backend",
+        "skeleton/agents/human_control.py",
+        "skeleton/ai/agents/core/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-human-control.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_human_control.py",
-        "planned:skeleton/testing/test_revocation_propagation.py"
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:late-cancel race evaluation",
-        "planned:revocation-under-partition drill"
+        ".github/workflows/p1-human-control.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006960",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "approval bypass",
         "stale authority after revocation",
@@ -8652,15 +9275,32 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/ai/runtime/skills/privileged_transaction.py",
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/shells/isolation.py",
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_sandbox_runtime.py"
+        "skeleton/testing/test_privileged_tool_transaction.py",
+        "skeleton/testing/test_tool_runtime.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_shell_ai_isolation_sandbox.py",
+        "tests/test_governed_tool_journey.py",
+        "tests/test_tool_runtime_independent_verifier.py"
       ],
       "evaluations": [
-        "planned:escape/resource-exhaustion campaign"
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005732",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "sandbox escape",
         "host resource denial"
@@ -8699,15 +9339,32 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "machine"
+        "machine",
+        "skeleton/skills/privileged_transaction.py",
+        "skeleton/ai/runtime/skills/privileged_transaction.py",
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/shells/isolation.py",
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_policy_language.py"
+        "skeleton/testing/test_privileged_tool_transaction.py",
+        "skeleton/testing/test_tool_runtime.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_shell_ai_isolation_sandbox.py",
+        "tests/test_governed_tool_journey.py",
+        "tests/test_tool_runtime_independent_verifier.py"
       ],
       "evaluations": [
-        "planned:policy ambiguity/fuzz suite"
+        ".github/workflows/p1-privileged-tool-transaction.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005732",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "ambiguous policy",
         "model-generated authority"
@@ -8840,15 +9497,31 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_ai_threat_controls.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:prompt/memory/tool injection campaign"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "indirect injection",
         "memory poisoning"
@@ -8934,15 +9607,31 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/network"
+        "skeleton/network",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_zero_trust_internal.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:stolen-token/lateral movement evaluation"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "ambient authority",
         "stale service token"
@@ -10391,15 +11080,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai/agents",
-        "skeleton/network"
+        "skeleton/network",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_communication.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evaluations": [
-        "planned:reorder/duplicate message evaluation"
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "spoofed agent identity",
         "message replay"
@@ -10438,15 +11140,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai/agents",
-        "machine"
+        "machine",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_agent_handoff.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evaluations": [
-        "planned:missing-context handoff evaluation"
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "authority amplification",
         "lost context"
@@ -10579,15 +11294,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai/agents",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/ai/agents/core/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_delegation_budgets.py"
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_swarm_exact_lease_atomicity.py",
+        "skeleton/testing/test_swarm_fencing.py",
+        "skeleton/testing/test_swarm_fencing_concurrency.py"
       ],
       "evaluations": [
-        "planned:recursive fanout stress"
+        ".github/workflows/p1-agent-delegation-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006805",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "delegation explosion",
         "orphan child work"
@@ -10673,15 +11401,31 @@
       ],
       "implementation_paths": [
         "skeleton/ai/agents",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_adversarial_reviewer.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:known-defect detection benchmark"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "reviewer collusion",
         "unactionable criticism"
@@ -10720,15 +11464,41 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "machine/ai_build_accountability.json"
+        "machine/ai_build_accountability.json",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml",
+        "skeleton/agents/safe_autonomy.py",
+        "skeleton/ai/agents/core/safe_autonomy.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/skills/privileged_transaction.py",
+        ".github/workflows/p1-safe-autonomy-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_independent_verifier.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_safe_autonomy_bundle.py",
+        "skeleton/testing/test_privileged_tool_transaction.py"
       ],
       "evaluations": [
-        "planned:tampered-evidence verification"
+        ".github/workflows/p1-blast-radius-alignment.yml",
+        ".github/workflows/p1-safe-autonomy-bundle.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006336",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413031"
+      ],
       "risks": [
         "self-verification",
         "rubber-stamp approval"
@@ -12600,15 +13370,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_uncertainty_representation.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evaluations": [
-        "planned:calibration evaluation"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "risks": [
         "false precision",
         "uncertainty dropped in summaries"
@@ -12741,15 +13524,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/retrieval"
+        "skeleton/retrieval",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_search_strategy_engine.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evaluations": [
-        "planned:strategy baseline comparison"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "risks": [
         "unbounded search",
         "source scope violation"
@@ -12788,15 +13584,28 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_value_of_information.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evaluations": [
-        "planned:decision-efficiency evaluation"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+      ],
       "risks": [
         "bad confidence model",
         "VOI bypasses policy"
@@ -12835,10 +13644,15 @@
       ],
       "implementation_paths": [
         "skeleton/intelligence/strategy_registry.py",
-        "skeleton/ai/runtime/intelligence/strategy_registry.py"
+        "skeleton/ai/runtime/intelligence/strategy_registry.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/cognition.py",
+        ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "tests": [
-        "skeleton/testing/test_reasoning_strategy_registry.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_cognition_control.py",
+        "skeleton/testing/test_jeeves_rational_metareasoning.py"
       ],
       "evaluations": [
         ".github/workflows/p1-reasoning-search-stop-policy.yml"
@@ -12849,7 +13663,9 @@
         ".github/workflows/p1-reasoning-search-stop-policy.yml",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
+        "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "github-actions-job:108726229944"
       ],
       "risks": [
         "never-ending work",
@@ -12886,10 +13702,13 @@
       ],
       "implementation_paths": [
         "skeleton/intelligence/output_quality.py",
-        "skeleton/ai/runtime/intelligence/output_quality.py"
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "tests": [
-        "skeleton/testing/test_answer_artifact_quality.py"
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evaluations": [
         ".github/workflows/p1-answer-artifact-quality.yml",
@@ -12946,10 +13765,13 @@
       ],
       "implementation_paths": [
         "skeleton/intelligence/output_quality.py",
-        "skeleton/ai/runtime/intelligence/output_quality.py"
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "tests": [
-        "skeleton/testing/test_answer_artifact_quality.py"
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evaluations": [
         ".github/workflows/p1-answer-artifact-quality.yml",
@@ -13006,15 +13828,29 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "frontend"
+        "frontend",
+        "skeleton/agents/human_control.py",
+        "skeleton/ai/agents/core/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-human-control.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_human_in_loop_gates.py"
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:stale-approval race evaluation"
+        ".github/workflows/p1-human-control.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006960",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "rubber-stamp fatigue",
         "approval reused after change"
@@ -13053,15 +13889,31 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_reversibility_classification.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:misclassification challenge"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "irreversible action labeled reversible",
         "compensation untested"
@@ -13100,15 +13952,31 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_blast_radius_model.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:dependency-impact benchmark"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "underestimated impact",
         "stale topology"
@@ -13147,15 +14015,31 @@
       ],
       "implementation_paths": [
         "skeleton/ai/build",
-        "machine"
+        "machine",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_changeset_budgeting.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:scope-creep evaluation"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "large hidden rewrite",
         "gaming file-count budget"
@@ -15920,15 +16804,27 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/security"
+        "skeleton/security",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/ai/agents/core/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_autonomy_levels.py"
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:level boundary evaluation"
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005856",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "implicit autonomy creep",
         "confusing capability with authority"
@@ -16014,15 +16910,27 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/ai/agents/core/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_autonomy_deescalation.py"
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:revocation-during-action evaluation"
+        ".github/workflows/p1-autonomy-deescalation.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064005856",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412846",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "child work keeps privilege",
         "de-escalation loses state"
@@ -16061,15 +16969,29 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/agents/human_control.py",
+        "skeleton/ai/agents/core/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-human-control.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_human_override_plane.py"
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:override-under-load evaluation"
+        ".github/workflows/p1-human-control.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006960",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "override blocked by congested data plane",
         "child authority persists"
@@ -16107,16 +17029,29 @@
         "InterruptOutcome"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/agents/human_control.py",
+        "skeleton/ai/agents/core/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/agents/delegation_qualification.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-human-control.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_interrupt_handling.py"
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:interrupt-at-every-step campaign"
+        ".github/workflows/p1-human-control.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006960",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462413272",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "half-written state",
         "cancel reported before effect stops"
@@ -16155,15 +17090,31 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_goal_drift_detector.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:long-horizon drift benchmark"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "false positive freezes work",
         "subtle drift missed"
@@ -16202,15 +17153,42 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "benchmarks"
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml",
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/ai/evaluation/regression_corpus.py",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_specification_gaming.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py",
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py"
       ],
       "evaluations": [
-        "planned:reward/proxy gaming suite"
+        ".github/workflows/p1-blast-radius-alignment.yml",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147873",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "tests teach exact exploits only",
         "intent not measurable"
@@ -16249,15 +17227,31 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/agents/blast_radius.py",
+        "skeleton/ai/agents/core/blast_radius.py",
+        "skeleton/agents/human_control.py",
+        "skeleton/agents/autonomy_control.py",
+        "skeleton/contracts/risk_evidence.py",
+        "skeleton/agents/__init__.py",
+        "skeleton/ai/agents/core/__init__.py",
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_plan_execution_alignment.py"
+        "skeleton/testing/test_blast_radius_alignment.py",
+        "skeleton/testing/test_human_control.py",
+        "skeleton/testing/test_autonomy_deescalation.py",
+        "skeleton/testing/test_agent_delegation_qualification.py"
       ],
       "evaluations": [
-        "planned:injected deviation evaluation"
+        ".github/workflows/p1-blast-radius-alignment.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "github-actions-job:109064006200",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36462412966",
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+      ],
       "risks": [
         "unplanned side effects",
         "plan says done without action evidence"
@@ -17943,18 +18937,31 @@
         "skeleton/ai",
         "skeleton/persistence",
         "skeleton/memory/reconciliation.py",
-        "skeleton/persistence/memory_repository.py"
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_gc.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py"
       ],
       "evaluations": [
-        "planned:GC resurrection/retention evaluation"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "evidence": [
         "skeleton/memory/reconciliation.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
       ],
       "risks": [
         "useful memory deleted",
@@ -17995,18 +19002,49 @@
       "implementation_paths": [
         "skeleton/eval",
         "skeleton/ai",
-        "skeleton/memory/reconciliation.py"
+        "skeleton/memory/reconciliation.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+        "skeleton/intelligence/core_intelligence.py",
+        "skeleton/ai/runtime/intelligence/core_intelligence.py",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/intelligence/plan_verifier.py",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_quality.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py",
+        "skeleton/testing/test_routing_context_receipt.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_core_intelligence_bundle.py"
       ],
       "evaluations": [
-        "planned:stale/false-memory benchmark"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml"
       ],
       "evidence": [
         "skeleton/memory/reconciliation.py",
-        "tests/test_memory_reconciliation.py"
+        "tests/test_memory_reconciliation.py",
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140",
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b"
       ],
       "risks": [
         "self-confirming memory",
@@ -18046,15 +19084,31 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/intelligence/quality.py",
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_interference.py"
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "tests/test_memory_reconciliation.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_retrieval_freshness.py"
       ],
       "evaluations": [
-        "planned:cross-project contamination suite"
+        ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "github-actions-job:108732888770",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36359213635",
+        "https://github.com/Apeloff1/Skeleton/commit/939c0a139cfde0cdf18f16e5adb40d2c43a4bbdb",
+        "https://github.com/Apeloff1/Skeleton/commit/fb6b42094c41139d866ebbbdce402f51af7dd140"
+      ],
       "risks": [
         "memory bleed",
         "poisoned instruction persistence"
@@ -18344,15 +19398,50 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "benchmarks"
+        "skeleton/intelligence/output_quality.py",
+        "skeleton/ai/runtime/intelligence/output_quality.py",
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        "skeleton/intelligence/core_intelligence.py",
+        "skeleton/ai/runtime/intelligence/core_intelligence.py",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/intelligence/plan_verifier.py",
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/ai/evaluation/regression_corpus.py",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_reasoning_regressions.py"
+        "skeleton/testing/test_answer_artifact_quality.py",
+        "skeleton/testing/test_core_intelligence_bundle.py",
+        "skeleton/testing/test_routing_context_receipt.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_plan_qualification.py",
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py"
       ],
       "evaluations": [
-        "planned:strategy mutation suite"
+        ".github/workflows/p1-answer-artifact-quality.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "github-actions-job:109014996463",
+        "github-actions-job:109014994255",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945816",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36447945487",
+        "https://github.com/Apeloff1/Skeleton/commit/0338bd4519e33e574ced4705b414f4b7345b4a7b",
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147873",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "benchmark overfit",
         "nondeterminism noise"
@@ -18391,14 +19480,27 @@
       ],
       "implementation_paths": [
         "skeleton/intelligence/plan_verifier.py",
-        "skeleton/ai/runtime/intelligence/plan_verifier.py"
+        "skeleton/ai/runtime/intelligence/plan_verifier.py",
+        ".github/workflows/p1-plan-verification.yml",
+        ".github/workflows/p1-core-intelligence-bundle.yml",
+        "skeleton/intelligence/core_intelligence.py",
+        "skeleton/ai/runtime/intelligence/core_intelligence.py",
+        "skeleton/intelligence/routing_context_receipt.py",
+        "skeleton/intelligence/memory_retrieval_quality.py",
+        "skeleton/intelligence/strategy_registry.py",
+        "skeleton/intelligence/output_quality.py"
       ],
       "tests": [
         "skeleton/testing/test_plan_static_analyzer.py",
         "skeleton/testing/test_plan_cycles.py",
         "skeleton/testing/test_plan_simulation.py",
         "skeleton/testing/test_plan_qualification.py",
-        "skeleton/testing/test_plan_execution_admission.py"
+        "skeleton/testing/test_plan_execution_admission.py",
+        "skeleton/testing/test_core_intelligence_bundle.py",
+        "skeleton/testing/test_routing_context_receipt.py",
+        "skeleton/testing/test_memory_retrieval_knowledge_quality.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "skeleton/testing/test_answer_artifact_quality.py"
       ],
       "evaluations": [
         ".github/workflows/p1-plan-verification.yml",
@@ -18929,15 +20031,23 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/network"
+        "skeleton/network",
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_inference_control_plane.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:leader/partition evaluation"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "split brain",
         "stale routing"
@@ -18975,16 +20085,23 @@
         "ReplicaAssignment"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_placement.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:heterogeneous cluster benchmark"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "OOM placement",
         "correlated replica failure"
@@ -19116,16 +20233,23 @@
         "WarmupEvidence"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_model_warming.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:cold-start benchmark"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "wasted memory",
         "warmup overload"
@@ -19163,16 +20287,24 @@
         "BatchSchedule"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/mesh/batching_autoscaling.py",
+        "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py",
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_continuous_batching.py"
+        "skeleton/testing/test_continuous_batching.py",
+        "skeleton/testing/test_inference_autoscaling.py"
       ],
       "evaluations": [
-        "planned:throughput/tail-latency benchmark"
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102423944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "head-of-line blocking",
         "cross-tenant leakage"
@@ -19351,16 +20483,24 @@
         "ScaleDecision"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/mesh/batching_autoscaling.py",
+        "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py",
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_inference_autoscaling.py"
+        "skeleton/testing/test_continuous_batching.py",
+        "skeleton/testing/test_inference_autoscaling.py"
       ],
       "evaluations": [
-        "planned:burst/oscillation simulation"
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102423944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "scale thrash",
         "late scale-up"
@@ -19398,16 +20538,23 @@
         "LoadResult"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_inference_load_profiles.py"
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evaluations": [
-        "planned:saturation/long-context benchmark"
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424598",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "unrepresentative load",
         "load test destabilizes shared env"
@@ -19445,16 +20592,23 @@
         "HardwareTopology"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "machine"
+        "machine",
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_hardware_topology.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:topology discovery validation"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "stale topology",
         "device misidentification"
@@ -19681,15 +20835,22 @@
       ],
       "implementation_paths": [
         "skeleton/network",
-        "skeleton/runtime"
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_network_topology_awareness.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:degraded-link simulation"
+        ".github/workflows/p1-model-placement.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "oversubscribed link",
         "zone failure correlation"
@@ -19728,15 +20889,23 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/network"
+        "skeleton/network",
+        "skeleton/network/remote_execution.py",
+        "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_remote_execution_protocol.py"
+        "skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evaluations": [
-        "planned:worker-loss/replay evaluation"
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424893",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "stale worker executes",
         "result spoofing"
@@ -19775,15 +20944,22 @@
       ],
       "implementation_paths": [
         "skeleton/security",
-        "skeleton/runtime"
+        "skeleton/network/remote_execution.py",
+        "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_worker_attestation.py"
+        "skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evaluations": [
-        "planned:tampered worker evaluation"
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424893",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "forged attestation",
         "stale trusted worker"
@@ -19962,16 +21138,23 @@
         "QuotaUsage"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/observability/budget_accounting.py",
+        "skeleton/ai/runtime/observability/budget_accounting.py",
+        ".github/workflows/p1-budget-accounting.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_compute_quotas.py"
+        "skeleton/testing/test_budget_accounting_ledger.py"
       ],
       "evaluations": [
-        "planned:quota exhaustion/recovery evaluation"
+        ".github/workflows/p1-budget-accounting.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424353",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "quota bypass",
         "leaked reservation"
@@ -20010,15 +21193,23 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "skeleton/persistence"
+        "skeleton/persistence",
+        "skeleton/observability/budget_accounting.py",
+        "skeleton/ai/runtime/observability/budget_accounting.py",
+        ".github/workflows/p1-budget-accounting.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_budget_accounting_ledger.py"
+        "skeleton/testing/test_budget_accounting_ledger.py"
       ],
       "evaluations": [
-        "planned:double-charge/reconciliation evaluation"
+        ".github/workflows/p1-budget-accounting.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424353",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "accounting drift",
         "negative budget race"
@@ -20057,15 +21248,24 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/observability/forecasting.py",
+        "skeleton/ai/runtime/observability/forecasting.py",
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_forecasting_engine.py"
+        "skeleton/testing/test_forecasting_engine.py",
+        "skeleton/testing/test_cost_anomaly_detection.py"
       ],
       "evaluations": [
-        "planned:historical forecast backtest"
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424052",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "bad forecast drives overprovisioning",
         "uncertainty ignored"
@@ -20104,15 +21304,24 @@
       ],
       "implementation_paths": [
         "skeleton/observability",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/observability/forecasting.py",
+        "skeleton/ai/runtime/observability/forecasting.py",
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cost_anomaly_detection.py"
+        "skeleton/testing/test_forecasting_engine.py",
+        "skeleton/testing/test_cost_anomaly_detection.py"
       ],
       "evaluations": [
-        "planned:seeded anomaly evaluation"
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424052",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "risks": [
         "false alarm fatigue",
         "slow leak missed"
@@ -20244,16 +21453,25 @@
         "AttributionBundle"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "docs"
+        "docs",
+        "skeleton/release/attribution.py",
+        "machine/p1_release_attribution.json",
+        "scripts/check_p1_release_attribution.py",
+        ".github/workflows/p1-release-attribution.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_attribution_engine.py"
+        "skeleton/testing/test_release_attribution.py",
+        "tests/test_p1_release_attribution.py"
       ],
       "evaluations": [
-        "planned:provenance-to-attribution audit"
+        ".github/workflows/p1-release-attribution.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309784",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598091",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "risks": [
         "missing required notice",
         "false attribution"
@@ -20480,15 +21698,23 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/eval/shadow_traffic.py",
+        "skeleton/ai/evaluation/shadow_traffic.py",
+        ".github/workflows/p1-shadow-traffic-isolation.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_shadow_traffic.py"
+        "skeleton/testing/test_shadow_traffic.py"
       ],
       "evaluations": [
-        "planned:shadow isolation evaluation"
+        ".github/workflows/p1-shadow-traffic-isolation.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147623",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954568",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "candidate side effect leaks",
         "non-comparable traffic"
@@ -20527,15 +21753,26 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/eval/champion_registry.py",
+        "skeleton/ai/evaluation/champion_registry.py",
+        "machine/p1_champion_registry.json",
+        "scripts/check_p1_champion_registry.py",
+        ".github/workflows/p1-champion-registry.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_champion_challenger_registry.py"
+        "skeleton/testing/test_champion_registry.py",
+        "tests/test_p1_champion_registry.py"
       ],
       "evaluations": [
-        "planned:promotion/reversion evaluation"
+        ".github/workflows/p1-champion-registry.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096146862",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "benchmark gaming",
         "candidate overwrites champion"
@@ -20715,15 +21952,26 @@
       ],
       "implementation_paths": [
         "machine",
-        "docs/plan"
+        "docs/plan",
+        "skeleton/eval/failure_knowledge.py",
+        "skeleton/ai/evaluation/failure_knowledge.py",
+        "machine/p1_failure_knowledge.json",
+        "scripts/check_p1_failure_knowledge.py",
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_knowledge_of_failure.py"
+        "skeleton/testing/test_failure_knowledge.py",
+        "tests/test_p1_failure_knowledge.py"
       ],
       "evaluations": [
-        "planned:failure-to-regression trace audit"
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096149360",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "risks": [
         "same failure repeated",
         "anecdote becomes dogma"
@@ -20762,15 +22010,28 @@
       ],
       "implementation_paths": [
         "machine/ai_master_plan.json",
-        "docs/plan"
+        "docs/plan",
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_build_accountability.json",
+        "machine/ai_scope_freeze_adrs.json",
+        "scripts/check_ai_scope_freeze.py",
+        ".github/workflows/p1-scope-freeze.yml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_architecture_scope_freeze.py"
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py",
+        "skeleton/testing/test_architecture_scope_freeze.py"
       ],
       "evaluations": [
-        "planned:scope-creep mutation evaluation"
+        ".github/workflows/p1-scope-freeze.yml"
       ],
-      "evidence": [],
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034204451",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "risks": [
         "breadth inflation",
         "misfit requirement forced into wrong volume"

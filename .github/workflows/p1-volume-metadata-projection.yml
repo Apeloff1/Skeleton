@@ -1,0 +1,152 @@
+name: P1 Volume Metadata Projection Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_volume_metadata.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "tests/test_p1_volume_metadata_projection.py"
+      - ".github/workflows/p1-volume-metadata-projection.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_volume_metadata.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "tests/test_p1_volume_metadata_projection.py"
+      - ".github/workflows/p1-volume-metadata-projection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-volume-metadata-projection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate non-authoritative P1 volume metadata projection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile projection and maturity engines
+        run: |
+          set -euo pipefail
+          python -m py_compile             scripts/reconcile_p1_volume_metadata.py             scripts/reconcile_p1_maturity.py             skeleton/contracts/maturity_reconciliation.py
+
+      - name: Assert volume metadata projection is current
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-volume-metadata
+          python scripts/reconcile_p1_volume_metadata.py             --check             --report .p1-volume-metadata/projection.json
+
+      - name: Validate canonical masterplan
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run projection and maturity regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_volume_metadata_projection.py
+          tests/test_p1_maturity_reconciliation.py
+          skeleton/testing/test_maturity_reconciliation.py
+
+      - name: Reconcile full P1 primary frontier
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_maturity.py             --out .p1-volume-metadata/maturity-report.json
+
+      - name: Assert metadata-only closure boundary
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-volume-metadata/maturity-report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["volume_count"] != 107:
+              raise SystemExit("P1 primary frontier count drift")
+          if report["target_floor_eligible_count"] != 3:
+              raise SystemExit(
+                  "metadata projection unexpectedly changed maturity eligibility"
+              )
+
+          forbidden = (
+              "must contain materialized references",
+              "contains unresolved repository references",
+          )
+          for row in report["records"]:
+              target = next(
+                  item
+                  for item in row["evaluations"]
+                  if item["state"] == row["target_floor"]
+              )
+              for blocker in target["blockers"]:
+                  if any(marker in blocker for marker in forbidden):
+                      raise SystemExit(
+                          f"{row['volume_key']}: unresolved metadata blocker: "
+                          f"{blocker}"
+                      )
+
+          eligible = {
+              row["volume_key"]
+              for row in report["records"]
+              if row["target_floor_eligible"] is True
+          }
+          if eligible != {"VOL-013", "VOL-014", "VOL-253"}:
+              raise SystemExit(
+                  "metadata-only projection changed target-floor set: "
+                  + ",".join(sorted(eligible))
+              )
+          print(
+              "P1 metadata-only closure OK:",
+              report["volume_count"],
+              report["target_floor_eligible_count"],
+              report["report_digest"],
+          )
+          PY
