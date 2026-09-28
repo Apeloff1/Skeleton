@@ -5,6 +5,26 @@ This package is additive. Hidden network-command classification lives in
 is a sibling concern and is not defined here.
 """
 
+from skeleton.build.remote_build import (
+    REMOTE_BUILD_ALGORITHM,
+    REMOTE_BUILD_SCHEMA,
+    ArtifactTransferManifest,
+    RemoteArtifactRef,
+    RemoteBuildError,
+    RemoteBuildJob,
+    RemoteBuildPlan,
+    RemoteExecutionSpec,
+    RemoteJobReceipt,
+    TransferChunk,
+    VerifiedRemoteReceipt,
+    build_remote_plan,
+    build_transfer_manifest,
+    resume_missing_chunks,
+    toolchain_manifest_digest,
+    verify_remote_receipt,
+    verify_transfer_chunks,
+)
+
 from skeleton.build.incremental_graph import (
     FINGERPRINT_ALGORITHM,
     GRAPH_SCHEMA,
@@ -36,6 +56,23 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "verify_transfer_chunks",
+    "verify_remote_receipt",
+    "toolchain_manifest_digest",
+    "resume_missing_chunks",
+    "build_transfer_manifest",
+    "build_remote_plan",
+    "VerifiedRemoteReceipt",
+    "TransferChunk",
+    "RemoteJobReceipt",
+    "RemoteExecutionSpec",
+    "RemoteBuildPlan",
+    "RemoteBuildJob",
+    "RemoteBuildError",
+    "RemoteArtifactRef",
+    "ArtifactTransferManifest",
+    "REMOTE_BUILD_SCHEMA",
+    "REMOTE_BUILD_ALGORITHM",
     "build_incremental_graph",
     "NodeSpec",
     "IncrementalGraphError",
