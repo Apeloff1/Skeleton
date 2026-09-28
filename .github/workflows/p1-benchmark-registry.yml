@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/benchmark_registry.py"
       - "skeleton/ai/evaluation/benchmark_registry.py"
       - "skeleton/eval/experiment_registry.py"
@@ -21,6 +22,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/benchmark_registry.py"
       - "skeleton/ai/evaluation/benchmark_registry.py"
       - "skeleton/eval/experiment_registry.py"

@@ -1745,7 +1745,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096150349",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954405",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1756,13 +1761,15 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "experiments",
-        "skeleton/evaluation",
-        "machine"
+        "skeleton/eval/experiment_registry.py",
+        "skeleton/ai/evaluation/experiment_registry.py",
+        "machine/p1_experiment_registry.json",
+        "scripts/check_p1_experiment_registry.py",
+        ".github/workflows/p1-experiment-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_experiment_manifest.py",
-        "planned:skeleton/testing/test_experiment_isolation.py"
+        "skeleton/testing/test_experiment_registry.py",
+        "tests/test_p1_experiment_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1804,7 +1811,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147549",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954538",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1815,18 +1827,15 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "skeleton/eval",
-        "machine",
-        "eval",
-        "tests",
-        "planned:skeleton/evaluation"
+        "skeleton/eval/benchmark_registry.py",
+        "skeleton/ai/evaluation/benchmark_registry.py",
+        "machine/p1_benchmark_registry.json",
+        "scripts/check_p1_benchmark_registry.py",
+        ".github/workflows/p1-benchmark-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_benchmark_registry.py",
-        "planned:benchmark replay tests",
-        "planned:skeleton/testing/test_eval_reproducibility.py",
-        "planned:skeleton/testing/test_benchmark_metadata.py"
+        "skeleton/testing/test_benchmark_registry.py",
+        "tests/test_p1_benchmark_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1867,7 +1876,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096146862",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954486",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1878,15 +1892,15 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "planned:skeleton/forge",
-        "planned:skeleton/experiments",
-        "machine",
-        "skeleton/eval"
+        "skeleton/eval/champion_registry.py",
+        "skeleton/ai/evaluation/champion_registry.py",
+        "machine/p1_champion_registry.json",
+        "scripts/check_p1_champion_registry.py",
+        ".github/workflows/p1-champion-registry.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_forge_isolation.py",
-        "planned:skeleton/testing/test_champion_challenger.py",
-        "planned:skeleton/testing/test_champion_challenger_registry.py"
+        "skeleton/testing/test_champion_registry.py",
+        "tests/test_p1_champion_registry.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1927,7 +1941,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147623",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954568",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1938,11 +1957,12 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval/shadow_traffic.py",
+        "skeleton/ai/evaluation/shadow_traffic.py",
+        ".github/workflows/p1-shadow-traffic-isolation.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_shadow_traffic.py"
+        "skeleton/testing/test_shadow_traffic.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -1984,7 +2004,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096147873",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954790",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -1995,16 +2020,15 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "skeleton/eval",
-        "benchmarks",
-        "skeleton/security",
-        "tests"
+        "skeleton/eval/regression_corpus.py",
+        "skeleton/ai/evaluation/regression_corpus.py",
+        "machine/p1_regression_corpus.json",
+        "scripts/check_p1_regression_corpus.py",
+        ".github/workflows/p1-regression-corpus.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_specification_gaming.py",
-        "planned:skeleton/testing/test_reasoning_regressions.py",
-        "planned:skeleton/testing/test_red_team_registry.py",
-        "planned:red-team regression conversion tests"
+        "skeleton/testing/test_regression_corpus.py",
+        "tests/test_p1_regression_corpus.py"
       ],
       "evidence_modes": [
         "benchmark",
@@ -2044,7 +2068,12 @@
         "Candidate/evaluation isolation and reproducibility tests pass without self-promotion.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "github-actions-job:109096149360",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36471954446",
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+      ],
       "accountability_ref": "ACC-P1-LEARN-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2055,15 +2084,15 @@
         "WP-W28"
       ],
       "implementation_paths": [
-        "machine",
-        "docs/plan",
-        "planned:skeleton/learning",
-        "planned:skeleton/experiments"
+        "skeleton/eval/failure_knowledge.py",
+        "skeleton/ai/evaluation/failure_knowledge.py",
+        "machine/p1_failure_knowledge.json",
+        "scripts/check_p1_failure_knowledge.py",
+        ".github/workflows/p1-failure-knowledge.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_knowledge_of_failure.py",
-        "planned:skeleton/testing/test_learning_signal_lineage.py",
-        "planned:skeleton/testing/test_no_direct_self_modify.py"
+        "skeleton/testing/test_failure_knowledge.py",
+        "tests/test_p1_failure_knowledge.py"
       ],
       "evidence_modes": [
         "benchmark",
