@@ -2881,7 +2881,7 @@
       ],
       "objective": "Independently verify all P1 evidence and record signed promotion or explicit rejection without self-certification.",
       "acceptance": [
-        "Promotion is exact-head, independently verified, signed, and leaves deferred 357-volume work visible.",
+        "Promotion is exact-head, independently verified, signed, and leaves the canonical deferred-volume work visible.",
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],

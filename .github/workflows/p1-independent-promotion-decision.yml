@@ -1,0 +1,372 @@
+name: P1 Independent Promotion Decision Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/contracts/p1_promotion_decision.py"
+      - "skeleton/ai/runtime/contracts/p1_promotion_decision.py"
+      - "skeleton/contracts/p1_failure_journeys.py"
+      - "machine/p1_promotion_decision_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/check_p1_promotion_decision_policy.py"
+      - "scripts/build_p1_promotion_intent.py"
+      - "scripts/verify_p1_promotion_signature.py"
+      - "scripts/finalize_p1_promotion_decision.py"
+      - "scripts/build_p1_terminal_failure_journeys.py"
+      - "skeleton/testing/test_p1_promotion_decision.py"
+      - "tests/test_p1_promotion_decision_policy.py"
+      - ".github/workflows/p1-independent-promotion-decision.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/prom-02-terminal-failure-journeys-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/p1_promotion_decision.py"
+      - "skeleton/ai/runtime/contracts/p1_promotion_decision.py"
+      - "skeleton/contracts/p1_failure_journeys.py"
+      - "machine/p1_promotion_decision_policy.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/check_p1_promotion_decision_policy.py"
+      - "scripts/build_p1_promotion_intent.py"
+      - "scripts/verify_p1_promotion_signature.py"
+      - "scripts/finalize_p1_promotion_decision.py"
+      - "scripts/build_p1_terminal_failure_journeys.py"
+      - "skeleton/testing/test_p1_promotion_decision.py"
+      - "tests/test_p1_promotion_decision_policy.py"
+      - ".github/workflows/p1-independent-promotion-decision.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-independent-promotion-decision-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate independent terminal promotion decision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      RUN_IDENTITY: "${{ github.run_id }}"
+      RUN_ATTEMPT: "${{ github.run_attempt }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install terminal promotion runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "pytest>=8,<9"
+
+      - name: Compile PROM-02/PROM-03 contracts and tooling
+        run: >-
+          python -m compileall -q
+          skeleton/contracts/p1_failure_journeys.py
+          skeleton/contracts/p1_promotion_decision.py
+          skeleton/ai/runtime/contracts/p1_failure_journeys.py
+          skeleton/ai/runtime/contracts/p1_promotion_decision.py
+          scripts/build_p1_terminal_failure_journeys.py
+          scripts/check_p1_promotion_decision_policy.py
+          scripts/build_p1_promotion_intent.py
+          scripts/verify_p1_promotion_signature.py
+          scripts/finalize_p1_promotion_decision.py
+
+      - name: Validate terminal promotion policies
+        run: |
+          python scripts/check_p1_terminal_evidence_policy.py --print-summary
+          python scripts/check_p1_terminal_failure_journeys.py --print-summary
+          python scripts/check_p1_promotion_decision_policy.py --print-summary
+
+      - name: Run PROM-02/PROM-03 mutations
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_p1_failure_journeys.py
+          python -m pytest -q --noconftest skeleton/testing/test_p1_promotion_decision.py
+          python -m pytest -q --noconftest tests/test_p1_terminal_failure_journeys_policy.py
+          python -m pytest -q --noconftest tests/test_p1_promotion_decision_policy.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
+
+      - name: Rebuild exact-head PROM-01 and PROM-02
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-prom-03
+          python scripts/reconcile_p1_maturity.py \
+            --out .p1-prom-03/maturity.json
+          python scripts/build_p1_terminal_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --maturity-report .p1-prom-03/maturity.json \
+            --out .p1-prom-03/prom01.json \
+            --refs-out .p1-prom-03/prom01-refs.json
+          python scripts/build_p1_terminal_failure_journeys.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom01-bundle .p1-prom-03/prom01.json \
+            --out .p1-prom-03/prom02.json \
+            --refs-out .p1-prom-03/prom02-refs.json
+
+      - name: Record exact-head explicit rejection without external signature
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_promotion_intent.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom02-bundle .p1-prom-03/prom02.json \
+            --disposition reject \
+            --blocker independent-signature-not-supplied \
+            --out .p1-prom-03/reject-intent.json \
+            --signing-payload-out .p1-prom-03/reject-intent.bin
+          python scripts/finalize_p1_promotion_decision.py \
+            --intent .p1-prom-03/reject-intent.json \
+            --prom02-bundle .p1-prom-03/prom02.json \
+            --out .p1-prom-03/decision.json \
+            --refs-out .p1-prom-03/refs.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          decision = json.loads(
+              Path(".p1-prom-03/decision.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          execution_map = json.loads(
+              Path("machine/ai_p1_execution_map.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected_count = execution_map["scope_summary"][
+              "deferred_volume_count"
+          ]
+          if decision["accepted"] is not True:
+              raise SystemExit("PROM-03 explicit rejection invalid")
+          if decision["disposition"] != "reject":
+              raise SystemExit("PROM-03 default must be explicit rejection")
+          if decision["promotion_granted"] is not False:
+              raise SystemExit("PROM-03 unsigned decision cannot promote")
+          if decision["signed"] is not False:
+              raise SystemExit("PROM-03 rejection unexpectedly signed")
+          if decision["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROM-03 exact-head mismatch")
+          if decision["deferred_volume_count"] != expected_count:
+              raise SystemExit("PROM-03 deferred scope count mismatch")
+          if decision["explicit_blockers"] != [
+              "independent-signature-not-supplied"
+          ]:
+              raise SystemExit("PROM-03 rejection blocker mismatch")
+          print(
+              "PROM-03 explicit rejection recorded",
+              decision["decision_digest"],
+          )
+          PY
+
+      - name: Prove detached Ed25519 signature verification
+        run: |
+          set -euo pipefail
+          SIGNER_ID="release-authority:ci-independent"
+          SIGNER_DIGEST="$(
+            printf '%s' "$SIGNER_ID" | sha256sum | awk '{print $1}'
+          )"
+          openssl genpkey \
+            -algorithm ED25519 \
+            -out .p1-prom-03/private.pem
+          openssl pkey \
+            -in .p1-prom-03/private.pem \
+            -pubout \
+            -out .p1-prom-03/public.pem
+          KEY_FP="$(
+            openssl pkey \
+              -pubin \
+              -in .p1-prom-03/public.pem \
+              -outform DER \
+              | sha256sum \
+              | awk '{print $1}'
+          )"
+          python scripts/build_p1_promotion_intent.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --prom02-bundle .p1-prom-03/prom02.json \
+            --disposition promote \
+            --signer-id "$SIGNER_ID" \
+            --signer-identity-digest "$SIGNER_DIGEST" \
+            --public-key-fingerprint "$KEY_FP" \
+            --out .p1-prom-03/promote-intent.json \
+            --signing-payload-out .p1-prom-03/promote-intent.bin
+          openssl pkeyutl \
+            -sign \
+            -inkey .p1-prom-03/private.pem \
+            -rawin \
+            -in .p1-prom-03/promote-intent.bin \
+            -out .p1-prom-03/signature.bin
+          python scripts/verify_p1_promotion_signature.py \
+            --intent-json .p1-prom-03/promote-intent.json \
+            --payload .p1-prom-03/promote-intent.bin \
+            --public-key .p1-prom-03/public.pem \
+            --signature .p1-prom-03/signature.bin \
+            --signer-id "$SIGNER_ID" \
+            --signer-identity-digest "$SIGNER_DIGEST" \
+            --out .p1-prom-03/signature-observation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          row = json.loads(
+              Path(
+                  ".p1-prom-03/signature-observation.json"
+              ).read_text(encoding="utf-8")
+          )
+          if row["verified"] is not True:
+              raise SystemExit("Ed25519 verification did not pass")
+          if row["independent"] is not True:
+              raise SystemExit("signature verifier is not independent")
+          if row["signature_method"] != "ed25519":
+              raise SystemExit("signature method drift")
+          PY
+          cp \
+            .p1-prom-03/promote-intent.bin \
+            .p1-prom-03/tampered-intent.bin
+          printf 'x' >> .p1-prom-03/tampered-intent.bin
+          if python scripts/verify_p1_promotion_signature.py \
+            --intent-json .p1-prom-03/promote-intent.json \
+            --payload .p1-prom-03/tampered-intent.bin \
+            --public-key .p1-prom-03/public.pem \
+            --signature .p1-prom-03/signature.bin \
+            --signer-id "$SIGNER_ID" \
+            --signer-identity-digest "$SIGNER_DIGEST" \
+            --out .p1-prom-03/tampered-observation.json
+          then
+            echo "tampered promotion payload unexpectedly verified" >&2
+            exit 1
+          fi
+          rm -f .p1-prom-03/private.pem
+
+      - name: Emit exact-head PROM-03 evidence receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def digest(paths):
+              h = hashlib.sha256()
+              for name in paths:
+                  h.update(name.encode())
+                  h.update(b"\0")
+                  h.update(Path(name).read_bytes())
+                  h.update(b"\0")
+              return h.hexdigest()
+
+          Path(".p1-prom-03/config.digest").write_text(
+              hashlib.sha256(
+                  Path(
+                      "machine/p1_promotion_decision_policy.json"
+                  ).read_bytes()
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-03/environment.digest").write_text(
+              hashlib.sha256(
+                  b"ubuntu-24.04|python-3.11.16|openssl-ed25519|prom-03"
+              ).hexdigest(),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-03/verifier.digest").write_text(
+              digest([
+                  "skeleton/contracts/p1_promotion_decision.py",
+                  "scripts/check_p1_promotion_decision_policy.py",
+                  "scripts/build_p1_promotion_intent.py",
+                  "scripts/verify_p1_promotion_signature.py",
+                  "scripts/finalize_p1_promotion_decision.py",
+                  "scripts/build_p1_terminal_failure_journeys.py",
+                  "machine/p1_promotion_decision_policy.json",
+                  "machine/ai_p1_task_backlog.json",
+                  "machine/ai_p1_execution_map.json",
+                  ".github/workflows/p1-independent-promotion-decision.yml",
+              ]),
+              encoding="utf-8",
+          )
+          Path(".p1-prom-03/tests.digest").write_text(
+              digest([
+                  "skeleton/testing/test_p1_promotion_decision.py",
+                  "skeleton/testing/test_p1_failure_journeys.py",
+                  "tests/test_p1_promotion_decision_policy.py",
+                  "tests/test_p1_terminal_failure_journeys_policy.py",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          python scripts/emit_p1_promotion_evidence.py \
+            --repository Apeloff1/Skeleton \
+            --commit-sha "$EXPECTED_SHA" \
+            --expected-head "$EXPECTED_SHA" \
+            --task-id P1-PROM-03 \
+            --accountability-id ACC-P1-PROM-03 \
+            --configuration-digest "$(cat .p1-prom-03/config.digest)" \
+            --environment-digest "$(cat .p1-prom-03/environment.digest)" \
+            --verifier-id github-actions:p1-independent-promotion-decision \
+            --verifier-digest "$(cat .p1-prom-03/verifier.digest)" \
+            --test-manifest-digest "$(cat .p1-prom-03/tests.digest)" \
+            --run-id "$RUN_IDENTITY" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --evidence-file .p1-prom-03/refs.json \
+            --out .p1-prom-03/receipt.json \
+            > .p1-prom-03/receipt.stdout.json
+
+      - name: Assert exact-head PROM-03 receipt
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".p1-prom-03/receipt.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if receipt["commit_sha"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("PROM-03 receipt head mismatch")
+          if receipt["task_id"] != "P1-PROM-03":
+              raise SystemExit("PROM-03 task identity mismatch")
+          if receipt["accountability_id"] != "ACC-P1-PROM-03":
+              raise SystemExit(
+                  "PROM-03 accountability identity mismatch"
+              )
+          for field in (
+              "subject_digest",
+              "evidence_digest",
+              "receipt_digest",
+          ):
+              if len(receipt.get(field, "")) != 64:
+                  raise SystemExit(f"invalid {field}")
+          print(
+              "PROM-03 exact-head explicit-rejection receipt OK",
+              receipt["receipt_digest"],
+          )
+          PY
