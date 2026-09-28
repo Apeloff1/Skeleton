@@ -1,8 +1,0 @@
-{
-  "schema": 1,
-  "path": "satellites/branch-snapshots/codex-jeeves-control-plane-v2/backend/godot",
-  "source_commit": "7e0f257edbd1783f9b2ea346bebda8830a0ae8b6",
-  "blob_oid": "0462da7140794edeaecc6f7582aa93048d37bc7b",
-  "size_bytes": 103604344,
-  "kind": "engine-binary"
-}
