@@ -111,7 +111,11 @@ def build_cache_key(
     normalized_namespace = _require_namespace(namespace)
     material_pairs = _normalize_mapping(materials, field="materials", allow_empty=False)
     toolchain_pairs = _normalize_mapping(toolchain, field="toolchain", allow_empty=False)
-    config_pairs = _normalize_mapping(config or {}, field="config", allow_empty=True)
+    config_pairs = _normalize_mapping(
+        {} if config is None else config,
+        field="config",
+        allow_empty=True,
+    )
 
     material_digest = _sha256_pairs(material_pairs)
     toolchain_digest = _sha256_pairs(toolchain_pairs)
@@ -189,6 +193,9 @@ def plan_eviction(
 
     retained = {entry.key: entry for entry in normalized if entry.key not in expired_keys}
     victims = list(sorted(expired_keys))
+    retained_bytes = bytes_before - sum(
+        entry.size_bytes for entry in normalized if entry.key in expired_keys
+    )
 
     candidates = sorted(
         (entry for entry in retained.values() if not entry.pinned),
@@ -201,7 +208,7 @@ def plan_eviction(
     index = 0
     while (
         len(retained) > checked_policy.max_entries
-        or sum(entry.size_bytes for entry in retained.values()) > checked_policy.max_bytes
+        or retained_bytes > checked_policy.max_bytes
     ):
         if index >= len(candidates):
             raise CacheContractError("eviction policy cannot be satisfied")
@@ -209,6 +216,7 @@ def plan_eviction(
         index += 1
         if victim.key in retained:
             del retained[victim.key]
+            retained_bytes -= victim.size_bytes
             victims.append(victim.key)
 
     return EvictionPlan(
@@ -216,7 +224,7 @@ def plan_eviction(
         victims=tuple(victims),
         expired=tuple(sorted(expired_keys)),
         bytes_before=bytes_before,
-        bytes_after=sum(entry.size_bytes for entry in retained.values()),
+        bytes_after=retained_bytes,
     )
 
 
