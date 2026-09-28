@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/shadow_traffic.py"
       - "skeleton/ai/evaluation/shadow_traffic.py"
       - "skeleton/eval/champion_registry.py"
@@ -19,6 +20,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/shadow_traffic.py"
       - "skeleton/ai/evaluation/shadow_traffic.py"
       - "skeleton/eval/champion_registry.py"
