@@ -170,6 +170,16 @@ def _git_blob_oid(path: Path, size_bytes: int) -> str:
     return digest.hexdigest()
 
 
+def _discover_repo_root(manifest_path: Path) -> Path:
+    resolved = manifest_path.resolve()
+    for candidate in (resolved.parent, *resolved.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    raise ArtifactRestoreError(
+        f"cannot discover repository root from manifest: {manifest_path}"
+    )
+
+
 def restore_artifact(
     manifest_path: Path,
     *,
@@ -178,7 +188,7 @@ def restore_artifact(
     overwrite: bool = False,
 ) -> Path:
     payload = validate_manifest(_load_manifest(manifest_path))
-    root = (repo_root or manifest_path.resolve().parents[2]).resolve()
+    root = (repo_root.resolve() if repo_root is not None else _discover_repo_root(manifest_path))
     if not (root / ".git").exists():
         raise ArtifactRestoreError(f"repository root has no .git directory: {root}")
 
