@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "task_id": "P1-PROM-02",
+  "accountability_ref": "ACC-P1-PROM-02",
+  "authority": "machine/p1_failure_journey_policy.json",
+  "terminal_dependency": "P1-PROM-01",
+  "promotion_authority": false,
+  "signed_promotion": false,
+  "require_exact_head": true,
+  "require_independent_verifier": true,
+  "forbid_production_mutation": true,
+  "journeys": [
+    {
+      "family": "clean_machine",
+      "recovery_required": false,
+      "required_assertions": [
+        "clean_install_verified",
+        "no_unowned_critical_state"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_installer_lifecycle.py"
+      ]
+    },
+    {
+      "family": "rollback",
+      "recovery_required": true,
+      "required_assertions": [
+        "rollback_verified",
+        "prechange_state_restored"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_migration_rollback_compatibility.py"
+      ]
+    },
+    {
+      "family": "restore",
+      "recovery_required": true,
+      "required_assertions": [
+        "restore_verified",
+        "authoritative_state_reconciled"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_backup_restore_qualification.py"
+      ]
+    },
+    {
+      "family": "saturation",
+      "recovery_required": true,
+      "required_assertions": [
+        "graceful_degradation_verified",
+        "capacity_bounds_enforced"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_capacity_qualification.py"
+      ]
+    },
+    {
+      "family": "partition",
+      "recovery_required": true,
+      "required_assertions": [
+        "partition_failover_verified",
+        "split_brain_prevented"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_worker_fairness_failover_shutdown.py"
+      ]
+    },
+    {
+      "family": "adversarial",
+      "recovery_required": false,
+      "required_assertions": [
+        "adversarial_blocking_verified",
+        "deception_or_policy_conflict_blocks"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_blast_radius_alignment.py"
+      ]
+    },
+    {
+      "family": "provider_failover",
+      "recovery_required": true,
+      "required_assertions": [
+        "provider_failover_verified",
+        "governance_denial_not_routed"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_provider_contract.py"
+      ]
+    },
+    {
+      "family": "stale_evidence",
+      "recovery_required": false,
+      "required_assertions": [
+        "stale_evidence_rejected",
+        "exact_head_required"
+      ],
+      "test_paths": [
+        "skeleton/testing/test_p1_terminal_evidence.py"
+      ]
+    }
+  ]
+}
