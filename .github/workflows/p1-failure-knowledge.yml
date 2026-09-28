@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/failure_knowledge.py"
       - "skeleton/ai/evaluation/failure_knowledge.py"
       - "skeleton/eval/regression_corpus.py"
@@ -24,6 +25,7 @@ on:
       - p1/learn-05-regression-corpus-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/eval/failure_knowledge.py"
       - "skeleton/ai/evaluation/failure_knowledge.py"
       - "skeleton/eval/regression_corpus.py"
