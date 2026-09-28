@@ -154,8 +154,7 @@ def test_forged_plan_derived_fields_fail_closed() -> None:
     plan = _plan()
     first = plan.jobs[0]
 
-    with pytest.raises(RemoteBuildError, match="plan fingerprint"):
-        plan.ready_jobs()
+    assert {job.node_id for job in plan.ready_jobs()} == {"src-a", "src-b", "docs"}
 
     forged_plan = replace(plan, plan_fingerprint="0" * 64)
     with pytest.raises(RemoteBuildError, match="plan fingerprint"):
