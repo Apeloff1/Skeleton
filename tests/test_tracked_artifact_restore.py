@@ -146,6 +146,23 @@ class TrackedArtifactRestoreTests(unittest.TestCase):
         ):
             restore.check_artifact_manifest(self.manifest)
 
+    def test_duplicate_manifest_keys_fail_closed(self) -> None:
+        self.manifest.write_text(
+            '{"schema":1,"schema":1,"path":"deep/nested/artifact.bin",'
+            f'"source_commit":"{self.source_commit}","blob_oid":"{self.blob_oid}",'
+            f'"size_bytes":{len(self.payload)},"kind":"test-fixture"}',
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(restore.ArtifactRestoreError, "duplicate manifest key"):
+            restore._load_manifest(self.manifest)
+
+    def test_source_commit_must_be_a_commit_object(self) -> None:
+        self._write_manifest(source_commit=self.blob_oid)
+
+        with self.assertRaisesRegex(restore.ArtifactRestoreError, "not a Git commit"):
+            restore.check_artifact_manifest(self.manifest)
+
     def test_unknown_manifest_fields_fail_closed(self) -> None:
         payload = self._manifest_payload()
         payload["url"] = "https://example.invalid/untrusted"
