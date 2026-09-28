@@ -56,6 +56,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install focused test runtime
+        run: python -m pip install pytest==8.4.2
+
       - name: Compile projection and maturity engines
         run: |
           python -m py_compile             scripts/reconcile_p1_volume_metadata.py             scripts/reconcile_p1_maturity.py             skeleton/contracts/maturity_reconciliation.py
