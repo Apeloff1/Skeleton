@@ -132,7 +132,10 @@ def test_receipt_order_does_not_change_decision_identity() -> None:
 @pytest.mark.parametrize(
     ("changes", "reason"),
     (
-        ({"accepted": False}, "terminal-evidence-rejected"),
+        (
+            {"accepted": False, "promotion_ready": False},
+            "terminal-evidence-rejected",
+        ),
         ({"promotion_ready": False}, "terminal-evidence-not-promotion-ready"),
         (
             {"promotion_blockers": ("VOL-001:blocking",), "promotion_ready": False},
