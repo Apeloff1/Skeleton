@@ -624,20 +624,37 @@ PRODUCT_LANE_TASKS = (
     "P1-PROD-05",
 )
 
+PRODUCT_LANE_EVIDENCE_HEAD = "b5c084b467882913f51b96c945e5eccb27a2e8c7"
+PRODUCT_LANE_EVIDENCE = {
+    "P1-PROD-01": ("36469488333", ("109087842649",)),
+    "P1-PROD-02": ("36469488267", ("109087843241",)),
+    "P1-PROD-03": ("36469488382", ("109087842827",)),
+    "P1-PROD-04": (
+        "36469488469",
+        ("109087843767", "109087844354"),
+    ),
+    "P1-PROD-05": (
+        "36469488639",
+        ("109087845062", "109087845157"),
+    ),
+}
 
-def test_product_lane_paths_are_materialized_before_evidence_binding() -> None:
+
+def test_product_lane_uses_materialized_exact_head_evidence() -> None:
     payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
     task_by_id = {task["task_id"]: task for task in payload["tasks"]}
 
     for task_id in PRODUCT_LANE_TASKS:
         task = task_by_id[task_id]
 
-        for field in ("implementation_paths", "test_targets"):
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
             assert task[field]
             assert all(
                 not str(reference).startswith("planned:")
                 for reference in task[field]
             )
+
+        for field in ("implementation_paths", "test_targets"):
             for reference in task[field]:
                 assert (ROOT / reference).is_file(), (
                     task_id,
@@ -645,7 +662,20 @@ def test_product_lane_paths_are_materialized_before_evidence_binding() -> None:
                     reference,
                 )
 
-        assert task["evidence_refs"] == []
+        run_id, job_ids = PRODUCT_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{PRODUCT_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + PRODUCT_LANE_EVIDENCE_HEAD
+        ) in evidence
+
         assert task["status"] == "blocked"
         assert task["accountability_status"] == "planned"
         assert task["implementation_signed"] is False
