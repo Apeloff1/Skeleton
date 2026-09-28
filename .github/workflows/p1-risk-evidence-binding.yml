@@ -19,10 +19,12 @@ on:
       - "scripts/reconcile_p1_risk_evidence.py"
       - "skeleton/testing/test_risk_evidence.py"
       - "tests/test_p1_risk_evidence_reconciliation.py"
+      - "tests/test_p1_release_gap_bindings_batch1.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   pull_request:
     branches:
       - main
+      - p1/release-lane-materialize-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -93,6 +95,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_risk_evidence.py
           tests/test_p1_risk_evidence_reconciliation.py
+          tests/test_p1_release_gap_bindings_batch1.py
 
       - name: Reconcile exact-head P1 risk evidence inventory
         run: |
@@ -141,18 +144,22 @@ jobs:
                   "risk obligation inventory drift: "
                   + repr(report["inventory"])
               )
-          if report["binding_count"] != 0:
-              raise SystemExit(
-                  "initial risk binding registry must remain evidence-empty"
-              )
-          if report["resolved_count"] != 0:
-              raise SystemExit(
-                  "risk obligations were resolved without governed evidence"
-              )
-          if report["unresolved_blocking_count"] != 513:
+          if report["binding_count"] != 12:
+              raise SystemExit("unexpected governed risk binding count")
+          if report["resolved_count"] != 12:
+              raise SystemExit("unexpected resolved risk obligation count")
+          if report["unresolved_blocking_count"] != 501:
               raise SystemExit("unexpected unresolved blocking obligation count")
           if report["unclassified_count"] != 281:
               raise SystemExit("unexpected unclassified risk count")
+          if report["disposition_counts"] != {
+              "evidence": 12,
+              "unbound": 501,
+          }:
+              raise SystemExit(
+                  "unexpected risk disposition counts: "
+                  + repr(report["disposition_counts"])
+              )
           if len(report.get("report_digest", "")) != 64:
               raise SystemExit("invalid risk reconciliation report digest")
           if len(os.environ["EXPECTED_SHA"]) != 40:
@@ -238,6 +245,7 @@ jobs:
                   [
                       "skeleton/testing/test_risk_evidence.py",
                       "tests/test_p1_risk_evidence_reconciliation.py",
+                      "tests/test_p1_release_gap_bindings_batch1.py",
                   ]
               ),
               encoding="utf-8",
