@@ -399,6 +399,7 @@ def test_privileged_step_requires_exact_qualified_execution_admission() -> None:
         verification_policy=verifier,
         qualification=qualification,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
 
     assert isinstance(admission, PlanExecutionAdmission)
@@ -426,6 +427,7 @@ def test_rejected_plan_cannot_admit_privileged_execution() -> None:
         verification_policy=verifier,
         qualification=rejected,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
 
     assert admission.accepted is False
@@ -452,6 +454,7 @@ def test_execution_admission_is_bound_to_exact_plan_and_policy() -> None:
         verification_policy=verifier,
         qualification=qualification,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
     assert admission.accepted is False
     assert "qualification-plan-digest-mismatch" in admission.reasons
@@ -465,6 +468,7 @@ def test_execution_admission_is_bound_to_exact_plan_and_policy() -> None:
         verification_policy=drifted_policy,
         qualification=qualification,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
     assert admission.accepted is False
     assert "qualification-policy-digest-mismatch" in admission.reasons
@@ -489,6 +493,7 @@ def test_under_specified_privileged_step_fails_admission() -> None:
         verification_policy=verifier,
         qualification=qualification,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
     assert admission.accepted is False
     assert (
@@ -504,6 +509,7 @@ def test_step_outside_admission_cannot_execute() -> None:
         verification_policy=verifier,
         qualification=qualification,
         requested_step_ids=("apply",),
+        completed_step_ids=("inspect",),
     )
 
     with pytest.raises(
@@ -515,3 +521,20 @@ def test_step_outside_admission_cannot_execute() -> None:
             plan=plan,
             step_id="verify",
         )
+
+
+
+def test_privileged_execution_admission_requires_dependency_closure() -> None:
+    verifier, plan, qualification = _privileged_fixture()
+    admission = admit_plan_execution(
+        plan=plan,
+        verification_policy=verifier,
+        qualification=qualification,
+        requested_step_ids=("apply",),
+    )
+
+    assert admission.accepted is False
+    assert (
+        "execution-dependency-missing:apply:inspect"
+        in admission.reasons
+    )
