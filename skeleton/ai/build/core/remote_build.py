@@ -137,6 +137,7 @@ class RemoteBuildPlan:
         return {job.node_id: job for job in self.jobs}
 
     def ready_jobs(self, completed_job_ids: Iterable[str] = ()) -> tuple[RemoteBuildJob, ...]:
+        validate_remote_plan(self)
         completed = _normalize_completed(completed_job_ids, self.job_map())
         return tuple(
             job
@@ -487,8 +488,7 @@ def verify_remote_receipt(
 ) -> VerifiedRemoteReceipt:
     """Validate runner evidence against the exact remote job contract."""
 
-    if not isinstance(plan, RemoteBuildPlan):
-        raise RemoteBuildError("plan must be a RemoteBuildPlan")
+    validate_remote_plan(plan)
     if not isinstance(receipt, RemoteJobReceipt):
         raise RemoteBuildError("receipt must be a RemoteJobReceipt")
     jobs = plan.job_map()
@@ -542,6 +542,107 @@ def verify_remote_receipt(
         log_digest=log_digest,
         receipt_digest=_sha256(payload),
     )
+
+
+def validate_remote_plan(plan: RemoteBuildPlan) -> None:
+    """Recompute all derived job/plan identities and dependency ordering."""
+
+    if not isinstance(plan, RemoteBuildPlan):
+        raise RemoteBuildError("plan must be a RemoteBuildPlan")
+    if plan.schema != REMOTE_BUILD_SCHEMA or plan.algorithm != REMOTE_BUILD_ALGORITHM:
+        raise RemoteBuildError("remote plan schema/algorithm mismatch")
+    source_commit = _require_sha1(plan.source_commit, field="source_commit")
+    toolchain_digest = _require_sha256(
+        plan.toolchain_digest,
+        field="toolchain_digest",
+    )
+    graph_fingerprint = _require_sha256(
+        plan.graph_fingerprint,
+        field="graph_fingerprint",
+    )
+    if len(plan.jobs) > MAX_JOBS or len(plan.jobs) != len(plan.selected_nodes):
+        raise RemoteBuildError("remote plan job count is invalid")
+
+    seen_jobs: set[str] = set()
+    seen_nodes: set[str] = set()
+    observed_nodes: list[str] = []
+    for job in plan.jobs:
+        if not isinstance(job, RemoteBuildJob):
+            raise RemoteBuildError("remote plan jobs must be RemoteBuildJob values")
+        if job.node_id in seen_nodes:
+            raise RemoteBuildError("remote plan contains duplicate node id")
+        if job.job_id in seen_jobs:
+            raise RemoteBuildError("remote plan contains duplicate job id")
+        if (
+            job.graph_fingerprint != graph_fingerprint
+            or job.source_commit != source_commit
+            or job.toolchain_digest != toolchain_digest
+            or job.network_access is not False
+        ):
+            raise RemoteBuildError("remote job authority/provenance drifted from plan")
+
+        dependency_ids = tuple(job.dependency_job_ids)
+        if any(dep not in seen_jobs for dep in dependency_ids):
+            raise RemoteBuildError(
+                "remote job dependency must reference an earlier plan job"
+            )
+        payload = {
+            "schema": REMOTE_BUILD_SCHEMA,
+            "algorithm": REMOTE_BUILD_ALGORITHM,
+            "node_id": job.node_id,
+            "node_fingerprint": _require_sha256(
+                job.node_fingerprint,
+                field="node_fingerprint",
+            ),
+            "graph_fingerprint": graph_fingerprint,
+            "source_commit": source_commit,
+            "toolchain_digest": toolchain_digest,
+            "dependency_job_ids": list(dependency_ids),
+            "argv": list(_normalize_argv(job.argv)),
+            "input_artifacts": [
+                item.to_dict() for item in _normalize_artifacts(job.input_artifacts)
+            ],
+            "output_artifact_ids": list(
+                _normalize_ids(
+                    job.output_artifact_ids,
+                    field="output_artifact_ids",
+                    maximum=MAX_ARTIFACTS,
+                )
+            ),
+            "working_directory": _normalize_path(
+                job.working_directory,
+                field="working_directory",
+                allow_dot=True,
+            ),
+            "writable_paths": list(
+                _normalize_paths(
+                    job.writable_paths,
+                    field="writable_paths",
+                    maximum=MAX_PATHS,
+                    allow_dot=False,
+                )
+            ),
+            "network_access": False,
+        }
+        if _sha256(payload) != job.job_id:
+            raise RemoteBuildError("remote job fingerprint mismatch")
+        seen_jobs.add(job.job_id)
+        seen_nodes.add(job.node_id)
+        observed_nodes.append(job.node_id)
+
+    if tuple(observed_nodes) != tuple(plan.selected_nodes):
+        raise RemoteBuildError("remote plan selected_nodes drifted from jobs")
+    plan_payload = {
+        "schema": REMOTE_BUILD_SCHEMA,
+        "algorithm": REMOTE_BUILD_ALGORITHM,
+        "source_commit": source_commit,
+        "graph_fingerprint": graph_fingerprint,
+        "toolchain_digest": toolchain_digest,
+        "selected_nodes": list(plan.selected_nodes),
+        "jobs": [job.to_dict() for job in plan.jobs],
+    }
+    if _sha256(plan_payload) != plan.plan_fingerprint:
+        raise RemoteBuildError("remote plan fingerprint mismatch")
 
 
 def toolchain_manifest_digest(value: Mapping[str, Any]) -> str:
@@ -753,6 +854,17 @@ def _normalize_completed(
         if job_id not in jobs:
             raise RemoteBuildError("completed job id is outside remote plan")
         normalized.add(job_id)
+    for job_id in normalized:
+        missing_dependencies = [
+            dependency
+            for dependency in jobs[job_id].dependency_job_ids
+            if dependency not in normalized
+        ]
+        if missing_dependencies:
+            raise RemoteBuildError(
+                "completed job set is not dependency-closed",
+                context={"job_id": job_id},
+            )
     return frozenset(normalized)
 
 
@@ -908,4 +1020,5 @@ __all__ = [
     "toolchain_manifest_digest",
     "verify_remote_receipt",
     "verify_transfer_chunks",
+    "validate_remote_plan",
 ]
