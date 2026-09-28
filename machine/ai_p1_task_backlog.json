@@ -122,7 +122,12 @@
         "Reconciliation reports bind masterplan, accountability, P1 map, engine contract and engine runner digests.",
         "Masterplan status and implementation_status are reconciled as distinct non-mutating claims."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199519",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-EVID-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -156,10 +161,6 @@
       "test_targets": [
         "scripts/check_ai_master_plan.py",
         "skeleton/testing/test_ai_master_plan.py",
-        "planned:skeleton/testing/test_gap_ledger.py",
-        "planned:skeleton/testing/test_gap_closure.py",
-        "planned:skeleton/testing/test_test_architecture.py",
-        "planned:skeleton/testing/test_fixture_policy.py",
         "skeleton/testing/test_maturity_reconciliation.py",
         "tests/test_p1_maturity_reconciliation.py"
       ],
@@ -429,7 +430,12 @@
         "Validator mutations prove stale/missing evidence and gate authority fail closed.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034204451",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ],
       "accountability_ref": "ACC-P1-EVID-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -458,7 +464,6 @@
       "test_targets": [
         "scripts/check_ai_master_plan.py",
         "skeleton/testing/test_ai_master_plan.py",
-        "planned:skeleton/testing/test_architecture_scope_freeze.py",
         "skeleton/testing/test_architecture_scope_freeze.py"
       ],
       "evidence_modes": [
