@@ -965,6 +965,7 @@ class PlanExecutionAdmission:
     qualification_digest: str
     policy_digest: str
     requested_step_ids: tuple[str, ...]
+    completed_step_ids: tuple[str, ...]
     privileged_step_ids: tuple[str, ...]
     required_capabilities: tuple[str, ...]
     task_id: str = PLAN_VERIFIER_TASK_ID
@@ -1002,6 +1003,20 @@ class PlanExecutionAdmission:
         )
         object.__setattr__(
             self,
+            "completed_step_ids",
+            _plan_tokens(
+                self.completed_step_ids,
+                "completed_step_ids",
+            ),
+        )
+        if set(self.requested_step_ids).intersection(
+            self.completed_step_ids
+        ):
+            raise PlanStaticVerifierError(
+                "requested and completed steps must be disjoint"
+            )
+        object.__setattr__(
+            self,
             "privileged_step_ids",
             _plan_tokens(
                 self.privileged_step_ids,
@@ -1034,6 +1049,7 @@ class PlanExecutionAdmission:
             "qualification_digest": self.qualification_digest,
             "policy_digest": self.policy_digest,
             "requested_step_ids": list(self.requested_step_ids),
+            "completed_step_ids": list(self.completed_step_ids),
             "privileged_step_ids": list(self.privileged_step_ids),
             "required_capabilities": list(
                 self.required_capabilities
@@ -1066,6 +1082,7 @@ def admit_plan_execution(
     verification_policy: PlanVerificationPolicy,
     qualification: PlanQualificationDecision,
     requested_step_ids: Iterable[str],
+    completed_step_ids: Iterable[str] = (),
 ) -> PlanExecutionAdmission:
     if not isinstance(plan, StaticPlanDefinition):
         raise TypeError("plan must be StaticPlanDefinition")
@@ -1089,6 +1106,10 @@ def admit_plan_execution(
         "requested_step_ids",
         allow_empty=False,
     )
+    completed = _plan_tokens(
+        completed_step_ids,
+        "completed_step_ids",
+    )
     steps = {step.step_id: step for step in plan.steps}
     reasons: list[str] = []
 
@@ -1107,12 +1128,32 @@ def admit_plan_execution(
         reasons.append(
             "unknown-execution-steps:" + ",".join(missing)
         )
+    unknown_completed = sorted(set(completed) - set(steps))
+    if unknown_completed:
+        reasons.append(
+            "unknown-completed-steps:" + ",".join(unknown_completed)
+        )
+    if set(requested).intersection(completed):
+        reasons.append("requested-completed-step-overlap")
 
     known = tuple(
         steps[step_id]
         for step_id in requested
         if step_id in steps
     )
+    execution_context = set(requested) | set(completed)
+    for step in known:
+        missing_dependencies = sorted(
+            set(step.depends_on) - execution_context
+        )
+        if missing_dependencies:
+            reasons.append(
+                "execution-dependency-missing:"
+                + step.step_id
+                + ":"
+                + ",".join(missing_dependencies)
+            )
+
     privileged_caps = set(
         verification_policy.privileged_capabilities
     )
@@ -1164,6 +1205,7 @@ def admit_plan_execution(
         qualification_digest=qualification.decision_digest,
         policy_digest=verification_policy.digest,
         requested_step_ids=requested,
+        completed_step_ids=completed,
         privileged_step_ids=privileged,
         required_capabilities=required_capabilities,
     )
