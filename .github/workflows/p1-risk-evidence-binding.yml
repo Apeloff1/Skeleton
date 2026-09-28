@@ -41,6 +41,7 @@ on:
       - "scripts/reconcile_p1_risk_evidence.py"
       - "skeleton/testing/test_risk_evidence.py"
       - "tests/test_p1_risk_evidence_reconciliation.py"
+      - "tests/test_p1_release_gap_bindings_batch1.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
