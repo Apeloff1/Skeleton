@@ -51,10 +51,17 @@ def test_current_terminal_evidence_policy_is_valid() -> None:
 
 def test_dependency_drift_is_rejected(tmp_path: Path) -> None:
     root = _repo(tmp_path)
+    def reverse_prom_dependencies(value):
+        prom = next(
+            row for row in value["tasks"]
+            if row["task_id"] == "P1-PROM-01"
+        )
+        prom["depends_on"].reverse()
+
     _mutate(
         root,
         BACKLOG_PATH,
-        lambda value: value["tasks"][-3]["depends_on"].reverse(),
+        reverse_prom_dependencies,
     )
     with pytest.raises(
         TerminalPolicyError,
