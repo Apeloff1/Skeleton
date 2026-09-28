@@ -72,6 +72,52 @@ UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("head ref", re.compile(r"\bgithub\.head_ref\b")),
 )
 
+SECRET_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("secrets context", re.compile(r"(?<![A-Za-z0-9_])secrets(?:\.|\[)")),
+    (
+        "GitHub token context",
+        re.compile(
+            r"(?<![A-Za-z0-9_])github(?:\.token|\[['\"]token['\"]\])"
+        ),
+    ),
+)
+SHELL_XTRACE_RE = re.compile(
+    r"(?m)(?:^[ \t]*|[;&|][ \t]*)(?:"
+    r"set[ \t]+(?:-[A-Za-z]*x[A-Za-z]*|(?:-o|--option)[ \t]+xtrace)\b"
+    r"|(?:[./A-Za-z0-9_-]+/)?(?:bash|sh)[ \t]+"
+    r"(?:-[A-Za-z]*x[A-Za-z]*|(?:-o|--option)[ \t]+xtrace)\b"
+    r")",
+    re.IGNORECASE,
+)
+SENSITIVE_ENV_NAME_RE = re.compile(
+    r"(?:"
+    r"TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|CREDENTIAL|"
+    r"PRIVATE_?KEY|SESSION_?KEY|SIGNED_?URL|"
+    r"AUTHORIZATION|AUTH_?(?:HEADER|TOKEN|CREDENTIAL)|"
+    r"TRACEBACK|EXCEPTION|ERROR_?(?:BODY|PAYLOAD|LOG)|RESPONSE_?BODY"
+    r")",
+    re.IGNORECASE,
+)
+SHELL_VARIABLE_RE = re.compile(
+    r"\$(?:\{)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?:\})?"
+)
+OUTPUT_COMMAND_RE = re.compile(
+    r"^\s*(?:echo|printf|cat|head|tail|tee)\b(?P<args>.*)$",
+    re.IGNORECASE,
+)
+ENV_DUMP_RE = re.compile(
+    r"^\s*(?:env|printenv|set|declare\s+-p|export\s+-p)\s*(?:#.*)?$",
+    re.IGNORECASE,
+)
+CURL_VERBOSE_RE = re.compile(
+    r"\bcurl\b[^\n]*(?:"
+    r"\s-[A-Za-z]*v[A-Za-z]*(?:\s|$)|"
+    r"\s--verbose(?:\s|$)|"
+    r"\s--trace(?:-ascii)?(?:\s|=|$)"
+    r")",
+    re.IGNORECASE,
+)
+
 
 def workflow_files() -> list[Path]:
     return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
@@ -341,6 +387,41 @@ def _untrusted_expression(fragment: str) -> str | None:
     return None
 
 
+def _secret_expression(fragment: str) -> str | None:
+    for expression in EXPRESSION_RE.finditer(fragment):
+        body = expression.group("body")
+        for label, pattern in SECRET_RUN_CONTEXTS:
+            if pattern.search(body):
+                return label
+    return None
+
+
+def _sensitive_output_violation(fragment: str) -> str | None:
+    if SHELL_XTRACE_RE.search(fragment):
+        return "shell xtrace is forbidden because it can expose secret-bearing commands"
+    if CURL_VERBOSE_RE.search(fragment):
+        return "verbose/trace curl is forbidden because request headers and signed URLs can reach logs"
+
+    for raw_line in fragment.splitlines():
+        for command in raw_line.split(";"):
+            if ENV_DUMP_RE.fullmatch(command):
+                return "environment-dump commands are forbidden in workflow shells"
+            match = OUTPUT_COMMAND_RE.match(command)
+            if match is None:
+                continue
+            args = match.group("args")
+            if "authorization:" in args.lower():
+                return "printing authorization headers is forbidden"
+            for variable in SHELL_VARIABLE_RE.finditer(args):
+                name = variable.group("name")
+                if SENSITIVE_ENV_NAME_RE.search(name):
+                    return (
+                        "printing secret-like environment variables is forbidden "
+                        f"({name})"
+                    )
+    return None
+
+
 def violations(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
@@ -399,6 +480,16 @@ def violations(path: Path) -> list[str]:
         if label:
             findings.append(
                 f"{path.name}:{number}: direct {label} interpolation in run shell is forbidden; pass it through env instead"
+            )
+        secret_label = _secret_expression(fragment)
+        if secret_label:
+            findings.append(
+                f"{path.name}:{number}: direct {secret_label} interpolation in run shell is forbidden; pass it through env and never print it"
+            )
+        output_violation = _sensitive_output_violation(fragment)
+        if output_violation:
+            findings.append(
+                f"{path.name}:{number}: {output_violation}"
             )
 
     if not has_top_level_permissions:
