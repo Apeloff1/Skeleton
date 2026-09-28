@@ -119,3 +119,61 @@ def test_snapshot_fails_closed_when_canonical_surface_is_missing(
 
     with pytest.raises(SystemExit, match="canonical accountability surface"):
         module.snapshot()
+
+
+
+def _batch_argv(*, dry_run: bool) -> list[str]:
+    argv = [
+        str(MODULE_PATH),
+        "start",
+        "--record-id",
+        "ACC-P1-EVID-01",
+        "--record-id",
+        "ACC-P1-INTEL-01",
+        "--actor-id",
+        "chatgpt:gpt-5.6-sol",
+        "--actor-type",
+        "agent",
+        "--role",
+        "implementer",
+        "--statement",
+        "begin governed implementation",
+        "--signature-method",
+        "github_identity",
+        "--git-sha",
+        "c" * 40,
+    ]
+    if dry_run:
+        argv.append("--dry-run")
+    return argv
+
+
+def test_main_dry_run_preflights_every_record_without_apply(monkeypatch) -> None:
+    module = _module()
+    commands: list[list[str]] = []
+    monkeypatch.setattr(module, "run_checked", lambda command: commands.append(command))
+    monkeypatch.setattr(sys, "argv", _batch_argv(dry_run=True))
+
+    assert module.main() == 0
+    assert len(commands) == 2
+    assert all(command[-1] == "--dry-run" for command in commands)
+    assert "ACC-P1-EVID-01" in commands[0]
+    assert "ACC-P1-INTEL-01" in commands[1]
+
+
+def test_main_preflights_entire_batch_before_first_apply(monkeypatch) -> None:
+    module = _module()
+    commands: list[list[str]] = []
+    monkeypatch.setattr(module, "run_checked", lambda command: commands.append(command))
+    monkeypatch.setattr(module, "snapshot", lambda: {})
+    monkeypatch.setattr(sys, "argv", _batch_argv(dry_run=False))
+
+    assert module.main() == 0
+    assert len(commands) == 5
+    assert commands[0][-1] == "--dry-run"
+    assert commands[1][-1] == "--dry-run"
+    assert "--dry-run" not in commands[2]
+    assert "--dry-run" not in commands[3]
+    assert commands[4] == [sys.executable, str(module.VALIDATOR)]
+    assert "ACC-P1-EVID-01" in commands[2]
+    assert "ACC-P1-INTEL-01" in commands[3]
