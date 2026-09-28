@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/mesh/capacity_qualification.py"
       - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
       - "skeleton/mesh/batching_autoscaling.py"
@@ -17,6 +18,7 @@ on:
       - main
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/mesh/capacity_qualification.py"
       - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
       - "skeleton/mesh/batching_autoscaling.py"
