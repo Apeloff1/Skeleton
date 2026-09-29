@@ -1002,9 +1002,6 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ],
-      "overlay_children": [
-        "jvm_registry.py"
-      ],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -1468,11 +1465,11 @@
     },
     {
       "id": "AIFT-KV-CACHE",
-      "source": "skeleton/kv_cache.py",
-      "destination": "skeleton/ai/runtime/inference/kv_cache.py",
+      "source": "skeleton/kv/__init__.py",
+      "destination": "skeleton/ai/runtime/inference/kv/__init__.py",
       "kind": "file",
-      "source_git_object_sha": "78ff394cc150afc8e0d85f5c4d9f8a603d0ac068",
-      "role": "The standalone KV-cache implementation is inference/runtime state and must converge beside the already assigned KV package.",
+      "source_git_object_sha": "b4bc60a3ed0e919889e9dce3aafa045ace22fffe",
+      "role": "Canonical KV-cache public facade is the skeleton.kv package surface; the legacy root module and legacy AI sibling remain compatibility shims.",
       "work_package_refs": [
         "WP-W05",
         "WP-W19",
@@ -1487,7 +1484,7 @@
         "VOL-029",
         "VOL-387"
       ],
-      "migration_action": "mirror_then_cutover",
+      "migration_action": "converge_facade_then_cutover",
       "cutover_preconditions": [
         "prove cache reuse is semantics-preserving",
         "bound capacity and eviction",
@@ -1499,7 +1496,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_package_facade_with_legacy_shims"
     },
     {
       "id": "AIFT-MESH",
