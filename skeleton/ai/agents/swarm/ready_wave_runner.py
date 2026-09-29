@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from skeleton.swarm.dag import SwarmDag, TaskNode
+from skeleton.automation.swarm.dag import SwarmDag, TaskNode
 
 
 Handler = Callable[[TaskNode], Any]

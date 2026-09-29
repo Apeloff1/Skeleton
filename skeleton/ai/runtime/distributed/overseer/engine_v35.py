@@ -26,11 +26,11 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.overseer.atlas import CapabilityAtlas
-from skeleton.overseer.energy import EnergyModel
-from skeleton.overseer.engine_v3 import OverseerEngineV3
-from skeleton.overseer.fleet_gov import FleetGovernor
-from skeleton.overseer.recovery import RecoveryEngine
+from skeleton.automation.overseer.atlas import CapabilityAtlas
+from skeleton.automation.overseer.energy import EnergyModel
+from skeleton.automation.overseer.engine_v3 import OverseerEngineV3
+from skeleton.automation.overseer.fleet_gov import FleetGovernor
+from skeleton.automation.overseer.recovery import RecoveryEngine
 
 
 @dataclass

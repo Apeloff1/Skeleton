@@ -142,21 +142,26 @@ def _compare(
     overlays = overlay_children or set()
     src = _tree_files(source)
     dst = _tree_files(destination)
+    governed_src = {
+        rel: path
+        for rel, path in src.items()
+        if not any(rel == overlay or rel.startswith(overlay + "/") for overlay in overlays)
+    }
     governed_dst = {
         rel: path
         for rel, path in dst.items()
         if not any(rel == overlay or rel.startswith(overlay + "/") for overlay in overlays)
     }
-    if set(src) != set(governed_dst):
-        missing = sorted(set(src) - set(governed_dst))
-        extra = sorted(set(governed_dst) - set(src))
+    if set(governed_src) != set(governed_dst):
+        missing = sorted(set(governed_src) - set(governed_dst))
+        extra = sorted(set(governed_dst) - set(governed_src))
         return [
             f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
             f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)}"
         ]
 
     errors: list[str] = []
-    for rel in sorted(src):
+    for rel in sorted(governed_src):
         exception = exceptions.get(rel)
         if exception:
             if exception.get("mode") != "compatibility_facade":
@@ -174,7 +179,7 @@ def _compare(
                 )
             )
             continue
-        if not _content_equivalent(src[rel], governed_dst[rel]):
+        if not _content_equivalent(governed_src[rel], governed_dst[rel]):
             errors.append(f"tree semantic/content drift: {source.relative_to(ROOT)}/{rel}")
     return errors
 
@@ -302,6 +307,12 @@ def validate() -> list[str]:
         item.get("destination")
         for item in mappings
         if isinstance(item, dict) and isinstance(item.get("destination"), str)
+    }
+
+    declared_sources = {
+        item.get("source")
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("source"), str)
     }
 
     seen_ids: set[str] = set()
@@ -447,10 +458,17 @@ def validate() -> list[str]:
                             errors.append(f"{mid}: duplicate overlay child {overlay}")
                             continue
                         full_destination = f"{dst}/{overlay}"
-                        if full_destination not in declared_destinations:
+                        full_source = f"{src}/{overlay}"
+                        governed_destination = full_destination in declared_destinations
+                        governed_source = any(
+                            candidate == full_source
+                            or candidate.startswith(full_source.rstrip("/") + "/")
+                            for candidate in declared_sources
+                        )
+                        if not (governed_destination or governed_source):
                             errors.append(
-                                f"{mid}: overlay child is not a governed mapping destination: "
-                                f"{full_destination}"
+                                f"{mid}: overlay child is not independently governed: "
+                                f"source={full_source} destination={full_destination}"
                             )
                             continue
                         overlays.add(overlay)
@@ -596,6 +614,13 @@ def validate() -> list[str]:
     pending_ids: set[str] = set()
     pending_sources: set[str] = set()
     pending_destinations: set[str] = set()
+    alias_sources = {
+        item.get("planned_path")
+        for item in audit.get("covered_aliases", [])
+        if isinstance(audit, dict)
+        and isinstance(item, dict)
+        and isinstance(item.get("planned_path"), str)
+    }
     required_pending_sources = {
         "skeleton/state",
         "skeleton/network",
@@ -613,7 +638,7 @@ def validate() -> list[str]:
         "skeleton/overseer",
         "skeleton/pr_automation",
         "skeleton/chronicle",
-    } - mapped_sources
+    } - mapped_sources - alias_sources
     if required_pending_sources and len(assignments) < len(required_pending_sources):
         errors.append(
             "next_move_assignments must contain every still-unmapped plan-derived source"
@@ -720,6 +745,11 @@ def validate() -> list[str]:
         for item in audit.get("intentionally_external", []):
             if isinstance(item, dict):
                 root = _first_level(item.get("path"))
+                if root:
+                    classified_top_level.add(root)
+        for item in audit.get("covered_aliases", []):
+            if isinstance(item, dict):
+                root = _first_level(item.get("planned_path"))
                 if root:
                     classified_top_level.add(root)
         for path_value in audit.get("non_engine_root_exclusions", []):

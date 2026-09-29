@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from skeleton.kernel.errors import AgentError
-from skeleton.swarm.types import AgentRole
+from skeleton.automation.swarm.types import AgentRole
 
 
 class RoleError(AgentError):

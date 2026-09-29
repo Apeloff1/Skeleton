@@ -31,17 +31,17 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.overseer.control import QoSArbiter, QoSTier
-from skeleton.overseer.governor import BudgetEnforcer, BudgetProfile, ResourceGovernor
-from skeleton.overseer.hardware import HardwareProbe
-from skeleton.overseer.mpc import ModelPredictiveController, MPCResult, SystemIdentifier
-from skeleton.overseer.predict import (
+from skeleton.automation.overseer.control import QoSArbiter, QoSTier
+from skeleton.automation.overseer.governor import BudgetEnforcer, BudgetProfile, ResourceGovernor
+from skeleton.automation.overseer.hardware import HardwareProbe
+from skeleton.automation.overseer.mpc import ModelPredictiveController, MPCResult, SystemIdentifier
+from skeleton.automation.overseer.predict import (
     SensorFusion,
     TrendForecaster,
     WearModel,
     WorkloadProfiler,
 )
-from skeleton.overseer.twin import DigitalTwin, MetaCognition
+from skeleton.automation.overseer.twin import DigitalTwin, MetaCognition
 
 
 # Setpoints the MPC tracks (same envelopes as V2's control core)

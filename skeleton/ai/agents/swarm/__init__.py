@@ -6,10 +6,10 @@ available for Genesis and compatibility callers while those surfaces migrate.
 
 from __future__ import annotations
 
-from skeleton.swarm.capabilities import capabilities
-from skeleton.swarm.dag import SubmitError, SwarmDag, TaskNode, TaskStatus
-from skeleton.swarm.law import N_CAP, PACKET, VERSION
-from skeleton.swarm.mesh import (
+from skeleton.automation.swarm.capabilities import capabilities
+from skeleton.automation.swarm.dag import SubmitError, SwarmDag, TaskNode, TaskStatus
+from skeleton.automation.swarm.law import N_CAP, PACKET, VERSION
+from skeleton.automation.swarm.mesh import (
     Agent,
     CapabilityNegotiator,
     HiveMind,
@@ -20,9 +20,9 @@ from skeleton.swarm.mesh import (
     SwarmMesh,
     standard_platoons,
 )
-from skeleton.swarm.mesh_boundary import boundary
-from skeleton.swarm.mesh_handoff import handoff
-from skeleton.swarm.ready_wave_runner import ReadyWaveReport, ReadyWaveRunner
+from skeleton.automation.swarm.mesh_boundary import boundary
+from skeleton.automation.swarm.mesh_handoff import handoff
+from skeleton.automation.swarm.ready_wave_runner import ReadyWaveReport, ReadyWaveRunner
 
 __all__ = [
     "N_CAP",

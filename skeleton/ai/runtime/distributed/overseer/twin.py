@@ -35,7 +35,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from skeleton.overseer.mpc import ChannelModel
+from skeleton.automation.overseer.mpc import ChannelModel
 
 
 # ---------------------------------------------------------------------------

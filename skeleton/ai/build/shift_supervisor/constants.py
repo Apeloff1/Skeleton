@@ -1,3 +1,2 @@
-SECRETARY_DEFAULT_INTERVAL_SECONDS = 900
-MANAGER_DEFAULT_INTERVAL_SECONDS = 1800
-MAX_WORKER_SNAPSHOTS = 2048
+"""Compatibility shim; canonical implementation lives in skeleton.automation.shift_supervisor.constants."""
+from skeleton.automation.shift_supervisor.constants import *  # noqa: F401,F403

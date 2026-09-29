@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.hive.cards import hive_card
-from skeleton.hive.kernel import Hive
-from skeleton.hive.law import WALK_CAP
+from skeleton.automation.hive.cards import hive_card
+from skeleton.automation.hive.kernel import Hive
+from skeleton.automation.hive.law import WALK_CAP
 
 
 class HiveEngine:
