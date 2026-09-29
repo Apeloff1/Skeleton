@@ -336,8 +336,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "game-compat"
+prefixes = ["skeleton/game/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only game-runtime namespace; canonical mechanics and deterministic replay live under skeleton/simulation/game/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."

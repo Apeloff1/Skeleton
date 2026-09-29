@@ -939,7 +939,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "2f78155ea4cb98be0547e340f1b0fea142fed9a3",
+      "source_git_object_sha": "e109d865ed3f55e7b318ba9bb03611b287f434b0",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -951,16 +951,13 @@
       "volume_refs": [
         "VOL-019"
       ],
-      "overlay_children": [
-        "game"
-      ],
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_tree_exactly_mirrored"
     },
     {
       "id": "AIFT-FORGE",
@@ -2153,11 +2150,11 @@
     },
     {
       "id": "AIFT-GAME",
-      "source": "skeleton/game",
+      "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "b3643c67b7547e82ccd4231684a10afeb39532d3",
-      "role": "Game mechanics, replay, AI FSM, economy simulation, progression, and tick-clock code is simulation/world-model substrate.",
+      "source_git_object_sha": "9abc5257e09e0bfafc2bee544483798b1280dd89",
+      "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
         "WP-W12"
@@ -2181,7 +2178,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_game_with_legacy_root_shims"
     },
     {
       "id": "AIFT-HIVE",
@@ -4795,6 +4792,11 @@
         "planned_path": "skeleton/creator",
         "implemented_path": "skeleton/forge/creator",
         "mapping_id": "AIFT-CREATOR"
+      },
+      {
+        "planned_path": "skeleton/game",
+        "implemented_path": "skeleton/simulation/game",
+        "mapping_id": "AIFT-GAME"
       }
     ],
     "planned_but_absent": [
@@ -5339,6 +5341,11 @@
       "path": "skeleton/architecture_round22.py",
       "owner": "architecture compatibility boundary",
       "reason": "legacy architecture round 22 remains a shim for skeleton/foundation/architecture/rounds/round22.py"
+    },
+    {
+      "path": "skeleton/game",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
     }
   ],
   "classification_coverage": {
@@ -5419,7 +5426,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "TREE-028 import-inversion follow-through refreshed AIFT-APPLICATION after capability discovery/loading switched from compatibility roots to canonical application/swarm/pipelines/agents/content namespaces; exact source/AI application tree parity verified.",
+    "note": "TREE-028 capability import inversion refreshes AIFT-APPLICATION while TREE-029 simulation/game convergence remains preserved; canonical application and simulation mirrors are exact and fresh exact-head CI remains required.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [
