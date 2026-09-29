@@ -1,7 +1,2 @@
-"""Skeleton Swarm — Stigmergy module (canonical home)."""
-
-from __future__ import annotations
-
-from skeleton.swarm.mesh import PheromoneField, StigmergicRouter
-
-__all__ = ["PheromoneField", "StigmergicRouter"]
+"""Compatibility shim for skeleton.automation.swarm.stigmergy."""
+from skeleton.automation.swarm.stigmergy import *  # noqa: F401,F403

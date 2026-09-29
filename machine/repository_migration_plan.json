@@ -214,6 +214,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/economy/",
       "notes": "The six-file simulation economy package moved under canonical simulation ownership. Package-internal imports were rewritten to skeleton.simulation.economy while law.py, quota.py and treasury.py moved byte-identically. The legacy root remains compatibility-only, AIFT-ECONOMY follows the nested canonical path, and the parent AIFT-SIMULATION economy overlay was retired after exact governed-tree parity verification."
+    },
+    {
+      "id": "TREE-024",
+      "source": "skeleton/swarm/",
+      "destination": "skeleton/automation/swarm/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/swarm/",
+      "notes": "Twenty-one Swarm modules moved under canonical automation ownership. Nine modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
     }
   ]
 }
