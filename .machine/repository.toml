@@ -259,7 +259,7 @@ name = "frontier-runtime"
 prefixes = ["skeleton/frontier/"]
 owner = "frontier-runtime"
 criticality = "high"
-purpose = "Frontier domain runtime with control-plane primitives under runtime/, progression/meta-game systems under progression/, ecology/lifecycle systems under ecology/, and economy/production systems under economy/; remaining character/world/gameplay domains stay explicit pending later extraction."
+purpose = "Frontier domain runtime with control-plane primitives under runtime/, progression/meta-game systems under progression/, ecology/lifecycle systems under ecology/, economy/production systems under economy/, and NPC/character systems under characters/; remaining world/gameplay domains stay explicit pending later extraction."
 audience = "both"
 lifecycle = "canonical"
 
