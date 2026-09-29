@@ -44,6 +44,7 @@ Skeleton/
 │   ├── release/ + deploy*/   delivery lifecycle
 │   ├── simulation/ + game/   simulation/game runtime
 │   │   ├── content/          domain knowledge / NPC-dialogue world model
+│   │   ├── economy/          treasury, quota and catalog economy simulation
 │   │   └── platform/         engine adapter boundary (Godot)
 │   ├── world/                deterministic world/scene state
 │   ├── frontier/             frontier gameplay/product runtime
@@ -136,6 +137,7 @@ compatibility shims:
 | `skeleton.pipelines.*` | `skeleton.forge.pipelines.*` | transitional shim |
 | `skeleton.creator.*` | `skeleton.forge.creator.*` | transitional shim |
 | `skeleton.content.*` | `skeleton.simulation.content.*` | transitional shim |
+| `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
 | `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
 | `skeleton.frontier.{aquarium,bait,biotope,breeding,...}` | `skeleton.frontier.ecology.*` | transitional module shims |

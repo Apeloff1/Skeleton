@@ -282,8 +282,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "economy-compat"
+prefixes = ["skeleton/economy/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only simulation economy namespace; canonical treasury/economy ownership lives under skeleton/simulation/economy/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
