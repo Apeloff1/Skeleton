@@ -88,6 +88,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/genesis.py",
       "notes": "Genesis moved byte-identically into a dedicated canonical bootstrap namespace. The package root remains a compatibility shim, the governed AI runtime bootstrap mirror stays byte-identical, and AIFT-GENESIS now follows the canonical source path."
+    },
+    {
+      "id": "TREE-010",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/providers/contract.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/provider_contract.py",
+      "notes": "The provider-neutral contract moved byte-identically into a dedicated canonical providers namespace. The root module remains a compatibility shim; skeleton/provider_runtime.py remains owner-sensitive in place but now imports the canonical contract. The AI providers contract mirror remains byte-identical and its mapping source follows skeleton/providers/contract.py."
     }
   ]
 }
