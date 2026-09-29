@@ -89,6 +89,7 @@ CANONICAL_PREFIXES = (
 # Transitional/support roots remain first-party but cannot silently acquire
 # canonical runtime ownership. machine/architecture.json is authoritative.
 FIRST_PARTY_PREFIXES = (
+    "apps/",
     "core/",
     "eval/",
     "java-accelerators/",

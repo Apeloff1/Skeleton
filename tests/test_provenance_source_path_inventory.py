@@ -19,6 +19,7 @@ LIVE_EXAMPLES = (
     ("backend/server.py", "canonical"),
     ("frontend/package.json", "canonical"),
     ("core/activation_security.py", "first-party"),
+    ("apps/jeeves/README.md", "first-party"),
     ("skeleton/testing/test_backlog_reader.py", "first-party"),
     ("backend/tests/test_architecture_boundaries.py", "first-party"),
     ("scripts/check_architecture_boundaries.py", "first-party"),
@@ -144,6 +145,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("machine/manifest.json"), "first-party")
         self.assertEqual(policy.classify_path("packaging/windows/SkeletonSetup.iss"), "first-party")
         self.assertEqual(policy.classify_path("packaging/windows/launcher_entry.py"), "first-party")
+        self.assertEqual(policy.classify_path("apps/jeeves/src/index.js"), "first-party")
         self.assertEqual(policy.classify_path("complete/README.md"), "first-party")
         self.assertEqual(policy.classify_path("complete/cbm26-agent/package.json"), "first-party")
         self.assertEqual(policy.classify_path("complete/cbm26-ai/package.json"), "first-party")
