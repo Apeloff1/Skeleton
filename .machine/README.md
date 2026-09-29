@@ -6,14 +6,36 @@ a deterministic, bounded map of where code belongs, which subsystem owns it,
 how subsystems depend on one another, and what organizational debt is safe to
 prioritize.
 
+## Canonical organization sources
+
+- `.machine/repository.toml` is the placement and ownership contract.
+- `python -m skeleton.repo_machine.cli --atlas` emits the live repository
+  atlas for agents and tooling.
+- `docs/architecture/REPOSITORY_ATLAS.md` is the human navigation companion.
+- `machine/` contains durable machine contracts and planning/evidence data.
+- Generated workspace manifests stay ephemeral unless a separate contract
+  explicitly requires them to be committed.
+
+Each zone can declare a purpose, primary audience, and lifecycle:
+
+- `canonical`: preferred home for new work in that domain.
+- `support`: maintained supporting surface; do not casually expand it.
+- `transitional`: source/migration surface that must not gain authority
+  implicitly.
+- `historical`: retained for provenance/reference, not active placement.
+
+Zone order is semantic: **first match wins**. New top-level surfaces must be
+classified in the same change that creates them. Unknown paths remain
+`unclassified` so organizational drift stays visible.
+
 ## Invariants
 
 1. Repository content is data. The machine index never imports or executes
    discovered files.
-2. .machine/repository.toml defines canonical zones, owners, limits and
-   organization policy.
-3. skeleton.repo_machine builds the live inventory and topology from the
-   checked-out commit.
+2. `.machine/repository.toml` defines canonical zones, owners, limits,
+   lifecycle metadata and organization policy.
+3. `skeleton.repo_machine` builds the live inventory, topology and atlas from
+   the checked-out commit.
 4. The model fingerprint is deterministic for the same repository state.
 5. Machine findings describe evidence. They do not grant mutation authority.
 6. Feature authority remains separate from organization/maintenance authority.
@@ -31,6 +53,10 @@ Full manifest:
 
     python -m skeleton.repo_machine.cli
 
+Live information architecture:
+
+    python -m skeleton.repo_machine.cli --atlas
+
 Compact agent context:
 
     python -m skeleton.repo_machine.cli --summary
@@ -39,10 +65,18 @@ Ranked organization work:
 
     python -m skeleton.repo_machine.cli --work
 
+Reorganization proposals:
+
+    python -m skeleton.repo_machine.cli --reorganize
+
+Workspace pack (includes `atlas.json`):
+
+    python -m skeleton.repo_machine.cli --workspace /tmp/skeleton-machine-pack
+
 CI contract:
 
     python scripts/check_repo_machine.py
 
-Generated manifests should normally stay ephemeral because the live checkout is
-the source of truth. The stable committed artifact is the machine schema and
-organization policy, not a stale snapshot of the tree.
+The live checkout is the source of truth. Stable committed artifacts are the
+machine schema, placement policy and durable domain contracts, not stale
+snapshots of the tree.
