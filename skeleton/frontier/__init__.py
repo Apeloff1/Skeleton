@@ -28,8 +28,8 @@ from skeleton.frontier.achievements import (
     unlock_qualified,
     update_stat as update_achievement_stat,
 )
-from skeleton.frontier.agent_runtime import AgentRuntime, ExecutionResult
-from skeleton.frontier.contracts import (
+from skeleton.frontier.runtime.agent_runtime import AgentRuntime, ExecutionResult
+from skeleton.frontier.runtime.contracts import (
     AgentContract,
     MemoryContract,
     ProvenanceRecord,
@@ -122,7 +122,7 @@ from skeleton.frontier.equipment import (
     quote_equipment_purchase,
     recommended_equipment,
 )
-from skeleton.frontier.events import (
+from skeleton.frontier.runtime.events import (
     DomainEvent,
     EventBus,
     EventJournal,
@@ -144,13 +144,13 @@ from skeleton.frontier.logbook import (
     timeline,
     toggle_pin,
 )
-from skeleton.frontier.memory import (
+from skeleton.frontier.runtime.memory import (
     InMemoryStore,
     MemoryItem,
     normalize_memory_filters,
     normalize_memory_metadata,
 )
-from skeleton.frontier.memory_adapters import (
+from skeleton.frontier.runtime.memory_adapters import (
     CollectionMemoryAdapter,
     MemoryStoreCorruptionError,
     SQLiteCollection,
@@ -184,8 +184,8 @@ from skeleton.frontier.reputation import (
     reputation_level,
     standing_summary,
 )
-from skeleton.frontier.resilience import DegradationLevel, ResilienceController, ResilienceDecision
-from skeleton.frontier.runtime_events import (
+from skeleton.frontier.runtime.resilience import DegradationLevel, ResilienceController, ResilienceDecision
+from skeleton.frontier.runtime.runtime_events import (
     execution_event_to_memory_item,
     execution_result_to_event,
 )
