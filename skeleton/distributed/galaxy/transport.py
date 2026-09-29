@@ -87,8 +87,12 @@ class NodeTransport:
 
     def start(self) -> "NodeTransport":
         """Start the inbox server. Port 0 picks a free ephemeral port."""
-        _InboxHandler.transport = self
-        self._server = HTTPServer((self.host, self.port), _InboxHandler)
+        if self._server is not None:
+            return self
+        # A shared handler class would route every node's requests to the
+        # most recently started transport in this process.
+        handler = type("_NodeInboxHandler", (_InboxHandler,), {"transport": self})
+        self._server = HTTPServer((self.host, self.port), handler)
         self.port = self._server.server_address[1]  # resolve ephemeral port
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
@@ -97,7 +101,11 @@ class NodeTransport:
     def stop(self) -> None:
         if self._server:
             self._server.shutdown()
+            self._server.server_close()
             self._server = None
+            if self._thread is not None:
+                self._thread.join(timeout=2.0)
+                self._thread = None
 
     def send(self, target_address: str, payload: Dict[str, Any], timeout: float = 2.0) -> bool:
         """Send an envelope to a peer node."""

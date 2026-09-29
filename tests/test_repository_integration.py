@@ -21,7 +21,7 @@ def test_integrated_source_identities_match_the_index() -> None:
     ids = {
         "AIFT-APPLICATION", "AIFT-DISTRIBUTED", "AIFT-RESEARCH", "AIFT-KNOWLEDGE",
         "AIFT-PROVENANCE", "AIFT-TOOLS", "AIFT-SIMULATION", "AIFT-GAME",
-        "AIFT-SCHOOL", "AIFT-LEARNING", "AIFT-KERNEL", "AIFT-SWARM",
+        "AIFT-SCHOOL", "AIFT-LEARNING", "AIFT-KERNEL", "AIFT-SWARM", "AIFT-NETWORK", "AIFT-ORGANISM", "AIFT-AUTOMATION", "AIFT-GALAXY",
     }
     mappings = {item["id"]: item for item in manifest["mappings"]}
     tree = _git("write-tree")

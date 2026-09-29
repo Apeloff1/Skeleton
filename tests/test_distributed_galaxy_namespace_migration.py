@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 from skeleton.app.runtime import get_capability
@@ -33,7 +34,10 @@ def test_ai_tree_and_capability_loader_follow_canonical_galaxy_owner() -> None:
 
     assert galaxy["source"] == "skeleton/distributed/galaxy"
     assert galaxy["destination"] == "skeleton/ai/runtime/distributed/galaxy"
-    assert galaxy["source_git_object_sha"] == "4edf8f5dbd7323a5581072a3430b1ad85c81f2dd"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert galaxy["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f"{tree}:skeleton/distributed/galaxy"], cwd=ROOT, text=True
+    ).strip()
     assert get_capability("galaxy").module == "skeleton.distributed.galaxy"
     assert "skeleton/distributed" not in manifest["planned_path_audit"]["planned_but_absent"]
 

@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "eb3efb3107b598c8f5621529e8d91785b904bdcf",
+      "source_git_object_sha": "511ac40e70460c682fa3af4991bb6aef5671fb9c",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1055,7 +1055,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "bc423ad5d959119aa4c905e6eaeff55e6dc043bd",
+      "source_git_object_sha": "de7558031ae17d0dbe4d027076e5779f23790953",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -1366,7 +1366,7 @@
       "source": "skeleton/distributed/galaxy",
       "destination": "skeleton/ai/runtime/distributed/galaxy",
       "kind": "tree",
-      "source_git_object_sha": "4edf8f5dbd7323a5581072a3430b1ad85c81f2dd",
+      "source_git_object_sha": "fea95fb293259929d5c9f296088f29931f4dfb40",
       "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
       "work_package_refs": [
         "WP-W16",
@@ -1569,7 +1569,7 @@
       "source": "skeleton/distributed/network",
       "destination": "skeleton/ai/runtime/distributed/network",
       "kind": "tree",
-      "source_git_object_sha": "66273902c841caa8ea1c9e248d1e494c2bfc8812",
+      "source_git_object_sha": "e0cf7a9f7dc0169aab0fa9fd39fb7fbf4cbba231",
       "role": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
       "work_package_refs": [
         "WP-W19",
@@ -1776,7 +1776,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "5aaea3da1c06ecd88cce425e425937d6836f392b",
+      "source_git_object_sha": "5a69b6573beb734f92aafbd6e7220d8a9e1b3951",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -4746,7 +4746,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "ffa1be723381caa86e3c21ec163ecba957c0d9af",
+      "source_git_object_sha": "88d6e639850cf96e163fae754d57fa115f157bb8",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"

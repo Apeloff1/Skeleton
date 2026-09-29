@@ -229,6 +229,11 @@ jobs:
           tests/test_app_workspace_taxonomy.py
           tests/test_research_lineage_taxonomy.py
           tests/test_repository_integration.py
+          tests/test_replication_module_layout.py
+          tests/test_organism_persistence_paths.py
+          skeleton/testing/test_mesh_handoff.py
+          skeleton/testing/test_galaxy_bridge.py
+          skeleton/testing/test_replication_rollback_contract.py
           tests/test_*namespace_migration*.py
           tests/test_autonomous_supervisor.py
           tests/test_autonomous_builder_e2e_contract.py

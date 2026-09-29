@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,10 @@ def test_ai_tree_retargets_network_to_canonical_distributed_owner() -> None:
 
     assert network["source"] == "skeleton/distributed/network"
     assert network["destination"] == "skeleton/ai/runtime/distributed/network"
-    assert network["source_git_object_sha"] == "66273902c841caa8ea1c9e248d1e494c2bfc8812"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert network["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f"{tree}:skeleton/distributed/network"], cwd=ROOT, text=True
+    ).strip()
 
 
 def test_network_migration_follows_galaxy_wave() -> None:

@@ -29,7 +29,8 @@ from skeleton.network import (
     frame_digest,
     state_digest,
 )
-from skeleton.network import replication as replication_mod
+from skeleton.distributed.network import replication as replication_mod
+from skeleton.distributed.network import _replication_protocol as protocol_mod
 from skeleton.network.replication import Packet, decode_packet
 
 
@@ -696,7 +697,8 @@ def test_failed_buffer_drain_rolls_back_direct_predecessor_atomically() -> None:
 
 
 def test_module_has_no_socket_or_server_surface():
-    tree = ast.parse(inspect.getsource(replication_mod))
+    source = "\n".join(inspect.getsource(module) for module in (replication_mod, protocol_mod))
+    tree = ast.parse(source)
     imported: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -706,8 +708,8 @@ def test_module_has_no_socket_or_server_surface():
     assert "socket" not in imported
     assert "asyncio" not in imported
     assert "httpx" not in imported
-    assert "create_server" not in inspect.getsource(replication_mod)
-    assert "create_connection" not in inspect.getsource(replication_mod)
+    assert "create_server" not in source
+    assert "create_connection" not in source
 
 
 def test_acknowledgement_evidence_rejects_impossible_or_forged_state():
@@ -731,13 +733,13 @@ def test_acknowledgement_evidence_rejects_impossible_or_forged_state():
         int(future_payload["last_applied_sequence"]),
         future_payload,
     )
-    with pytest.raises(SequenceError, match="future applied sequence"):
+    with pytest.raises(SequenceError, match="future authority sequence"):
         authority.record_ack(future)
 
     wrong_digest_payload = dict(valid.payload)
     wrong_digest_payload["last_applied_digest"] = "0" * 64
     wrong_digest = replication_mod._wrap_packet("ack", valid.sequence, wrong_digest_payload)
-    with pytest.raises(ReplicationError, match="retained authority history"):
+    with pytest.raises(ReplicationError, match="retained authority frame"):
         authority.record_ack(wrong_digest)
 
     non_hex_payload = dict(valid.payload)
@@ -750,5 +752,5 @@ def test_acknowledgement_evidence_rejects_impossible_or_forged_state():
     impossible_gap_payload["last_received_sequence"] = 3
     impossible_gap_payload["missing_sequences"] = [1, 2]
     impossible_gap = replication_mod._wrap_packet("ack", valid.sequence, impossible_gap_payload)
-    with pytest.raises(SequenceError, match="outside the reported gap"):
+    with pytest.raises(SequenceError, match="strictly after applied"):
         authority.record_ack(impossible_gap)
