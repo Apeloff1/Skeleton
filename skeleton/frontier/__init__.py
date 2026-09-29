@@ -189,7 +189,7 @@ from skeleton.frontier.runtime.runtime_events import (
     execution_event_to_memory_item,
     execution_result_to_event,
 )
-from skeleton.frontier.ship import (
+from skeleton.frontier.game.ship import (
     CrewRoleSpec,
     PurchaseQuote,
     aggregate_crew,
@@ -202,7 +202,7 @@ from skeleton.frontier.ship import (
     quote_purchase,
     stores_for_location,
 )
-from skeleton.frontier.world import (
+from skeleton.frontier.game.world import (
     IslandVocabulary,
     WorldBounds,
     WorldRegion,
