@@ -237,8 +237,17 @@ audience = "machine"
 lifecycle = "canonical"
 
 [[zone]]
+name = "provider-contract-compat"
+prefixes = ["skeleton/provider_contract.py"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only provider contract entrypoint; canonical provider-neutral contract lives under skeleton/ai/providers/contract.py."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "integrations"
-prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_contract.py", "skeleton/provider_runtime.py"]
+prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_runtime.py"]
 owner = "integration-runtime"
 criticality = "medium"
 purpose = "External provider, tool, skill and service integration boundaries."
