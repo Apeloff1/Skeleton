@@ -25,10 +25,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.overseer.control import ControlCore, ControlDecision, QoSTier
-from skeleton.overseer.governor import BudgetEnforcer, BudgetProfile, ResourceGovernor
-from skeleton.overseer.hardware import HardwareProbe, HardwareState
-from skeleton.overseer.predict import (
+from skeleton.automation.overseer.control import ControlCore, ControlDecision, QoSTier
+from skeleton.automation.overseer.governor import BudgetEnforcer, BudgetProfile, ResourceGovernor
+from skeleton.automation.overseer.hardware import HardwareProbe, HardwareState
+from skeleton.automation.overseer.predict import (
     SensorFusion,
     TrendForecaster,
     WearModel,

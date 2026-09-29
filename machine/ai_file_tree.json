@@ -442,7 +442,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "f88a6552af2fe9cf6108db4a6cf4223ed05408b1",
+      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -513,7 +513,10 @@
       "move_batch": "B3-owner-sensitive",
       "source_disposition": "retain_until_explicit_owner_and_import_cutover",
       "source_exclusions": [
-        "shift_supervisor"
+        "shift_supervisor",
+        "hive",
+        "overseer",
+        "swarm"
       ]
     },
     {
@@ -1563,10 +1566,10 @@
     },
     {
       "id": "AIFT-OVERSEER",
-      "source": "skeleton/overseer",
+      "source": "skeleton/automation/overseer",
       "destination": "skeleton/ai/runtime/distributed/overseer",
       "kind": "tree",
-      "source_git_object_sha": "ec0dbf04244ebe3ec9521a3c72fed2d7d9945b3c",
+      "source_git_object_sha": "168caafd2a3f001fec00f7eb08ae990b707871fc",
       "role": "Governor, digital-twin, hardware, recovery, fleet, and model-predictive control code is runtime supervision/scheduling infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -1595,7 +1598,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_owner_with_legacy_root_shims"
     },
     {
       "id": "AIFT-PR-AUTOMATION",
@@ -1738,10 +1741,10 @@
     },
     {
       "id": "AIFT-SWARM",
-      "source": "skeleton/swarm",
+      "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "a340e961569a134a27bb5302baa0778e75d7a1dd",
+      "source_git_object_sha": "9a9d9d0ad1b2816389e96734899c81b9969ce53b",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1770,7 +1773,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_owner_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GRAPHS",
@@ -2178,10 +2181,10 @@
     },
     {
       "id": "AIFT-HIVE",
-      "source": "skeleton/hive",
+      "source": "skeleton/automation/hive",
       "destination": "skeleton/ai/agents/swarm/hive",
       "kind": "tree",
-      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788",
+      "source_git_object_sha": "b67b286d9450ba6780a4dc92b611ce3c2aa0fd28",
       "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
       "work_package_refs": [
         "WP-W15",
@@ -2205,7 +2208,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_owner_with_legacy_root_shims"
     },
     {
       "id": "AIFT-JVM-REGISTRY",
@@ -5207,6 +5210,36 @@
       "path": "skeleton/architecture_round22.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/hive",
+      "owner": "compatibility shim for skeleton/automation/hive",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/hive"
+    },
+    {
+      "path": "skeleton/overseer",
+      "owner": "compatibility shim for skeleton/automation/overseer",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/overseer"
+    },
+    {
+      "path": "skeleton/swarm",
+      "owner": "compatibility shim for skeleton/automation/swarm",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/swarm"
+    },
+    {
+      "path": "skeleton/content",
+      "owner": "compatibility shim for skeleton/simulation/content",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/content"
+    },
+    {
+      "path": "skeleton/economy",
+      "owner": "compatibility shim for skeleton/simulation/economy",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/economy"
+    },
+    {
+      "path": "skeleton/world",
+      "owner": "compatibility shim for skeleton/simulation/world",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
     }
   ],
   "classification_coverage": {

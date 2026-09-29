@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from skeleton.swarm.mesh import CapabilityNegotiator
+from skeleton.automation.swarm.mesh import CapabilityNegotiator
 
 __all__ = ["CapabilityNegotiator"]

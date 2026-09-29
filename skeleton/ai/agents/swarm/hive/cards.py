@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from skeleton.hive.law import CITATION, PACKET, STORED_PROSE
+from skeleton.automation.hive.law import CITATION, PACKET, STORED_PROSE
 
 
 def hive_card(

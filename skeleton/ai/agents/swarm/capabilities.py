@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.swarm.law import CITATION, LAYER, N_CAP, PACKET, VERSION
+from skeleton.automation.swarm.law import CITATION, LAYER, N_CAP, PACKET, VERSION
 
 
 def capabilities() -> dict[str, Any]:

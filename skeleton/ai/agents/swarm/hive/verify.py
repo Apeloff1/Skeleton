@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.hive.capabilities import capabilities
-from skeleton.hive.engine import HiveEngine
-from skeleton.hive.kernel import Hive
-from skeleton.hive.law import WALK_CAP
+from skeleton.automation.hive.capabilities import capabilities
+from skeleton.automation.hive.engine import HiveEngine
+from skeleton.automation.hive.kernel import Hive
+from skeleton.automation.hive.law import WALK_CAP
 
 
 def check_mint_link() -> None:

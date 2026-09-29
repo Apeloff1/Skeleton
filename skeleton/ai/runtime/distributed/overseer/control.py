@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from skeleton.overseer.predict import WorkloadRegime
+from skeleton.automation.overseer.predict import WorkloadRegime
 
 
 # ---------------------------------------------------------------------------

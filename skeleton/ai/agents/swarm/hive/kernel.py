@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from skeleton.hive.cards import hive_card
-from skeleton.hive.law import HISTORY_KEEP, WALK_CAP
-from skeleton.hive.merkle import digest, fold, merkle_pair
+from skeleton.automation.hive.cards import hive_card
+from skeleton.automation.hive.law import HISTORY_KEEP, WALK_CAP
+from skeleton.automation.hive.merkle import digest, fold, merkle_pair
 
 
 class Hive:

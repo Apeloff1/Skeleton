@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.hive.law import CITATION, LAYER, PACKET, VERSION, WALK_CAP
+from skeleton.automation.hive.law import CITATION, LAYER, PACKET, VERSION, WALK_CAP
 
 
 def capabilities() -> dict[str, Any]:
