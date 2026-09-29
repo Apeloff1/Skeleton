@@ -6,6 +6,7 @@ Repository files are inspected as data and are never imported or executed by
 this package.
 """
 
+from .atlas import AtlasZone, PathPlacement, RepositoryAtlas, build_repository_atlas, placement_for_path
 from .budgets import ZoneBudget, derive_zone_budgets
 from .builder import RepositoryModelBuilder, build_repository_model
 from .catalog import CapabilityRecord, RepositoryCatalog, build_catalog
@@ -41,6 +42,7 @@ from .workgraph import WorkGraph, WorkNode, build_work_graph
 from .workspace import generate_workspace
 
 __all__ = [
+    "AtlasZone",
     "CapabilityRecord",
     "ContextShard",
     "FileRecord",
@@ -53,9 +55,11 @@ __all__ = [
     "ManifestDelta",
     "NavigationIndex",
     "OwnershipReport",
+    "PathPlacement",
     "PolicyDecision",
     "Relation",
     "ReorganizationProposal",
+    "RepositoryAtlas",
     "RepositoryCatalog",
     "RepositoryModel",
     "RepositoryModelBuilder",
@@ -77,6 +81,7 @@ __all__ = [
     "analyze_impact",
     "analyze_ownership",
     "build_catalog",
+    "build_repository_atlas",
     "build_context_shards",
     "build_relations",
     "build_repository_model",
@@ -90,6 +95,7 @@ __all__ = [
     "evaluate_change_policy",
     "generate_workspace",
     "growth_recommendations",
+    "placement_for_path",
     "propose_reorganization",
     "reachable_files",
     "repository_health",
