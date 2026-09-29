@@ -989,7 +989,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "69804584a7f002f1bcd1709dc2c50cab12597e5b",
+      "source_git_object_sha": "143dd478f3e24d32268547b69826d5d485ff9edc",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
