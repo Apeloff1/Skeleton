@@ -160,6 +160,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier progression/meta modules",
       "notes": "Twelve Frontier progression/meta-game modules were extracted into skeleton/frontier/progression/. Internal progression/runtime references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and biotope_achievement_adapters now imports canonical progression/runtime dependencies. Whole-tree source/AI parity remains exact."
+    },
+    {
+      "id": "TREE-018",
+      "source": "skeleton/frontier/{aquarium,aquarium_adapters,bait,biotope,biotope_achievement_adapters,biotope_adapters,breeding,breeding_adapters}.py",
+      "destination": "skeleton/frontier/ecology/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier ecology modules",
+      "notes": "Eight Frontier ecology/lifecycle modules were extracted into skeleton/frontier/ecology/. Internal ecology/runtime/progression references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and cooking_adapters/gameplay now consume canonical ecology paths. Whole-tree source/AI parity remains exact."
     }
   ]
 }
