@@ -4751,6 +4751,11 @@
         "planned_path": "skeleton/kv_cache.py",
         "implemented_path": "skeleton/kv/__init__.py",
         "mapping_id": "AIFT-KV-CACHE"
+      },
+      {
+        "planned_path": "skeleton/creator",
+        "implemented_path": "skeleton/forge/creator",
+        "mapping_id": "AIFT-CREATOR"
       }
     ],
     "planned_but_absent": [

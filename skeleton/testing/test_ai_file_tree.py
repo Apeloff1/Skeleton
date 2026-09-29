@@ -270,6 +270,7 @@ def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
     assert aliases["skeleton/application"] == "skeleton/app/runtime"
     assert aliases["skeleton/genesis.py"] == "skeleton/bootstrap/genesis.py"
     assert aliases["skeleton/provider_contract.py"] == "skeleton/providers/contract.py"
+    assert aliases["skeleton/creator"] == "skeleton/forge/creator"
 
 
 def test_ai_file_tree_classifies_all_machine_authority_roots() -> None:
