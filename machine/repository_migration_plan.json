@@ -286,6 +286,15 @@
       "state": "classified",
       "compatibility": null,
       "notes": "Aligned repository taxonomy with the existing AI research map: circulation, HOAG, motive, sheaf, spine and viscera are historical/research-quarantine lineage with no production authority. Their source trees remain preserved for provenance and characterization; generic specialized-runtime support ownership now covers only unresolved cue, genos, parse and turn surfaces."
+    },
+    {
+      "id": "TREE-032",
+      "source": "apps/",
+      "destination": ".machine/repository.toml application-workspace zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Classified the newly introduced top-level apps/ workspace. apps/jeeves receives specific Jeeves ownership as an operator-facing facade/CLI/plane layout, while the generic apps/ root is a support-layer application workspace. The classification explicitly prevents app facades from silently becoming source-of-truth runtime ownership."
     }
   ]
 }

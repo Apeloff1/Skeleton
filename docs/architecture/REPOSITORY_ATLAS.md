@@ -17,6 +17,8 @@ Skeleton/
 ├── .machine/                 machine placement/ownership policy
 ├── machine/                  durable machine contracts, evidence and plans
 ├── .github/                  hosted CI, merge policy and repository automation
+├── apps/                     operator-facing application workspaces
+│   └── jeeves/               Jeeves facade, CLI and app-local plane layout
 ├── skeleton/                 canonical Python application/runtime namespace
 │   ├── ai/                   AI runtime, providers, learning, research
 │   ├── providers/            canonical provider-neutral contracts
@@ -92,7 +94,10 @@ Skeleton/
    lifecycle entry in `.machine/repository.toml` in the same change.
 9. Preserve compatibility imports during moves. Prefer staged extraction and
    shims over tree-wide rename bursts.
-10. Generated machine snapshots are normally ephemeral. Commit them only when
+10. App workspaces under `apps/` are composition surfaces. They may expose CLIs,
+    facades and deployable wiring, but they do not silently supersede source-domain
+    runtime ownership or justify copying transitional source trees.
+11. Generated machine snapshots are normally ephemeral. Commit them only when
     another evidence/provenance contract explicitly requires a durable artifact.
 
 ## Lifecycle meanings
@@ -116,6 +121,15 @@ runtime ownership:
 - Unresolved specialized runtime: `skeleton/cue/`, `skeleton/genos/`,
   `skeleton/parse/`, and `skeleton/turn/`. These remain explicit until a
   canonical owner and cutover contract are approved.
+
+## Application workspaces
+
+`apps/` is the operator/deployable composition layer. The first workspace,
+`apps/jeeves/`, exposes Jeeves facades, a CLI, and app-local plane directories.
+Its own tree law is one implementation with many faces: the app workspace must
+compose governed implementations rather than fork them. The repository taxonomy
+therefore marks app workspaces as support surfaces, with more-specific ownership
+zones allowed before the generic `apps/` rule.
 
 ## Machine discovery
 
