@@ -406,11 +406,11 @@
     },
     {
       "id": "AIFT-AGENTS",
-      "source": "skeleton/agents",
+      "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "940ef2520e015bf13d7eba00813a792b575a7b3d",
-      "role": "core agent/swarm execution runtime",
+      "source_git_object_sha": "90d2fb55348611e5d4b15337c1b5b2240c38d23e",
+      "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -435,14 +435,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_agents_with_legacy_root_shims"
     },
     {
       "id": "AIFT-AUTOMATION",
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "source_git_object_sha": "580a40ef8c915834d19fccc18905bdde808d6024",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -511,7 +511,10 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "overlay_children": [
+        "agents"
+      ]
     },
     {
       "id": "AIFT-ARTIFACT-PLANE",

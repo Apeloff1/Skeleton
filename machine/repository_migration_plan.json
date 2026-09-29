@@ -250,6 +250,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/world/",
       "notes": "The two-file deterministic scene/world package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-WORLD follows skeleton/simulation/world, and the parent AIFT-SIMULATION world overlay was retired after exact governed-tree parity verification, leaving only game as an overlay."
+    },
+    {
+      "id": "TREE-028",
+      "source": "skeleton/agents/",
+      "destination": "skeleton/automation/agents/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/agents/",
+      "notes": "Sixty-eight agent/swarm runtime modules moved under canonical automation ownership. Forty-one modules with absolute skeleton.agents self-imports were rewritten to skeleton.automation.agents; unchanged modules retained source blobs. The governed skeleton/ai/agents/core mirror received identical rewrites and remains exact tree-parity with the canonical package. The legacy skeleton.agents namespace is compatibility-only, and AIFT-AUTOMATION now treats agents as a governed overlay."
     }
   ]
 }
