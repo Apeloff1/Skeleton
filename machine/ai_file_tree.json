@@ -929,7 +929,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "eab3454f6d83990595d7eb08ac8ffd69e6e6564f",
+      "source_git_object_sha": "957d1af8304715ce73370c8230cf7edf46d23c3c",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -942,7 +942,6 @@
         "VOL-019"
       ],
       "overlay_children": [
-        "economy",
         "game",
         "world"
       ],
@@ -2110,11 +2109,11 @@
     },
     {
       "id": "AIFT-ECONOMY",
-      "source": "skeleton/economy",
+      "source": "skeleton/simulation/economy",
       "destination": "skeleton/ai/simulation/economy",
       "kind": "tree",
       "source_git_object_sha": "ff47921c83321c4644ee8040fcb20604de5f72af",
-      "role": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
+      "role": "Canonical GameForge-derived simulation economy and treasury model under skeleton/simulation/economy, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
         "WP-W12"
@@ -2138,7 +2137,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_economy_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GAME",
