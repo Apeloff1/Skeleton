@@ -15,8 +15,8 @@
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
     "provider_contract": "skeleton/provider_contract.py",
     "operation_contract": "skeleton/contracts/operation.py",
-    "stream_contract": "skeleton/frontier/operation_stream.py",
-    "stream_store": "skeleton/frontier/operation_stream_store.py",
+    "stream_contract": "skeleton/frontier/runtime/operation_stream.py",
+    "stream_store": "skeleton/frontier/runtime/operation_stream_store.py",
     "capability_interface_registry": "machine/capability_interfaces.json",
     "capability_interface_validator": "scripts/check_capability_interfaces.py",
     "state_topology": "machine/state_topology.json",
@@ -600,7 +600,7 @@
       "from": "engine-runtime",
       "to": "application/product transport adapters",
       "transport": "transport-neutral ordered operation event envelope; SSE/WebSocket/polling adapters allowed",
-      "contract": "skeleton/frontier/operation_stream.py",
+      "contract": "skeleton/frontier/runtime/operation_stream.py",
       "security": "operation scoped; bounded JSON payload; no secret-bearing raw logs; replay cursor validated"
     }
   ],
@@ -687,7 +687,7 @@
       {
         "plane": "model-routing",
         "zone": "engine",
-        "owner": "skeleton/frontier/model_routing.py",
+        "owner": "skeleton/frontier/runtime/model_routing.py",
         "unit_type": "module",
         "boundary_class": "policy-boundary",
         "exposure": "internal"
@@ -902,7 +902,7 @@
       },
       {
         "id": "model-routing-policy",
-        "path": "skeleton/frontier/model_routing.py",
+        "path": "skeleton/frontier/runtime/model_routing.py",
         "zone": "engine",
         "responsibility": "Own canonical provider capability/budget routing below the application boundary; no provider credentials."
       },
