@@ -16,10 +16,10 @@ def test_flat_frontier_ecology_modules_reexport_canonical_modules() -> None:
         ("aquarium_adapters", "aquarium_state_payload"),
         ("bait", "BaitSpec"),
         ("biotope", "BiotopeProgress"),
-        ("biotope_achievement_adapters", "biotope_achievement_events"),
+        ("biotope_achievement_adapters", "empty_biotope_catch_evidence"),
         ("biotope_adapters", "biotope_progress_payload"),
         ("breeding", "BreedingJob"),
-        ("breeding_adapters", "offspring_plan_payload"),
+        ("breeding_adapters", "breeding_offspring_digest"),
     )
     for module_name, symbol in pairs:
         legacy = importlib.import_module(f"skeleton.frontier.{module_name}")
