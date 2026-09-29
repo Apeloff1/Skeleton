@@ -147,11 +147,29 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "chronicle-compat"
+prefixes = ["skeleton/chronicle/"]
+owner = "provenance-runtime"
+criticality = "low"
+purpose = "Compatibility-only Chronicle namespace; canonical append-only provenance and tamper-evident event history live under skeleton/provenance/chronicle/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "provenance"
+prefixes = ["skeleton/provenance/"]
+owner = "provenance-runtime"
+criticality = "high"
+purpose = "Canonical append-only event evidence, Merkle history, tamper detection and independent provenance verification."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "knowledge"
-prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/knowledge/", "skeleton/chronicle/"]
+prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/knowledge/"]
 owner = "knowledge-runtime"
 criticality = "high"
-purpose = "Runtime memory, retrieval, reusable knowledge/reasoning substrate, indexing, graphs and chronology services."
+purpose = "Runtime memory, retrieval, reusable knowledge/reasoning substrate, indexing and graph services."
 audience = "both"
 lifecycle = "canonical"
 

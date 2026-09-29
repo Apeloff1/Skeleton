@@ -1153,11 +1153,43 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
+      "id": "AIFT-PROVENANCE",
+      "source": "skeleton/provenance",
+      "destination": "skeleton/ai/runtime/provenance",
+      "kind": "tree",
+      "source_git_object_sha": "0198cb43f5bd16c81f5c8ad333c771d02bdccb60",
+      "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W17",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ],
+      "overlay_children": [
+        "chronicle"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_provenance_parent_with_governed_chronicle_overlay"
+    },
+    {
       "id": "AIFT-CHRONICLE",
-      "source": "skeleton/chronicle",
+      "source": "skeleton/provenance/chronicle",
       "destination": "skeleton/ai/runtime/provenance/chronicle",
       "kind": "tree",
-      "source_git_object_sha": "ee6ebd667a67fab74eb295e1914a0ab205c77217",
+      "source_git_object_sha": "5831cc060b6fd0f260437150b172796da8318e43",
       "role": "Append-only Merkle chronicle behavior is provenance/event evidence and belongs under the governed runtime provenance owner.",
       "work_package_refs": [
         "WP-W03",
@@ -1185,7 +1217,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_provenance_chronicle_with_legacy_root_shims"
     },
     {
       "id": "AIFT-CORE",
@@ -4886,6 +4918,11 @@
         "planned_path": "skeleton/graphs",
         "implemented_path": "skeleton/knowledge/graphs",
         "mapping_id": "AIFT-GRAPHS"
+      },
+      {
+        "planned_path": "skeleton/chronicle",
+        "implemented_path": "skeleton/provenance/chronicle",
+        "mapping_id": "AIFT-CHRONICLE"
       }
     ],
     "planned_but_absent": [
@@ -4907,7 +4944,6 @@
       "skeleton/policy",
       "skeleton/product",
       "skeleton/product_shell",
-      "skeleton/provenance",
       "skeleton/repo_engineering",
       "skeleton/routing",
       "skeleton/safety",
@@ -5457,6 +5493,11 @@
       "path": "skeleton/graphs",
       "owner": "knowledge compatibility boundary",
       "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-035"
+    },
+    {
+      "path": "skeleton/chronicle",
+      "owner": "provenance compatibility boundary",
+      "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-036"
     }
   ],
   "classification_coverage": {
