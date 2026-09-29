@@ -39,6 +39,7 @@ Skeleton/
 │   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
 │   ├── build/ + forge/       build/construction systems
+│   │   ├── creator/          intent compiler + reversible design edits
 │   │   └── pipelines/        content/game generation pipelines
 │   ├── release/ + deploy*/   delivery lifecycle
 │   ├── simulation/ + game/   simulation/game runtime
@@ -126,6 +127,7 @@ compatibility shims:
 | `skeleton.kv_cache` | `skeleton.kv` | transitional shim |
 | `skeleton.platform.*` | `skeleton.simulation.platform.*` | transitional shim |
 | `skeleton.pipelines.*` | `skeleton.forge.pipelines.*` | transitional shim |
+| `skeleton.creator.*` | `skeleton.forge.creator.*` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
