@@ -120,7 +120,7 @@ def test_model_entrypoints_gate_before_configuration_or_network() -> None:
         "__init__",
     )
     supervisor_call = _method(
-        "core/shift_supervisor/model_gateway.py",
+        "skeleton/automation/shift_supervisor/model_gateway.py",
         "ModelGateway",
         "call_json",
     )
@@ -132,7 +132,7 @@ def test_model_entrypoints_gate_before_configuration_or_network() -> None:
 def test_model_entrypoints_import_dependency_free_gate() -> None:
     for relative in (
         "skeleton/automation/chatgpt_adapter.py",
-        "core/shift_supervisor/model_gateway.py",
+        "skeleton/automation/shift_supervisor/model_gateway.py",
     ):
         source = (REPO_ROOT / relative).read_text(encoding="utf-8")
         assert (
