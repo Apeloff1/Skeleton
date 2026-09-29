@@ -117,7 +117,7 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
         "skeleton/application",
         "skeleton/core",
         "skeleton/data",
-        "skeleton/genesis.py",
+        "skeleton/bootstrap/genesis.py",
         "skeleton/galaxy",
         "skeleton/pr_automation",
         "skeleton/school",

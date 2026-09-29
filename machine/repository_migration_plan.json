@@ -79,6 +79,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/jvm_accelerators.py",
       "notes": "The optional JVM accelerator registry moved byte-identically beside native runtime ownership. The root module is now a compatibility shim; the canonical AI runtime mirror remains byte-identical and its mapping source now follows skeleton/native/jvm_registry.py. The separate java-accelerators/ implementation root remains unchanged."
+    },
+    {
+      "id": "TREE-009",
+      "source": "skeleton/genesis.py",
+      "destination": "skeleton/bootstrap/genesis.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/genesis.py",
+      "notes": "Genesis moved byte-identically into a dedicated canonical bootstrap namespace. The package root remains a compatibility shim, the governed AI runtime bootstrap mirror stays byte-identical, and AIFT-GENESIS now follows the canonical source path."
     }
   ]
 }
