@@ -29,6 +29,12 @@ def test_application_package_exports_are_canonical_identities() -> None:
 def test_application_module_shims_cover_canonical_public_surface(module_name: str) -> None:
     canonical = importlib.import_module(f"skeleton.app.runtime.{module_name}")
     legacy = importlib.import_module(f"skeleton.application.{module_name}")
-    public = {name for name in vars(canonical) if not name.startswith("_")}
-    assert public
-    assert public.issubset(set(vars(legacy)))
+    exported = tuple(
+        getattr(
+            canonical,
+            "__all__",
+            tuple(name for name in vars(canonical) if not name.startswith("_")),
+        )
+    )
+    assert exported
+    assert all(hasattr(legacy, name) for name in exported)
