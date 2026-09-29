@@ -158,7 +158,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_context_with_governed_domains_overlay",
+      "overlay_children": [
+        "domains"
+      ]
     },
     {
       "id": "AIFT-RETRIEVAL",
@@ -307,10 +310,10 @@
     },
     {
       "id": "AIFT-BUILD-PLANNING",
-      "source": "core/shift_supervisor",
+      "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "38821fcba5f53183550b97915c4f5b31584a8f1f",
+      "source_git_object_sha": "9e784b949d6b8cb2dbd76684b9ccc6ce03bfa1d0",
       "role": "transitional planning scheduling and build-control harness",
       "work_package_refs": [
         "WP-W11",
@@ -323,8 +326,8 @@
         {
           "path": "model_gateway.py",
           "mode": "compatibility_facade",
-          "facade_required_import": "from core.shift_supervisor.model_gateway import",
-          "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
+          "facade_required_import": "from skeleton.automation.shift_supervisor.model_gateway import",
+          "note": "Credential-bearing model gateway remains singular at skeleton/automation/shift_supervisor/model_gateway.py; the AI-tree destination is a non-owning facade."
         }
       ],
       "move_tags": [
@@ -333,7 +336,7 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "canonical_automation_shift_supervisor_with_legacy_core_shims"
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -516,7 +519,8 @@
         "agents",
         "swarm",
         "hive",
-        "overseer"
+        "overseer",
+        "shift_supervisor"
       ]
     },
     {
