@@ -46,6 +46,8 @@ Skeleton/
 │   ├── kv/                   paged/tiered KV-cache control plane
 │   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
+│   ├── tools/                governed tool execution and connector edges
+│   │   └── integrations/     connectors, GitHub adapter and authenticated webhooks
 │   ├── build/ + forge/       build/construction systems
 │   │   ├── creator/          intent compiler + reversible design edits
 │   │   └── pipelines/        content/game generation pipelines
@@ -159,6 +161,7 @@ compatibility shims:
 | `skeleton.mesh.*` | `skeleton.distributed.mesh.*` | transitional shim |
 | `skeleton.graphs.*` | `skeleton.knowledge.graphs.*` | transitional shim |
 | `skeleton.chronicle.*` | `skeleton.provenance.chronicle.*` | transitional shim |
+| `skeleton.integrations.*` | `skeleton.tools.integrations.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

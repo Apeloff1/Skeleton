@@ -1868,11 +1868,41 @@
       "source_disposition": "canonical_knowledge_graphs_with_legacy_root_shims"
     },
     {
+      "id": "AIFT-TOOLS",
+      "source": "skeleton/tools",
+      "destination": "skeleton/ai/runtime/tools",
+      "kind": "tree",
+      "source_git_object_sha": "63239f151af1b31b36db84ead936f9557aa62fb1",
+      "role": "Canonical governed tool-edge runtime parent with independently governed connector and webhook integrations.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-015",
+        "VOL-026"
+      ],
+      "overlay_children": [
+        "integrations"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_tools_parent_with_governed_integrations_overlay"
+    },
+    {
       "id": "AIFT-INTEGRATIONS",
-      "source": "skeleton/integrations",
+      "source": "skeleton/tools/integrations",
       "destination": "skeleton/ai/runtime/tools/integrations",
       "kind": "tree",
-      "source_git_object_sha": "e0ad81df2a6baf6b340aabafd144ddf5660c13d9",
+      "source_git_object_sha": "7a342bbbcfac4bd26124df1c96bbf86df1b183d7",
       "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
       "work_package_refs": [
         "WP-W13",
@@ -1898,7 +1928,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_tools_integrations_with_legacy_root_shims"
     },
     {
       "id": "AIFT-INVENTORY",
@@ -4923,6 +4953,11 @@
         "planned_path": "skeleton/chronicle",
         "implemented_path": "skeleton/provenance/chronicle",
         "mapping_id": "AIFT-CHRONICLE"
+      },
+      {
+        "planned_path": "skeleton/integrations",
+        "implemented_path": "skeleton/tools/integrations",
+        "mapping_id": "AIFT-INTEGRATIONS"
       }
     ],
     "planned_but_absent": [
@@ -4949,7 +4984,6 @@
       "skeleton/safety",
       "skeleton/speech",
       "skeleton/storage",
-      "skeleton/tools",
       "skeleton/training",
       "skeleton/verification",
       "skeleton/video",
@@ -5498,6 +5532,11 @@
       "path": "skeleton/chronicle",
       "owner": "provenance compatibility boundary",
       "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-036"
+    },
+    {
+      "path": "skeleton/integrations",
+      "owner": "tools compatibility boundary",
+      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-037"
     }
   ],
   "classification_coverage": {

@@ -489,11 +489,29 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "integrations-compat"
+prefixes = ["skeleton/integrations/"]
+owner = "tool-runtime"
+criticality = "low"
+purpose = "Compatibility-only integrations namespace; canonical connector and webhook tool edges live under skeleton/tools/integrations/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "tools"
+prefixes = ["skeleton/tools/"]
+owner = "tool-runtime"
+criticality = "high"
+purpose = "Canonical governed tool execution edges, connector adapters and authenticated webhook integrations."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "integrations"
-prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_runtime.py"]
+prefixes = ["skeleton/skills/", "skeleton/provider_runtime.py"]
 owner = "integration-runtime"
 criticality = "medium"
-purpose = "External provider, tool, skill and service integration boundaries."
+purpose = "Provider, skill and service integration boundaries that remain outside the canonical tool-edge package."
 audience = "both"
 lifecycle = "canonical"
 

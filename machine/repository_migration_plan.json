@@ -331,6 +331,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/chronicle/",
       "notes": "Seven Chronicle provenance modules moved out of the mixed knowledge bucket into canonical skeleton/provenance/chronicle. Five modules with absolute skeleton.chronicle imports were rewritten to skeleton.provenance.chronicle; helix.py and law.py moved semantically unchanged. The canonical child and full provenance parent are mirrored exactly into skeleton/ai/runtime/provenance, the legacy root is compatibility-only, AIFT-CHRONICLE follows the canonical child, AIFT-PROVENANCE governs the parent, and skeleton/provenance is no longer planned-but-absent."
+    },
+    {
+      "id": "TREE-037",
+      "source": "skeleton/integrations/",
+      "destination": "skeleton/tools/integrations/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/integrations/",
+      "notes": "Four privileged integration-edge modules moved into canonical skeleton/tools/integrations. Only __init__.py required an absolute namespace rewrite; connector, GitHub and webhook implementations moved semantically unchanged. The canonical child and full tools parent are mirrored exactly into skeleton/ai/runtime/tools, the legacy root is compatibility-only, AIFT-INTEGRATIONS follows the canonical child, AIFT-TOOLS governs the parent, and skeleton/tools is no longer planned-but-absent."
     }
   ]
 }
