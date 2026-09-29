@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 
+from .atlas import build_repository_atlas
 from .budgets import derive_zone_budgets
 from .builder import RepositoryModelBuilder
 from .context import context_for_intent
@@ -36,6 +37,7 @@ def main() -> int:
     parser.add_argument("--governance", action="store_true")
     parser.add_argument("--reorganize", action="store_true")
     parser.add_argument("--budgets", action="store_true")
+    parser.add_argument("--atlas", action="store_true")
     parser.add_argument("--search", default="")
     parser.add_argument("--workspace", default="")
     parser.add_argument(
@@ -103,6 +105,8 @@ def main() -> int:
                 for item in derive_zone_budgets(model)
             ],
         }
+    elif args.atlas:
+        payload = build_repository_atlas(model, builder.config).as_dict()
     elif args.health:
         payload = repository_health(model).as_dict()
     elif args.growth:
@@ -129,7 +133,7 @@ def main() -> int:
     if args.output and not any((
         args.summary, args.work, args.health, args.growth,
         args.steward, args.shards, args.hotspots, args.governance,
-        args.reorganize, args.budgets, bool(args.search),
+        args.reorganize, args.budgets, args.atlas, bool(args.search),
         bool(args.workspace), bool(args.intent),
     )):
         save_manifest(model, args.output)

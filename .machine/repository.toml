@@ -16,59 +16,225 @@ oversized_python_lines = 1400
 oversized_javascript_lines = 1800
 oversized_generic_lines = 2400
 
-[[zone]]
-name = "automation"
-prefixes = ["skeleton/automation/", ".github/workflows/", "backend/scripts/check_workflow_"]
-owner = "automation-control-plane"
-criticality = "critical"
+# Zone order is semantic: first match wins. Keep narrow/specific surfaces before
+# broader families. Audience describes the primary navigation consumer, not an
+# access-control boundary. Lifecycle is organizational state, not maturity.
 
 [[zone]]
-name = "jeeves"
-prefixes = ["skeleton/jeeves/", "jeeves/", "core/jeeves/"]
-owner = "jeeves-runtime"
+name = "repository-machine"
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/"]
+owner = "repository-control-plane"
 criticality = "high"
-
-[[zone]]
-name = "backend"
-prefixes = ["backend/"]
-owner = "backend-runtime"
-criticality = "high"
-
-[[zone]]
-name = "frontend"
-prefixes = ["frontend/"]
-owner = "frontend-runtime"
-criticality = "medium"
-
-[[zone]]
-name = "core"
-prefixes = ["core/"]
-owner = "core-runtime"
-criticality = "high"
-
-[[zone]]
-name = "tests"
-prefixes = ["tests/", "skeleton/testing/", "backend/tests/"]
-owner = "quality-plane"
-criticality = "high"
+purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
+audience = "machine"
+lifecycle = "canonical"
 
 [[zone]]
 name = "github"
 prefixes = [".github/"]
 owner = "repository-control-plane"
 criticality = "critical"
+purpose = "GitHub Actions, repository policy, merge gates and hosted automation configuration."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "security"
+prefixes = ["skeleton/security/", "skeleton/vault/", "core/activation_security.py"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "automation"
+prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/", "core/shift_supervisor/"]
+owner = "automation-control-plane"
+criticality = "critical"
+purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "jeeves"
+prefixes = ["skeleton/jeeves/", "jeeves/", "core/jeeves/"]
+owner = "jeeves-runtime"
+criticality = "high"
+purpose = "Jeeves reasoning, assurance, evidence, memory and orchestration planes."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "ai"
+prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/", "skeleton/contexts/"]
+owner = "ai-runtime"
+criticality = "high"
+purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "shell-runtime"
+prefixes = ["skeleton/shells/"]
+owner = "shell-runtime"
+criticality = "critical"
+purpose = "Policy-bound shell execution, toolchain contracts, workspace transactions and runtime trust."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "knowledge"
+prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/graphs/", "skeleton/chronicle/"]
+owner = "knowledge-runtime"
+criticality = "high"
+purpose = "Runtime memory, retrieval, indexing, graph and chronology services."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "application"
+prefixes = ["skeleton/app/", "skeleton/application/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
+owner = "application-runtime"
+criticality = "high"
+purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "backend"
+prefixes = ["backend/"]
+owner = "backend-runtime"
+criticality = "high"
+purpose = "Backend application API, product control plane and service-side integration."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "frontend"
+prefixes = ["frontend/"]
+owner = "frontend-runtime"
+criticality = "medium"
+purpose = "Canonical browser/mobile product shell and human-facing application interface."
+audience = "human"
+lifecycle = "canonical"
+
+[[zone]]
+name = "foundation"
+prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/architecture_", "skeleton/genesis.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+owner = "core-runtime"
+criticality = "critical"
+purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "platform"
+prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persist/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
+owner = "platform-runtime"
+criticality = "high"
+purpose = "State, storage, networking, native execution, observability and resilience substrate."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "build-delivery"
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/deployment/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "skeleton/jvm_accelerators.py", "deploy.py"]
+owner = "delivery-plane"
+criticality = "high"
+purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "simulation"
+prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
+owner = "simulation-runtime"
+criticality = "medium"
+purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "quality"
+prefixes = ["skeleton/eval/", "eval/", "skeleton/quality/", "skeleton/gate_plane/", "skeleton/artifact_plane/"]
+owner = "quality-plane"
+criticality = "high"
+purpose = "Evaluation, quality analysis, artifact assurance and reusable gate-plane implementation."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "tests"
+prefixes = ["tests/", "skeleton/testing/"]
+owner = "quality-plane"
+criticality = "high"
+purpose = "Regression, contract, integration, reliability and repository-control validation."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "repository-automation"
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
+owner = "repository-control-plane"
+criticality = "high"
+purpose = "PR automation, repository intelligence, merge control and repository inventory logic."
+audience = "machine"
+lifecycle = "canonical"
+
+[[zone]]
+name = "integrations"
+prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_contract.py", "skeleton/provider_runtime.py"]
+owner = "integration-runtime"
+criticality = "medium"
+purpose = "External provider, tool, skill and service integration boundaries."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "specialized-runtime"
+prefixes = ["skeleton/circulation/", "skeleton/cue/", "skeleton/genos/", "skeleton/hoag/", "skeleton/motive/", "skeleton/parse/", "skeleton/school/", "skeleton/sheaf/", "skeleton/spine/", "skeleton/turn/", "skeleton/viscera/"]
+owner = "core-runtime"
+criticality = "medium"
+purpose = "Named specialized runtime subsystems that remain explicit while their long-term domain boundaries are refined."
+audience = "internal"
+lifecycle = "support"
+
+[[zone]]
+name = "external-sources"
+prefixes = ["complete/", "satellites/", "skeleton/acquired/"]
+owner = "repository-control-plane"
+criticality = "medium"
+purpose = "Imported, mirrored, staged or satellite source material; never becomes canonical implicitly."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "project-memory"
+prefixes = ["memory/"]
+owner = "documentation-plane"
+criticality = "medium"
+purpose = "Historical project/session memory and recovery records; informative but not runtime authority."
+audience = "human"
+lifecycle = "support"
 
 [[zone]]
 name = "docs"
-prefixes = ["docs/", "README", "CONTRIBUTING", "SECURITY"]
+prefixes = ["docs/", "README", "BACKLOG", "CHANGELOG", "AGENTS", "CLAUDE", "GEMINI", "SECURITY", "LICENSE", "design_guidelines.json"]
 owner = "documentation-plane"
 criticality = "medium"
+purpose = "Human-facing architecture, plans, runbooks, status, policy and project documentation."
+audience = "human"
+lifecycle = "canonical"
 
 [[zone]]
 name = "tooling"
-prefixes = ["scripts/", "tools/", "pyproject.toml", "package.json", "Makefile"]
+prefixes = ["scripts/", ".cursor/", ".dockerignore", ".env.example", ".gitattributes", ".gitignore", ".gitleaks.toml", ".pre-commit-config.yaml", "Dockerfile", "Makefile", "docker-compose", "pyproject.toml", "requirements", "setup.cfg", "tools/", "package.json"]
 owner = "developer-tooling"
 criticality = "medium"
+purpose = "Local/CI tooling, repository scripts, environment configuration and developer entrypoints."
+audience = "both"
+lifecycle = "canonical"
 
 [ignore]
 prefixes = [

@@ -16,6 +16,8 @@ _ALLOWED_KINDS = {
     "source", "test", "workflow", "config", "docs", "script",
     "data", "generated", "unknown",
 }
+_ALLOWED_AUDIENCE = {"human", "machine", "both", "internal"}
+_ALLOWED_LIFECYCLE = {"canonical", "support", "transitional", "historical"}
 
 
 def _text(name: str, value: object, maximum: int = 512, *, empty: bool = False) -> str:
@@ -52,6 +54,9 @@ class ZoneRule:
     prefixes: tuple[str, ...]
     owner: str
     criticality: str = "medium"
+    purpose: str = ""
+    audience: str = "both"
+    lifecycle: str = "canonical"
 
     def __post_init__(self) -> None:
         zone_name = _token("zone name", self.name)
@@ -65,6 +70,16 @@ class ZoneRule:
         if criticality not in _ALLOWED_CRITICALITY:
             raise ValueError("invalid zone criticality")
         object.__setattr__(self, "criticality", criticality)
+        purpose = _text("zone purpose", self.purpose, 512, empty=True)
+        object.__setattr__(self, "purpose", purpose)
+        audience = _text("zone audience", self.audience, 16).casefold()
+        if audience not in _ALLOWED_AUDIENCE:
+            raise ValueError("invalid zone audience")
+        object.__setattr__(self, "audience", audience)
+        lifecycle = _text("zone lifecycle", self.lifecycle, 16).casefold()
+        if lifecycle not in _ALLOWED_LIFECYCLE:
+            raise ValueError("invalid zone lifecycle")
+        object.__setattr__(self, "lifecycle", lifecycle)
         prefixes = tuple(sorted({_text("prefix", item, 256) for item in self.prefixes}))
         if not prefixes:
             raise ValueError("zone requires at least one prefix")

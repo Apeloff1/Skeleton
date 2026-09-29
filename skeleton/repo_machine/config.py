@@ -81,6 +81,9 @@ def load_machine_config(root: str | Path) -> MachineConfig:
             prefixes=tuple(raw_zone.get("prefixes", ())),
             owner=raw_zone.get("owner", repository.get("default_owner", "automation-supervisor")),
             criticality=raw_zone.get("criticality", "medium"),
+            purpose=raw_zone.get("purpose", ""),
+            audience=raw_zone.get("audience", "both"),
+            lifecycle=raw_zone.get("lifecycle", "canonical"),
         )
         if rule.name in seen:
             raise ValueError(f"duplicate zone: {rule.name}")

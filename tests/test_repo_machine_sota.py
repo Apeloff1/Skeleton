@@ -192,6 +192,7 @@ class ModelDiffWorkspaceTests(unittest.TestCase):
             )
             self.assertIn("repository-manifest.json", files)
             self.assertIn("health.json", files)
+            self.assertIn("atlas.json", files)
             self.assertIn("steward-plan.json", files)
             self.assertTrue((destination / "index.json").exists())
 
