@@ -49,6 +49,8 @@ Skeleton/
 │   │   ├── game/             mechanics, deterministic replay and game systems
 │   │   ├── platform/         engine adapter boundary (Godot)
 │   │   └── world/            deterministic world/scene state
+│   ├── research/             provenance-preserving research/evidence intake
+│   │   └── social/           archive/source ingest, coverage, graph and SOTA discovery
 │   ├── frontier/             frontier gameplay/product runtime
 │   │   ├── runtime/          contracts, execution, streams, memory/control plane
 │   │   ├── progression/      achievements, quests, reputation, passes/meta systems
@@ -143,6 +145,7 @@ compatibility shims:
 | `skeleton.world.*` | `skeleton.simulation.world.*` | transitional shim |
 | `skeleton.game.*` | `skeleton.simulation.game.*` | transitional shim |
 | `skeleton.era.*` | `skeleton.simulation.era.*` | transitional shim |
+| `skeleton.social.*` | `skeleton.research.social.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

@@ -354,8 +354,26 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "social-compat"
+prefixes = ["skeleton/social/"]
+owner = "research-evidence"
+criticality = "low"
+purpose = "Compatibility-only social/research evidence namespace; canonical source ingestion, graph and coverage logic lives under skeleton/research/social/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "research"
+prefixes = ["skeleton/research/"]
+owner = "research-evidence"
+criticality = "normal"
+purpose = "Untrusted evidence intake, provenance-preserving discovery, source coverage and research support surfaces."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/galaxy/", "skeleton/organism/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."

@@ -277,6 +277,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/era/",
       "notes": "Six era-binding modules moved under canonical simulation ownership. Four modules with absolute skeleton.era self-imports were rewritten to skeleton.simulation.era; admit.py and law.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/simulation/era, the legacy root is compatibility-only, AIFT-ERA governs the nested owner, and full simulation/AI-simulation tree parity remains exact."
+    },
+    {
+      "id": "TREE-031",
+      "source": "skeleton/social/",
+      "destination": "skeleton/research/social/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/social/",
+      "notes": "Eleven social/research evidence modules moved out of simulation ownership into canonical skeleton/research/social. Eight modules with absolute skeleton.social imports were rewritten to skeleton.research.social; all eleven canonical modules are mirrored exactly at skeleton/ai/research/social. The legacy root is compatibility-only, AIFT-SOCIAL now follows the canonical research source, and skeleton/research is no longer planned-but-absent."
     }
   ]
 }

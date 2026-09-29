@@ -1884,11 +1884,11 @@
     },
     {
       "id": "AIFT-SOCIAL",
-      "source": "skeleton/social",
+      "source": "skeleton/research/social",
       "destination": "skeleton/ai/research/social",
       "kind": "tree",
-      "source_git_object_sha": "0f7c484c4d2692f789dc603b60f9c5f854693276",
-      "role": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
+      "source_git_object_sha": "8648d7d27f18e87620b1603d1adc4335a887d690",
+      "role": "Canonical archive/source ingestion, coverage, graph and SOTA discovery code under research evidence ownership, mirrored exactly into AI research without serving authority.",
       "work_package_refs": [
         "WP-W26"
       ],
@@ -1912,7 +1912,7 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "canonical_research_social_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SUPPORT",
@@ -4833,6 +4833,11 @@
         "planned_path": "skeleton/era",
         "implemented_path": "skeleton/simulation/era",
         "mapping_id": "AIFT-ERA"
+      },
+      {
+        "planned_path": "skeleton/social",
+        "implemented_path": "skeleton/research/social",
+        "mapping_id": "AIFT-SOCIAL"
       }
     ],
     "planned_but_absent": [
@@ -4858,7 +4863,6 @@
       "skeleton/product_shell",
       "skeleton/provenance",
       "skeleton/repo_engineering",
-      "skeleton/research",
       "skeleton/routing",
       "skeleton/safety",
       "skeleton/speech",
@@ -5382,6 +5386,11 @@
       "path": "skeleton/game",
       "owner": "simulation compatibility boundary",
       "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
+    },
+    {
+      "path": "skeleton/social",
+      "owner": "research compatibility boundary",
+      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-031"
     }
   ],
   "classification_coverage": {
