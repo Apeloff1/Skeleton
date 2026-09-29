@@ -408,8 +408,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "school-compat"
+prefixes = ["skeleton/school/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only School namespace; canonical curriculum, learner-state, assessment, tutoring and learning-control runtime lives under skeleton/learning/school/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "specialized-runtime"
-prefixes = ["skeleton/circulation/", "skeleton/cue/", "skeleton/genos/", "skeleton/hoag/", "skeleton/motive/", "skeleton/parse/", "skeleton/school/", "skeleton/sheaf/", "skeleton/spine/", "skeleton/turn/", "skeleton/viscera/"]
+prefixes = ["skeleton/circulation/", "skeleton/cue/", "skeleton/genos/", "skeleton/hoag/", "skeleton/motive/", "skeleton/parse/", "skeleton/sheaf/", "skeleton/spine/", "skeleton/turn/", "skeleton/viscera/"]
 owner = "core-runtime"
 criticality = "medium"
 purpose = "Named specialized runtime subsystems that remain explicit while their long-term domain boundaries are refined."

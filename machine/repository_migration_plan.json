@@ -268,6 +268,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/game/",
       "notes": "The full 13-file game mechanics/replay package moved under canonical simulation ownership. Seven modules with absolute skeleton.game self-imports were rewritten to skeleton.simulation.game and mirrored identically into AI simulation; six modules moved byte-identically. The legacy root remains compatibility-only, AIFT-GAME follows the nested canonical path, and the final AIFT-SIMULATION game overlay was retired, making skeleton/simulation and skeleton/ai/simulation exact Git-tree mirrors."
+    },
+    {
+      "id": "TREE-030",
+      "source": "skeleton/school/",
+      "destination": "skeleton/learning/school/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/school/",
+      "notes": "Thirty-four School curriculum, assessment, learner-state, tutoring, code-intelligence and learning-control modules moved byte-identically under canonical skeleton/learning/school ownership. The legacy skeleton/school package is compatibility-only, while the governed skeleton/ai/learning/school mirror remains exact tree-parity. AIFT-LEARNING now retains only acquired.py as an overlay."
     }
   ]
 }

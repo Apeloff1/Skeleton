@@ -775,7 +775,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "aa2e9a8c65dae1849dbd6a559e2e0c4b598c1dde",
+      "source_git_object_sha": "e083364d7faea043ee10a8d9069cec7c41e4aa11",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -795,8 +795,7 @@
         "AIQ-S7-E2E-01"
       ],
       "overlay_children": [
-        "acquired.py",
-        "school"
+        "acquired.py"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -2278,7 +2277,7 @@
     },
     {
       "id": "AIFT-SCHOOL",
-      "source": "skeleton/school",
+      "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
       "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee",
@@ -2305,7 +2304,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_learning_school_with_legacy_school_shims"
     },
     {
       "id": "AIFT-WORLD",
@@ -5426,7 +5425,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "TREE-028 canonical capability/import repairs are preserved; TREE-029 converges game under skeleton/simulation/game, retires the final simulation game overlay, and keeps canonical simulation/AI simulation exact-tree parity pending fresh exact-head CI.",
+    "note": "TREE-030 canonicalized School under skeleton/learning/school, preserved exact skeleton/ai/learning/school parity, and retired the School overlay from AIFT-LEARNING; acquired.py remains the only learning overlay.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [
