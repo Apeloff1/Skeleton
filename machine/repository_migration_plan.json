@@ -259,6 +259,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/agents/",
       "notes": "Sixty-eight agent/swarm runtime modules moved under canonical automation ownership. Forty-one modules with absolute skeleton.agents self-imports were rewritten to skeleton.automation.agents; unchanged modules retained source blobs. The governed skeleton/ai/agents/core mirror received identical rewrites and remains exact tree-parity with the canonical package. The legacy skeleton.agents namespace is compatibility-only, and AIFT-AUTOMATION now treats agents as a governed overlay."
+    },
+    {
+      "id": "TREE-029",
+      "source": "skeleton/game/",
+      "destination": "skeleton/simulation/game/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/game/",
+      "notes": "The full 13-file game mechanics/replay package moved under canonical simulation ownership. Seven modules with absolute skeleton.game self-imports were rewritten to skeleton.simulation.game and mirrored identically into AI simulation; six modules moved byte-identically. The legacy root remains compatibility-only, AIFT-GAME follows the nested canonical path, and the final AIFT-SIMULATION game overlay was retired, making skeleton/simulation and skeleton/ai/simulation exact Git-tree mirrors."
     }
   ]
 }
