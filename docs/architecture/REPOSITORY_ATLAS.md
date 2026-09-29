@@ -109,6 +109,25 @@ Skeleton/
 | `transitional` | Migration/import/staging surface | Do not grant new runtime authority silently |
 | `historical` | Provenance/reference only | No new active implementation |
 
+## Runtime ownership refinement
+
+Several top-level packages previously inherited the broad simulation owner even
+though their contracts describe different responsibilities. TREE-033 makes those
+boundaries explicit without moving implementation:
+
+- `skeleton/galaxy/` — canonical distributed/multi-agent runtime owned by
+  `ai-runtime`; its staged AI mirror remains a cutover target, not a second owner.
+- `skeleton/organism/` — owner-sensitive core support for runtime DAG, health,
+  policy, quality, recovery and operator control. Security-owned secret handling
+  remains singular until an explicit security-owner cutover.
+- `skeleton/social/` — transitional research evidence intake for archive/source
+  ingestion, coverage, graph and SOTA discovery; discovery results do not gain
+  serving authority from placement.
+- `skeleton/era/` — historical GB-39 era-bind/GameForge lineage retained for
+  compatibility and provenance, with no new runtime authority.
+- `skeleton/simulation/` — the simulation owner is narrowed to actual
+  deterministic simulation/world-model code and the Godot adapter pointer.
+
 ## Research lineage and unresolved specialized roots
 
 The machine taxonomy distinguishes preserved research lineage from unresolved

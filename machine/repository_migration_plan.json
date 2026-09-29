@@ -295,6 +295,15 @@
       "state": "classified",
       "compatibility": null,
       "notes": "Classified the newly introduced top-level apps/ workspace. apps/jeeves receives specific Jeeves ownership as an operator-facing facade/CLI/plane layout, while the generic apps/ root is a support-layer application workspace. The classification explicitly prevents app facades from silently becoming source-of-truth runtime ownership."
+    },
+    {
+      "id": "TREE-033",
+      "source": "skeleton/{era,galaxy,organism,social}/ + simulation taxonomy",
+      "destination": ".machine/repository.toml refined runtime ownership zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface."
     }
   ]
 }
