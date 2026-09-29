@@ -484,7 +484,7 @@ def validate() -> list[str]:
                 errors.append(f"{mid}: unknown parity_mode {parity_mode!r}")
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
-        has_build |= src == "core/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
+        has_build |= src in {"core/shift_supervisor", "skeleton/automation/shift_supervisor"} and dst == "skeleton/ai/build/shift_supervisor"
 
     if not has_jeeves:
         errors.append("Jeeves engine mapping is mandatory")
