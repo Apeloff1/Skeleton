@@ -117,7 +117,7 @@ class ArtifactReferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(refs.ArtifactReferenceError, "blob SHA-256"):
                 refs.validate_file(manifest_path, repo_root=repo)
 
-    def test_materialize_rejects_sha256_mismatch_and_removes_output(self) -> None:
+    def test_materialize_rejects_sha256_mismatch_before_writing_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             repo, manifest_path, manifest, _ = _fixture(root)
@@ -125,7 +125,7 @@ class ArtifactReferenceTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             output = root / "tampered.bin"
 
-            with self.assertRaisesRegex(refs.ArtifactReferenceError, "SHA-256 mismatch"):
+            with self.assertRaisesRegex(refs.ArtifactReferenceError, "blob SHA-256"):
                 refs.materialize(
                     "demo-blob",
                     output,
