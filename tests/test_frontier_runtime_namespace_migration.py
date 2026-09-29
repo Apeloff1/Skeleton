@@ -18,7 +18,7 @@ def test_frontier_legacy_runtime_modules_reexport_canonical_symbols() -> None:
         ("operation_stream", "OperationEventLog"),
         ("operation_stream_store", "SQLiteOperationEventStore"),
         ("resilience", "ResilienceController"),
-        ("runtime_events", "RuntimeEventBridge"),
+        ("runtime_events", "execution_result_to_event"),
     )
     for module_name, symbol in checks:
         legacy = importlib.import_module(f"skeleton.frontier.{module_name}")
