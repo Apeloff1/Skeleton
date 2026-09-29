@@ -287,7 +287,7 @@
     },
     {
       "id": "model-routing",
-      "owner": "skeleton/frontier/model_routing.py",
+      "owner": "skeleton/frontier/runtime/model_routing.py",
       "state": "present",
       "responsibility": "Capability/privacy/cost/latency/quality-aware model selection with deterministic fallback ordering.",
       "depends_on": [
@@ -295,7 +295,7 @@
         "observability"
       ],
       "evidence": [
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "backend/core/model_router.py"
       ],
       "required_interfaces": [
@@ -578,8 +578,8 @@
         "backend/services/memory_engine.py",
         "backend/services/cag.py",
         "backend/services/mag.py",
-        "skeleton/frontier/memory.py",
-        "skeleton/frontier/retrieval_context.py",
+        "skeleton/frontier/runtime/memory.py",
+        "skeleton/frontier/runtime/retrieval_context.py",
         "skeleton/memory/frontier_adapter.py"
       ],
       "required_interfaces": [
@@ -2105,7 +2105,7 @@
       "gap": "Shared-network operation/stream authorities, durable replay/compaction/terminal fencing, production browser reconnect/resync/cancel semantics, frontend type safety, and independent closure verification are implementation-complete. Exact-head Streaming Protocol Closure Gate plus App Assembly are the merge criteria.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
-        "use skeleton/frontier/operation_stream.py as the stream conformance contract",
+        "use skeleton/frontier/runtime/operation_stream.py as the stream conformance contract",
         "maintain backend SSE adapter without changing envelope semantics",
         "keep cancellation bound to the canonical operation state machine and transactional outbox",
         "add frontend reducer, reconnect cursor, duplicate/out-of-order handling",
@@ -2754,7 +2754,7 @@
       "id": "frontier-model-runtime",
       "family": "none",
       "role": "provider-neutral protocol/runtime primitives; no credential ownership",
-      "owner": "skeleton/frontier/model_runtime.py",
+      "owner": "skeleton/frontier/runtime/model_runtime.py",
       "credential_bearing": false,
       "receipt_required": false,
       "status": "library",
@@ -3542,7 +3542,7 @@
       "gap": "gap-governance-registry",
       "wave": 1,
       "owners": [
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "skeleton/kernel/governance.py",
         "skeleton/shells/ai/governance.py",
         "backend/routes/governance.py",
@@ -3602,7 +3602,7 @@
       "gap": "gap-cost-admission",
       "wave": 1,
       "owners": [
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "skeleton/intelligence/capacity_planner.py",
         "backend/core/model_router.py",
         "skeleton/agents/swarm_quota.py",
@@ -3712,7 +3712,7 @@
         "backend/services/database.py",
         "backend/services/rag_service.py",
         "skeleton/contracts/operation.py",
-        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
         "skeleton/persistence/snapshots.py",
         "docker-compose.yml"
       ],
@@ -4074,12 +4074,12 @@
         "skeleton/intelligence",
         "skeleton/contracts/operation.py",
         "skeleton/provider_runtime.py",
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "skeleton/context",
         "skeleton/skills",
         "skeleton/memory",
         "skeleton/retrieval",
-        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream.py",
         "skeleton/contracts",
         "skeleton/persistence"
       ],
@@ -4144,10 +4144,10 @@
       "wave": 2,
       "owners": [
         "skeleton/contracts/operation.py",
-        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream.py",
         "skeleton/testing/test_operation_stream_store.py",
-        "skeleton/frontier/operation_stream_store.py",
-        "skeleton/frontier/runtime_events.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
+        "skeleton/frontier/runtime/runtime_events.py",
         "skeleton/testing/test_operation_contract.py",
         "skeleton/testing/test_operation_stream.py",
         "backend/core/operation_stream_transport.py",
@@ -4238,7 +4238,7 @@
       "gap": "gap-provider-redundancy",
       "wave": 2,
       "owners": [
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "backend/core/ai_provider.py",
         "backend/core/model_router.py"
       ],
@@ -4438,7 +4438,7 @@
     ]
   },
   "stream_protocol": {
-    "owner": "skeleton/frontier/operation_stream.py",
+    "owner": "skeleton/frontier/runtime/operation_stream.py",
     "schema_version": 1,
     "transport_neutral": true,
     "required_semantics": [
@@ -4455,7 +4455,7 @@
     ],
     "reference_implementation": "OperationEventLog",
     "production_storage_policy": "replace storage only; preserve protocol semantics",
-    "durable_reference_store": "skeleton/frontier/operation_stream_store.py:SQLiteOperationEventStore",
+    "durable_reference_store": "skeleton/frontier/runtime/operation_stream_store.py:SQLiteOperationEventStore",
     "persistence_semantics": [
       "transactional exact-next sequence",
       "durable terminal fence",
@@ -6614,8 +6614,8 @@
     "blueprint_version": "1.0.0",
     "status": "complete",
     "gap": "gap-streaming-protocol",
-    "canonical_source": "skeleton/frontier/operation_stream.py",
-    "durable_store": "skeleton/frontier/operation_stream_store.py",
+    "canonical_source": "skeleton/frontier/runtime/operation_stream.py",
+    "durable_store": "skeleton/frontier/runtime/operation_stream_store.py",
     "product_transport": {
       "default": "SSE",
       "optional": "WebSocket may be added without changing event envelope semantics",
@@ -6927,9 +6927,9 @@
     "status": "complete",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
-      "storage": "skeleton/frontier/contracts.py:MemoryContract",
-      "normalization": "skeleton/frontier/memory.py",
-      "retrieval": "skeleton/frontier/retrieval_context.py:RetrieverContract",
+      "storage": "skeleton/frontier/runtime/contracts.py:MemoryContract",
+      "normalization": "skeleton/frontier/runtime/memory.py",
+      "retrieval": "skeleton/frontier/runtime/retrieval_context.py:RetrieverContract",
       "legacy_adapter": "skeleton/memory/frontier_adapter.py"
     },
     "planned_modules": {
