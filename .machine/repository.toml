@@ -120,8 +120,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "creator-compat"
+prefixes = ["skeleton/creator/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only creator namespace; canonical intent compilation and reversible design-edit ownership lives under skeleton/forge/creator/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/support/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."

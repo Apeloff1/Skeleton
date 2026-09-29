@@ -963,7 +963,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "53b5269b302f1f89f7f2fe65f7e4c41855011ce3",
+      "source_git_object_sha": "e061c4a12424188c8c1d2296c38763bece70a6dc",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -973,9 +973,6 @@
       ],
       "volume_refs": [
         "VOL-023"
-      ],
-      "overlay_children": [
-        "creator"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -2088,11 +2085,11 @@
     },
     {
       "id": "AIFT-CREATOR",
-      "source": "skeleton/creator",
+      "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "7debd95822e3b7694bfdc668db945a6c94a19145",
-      "role": "Intent compilation and reversible design edits are candidate-generation/planning primitives for Forge.",
+      "source_git_object_sha": "9080deea277fd96dfdcfc8697682afc075f2f036",
+      "role": "Canonical engine-neutral intent compiler and reversible design-edit surface under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
         "WP-W27"
@@ -2116,7 +2113,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_forge_creator_with_legacy_root_shims"
     },
     {
       "id": "AIFT-ECONOMY",
