@@ -272,6 +272,10 @@ class SemanticCompiler:
                 results=(result,),
                 effects=self._effects(step),
                 attributes={
+                    **({
+                        "nondeterminism_source": "model_inference",
+                        "replay_policy": "recorded_model_observation_required",
+                    } if step.tool is None else {}),
                     "step_id": step.step_id,
                     "title": step.title,
                     "description": step.description,
@@ -303,7 +307,11 @@ class SemanticCompiler:
                         results=(),
                         effects=(Effect.ASSERTION,),
                         attributes={
-                            "step_id": step.step_id,
+                            **({
+                        "nondeterminism_source": "model_inference",
+                        "replay_policy": "recorded_model_observation_required",
+                    } if step.tool is None else {}),
+                    "step_id": step.step_id,
                             "verification": step.verification,
                             "expected_outcome": step.expected_outcome,
                         },
@@ -327,7 +335,11 @@ class SemanticCompiler:
                     predecessors_hint=(predecessor_for[block_id],),
                     metadata={
                         "role": "plan_step",
-                        "step_id": step.step_id,
+                        **({
+                        "nondeterminism_source": "model_inference",
+                        "replay_policy": "recorded_model_observation_required",
+                    } if step.tool is None else {}),
+                    "step_id": step.step_id,
                         "schedule_index": index,
                     },
                 )

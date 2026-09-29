@@ -354,7 +354,7 @@ def test_resume_rejects_semantic_topology_learning_drift() -> None:
 
     with pytest.raises(
         ExecutionAuditError,
-        match="topology learning fingerprint changed",
+        match="semantic runtime state fingerprint changed",
     ):
         runtime._state_from_checkpoint(inputs, checkpoint)
 

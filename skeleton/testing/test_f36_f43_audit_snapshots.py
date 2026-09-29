@@ -94,7 +94,7 @@ def test_contract_audit_locks_runtime_handler_parity(monkeypatch) -> None:
     assert payload["missing_from_runtime"] == []
     assert payload["missing_from_contract"] == []
     rows = {row["command"]: row for row in payload["commands"]}
-    assert set(rows) == {"run", "tool", "memory", "status", "configuration", "capabilities", "admin"}
+    assert set(rows) == {"run", "tool", "memory", "status", "configuration", "capabilities", "admin", "retrieve", "plan", "evidence"}
     assert rows["run"]["auth_required"] is True
     assert rows["status"]["auth_required"] is False
     assert rows["admin"]["mutating"] is True
@@ -126,6 +126,10 @@ def test_env_flag_audit_locks_own_and_seal_names(monkeypatch) -> None:
     _assert_import_free(monkeypatch, env_flag_audit_snapshot, ENV_FLAG_AUDIT_KIND)
     payload = env_flag_audit_snapshot()
     assert payload["names"] == [
+        "SKL_GOVERNANCE_AUDIT_PATH",
+        "SKL_MONGO_URI",
+        "SKL_GOVERNANCE_LIFECYCLE_PATH",
+        "SKL_GOVERNANCE_ARTIFACT_ROOT",
         "SKELETON_PUBLIC_DEV_SURFACES",
         "GF_SEAL_SECRET",
         "GF_SEAL_KEYRING",

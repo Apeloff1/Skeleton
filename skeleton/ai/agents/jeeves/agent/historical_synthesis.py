@@ -620,7 +620,7 @@ class HistoricalContextAdapter:
             trust=max(0.05, min(1.0, evidence_strength)),
             confidence=max(0.05, min(1.0, evidence_strength)),
             salience=0.75,
-            token_estimate=max(1, len(text) // 4),
+            token_estimate=max(1, (len(text) + 3) // 4),
             source_provider=self.source_provider,
             tags=tuple(family.value for family in method.families) + ("scientific-lineage",),
             metadata={

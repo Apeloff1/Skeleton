@@ -11,8 +11,17 @@ from typing import Any, Dict
 from skeleton.cortex.deck import CommandDeck
 
 
-def nervous_card(*, root=None) -> Dict[str, Any]:
-    deck = CommandDeck(root=root)
+def nervous_card(org=None, *, neo=None, root=None, deck=None) -> Dict[str, Any]:
+    if org is not None:
+        from skeleton.organism.health import health_card
+        from skeleton.organism.laws import laws_card
+        health = health_card(org, neo=neo)
+        return {"kind": "nervous", "ok": health["ok"], "health": health,
+                "slos": {"prose": laws_card(org.galaxy.mesh),
+                         "pressure": health["pressure"], "error_ratio": health["error_ratio"]},
+                "intelligence": {"temporal": health["calendar"], "context": health["rot"]},
+                "stored_prose": health["stored_prose"]}
+    deck = deck or CommandDeck(root=root)
     policy = deck.policy_state()
     repair = deck.repair_sessions()
     kv = deck.kv_cache_stats()
@@ -30,7 +39,7 @@ def nervous_card(*, root=None) -> Dict[str, Any]:
     tracer = deck.tracer_card()
     audit = deck.audit_card()
     event_store = deck.event_store_card()
-    dashboard = deck.dashboard_card()
+    dashboard = deck.dashboard.summary()
     return {
         "kind": "nervous-card",
         "health": {

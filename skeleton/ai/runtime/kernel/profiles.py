@@ -198,8 +198,9 @@ def pick(*, tier: str = "", pressure: float = 0.0, cpus: int = 1,
 def card(*, caps: Dict[str, Any] | None = None) -> Dict[str, Any]:
     if caps is None:
         try:
-            from skeleton.organism.caps import card as caps_card
-            caps = caps_card()
+            from dataclasses import asdict
+            from skeleton.organism.caps import live as live_caps
+            caps = asdict(live_caps())
         except Exception:
             caps = {"tier": "small", "pressure": 0.4, "cpus": 2, "avail_mb": 2048, "gpu": False}
     name = pick(

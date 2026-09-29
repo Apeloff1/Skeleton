@@ -73,6 +73,14 @@ class ContextKind(str, Enum):
     FAILURE = "failure"
     TOOL = "tool"
     SCRATCH = "scratch"
+    JOURNAL = "journal"
+    LOG = "log"
+    DIARY = "diary"
+    ANNAL = "annal"
+    CHRONICLE = "chronicle"
+    DATABASE = "database"
+    CACHE = "cache"
+    FILE = "file"
 
 
 class PatchOperation(str, Enum):
@@ -808,7 +816,7 @@ class ContextRepository:
             recency = math.exp(-math.log(2) * age / (14 * 24 * 3600))
             promotion = 1.0 if entry.promoted else 0.0
             score = lexical * 0.48 + recency * 0.10 + entry.trust * 0.18 + entry.salience * 0.12 + entry.confidence * 0.07 + promotion * 0.05
-            tokens = max(1, len(entry.content) // 4)
+            tokens = max(1, (len(entry.content) + 3) // 4)
             candidates.append(RetrievalHit(entry, score, lexical, recency, entry.trust, entry.salience, promotion, tokens))
         candidates.sort(key=lambda hit: (hit.score, hit.entry.promoted, hit.entry.updated_at, hit.entry.key), reverse=True)
         chosen: list[RetrievalHit] = []
@@ -816,7 +824,7 @@ class ContextRepository:
         for hit in candidates:
             if len(chosen) >= max_entries:
                 break
-            if chosen and used + hit.token_estimate > max_tokens:
+            if used + hit.token_estimate > max_tokens:
                 continue
             chosen.append(hit)
             used += hit.token_estimate

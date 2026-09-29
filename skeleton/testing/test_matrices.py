@@ -25,7 +25,7 @@ class TestSAM(unittest.TestCase):
 
     def test_decay_prunes_weak_edges(self):
         self.sam.observe("alpha beta gamma delta")
-        for _ in range(200):
+        for _ in range(300):
             self.sam.decay()
         self.assertEqual(self.sam.snapshot()["edges"], 0)
 

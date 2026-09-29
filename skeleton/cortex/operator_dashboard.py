@@ -37,8 +37,9 @@ class DashboardAlert:
 class OperatorDashboard:
     """Live dashboard aggregating all subsystem cards and alerts."""
 
-    def __init__(self, root=None):
+    def __init__(self, root=None, *, deck=None):
         self.root = root
+        self._deck = deck
         self._alerts: List[DashboardAlert] = []
         self._subscribers: List[Callable[[Dict[str, Any]], None]] = []
         self._alert_counter = 0
@@ -95,23 +96,30 @@ class OperatorDashboard:
     def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> None:
         self._subscribers.append(callback)
 
-    def card(self) -> Dict[str, Any]:
-        # Lazy imports avoid deck -> dashboard -> organism -> deck cycles
-        # when skeleton.cortex package init pulls CommandDeck.
-        from skeleton.organism.doctor import doctor_card
-        from skeleton.organism.nervous import nervous_card
-        from skeleton.organism.product import product_card
+    def summary(self) -> Dict[str, Any]:
+        """Return local alert state without recursively aggregating the deck."""
         return {
             "kind": "operator-dashboard",
             "updated_at_ns": self._last_update_ns,
-            "product": product_card(root=self.root),
-            "nervous": nervous_card(root=self.root),
-            "doctor": doctor_card(root=self.root),
             "alerts": self.active_alerts(),
             "alert_counts": {
-                "critical": len([a for a in self._alerts if a.severity == "critical" and not a.resolved]),
-                "warning": len([a for a in self._alerts if a.severity == "warning" and not a.resolved]),
-                "info": len([a for a in self._alerts if a.severity == "info" and not a.resolved]),
+                severity: sum(a.severity == severity and not a.resolved for a in self._alerts)
+                for severity in ("critical", "warning", "info")
             },
             "stored_prose": 0,
+        }
+
+    def card(self) -> Dict[str, Any]:
+        from skeleton.cortex.deck import CommandDeck
+        from skeleton.organism.doctor import doctor_card
+        from skeleton.organism.nervous import nervous_card
+        from skeleton.organism.product import product_card
+        if self._deck is None:
+            self._deck = CommandDeck(root=self.root)
+            self._deck.dashboard = self
+        return {
+            **self.summary(),
+            "product": product_card(deck=self._deck),
+            "nervous": nervous_card(deck=self._deck),
+            "doctor": doctor_card(deck=self._deck),
         }

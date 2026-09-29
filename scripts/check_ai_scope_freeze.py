@@ -259,7 +259,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     authority = master.get("authority")
     if not isinstance(authority, dict):
         errors.append("master plan authority must be an object")
-    elif authority.get("p1_scope_freeze_adr_register") != str(REGISTER_PATH):
+    elif authority.get("p1_scope_freeze_adr_register") != REGISTER_PATH.as_posix():
         errors.append("master plan scope-freeze ADR authority pointer drift")
 
     freeze = master.get("breadth_freeze")
@@ -270,7 +270,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         errors.append("breadth freeze must remain enabled")
     if freeze.get("last_top_level_volume") != EXPECTED_LAST:
         errors.append(f"active P1 breadth boundary must remain VOL-{EXPECTED_LAST:03d}")
-    if freeze.get("exception_register") != str(REGISTER_PATH):
+    if freeze.get("exception_register") != REGISTER_PATH.as_posix():
         errors.append("breadth freeze exception_register pointer drift")
     if freeze.get("p1_application_policy") != "forbid":
         errors.append("breadth freeze p1_application_policy must equal forbid")
@@ -311,7 +311,7 @@ def validate_repository(root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
         errors.append("scope-freeze register task_id drift")
     if register.get("accountability_ref") != EXPECTED_ACCOUNTABILITY:
         errors.append("scope-freeze register accountability_ref drift")
-    if register.get("authority") != str(REGISTER_PATH):
+    if register.get("authority") != REGISTER_PATH.as_posix():
         errors.append("scope-freeze register self-authority path drift")
 
     baseline = register.get("baseline")

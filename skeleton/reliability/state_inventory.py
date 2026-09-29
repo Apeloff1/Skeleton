@@ -12,6 +12,7 @@ Unknown stores, unknown families, and incomplete classification fail closed.
 from __future__ import annotations
 
 import ast
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,8 +169,8 @@ STORES: tuple[DurableStore, ...] = (
         family="swarm_durable",
         status="classified",
         format="SwarmRecoveryManager archive v1 inside SQLiteRunStore checkpoint JSON",
-        owner="skeleton.agents.swarm_durable",
-        owner_path="skeleton/agents/swarm_durable.py",
+        owner="skeleton.automation.agents.swarm_durable",
+        owner_path="skeleton/automation/agents/swarm_durable.py",
         persistence="caller SQLiteRunStore path (docs: var/skeleton-runs.sqlite3)",
         restart_durable=True,
         corruption="DurableSwarmError on version mismatch, non-object payload, or invalid archive",
@@ -181,7 +182,7 @@ STORES: tuple[DurableStore, ...] = (
         recovery_policy="restore_verified",
         discovery_name="SwarmDurableBridge",
         evidence=(
-            "skeleton/agents/swarm_durable.py",
+            "skeleton/automation/agents/swarm_durable.py",
             "skeleton/testing/test_swarm_durable.py",
             "docs/DURABLE_RUN_STATE.md",
         ),
@@ -276,8 +277,8 @@ STORES: tuple[DurableStore, ...] = (
         family="sqlite_collection",
         status="classified",
         format="sqlite table frontier_memory_items (namespace, item_id, document, metadata_json)",
-        owner="skeleton.frontier.memory_adapters",
-        owner_path="skeleton/frontier/memory_adapters.py",
+        owner="skeleton.frontier.runtime.memory_adapters",
+        owner_path="skeleton/frontier/runtime/memory_adapters.py",
         persistence="caller sqlite path; :memory: allowed (not restart-durable)",
         restart_durable=True,
         corruption="MemoryStoreCorruptionError on malformed identity, document, or metadata",
@@ -286,7 +287,7 @@ STORES: tuple[DurableStore, ...] = (
         recovery_policy="refuse",
         discovery_name="SQLiteCollection",
         evidence=(
-            "skeleton/frontier/memory_adapters.py",
+            "skeleton/frontier/runtime/memory_adapters.py",
             "skeleton/testing/test_frontier_memory_corruption.py",
             "skeleton/testing/test_frontier_memory_row_identity.py",
         ),
@@ -417,9 +418,28 @@ def discover_stores(root: Path) -> tuple[tuple[str, str, str], ...]:
 
 
 def _catalog_index(
-    inventory: Iterable[DurableStore],
+    inventory: Iterable[DurableStore], root: Path,
 ) -> dict[tuple[str, str], DurableStore]:
-    return {(store.owner_path, store.discovery_name): store for store in inventory}
+    rows = tuple(inventory)
+    catalog = {(store.owner_path, store.discovery_name): store for store in rows}
+    manifest = root / "machine/ai_file_tree.json"
+    if not manifest.is_file():
+        return catalog
+    # Mirrors are aliases only when declared and identical to the classified
+    # owner. An extra or modified store still fails closed during discovery.
+    mappings = json.loads(manifest.read_text(encoding="utf-8")).get("mappings", [])
+    for mapping in mappings:
+        source = mapping["source"].rstrip("/")
+        destination = mapping["destination"].rstrip("/")
+        for store in rows:
+            if not store.owner_path.startswith(source + "/"):
+                continue
+            mirror = destination + store.owner_path[len(source):]
+            owner_path, mirror_path = root / store.owner_path, root / mirror
+            if (owner_path.is_file() and mirror_path.is_file()
+                    and owner_path.read_bytes() == mirror_path.read_bytes()):
+                catalog[(mirror, store.discovery_name)] = store
+    return catalog
 
 
 def _row_violations(store: DurableStore, *, root: Path, require_paths: bool) -> list[str]:
@@ -487,7 +507,7 @@ def collect_violations(
                 "missing classified family fails closed: " + ", ".join(missing)
             )
 
-    catalog = _catalog_index(rows)
+    catalog = _catalog_index(rows, repo)
     for relative, name, family in discover_stores(repo):
         store = catalog.get((relative, name))
         if store is None:

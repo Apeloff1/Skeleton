@@ -345,6 +345,10 @@ class RepetitionScheduler:
         self._schedule: Dict[str, Dict[str, Any]] = {}
         self._bus = bus
 
+    def is_scheduled(self, item_id: str) -> bool:
+        """Whether a review is already enrolled, including overdue reviews."""
+        return item_id in self._schedule
+
     def schedule(self, item_id: str, interval_hours: float = 24) -> None:
         now = time.time()
         self._schedule[item_id] = {

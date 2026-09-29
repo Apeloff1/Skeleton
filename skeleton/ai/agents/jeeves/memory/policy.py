@@ -35,7 +35,7 @@ class MemPolicyIndex:
 @dataclass(frozen=True)
 class MemPolicyPolicy000:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -47,7 +47,7 @@ class MemPolicyPolicy000:
 @dataclass(frozen=True)
 class MemPolicyPolicy001:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -59,7 +59,7 @@ class MemPolicyPolicy001:
 @dataclass(frozen=True)
 class MemPolicyPolicy002:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -71,7 +71,7 @@ class MemPolicyPolicy002:
 @dataclass(frozen=True)
 class MemPolicyPolicy003:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -83,7 +83,7 @@ class MemPolicyPolicy003:
 @dataclass(frozen=True)
 class MemPolicyPolicy004:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -95,7 +95,7 @@ class MemPolicyPolicy004:
 @dataclass(frozen=True)
 class MemPolicyPolicy005:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -107,7 +107,7 @@ class MemPolicyPolicy005:
 @dataclass(frozen=True)
 class MemPolicyPolicy006:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -119,7 +119,7 @@ class MemPolicyPolicy006:
 @dataclass(frozen=True)
 class MemPolicyPolicy007:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -131,7 +131,7 @@ class MemPolicyPolicy007:
 @dataclass(frozen=True)
 class MemPolicyPolicy008:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -143,7 +143,7 @@ class MemPolicyPolicy008:
 @dataclass(frozen=True)
 class MemPolicyPolicy009:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -155,7 +155,7 @@ class MemPolicyPolicy009:
 @dataclass(frozen=True)
 class MemPolicyPolicy010:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -167,7 +167,7 @@ class MemPolicyPolicy010:
 @dataclass(frozen=True)
 class MemPolicyPolicy011:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -179,7 +179,7 @@ class MemPolicyPolicy011:
 @dataclass(frozen=True)
 class MemPolicyPolicy012:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -191,7 +191,7 @@ class MemPolicyPolicy012:
 @dataclass(frozen=True)
 class MemPolicyPolicy013:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -203,7 +203,7 @@ class MemPolicyPolicy013:
 @dataclass(frozen=True)
 class MemPolicyPolicy014:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -215,7 +215,7 @@ class MemPolicyPolicy014:
 @dataclass(frozen=True)
 class MemPolicyPolicy015:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -227,7 +227,7 @@ class MemPolicyPolicy015:
 @dataclass(frozen=True)
 class MemPolicyPolicy016:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -239,7 +239,7 @@ class MemPolicyPolicy016:
 @dataclass(frozen=True)
 class MemPolicyPolicy017:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -251,7 +251,7 @@ class MemPolicyPolicy017:
 @dataclass(frozen=True)
 class MemPolicyPolicy018:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -263,7 +263,7 @@ class MemPolicyPolicy018:
 @dataclass(frozen=True)
 class MemPolicyPolicy019:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -275,7 +275,7 @@ class MemPolicyPolicy019:
 @dataclass(frozen=True)
 class MemPolicyPolicy020:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -287,7 +287,7 @@ class MemPolicyPolicy020:
 @dataclass(frozen=True)
 class MemPolicyPolicy021:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -299,7 +299,7 @@ class MemPolicyPolicy021:
 @dataclass(frozen=True)
 class MemPolicyPolicy022:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -311,7 +311,7 @@ class MemPolicyPolicy022:
 @dataclass(frozen=True)
 class MemPolicyPolicy023:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -323,7 +323,7 @@ class MemPolicyPolicy023:
 @dataclass(frozen=True)
 class MemPolicyPolicy024:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -335,7 +335,7 @@ class MemPolicyPolicy024:
 @dataclass(frozen=True)
 class MemPolicyPolicy025:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -347,7 +347,7 @@ class MemPolicyPolicy025:
 @dataclass(frozen=True)
 class MemPolicyPolicy026:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -359,7 +359,7 @@ class MemPolicyPolicy026:
 @dataclass(frozen=True)
 class MemPolicyPolicy027:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -371,7 +371,7 @@ class MemPolicyPolicy027:
 @dataclass(frozen=True)
 class MemPolicyPolicy028:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -383,7 +383,7 @@ class MemPolicyPolicy028:
 @dataclass(frozen=True)
 class MemPolicyPolicy029:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -395,7 +395,7 @@ class MemPolicyPolicy029:
 @dataclass(frozen=True)
 class MemPolicyPolicy030:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -407,7 +407,7 @@ class MemPolicyPolicy030:
 @dataclass(frozen=True)
 class MemPolicyPolicy031:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -419,7 +419,7 @@ class MemPolicyPolicy031:
 @dataclass(frozen=True)
 class MemPolicyPolicy032:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -431,7 +431,7 @@ class MemPolicyPolicy032:
 @dataclass(frozen=True)
 class MemPolicyPolicy033:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -443,7 +443,7 @@ class MemPolicyPolicy033:
 @dataclass(frozen=True)
 class MemPolicyPolicy034:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -455,7 +455,7 @@ class MemPolicyPolicy034:
 @dataclass(frozen=True)
 class MemPolicyPolicy035:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -467,7 +467,7 @@ class MemPolicyPolicy035:
 @dataclass(frozen=True)
 class MemPolicyPolicy036:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -479,7 +479,7 @@ class MemPolicyPolicy036:
 @dataclass(frozen=True)
 class MemPolicyPolicy037:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -491,7 +491,7 @@ class MemPolicyPolicy037:
 @dataclass(frozen=True)
 class MemPolicyPolicy038:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -503,7 +503,7 @@ class MemPolicyPolicy038:
 @dataclass(frozen=True)
 class MemPolicyPolicy039:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -515,7 +515,7 @@ class MemPolicyPolicy039:
 @dataclass(frozen=True)
 class MemPolicyPolicy040:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -527,7 +527,7 @@ class MemPolicyPolicy040:
 @dataclass(frozen=True)
 class MemPolicyPolicy041:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -539,7 +539,7 @@ class MemPolicyPolicy041:
 @dataclass(frozen=True)
 class MemPolicyPolicy042:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -551,7 +551,7 @@ class MemPolicyPolicy042:
 @dataclass(frozen=True)
 class MemPolicyPolicy043:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -563,7 +563,7 @@ class MemPolicyPolicy043:
 @dataclass(frozen=True)
 class MemPolicyPolicy044:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -575,7 +575,7 @@ class MemPolicyPolicy044:
 @dataclass(frozen=True)
 class MemPolicyPolicy045:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -587,7 +587,7 @@ class MemPolicyPolicy045:
 @dataclass(frozen=True)
 class MemPolicyPolicy046:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -599,7 +599,7 @@ class MemPolicyPolicy046:
 @dataclass(frozen=True)
 class MemPolicyPolicy047:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -611,7 +611,7 @@ class MemPolicyPolicy047:
 @dataclass(frozen=True)
 class MemPolicyPolicy048:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -623,7 +623,7 @@ class MemPolicyPolicy048:
 @dataclass(frozen=True)
 class MemPolicyPolicy049:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -635,7 +635,7 @@ class MemPolicyPolicy049:
 @dataclass(frozen=True)
 class MemPolicyPolicy050:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -647,7 +647,7 @@ class MemPolicyPolicy050:
 @dataclass(frozen=True)
 class MemPolicyPolicy051:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -659,7 +659,7 @@ class MemPolicyPolicy051:
 @dataclass(frozen=True)
 class MemPolicyPolicy052:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -671,7 +671,7 @@ class MemPolicyPolicy052:
 @dataclass(frozen=True)
 class MemPolicyPolicy053:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -683,7 +683,7 @@ class MemPolicyPolicy053:
 @dataclass(frozen=True)
 class MemPolicyPolicy054:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -695,7 +695,7 @@ class MemPolicyPolicy054:
 @dataclass(frozen=True)
 class MemPolicyPolicy055:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -707,7 +707,7 @@ class MemPolicyPolicy055:
 @dataclass(frozen=True)
 class MemPolicyPolicy056:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -719,7 +719,7 @@ class MemPolicyPolicy056:
 @dataclass(frozen=True)
 class MemPolicyPolicy057:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -731,7 +731,7 @@ class MemPolicyPolicy057:
 @dataclass(frozen=True)
 class MemPolicyPolicy058:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -743,7 +743,7 @@ class MemPolicyPolicy058:
 @dataclass(frozen=True)
 class MemPolicyPolicy059:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -755,7 +755,7 @@ class MemPolicyPolicy059:
 @dataclass(frozen=True)
 class MemPolicyPolicy060:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -767,7 +767,7 @@ class MemPolicyPolicy060:
 @dataclass(frozen=True)
 class MemPolicyPolicy061:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -779,7 +779,7 @@ class MemPolicyPolicy061:
 @dataclass(frozen=True)
 class MemPolicyPolicy062:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -791,7 +791,7 @@ class MemPolicyPolicy062:
 @dataclass(frozen=True)
 class MemPolicyPolicy063:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -803,7 +803,7 @@ class MemPolicyPolicy063:
 @dataclass(frozen=True)
 class MemPolicyPolicy064:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -815,7 +815,7 @@ class MemPolicyPolicy064:
 @dataclass(frozen=True)
 class MemPolicyPolicy065:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -827,7 +827,7 @@ class MemPolicyPolicy065:
 @dataclass(frozen=True)
 class MemPolicyPolicy066:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -839,7 +839,7 @@ class MemPolicyPolicy066:
 @dataclass(frozen=True)
 class MemPolicyPolicy067:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -851,7 +851,7 @@ class MemPolicyPolicy067:
 @dataclass(frozen=True)
 class MemPolicyPolicy068:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -863,7 +863,7 @@ class MemPolicyPolicy068:
 @dataclass(frozen=True)
 class MemPolicyPolicy069:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -875,7 +875,7 @@ class MemPolicyPolicy069:
 @dataclass(frozen=True)
 class MemPolicyPolicy070:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -887,7 +887,7 @@ class MemPolicyPolicy070:
 @dataclass(frozen=True)
 class MemPolicyPolicy071:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -899,7 +899,7 @@ class MemPolicyPolicy071:
 @dataclass(frozen=True)
 class MemPolicyPolicy072:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -911,7 +911,7 @@ class MemPolicyPolicy072:
 @dataclass(frozen=True)
 class MemPolicyPolicy073:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -923,7 +923,7 @@ class MemPolicyPolicy073:
 @dataclass(frozen=True)
 class MemPolicyPolicy074:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -935,7 +935,7 @@ class MemPolicyPolicy074:
 @dataclass(frozen=True)
 class MemPolicyPolicy075:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -947,7 +947,7 @@ class MemPolicyPolicy075:
 @dataclass(frozen=True)
 class MemPolicyPolicy076:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -959,7 +959,7 @@ class MemPolicyPolicy076:
 @dataclass(frozen=True)
 class MemPolicyPolicy077:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -971,7 +971,7 @@ class MemPolicyPolicy077:
 @dataclass(frozen=True)
 class MemPolicyPolicy078:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -983,7 +983,7 @@ class MemPolicyPolicy078:
 @dataclass(frozen=True)
 class MemPolicyPolicy079:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -995,7 +995,7 @@ class MemPolicyPolicy079:
 @dataclass(frozen=True)
 class MemPolicyPolicy080:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1007,7 +1007,7 @@ class MemPolicyPolicy080:
 @dataclass(frozen=True)
 class MemPolicyPolicy081:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1019,7 +1019,7 @@ class MemPolicyPolicy081:
 @dataclass(frozen=True)
 class MemPolicyPolicy082:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1031,7 +1031,7 @@ class MemPolicyPolicy082:
 @dataclass(frozen=True)
 class MemPolicyPolicy083:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1043,7 +1043,7 @@ class MemPolicyPolicy083:
 @dataclass(frozen=True)
 class MemPolicyPolicy084:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1055,7 +1055,7 @@ class MemPolicyPolicy084:
 @dataclass(frozen=True)
 class MemPolicyPolicy085:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1067,7 +1067,7 @@ class MemPolicyPolicy085:
 @dataclass(frozen=True)
 class MemPolicyPolicy086:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1079,7 +1079,7 @@ class MemPolicyPolicy086:
 @dataclass(frozen=True)
 class MemPolicyPolicy087:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1091,7 +1091,7 @@ class MemPolicyPolicy087:
 @dataclass(frozen=True)
 class MemPolicyPolicy088:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1103,7 +1103,7 @@ class MemPolicyPolicy088:
 @dataclass(frozen=True)
 class MemPolicyPolicy089:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1115,7 +1115,7 @@ class MemPolicyPolicy089:
 @dataclass(frozen=True)
 class MemPolicyPolicy090:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1127,7 +1127,7 @@ class MemPolicyPolicy090:
 @dataclass(frozen=True)
 class MemPolicyPolicy091:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1139,7 +1139,7 @@ class MemPolicyPolicy091:
 @dataclass(frozen=True)
 class MemPolicyPolicy092:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1151,7 +1151,7 @@ class MemPolicyPolicy092:
 @dataclass(frozen=True)
 class MemPolicyPolicy093:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1163,7 +1163,7 @@ class MemPolicyPolicy093:
 @dataclass(frozen=True)
 class MemPolicyPolicy094:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1175,7 +1175,7 @@ class MemPolicyPolicy094:
 @dataclass(frozen=True)
 class MemPolicyPolicy095:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1187,7 +1187,7 @@ class MemPolicyPolicy095:
 @dataclass(frozen=True)
 class MemPolicyPolicy096:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1199,7 +1199,7 @@ class MemPolicyPolicy096:
 @dataclass(frozen=True)
 class MemPolicyPolicy097:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1211,7 +1211,7 @@ class MemPolicyPolicy097:
 @dataclass(frozen=True)
 class MemPolicyPolicy098:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1223,7 +1223,7 @@ class MemPolicyPolicy098:
 @dataclass(frozen=True)
 class MemPolicyPolicy099:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -1235,7 +1235,7 @@ class MemPolicyPolicy099:
 @dataclass(frozen=True)
 class MemPolicyPolicy100:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -1247,7 +1247,7 @@ class MemPolicyPolicy100:
 @dataclass(frozen=True)
 class MemPolicyPolicy101:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -1259,7 +1259,7 @@ class MemPolicyPolicy101:
 @dataclass(frozen=True)
 class MemPolicyPolicy102:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -1271,7 +1271,7 @@ class MemPolicyPolicy102:
 @dataclass(frozen=True)
 class MemPolicyPolicy103:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -1283,7 +1283,7 @@ class MemPolicyPolicy103:
 @dataclass(frozen=True)
 class MemPolicyPolicy104:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -1295,7 +1295,7 @@ class MemPolicyPolicy104:
 @dataclass(frozen=True)
 class MemPolicyPolicy105:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -1307,7 +1307,7 @@ class MemPolicyPolicy105:
 @dataclass(frozen=True)
 class MemPolicyPolicy106:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -1319,7 +1319,7 @@ class MemPolicyPolicy106:
 @dataclass(frozen=True)
 class MemPolicyPolicy107:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -1331,7 +1331,7 @@ class MemPolicyPolicy107:
 @dataclass(frozen=True)
 class MemPolicyPolicy108:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -1343,7 +1343,7 @@ class MemPolicyPolicy108:
 @dataclass(frozen=True)
 class MemPolicyPolicy109:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -1355,7 +1355,7 @@ class MemPolicyPolicy109:
 @dataclass(frozen=True)
 class MemPolicyPolicy110:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -1367,7 +1367,7 @@ class MemPolicyPolicy110:
 @dataclass(frozen=True)
 class MemPolicyPolicy111:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -1379,7 +1379,7 @@ class MemPolicyPolicy111:
 @dataclass(frozen=True)
 class MemPolicyPolicy112:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1391,7 +1391,7 @@ class MemPolicyPolicy112:
 @dataclass(frozen=True)
 class MemPolicyPolicy113:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1403,7 +1403,7 @@ class MemPolicyPolicy113:
 @dataclass(frozen=True)
 class MemPolicyPolicy114:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1415,7 +1415,7 @@ class MemPolicyPolicy114:
 @dataclass(frozen=True)
 class MemPolicyPolicy115:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1427,7 +1427,7 @@ class MemPolicyPolicy115:
 @dataclass(frozen=True)
 class MemPolicyPolicy116:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1439,7 +1439,7 @@ class MemPolicyPolicy116:
 @dataclass(frozen=True)
 class MemPolicyPolicy117:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1451,7 +1451,7 @@ class MemPolicyPolicy117:
 @dataclass(frozen=True)
 class MemPolicyPolicy118:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1463,7 +1463,7 @@ class MemPolicyPolicy118:
 @dataclass(frozen=True)
 class MemPolicyPolicy119:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1475,7 +1475,7 @@ class MemPolicyPolicy119:
 @dataclass(frozen=True)
 class MemPolicyPolicy120:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1487,7 +1487,7 @@ class MemPolicyPolicy120:
 @dataclass(frozen=True)
 class MemPolicyPolicy121:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1499,7 +1499,7 @@ class MemPolicyPolicy121:
 @dataclass(frozen=True)
 class MemPolicyPolicy122:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1511,7 +1511,7 @@ class MemPolicyPolicy122:
 @dataclass(frozen=True)
 class MemPolicyPolicy123:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1523,7 +1523,7 @@ class MemPolicyPolicy123:
 @dataclass(frozen=True)
 class MemPolicyPolicy124:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1535,7 +1535,7 @@ class MemPolicyPolicy124:
 @dataclass(frozen=True)
 class MemPolicyPolicy125:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1547,7 +1547,7 @@ class MemPolicyPolicy125:
 @dataclass(frozen=True)
 class MemPolicyPolicy126:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1559,7 +1559,7 @@ class MemPolicyPolicy126:
 @dataclass(frozen=True)
 class MemPolicyPolicy127:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1571,7 +1571,7 @@ class MemPolicyPolicy127:
 @dataclass(frozen=True)
 class MemPolicyPolicy128:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1583,7 +1583,7 @@ class MemPolicyPolicy128:
 @dataclass(frozen=True)
 class MemPolicyPolicy129:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1595,7 +1595,7 @@ class MemPolicyPolicy129:
 @dataclass(frozen=True)
 class MemPolicyPolicy130:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1607,7 +1607,7 @@ class MemPolicyPolicy130:
 @dataclass(frozen=True)
 class MemPolicyPolicy131:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -1619,7 +1619,7 @@ class MemPolicyPolicy131:
 @dataclass(frozen=True)
 class MemPolicyPolicy132:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -1631,7 +1631,7 @@ class MemPolicyPolicy132:
 @dataclass(frozen=True)
 class MemPolicyPolicy133:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -1643,7 +1643,7 @@ class MemPolicyPolicy133:
 @dataclass(frozen=True)
 class MemPolicyPolicy134:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -1655,7 +1655,7 @@ class MemPolicyPolicy134:
 @dataclass(frozen=True)
 class MemPolicyPolicy135:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -1667,7 +1667,7 @@ class MemPolicyPolicy135:
 @dataclass(frozen=True)
 class MemPolicyPolicy136:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -1679,7 +1679,7 @@ class MemPolicyPolicy136:
 @dataclass(frozen=True)
 class MemPolicyPolicy137:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -1691,7 +1691,7 @@ class MemPolicyPolicy137:
 @dataclass(frozen=True)
 class MemPolicyPolicy138:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -1703,7 +1703,7 @@ class MemPolicyPolicy138:
 @dataclass(frozen=True)
 class MemPolicyPolicy139:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -1715,7 +1715,7 @@ class MemPolicyPolicy139:
 @dataclass(frozen=True)
 class MemPolicyPolicy140:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -1727,7 +1727,7 @@ class MemPolicyPolicy140:
 @dataclass(frozen=True)
 class MemPolicyPolicy141:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -1739,7 +1739,7 @@ class MemPolicyPolicy141:
 @dataclass(frozen=True)
 class MemPolicyPolicy142:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -1751,7 +1751,7 @@ class MemPolicyPolicy142:
 @dataclass(frozen=True)
 class MemPolicyPolicy143:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -1763,7 +1763,7 @@ class MemPolicyPolicy143:
 @dataclass(frozen=True)
 class MemPolicyPolicy144:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1775,7 +1775,7 @@ class MemPolicyPolicy144:
 @dataclass(frozen=True)
 class MemPolicyPolicy145:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1787,7 +1787,7 @@ class MemPolicyPolicy145:
 @dataclass(frozen=True)
 class MemPolicyPolicy146:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1799,7 +1799,7 @@ class MemPolicyPolicy146:
 @dataclass(frozen=True)
 class MemPolicyPolicy147:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1811,7 +1811,7 @@ class MemPolicyPolicy147:
 @dataclass(frozen=True)
 class MemPolicyPolicy148:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1823,7 +1823,7 @@ class MemPolicyPolicy148:
 @dataclass(frozen=True)
 class MemPolicyPolicy149:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1835,7 +1835,7 @@ class MemPolicyPolicy149:
 @dataclass(frozen=True)
 class MemPolicyPolicy150:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1847,7 +1847,7 @@ class MemPolicyPolicy150:
 @dataclass(frozen=True)
 class MemPolicyPolicy151:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1859,7 +1859,7 @@ class MemPolicyPolicy151:
 @dataclass(frozen=True)
 class MemPolicyPolicy152:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1871,7 +1871,7 @@ class MemPolicyPolicy152:
 @dataclass(frozen=True)
 class MemPolicyPolicy153:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1883,7 +1883,7 @@ class MemPolicyPolicy153:
 @dataclass(frozen=True)
 class MemPolicyPolicy154:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1895,7 +1895,7 @@ class MemPolicyPolicy154:
 @dataclass(frozen=True)
 class MemPolicyPolicy155:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1907,7 +1907,7 @@ class MemPolicyPolicy155:
 @dataclass(frozen=True)
 class MemPolicyPolicy156:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1919,7 +1919,7 @@ class MemPolicyPolicy156:
 @dataclass(frozen=True)
 class MemPolicyPolicy157:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1931,7 +1931,7 @@ class MemPolicyPolicy157:
 @dataclass(frozen=True)
 class MemPolicyPolicy158:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1943,7 +1943,7 @@ class MemPolicyPolicy158:
 @dataclass(frozen=True)
 class MemPolicyPolicy159:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1955,7 +1955,7 @@ class MemPolicyPolicy159:
 @dataclass(frozen=True)
 class MemPolicyPolicy160:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1967,7 +1967,7 @@ class MemPolicyPolicy160:
 @dataclass(frozen=True)
 class MemPolicyPolicy161:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1979,7 +1979,7 @@ class MemPolicyPolicy161:
 @dataclass(frozen=True)
 class MemPolicyPolicy162:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1991,7 +1991,7 @@ class MemPolicyPolicy162:
 @dataclass(frozen=True)
 class MemPolicyPolicy163:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -2003,7 +2003,7 @@ class MemPolicyPolicy163:
 @dataclass(frozen=True)
 class MemPolicyPolicy164:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -2015,7 +2015,7 @@ class MemPolicyPolicy164:
 @dataclass(frozen=True)
 class MemPolicyPolicy165:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -2027,7 +2027,7 @@ class MemPolicyPolicy165:
 @dataclass(frozen=True)
 class MemPolicyPolicy166:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -2039,7 +2039,7 @@ class MemPolicyPolicy166:
 @dataclass(frozen=True)
 class MemPolicyPolicy167:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -2051,7 +2051,7 @@ class MemPolicyPolicy167:
 @dataclass(frozen=True)
 class MemPolicyPolicy168:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -2063,7 +2063,7 @@ class MemPolicyPolicy168:
 @dataclass(frozen=True)
 class MemPolicyPolicy169:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -2075,7 +2075,7 @@ class MemPolicyPolicy169:
 @dataclass(frozen=True)
 class MemPolicyPolicy170:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -2087,7 +2087,7 @@ class MemPolicyPolicy170:
 @dataclass(frozen=True)
 class MemPolicyPolicy171:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -2099,7 +2099,7 @@ class MemPolicyPolicy171:
 @dataclass(frozen=True)
 class MemPolicyPolicy172:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -2111,7 +2111,7 @@ class MemPolicyPolicy172:
 @dataclass(frozen=True)
 class MemPolicyPolicy173:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -2123,7 +2123,7 @@ class MemPolicyPolicy173:
 @dataclass(frozen=True)
 class MemPolicyPolicy174:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -2135,7 +2135,7 @@ class MemPolicyPolicy174:
 @dataclass(frozen=True)
 class MemPolicyPolicy175:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -2147,7 +2147,7 @@ class MemPolicyPolicy175:
 @dataclass(frozen=True)
 class MemPolicyPolicy176:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -2159,7 +2159,7 @@ class MemPolicyPolicy176:
 @dataclass(frozen=True)
 class MemPolicyPolicy177:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -2171,7 +2171,7 @@ class MemPolicyPolicy177:
 @dataclass(frozen=True)
 class MemPolicyPolicy178:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -2183,7 +2183,7 @@ class MemPolicyPolicy178:
 @dataclass(frozen=True)
 class MemPolicyPolicy179:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -2195,7 +2195,7 @@ class MemPolicyPolicy179:
 @dataclass(frozen=True)
 class MemPolicyPolicy180:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -2207,7 +2207,7 @@ class MemPolicyPolicy180:
 @dataclass(frozen=True)
 class MemPolicyPolicy181:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -2219,7 +2219,7 @@ class MemPolicyPolicy181:
 @dataclass(frozen=True)
 class MemPolicyPolicy182:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -2231,7 +2231,7 @@ class MemPolicyPolicy182:
 @dataclass(frozen=True)
 class MemPolicyPolicy183:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -2243,7 +2243,7 @@ class MemPolicyPolicy183:
 @dataclass(frozen=True)
 class MemPolicyPolicy184:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -2255,7 +2255,7 @@ class MemPolicyPolicy184:
 @dataclass(frozen=True)
 class MemPolicyPolicy185:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -2267,7 +2267,7 @@ class MemPolicyPolicy185:
 @dataclass(frozen=True)
 class MemPolicyPolicy186:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -2279,7 +2279,7 @@ class MemPolicyPolicy186:
 @dataclass(frozen=True)
 class MemPolicyPolicy187:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -2291,7 +2291,7 @@ class MemPolicyPolicy187:
 @dataclass(frozen=True)
 class MemPolicyPolicy188:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -2303,7 +2303,7 @@ class MemPolicyPolicy188:
 @dataclass(frozen=True)
 class MemPolicyPolicy189:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -2315,7 +2315,7 @@ class MemPolicyPolicy189:
 @dataclass(frozen=True)
 class MemPolicyPolicy190:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -2327,7 +2327,7 @@ class MemPolicyPolicy190:
 @dataclass(frozen=True)
 class MemPolicyPolicy191:
     name:str
-    tier:MemPolicyTier=ARCHIVE
+    tier:MemPolicyTier=MemPolicyTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -2339,7 +2339,7 @@ class MemPolicyPolicy191:
 @dataclass(frozen=True)
 class MemPolicyPolicy192:
     name:str
-    tier:MemPolicyTier=EPHEMERAL
+    tier:MemPolicyTier=MemPolicyTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -2351,7 +2351,7 @@ class MemPolicyPolicy192:
 @dataclass(frozen=True)
 class MemPolicyPolicy193:
     name:str
-    tier:MemPolicyTier=WORKING
+    tier:MemPolicyTier=MemPolicyTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -2363,7 +2363,7 @@ class MemPolicyPolicy193:
 @dataclass(frozen=True)
 class MemPolicyPolicy194:
     name:str
-    tier:MemPolicyTier=CANONICAL
+    tier:MemPolicyTier=MemPolicyTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)

@@ -336,7 +336,17 @@ def get_phase(phase_name: str) -> Optional[Dict[str, Any]]:
 
 def get_package(package_name: str) -> Optional[Dict[str, Any]]:
     """Get package definition by name."""
-    return PACKAGES.get(package_name)
+    aliases = {
+        "skeleton.distributed.galaxy": "skeleton.galaxy",
+        "skeleton.research.social": "skeleton.social",
+        "skeleton.distributed.network": "skeleton.network",
+        "skeleton.distributed.mesh": "skeleton.mesh",
+        "skeleton.simulation.era": "skeleton.era",
+        "skeleton.knowledge.graphs": "skeleton.graphs",
+        "skeleton.provenance.chronicle": "skeleton.chronicle",
+        "skeleton.tools.integrations": "skeleton.integrations",
+    }
+    return PACKAGES.get(aliases.get(package_name, package_name))
 
 
 def get_routes(protected_only: bool = False) -> List[Dict[str, Any]]:

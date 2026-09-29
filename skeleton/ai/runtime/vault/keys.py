@@ -1,9 +1,8 @@
 """Vault key versioning — manage master key generations safely.
 
-EnvelopeKMS.rotate_master re-wraps everything blindly; KeyRegistry
-tracks which generation wrote each data key, enables a staged
-rotation (new keys → new master, old keys → progressively unwrapped),
-and reports the split so operators can verify a rotation completed.
+EnvelopeKMS validates all keys before an atomic rotation. KeyRegistry advances
+its generation only after that rotation succeeds and tracks registered keys
+against the committed generation.
 """
 
 from __future__ import annotations
@@ -37,8 +36,8 @@ class KeyRegistry:
         self._versions[key.key_id] = self._generation
 
     def rotate(self, new_master: bytes) -> int:
-        self._generation += 1
         rotated = self._kms.rotate_master(new_master)
+        self._generation += 1
         for key_id in list(self._versions):
             self._versions[key_id] = self._generation
         return rotated

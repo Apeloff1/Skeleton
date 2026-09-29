@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from skeleton.memory.guarded_compaction import RotGuardedCompactor
 from skeleton.memory.compaction import ContextCompactor, Turn
 from skeleton.memory.rot_guard import ContextRotGuard
@@ -61,7 +63,8 @@ def test_compact_turns_none_without_payload():
 
     assert compact_turns(None) is None
     assert compact_turns([]) is None
-    assert compact_turns([{"role": "user"}]) is None  # no content
+    with pytest.raises(ValueError, match="content must be a string"):
+        compact_turns([{"role": "user"}])
 
 
 def test_compact_turns_returns_api_shape():
@@ -76,4 +79,3 @@ def test_compact_turns_returns_api_shape():
     assert isinstance(out["compacted"], bool)
     assert out["turns"][0]["role"] == "user"
     assert "report" in out
-

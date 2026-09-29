@@ -166,3 +166,9 @@ class KremMatrix:
 
     def snapshot(self) -> dict[str, float]:
         return {s: round(st.effectiveness, 4) for s, st in self._sources.items()}
+
+
+# Historical matrix names retain their original implementations.
+from skeleton.jeeves.matrices_llm import (
+    SemanticAssociationMap, CompressedLearnedOutcomeModel, KnowledgeRetentionMatrix,
+)

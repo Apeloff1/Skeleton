@@ -35,7 +35,7 @@ class RehydIndex:
 @dataclass(frozen=True)
 class RehydPolicy000:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -47,7 +47,7 @@ class RehydPolicy000:
 @dataclass(frozen=True)
 class RehydPolicy001:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -59,7 +59,7 @@ class RehydPolicy001:
 @dataclass(frozen=True)
 class RehydPolicy002:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -71,7 +71,7 @@ class RehydPolicy002:
 @dataclass(frozen=True)
 class RehydPolicy003:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -83,7 +83,7 @@ class RehydPolicy003:
 @dataclass(frozen=True)
 class RehydPolicy004:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -95,7 +95,7 @@ class RehydPolicy004:
 @dataclass(frozen=True)
 class RehydPolicy005:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -107,7 +107,7 @@ class RehydPolicy005:
 @dataclass(frozen=True)
 class RehydPolicy006:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -119,7 +119,7 @@ class RehydPolicy006:
 @dataclass(frozen=True)
 class RehydPolicy007:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -131,7 +131,7 @@ class RehydPolicy007:
 @dataclass(frozen=True)
 class RehydPolicy008:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -143,7 +143,7 @@ class RehydPolicy008:
 @dataclass(frozen=True)
 class RehydPolicy009:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -155,7 +155,7 @@ class RehydPolicy009:
 @dataclass(frozen=True)
 class RehydPolicy010:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -167,7 +167,7 @@ class RehydPolicy010:
 @dataclass(frozen=True)
 class RehydPolicy011:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -179,7 +179,7 @@ class RehydPolicy011:
 @dataclass(frozen=True)
 class RehydPolicy012:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -191,7 +191,7 @@ class RehydPolicy012:
 @dataclass(frozen=True)
 class RehydPolicy013:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -203,7 +203,7 @@ class RehydPolicy013:
 @dataclass(frozen=True)
 class RehydPolicy014:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -215,7 +215,7 @@ class RehydPolicy014:
 @dataclass(frozen=True)
 class RehydPolicy015:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -227,7 +227,7 @@ class RehydPolicy015:
 @dataclass(frozen=True)
 class RehydPolicy016:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -239,7 +239,7 @@ class RehydPolicy016:
 @dataclass(frozen=True)
 class RehydPolicy017:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -251,7 +251,7 @@ class RehydPolicy017:
 @dataclass(frozen=True)
 class RehydPolicy018:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -263,7 +263,7 @@ class RehydPolicy018:
 @dataclass(frozen=True)
 class RehydPolicy019:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -275,7 +275,7 @@ class RehydPolicy019:
 @dataclass(frozen=True)
 class RehydPolicy020:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -287,7 +287,7 @@ class RehydPolicy020:
 @dataclass(frozen=True)
 class RehydPolicy021:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -299,7 +299,7 @@ class RehydPolicy021:
 @dataclass(frozen=True)
 class RehydPolicy022:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -311,7 +311,7 @@ class RehydPolicy022:
 @dataclass(frozen=True)
 class RehydPolicy023:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -323,7 +323,7 @@ class RehydPolicy023:
 @dataclass(frozen=True)
 class RehydPolicy024:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -335,7 +335,7 @@ class RehydPolicy024:
 @dataclass(frozen=True)
 class RehydPolicy025:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -347,7 +347,7 @@ class RehydPolicy025:
 @dataclass(frozen=True)
 class RehydPolicy026:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -359,7 +359,7 @@ class RehydPolicy026:
 @dataclass(frozen=True)
 class RehydPolicy027:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -371,7 +371,7 @@ class RehydPolicy027:
 @dataclass(frozen=True)
 class RehydPolicy028:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -383,7 +383,7 @@ class RehydPolicy028:
 @dataclass(frozen=True)
 class RehydPolicy029:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -395,7 +395,7 @@ class RehydPolicy029:
 @dataclass(frozen=True)
 class RehydPolicy030:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -407,7 +407,7 @@ class RehydPolicy030:
 @dataclass(frozen=True)
 class RehydPolicy031:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -419,7 +419,7 @@ class RehydPolicy031:
 @dataclass(frozen=True)
 class RehydPolicy032:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -431,7 +431,7 @@ class RehydPolicy032:
 @dataclass(frozen=True)
 class RehydPolicy033:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -443,7 +443,7 @@ class RehydPolicy033:
 @dataclass(frozen=True)
 class RehydPolicy034:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -455,7 +455,7 @@ class RehydPolicy034:
 @dataclass(frozen=True)
 class RehydPolicy035:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -467,7 +467,7 @@ class RehydPolicy035:
 @dataclass(frozen=True)
 class RehydPolicy036:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -479,7 +479,7 @@ class RehydPolicy036:
 @dataclass(frozen=True)
 class RehydPolicy037:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -491,7 +491,7 @@ class RehydPolicy037:
 @dataclass(frozen=True)
 class RehydPolicy038:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -503,7 +503,7 @@ class RehydPolicy038:
 @dataclass(frozen=True)
 class RehydPolicy039:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -515,7 +515,7 @@ class RehydPolicy039:
 @dataclass(frozen=True)
 class RehydPolicy040:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -527,7 +527,7 @@ class RehydPolicy040:
 @dataclass(frozen=True)
 class RehydPolicy041:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -539,7 +539,7 @@ class RehydPolicy041:
 @dataclass(frozen=True)
 class RehydPolicy042:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -551,7 +551,7 @@ class RehydPolicy042:
 @dataclass(frozen=True)
 class RehydPolicy043:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -563,7 +563,7 @@ class RehydPolicy043:
 @dataclass(frozen=True)
 class RehydPolicy044:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -575,7 +575,7 @@ class RehydPolicy044:
 @dataclass(frozen=True)
 class RehydPolicy045:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -587,7 +587,7 @@ class RehydPolicy045:
 @dataclass(frozen=True)
 class RehydPolicy046:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -599,7 +599,7 @@ class RehydPolicy046:
 @dataclass(frozen=True)
 class RehydPolicy047:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -611,7 +611,7 @@ class RehydPolicy047:
 @dataclass(frozen=True)
 class RehydPolicy048:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -623,7 +623,7 @@ class RehydPolicy048:
 @dataclass(frozen=True)
 class RehydPolicy049:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -635,7 +635,7 @@ class RehydPolicy049:
 @dataclass(frozen=True)
 class RehydPolicy050:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -647,7 +647,7 @@ class RehydPolicy050:
 @dataclass(frozen=True)
 class RehydPolicy051:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -659,7 +659,7 @@ class RehydPolicy051:
 @dataclass(frozen=True)
 class RehydPolicy052:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -671,7 +671,7 @@ class RehydPolicy052:
 @dataclass(frozen=True)
 class RehydPolicy053:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -683,7 +683,7 @@ class RehydPolicy053:
 @dataclass(frozen=True)
 class RehydPolicy054:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -695,7 +695,7 @@ class RehydPolicy054:
 @dataclass(frozen=True)
 class RehydPolicy055:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -707,7 +707,7 @@ class RehydPolicy055:
 @dataclass(frozen=True)
 class RehydPolicy056:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -719,7 +719,7 @@ class RehydPolicy056:
 @dataclass(frozen=True)
 class RehydPolicy057:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -731,7 +731,7 @@ class RehydPolicy057:
 @dataclass(frozen=True)
 class RehydPolicy058:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -743,7 +743,7 @@ class RehydPolicy058:
 @dataclass(frozen=True)
 class RehydPolicy059:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -755,7 +755,7 @@ class RehydPolicy059:
 @dataclass(frozen=True)
 class RehydPolicy060:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -767,7 +767,7 @@ class RehydPolicy060:
 @dataclass(frozen=True)
 class RehydPolicy061:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -779,7 +779,7 @@ class RehydPolicy061:
 @dataclass(frozen=True)
 class RehydPolicy062:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -791,7 +791,7 @@ class RehydPolicy062:
 @dataclass(frozen=True)
 class RehydPolicy063:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -803,7 +803,7 @@ class RehydPolicy063:
 @dataclass(frozen=True)
 class RehydPolicy064:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -815,7 +815,7 @@ class RehydPolicy064:
 @dataclass(frozen=True)
 class RehydPolicy065:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -827,7 +827,7 @@ class RehydPolicy065:
 @dataclass(frozen=True)
 class RehydPolicy066:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -839,7 +839,7 @@ class RehydPolicy066:
 @dataclass(frozen=True)
 class RehydPolicy067:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -851,7 +851,7 @@ class RehydPolicy067:
 @dataclass(frozen=True)
 class RehydPolicy068:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -863,7 +863,7 @@ class RehydPolicy068:
 @dataclass(frozen=True)
 class RehydPolicy069:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -875,7 +875,7 @@ class RehydPolicy069:
 @dataclass(frozen=True)
 class RehydPolicy070:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -887,7 +887,7 @@ class RehydPolicy070:
 @dataclass(frozen=True)
 class RehydPolicy071:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -899,7 +899,7 @@ class RehydPolicy071:
 @dataclass(frozen=True)
 class RehydPolicy072:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -911,7 +911,7 @@ class RehydPolicy072:
 @dataclass(frozen=True)
 class RehydPolicy073:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -923,7 +923,7 @@ class RehydPolicy073:
 @dataclass(frozen=True)
 class RehydPolicy074:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -935,7 +935,7 @@ class RehydPolicy074:
 @dataclass(frozen=True)
 class RehydPolicy075:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -947,7 +947,7 @@ class RehydPolicy075:
 @dataclass(frozen=True)
 class RehydPolicy076:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -959,7 +959,7 @@ class RehydPolicy076:
 @dataclass(frozen=True)
 class RehydPolicy077:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -971,7 +971,7 @@ class RehydPolicy077:
 @dataclass(frozen=True)
 class RehydPolicy078:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -983,7 +983,7 @@ class RehydPolicy078:
 @dataclass(frozen=True)
 class RehydPolicy079:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -995,7 +995,7 @@ class RehydPolicy079:
 @dataclass(frozen=True)
 class RehydPolicy080:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1007,7 +1007,7 @@ class RehydPolicy080:
 @dataclass(frozen=True)
 class RehydPolicy081:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1019,7 +1019,7 @@ class RehydPolicy081:
 @dataclass(frozen=True)
 class RehydPolicy082:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1031,7 +1031,7 @@ class RehydPolicy082:
 @dataclass(frozen=True)
 class RehydPolicy083:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1043,7 +1043,7 @@ class RehydPolicy083:
 @dataclass(frozen=True)
 class RehydPolicy084:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1055,7 +1055,7 @@ class RehydPolicy084:
 @dataclass(frozen=True)
 class RehydPolicy085:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1067,7 +1067,7 @@ class RehydPolicy085:
 @dataclass(frozen=True)
 class RehydPolicy086:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1079,7 +1079,7 @@ class RehydPolicy086:
 @dataclass(frozen=True)
 class RehydPolicy087:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1091,7 +1091,7 @@ class RehydPolicy087:
 @dataclass(frozen=True)
 class RehydPolicy088:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1103,7 +1103,7 @@ class RehydPolicy088:
 @dataclass(frozen=True)
 class RehydPolicy089:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1115,7 +1115,7 @@ class RehydPolicy089:
 @dataclass(frozen=True)
 class RehydPolicy090:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1127,7 +1127,7 @@ class RehydPolicy090:
 @dataclass(frozen=True)
 class RehydPolicy091:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1139,7 +1139,7 @@ class RehydPolicy091:
 @dataclass(frozen=True)
 class RehydPolicy092:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1151,7 +1151,7 @@ class RehydPolicy092:
 @dataclass(frozen=True)
 class RehydPolicy093:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1163,7 +1163,7 @@ class RehydPolicy093:
 @dataclass(frozen=True)
 class RehydPolicy094:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1175,7 +1175,7 @@ class RehydPolicy094:
 @dataclass(frozen=True)
 class RehydPolicy095:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1187,7 +1187,7 @@ class RehydPolicy095:
 @dataclass(frozen=True)
 class RehydPolicy096:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1199,7 +1199,7 @@ class RehydPolicy096:
 @dataclass(frozen=True)
 class RehydPolicy097:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1211,7 +1211,7 @@ class RehydPolicy097:
 @dataclass(frozen=True)
 class RehydPolicy098:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1223,7 +1223,7 @@ class RehydPolicy098:
 @dataclass(frozen=True)
 class RehydPolicy099:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -1235,7 +1235,7 @@ class RehydPolicy099:
 @dataclass(frozen=True)
 class RehydPolicy100:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -1247,7 +1247,7 @@ class RehydPolicy100:
 @dataclass(frozen=True)
 class RehydPolicy101:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -1259,7 +1259,7 @@ class RehydPolicy101:
 @dataclass(frozen=True)
 class RehydPolicy102:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -1271,7 +1271,7 @@ class RehydPolicy102:
 @dataclass(frozen=True)
 class RehydPolicy103:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -1283,7 +1283,7 @@ class RehydPolicy103:
 @dataclass(frozen=True)
 class RehydPolicy104:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -1295,7 +1295,7 @@ class RehydPolicy104:
 @dataclass(frozen=True)
 class RehydPolicy105:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -1307,7 +1307,7 @@ class RehydPolicy105:
 @dataclass(frozen=True)
 class RehydPolicy106:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -1319,7 +1319,7 @@ class RehydPolicy106:
 @dataclass(frozen=True)
 class RehydPolicy107:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -1331,7 +1331,7 @@ class RehydPolicy107:
 @dataclass(frozen=True)
 class RehydPolicy108:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -1343,7 +1343,7 @@ class RehydPolicy108:
 @dataclass(frozen=True)
 class RehydPolicy109:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -1355,7 +1355,7 @@ class RehydPolicy109:
 @dataclass(frozen=True)
 class RehydPolicy110:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -1367,7 +1367,7 @@ class RehydPolicy110:
 @dataclass(frozen=True)
 class RehydPolicy111:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -1379,7 +1379,7 @@ class RehydPolicy111:
 @dataclass(frozen=True)
 class RehydPolicy112:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1391,7 +1391,7 @@ class RehydPolicy112:
 @dataclass(frozen=True)
 class RehydPolicy113:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1403,7 +1403,7 @@ class RehydPolicy113:
 @dataclass(frozen=True)
 class RehydPolicy114:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1415,7 +1415,7 @@ class RehydPolicy114:
 @dataclass(frozen=True)
 class RehydPolicy115:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1427,7 +1427,7 @@ class RehydPolicy115:
 @dataclass(frozen=True)
 class RehydPolicy116:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1439,7 +1439,7 @@ class RehydPolicy116:
 @dataclass(frozen=True)
 class RehydPolicy117:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1451,7 +1451,7 @@ class RehydPolicy117:
 @dataclass(frozen=True)
 class RehydPolicy118:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1463,7 +1463,7 @@ class RehydPolicy118:
 @dataclass(frozen=True)
 class RehydPolicy119:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1475,7 +1475,7 @@ class RehydPolicy119:
 @dataclass(frozen=True)
 class RehydPolicy120:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1487,7 +1487,7 @@ class RehydPolicy120:
 @dataclass(frozen=True)
 class RehydPolicy121:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1499,7 +1499,7 @@ class RehydPolicy121:
 @dataclass(frozen=True)
 class RehydPolicy122:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1511,7 +1511,7 @@ class RehydPolicy122:
 @dataclass(frozen=True)
 class RehydPolicy123:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1523,7 +1523,7 @@ class RehydPolicy123:
 @dataclass(frozen=True)
 class RehydPolicy124:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1535,7 +1535,7 @@ class RehydPolicy124:
 @dataclass(frozen=True)
 class RehydPolicy125:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1547,7 +1547,7 @@ class RehydPolicy125:
 @dataclass(frozen=True)
 class RehydPolicy126:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1559,7 +1559,7 @@ class RehydPolicy126:
 @dataclass(frozen=True)
 class RehydPolicy127:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1571,7 +1571,7 @@ class RehydPolicy127:
 @dataclass(frozen=True)
 class RehydPolicy128:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1583,7 +1583,7 @@ class RehydPolicy128:
 @dataclass(frozen=True)
 class RehydPolicy129:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1595,7 +1595,7 @@ class RehydPolicy129:
 @dataclass(frozen=True)
 class RehydPolicy130:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1607,7 +1607,7 @@ class RehydPolicy130:
 @dataclass(frozen=True)
 class RehydPolicy131:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -1619,7 +1619,7 @@ class RehydPolicy131:
 @dataclass(frozen=True)
 class RehydPolicy132:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -1631,7 +1631,7 @@ class RehydPolicy132:
 @dataclass(frozen=True)
 class RehydPolicy133:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -1643,7 +1643,7 @@ class RehydPolicy133:
 @dataclass(frozen=True)
 class RehydPolicy134:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -1655,7 +1655,7 @@ class RehydPolicy134:
 @dataclass(frozen=True)
 class RehydPolicy135:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -1667,7 +1667,7 @@ class RehydPolicy135:
 @dataclass(frozen=True)
 class RehydPolicy136:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -1679,7 +1679,7 @@ class RehydPolicy136:
 @dataclass(frozen=True)
 class RehydPolicy137:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -1691,7 +1691,7 @@ class RehydPolicy137:
 @dataclass(frozen=True)
 class RehydPolicy138:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -1703,7 +1703,7 @@ class RehydPolicy138:
 @dataclass(frozen=True)
 class RehydPolicy139:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -1715,7 +1715,7 @@ class RehydPolicy139:
 @dataclass(frozen=True)
 class RehydPolicy140:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -1727,7 +1727,7 @@ class RehydPolicy140:
 @dataclass(frozen=True)
 class RehydPolicy141:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -1739,7 +1739,7 @@ class RehydPolicy141:
 @dataclass(frozen=True)
 class RehydPolicy142:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -1751,7 +1751,7 @@ class RehydPolicy142:
 @dataclass(frozen=True)
 class RehydPolicy143:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -1763,7 +1763,7 @@ class RehydPolicy143:
 @dataclass(frozen=True)
 class RehydPolicy144:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -1775,7 +1775,7 @@ class RehydPolicy144:
 @dataclass(frozen=True)
 class RehydPolicy145:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -1787,7 +1787,7 @@ class RehydPolicy145:
 @dataclass(frozen=True)
 class RehydPolicy146:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -1799,7 +1799,7 @@ class RehydPolicy146:
 @dataclass(frozen=True)
 class RehydPolicy147:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -1811,7 +1811,7 @@ class RehydPolicy147:
 @dataclass(frozen=True)
 class RehydPolicy148:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -1823,7 +1823,7 @@ class RehydPolicy148:
 @dataclass(frozen=True)
 class RehydPolicy149:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -1835,7 +1835,7 @@ class RehydPolicy149:
 @dataclass(frozen=True)
 class RehydPolicy150:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -1847,7 +1847,7 @@ class RehydPolicy150:
 @dataclass(frozen=True)
 class RehydPolicy151:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -1859,7 +1859,7 @@ class RehydPolicy151:
 @dataclass(frozen=True)
 class RehydPolicy152:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -1871,7 +1871,7 @@ class RehydPolicy152:
 @dataclass(frozen=True)
 class RehydPolicy153:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -1883,7 +1883,7 @@ class RehydPolicy153:
 @dataclass(frozen=True)
 class RehydPolicy154:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -1895,7 +1895,7 @@ class RehydPolicy154:
 @dataclass(frozen=True)
 class RehydPolicy155:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -1907,7 +1907,7 @@ class RehydPolicy155:
 @dataclass(frozen=True)
 class RehydPolicy156:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -1919,7 +1919,7 @@ class RehydPolicy156:
 @dataclass(frozen=True)
 class RehydPolicy157:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -1931,7 +1931,7 @@ class RehydPolicy157:
 @dataclass(frozen=True)
 class RehydPolicy158:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -1943,7 +1943,7 @@ class RehydPolicy158:
 @dataclass(frozen=True)
 class RehydPolicy159:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -1955,7 +1955,7 @@ class RehydPolicy159:
 @dataclass(frozen=True)
 class RehydPolicy160:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -1967,7 +1967,7 @@ class RehydPolicy160:
 @dataclass(frozen=True)
 class RehydPolicy161:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -1979,7 +1979,7 @@ class RehydPolicy161:
 @dataclass(frozen=True)
 class RehydPolicy162:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)
@@ -1991,7 +1991,7 @@ class RehydPolicy162:
 @dataclass(frozen=True)
 class RehydPolicy163:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=4
     def validate(self)->bool:
         _text(self.name)
@@ -2003,7 +2003,7 @@ class RehydPolicy163:
 @dataclass(frozen=True)
 class RehydPolicy164:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=5
     def validate(self)->bool:
         _text(self.name)
@@ -2015,7 +2015,7 @@ class RehydPolicy164:
 @dataclass(frozen=True)
 class RehydPolicy165:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=6
     def validate(self)->bool:
         _text(self.name)
@@ -2027,7 +2027,7 @@ class RehydPolicy165:
 @dataclass(frozen=True)
 class RehydPolicy166:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=7
     def validate(self)->bool:
         _text(self.name)
@@ -2039,7 +2039,7 @@ class RehydPolicy166:
 @dataclass(frozen=True)
 class RehydPolicy167:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=8
     def validate(self)->bool:
         _text(self.name)
@@ -2051,7 +2051,7 @@ class RehydPolicy167:
 @dataclass(frozen=True)
 class RehydPolicy168:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=9
     def validate(self)->bool:
         _text(self.name)
@@ -2063,7 +2063,7 @@ class RehydPolicy168:
 @dataclass(frozen=True)
 class RehydPolicy169:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=10
     def validate(self)->bool:
         _text(self.name)
@@ -2075,7 +2075,7 @@ class RehydPolicy169:
 @dataclass(frozen=True)
 class RehydPolicy170:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=11
     def validate(self)->bool:
         _text(self.name)
@@ -2087,7 +2087,7 @@ class RehydPolicy170:
 @dataclass(frozen=True)
 class RehydPolicy171:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=12
     def validate(self)->bool:
         _text(self.name)
@@ -2099,7 +2099,7 @@ class RehydPolicy171:
 @dataclass(frozen=True)
 class RehydPolicy172:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=13
     def validate(self)->bool:
         _text(self.name)
@@ -2111,7 +2111,7 @@ class RehydPolicy172:
 @dataclass(frozen=True)
 class RehydPolicy173:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=14
     def validate(self)->bool:
         _text(self.name)
@@ -2123,7 +2123,7 @@ class RehydPolicy173:
 @dataclass(frozen=True)
 class RehydPolicy174:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=15
     def validate(self)->bool:
         _text(self.name)
@@ -2135,7 +2135,7 @@ class RehydPolicy174:
 @dataclass(frozen=True)
 class RehydPolicy175:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=16
     def validate(self)->bool:
         _text(self.name)
@@ -2147,7 +2147,7 @@ class RehydPolicy175:
 @dataclass(frozen=True)
 class RehydPolicy176:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=17
     def validate(self)->bool:
         _text(self.name)
@@ -2159,7 +2159,7 @@ class RehydPolicy176:
 @dataclass(frozen=True)
 class RehydPolicy177:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=18
     def validate(self)->bool:
         _text(self.name)
@@ -2171,7 +2171,7 @@ class RehydPolicy177:
 @dataclass(frozen=True)
 class RehydPolicy178:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=19
     def validate(self)->bool:
         _text(self.name)
@@ -2183,7 +2183,7 @@ class RehydPolicy178:
 @dataclass(frozen=True)
 class RehydPolicy179:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=20
     def validate(self)->bool:
         _text(self.name)
@@ -2195,7 +2195,7 @@ class RehydPolicy179:
 @dataclass(frozen=True)
 class RehydPolicy180:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=21
     def validate(self)->bool:
         _text(self.name)
@@ -2207,7 +2207,7 @@ class RehydPolicy180:
 @dataclass(frozen=True)
 class RehydPolicy181:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=22
     def validate(self)->bool:
         _text(self.name)
@@ -2219,7 +2219,7 @@ class RehydPolicy181:
 @dataclass(frozen=True)
 class RehydPolicy182:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=23
     def validate(self)->bool:
         _text(self.name)
@@ -2231,7 +2231,7 @@ class RehydPolicy182:
 @dataclass(frozen=True)
 class RehydPolicy183:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=24
     def validate(self)->bool:
         _text(self.name)
@@ -2243,7 +2243,7 @@ class RehydPolicy183:
 @dataclass(frozen=True)
 class RehydPolicy184:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=25
     def validate(self)->bool:
         _text(self.name)
@@ -2255,7 +2255,7 @@ class RehydPolicy184:
 @dataclass(frozen=True)
 class RehydPolicy185:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=26
     def validate(self)->bool:
         _text(self.name)
@@ -2267,7 +2267,7 @@ class RehydPolicy185:
 @dataclass(frozen=True)
 class RehydPolicy186:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=27
     def validate(self)->bool:
         _text(self.name)
@@ -2279,7 +2279,7 @@ class RehydPolicy186:
 @dataclass(frozen=True)
 class RehydPolicy187:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=28
     def validate(self)->bool:
         _text(self.name)
@@ -2291,7 +2291,7 @@ class RehydPolicy187:
 @dataclass(frozen=True)
 class RehydPolicy188:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=29
     def validate(self)->bool:
         _text(self.name)
@@ -2303,7 +2303,7 @@ class RehydPolicy188:
 @dataclass(frozen=True)
 class RehydPolicy189:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=30
     def validate(self)->bool:
         _text(self.name)
@@ -2315,7 +2315,7 @@ class RehydPolicy189:
 @dataclass(frozen=True)
 class RehydPolicy190:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=31
     def validate(self)->bool:
         _text(self.name)
@@ -2327,7 +2327,7 @@ class RehydPolicy190:
 @dataclass(frozen=True)
 class RehydPolicy191:
     name:str
-    tier:RehydTier=ARCHIVE
+    tier:RehydTier=RehydTier.ARCHIVE
     max_entries:int=32
     def validate(self)->bool:
         _text(self.name)
@@ -2339,7 +2339,7 @@ class RehydPolicy191:
 @dataclass(frozen=True)
 class RehydPolicy192:
     name:str
-    tier:RehydTier=EPHEMERAL
+    tier:RehydTier=RehydTier.EPHEMERAL
     max_entries:int=1
     def validate(self)->bool:
         _text(self.name)
@@ -2351,7 +2351,7 @@ class RehydPolicy192:
 @dataclass(frozen=True)
 class RehydPolicy193:
     name:str
-    tier:RehydTier=WORKING
+    tier:RehydTier=RehydTier.WORKING
     max_entries:int=2
     def validate(self)->bool:
         _text(self.name)
@@ -2363,7 +2363,7 @@ class RehydPolicy193:
 @dataclass(frozen=True)
 class RehydPolicy194:
     name:str
-    tier:RehydTier=CANONICAL
+    tier:RehydTier=RehydTier.CANONICAL
     max_entries:int=3
     def validate(self)->bool:
         _text(self.name)

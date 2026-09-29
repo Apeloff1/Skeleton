@@ -42,7 +42,7 @@ def test_plane_audit_snapshot_is_deterministic_and_import_free(monkeypatch) -> N
         raise AssertionError("plane audit must not import capability modules")
 
     monkeypatch.setattr(
-        "skeleton.application.capability_runtime.import_module",
+        "skeleton.app.runtime.capability_runtime.import_module",
         should_not_import,
     )
 
@@ -65,7 +65,7 @@ def test_plane_audit_rows_lock_public_exports_and_genesis_wiring() -> None:
     for plane_id, expected in expected_exports.items():
         row = rows[plane_id]
         assert set(row) == _ROW_KEYS
-        assert row["module"] == f"skeleton.{plane_id}"
+        assert row["module"] == {"organism": "skeleton.organism", "social": "skeleton.research.social", "galaxy": "skeleton.distributed.galaxy"}[plane_id]
         assert row["resolvable"] is True
         assert row["public_exports"] == expected
         assert row["architecture_exports"] == expected

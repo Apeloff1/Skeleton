@@ -218,10 +218,12 @@ class TestDeveloperCLI(TestCase):
 
     def test_wizard_runs(self):
         """Wizard generates project plans."""
-        from skeleton.developer.wizard import Wizard, WizardMode
-        wizard = Wizard(mode=WizardMode.QUICK)
-        result = wizard.run()
-        self.assertIn("Project:", result)
+        from skeleton.developer.wizard import ProjectWizard
+        wizard = ProjectWizard(self.scaffold.genesis)
+        result = wizard.run({step.id: step.default for step in wizard.STEPS})
+        self.assertEqual(result["project_name"], "my-skeleton-project")
+        self.assertEqual(result["template"], "minimal-agent")
+        self.assertTrue(result["next_steps"])
 
 
 class TestConfigurationSystem(TestCase):

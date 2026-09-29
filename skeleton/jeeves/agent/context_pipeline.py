@@ -463,7 +463,7 @@ class LayeredContextResolver:
         if card_native_ready and stop:
             coverage, missing = self._coverage(text, items)
             confidence, trust = self._aggregate(items)
-            fingerprint = stable_fingerprint({"query": text, "items": [(x.item_id, x.score) for x in items], "stages": [(s.tier, s.stop_after) for s in stages]})
+            fingerprint = stable_fingerprint({"query": text, "items": [(x.item_id, x.score) for x in items], "stages": [(s.tier.value, s.stop_after) for s in stages]})
             return ContextResolution(text, tuple(items), tuple(stages), ContextTier.INDEX_CARD, True, coverage, confidence, trust, missing, fingerprint)
 
         if max_tier >= ContextTier.SCOPED_MEMORY:

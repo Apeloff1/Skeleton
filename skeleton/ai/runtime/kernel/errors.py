@@ -112,6 +112,11 @@ class ConfigurationError(KernelError):
     severity = Severity.CRITICAL
 
 
+class ResilienceError(SkeletonError):
+    code = "RES.UNKNOWN"
+    http_status = 503
+
+
 class AgentError(SkeletonError):
     code = "AGT.UNKNOWN"
 

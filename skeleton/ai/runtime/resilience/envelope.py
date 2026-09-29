@@ -102,6 +102,13 @@ class CircuitBreaker:
         self._opened_at = time.time()
         self._emit("resilience.breaker.opened", failures=len(self._failures))
 
+    def snapshot(self) -> Dict[str, Any]:
+        state = self.state
+        with self._lock:
+            self._prune()
+            return {"state": state.value, "failures": len(self._failures),
+                    "last_failure": self._failures[-1] if self._failures else None}
+
     def admit(self) -> None:
         if self.state == BreakerState.OPEN:
             raise CircuitOpenError(self.name)

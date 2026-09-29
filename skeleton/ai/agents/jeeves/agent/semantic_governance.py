@@ -65,6 +65,12 @@ _FAMILY_MAP: Mapping[LensFamily, GovernedLensFamily] = {
     LensFamily.SOCIAL: GovernedLensFamily.SOCIAL,
     LensFamily.TEMPORAL: GovernedLensFamily.PREDICTIVE,
     LensFamily.SYSTEM: GovernedLensFamily.COMPUTATIONAL,
+    LensFamily.CAUSAL: GovernedLensFamily.CAUSAL,
+    LensFamily.INFORMATION: GovernedLensFamily.INFORMATION,
+    LensFamily.COMPUTATIONAL: GovernedLensFamily.COMPUTATIONAL,
+    LensFamily.METACOGNITIVE: GovernedLensFamily.METACOGNITIVE,
+    LensFamily.PROBABILITY: GovernedLensFamily.PROBABILITY,
+    LensFamily.PREDICTIVE: GovernedLensFamily.PREDICTIVE,
 }
 
 

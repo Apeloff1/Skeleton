@@ -15,13 +15,13 @@ class TestFullSystemBoot(TestCase):
     """End-to-end system boot and integration test."""
 
     def test_genesis_boots_all_phases(self):
-        """Verify genesis boots all 7 phases."""
+        """Verify genesis boots all declared phases in order."""
         genesis = self.scaffold.genesis
         self.assertIsNotNone(genesis)
         
-        expected_phases = ["kernel", "memory", "intelligence", "swarm", "resilience", "interface", "cortex"]
+        expected_phases = ["foundation", "kernel", "memory", "intelligence", "swarm", "resilience", "interface", "forge", "galaxy", "contexts", "support", "cortex"]
         self.assertEqual(genesis.report.phases, expected_phases)
-        self.assertEqual(len(genesis.report.phases), 7)
+        self.assertEqual(len(genesis.report.phases), len(expected_phases))
 
     def test_all_handles_wired(self):
         """Verify all expected handles are present."""
@@ -96,11 +96,12 @@ class TestFullSystemBoot(TestCase):
         self.assertIsNotNone(trinity)
         
         # Add some test data
-        trinity.rag.add(trinity.rag.__class__.__bases__[0].__new__(trinity.rag.__class__.__bases__[0]))
+        from skeleton.memory.core import Chunk
+        trinity.rag.add(Chunk(text="test query document", chunk_id="integration-query"))
         # The trinity should be queryable even with empty stores
         result = trinity.query_unified("test query", top_k_per_tier=1)
         self.assertIsNotNone(result)
-        self.assertIsInstance(result.token_estimate, float)
+        self.assertGreater(result.token_estimate, 0)
 
     def test_forge_blueprint_creation(self):
         """Test forge can create and validate blueprints."""
@@ -179,10 +180,10 @@ class TestDeveloperCLI(TestCase):
 
     def test_wizard_importable(self):
         """Verify wizard can be imported."""
-        from skeleton.developer.wizard import Wizard, WizardMode
-        wizard = Wizard(mode=WizardMode.QUICK)
-        result = wizard.run()
-        self.assertIn("Quick Mode", result)
+        from skeleton.developer.wizard import ProjectWizard
+        wizard = ProjectWizard(self.scaffold.genesis)
+        result = wizard.run({step.id: step.default for step in wizard.STEPS})
+        self.assertEqual(result["project_name"], "my-skeleton-project")
 
 
 if __name__ == "__main__":

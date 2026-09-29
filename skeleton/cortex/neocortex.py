@@ -669,6 +669,12 @@ class JeevesCortex:
             self.bpe = BytePairEncoder.from_snapshot(blob["bpe"])
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
+    def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
+        """Read the shared bus's bounded replay window without a second log."""
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a non-negative integer")
+        return self._bus.replay(topic)[-n:] if n else []
+
     def status(self) -> Dict[str, Any]:
         xf = self.transformer
         info = self._device_info or {}

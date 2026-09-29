@@ -19,16 +19,16 @@ from typing import Callable, List, Optional, Tuple
 # Patterns ordered by confidence: first match wins per sentence.
 _PATTERNS: List[Tuple[re.Pattern, Callable[[re.Match], Optional[Tuple[str, str, str]]]]] = [
     # "X is a Y" / "X is an Y" / "X are Y"
-    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(?:is|are|was|were)\s+(?:a|an|the)?\s*([\w -]{2,40})", re.IGNORECASE),
+    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(?:is|are|was|were)\s+(?:(?:a|an|the)\s+)?([\w -]{2,40})", re.IGNORECASE),
      lambda m: (m.group(1).strip(), "is_a", m.group(2).strip())),
     # "X has Y" / "X have Y"
-    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(?:has|have|had)\s+(?:a|an|the)?\s*([\w -]{2,40})", re.IGNORECASE),
+    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(?:has|have|had)\s+(?:(?:a|an|the)\s+)?([\w -]{2,40})", re.IGNORECASE),
      lambda m: (m.group(1).strip(), "has", m.group(2).strip())),
     # "X produces Y" / "X creates Y" / "X builds Y" / "X generates Y"
-    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(produces?|creates?|builds?|generates?|makes?)\s+(?:a|an|the)?\s*([\w -]{2,40})", re.IGNORECASE),
+    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(produces?|creates?|builds?|generates?|makes?)\s+(?:(?:a|an|the)\s+)?([\w -]{2,40})", re.IGNORECASE),
      lambda m: (m.group(1).strip(), m.group(2).rstrip("s").lower() + "s", m.group(3).strip())),
     # "X uses Y" / "X requires Y" / "X needs Y"
-    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(uses?|requires?|needs?)\s+(?:a|an|the)?\s*([\w -]{2,40})", re.IGNORECASE),
+    (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+(uses?|requires?|needs?)\s+(?:(?:a|an|the)\s+)?([\w -]{2,40})", re.IGNORECASE),
      lambda m: (m.group(1).strip(), m.group(2).rstrip("s").lower() + "s", m.group(3).strip())),
     # "X can Y" — capability
     (re.compile(r"\b([A-Z][\w -]{1,40}?)\s+can\s+([a-z][\w-]{1,25})", re.IGNORECASE),
@@ -67,7 +67,7 @@ class TripleExtractor:
         considered = 0
 
         for sentence in sentences:
-            sentence = sentence.strip()
+            sentence = re.sub(r"^(?:the|an|a)\s+", "", sentence.strip(), flags=re.IGNORECASE)
             if len(sentence) < 10:
                 continue
             considered += 1

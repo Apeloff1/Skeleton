@@ -11,8 +11,19 @@ from typing import Any, Dict, List
 from skeleton.cortex.deck import CommandDeck
 
 
-def doctor_card(*, root=None) -> Dict[str, Any]:
-    deck = CommandDeck(root=root)
+def doctor_card(org=None, *, neo=None, fix=False, root=None, deck=None) -> Dict[str, Any]:
+    if org is not None:
+        from skeleton.organism.health import health_card
+        from skeleton.organism.helix import verify
+        from skeleton.organism.laws import clip_fat, persist_clip
+        repaired = None
+        if fix:
+            repaired = {**clip_fat(org.galaxy.mesh), **persist_clip(org)}
+        health = health_card(org, neo=neo)
+        helix = verify(getattr(org, "root", root))
+        return {**health, "kind": "doctor", "ok": int(bool(health["ok"] and helix["ok"])),
+                "helix_ok": helix["ok"], "helix": helix, "fix": repaired}
+    deck = deck or CommandDeck(root=root)
     errors = deck.repair_errors()
     learned = deck.repair_learned()
     effectiveness = deck.repair_effectiveness()
@@ -23,11 +34,11 @@ def doctor_card(*, root=None) -> Dict[str, Any]:
     load_shedder = deck.load_shedder_card()
     health = deck.health_probe_card()
     audit = deck.audit_integrity()
-    dashboard = deck.dashboard_card()
+    dashboard = deck.dashboard.summary()
     alerts: List[Dict[str, Any]] = []
     if errors.get("total_errors", 0) > 5:
         alerts.append({"severity": "warning", "subsystem": "repair", "message": f"{errors['total_errors']} recent repair errors", "action": "inspect repair telemetry"})
-    if effectiveness.get("success_rate", 1.0) < 0.3:
+    if effectiveness.get("success_rate") is not None and effectiveness["success_rate"] < 0.3:
         alerts.append({"severity": "critical", "subsystem": "repair", "message": "repair success rate below 30%", "action": "review learned policy and thresholds"})
     if kv.get("hit_rate", 1.0) < 0.5:
         alerts.append({"severity": "info", "subsystem": "kv_cache", "message": "KV cache hit rate low", "action": "increase cache size or review access patterns"})
