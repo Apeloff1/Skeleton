@@ -35,7 +35,7 @@ from skeleton.frontier.runtime.contracts import (
     ProvenanceRecord,
     stable_content_digest,
 )
-from skeleton.frontier.cooking import (
+from skeleton.frontier.economy.cooking import (
     ActiveCookingBuff,
     CookingCollectPlan,
     CookingIngredient,
@@ -52,11 +52,11 @@ from skeleton.frontier.cooking import (
     refresh_kitchen,
     start_cooking,
 )
-from skeleton.frontier.cooking_adapters import (
+from skeleton.frontier.economy.cooking_adapters import (
     catch_bonuses_from_cooking_buff,
     energy_booster_from_cooking_buff,
 )
-from skeleton.frontier.crafting import (
+from skeleton.frontier.economy.crafting import (
     CraftCancelPlan,
     CraftCollectPlan,
     CraftIngredient,
@@ -81,8 +81,8 @@ from skeleton.frontier.crafting import (
     unlock_crafting_slot,
     unlock_slot_cost,
 )
-from skeleton.frontier.crafting_adapters import energy_booster_from_craft_output
-from skeleton.frontier.energy import (
+from skeleton.frontier.economy.crafting_adapters import energy_booster_from_craft_output
+from skeleton.frontier.economy.energy import (
     DEFAULT_ENERGY_POLICY,
     AdRestorePlan,
     EnergyBoosterSpec,
@@ -102,14 +102,14 @@ from skeleton.frontier.energy import (
     restore_from_ad,
     sync_max_energy,
 )
-from skeleton.frontier.energy_adapters import (
+from skeleton.frontier.economy.energy_adapters import (
     energy_event,
     energy_event_to_memory_item,
     energy_identity,
     energy_state_digest,
     energy_state_memory_item,
 )
-from skeleton.frontier.equipment import (
+from skeleton.frontier.economy.equipment import (
     EquipmentBonuses,
     EquipmentLoadout,
     EquipmentPurchaseQuote,

@@ -169,6 +169,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier ecology modules",
       "notes": "Eight Frontier ecology/lifecycle modules were extracted into skeleton/frontier/ecology/. Internal ecology/runtime/progression references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and cooking_adapters/gameplay now consume canonical ecology paths. Whole-tree source/AI parity remains exact."
+    },
+    {
+      "id": "TREE-019",
+      "source": "skeleton/frontier/{commerce,cooking,cooking_adapters,crafting,crafting_adapters,energy,energy_adapters,equipment}.py",
+      "destination": "skeleton/frontier/economy/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier economy modules",
+      "notes": "Eight Frontier economy/production modules were extracted into skeleton/frontier/economy/. Five modules had internal runtime/ecology/economy imports rewritten to canonical nested paths; crafting.py, energy.py, and equipment.py moved byte-identically. Public frontier exports now target the canonical economy modules, flat module paths remain compatibility shims, and the same transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
     }
   ]
 }
