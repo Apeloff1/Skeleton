@@ -4796,6 +4796,11 @@
         "planned_path": "skeleton/game",
         "implemented_path": "skeleton/simulation/game",
         "mapping_id": "AIFT-GAME"
+      },
+      {
+        "planned_path": "skeleton/school",
+        "implemented_path": "skeleton/learning/school",
+        "mapping_id": "AIFT-SCHOOL"
       }
     ],
     "planned_but_absent": [
@@ -5345,6 +5350,11 @@
       "path": "skeleton/game",
       "owner": "simulation compatibility boundary",
       "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
+    },
+    {
+      "path": "skeleton/school",
+      "owner": "learning compatibility boundary",
+      "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
     }
   ],
   "classification_coverage": {
@@ -5425,7 +5435,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "TREE-030 canonicalized School under skeleton/learning/school, preserved exact skeleton/ai/learning/school parity, and retired the School overlay from AIFT-LEARNING; acquired.py remains the only learning overlay.",
+    "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [
