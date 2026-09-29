@@ -61,6 +61,20 @@ class RepoMachineTests(unittest.TestCase):
         (root / ".machine" / "repository.toml").write_text(CONFIG, encoding="utf-8")
         return temp
 
+    def test_supervisor_context_uses_real_bounded_repository_model(self) -> None:
+        from unittest.mock import patch
+        from skeleton.automation import supervisor
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "alpha" / "example.py").write_text("VALUE = 1\n", encoding="utf-8")
+            with patch.object(supervisor.Path, "cwd", return_value=root):
+                context = supervisor._machine_repository_context()
+            self.assertEqual(context["status"], "available")
+            self.assertEqual(context["fingerprint"], RepositoryModelBuilder(root).build().fingerprint)
+            self.assertIn("work_candidates", context)
+            self.assertIn("organization", context)
+
     def test_builds_zone_inventory_and_internal_edges(self) -> None:
         with self.fixture() as temp:
             root = Path(temp)

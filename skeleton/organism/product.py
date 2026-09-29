@@ -13,15 +13,19 @@ from skeleton.cortex.deck import CommandDeck
 
 def product_card(org=None, *, neo=None, root=None, deck=None) -> Dict[str, Any]:
     deck = deck or CommandDeck(neo, root=getattr(org, "root", root))
+    from skeleton.organism.quality_state import quality_snapshot
+    from skeleton.organism.repair_card import repair_card
+    quality = {"quality": quality_snapshot(root=deck.root), "repair_card": repair_card(root=deck.root)}
     if org is not None:
         from skeleton import __version__
         from skeleton.organism.health import health_card
         from skeleton.research.social.field import field_card
-        return {"kind": "product", "version": __version__, "target": org.TARGET,
+        return {**quality, "kind": "product", "version": __version__, "target": org.TARGET,
                 "health": health_card(org, neo=neo), "field": field_card()["pointers"],
                 "endpoints": ["GET /cortex/product", "GET /cortex/ready"],
                 "operator": deck.master_card(), "stored_prose": 0}
     return {
+        **quality,
         "kind": "product-card",
         "policy": deck.policy_state(),
         "versions": deck.policy_versions(limit=4),

@@ -143,7 +143,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "6e808777ce8fc27375ae5cedf7ddd969ccabc73b",
+      "source_git_object_sha": "676f0f50c86a2acb550bada89840de7622d4288d",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "7c4595007d17a930721fae16e4070f96b689ef1e",
+      "source_git_object_sha": "4cf0ce78d06cfe09f69412baa81cdddb78308d4f",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -595,7 +595,7 @@
       "source": "skeleton/context/domains",
       "destination": "skeleton/ai/runtime/contexts",
       "kind": "tree",
-      "source_git_object_sha": "5d933e1eaae1f8dc9da9af805eb186d12164f352",
+      "source_git_object_sha": "7bcea1567e7f4822d73a42c43740fcdb6f989df3",
       "role": "Canonical context-domain runtime under skeleton/context/domains, mirrored into the governed AI runtime.",
       "work_package_refs": [
         "WP-W00",
@@ -1013,7 +1013,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "41230e6f8642b6813b356c5f959339bf884a456b",
+      "source_git_object_sha": "9e7b5152d97b388805d28a91676ea0f64722aeea",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -1055,7 +1055,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "d16f70256a882380ec252528687a880db49d4ccd",
+      "source_git_object_sha": "8b6aba1f59e8c0017238aa67b8fbc59e35e531ea",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -2008,7 +2008,7 @@
       "source": "skeleton/support",
       "destination": "skeleton/ai/runtime/support",
       "kind": "tree",
-      "source_git_object_sha": "98bf68c7c3d68ebe6e952b4850d2b285de2b7b30",
+      "source_git_object_sha": "89621aaf005d4115587cef019fd0192c3b5a4fd1",
       "role": "Agentic RAG/loading/support-plane helpers are engine support capabilities and should not remain an ungoverned top-level owner.",
       "work_package_refs": [
         "WP-W08",

@@ -119,16 +119,22 @@ class ContextSyntaxFixer:
     # --- Repair primitives ----------------------------------------------------
 
     def _nearest_connector(self, ref: str) -> str:
-        """Rebind a dangling connector to the closest known one."""
-        if not ref:
-            return "web.search"
-        ref_parts = set(ref.split("."))
-        best, best_overlap = ref, -1
-        for known in KNOWN_CONNECTORS:
-            overlap = len(ref_parts & set(known.split(".")))
-            if overlap > best_overlap:
-                best, best_overlap = known, overlap
-        return best
+        """Correct a close spelling within the same namespace, without guessing ties."""
+        from difflib import SequenceMatcher
+        namespace, separator, action = ref.partition(".")
+        if not separator or not action:
+            return ref
+        scored = sorted(
+            ((SequenceMatcher(None, ref, known).ratio(), known)
+             for known in KNOWN_CONNECTORS
+             if known.partition(".")[0] == namespace),
+            key=lambda item: (-item[0], item[1]),
+        )
+        if not scored or scored[0][0] < 0.75:
+            return ref
+        if len(scored) > 1 and scored[0][0] == scored[1][0]:
+            return ref
+        return scored[0][1]
 
     def _nearest_status(self, status: str) -> str:
         """Remap an unknown status to the nearest valid state."""

@@ -42,6 +42,26 @@ class DeckOperations:
     def policy_state(self):
         return policy_enforcement.policy_summary(root=self.root)
 
+    def policy(self):
+        from skeleton.organism.policy_control_card import policy_control_card
+        return policy_control_card(root=self.root)
+
+    def threshold(self, surface=""):
+        from skeleton.organism.policy_card import threshold_card
+        return threshold_card(root=self.root, surface=surface)
+
+    def set_threshold(self, surface, value):
+        from skeleton.organism.policy_card import set_threshold_card
+        return set_threshold_card(surface, value, root=self.root)
+
+    def set_repair_enabled(self, surface, enabled):
+        from skeleton.organism.policy_card import set_repair_enabled_card
+        return set_repair_enabled_card(surface, enabled, root=self.root)
+
+    def set_repair_class(self, name, enabled):
+        from skeleton.organism.policy_card import set_repair_class_card
+        return set_repair_class_card(name, enabled, root=self.root)
+
     def policy_gate(self, surface, score):
         return policy_enforcement.gate_check(surface, score, root=self.root)
 

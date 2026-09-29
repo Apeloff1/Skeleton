@@ -56,12 +56,25 @@ the API test constructs the app and intercepts server startup without opening a
 listener. Checkpoint and compiler test fixtures use explicit run identity and
 replay declarations so their tamper, rollback and effect checks execute again.
 
+Operator controls delegate threshold and repair changes to the existing policy
+owner. Product cards expose actual quality and repair history from the selected
+root; independent decks cannot borrow each other's history. Context/support
+exports retain canonical type identity. Connector spelling repair is deterministic,
+stays within its service namespace and leaves ties or unknown services unresolved.
+
+Supervisor envelope unit tests now isolate repository discovery, with separate
+coverage exercising the real model on a bounded repository fixture. An unavailable
+provider is rejected before building an unused model prompt. Full repository
+validation remains in the repository-model and architecture checks.
+
 ## Remaining validation scope
 
 An exploratory canonical run on the initial repair snapshot produced 16,164
 passes, 331 failures and 91 skips. The combined final regression
-matrix passes 738 tests across 49 files, including repair receipts, generated
-projects, checkpoint binding and compiler rollback. This does not establish
+matrix passes 927 tests across 57 files, including repair receipts, generated
+projects, checkpoint binding, compiler rollback and operator/context integration.
+Six existing platform skips and three explicitly deselected POSIX mutation tests
+apply to this Windows run; the Linux CI command retains those mutation tests. This does not establish
 that the complete exploratory suite is clean. Earlier focused counts overlap
 this matrix and must not be added to it.
 

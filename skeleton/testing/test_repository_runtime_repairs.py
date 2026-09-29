@@ -342,3 +342,30 @@ def test_scaffold_force_preflights_nonregular_targets(tmp_path):
     with pytest.raises(ValueError, match="non-regular"):
         ScaffoldEngine(tmp_path).scaffold("minimal-agent", "example", force=True)
     assert (project / "agent.py").read_text() == "preserve me"
+
+
+def test_connector_repair_is_deterministic_and_does_not_cross_namespaces(monkeypatch):
+    from skeleton.context.domains import syntax
+    fixer = syntax.ContextSyntaxFixer()
+    connectors = sorted(syntax.KNOWN_CONNECTORS)
+    for ordering in (connectors, list(reversed(connectors))):
+        monkeypatch.setattr(syntax, "KNOWN_CONNECTORS", ordering)
+        assert fixer._nearest_connector("github.pu") == "github.push"
+        assert fixer._nearest_connector("unknown.push") == "unknown.push"
+        assert fixer._nearest_connector("") == ""
+    monkeypatch.setattr(syntax, "KNOWN_CONNECTORS", ["test.a", "test.b"])
+    assert fixer._nearest_connector("test.c") == "test.c"
+
+
+def test_operator_policy_and_quality_are_scoped_to_deck_root(tmp_path):
+    from skeleton.cortex.deck import CommandDeck
+    from skeleton.organism.product import product_card
+    from skeleton.organism.quality_state import append_quality
+    first = CommandDeck(root=tmp_path / "first")
+    second = CommandDeck(root=tmp_path / "second")
+    first.set_threshold("forge", 0.83)
+    assert first.threshold("forge")["threshold"] == 0.83
+    assert second.threshold("forge")["threshold"] != 0.83
+    append_quality({"surface": "npc", "accepted": False, "score": 0.2, "reason": "test"}, root=first.root)
+    assert product_card(deck=first)["repair_card"]["activity"]["n"] > 0
+    assert product_card(deck=second)["repair_card"]["activity"]["n"] == 0
