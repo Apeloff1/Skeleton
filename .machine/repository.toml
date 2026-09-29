@@ -147,8 +147,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "persist-compat"
+prefixes = ["skeleton/persist/"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only persistence namespace; canonical primitives live under skeleton/persistence/core/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "platform"
-prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persist/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
+prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."
