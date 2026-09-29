@@ -156,8 +156,26 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "genesis-compat"
+prefixes = ["skeleton/genesis.py"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only Genesis entrypoint; canonical engine bootstrap lives under skeleton/bootstrap/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "bootstrap"
+prefixes = ["skeleton/bootstrap/"]
+owner = "core-runtime"
+criticality = "critical"
+purpose = "Canonical engine bootstrap, boot ordering and subsystem wiring."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "foundation"
-prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/genesis.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
 owner = "core-runtime"
 criticality = "critical"
 purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."
