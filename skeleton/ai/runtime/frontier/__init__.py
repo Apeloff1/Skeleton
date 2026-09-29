@@ -155,9 +155,9 @@ from skeleton.frontier.runtime.memory_adapters import (
     MemoryStoreCorruptionError,
     SQLiteCollection,
 )
-from skeleton.frontier.npc import NPCGenerator, NPCSpec
-from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
-from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
+from skeleton.frontier.characters.npc import NPCGenerator, NPCSpec
+from skeleton.frontier.characters.npc_adapters import npc_spec_from_domain_record
+from skeleton.frontier.characters.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
 from skeleton.frontier.progression.quests import (
     ObjectiveProgress,
     QuestProgressState,
