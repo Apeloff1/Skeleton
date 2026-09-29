@@ -107,6 +107,8 @@ compatibility shims:
 | `skeleton.contexts.*` | `skeleton.context.domains.*` | transitional shim |
 | `skeleton.application.*` | `skeleton.app.runtime.*` | transitional shim |
 | `skeleton.persist.*` | `skeleton.persistence.core.*` | transitional shim |
+| `core.shift_supervisor.*` | `skeleton.automation.shift_supervisor.*` | transitional shim |
+| `core.activation_security` | `skeleton.security.activation_security` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be

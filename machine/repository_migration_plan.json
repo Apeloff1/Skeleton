@@ -43,6 +43,24 @@
       "state": "canonicalized",
       "compatibility": "skeleton/persist/",
       "notes": "Seven persistence primitive modules moved byte-identically to skeleton/persistence/core/; skeleton/persist remains compatibility-only."
+    },
+    {
+      "id": "TREE-005",
+      "source": "core/shift_supervisor/",
+      "destination": "skeleton/automation/shift_supervisor/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/shift_supervisor/",
+      "notes": "Runtime Python moved under skeleton/automation, embedded assurance tests moved to tests/shift_supervisor, and human docs moved to docs/operations/shift-supervisor."
+    },
+    {
+      "id": "TREE-006",
+      "source": "core/activation_security.py",
+      "destination": "skeleton/security/activation_security.py",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/activation_security.py",
+      "notes": "Canonical implementation pre-existed under skeleton/security; the top-level core file is already a compatibility entrypoint."
     }
   ]
 }
