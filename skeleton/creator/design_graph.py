@@ -440,7 +440,7 @@ def _coerce_node(raw: DesignGraphNode | Mapping[str, Any]) -> DesignGraphNode:
             node_id=_identifier(raw.node_id, field="node_id"),
             kind=_node_kind(raw.kind),
             label=_text(raw.label, field="label"),
-            attributes=_attributes(dict(raw.attributes)),
+            attributes=_attribute_pairs(raw.attributes),
         )
     if not isinstance(raw, Mapping):
         raise DesignGraphError("node must be DesignGraphNode or mapping")
@@ -460,7 +460,7 @@ def _coerce_edge(raw: DesignGraphEdge | Mapping[str, Any]) -> DesignGraphEdge:
             kind=_edge_kind(raw.kind),
             source=_identifier(raw.source, field="source"),
             target=_identifier(raw.target, field="target"),
-            attributes=_attributes(dict(raw.attributes)),
+            attributes=_attribute_pairs(raw.attributes),
         )
     if not isinstance(raw, Mapping):
         raise DesignGraphError("edge must be DesignGraphEdge or mapping")
@@ -472,6 +472,28 @@ def _coerce_edge(raw: DesignGraphEdge | Mapping[str, Any]) -> DesignGraphEdge:
         target=_identifier(raw["target"], field="target"),
         attributes=_attributes(raw["attributes"]),
     )
+
+
+def _attribute_pairs(
+    raw: Iterable[tuple[str, object]],
+) -> tuple[tuple[str, object], ...]:
+    rows: list[tuple[str, object]] = []
+    seen: set[str] = set()
+    for pair in raw:
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise DesignGraphError("attribute pairs must contain key/value tuples")
+        key, value = pair
+        checked_key = _identifier(key, field="attribute key")
+        if checked_key in seen:
+            raise DesignGraphError(
+                "duplicate attribute key",
+                context={"key": checked_key},
+            )
+        seen.add(checked_key)
+        if len(rows) >= MAX_ATTRIBUTES:
+            raise DesignGraphError("attribute count exceeds configured bound")
+        rows.append((checked_key, _scalar(value, field=f"attribute {checked_key}")))
+    return tuple(sorted(rows))
 
 
 def _attributes(raw: Any) -> tuple[tuple[str, object], ...]:
