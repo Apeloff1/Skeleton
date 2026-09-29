@@ -202,6 +202,22 @@ def test_unknown_kinds_and_non_scalar_attributes_fail_closed() -> None:
         )
 
 
+def test_duplicate_direct_attribute_keys_fail_closed() -> None:
+    with pytest.raises(DesignGraphError, match="duplicate attribute key"):
+        build_design_graph(
+            project_id="project_demo",
+            nodes=(
+                DesignGraphNode(
+                    "scene_harbor",
+                    "scene",
+                    "Harbor",
+                    attributes=(("source", "a"), ("source", "b")),
+                ),
+            ),
+            edges=(),
+        )
+
+
 def test_tampered_digest_fails_closed() -> None:
     graph = _manual_graph()
     payload = json.loads(graph.serialize())
