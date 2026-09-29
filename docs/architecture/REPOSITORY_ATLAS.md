@@ -104,6 +104,19 @@ Skeleton/
 | `transitional` | Migration/import/staging surface | Do not grant new runtime authority silently |
 | `historical` | Provenance/reference only | No new active implementation |
 
+## Research lineage and unresolved specialized roots
+
+The machine taxonomy distinguishes preserved research lineage from unresolved
+runtime ownership:
+
+- Historical/research quarantine: `skeleton/circulation/`, `skeleton/hoag/`,
+  `skeleton/motive/`, `skeleton/sheaf/`, `skeleton/spine/`, and
+  `skeleton/viscera/`. These paths preserve provenance and experimental
+  mechanisms but carry no production authority.
+- Unresolved specialized runtime: `skeleton/cue/`, `skeleton/genos/`,
+  `skeleton/parse/`, and `skeleton/turn/`. These remain explicit until a
+  canonical owner and cutover contract are approved.
+
 ## Machine discovery
 
 Agents should read the atlas before broad code search. The live atlas contains

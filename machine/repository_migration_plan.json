@@ -277,6 +277,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/school/",
       "notes": "Thirty-four School curriculum, assessment, learner-state, tutoring, code-intelligence and learning-control modules moved byte-identically under canonical skeleton/learning/school ownership. The legacy skeleton/school package is compatibility-only, while the governed skeleton/ai/learning/school mirror remains exact tree-parity. AIFT-LEARNING now retains only acquired.py as an overlay."
+    },
+    {
+      "id": "TREE-031",
+      "source": "skeleton/{circulation,hoag,motive,sheaf,spine,viscera}/",
+      "destination": ".machine/repository.toml research-lineage zone",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Aligned repository taxonomy with the existing AI research map: circulation, HOAG, motive, sheaf, spine and viscera are historical/research-quarantine lineage with no production authority. Their source trees remain preserved for provenance and characterization; generic specialized-runtime support ownership now covers only unresolved cue, genos, parse and turn surfaces."
     }
   ]
 }
