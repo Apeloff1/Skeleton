@@ -174,6 +174,15 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "jvm-registry-compat"
+prefixes = ["skeleton/jvm_accelerators.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only JVM accelerator registry entrypoint; canonical registry lives at skeleton/native/jvm_registry.py."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "platform"
 prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
 owner = "platform-runtime"
@@ -193,7 +202,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "skeleton/jvm_accelerators.py", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."

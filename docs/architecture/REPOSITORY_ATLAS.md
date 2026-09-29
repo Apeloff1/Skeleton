@@ -33,6 +33,7 @@ Skeleton/
 │   ├── retrieval/            retrieval/ranking/fusion
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
+│   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
 │   ├── build/ + forge/       build/construction systems
 │   ├── release/ + deploy*/   delivery lifecycle
@@ -113,6 +114,7 @@ compatibility shims:
 | `core.activation_security` | `skeleton.security.activation_security` | transitional shim |
 | `skeleton.architecture_index` | `skeleton.foundation.architecture.index` | transitional shim |
 | `skeleton.architecture_round*` | `skeleton.foundation.architecture.rounds.round*` | transitional shim |
+| `skeleton.jvm_accelerators` | `skeleton.native.jvm_registry` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
