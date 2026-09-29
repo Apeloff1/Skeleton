@@ -529,7 +529,7 @@
       "implementation_paths": [
         "skeleton/intelligence/routing_context_receipt.py",
         "skeleton/ai/runtime/intelligence/routing_context_receipt.py",
-        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/runtime/model_routing.py",
         "skeleton/intelligence/admission.py",
         "skeleton/intelligence/quality.py",
         "skeleton/context/compiler.py",
@@ -1496,7 +1496,7 @@
         "backend/core/operation_projection.py",
         "backend/core/operation_stream_transport.py",
         "backend/routes/operation_stream.py",
-        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream.py",
         ".github/workflows/p1-streaming-projection-authority.yml"
       ],
       "test_targets": [

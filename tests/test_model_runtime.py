@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from skeleton.frontier import model_runtime as runtime
+from skeleton.frontier.runtime import model_runtime as runtime
 
 
 class _AsyncStream:

@@ -51,7 +51,7 @@
           "durable tenant quota/window reservation store"
         ],
         "integration": [
-          "skeleton/frontier/model_routing.py",
+          "skeleton/frontier/runtime/model_routing.py",
           "skeleton/skills",
           "skeleton/artifact_plane"
         ],
@@ -336,7 +336,7 @@
         ],
         "runtime": [
           "skeleton/persistence",
-          "skeleton/frontier/operation_stream_store.py"
+          "skeleton/frontier/runtime/operation_stream_store.py"
         ],
         "persistence": [
           "backend/services/database.py",
@@ -554,7 +554,7 @@
       "target_files": {
         "contracts": [
           "skeleton/contracts/memory_record.py",
-          "skeleton/frontier/contracts.py"
+          "skeleton/frontier/runtime/contracts.py"
         ],
         "runtime": [
           "skeleton/memory/policy.py",
@@ -1051,12 +1051,12 @@
         ],
         "integration": [
           "skeleton/provider_runtime.py",
-          "skeleton/frontier/model_routing.py",
+          "skeleton/frontier/runtime/model_routing.py",
           "skeleton/context",
           "skeleton/skills",
           "skeleton/memory",
           "skeleton/retrieval",
-          "skeleton/frontier/operation_stream.py"
+          "skeleton/frontier/runtime/operation_stream.py"
         ],
         "tests": [
           "skeleton/testing/test_ai_execution_contract.py",
@@ -1231,7 +1231,7 @@
       "objective": "One ordered resumable protocol for long-running AI operations.",
       "target_files": {
         "contracts": [
-          "skeleton/frontier/operation_stream.py",
+          "skeleton/frontier/runtime/operation_stream.py",
           "skeleton/contracts/operation.py"
         ],
         "runtime": [
@@ -1240,7 +1240,7 @@
           "frontend operation reducer"
         ],
         "persistence": [
-          "skeleton/frontier/operation_stream_store.py"
+          "skeleton/frontier/runtime/operation_stream_store.py"
         ],
         "integration": [
           "frontend reconnect/cursor state",

@@ -235,8 +235,8 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "50523f0a4aa82797c820f8163cd765da72be1900",
-      "role": "routing streams and frontier orchestration",
+      "source_git_object_sha": "84542f5b1c2b26f13dfb8e48cbfd6c18d92a560c",
+      "role": "Frontier domain runtime with nested canonical runtime/control-plane primitives under skeleton/frontier/runtime; mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
         "WP-W05",
@@ -252,7 +252,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_frontier_tree_with_flat_runtime_compatibility_shims"
     },
     {
       "id": "AIFT-SKILLS",
