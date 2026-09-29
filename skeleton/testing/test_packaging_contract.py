@@ -12,7 +12,7 @@ def test_legacy_setup_entrypoint_matches_canonical_pyproject() -> None:
     canonical = pyproject["project"]["scripts"]["skeleton-dev"]
     setup_cfg = (ROOT / "setup.cfg").read_text(encoding="utf-8")
 
-    assert canonical == "skeleton.developer.cli:run_dev_cli"
+    assert canonical == "skeleton.developer.cli:main"
     assert f"skeleton-dev = {canonical}" in setup_cfg
 
 
@@ -100,3 +100,29 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
     assert "RUN apt-get" not in root_dockerfile
     assert "RUN apt-get" not in backend_dockerfile
     assert "curl -f http://localhost:8001/api/health" not in backend_dockerfile
+
+
+def test_legacy_packaging_metadata_matches_authoritative_project() -> None:
+    import configparser
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    legacy = configparser.ConfigParser()
+    legacy.read(ROOT / "setup.cfg", encoding="utf-8")
+    for field in ("name", "version", "description"):
+        assert legacy["metadata"][field] == project["project"][field]
+    assert legacy["options"]["python_requires"] == project["project"]["requires-python"]
+
+    def lines(section, option):
+        return {line.strip() for line in legacy[section][option].splitlines() if line.strip()}
+
+    assert lines("options", "install_requires") == set(project["project"]["dependencies"])
+    extras = project["project"]["optional-dependencies"]
+    assert set(legacy["options.extras_require"]) == set(extras)
+    for name, dependencies in extras.items():
+        assert lines("options.extras_require", name) == set(dependencies)
+    scripts = dict(line.split(" = ", 1) for line in lines("options.entry_points", "console_scripts"))
+    assert scripts == project["project"]["scripts"]
+    for name, patterns in project["tool"]["setuptools"]["package-data"].items():
+        assert lines("options.package_data", name) == set(patterns)
+    for name, patterns in project["tool"]["setuptools"]["packages"]["find"].items():
+        assert lines("options.packages.find", name) == set(patterns)
