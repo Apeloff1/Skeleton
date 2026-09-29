@@ -4,7 +4,7 @@ Core game/world/creator semantics stay in their owning packages. This package
 only hosts fail-closed, versioned adapter boundaries.
 """
 
-from skeleton.platform.godot_adapter import (
+from skeleton.simulation.platform.godot_adapter import (
     ADAPTER_INPUT_SCHEMA,
     ADAPTER_SCHEMA,
     ADAPTER_VERSION,
