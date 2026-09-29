@@ -246,8 +246,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "platform-compat"
+prefixes = ["skeleton/platform/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only engine-adapter namespace; canonical Godot adapter ownership lives under skeleton/simulation/platform/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/platform/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
