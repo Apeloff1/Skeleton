@@ -106,6 +106,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/kv_cache.py + skeleton/ai/runtime/inference/kv_cache.py",
       "notes": "The duplicate KV-cache facade was collapsed onto the existing canonical skeleton.kv package surface. The root and legacy AI sibling remain compatibility shims; AIFT-KV-CACHE now binds identical canonical package __init__ files. This wave also removes the stale AIFT-NATIVE jvm_registry.py overlay exclusion after TREE-008 made that file part of both native trees."
+    },
+    {
+      "id": "TREE-012",
+      "source": "skeleton/frontier/ + skeleton/pipelines/ + skeleton/platform/",
+      "destination": ".machine/repository.toml canonical zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Classified the final previously-unmentioned skeleton top-level runtime roots without moving code: frontier receives an explicit canonical frontier-runtime zone; pipelines joins build/Forge delivery ownership; platform joins simulation as the Godot adapter boundary."
     }
   ]
 }

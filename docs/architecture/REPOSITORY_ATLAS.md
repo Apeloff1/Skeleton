@@ -39,9 +39,12 @@ Skeleton/
 │   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
 │   ├── build/ + forge/       build/construction systems
+│   ├── pipelines/            content/game generation pipelines
 │   ├── release/ + deploy*/   delivery lifecycle
 │   ├── simulation/ + game/   simulation/game runtime
+│   ├── platform/             engine adapter boundary (Godot)
 │   ├── world/                deterministic world/scene state
+│   ├── frontier/             frontier gameplay/orchestration runtime
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis

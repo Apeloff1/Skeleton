@@ -229,7 +229,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/pipelines/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
@@ -237,8 +237,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "frontier-runtime"
+prefixes = ["skeleton/frontier/"]
+owner = "frontier-runtime"
+criticality = "high"
+purpose = "Frontier consolidation runtime spanning gameplay, orchestration, state, model routing and product-domain contracts."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/platform/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "skeleton/economy/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
