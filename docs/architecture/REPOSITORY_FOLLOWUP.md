@@ -96,7 +96,11 @@ separate; promotion, calibration, privacy budgets and evidence gates are unchang
 The architecture index records all 24 documented research domains without claiming
 local reproduction or granting production authority.
 
-## Remaining validation scope
+## Historical diagnostic scope
+
+The counts and unresolved categories in this section describe earlier repair
+snapshots, not the final integration state. See the completion evidence below
+and PR #2238's revision-specific checks for current validation.
 
 The initial exploratory canonical run produced 16,164 passes, 331 failures and
 91 skips. A later full diagnostic against the e9e3c12 source snapshot produced
@@ -118,6 +122,42 @@ consumer fixtures for evolved scientific/semantic contracts, deeper engine and
 forecasting behavior, and platform-dependent filesystem/shell cases. The repository
 organization audit also retains advisory findings and a broad dependency cycle;
 passing targeted checks is not a claim that these architectural debts are retired.
+
+## Completion evidence
+
+The expanded integration matrix subsequently passed 2,989 tests across 196 files
+(20 skips and four documented Windows exclusions). Main reconciliation passed
+141 focused tests; the migration-source path correction passed 11. Packaging and
+developer-command repairs passed 87 tests. A clean wheel verified 563 changed
+Python files against its source tree, and its installed commands and four
+generated starter projects passed 22 smoke checks.
+
+The broad Windows diagnostic reached 16,473 passes, 95 skips and 79 explicit
+platform exclusions, with one stale packaging assertion. The legacy metadata
+and assertion were corrected and covered by the packaging matrix. This earlier
+diagnostic is not a passing final-revision full-suite result.
+
+Hosted validation at `07c8ae7` passed 2,084 automation tests, 308 Linux filesystem
+and transaction tests, 45 isolated supervisor contracts, 3,131 backend tests,
+application assembly, live Mongo integration and ARM64 builds. Its combined
+quality gate identified a dynamic import in the entrypoint regression test.
+That test now asserts the declared entrypoint and imports it explicitly;
+the repository's dynamic-import restriction remains unchanged. Final acceptance
+requires successful hosted checks on the PR's current head, including the full
+canonical domain suite and combined quality gate. The full Linux diagnostic at
+that revision passed 16,622 tests and exposed two integration issues: reference
+tests wrote into tracked provenance, and the focused test environment lacked
+PyYAML. Reference-writing legacy tests now use temporary logs while asserting
+that provenance is recorded and the corpus is unchanged. PyYAML is declared for
+development and the focused CI runtime. CI also verifies that the legacy runner
+leaves tracked source unchanged before starting the domain suite.
+
+The repository inventory contains 26,081 files in 65 zones with no unclassified
+files or truncation. All 160 governed source/mirror mappings pass validation.
+The static index retains 179 oversized-module findings, one broad runtime
+dependency cycle and four zones without direct static test-import evidence.
+Those are maintenance findings, not executed coverage or omitted acceptance
+failures. Future capability roots remain planned until implemented and accepted.
 
 ## Verification and rollback
 

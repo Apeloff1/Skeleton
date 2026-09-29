@@ -391,15 +391,14 @@ def test_developer_entrypoints_report_validation_exit_status(tmp_path, capsys, e
 
 
 def test_installed_developer_entrypoint_uses_integer_adapter():
-    import importlib
     import tomllib
     from pathlib import Path
+    from skeleton.developer.cli import main
     root = Path(__file__).resolve().parents[2]
     with (root / "pyproject.toml").open("rb") as handle:
         entry = tomllib.load(handle)["project"]["scripts"]["skeleton-dev"]
-    module_name, function_name = entry.split(":")
-    function = getattr(importlib.import_module(module_name), function_name)
-    assert function(["--help"]) == 0
+    assert entry == "skeleton.developer.cli:main"
+    assert main(["--help"]) == 0
 
 
 @pytest.mark.parametrize("entrypoint", ["developer", "root"])
