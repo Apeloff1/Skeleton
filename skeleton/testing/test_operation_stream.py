@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from skeleton.frontier.operation_stream import (
+from skeleton.frontier.runtime.operation_stream import (
     OperationEventLog,
     ReplayCursor,
     StreamBackpressureError,
