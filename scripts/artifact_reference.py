@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -18,6 +19,7 @@ SCHEMA = 1
 MAX_REFERENCES = 256
 MAX_MANIFEST_BYTES = 1_048_576
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,127}$")
 ALLOWED_MODES = frozenset({"100644", "100755"})
 ENTRY_KEYS = frozenset(
@@ -26,8 +28,12 @@ ENTRY_KEYS = frozenset(
         "target_path",
         "source_path",
         "git_blob_oid",
+        "sha256",
         "size_bytes",
         "mode",
+        "license",
+        "redistribution_status",
+        "provenance_note",
     }
 )
 
@@ -191,10 +197,22 @@ def validate_manifest(
             raise ArtifactReferenceError(
                 f"{artifact_id}: git_blob_oid must be a lowercase SHA-1"
             )
+        sha256 = _required_text(raw["sha256"], field="sha256")
+        if SHA256_RE.fullmatch(sha256) is None:
+            raise ArtifactReferenceError(
+                f"{artifact_id}: sha256 must be 64 lowercase hex characters"
+            )
         size_bytes = _positive_size(raw["size_bytes"])
         mode = _required_text(raw["mode"], field="mode")
         if mode not in ALLOWED_MODES:
             raise ArtifactReferenceError(f"{artifact_id}: unsupported mode {mode!r}")
+        license_name = _required_text(raw["license"], field="license", maximum=256)
+        redistribution_status = _required_text(
+            raw["redistribution_status"], field="redistribution_status", maximum=512
+        )
+        provenance_note = _required_text(
+            raw["provenance_note"], field="provenance_note", maximum=2048
+        )
 
         resolved = _resolve_blob(repo_root, source_commit, source_path)
         if resolved != blob_oid:
@@ -229,8 +247,12 @@ def validate_manifest(
                 "target_path": target_path,
                 "source_path": source_path,
                 "git_blob_oid": blob_oid,
+                "sha256": sha256,
                 "size_bytes": size_bytes,
                 "mode": mode,
+                "license": license_name,
+                "redistribution_status": redistribution_status,
+                "provenance_note": provenance_note,
                 "source_commit": source_commit,
             }
         )
@@ -270,6 +292,7 @@ def materialize(
         raise ArtifactReferenceError(f"refusing to overwrite existing path: {output}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
     process = subprocess.Popen(
         ["git", "cat-file", "blob", match["git_blob_oid"]],
         cwd=repo_root,
@@ -280,6 +303,7 @@ def materialize(
     try:
         with output.open("wb") as handle:
             for chunk in iter(lambda: process.stdout.read(1024 * 1024), b""):
+                digest.update(chunk)
                 handle.write(chunk)
         _, stderr = process.communicate()
     except BaseException:
@@ -295,6 +319,10 @@ def materialize(
     if output.stat().st_size != match["size_bytes"]:
         output.unlink(missing_ok=True)
         raise ArtifactReferenceError("materialized artifact size mismatch")
+    observed_sha256 = digest.hexdigest()
+    if observed_sha256 != match["sha256"]:
+        output.unlink(missing_ok=True)
+        raise ArtifactReferenceError("materialized artifact SHA-256 mismatch")
     observed_oid = (
         _git(repo_root, "hash-object", "--", str(output.resolve()))
         .stdout.decode("ascii")
