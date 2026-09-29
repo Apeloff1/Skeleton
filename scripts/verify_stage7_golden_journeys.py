@@ -59,7 +59,7 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "test_engine_client_crosses_real_tcp_process_boundary",
         "test_engine_state_survives_real_process_restart",
     ),
-    "skeleton/frontier/operation_stream_store_mongo.py": (
+    "skeleton/frontier/runtime/operation_stream_store_mongo.py": (
         "class MongoOperationEventStore",
         "def validate_transaction_capability(",
         "Mongo stream authority requires transaction-capable deployment",
@@ -97,7 +97,7 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
         "skeleton/ai/runtime/api/engine_service.py",
     ),
     (
-        "skeleton/frontier/operation_stream_store_mongo.py",
+        "skeleton/frontier/runtime/operation_stream_store_mongo.py",
         "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py",
     ),
     (
