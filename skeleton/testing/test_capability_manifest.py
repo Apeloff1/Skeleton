@@ -9,7 +9,7 @@ import json
 import pytest
 
 from skeleton.__main__ import main
-from skeleton.application import (
+from skeleton.app.runtime import (
     CAPABILITIES_BY_ID,
     CAPABILITY_MANIFEST_VERSION,
     CapabilityLoadError,
@@ -85,11 +85,11 @@ def test_capability_loader_is_lazy_cached_and_manifest_bound(monkeypatch) -> Non
 
     def counting_import(module_name: str):
         calls.append(module_name)
-        assert module_name == "skeleton.application"
-        return real_import("skeleton.application")
+        assert module_name == "skeleton.app.runtime"
+        return real_import("skeleton.app.runtime")
 
     monkeypatch.setattr(
-        "skeleton.application.capability_runtime.import_module",
+        "skeleton.app.runtime.capability_runtime.import_module",
         counting_import,
     )
     loader = CapabilityLoader()
@@ -97,8 +97,8 @@ def test_capability_loader_is_lazy_cached_and_manifest_bound(monkeypatch) -> Non
     assert not any(status.loaded for status in loader.status())
     application = loader.resolve("  Application ")
     assert loader.resolve("application") is application
-    assert application.__name__ == "skeleton.application"
-    assert calls == ["skeleton.application"]
+    assert application.__name__ == "skeleton.app.runtime"
+    assert calls == ["skeleton.app.runtime"]
     assert loader.loaded_ids() == ("application",)
     assert loader.is_loaded("APPLICATION")
 
@@ -120,7 +120,7 @@ def test_capability_loader_rejects_arbitrary_imports_before_import(monkeypatch) 
         raise AssertionError("unexpected import")
 
     monkeypatch.setattr(
-        "skeleton.application.capability_runtime.import_module",
+        "skeleton.app.runtime.capability_runtime.import_module",
         should_not_import,
     )
     loader = CapabilityLoader()
@@ -135,7 +135,7 @@ def test_capability_loader_redacts_import_failure_details(monkeypatch) -> None:
         raise RuntimeError("sensitive import backend detail")
 
     monkeypatch.setattr(
-        "skeleton.application.capability_runtime.import_module",
+        "skeleton.app.runtime.capability_runtime.import_module",
         broken_import,
     )
     loader = CapabilityLoader()
@@ -150,7 +150,7 @@ def test_capability_loader_redacts_import_failure_details(monkeypatch) -> None:
 
 def test_shared_capability_runtime_bridge_tracks_resolved_plane() -> None:
     application = load_capability("application")
-    assert application.__name__ == "skeleton.application"
+    assert application.__name__ == "skeleton.app.runtime"
 
     statuses = {status.id: status for status in capability_runtime_status()}
     assert statuses["application"].loaded is True
@@ -164,7 +164,7 @@ def test_capabilities_cli_matches_python_api(capsys) -> None:
 
 
 def test_capabilities_cli_lifecycle_matches_runtime_snapshot(capsys) -> None:
-    from skeleton.application import CAPABILITY_LOADER
+    from skeleton.app.runtime import CAPABILITY_LOADER
 
     CAPABILITY_LOADER.clear_cache()
     assert main(["capabilities", "--lifecycle"]) == 0
@@ -185,7 +185,7 @@ def test_capabilities_cli_rejects_unknown_options(capsys) -> None:
 
 
 def test_lifecycle_snapshot_does_not_import_planes(monkeypatch) -> None:
-    from skeleton.application import CAPABILITY_LOADER
+    from skeleton.app.runtime import CAPABILITY_LOADER
 
     called = False
 
@@ -195,7 +195,7 @@ def test_lifecycle_snapshot_does_not_import_planes(monkeypatch) -> None:
         raise AssertionError("lifecycle must not import capability modules")
 
     monkeypatch.setattr(
-        "skeleton.application.capability_runtime.import_module",
+        "skeleton.app.runtime.capability_runtime.import_module",
         should_not_import,
     )
     CAPABILITY_LOADER.clear_cache()
@@ -215,7 +215,7 @@ def test_http_application_capability_routes_match_cli_payloads() -> None:
 
     assert asyncio.run(routes.application_capabilities()) == capability_manifest()
     assert asyncio.run(routes.application_capability_lifecycle()) == capability_lifecycle_snapshot()
-    from skeleton.application import plane_audit_snapshot
+    from skeleton.app.runtime import plane_audit_snapshot
 
     assert asyncio.run(routes.application_plane_audit()) == plane_audit_snapshot()
 
@@ -233,7 +233,7 @@ def test_http_application_capability_routes_match_cli_payloads() -> None:
 
 
 def test_shared_command_capabilities_matches_identity_manifest() -> None:
-    from skeleton.application import build_runtime_command_service
+    from skeleton.app.runtime import build_runtime_command_service
 
     class _State:
         genesis = None
