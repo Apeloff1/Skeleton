@@ -39,8 +39,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "core-compat"
+prefixes = ["core/"]
+owner = "repository-control-plane"
+criticality = "low"
+purpose = "Compatibility-only top-level core namespace; canonical implementations live under skeleton/security and skeleton/automation."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/", "core/activation_security.py"]
+prefixes = ["skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -49,7 +58,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/", "core/shift_supervisor/"]
+prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."

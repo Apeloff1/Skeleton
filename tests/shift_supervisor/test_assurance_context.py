@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
-from core.shift_supervisor.assurance_context import AssuranceContext
+from skeleton.automation.shift_supervisor.assurance_context import AssuranceContext
 
 
 def test_assurance_context_digest_is_deterministic() -> None:

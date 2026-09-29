@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.shift_supervisor.assurance_model_boundary import AssuranceModelBoundary
+from skeleton.automation.shift_supervisor.assurance_model_boundary import AssuranceModelBoundary
 
 
 class TestAssuranceModelBoundary:
