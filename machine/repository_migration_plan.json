@@ -70,6 +70,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
       "notes": "Architecture index and rounds 3-22 moved into a cohesive foundation/architecture namespace; legacy root modules remain compatibility shims, and the canonical index imports canonical round modules."
+    },
+    {
+      "id": "TREE-008",
+      "source": "skeleton/jvm_accelerators.py",
+      "destination": "skeleton/native/jvm_registry.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/jvm_accelerators.py",
+      "notes": "The optional JVM accelerator registry moved byte-identically beside native runtime ownership. The root module is now a compatibility shim; the canonical AI runtime mirror remains byte-identical and its mapping source now follows skeleton/native/jvm_registry.py. The separate java-accelerators/ implementation root remains unchanged."
     }
   ]
 }
