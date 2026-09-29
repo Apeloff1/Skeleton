@@ -42,7 +42,8 @@ Skeleton/
 │   │   ├── creator/          intent compiler + reversible design edits
 │   │   └── pipelines/        content/game generation pipelines
 │   ├── release/ + deploy*/   delivery lifecycle
-│   ├── simulation/ + game/   simulation/game runtime
+│   ├── simulation/           canonical simulation/world-model runtime
+│   │   ├── game/             mechanics, deterministic replay and game systems
 │   │   ├── content/          domain knowledge / NPC-dialogue world model
 │   │   ├── economy/          treasury, quota and catalog economy simulation
 │   │   ├── platform/         engine adapter boundary (Godot)
@@ -139,6 +140,7 @@ compatibility shims:
 | `skeleton.content.*` | `skeleton.simulation.content.*` | transitional shim |
 | `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
 | `skeleton.world.*` | `skeleton.simulation.world.*` | transitional shim |
+| `skeleton.game.*` | `skeleton.simulation.game.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
