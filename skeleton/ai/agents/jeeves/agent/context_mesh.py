@@ -122,7 +122,7 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
             if entry.key not in refs and entry.entry_id not in refs:
                 continue
             record = self._record(entry)
-            if records and used + record.token_estimate > max_tokens:
+            if used + record.token_estimate > max_tokens:
                 continue
             records.append(record)
             used += record.token_estimate
@@ -165,7 +165,7 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
             trust=entry.trust,
             confidence=entry.confidence,
             salience=entry.salience,
-            token_estimate=max(1, len(entry.content) // 4),
+            token_estimate=max(1, (len(entry.content) + 3) // 4),
             source_provider=self.source_provider,
             tags=entry.tags,
             metadata={

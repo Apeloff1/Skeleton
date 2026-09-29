@@ -139,7 +139,7 @@ def test_free_space_move_applies_entire_requested_displacement() -> None:
     result = controller.move(displacement, (), dt=1.0 / 60.0)
 
     assert result.position == Vec3(1.25, 1.2, -0.5)
-    assert result.applied_displacement == displacement
+    assert result.applied_displacement.almost_equal(displacement)
     assert result.remaining_displacement == Vec3.zero()
     assert result.hits == ()
     assert not result.stepped

@@ -28,7 +28,7 @@ def test_legacy_world_scene_reexports_canonical_scene_module() -> None:
     assert legacy.SceneEntity is canonical.SceneEntity
 
 
-def test_ai_tree_simulation_only_game_overlay_remains() -> None:
+def test_ai_tree_simulation_has_no_remaining_overlay() -> None:
     manifest = json.loads(
         (ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8")
     )
@@ -37,7 +37,7 @@ def test_ai_tree_simulation_only_game_overlay_remains() -> None:
     )
     world = next(item for item in manifest["mappings"] if item["id"] == "AIFT-WORLD")
 
-    assert simulation.get("overlay_children") == ["game"]
+    assert simulation.get("overlay_children", []) == []
     assert world["source"] == "skeleton/simulation/world"
     assert world["destination"] == "skeleton/ai/simulation/world"
 

@@ -172,7 +172,7 @@ def test_context_resolver_queries_relations_before_scoped_memory():
     sources = [stage.source for stage in result.stages]
     assert sources[0] == "memory_game"
     assert sources[1] == "relational_memory"
-    assert sources.index("relational_memory") < sources.index("scoped_memory")
+    assert sources.index("relational_memory") < sources.index("memory_manager")
     assert any(item.source == "relational_memory" for item in result.items)
 
 

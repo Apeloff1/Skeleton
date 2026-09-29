@@ -1,6 +1,6 @@
 """Skeleton Contexts — The Context Fabric (with ResponseCycle)."""
 
-from skeleton.context.domains.workorder import WorkOrderEngine, WorkOrder, WorkOrderContext
+from skeleton.context.domains.workorder import CONTEXT_SIZE, WorkOrderEngine, WorkOrder, WorkOrderContext
 from skeleton.context.domains.backlog import BacklogContext, TensorCube, WorkChain, BacklogItem
 from skeleton.context.domains.planning import (
     PlanningContext,
@@ -90,6 +90,7 @@ class ContextFabric:
 
 
 __all__ = [
+    "CONTEXT_SIZE",
     "ContextFabric",
     "WorkOrderEngine",
     "WorkOrder",

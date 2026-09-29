@@ -1,9 +1,9 @@
 """Import-free audit of developer CLI commands versus architecture.CLI_COMMANDS.
 
-The help surface documents list-templates/validate/docs in ``cli.py`` while
-persistence snapshot commands live only on ``DevCommandRegistry``. This snapshot
-reports that split without importing the developer package or rewriting either
-registry.
+The runtime dispatches utility commands in ``cli.py`` and registered commands
+through ``DevCommandRegistry``. This snapshot checks their combined public
+surface against the architecture inventory without importing the developer
+package or rewriting either registry.
 """
 
 from __future__ import annotations

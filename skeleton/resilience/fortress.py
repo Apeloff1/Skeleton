@@ -48,13 +48,14 @@ class ResilienceFortress:
         guardrail_result = self.guardrail.evaluate(output)
         exfil_report = self.exfiltration.monitor_query(query, output, user_id)
 
+        safe = guardrail_result["safe"] and exfil_report is None
         result = {
-            "safe": guardrail_result["safe"] and exfil_report is None,
+            "safe": safe,
             "guardrail": guardrail_result,
             "exfiltration": exfil_report.to_dict() if exfil_report else None,
             "deliverable": (
                 guardrail_result.get("redacted_output") or output
-                if guardrail_result["safe"]
+                if safe
                 else "[OUTPUT BLOCKED: SAFETY VIOLATION]"
             ),
         }

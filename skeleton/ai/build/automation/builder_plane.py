@@ -398,7 +398,7 @@ class BuilderManifest:
     acceptance: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if self.version != 1:
+        if type(self.version) is not int or self.version != 1:
             raise BuilderPlaneError("unsupported builder manifest version")
         _repository(self.repository)
         _positive_int(
@@ -611,7 +611,7 @@ class BuilderProposalReceipt:
     tests_digest: str
 
     def __post_init__(self) -> None:
-        if self.version != 1:
+        if type(self.version) is not int or self.version != 1:
             raise BuilderPlaneError(
                 "unsupported builder proposal receipt version"
             )
@@ -1260,6 +1260,15 @@ def validate_builder_worker_evidence(
                 f"builder worker evidence {field} mismatch"
             )
 
+    if status == "pull-request-updated":
+        from .builder_repair_receipts import BuilderRepairReceipt, validate_builder_repair_receipt
+        receipt = BuilderRepairReceipt.from_payload(evidence.get("builder_repair_receipt"))
+        validate_builder_repair_receipt(receipt, manifest, evidence=evidence)
+        proposal = evidence.get("builder_proposal_receipt")
+        if proposal is not None and proposal != receipt.proposal.as_dict():
+            raise BuilderPlaneError("builder repair proposal receipt mismatch")
+        return
+
     try:
         receipt = BuilderProposalReceipt.from_payload(
             evidence.get("builder_proposal_receipt")
@@ -1316,3 +1325,16 @@ __all__ = [
     "validate_builder_custody",
     "validate_builder_worker_evidence",
 ]
+
+
+
+def __getattr__(name: str):
+    # Keep the established Builder Plane import surface while the repair
+    # receipt implementation lives in a focused module under the same owner.
+    if name in {"BuilderRepairReceipt", "compile_builder_repair_receipt", "validate_builder_repair_receipt"}:
+        from . import builder_repair_receipts
+        return getattr(builder_repair_receipts, name)
+    raise AttributeError(name)
+
+
+__all__ += ["BuilderRepairReceipt", "compile_builder_repair_receipt", "validate_builder_repair_receipt"]

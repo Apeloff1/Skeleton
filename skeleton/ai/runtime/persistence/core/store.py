@@ -6,8 +6,8 @@ import json
 import os
 from pathlib import Path
 
-from skeleton.persist.cards import persist_card
-from skeleton.persist.law import OWN_ENV
+from skeleton.persistence.core.cards import persist_card
+from skeleton.persistence.core.law import OWN_ENV
 
 
 class Persist:

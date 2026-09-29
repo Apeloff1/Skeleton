@@ -31,8 +31,8 @@ from skeleton.game import (
 from skeleton.game.mechanics import GameMechanicsError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPOSITION_SOURCE = (REPO_ROOT / "skeleton/game/composition.py").read_text(encoding="utf-8")
-MECHANICS_SOURCE = (REPO_ROOT / "skeleton/game/mechanics.py").read_text(encoding="utf-8")
+COMPOSITION_SOURCE = (REPO_ROOT / "skeleton/simulation/game/composition.py").read_text(encoding="utf-8")
+MECHANICS_SOURCE = (REPO_ROOT / "skeleton/simulation/game/mechanics.py").read_text(encoding="utf-8")
 
 
 def _ref(component_id: str, kind: MechanicType) -> MechanicComponentRef:

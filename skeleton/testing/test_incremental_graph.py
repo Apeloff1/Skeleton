@@ -268,9 +268,9 @@ def test_scale_bounds_fail_closed_and_admit_the_limit() -> None:
     ok_nodes = [{"id": f"n{i:04d}"} for i in range(3)]
     graph = build_incremental_graph(ok_nodes, max_nodes=3, max_edges=3)
     assert len(graph.nodes) == 3
-    with pytest.raises(IncrementalGraphError, match="node count exceeds"):
+    with pytest.raises(IncrementalGraphError, match="specs count exceeds"):
         build_incremental_graph(ok_nodes + [{"id": "n0003"}], max_nodes=3)
-    with pytest.raises(IncrementalGraphError, match="edge count exceeds"):
+    with pytest.raises(IncrementalGraphError, match="dependencies count exceeds"):
         build_incremental_graph(
             [
                 {"id": "a"},
@@ -384,7 +384,7 @@ def test_repo_index_non_ascii_paths_use_utf8_canonical_order_and_digest() -> Non
     ]
     files.sort(key=lambda item: str(item["path"]).encode("utf-8"))
     snapshot = {
-        "schema": "build.incremental_graph.v1",
+        "schema": 1,
         "object_format": "sha256",
         "head": "c" * 64,
         "source_digest": _repo_source_digest(files),
@@ -542,7 +542,7 @@ def test_working_mode_change_invalidates_source_fingerprint() -> None:
 
 
 def test_malformed_repo_index_fails_closed() -> None:
-    with pytest.raises(IncrementalGraphError, match="must be a mapping"):
+    with pytest.raises(IncrementalGraphError, match="missing required fields"):
         build_incremental_graph(repo_index="not-a-snapshot")
     with pytest.raises(IncrementalGraphError, match="unknown keys"):
         build_incremental_graph(
@@ -554,7 +554,7 @@ def test_malformed_repo_index_fails_closed() -> None:
 
     missing_digest_files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
     missing_digest_files[1].pop("index_blob")
-    with pytest.raises(IncrementalGraphError, match="index_blob"):
+    with pytest.raises(IncrementalGraphError, match="missing required keys"):
         build_incremental_graph(repo_index={**snapshot, "files": missing_digest_files})
 
     with pytest.raises(IncrementalGraphError, match="duplicate node"):

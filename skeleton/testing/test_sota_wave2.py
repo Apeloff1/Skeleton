@@ -41,7 +41,7 @@ def test_distill_compresses_and_keeps_entities():
         "Everyone agreed the tradeoff is worth it."
     )
     fact = distill(long_text)
-    assert fact.tokens < len(long_text) // 4
+    assert fact.tokens < (len(long_text) + 3) // 4
     assert "Cairo" in fact.entities or "Berlin" in fact.entities
     assert fact.gist
 

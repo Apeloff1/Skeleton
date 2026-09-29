@@ -88,7 +88,7 @@ def _finding(
         finding_id=finding_id,
         lens_key=lens_key,
         family=family,
-        observation_ids=("plane-o1", "plane-o2"),
+        observation_ids=("plane-o1", "plane-o2", "plane-o3"),
         interpretation=f"{lens_key} is a candidate reading of the current observations.",
         prediction=f"A discriminating future observation should test {lens_key}.",
         confidence=confidence,
@@ -534,11 +534,11 @@ def test_resolved_forecast_is_not_silently_reopened_and_revision_gets_new_identi
         for item in first.forecasts
         if item.source_finding_ids == ("lifecycle-concept-drift",)
     )
-    plane.resolve_forecast(
+    # Test forecast lifecycle independently of scientific calibration, which
+    # may correctly block this lens after a single unreplicated trial.
+    plane.prediction_ledger.resolve(
         first_forecast.forecast_id,
         outcome=True,
-        domain="lifecycle",
-        independent_run="lifecycle-001",
     )
 
     unchanged = plane.analyze(
@@ -723,7 +723,7 @@ def test_falsified_finding_cannot_emit_plane_forecast_or_interaction_forecast() 
         finding_id="falsified-causal",
         lens_key="backdoor_confounding",
         family=LensFamily.CAUSAL,
-        observation_ids=("plane-o1", "plane-o2"),
+        observation_ids=("plane-o1", "plane-o2", "plane-o3"),
         interpretation="A falsified causal reading.",
         prediction="This forecast must not be emitted.",
         confidence=0.9,

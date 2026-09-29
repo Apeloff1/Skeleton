@@ -107,16 +107,36 @@ def restore_mag(data: Dict[str, Any], mag: Any) -> int:
 def serialize_graph(graph: Any) -> Dict[str, Any]:
     return {
         "kind": "knowledge_graph",
-        "triples": [list(t) for t in sorted(graph._triples, key=str)],
+        "triples": [[t.subject, t.predicate, t.obj] for t in sorted(graph._triples, key=str)],
+        "annotations": [
+            {**t.to_dict(), "confidence": graph.annotation_for(t.subject, t.predicate, t.obj).confidence,
+             "provenance": graph.annotation_for(t.subject, t.predicate, t.obj).provenance}
+            for t in sorted(graph._triples, key=str)
+        ],
     }
 
 
 def restore_graph(data: Dict[str, Any], graph: Any) -> int:
-    count = 0
+    from skeleton.retrieval.kag import KnowledgeGraph
+
+    # Validate the complete snapshot before changing a live graph. Legacy
+    # snapshots containing only triples retain confidence=1 and empty provenance.
+    staged = KnowledgeGraph()
     for s, p, o in data.get("triples", []):
-        graph.add(s, p, o)
-        count += 1
-    return count
+        staged.add(s, p, o)
+    for row in data.get("annotations", []):
+        identity = (row["subject"], row["predicate"], row["object"])
+        if not any((t.subject, t.predicate, t.obj) == identity for t in staged._triples):
+            raise ValueError("snapshot annotation has no matching triple")
+        from skeleton.retrieval.kag import FactAnnotation, Triple, validate_fact_confidence
+        confidence = validate_fact_confidence(row["confidence"])
+        if not isinstance(row["provenance"], str):
+            raise TypeError("snapshot provenance must be a string")
+        staged._annotations[Triple(*identity)] = FactAnnotation(confidence, row["provenance"])
+    for t in staged._triples:
+        annotation = staged.annotation_for(t.subject, t.predicate, t.obj)
+        graph.add(t.subject, t.predicate, t.obj, confidence=annotation.confidence, provenance=annotation.provenance)
+    return len(staged._triples)
 
 
 def serialize_matrices(jeeves: Any) -> Dict[str, Any]:
@@ -143,7 +163,7 @@ def serialize_matrices(jeeves: Any) -> Dict[str, Any]:
 
 
 def restore_matrices(data: Dict[str, Any], jeeves: Any) -> None:
-    from skeleton.jeeves.matrices import RetentionCell
+    from skeleton.jeeves.matrices_llm import RetentionCell
 
     for a, edges in data.get("sam", {}).items():
         for b, w in edges.items():

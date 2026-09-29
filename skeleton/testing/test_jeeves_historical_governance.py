@@ -167,7 +167,7 @@ def test_same_decision_cannot_be_consumed_twice() -> None:
     ledger.activate(decision)
     with pytest.raises(HistoricalGovernanceError) as exc:
         ledger.activate(decision)
-    assert exc.value.context["reason"] == "duplicate_decision"
+    assert exc.value.context["reason"] == "already_active"
 
 
 def test_already_active_model_is_rejected_even_with_new_decision() -> None:

@@ -186,7 +186,12 @@ def test_backup_store_rejects_symlinked_storage_root(tmp_path: Path):
     real = tmp_path / "real-backup"
     real.mkdir()
     link = tmp_path / "backup-link"
-    link.symlink_to(real, target_is_directory=True)
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symlinks")
+        raise
 
     with pytest.raises(BackupError, match="real directory"):
         ContentAddressedBackupStore(link)
@@ -199,7 +204,12 @@ def test_backup_store_rejects_symlinked_blob_shard(tmp_path: Path):
     external = tmp_path / "external-shard"
     external.mkdir()
     shard = store.blob_root / digest[:2]
-    shard.symlink_to(external, target_is_directory=True)
+    try:
+        shard.symlink_to(external, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symlinks")
+        raise
 
     with pytest.raises(BackupError, match="real directory"):
         store.put_blob(digest, payload)
@@ -209,7 +219,12 @@ def test_durable_journal_rejects_symlinked_parent_directory(tmp_path: Path):
     real = tmp_path / "real-journal-dir"
     real.mkdir()
     linked = tmp_path / "journal-dir"
-    linked.symlink_to(real, target_is_directory=True)
+    try:
+        linked.symlink_to(real, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symlinks")
+        raise
     journal = TransactionJournal(
         storage_path=linked / "transactions.jsonl",
     )
@@ -228,7 +243,12 @@ def test_durable_journal_rejects_symlinked_journal_file(tmp_path: Path):
     target = tmp_path / "target.jsonl"
     target.write_text("", encoding="utf-8")
     link = tmp_path / "journal.jsonl"
-    link.symlink_to(target)
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symlinks")
+        raise
 
     with pytest.raises(JournalPersistenceError, match="regular file"):
         TransactionJournal(storage_path=link)
@@ -747,7 +767,11 @@ def test_file_to_directory_type_change_removes_children_before_parent_restore(tm
     assert target.read_text(encoding="utf-8") == "before"
 
 
-def test_rollback_conflicts_on_post_review_file_metadata_drift(tmp_path: Path):
+@pytest.mark.parametrize("metadata_kind", [
+    pytest.param("mode", marks=pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")),
+    "mtime",
+])
+def test_rollback_conflicts_on_post_review_file_metadata_drift(tmp_path: Path, metadata_kind):
     root, manager, _ = _manager(tmp_path)
     target = root / "state.txt"
     target.write_text("before", encoding="utf-8")
@@ -762,7 +786,12 @@ def test_rollback_conflicts_on_post_review_file_metadata_drift(tmp_path: Path):
 
     # Simulate an unrelated actor changing only metadata after review but
     # before rollback begins. Content remains exactly as reviewed.
-    target.chmod(0o640)
+    if metadata_kind == "mode":
+        target.chmod(0o640)
+    else:
+        metadata = target.stat()
+        os.utime(target, ns=(metadata.st_atime_ns, metadata.st_mtime_ns + 2_000_000_000))
+    reviewed_drift = target.stat()
     report = manager.rollback_engine.rollback(
         root,
         before,
@@ -774,7 +803,8 @@ def test_rollback_conflicts_on_post_review_file_metadata_drift(tmp_path: Path):
     assert report.conflicts
     assert report.conflicts[0].action.path == "state.txt"
     assert target.read_text(encoding="utf-8") == "after"
-    assert target.stat().st_mode & 0o777 == 0o640
+    assert target.stat().st_mode == reviewed_drift.st_mode
+    assert target.stat().st_mtime_ns == reviewed_drift.st_mtime_ns
 
 
 def test_reverse_rename_restores_original_file_mode_and_mtime(tmp_path: Path):
@@ -1203,3 +1233,38 @@ def test_transaction_manager_binds_missing_cwd_to_root(tmp_path: Path):
     assert result.accepted
     assert result.execution.result.stdout_text().strip() == "root-bound"
     assert result.execution.final_receipt.command == "test.read"
+
+
+def test_scanner_uses_fresh_file_identity_not_directory_entry_cache(tmp_path, monkeypatch):
+    import skeleton.shells.workspace_txn.scanner as scanner_module
+    from types import SimpleNamespace
+
+    target = tmp_path / "state.txt"
+    target.write_bytes(b"stable")
+    # Windows directory enumeration lacks identifiers; stale cached metadata
+    # on any platform must not be the identity used for descriptor comparison.
+    child = SimpleNamespace(name=target.name, path=str(target))
+    monkeypatch.setattr(scanner_module.os, "scandir", lambda directory: [child])
+    snapshot = WorkspaceScanner().scan(tmp_path)
+    entry = next(entry for entry in snapshot.entries if entry.path == "state.txt")
+    assert entry.device == target.lstat().st_dev
+    assert entry.inode == target.lstat().st_ino
+    assert entry.digest == hashlib.sha256(b"stable").hexdigest()
+
+
+def test_scanner_still_rejects_replacement_between_inspection_and_open(tmp_path, monkeypatch):
+    import skeleton.shells.workspace_txn.scanner as scanner_module
+
+    target = tmp_path / "state.txt"
+    target.write_bytes(b"stable")
+    original = scanner_module._hash_file
+
+    def replace_before_open(path, before, limits):
+        replacement = tmp_path / "replacement"
+        replacement.write_bytes(b"changed-content")
+        replacement.replace(path)
+        return original(path, before, limits)
+
+    monkeypatch.setattr(scanner_module, "_hash_file", replace_before_open)
+    with pytest.raises(scanner_module.WorkspaceScanError, match="changed before hashing"):
+        WorkspaceScanner().scan(tmp_path)

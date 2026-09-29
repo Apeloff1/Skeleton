@@ -9,9 +9,12 @@ being sliced.
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Sequence
 
 from skeleton.memory.prefix_renderer import estimate_tokens
+from skeleton.memory.compaction import ContextCompactor, Turn
+from skeleton.memory.rot_guard import ContextRotGuard, RotReport
 
 
 class CompactionError(ValueError):
@@ -104,6 +107,9 @@ def compact_turns(
         if not any(constraint in turn["content"] for turn in kept):
             raise CompactionError(f"constraint was dropped: {constraint}")
 
+    report = ContextRotGuard().assess(
+        "\n".join(turn["content"] for turn in kept), constraints=constraints
+    )
     return {
         "original_count": len(normalized),
         "preserved_count": len(kept),
@@ -118,7 +124,81 @@ def compact_turns(
         "dropped_indexes": dropped,
         "kept_tokens": sum(turn["tokens"] for turn in kept),
         "token_budget": token_budget,
+        "turns": [{"role": turn["role"], "content": turn["content"]} for turn in kept],
+        "compacted": bool(dropped),
+        "verdict": report.verdict,
+        "report": report.to_dict(),
     }
 
 
-__all__ = ["CompactionError", "compact_turns"]
+def turns_from_payload(payload: Any) -> list[Turn]:
+    """Read valid turns from optional legacy payloads without coercing content."""
+    if not isinstance(payload, list):
+        return []
+    return [
+        Turn(role=item["role"], content=item["content"])
+        for item in payload
+        if isinstance(item, dict)
+        and isinstance(item.get("role"), str)
+        and bool(item["role"].strip())
+        and item["role"] == item["role"].strip()
+        and isinstance(item.get("content"), str)
+    ]
+
+
+@dataclass(frozen=True)
+class GuardedCompactionResult:
+    turns: list[Turn]
+    compacted: bool
+    report: RotReport
+    hint: str | None
+
+
+class RotGuardedCompactor:
+    """Compose rot assessment with whole-turn, constraint-preserving trimming.
+
+    The supplied compactor provides the budget. Selection uses compact_turns
+    so a legacy head/tail strategy cannot silently discard required evidence.
+    """
+
+    def __init__(self, *, guard: ContextRotGuard | None = None,
+                 compactor: ContextCompactor | None = None) -> None:
+        self.guard = guard or ContextRotGuard()
+        self.compactor = compactor or ContextCompactor()
+        self._checks = 0
+        self._interventions = 0
+
+    def process(self, turns: list[Turn], *,
+                constraints: Sequence[str] | None = None) -> GuardedCompactionResult:
+        if not isinstance(turns, list) or any(not isinstance(turn, Turn) for turn in turns):
+            raise TypeError("turns must be a list of Turn objects")
+        if constraints is not None and (not isinstance(constraints, (list, tuple))
+                or any(not isinstance(item, str) or not item for item in constraints)):
+            raise ValueError("constraints must be a sequence of nonempty strings")
+        if any(not isinstance(turn.role, str) or not turn.role.strip()
+               or turn.role != turn.role.strip() or not isinstance(turn.content, str) for turn in turns):
+            raise ValueError("turns require a nonempty role and string content")
+        constraints = list(constraints) if constraints is not None else None
+        report = self.guard.assess("\n".join(turn.content for turn in turns), constraints=constraints)
+        self._checks += 1
+        hint = "restate missing or buried constraints explicitly" if report.buried else None
+        if report.verdict != "rot" and sum(turn.tokens for turn in turns) <= self.compactor.token_budget:
+            return GuardedCompactionResult(list(turns), False, report, hint)
+        result = compact_turns(
+            [{"role": turn.role, "content": turn.content} for turn in turns],
+            constraints, token_budget=self.compactor.token_budget,
+        )
+        if result is None:
+            return GuardedCompactionResult([], False, report, hint)
+        kept = turns_from_payload(result["turns"])
+        compacted = result["compacted"]
+        self._interventions += int(compacted)
+        final_report = self.guard.assess("\n".join(turn.content for turn in kept), constraints=constraints)
+        return GuardedCompactionResult(kept, compacted, final_report, hint)
+
+    def stats(self) -> dict[str, int]:
+        return {"checks": self._checks, "interventions": self._interventions}
+
+
+__all__ = ["CompactionError", "compact_turns", "RotGuardedCompactor",
+           "GuardedCompactionResult", "turns_from_payload"]

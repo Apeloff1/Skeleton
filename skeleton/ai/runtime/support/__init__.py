@@ -17,6 +17,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.context.domains.workorder import WorkOrder
+from skeleton.context.domains.syntax import SyntaxIssue
 from skeleton.support.planes import (
     SentinelContext,
     HospiceContext,
@@ -138,6 +140,8 @@ class SupportFabric:
 
 
 __all__ = [
+    "WorkOrder",
+    "SyntaxIssue",
     "SupportFabric",
     "SentinelContext",
     "HospiceContext",

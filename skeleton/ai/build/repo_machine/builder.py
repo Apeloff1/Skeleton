@@ -6,6 +6,7 @@ from collections import defaultdict
 import hashlib
 import os
 from pathlib import Path, PurePosixPath
+import posixpath
 import re
 import stat
 from typing import Iterable
@@ -24,7 +25,7 @@ _CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".
 _DOC_SUFFIXES = {".md", ".mdx", ".rst", ".txt"}
 _CONFIG_SUFFIXES = {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg"}
 _SCRIPT_SUFFIXES = {".sh", ".ps1", ".bat"}
-_JS_IMPORT = re.compile(r"(?:from\s+|require\s*\(|import\s*\()[\"']([^\"']+)")
+_JS_IMPORT = re.compile(r"(?:from\s+|require\s*\(\s*|import\s*\(\s*|import\s+)[\"']([^\"']+)")
 _JAVA_IMPORT = re.compile(r"^\s*import\s+([A-Za-z0-9_.]+)", re.MULTILINE)
 
 
@@ -81,6 +82,12 @@ def _python_metadata(content: str) -> tuple[int, tuple[str, ...]]:
             prefix = "." * node.level + (node.module or "")
             if prefix:
                 imports.add(prefix)
+            # ``from package import module`` can target a source module even
+            # when the package has no __init__.py. Keep the package reference
+            # as well; unresolved symbol names are discarded by target lookup.
+            for alias in node.names:
+                if alias.name != "*":
+                    imports.add(prefix + ("." if node.module else "") + alias.name)
     return symbols, tuple(sorted(imports))
 
 
@@ -106,11 +113,26 @@ def _test_target(path: str) -> str | None:
 def _internal_target(import_name: str, source_path: str, files: set[str]) -> str | None:
     if not import_name:
         return None
+    if PurePosixPath(source_path).suffix in {".js", ".jsx", ".ts", ".tsx"}:
+        # JavaScript paths are slash-relative, not Python dotted modules.
+        # Bare package names and unresolved aliases need separate package
+        # metadata; do not accidentally bind them to a same-named Python file.
+        if not import_name.startswith(("./", "../")):
+            return None
+        base = posixpath.normpath(posixpath.join(posixpath.dirname(source_path), import_name))
+        if base in {".", ".."} or base.startswith("../"):
+            return None
+        candidates = [base]
+        candidates.extend(base + extension for extension in (".ts", ".tsx", ".js", ".jsx"))
+        candidates.extend(base + "/index" + extension for extension in (".ts", ".tsx", ".js", ".jsx"))
+        return next((candidate for candidate in candidates if candidate in files), None)
     if import_name.startswith(".") and source_path.endswith(".py"):
         source_parts = PurePosixPath(source_path).parts[:-1]
         level = len(import_name) - len(import_name.lstrip("."))
         module = import_name[level:]
-        base = source_parts[: max(0, len(source_parts) - level + 1)]
+        if level > len(source_parts):
+            return None
+        base = source_parts[: len(source_parts) - level + 1]
         parts = (*base, *module.split(".")) if module else base
     else:
         parts = tuple(part for part in import_name.split(".") if part)
@@ -125,6 +147,8 @@ def _internal_target(import_name: str, source_path: str, files: set[str]) -> str
         "/".join(parts) + ".jsx",
         "/".join(parts) + ".java",
     ]
+    if source_path.endswith(".py"):
+        candidates = candidates[:2]
     for candidate in candidates:
         if candidate in files:
             return candidate
@@ -293,22 +317,34 @@ class RepositoryModelBuilder:
 
         path_set = {record.path for record in records}
         by_path = {record.path: record for record in records}
+        zone_rules = {rule.name: rule for rule in self.config.zones}
         edge_counts: dict[tuple[str, str, str], int] = defaultdict(int)
+        referenced_tests: dict[str, set[str]] = defaultdict(set)
         for record in records:
             for imported in record.imports:
                 target_path = _internal_target(imported, record.path, path_set)
                 if target_path is None:
                     continue
                 target = by_path[target_path]
+                if record.kind == "source" and target.kind == "test":
+                    findings.append(Finding(
+                        code="topology.production-test-import", severity="high", zone=record.zone,
+                        path=record.path, detail="production source imports a test module",
+                        evidence=(target.path,),
+                    ))
                 if target.zone == record.zone:
                     continue
-                edge_counts[(record.zone, target.zone, "import")] += 1
+                kind = "test-import" if record.kind == "test" else "import"
+                edge_counts[(record.zone, target.zone, kind)] += 1
+                source_rule = zone_rules.get(record.zone)
+                if (record.kind == "test" and target.kind == "source"
+                        and source_rule is not None and source_rule.lifecycle != "historical"):
+                    referenced_tests[target.zone].add(record.path)
         edges = tuple(
             TopologyEdge(source, target, kind, count)
             for (source, target, kind), count in sorted(edge_counts.items())
         )
 
-        zone_rules = {rule.name: rule for rule in self.config.zones}
         zones = sorted({record.zone for record in records} | set(zone_rules))
         dependencies: dict[str, set[str]] = defaultdict(set)
         dependents: dict[str, set[str]] = defaultdict(set)
@@ -336,6 +372,8 @@ class RepositoryModelBuilder:
                 file_count=len(members),
                 code_files=sum(record.kind == "source" for record in members),
                 test_files=sum(record.kind == "test" for record in members),
+                referenced_test_files=len(referenced_tests[zone]),
+                test_evidence=tuple(sorted(referenced_tests[zone])[:32]),
                 workflow_files=sum(record.kind == "workflow" for record in members),
                 total_lines=sum(record.lines for record in members),
                 total_bytes=sum(record.size for record in members),
@@ -345,7 +383,12 @@ class RepositoryModelBuilder:
                 dependents=tuple(sorted(dependents[zone])),
             ))
 
-        adjacency = {zone: set(dependencies[zone]) for zone in zones}
+        # Test dependencies remain visible for impact analysis, but a test's
+        # import of production code is not a runtime dependency cycle.
+        adjacency: dict[str, set[str]] = {zone: set() for zone in zones}
+        for edge in edges:
+            if edge.kind == "import":
+                adjacency[edge.source].add(edge.target)
         cycles = _tarjan(zones, adjacency) if self.config.detect_dependency_cycles else ()
         for cycle in cycles:
             severity = "high" if any((zone_rules.get(z) and zone_rules[z].criticality == "critical") for z in cycle) else "medium"
@@ -375,12 +418,12 @@ class RepositoryModelBuilder:
 
         if self.config.require_tests_for_code:
             for subsystem in subsystems:
-                if subsystem.code_files >= 4 and subsystem.test_files == 0:
+                if subsystem.code_files >= 4 and subsystem.test_surface_count == 0:
                     findings.append(Finding(
                         code="quality.missing-zone-tests",
                         severity="high" if subsystem.criticality in {"critical", "high"} else "medium",
                         zone=subsystem.name,
-                        detail=f"{subsystem.code_files} code files and no classified tests",
+                        detail=f"{subsystem.code_files} code files and no local or directly importing test files",
                     ))
 
         if truncated:

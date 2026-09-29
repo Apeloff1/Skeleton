@@ -51,7 +51,7 @@ def module_init_path(module: str) -> Path | None:
 
 
 def public_exports(module: str) -> list[str]:
-    init_path = module_init_path(module)
+    init_path = module_source_path(module)
     if init_path is None or not init_path.is_file():
         return []
     try:
@@ -87,7 +87,7 @@ def export_drift(public: list[str], documented: list[str]) -> dict[str, list[str
 
 
 def genesis_source_path() -> Path | None:
-    spec = find_spec("skeleton.genesis")
+    spec = find_spec("skeleton.bootstrap.genesis")
     if spec is None or not spec.origin:
         return None
     path = Path(spec.origin)
@@ -314,11 +314,38 @@ def architecture_api_routes() -> list[dict[str, object]]:
 
 
 def module_source_path(module: str) -> Path | None:
-    spec = find_spec(module)
-    if spec is None or not spec.origin:
-        return None
-    path = Path(spec.origin)
-    return path if path.is_file() else None
+    """Follow explicit, import-only compatibility shims to their source owner.
+
+    Inspect source rather than importing capability implementations. A cycle or
+    ambiguous shim fails closed instead of manufacturing an empty audit.
+    """
+    seen: set[str] = set()
+    for _ in range(16):
+        if module in seen:
+            return None
+        seen.add(module)
+        spec = find_spec(module)
+        if spec is None or not spec.origin:
+            return None
+        path = Path(spec.origin)
+        if not path.is_file():
+            return None
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            return None
+        meaningful = [node for node in tree.body if not (
+            isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str))]
+        targets = [node.module for node in meaningful
+                   if isinstance(node, ast.ImportFrom) and node.level == 0
+                   and node.module and node.module.startswith("skeleton.")
+                   and any(alias.name == "*" for alias in node.names)]
+        if len(targets) == 1 and all(isinstance(node, ast.ImportFrom) for node in meaningful):
+            module = targets[0]
+            continue
+        return path
+    return None
 
 
 def parse_module_tree(module: str) -> ast.AST | None:
@@ -713,7 +740,11 @@ def create_app_included_routers() -> list[dict[str, object]]:
     return rows
 
 
-_SKIP_MOUNTED_MODULES = frozenset({"skeleton.api.routes", "skeleton.api.gameforge_routes"})
+_SKIP_MOUNTED_MODULES = frozenset({
+    "skeleton.api.routes",
+    "skeleton.api.gameforge_routes",
+    "skeleton.api.command_routes",  # covered by the sidecar audit
+})
 
 
 def mounted_router_handlers() -> list[dict[str, object]]:

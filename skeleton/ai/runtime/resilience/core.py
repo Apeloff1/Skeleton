@@ -40,7 +40,7 @@ class ResilienceFortress:
     PATTERNS = {
         "sql_injection": re.compile(r"(\b(union|select|insert|delete|drop|exec|script)\b)", re.IGNORECASE),
         "path_traversal": re.compile(r"\.\./|\.\.\\|%2e%2e%2f"),
-        "command_injection": re.compile(r"[;&|`]\s*\b(cat|ls|rm|chmod|wget|curl|bash|sh|python)\b"),
+        "command_injection": re.compile(r"[;&|`]\s*\b(bash|cat|chmod|curl|ls|python|rm|sh|wget)\b"),
         "xss": re.compile(r"<script|javascript:|on\w+\s*=", re.IGNORECASE),
     }
 
@@ -59,6 +59,12 @@ class ResilienceFortress:
             if pattern.search(raw_input):
                 findings.append(f"Detected: {name}")
                 threat_score += 0.25
+
+        # A terminated statement followed by a destructive SQL command is
+        # stronger evidence than a harmless mention of a SQL keyword.
+        if re.search(r";\s*(?:drop\s+(?:table|database)|delete\s+from|truncate\s+table)\b", raw_input, re.IGNORECASE):
+            findings.append("Detected: destructive_sql_statement")
+            threat_score = max(threat_score, 0.6)
 
         # Length-based heuristic
         if len(raw_input) > 10000:
@@ -96,6 +102,13 @@ class ResilienceFortress:
 
         return sanitized, report
 
+    def process_output(self, output: str, user_id: str, query: str) -> Dict[str, Any]:
+        """Use the existing output guardrails and exfiltration owner."""
+        if not hasattr(self, "_output_fortress"):
+            from skeleton.resilience.fortress import ResilienceFortress as OutputFortress
+            self._output_fortress = OutputFortress(self._bus)
+        return self._output_fortress.process_output(output, user_id, query)
+
     @staticmethod
     def _score_to_level(score: float) -> ThreatLevel:
         if score >= 0.8:
@@ -114,7 +127,10 @@ class ResilienceFortress:
         return re.sub(r"<[^>]+>", "", text)
 
     def stats(self) -> Dict[str, Any]:
-        return dict(self._stats)
+        output_stats = self._output_fortress.stats() if hasattr(self, "_output_fortress") else {}
+        return {**output_stats, **self._stats,
+                "inputs_blocked": self._stats["blocked"],
+                "inputs_sanitized": self._stats["sanitized"]}
 
 
 class CanaryRegistry:

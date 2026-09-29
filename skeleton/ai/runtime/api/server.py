@@ -5,6 +5,7 @@ Skeleton API Server — FastAPI application factory and state management.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from dataclasses import asdict, is_dataclass
 from threading import RLock
 from typing import Any, Dict, Optional
@@ -971,7 +972,7 @@ def create_app() -> Any:
     install_error_handlers(app)
 
     from skeleton.api.routes import router
-    from skeleton.api.gameforge_routes import router as gameforge_router
+    from skeleton.api.command_routes import router as command_router
     from skeleton.api.cockpit import router as cockpit_router
     from skeleton.api.swarm_routes import router as swarm_router
     from skeleton.api.swarm_operator_routes import router as swarm_operator_router
@@ -987,7 +988,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_recovery_archive_routes import router as swarm_recovery_archive_router
     from skeleton.api.engine_routes import router as engine_router
     app.include_router(router, prefix="/api/v1")
-    app.include_router(gameforge_router, prefix="/api/v1")
+    app.include_router(command_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
     app.include_router(swarm_operator_router, prefix="/api/v1")
     app.include_router(swarm_policy_router, prefix="/api/v1")

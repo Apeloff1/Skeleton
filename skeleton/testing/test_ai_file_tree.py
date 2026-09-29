@@ -69,7 +69,9 @@ def test_ai_file_tree_native_and_path_audit() -> None:
     audit = manifest["planned_path_audit"]
     external = {item["path"] for item in audit["intentionally_external"]}
     assert {"skeleton/app", "skeleton/config", "skeleton/deploy", "skeleton/testing"} <= external
-    assert "skeleton/research" in audit["planned_but_absent"]
+    assert "skeleton/research" not in audit["planned_but_absent"]
+    assert mapping_by_id["AIFT-RESEARCH"]["source"] == "skeleton/research/__init__.py"
+    assert mapping_by_id["AIFT-RESEARCH"]["move_batch"] == "B4-research-quarantine"
     assert "skeleton/planning" in audit["planned_but_absent"]
 
 def test_ai_file_tree_cortex_and_organism_keep_sensitive_owners_singular() -> None:
@@ -324,3 +326,21 @@ def test_planned_implementation_file_is_governed_by_parent_tree_mapping() -> Non
     assert not module._mapping_covers_planned_source(
         tree_mapping, "skeleton/persist/execution_repository.py"
     )
+
+
+def test_namespace_composition_rejects_unmapped_members(tmp_path: Path, monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    parent = tmp_path / "skeleton/research"
+    parent.mkdir(parents=True)
+    members = {"__init__.py": parent / "__init__.py", "social/core.py": parent / "social/core.py"}
+    monkeypatch.setattr(module, "_tree_files", lambda _: members)
+    mappings = [
+        {"source": "skeleton/research/__init__.py", "kind": "file"},
+        {"source": "skeleton/research/social", "kind": "tree"},
+    ]
+    assert module._mappings_cover_planned_source(mappings, "skeleton/research")
+    members["social_extra.py"] = parent / "social_extra.py"
+    assert not module._mappings_cover_planned_source(mappings, "skeleton/research")
+    members.clear()
+    assert not module._mappings_cover_planned_source(mappings, "skeleton/research")

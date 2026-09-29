@@ -1,23 +1,2 @@
-"""
-Skeleton Social Package
-
-Exports:
-- SocialGraph: Agent relationship tracking
-- ReputationEngine: Trust scoring
-- InteractionLog: Immutable interaction history
-- Interaction: Single interaction record
-"""
-
-from skeleton.social.graph import (
-    Interaction,
-    InteractionLog,
-    ReputationEngine,
-    SocialGraph,
-)
-
-__all__ = [
-    "SocialGraph",
-    "ReputationEngine",
-    "InteractionLog",
-    "Interaction",
-]
+from skeleton.research.social import *  # noqa: F401,F403
+from skeleton.research.social import __all__ as __all__

@@ -6,8 +6,8 @@ import hashlib
 import json
 from typing import Sequence
 
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
-from skeleton.school.session_runtime import SessionEvent, SessionPhase
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionLedger
+from skeleton.learning.school.session_runtime import SessionEvent, SessionPhase
 
 
 def _runtime_payload(*, session_id: str, phase: str, events, selected_policy: str, selected_policy_decision_id: str, rejected_policies: tuple[str, ...], rejected_policy_decision_ids: tuple[str, ...], ledger_head: str, ledger_count: int, pipeline_contract_digest: str, provenance_digest: str) -> dict[str, object]:

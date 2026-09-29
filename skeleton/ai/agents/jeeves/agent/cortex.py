@@ -445,7 +445,7 @@ class JeevesCortex:
             "reason": result.reason.value,
             "world": world_fingerprint,
             "decisions": [item.decision_id for item in decisions],
-            "skills": learned,
+            "skills": sorted(learned),
             "anomalies": anomalies,
             "result_trace": result.trace_fingerprint,
         }

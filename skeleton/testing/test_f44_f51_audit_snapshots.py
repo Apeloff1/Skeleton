@@ -93,7 +93,7 @@ def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
     _assert_import_free(monkeypatch, seal_audit_snapshot, SEAL_AUDIT_KIND)
     payload = seal_audit_snapshot()
     assert payload["depends_seal"] == []
-    assert payload["calls_seal"] == ["POST /api/v1/commands/execute/{command}"]
+    assert payload["calls_seal"] == ["POST /api/v1/commands/execute/{command}", "POST /api/v1/commands/invoke"]
     assert payload["sidecar_depends_seal"] == ["POST /api/v1/gameforge/run"]
     assert payload["hmac_open_and_seal_gated"] == []
     assert payload["charter_gated"] == [

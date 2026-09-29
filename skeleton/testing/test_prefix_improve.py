@@ -127,7 +127,7 @@ def test_adapt_plane_learner_uses_signal_when_present():
     signal = AnswerQualitySignal()
     seed = _seed()
     signal.record(seed.sha, 0.77)
-    scorer = adapt_plane_learner(learner, signal=signal, default=0.1)
+    scorer = adapt_plane_learner(learner, signal=signal)
     assert scorer(seed) == 0.77
     other = mutate_prefix_variant(seed, 1)
     plane_score = scorer(other)

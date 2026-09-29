@@ -563,7 +563,10 @@ class ConvexHullShape:
         int_xz *= orientation_sign
         int_yz *= orientation_sign
 
-        center = first / volume
+        # Volume has already passed the scale-relative hull validation above.
+        # Generic vector division uses a length-scale guard and cannot judge
+        # a cubic volume for a small, otherwise valid hull.
+        center = Vec3(first.x / volume, first.y / volume, first.z / volume)
         mass = density * volume
         inertia_origin = Mat3(
             density * (int_y2 + int_z2),

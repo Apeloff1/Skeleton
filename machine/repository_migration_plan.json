@@ -298,12 +298,94 @@
     },
     {
       "id": "TREE-033",
-      "source": "skeleton/{era,galaxy,organism,social}/ + simulation taxonomy",
+      "source": "skeleton/era/",
+      "destination": "skeleton/simulation/era/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/era/",
+      "notes": "Six era-binding modules moved under canonical simulation ownership. Four modules with absolute skeleton.era self-imports were rewritten to skeleton.simulation.era; admit.py and law.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/simulation/era, the legacy root is compatibility-only, AIFT-ERA governs the nested owner, and full simulation/AI-simulation tree parity remains exact.",
+      "source_batch_id": "TREE-030"
+    },
+    {
+      "id": "TREE-034",
+      "source": "skeleton/social/",
+      "destination": "skeleton/research/social/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/social/",
+      "notes": "Eleven social/research evidence modules moved out of simulation ownership into canonical skeleton/research/social. Eight modules with absolute skeleton.social imports were rewritten to skeleton.research.social; all eleven canonical modules are mirrored exactly at skeleton/ai/research/social. The legacy root is compatibility-only, AIFT-SOCIAL now follows the canonical research source, and skeleton/research is no longer planned-but-absent.",
+      "source_batch_id": "TREE-031"
+    },
+    {
+      "id": "TREE-035",
+      "source": "skeleton/galaxy/",
+      "destination": "skeleton/distributed/galaxy/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/galaxy/",
+      "notes": "Twenty-seven Galaxy distributed-runtime modules moved out of simulation ownership into skeleton/distributed/galaxy. Sixteen modules with absolute skeleton.galaxy imports were rewritten to skeleton.distributed.galaxy; the remaining modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/galaxy, the legacy root is compatibility-only, AIFT-GALAXY follows the canonical distributed source, and skeleton/distributed is no longer planned-but-absent.",
+      "source_batch_id": "TREE-032"
+    },
+    {
+      "id": "TREE-036",
+      "source": "skeleton/network/",
+      "destination": "skeleton/distributed/network/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/network/",
+      "notes": "Four network/runtime modules moved from the generic platform bucket into canonical distributed ownership. __init__.py and model_placement.py were rewritten from skeleton.network to skeleton.distributed.network; remote_execution.py and replication.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/network and the legacy root is compatibility-only.",
+      "source_batch_id": "TREE-033"
+    },
+    {
+      "id": "TREE-037",
+      "source": "skeleton/mesh/",
+      "destination": "skeleton/distributed/mesh/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/mesh/",
+      "notes": "Ten mesh/distributed-runtime modules moved from the generic platform bucket into canonical skeleton/distributed/mesh ownership. capacity_qualification.py was rewritten from skeleton.mesh to skeleton.distributed.mesh; the other nine modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/mesh and the legacy root is compatibility-only.",
+      "source_batch_id": "TREE-034"
+    },
+    {
+      "id": "TREE-038",
+      "source": "skeleton/graphs/",
+      "destination": "skeleton/knowledge/graphs/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/graphs/",
+      "notes": "Thirteen graph/knowledge modules moved into canonical skeleton/knowledge/graphs. Eleven modules with absolute skeleton.graphs imports were rewritten to skeleton.knowledge.graphs; law.py and linalg.py moved semantically unchanged. The canonical child and full knowledge parent are mirrored exactly into skeleton/ai/runtime/knowledge, the legacy root is compatibility-only, AIFT-GRAPHS follows the canonical child, AIFT-KNOWLEDGE governs the parent, and skeleton/knowledge is no longer planned-but-absent.",
+      "source_batch_id": "TREE-035"
+    },
+    {
+      "id": "TREE-039",
+      "source": "skeleton/chronicle/",
+      "destination": "skeleton/provenance/chronicle/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/chronicle/",
+      "notes": "Seven Chronicle provenance modules moved out of the mixed knowledge bucket into canonical skeleton/provenance/chronicle. Five modules with absolute skeleton.chronicle imports were rewritten to skeleton.provenance.chronicle; helix.py and law.py moved semantically unchanged. The canonical child and full provenance parent are mirrored exactly into skeleton/ai/runtime/provenance, the legacy root is compatibility-only, AIFT-CHRONICLE follows the canonical child, AIFT-PROVENANCE governs the parent, and skeleton/provenance is no longer planned-but-absent.",
+      "source_batch_id": "TREE-036"
+    },
+    {
+      "id": "TREE-040",
+      "source": "skeleton/integrations/",
+      "destination": "skeleton/tools/integrations/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/integrations/",
+      "notes": "Four privileged integration-edge modules moved into canonical skeleton/tools/integrations. Only __init__.py required an absolute namespace rewrite; connector, GitHub and webhook implementations moved semantically unchanged. The canonical child and full tools parent are mirrored exactly into skeleton/ai/runtime/tools, the legacy root is compatibility-only, AIFT-INTEGRATIONS follows the canonical child, AIFT-TOOLS governs the parent, and skeleton/tools is no longer planned-but-absent.",
+      "source_batch_id": "TREE-037"
+    },
+    {
+      "id": "TREE-041",
+      "source": "skeleton/{era,galaxy,organism,social}/ + .machine/repository.toml",
       "destination": ".machine/repository.toml refined runtime ownership zones",
       "mode": "taxonomy-classification",
       "state": "classified",
       "compatibility": null,
-      "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface."
+      "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface. Merge reconciliation: the original TREE-033 identifier collides with the integrated Era migration and is retained as source_batch_id. Existing TREE-033 through TREE-040 migrations remain authoritative: Galaxy, Social and Era legacy roots are compatibility surfaces, with canonical owners at skeleton/distributed/galaxy, skeleton/research/social and skeleton/simulation/era. Organism receives its separate core-support zone. No duplicate prefix owners or reverse migrations are introduced.",
+      "source_batch_id": "TREE-033",
+      "source_commit": "f5e19db27aceaa22224b9dce247eecd2cb30d0f6"
     }
   ]
 }

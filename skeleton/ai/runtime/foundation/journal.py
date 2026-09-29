@@ -198,9 +198,9 @@ class JournaledBus:
         self.metrics_bridge = metrics_bridge
         self.metrics_bridge.attach(self._bus)
 
-    def publish(self, event: Any) -> None:
+    def publish(self, event: Any) -> Any:
         self.journal.append(event.topic, event.payload, event.correlation_id)
-        self._bus.publish(event)
+        return self._bus.publish(event)
 
     def emit(
         self,
@@ -227,8 +227,20 @@ class JournaledBus:
             )
         )
 
-    def subscribe(self, topic: str, handler: Any) -> None:
-        self._bus.subscribe(topic, handler)
+    def subscribe(self, topic: str, handler: Any, *, name: str | None = None):
+        return self._bus.subscribe(topic, handler, name=name)
+
+    def unsubscribe(self, topic: str, handler: Any) -> bool:
+        return self._bus.unsubscribe(topic, handler)
+
+    def subscriptions(self):
+        return self._bus.subscriptions()
+
+    def replay(self, topic: str = "*"):
+        return self._bus.replay(topic)
+
+    def trace(self, correlation_id: str):
+        return self._bus.trace(correlation_id)
 
     def stats(self) -> Dict[str, Any]:
         return {

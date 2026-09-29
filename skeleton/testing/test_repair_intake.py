@@ -205,6 +205,7 @@ def test_workflow_sha_recovered_rejects_invalid_workflow_identity() -> None:
             "Apeloff1/Skeleton",
             "Merge Readiness",
             HEAD_SHA,
+            failed_run_id=500,
             workflow_id="4242",  # type: ignore[arg-type]
             opener=lambda _path: (200, {"total_count": 0, "workflow_runs": []}),
         )
@@ -213,6 +214,7 @@ def test_workflow_sha_recovered_rejects_invalid_workflow_identity() -> None:
             "Apeloff1/Skeleton",
             "Merge Readiness",
             HEAD_SHA,
+            failed_run_id=500,
             workflow_id=0,
             opener=lambda _path: (200, {"total_count": 0, "workflow_runs": []}),
         )
@@ -315,9 +317,7 @@ def test_workflow_concurrency_coalesces_superseded_pr_failures() -> None:
     workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
 
     assert (
-        "group: repair-intake-${{ github.event.workflow_run.workflow_id }}-"
-        "${{ join(github.event.workflow_run.pull_requests.*.number, '-') || "
-        "github.event.workflow_run.head_sha }}"
+        "group: repair-intake-${{ github.event.workflow_run.head_branch }}"
     ) in workflow
     assert "cancel-in-progress: true" in workflow
     assert "github.event.workflow_run.pull_requests[0]" not in workflow

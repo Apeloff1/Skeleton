@@ -405,7 +405,7 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "MemGAS" in atlas and "ICLR 2026 Poster" in atlas
     assert "Data Mixture Optimization" in atlas and "NeurIPS 2025 Poster" in atlas
     assert "To Infinity and Beyond" in atlas and "ICLR 2026 Oral" in atlas
-    assert "research agent cannot mark its own result reproduced" in atlas.lower()
+    assert "do **not** receive authority to validate their own research conclusions" in atlas
     assert "AD60. Debt retirement and reopening" in plan
     assert "AD65. Research experiment sequencing" in plan
     assert "AD72. Experiment decision-value review" in plan
@@ -489,7 +489,7 @@ def test_research_dependency_map_exposes_blocking_edges() -> None:
     checkpoint = architecture_index.PLAN_CHECKPOINTS[
         "PLAN-20260922-RESEARCH-DEPENDENCY-MAP"
     ]
-    assert checkpoint["domain_count"] == 19
+    assert checkpoint["domain_count"] == 24
     assert checkpoint["research_question_range"] == ("RQ001", "RQ067")
     assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
     assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP050")
@@ -504,7 +504,7 @@ def test_research_dependency_map_exposes_blocking_edges() -> None:
     ).read_text(encoding="utf-8")
     plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
 
-    assert "RQ -> RDE -> RXP" in dependency_map
+    assert "ResearchQuestion -> ResearchDebt -> ExperimentProtocol" in " ".join(dependency_map.split())
     assert "Critical research path" in dependency_map
     assert "Promotion-blocker matrix" in dependency_map
     assert "AD83. Research dependency graph" in plan
@@ -672,5 +672,5 @@ def test_research_control_plane_gap_audit_blocks_authority_expansion() -> None:
 
     assert "P0 research-plane invariants" in audit
     assert "Fault campaigns" in audit
-    assert "AD122. Research control-plane adversarial gap closure" in plan
+    assert "AD122. Research control-plane adversarial audit" in plan
     assert "Research control-plane adversarial gap audit" in index

@@ -155,7 +155,7 @@ def quality_check(tree: DialogueTree, *, description: str = "", root=None, repai
     from skeleton.intelligence.pipeline_repair import attempt_dialogue_repair
     from skeleton.organism.quality_state import append_quality
 
-    verifier = DialogueVerifier()
+    verifier = DialogueVerifier(root=root)
     report = verifier.verify(tree.to_dict(), description=description)
     tree.quality = report.to_dict()
     tree.quality_stats = verifier.stats()

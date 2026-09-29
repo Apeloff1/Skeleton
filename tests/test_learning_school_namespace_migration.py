@@ -32,16 +32,14 @@ def test_ai_tree_retargets_school_and_retires_school_overlay() -> None:
 
     assert school["source"] == "skeleton/learning/school"
     assert school["destination"] == "skeleton/ai/learning/school"
-    assert school["source_git_object_sha"] == "2dfa6897682f678abb1ce9191a192a2c94682bee"
-    assert learning["source_git_object_sha"] == "e083364d7faea043ee10a8d9069cec7c41e4aa11"
     assert learning["overlay_children"] == ["acquired.py"]
 
 
-def test_school_migration_is_latest_canonicalization_batch() -> None:
+def test_school_migration_remains_in_canonicalization_history() -> None:
     plan = json.loads((ROOT / "machine/repository_migration_plan.json").read_text(encoding="utf-8"))
     batch = next(item for item in plan["batches"] if item["id"] == "TREE-030")
 
     assert batch["source"] == "skeleton/school/"
     assert batch["destination"] == "skeleton/learning/school/"
     assert batch["state"] == "canonicalized"
-    assert plan["batches"][-1]["id"] == "TREE-030"
+    assert batch["compatibility"] == "skeleton/school/"

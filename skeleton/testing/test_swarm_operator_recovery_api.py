@@ -38,10 +38,11 @@ def test_gc_endpoint_reclaims_terminal_history(monkeypatch) -> None:
         runtime.lease("w")
         runtime.succeed("w", str(i))
 
-    class State:
-        swarm = runtime
+    from skeleton.api.server import ServerState
+    state = ServerState()
+    state.bind_swarm_runtime(runtime)
 
-    monkeypatch.setattr("skeleton.api.swarm_operator_routes._state", lambda: State)
+    monkeypatch.setattr("skeleton.api.swarm_operator_routes._state", lambda: state)
     result = gc(keep_terminal=1, runtime=runtime)
     assert result["result"]["removed"] == 3
     assert result["capacity"]["available"] == 3

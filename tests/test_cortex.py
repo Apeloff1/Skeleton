@@ -1,6 +1,26 @@
 """Cortex — the model we are building, not implementing."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+
+@contextmanager
+def _isolated_reference_provenance():
+    from skeleton.cortex import refs
+
+    tracked = refs.provenance_path()
+    before = tracked.read_bytes()
+    with TemporaryDirectory() as directory:
+        destination = Path(directory) / "provenance.jsonl"
+        with patch.object(refs, "provenance_path", return_value=destination):
+            yield
+        assert destination.is_file(), "reference operations must still record provenance"
+    assert tracked.read_bytes() == before, "tests must not modify the reference corpus"
+
+
 try:
     import pytest
 except ImportError:  # pragma: no cover
@@ -137,34 +157,38 @@ class TestJeevesSurface:
 
 class TestPipelineAndCockpit:
     def test_pipeline_carries_cortex(self):
-        from skeleton.context.pipeline import GameForgeRun
-        out = GameForgeRun().execute("soulslike extraction with bonfire rest")
-        assert out["succeeded"]
-        assert out["cortex"]["amalgam"]["kind"] == "amalgam"
-        assert out["cortex"]["fingerprint"]
-        like = GameForgeRun().execute("like elden ring forge a pack")
-        assert like["succeeded"]
-        assert like.get("reference") == "Elden Ring" or like.get("era") == "soulslike"
-        assert like.get("law") in {None, "ok"}
-        if like.get("G") is not None:
-            assert float(like["G"]) >= 1.0
+        with _isolated_reference_provenance():
+            from skeleton.context.pipeline import GameForgeRun
+            out = GameForgeRun().execute("soulslike extraction with bonfire rest")
+            assert out["succeeded"]
+            assert out["cortex"]["amalgam"]["kind"] == "amalgam"
+            assert out["cortex"]["fingerprint"]
+            like = GameForgeRun().execute("like elden ring forge a pack")
+            assert like["succeeded"]
+            assert like.get("reference") == "Elden Ring" or like.get("era") == "soulslike"
+            assert like.get("law") in {None, "ok"}
+            if like.get("G") is not None:
+                assert float(like["G"]) >= 1.0
+
 
     def test_observe_run_cites_reference(self):
-        from skeleton.jeeves.core import Jeeves
-        j = Jeeves()
-        out = j.observe_run(
-            era="soulslike",
-            walk={"extracted": True, "collapsed": False, "hops": 3, "fights": 1, "cores": 1, "t": 10, "collapse_max": 20},
-            plan={"room_bias": "balanced", "enemy_mix": {"trash": 4, "elite": 2, "boss": 1}},
-            vision="like elden ring",
-        )
-        assert out.get("law") == "ok"
-        assert j.last_walk.get("reference") == "Elden Ring"
-        pack = j.bind_era("like elden ring")
-        assert pack["era"] == "soulslike"
-        planned = j.plan_build(vision="like hollow knight")
-        assert planned["era"] == "metroidvania"
-        assert planned.get("reference") == "Hollow Knight"
+        with _isolated_reference_provenance():
+            from skeleton.jeeves.core import Jeeves
+            j = Jeeves()
+            out = j.observe_run(
+                era="soulslike",
+                walk={"extracted": True, "collapsed": False, "hops": 3, "fights": 1, "cores": 1, "t": 10, "collapse_max": 20},
+                plan={"room_bias": "balanced", "enemy_mix": {"trash": 4, "elite": 2, "boss": 1}},
+                vision="like elden ring",
+            )
+            assert out.get("law") == "ok"
+            assert j.last_walk.get("reference") == "Elden Ring"
+            pack = j.bind_era("like elden ring")
+            assert pack["era"] == "soulslike"
+            planned = j.plan_build(vision="like hollow knight")
+            assert planned["era"] == "metroidvania"
+            assert planned.get("reference") == "Hollow Knight"
+
 
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit
@@ -374,7 +398,7 @@ class TestNeural:
             assert lms[slot]["neural_steps"] > 0, slot
             assert lms[slot]["ngram_fitted"] > 0, slot
         assert lms["midbrain"]["transformer_steps"] > 0
-        assert lms["pfc"]["transformer_steps"] == 0
+        assert lms["pfc"]["transformer_steps"] > 0
         assert lms["neo"]["transformer_steps"] > 0
 
     def test_left_neural_backend_keeps_mix_numbers(self):
@@ -1544,6 +1568,7 @@ class TestQueue24:
         from skeleton.cortex import JeevesCortex
         from skeleton.cortex.hive import merkle_card
         neo = JeevesCortex()
+        assert neo.slots["left"].fit("compile ttk hp dps recipe sim") >= 1
         neo.think("compile ttk hp dps recipe sim")
         before = merkle_card(neo)
         e0 = [row[:] for row in neo.transformer.E[:2]]
@@ -1563,6 +1588,7 @@ class TestQueue25:
         from skeleton.cortex import JeevesCortex
         neo = JeevesCortex()
         stim = "compile ttk hp dps recipe sim"
+        assert neo.slots["left"].fit(stim) >= 1
         neo.think(stim)
         neo.acquire("left")
         neo.surpass("left")
@@ -1848,40 +1874,39 @@ class TestGenosGatesAcquire:
         assert time.monotonic() - t0 >= 0.9
 
     def test_refer_is_a_tool_not_a_copy(self):
-        from skeleton.cortex import GameRefPort, JeevesCortex, refer
-        out = refer("plan an elden ring soulslike")
-        assert out["hit"] == 1
-        assert out["ref"]["stored_prose"] == 0
-        assert "elden ring" in out["ref"]["dialect"]
-        port = GameRefPort(slot="right")
-        t = port.think("hollow knight backtrack", {})
-        assert t.kind == "ref" and "metroidvania" in t.tags
-        neo = JeevesCortex()
-        assert neo.refer("totally unknown title xyz")["hit"] == 0
-        assert neo.refer("hades roguelike")["hit"] == 1
-        neo.bind_ref("right")
-        assert neo.backends()["right"] == "gameref"
-        assert neo.think("hades mix trash elite") is not None
+        with _isolated_reference_provenance():
+            from skeleton.cortex import GameRefPort, JeevesCortex, refer
+            out = refer("plan an elden ring soulslike")
+            assert out["hit"] == 1
+            assert out["ref"]["stored_prose"] == 0
+            assert "elden ring" in out["ref"]["dialect"]
+            port = GameRefPort(slot="right")
+            t = port.think("hollow knight backtrack", {})
+            assert t.kind == "ref" and "metroidvania" in t.tags
+            neo = JeevesCortex()
+            assert neo.refer("totally unknown title xyz")["hit"] == 0
+            assert neo.refer("hades roguelike")["hit"] == 1
+            neo.bind_ref("right")
+            assert neo.backends()["right"] == "gameref"
+            assert neo.think("hades mix trash elite") is not None
+
 
     def test_like_elden_ring_improves_under_law(self):
-        from skeleton.cortex import JeevesCortex
-        neo = JeevesCortex()
-        out = neo.improve("like elden ring", rounds=4)
-        assert out["improved"] == 1
-        assert out["stored_prose"] == 0
-        assert out["law"] == "ok"
-        assert out["era"] == "soulslike"
-        assert out["epsilon"] == 0.0
-        assert out["neo_steps"] > 0
-        assert out["G"] >= out["G0"]
-        miss = neo.improve("like something that does not exist")
-        assert miss["improved"] == 0
-        up = neo.ascend("like hollow knight", rounds=4)
-        assert up["kind"] == "ascend" and up["law"] == "ok"
-        tr = neo.think("like hades")
-        assert tr.G >= 1.0 and tr.law == "ok"
-
-
-
-
+        with _isolated_reference_provenance():
+            from skeleton.cortex import JeevesCortex
+            neo = JeevesCortex()
+            out = neo.improve("like elden ring", rounds=4)
+            assert out["improved"] == 1
+            assert out["stored_prose"] == 0
+            assert out["law"] == "ok"
+            assert out["era"] == "soulslike"
+            assert out["epsilon"] == 0.0
+            assert out["neo_steps"] > 0
+            assert out["G"] >= out["G0"]
+            miss = neo.improve("like something that does not exist")
+            assert miss["improved"] == 0
+            up = neo.ascend("like hollow knight", rounds=4)
+            assert up["kind"] == "ascend" and up["law"] == "ok"
+            tr = neo.think("like hades")
+            assert tr.G >= 1.0 and tr.law == "ok"
 

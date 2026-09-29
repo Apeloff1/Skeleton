@@ -109,7 +109,7 @@ def test_authz_audit_locks_memory_as_sealed_read(monkeypatch) -> None:
     _assert_import_free(monkeypatch, authz_audit_snapshot, AUTHZ_AUDIT_KIND)
     payload = authz_audit_snapshot()
     assert payload["mutating_without_auth"] == []
-    assert payload["auth_without_mutating"] == ["memory"]
+    assert payload["auth_without_mutating"] == ["memory", "retrieve", "plan", "evidence"]
     rows = {row["command"]: row for row in payload["commands"]}
     assert rows["run"]["mutating"] is True
     assert rows["run"]["auth_required"] is True
@@ -166,7 +166,11 @@ def test_cli_http_and_command_parity_for_f52_audits(capsys) -> None:
         assert asyncio.run(http()) == payload
         audit = service.execute("capabilities", {flag: True})
         assert audit.ok is True
-        assert audit.to_payload()["data"] == payload
+        public_payload = dict(payload)
+        if flag == "token_audit":
+            # The shared command boundary redacts token fields, including flag literals.
+            public_payload["tokens"] = [{"token": "[REDACTED]"} for _ in payload["tokens"]]
+        assert audit.to_payload()["data"] == public_payload
         invalid = service.execute("capabilities", {flag: 1})
         assert invalid.ok is False
         both = service.execute("capabilities", {flag: True, "route_audit": True})

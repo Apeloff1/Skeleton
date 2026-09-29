@@ -76,7 +76,7 @@ def structural_metrics(model: RepositoryModel) -> StructureMetrics:
         out = outbound.get(subsystem.name, 0)
         denom = inc + out
         instability = out / denom if denom else 0.0
-        test_ratio = subsystem.test_files / max(1, subsystem.code_files)
+        test_ratio = subsystem.test_surface_count / max(1, subsystem.code_files)
         share = subsystem.total_lines / max(1, total_lines)
         shares.append(share)
         zones.append(ZoneMetric(

@@ -94,7 +94,7 @@ def test_contract_audit_locks_runtime_handler_parity(monkeypatch) -> None:
     assert payload["missing_from_runtime"] == []
     assert payload["missing_from_contract"] == []
     rows = {row["command"]: row for row in payload["commands"]}
-    assert set(rows) == {"run", "tool", "memory", "status", "configuration", "capabilities", "admin"}
+    assert set(rows) == {"run", "tool", "memory", "status", "configuration", "capabilities", "admin", "retrieve", "plan", "evidence"}
     assert rows["run"]["auth_required"] is True
     assert rows["status"]["auth_required"] is False
     assert rows["admin"]["mutating"] is True
@@ -112,20 +112,22 @@ def test_live_hmac_audit_locks_probe_only_open_live_handlers(monkeypatch) -> Non
     assert rows["GET /cortex/status"]["hmac_open"] is False
 
 
-def test_nested_router_audit_locks_gameforge_command_include(monkeypatch) -> None:
+def test_nested_router_audit_excludes_unmounted_gameforge_wrapper(monkeypatch) -> None:
     _assert_import_free(monkeypatch, nested_router_audit_snapshot, NESTED_ROUTER_AUDIT_KIND)
     payload = nested_router_audit_snapshot()
-    assert len(payload["includes"]) == 1
-    row = payload["includes"][0]
-    assert row["host_module"] == "skeleton.api.gameforge_routes"
-    assert row["included_module"] == "skeleton.api.command_routes"
-    assert row["prefix"] == ""
+    assert payload["includes"] == []
+    with pytest.raises(KeyError, match="unknown include"):
+        get_nested_router_audit_row("skeleton.api.gameforge_routes")
 
 
 def test_env_flag_audit_locks_own_and_seal_names(monkeypatch) -> None:
     _assert_import_free(monkeypatch, env_flag_audit_snapshot, ENV_FLAG_AUDIT_KIND)
     payload = env_flag_audit_snapshot()
     assert payload["names"] == [
+        "SKL_GOVERNANCE_AUDIT_PATH",
+        "SKL_MONGO_URI",
+        "SKL_GOVERNANCE_LIFECYCLE_PATH",
+        "SKL_GOVERNANCE_ARTIFACT_ROOT",
         "SKELETON_PUBLIC_DEV_SURFACES",
         "GF_SEAL_SECRET",
         "GF_SEAL_KEYRING",
@@ -175,9 +177,9 @@ def test_cli_http_and_command_parity_for_new_audits(capsys) -> None:
     assert asyncio.run(routes.application_live_hmac_audit_row("GET", "api/v1/health/live")) == get_live_hmac_audit_row(
         "GET /api/v1/health/live"
     )
-    assert asyncio.run(routes.application_nested_router_audit_row("skeleton.api.gameforge_routes")) == get_nested_router_audit_row(
-        "skeleton.api.gameforge_routes"
-    )
+    with pytest.raises(HTTPException) as retired_include:
+        asyncio.run(routes.application_nested_router_audit_row("skeleton.api.gameforge_routes"))
+    assert retired_include.value.status_code == 404
     assert asyncio.run(routes.application_env_flag_audit_row("SKELETON_OWN")) == get_env_flag_audit_row("SKELETON_OWN")
     with pytest.raises(HTTPException) as missing:
         asyncio.run(routes.application_env_flag_audit_row("MISSING"))

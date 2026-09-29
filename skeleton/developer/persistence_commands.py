@@ -33,7 +33,7 @@ class SnapshotCommand:
 
         ingested = 0
         if parsed.ingest:
-            text = Path(parsed.ingest).read_text()
+            text = Path(parsed.ingest).read_text(encoding="utf-8")
             ingested = harness.genesis.get("quad").ingest_document(Path(parsed.ingest).stem, text)
 
         captured = harness.snapshot_state(name=parsed.name)

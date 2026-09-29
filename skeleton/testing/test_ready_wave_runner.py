@@ -52,7 +52,7 @@ def test_fail_does_not_unlock_dependents():
     assert "a" in report.failed
     assert "b" not in report.completed
     assert dag.get("a").status == TaskStatus.FAILED
-    assert dag.get("b").status == TaskStatus.PENDING
+    assert dag.get("b").status == TaskStatus.BLOCKED
     # Only one wave (root) — dependents never unlocked
     assert report.waves == 1
 
@@ -69,7 +69,7 @@ def test_unknown_capability_fails_cleanly():
     assert report.completed == []
     assert report.failed == ["a"]
     assert dag.get("a").status == TaskStatus.FAILED
-    assert dag.get("b").status == TaskStatus.PENDING
+    assert dag.get("b").status == TaskStatus.BLOCKED
 
     # Further drain finds nothing
     empty = runner.drain("exec-1", {"ok": lambda t: {"ok": True}})

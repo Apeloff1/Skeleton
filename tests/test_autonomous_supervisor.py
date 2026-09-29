@@ -83,6 +83,14 @@ def tamper_envelope(
 
 
 class SupervisorEnvelopeTests(unittest.TestCase):
+    def setUp(self):
+        # These tests exercise envelope custody, not live repository discovery.
+        # The repository-model suites cover discovery against bounded fixtures.
+        patcher = patch.object(supervisor, "_machine_repository_context",
+                               return_value={"status": "available", "fingerprint": "fixture", "work_candidates": []})
+        self.machine_context = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def snapshot(self) -> supervisor.SupervisorSnapshot:
         return supervisor.SupervisorSnapshot(
             repository=REPO,
@@ -508,6 +516,14 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             "base becomes stale.",
             plan["constraints"],
         )
+
+    def test_unavailable_provider_does_not_build_unused_model_context(self):
+        snap = self.snapshot()
+        with patch.object(supervisor, "FreeModelClient", side_effect=supervisor.ModelError("unavailable")):
+            with patch.object(supervisor, "_context", side_effect=AssertionError("unused prompt")):
+                plan = json.loads(supervisor.model_plan(snap))
+        self.assertEqual(plan["snapshot_fingerprint"], snap.fingerprint)
+        self.machine_context.assert_called_once()
 
     def test_model_plan_falls_back_without_complete_provider(
         self,
@@ -1234,7 +1250,7 @@ class WorkerPublicationBoundaryTests(unittest.TestCase):
             ),
             [
                 "-c",
-                "core.hooksPath=/tmp/empty-hooks",
+                f"core.hooksPath={hooks}",
                 "push",
                 "--set-upstream",
                 "origin",

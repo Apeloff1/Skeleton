@@ -247,8 +247,10 @@ class EconomicOptimiser:
         """
 
         self._validate_token_estimate(token_estimate)
-        if _bad_unit(route_threshold) or _bad_unit(escalate_below):
-            raise ValueError("thresholds must be in [0, 1]")
+        if _bad_unit(route_threshold):
+            raise ValueError("route_threshold must be in [0, 1]")
+        if _bad_unit(escalate_below):
+            raise ValueError("escalate_below must be in [0, 1]")
 
         candidates = self._eligible_models(
             required_capabilities=required_capabilities,

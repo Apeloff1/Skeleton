@@ -445,6 +445,10 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
 
 def model_plan(snapshot: SupervisorSnapshot) -> str:
     """Ask the configured model for a plan, falling back deterministically."""
+    try:
+        client = FreeModelClient()
+    except (ModelError, ValueError, OSError):
+        return deterministic_plan(snapshot)
     prompt = (
         "You are the planning-only repository supervisor. Produce a concise "
         "JSON-like plan for the secretary. Never emit shell commands, "
@@ -458,7 +462,6 @@ def model_plan(snapshot: SupervisorSnapshot) -> str:
         + _context(snapshot)
     )
     try:
-        client = FreeModelClient()
         plan = client.chat(
             (
                 "You are a planning-only repository supervisor. "

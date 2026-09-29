@@ -98,7 +98,7 @@ class TestAuditLogging:
         with tempfile.TemporaryDirectory() as td:
             log = AuditLog(root=Path(td))
             log.record("a", "act", "res", {})
-            file_path = Path(td) / ".skeleton" / "audit.jsonl"
+            file_path = Path(td) / "audit.jsonl"
             lines = file_path.read_text().strip().splitlines()
             data = __import__("json").loads(lines[0])
             data["actor"] = "tampered"
@@ -135,8 +135,8 @@ class TestEventSourcing:
             store.append("agg-1", "add", {"amount": 5})
             store.snapshot("agg-1", {"total": 5})
             store.append("agg-1", "add", {"amount": 3})
-            restored = store.restore("agg-1", lambda state, e: state + e.payload.get("amount", 0), 0)
-            assert restored == 8
+            restored = store.restore("agg-1", lambda state, e: {"total": state["total"] + e.payload.get("amount", 0)}, {"total": 0})
+            assert restored == {"total": 8}
 
 
 # ── Operator Dashboard ──────────────────────────────────
@@ -420,11 +420,11 @@ class TestAutoScaler:
         assert result["workers"] == 2
 
     def test_scale_down(self):
-        scaler = AutoScaler("test", ScalingPolicy(min_workers=2, max_workers=5, target_latency_ms=50.0))
+        scaler = AutoScaler("test", ScalingPolicy(min_workers=2, max_workers=5, target_latency_ms=50.0, cooldown_s=0))
         scaler.evaluate(200.0, 0.9)  # scale up first
         result = scaler.evaluate(10.0, 0.2)
         assert result["action"] == "scale_down"
-        assert result["workers"] == 1
+        assert result["workers"] == 2  # configured minimum
 
     def test_cooldown(self):
         scaler = AutoScaler("test", ScalingPolicy(min_workers=1, max_workers=5, target_latency_ms=50.0, cooldown_s=60.0))

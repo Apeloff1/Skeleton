@@ -69,7 +69,7 @@ def test_context_shift_and_juxtaposition_are_relational_not_truth_updates() -> N
     clock.advance()
     second = engine.capture(
         ns,
-        "The same neutral face is shown beside a funeral image.",
+        "A coffin and grieving mourners replace the warm meal.",
         context_tags=("film", "funeral"),
         trust=0.68,
     )

@@ -212,3 +212,27 @@ def test_provider_surface_evidence_records_validation_failure() -> None:
 
     assert evidence["valid"] is False
     assert evidence["validation_errors"] == ["synthetic failure"]
+
+
+def test_import_analysis_is_shared_without_mutable_results(tmp_path, monkeypatch):
+    module = _checker()
+    source = tmp_path / "provider.py"
+    source.write_text("import openai\nfrom urllib import request\n", encoding="utf-8")
+    walks = []
+    original = module.ast.walk
+
+    def counted(tree):
+        walks.append(tree)
+        return original(tree)
+
+    monkeypatch.setattr(module.ast, "walk", counted)
+    first = module._imported_modules(source)
+    first.clear()
+    assert module._provider_sdk_imports(source) == ["openai"]
+    assert module._imported_modules(source) == ["openai", "urllib"]
+    assert len(walks) == 1
+    source.write_text("import anthropic\n", encoding="utf-8")
+    assert module._provider_sdk_imports(source) == ["anthropic"]
+    assert len(walks) == 2
+    source.unlink()
+    assert module._imported_modules(source) == []

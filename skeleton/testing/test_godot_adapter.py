@@ -318,15 +318,19 @@ def test_adapter_module_has_no_hidden_engine_global_state():
     assert mutable == []
 
 
-def test_footprint_inventory_measures_and_does_not_propose_relocation():
-    inventory = inventory_godot_footprint(REPO_ROOT)
+def test_footprint_inventory_measures_and_does_not_propose_relocation(tmp_path):
+    for relative in (REPO_GODOT_BINARY, REPO_GODOT_ENGINE_PACKAGE, REPO_GODOT_EMIT):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fixture" * 200)
+    inventory = inventory_godot_footprint(tmp_path)
     assert inventory.packaging_recommendation == FOOTPRINT_POLICY == "leave_in_place"
     assert inventory.relocate_binaries is False
     assert inventory.packaging_owner == "#1008 / GB-9"
     by_path = {entry.path: entry for entry in inventory.entries}
     assert by_path[REPO_GODOT_BINARY].kind == "binary"
     assert by_path[REPO_GODOT_BINARY].exists is True
-    assert by_path[REPO_GODOT_BINARY].size_bytes > 50_000_000
+    assert by_path[REPO_GODOT_BINARY].size_bytes == 1400
     assert by_path[REPO_GODOT_ENGINE_PACKAGE].exists is True
     assert by_path[REPO_GODOT_EMIT].exists is True
     assert by_path[REPO_GODOT_EMIT].size_bytes > 1_000
@@ -370,3 +374,11 @@ def test_adapt_document_helpers_match_adapter_protocol():
     view = adapt_document(document)
     assert isinstance(view, GodotAdapterView)
     assert project_document(view)["project"]["title"] == "Helper"
+
+
+def test_footprint_inventory_reports_missing_optional_binary(tmp_path):
+    inventory = inventory_godot_footprint(tmp_path)
+    binary = next(entry for entry in inventory.entries if entry.path == REPO_GODOT_BINARY)
+    assert binary.exists is False
+    assert binary.size_bytes == 0
+    assert inventory.relocate_binaries is False

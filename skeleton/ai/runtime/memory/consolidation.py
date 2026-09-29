@@ -55,7 +55,11 @@ class ConsolidationCycle:
         due = self._krem.due()[:max_concepts]
 
         # 1. Schedule stale concepts for spaced review
+        scheduled = 0
         for concept in due:
+            if self._scheduler.is_scheduled(f"krem:{concept}"):
+                continue
+            scheduled += 1
             self._scheduler.schedule(f"krem:{concept}", interval_hours=self._interval_for(concept))
             self._stats["scheduled"] += 1
 
@@ -64,6 +68,8 @@ class ConsolidationCycle:
         for item in self._scheduler.due_items():
             if not item.startswith("krem:"):
                 continue
+            if len(refreshed) >= max_concepts:
+                break
             concept = item[len("krem:"):]
             _unit_retention(self._krem.retention(concept))
             self._krem.observe(concept)  # review strengthens the cell
@@ -81,7 +87,7 @@ class ConsolidationCycle:
         report = {
             "cycle": self._stats["cycles"],
             "due": due,
-            "scheduled": len(due),
+            "scheduled": scheduled,
             "refreshed": refreshed,
             "themes": [t.get("tag") for t in themes],
             "remaining_due": len(self._krem.due()),

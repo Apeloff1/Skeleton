@@ -112,7 +112,8 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
         "AUDITED_PLANE_IDS", "AUTHZ_AUDIT_KIND", "CAPABILITIES",
         "CAPABILITIES_BY_ID", "CAPABILITY_LOADER", "CAPABILITY_MANIFEST_VERSION", "CAPABILITY_VIEW_AUDIT_KIND",
         "CHARTER_AUDIT_KIND", "CLI_SHARED_AUDIT_KIND", "CODENAME_AUDIT_KIND", "CONTRACT_AUDIT_KIND", "CONTRACT_VERSION",
-        "CONTRACT_VERSION_AUDIT_KIND",
+        "CONTRACT_VERSION_AUDIT_KIND", "SCHEMA_VERSION", "SUPPORTED_MODE",
+        "UnifiedRequest", "invoke_unified", "normalize_request",
         "CORTEX_ROUTE_AUDIT_KIND", "DEVELOPER_CLI_AUDIT_KIND", "DEV_TOKEN_AUDIT_KIND",
         "ENV_FLAG_AUDIT_KIND", "EXPORT_AUDIT_KIND", "GATE_DOMAIN_AUDIT_KIND", "GATE_LIMIT_AUDIT_KIND",
         "GATE_STACK_AUDIT_KIND", "GENESIS_BOOT_AUDIT_KIND",
@@ -315,6 +316,14 @@ CLI_COMMANDS: List[Dict[str, Any]] = [
     {"command": "list-templates", "args": "", "description": "Show available templates"},
     {"command": "validate", "args": "<path>", "description": "Validate project conventions"},
     {"command": "docs", "args": "[topic]", "description": "Show documentation"},
+    {"command": "doctor", "args": "[--json] [--gates] [--card]", "description": "Inspect system health and doctor gates"},
+    {"command": "cockpit", "args": "[--json] [--gates] [--retune] [--knobs]", "description": "Inspect and tune cockpit controls"},
+    {"command": "bridge", "args": "[--json] [--apply] [--card]", "description": "Inspect or apply doctor bridge clamps"},
+    {"command": "regen", "args": "[--json] [--apply] [--artefacts] [--allow-empty]", "description": "Plan or apply artifact regeneration"},
+    {"command": "stu-tools", "args": "[--json] [--paths] [--apply-regen] [--ci-bundle]", "description": "Run developer health and regeneration tools"},
+    {"command": "snapshot", "args": "[--name] [--root] [--ingest]", "description": "Save memory plane state"},
+    {"command": "restore", "args": "[--name] [--root]", "description": "Restore memory plane state from a snapshot"},
+    {"command": "snapshots", "args": "[--root]", "description": "List available memory snapshots"},
 ]
 
 # Template registry
@@ -336,7 +345,22 @@ def get_phase(phase_name: str) -> Optional[Dict[str, Any]]:
 
 def get_package(package_name: str) -> Optional[Dict[str, Any]]:
     """Get package definition by name."""
-    return PACKAGES.get(package_name)
+    aliases = {
+        "skeleton.app.runtime": "skeleton.application",
+        "skeleton.automation.swarm": "skeleton.swarm",
+        "skeleton.automation.agents": "skeleton.agents",
+        "skeleton.forge.pipelines": "skeleton.pipelines",
+        "skeleton.simulation.content": "skeleton.content",
+        "skeleton.distributed.galaxy": "skeleton.galaxy",
+        "skeleton.research.social": "skeleton.social",
+        "skeleton.distributed.network": "skeleton.network",
+        "skeleton.distributed.mesh": "skeleton.mesh",
+        "skeleton.simulation.era": "skeleton.era",
+        "skeleton.knowledge.graphs": "skeleton.graphs",
+        "skeleton.provenance.chronicle": "skeleton.chronicle",
+        "skeleton.tools.integrations": "skeleton.integrations",
+    }
+    return PACKAGES.get(aliases.get(package_name, package_name))
 
 
 def get_routes(protected_only: bool = False) -> List[Dict[str, Any]]:

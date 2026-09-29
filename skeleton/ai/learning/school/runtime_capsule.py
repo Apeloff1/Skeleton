@@ -10,9 +10,9 @@ from dataclasses import dataclass
 import hashlib
 import json
 
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
-from skeleton.school.runtime_replay import RuntimeAudit, RuntimeReplaySnapshot, audit_runtime, replay_digest
-from skeleton.school.session_audit import SessionAudit, audit_session
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionLedger
+from skeleton.learning.school.runtime_replay import RuntimeAudit, RuntimeReplaySnapshot, audit_runtime, replay_digest
+from skeleton.learning.school.session_audit import SessionAudit, audit_session
 
 
 @dataclass(frozen=True)

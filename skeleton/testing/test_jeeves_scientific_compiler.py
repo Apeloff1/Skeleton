@@ -72,14 +72,14 @@ def _arithmetic_module(*, add_opcode: str = "add", with_effect: bool = False) ->
 
 
 class IdentityPass(CompilationPass):
-    contract = PassContract("identity")
+    contract = PassContract("identity", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         return module
 
 
 class SemanticCorruptionPass(CompilationPass):
-    contract = PassContract("corrupt")
+    contract = PassContract("corrupt", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -91,7 +91,7 @@ class SemanticCorruptionPass(CompilationPass):
 
 
 class EffectEscalationPass(CompilationPass):
-    contract = PassContract("effect-escalation", require_translation_validation=False)
+    contract = PassContract("effect-escalation", require_translation_validation=False, replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -115,6 +115,7 @@ class EffectEscalationPass(CompilationPass):
 class AllowedEffectPass(CompilationPass):
     contract = PassContract(
         "allowed-effect",
+        replay_safe=True,
         require_translation_validation=False,
         allowed_new_effects=frozenset({Effect.NETWORK}),
     )

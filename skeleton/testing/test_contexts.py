@@ -67,8 +67,8 @@ class TestBacklogContext(unittest.TestCase):
     def test_tensor_cube_argmax_finds_hot_band(self):
         from skeleton.contexts.backlog import TensorCube, BacklogItem
         cube = TensorCube()
-        cube.insert(BacklogItem(item_id="a", priority=9.0, age_cycles=2))
-        cube.insert(BacklogItem(item_id="b", priority=9.5, age_cycles=3))
+        cube.insert(BacklogItem(kind="spilled_order", item_id="a", priority=9.0, age_cycles=2))
+        cube.insert(BacklogItem(kind="spilled_order", item_id="b", priority=9.5, age_cycles=3))
         p, a, c, v = cube.argmax()
         self.assertGreater(v, 0)
         self.assertGreaterEqual(p, cube.dim - 1)
@@ -77,7 +77,7 @@ class TestBacklogContext(unittest.TestCase):
         from skeleton.contexts.backlog import WorkChain, TensorCube, BacklogItem
         chain = WorkChain(difficulty=2)
         cube = TensorCube()
-        cube.insert(BacklogItem(item_id="x", priority=5.0))
+        cube.insert(BacklogItem(kind="spilled_order", item_id="x", priority=5.0))
         block = chain.seal(cube, ["x"])
         self.assertEqual(block.index, 1)
         self.assertTrue(block.block_hash.startswith("00"))
@@ -87,7 +87,7 @@ class TestBacklogContext(unittest.TestCase):
         from skeleton.contexts.backlog import WorkChain, TensorCube, BacklogItem
         chain = WorkChain(difficulty=1)
         cube = TensorCube()
-        cube.insert(BacklogItem(item_id="y", priority=1.0))
+        cube.insert(BacklogItem(kind="spilled_order", item_id="y", priority=1.0))
         chain.seal(cube, ["y"])
         chain._chain[1].item_ids = ["tampered"]
         self.assertFalse(chain.verify())

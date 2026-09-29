@@ -16,9 +16,11 @@ from skeleton.forge.pipelines.generation import (
     NPCSpec,
 )
 from skeleton.forge.pipelines.gameforge import GameForge, GameSpec
+from skeleton.forge.pipelines.npc import NpcPipeline
 
 __all__ = [
     "NPCPipeline",
+    "NpcPipeline",
     "NPCSpec",
     "GameLogicPipeline",
     "GameLogicSpec",

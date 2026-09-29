@@ -116,4 +116,5 @@ class AdaptiveRetry:
                 "learned_permanent": sorted(p.learned_permanent_errors),
             } for e, p in self._policies.items()},
             "history": len(self._history),
+            "total_retries": sum(record.attempt > 0 for record in self._history),
         }

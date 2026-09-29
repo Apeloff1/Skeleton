@@ -135,7 +135,7 @@ class GameLogicPipeline:
         spec = GameLogicSpec(run_id=run_id, title=title, combat=combat,
                              economy=economy, progression=progression)
 
-        verifier = PipelineVerifier()
+        verifier = PipelineVerifier(root=self._root)
         quality = verifier.verify_game_logic(spec.to_dict(), description=description)
         spec.quality = quality.to_dict()
         spec.quality_stats = verifier.stats()

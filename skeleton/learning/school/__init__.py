@@ -1,38 +1,38 @@
 """School primitives for the Tutolage + Jeeves learning core."""
 
-from skeleton.school.ai_pipeline import PipelineKind, PipelinePlan, PipelineRequest, PipelineStage, PipelineStep, pipeline_capabilities, plan_pipeline
-from skeleton.school.assessment import AssessmentEngine, AssessmentEvidence, AssessmentKind, Intervention
-from skeleton.school.code_intelligence import CodeIntelligenceEngine, CodeIntelligenceReport, CodeSignal, CodeSignalKind, CodeTask as IntelligenceTask, CodeTaskKind
-from skeleton.school.code_lab import CodeFinding, CodeLabEngine, CodeReview, CodeTask, FindingSeverity
-from skeleton.school.cocoding import CodingPhase, CoCodingAction, CoCodingContext, HandoffStage, InteractionPattern, choose_action, next_handoff
-from skeleton.school.counterfactual import CandidateAction, CounterfactualResult, PolicyCandidate, compete, default_candidates
-from skeleton.school.curriculum import CurriculumGraph, CurriculumNode, LearningRecommendation, rank_recommendations
-from skeleton.school.debugging import DebugAction, DebugExperiment, DebugFocus, DebugHypothesis, DebugPlan, DebuggingPolicy
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord, EvidenceKind, EvidenceRef, LedgerCheckpoint, evidence_bundle
-from skeleton.school.decision_policy import ArbitrationAction, ArbitrationResult, EvidenceSignal, arbitrate
-from skeleton.school.energy import EnergyBudget, EnergyDecision, EnergyStrategy, choose_energy_strategy
-from skeleton.school.engine import SchoolEngine, SchoolPlan
-from skeleton.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_pathway, pathways_for
-from skeleton.school.epistemics import BeliefState, EpistemicEngine, EpistemicEvidence, EpistemicUpdate, EvidencePolarity, MisconceptionStage, contradiction_matrix
-from skeleton.school.knowledge import KnowledgeAssertion, KnowledgeCandidate, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeState, RelationKind, infer_ready_frontier, rank_knowledge
-from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
-from skeleton.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
-from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
-from skeleton.school.jeeves import JeevesControlPlane, JeevesDecision, JeevesSessionPlan
-from skeleton.school.outcomes import OutcomeKind, OutcomeResult, SessionOutcome, apply_outcome
-from skeleton.school.policy_calibration import PolicyCalibrator, PolicyStats
-from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
-from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
-from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
-from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, ReplaySnapshot, replay_digest
-from skeleton.school.runtime_replay import RuntimeAudit, RuntimeReplaySnapshot, audit_runtime, replay_digest as runtime_replay_digest
-from skeleton.school.runtime_audit_api import capture_runtime, complete_runtime
-from skeleton.school.runtime_attestation import RuntimeAttestation, verify_attestation
-from skeleton.school.runtime_capsule import RuntimeIntegrityCapsule
-from skeleton.school.session_audit import SessionAudit, audit_session, policy_chain
-from skeleton.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
-from skeleton.school.session import JeevesSessionEngine, SessionDecision
-from skeleton.school.student import SkillState, StudentProfile
+from skeleton.learning.school.ai_pipeline import PipelineKind, PipelinePlan, PipelineRequest, PipelineStage, PipelineStep, pipeline_capabilities, plan_pipeline
+from skeleton.learning.school.assessment import AssessmentEngine, AssessmentEvidence, AssessmentKind, Intervention
+from skeleton.learning.school.code_intelligence import CodeIntelligenceEngine, CodeIntelligenceReport, CodeSignal, CodeSignalKind, CodeTask as IntelligenceTask, CodeTaskKind
+from skeleton.learning.school.code_lab import CodeFinding, CodeLabEngine, CodeReview, CodeTask, FindingSeverity
+from skeleton.learning.school.cocoding import CodingPhase, CoCodingAction, CoCodingContext, HandoffStage, InteractionPattern, choose_action, next_handoff
+from skeleton.learning.school.counterfactual import CandidateAction, CounterfactualResult, PolicyCandidate, compete, default_candidates
+from skeleton.learning.school.curriculum import CurriculumGraph, CurriculumNode, LearningRecommendation, rank_recommendations
+from skeleton.learning.school.debugging import DebugAction, DebugExperiment, DebugFocus, DebugHypothesis, DebugPlan, DebuggingPolicy
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord, EvidenceKind, EvidenceRef, LedgerCheckpoint, evidence_bundle
+from skeleton.learning.school.decision_policy import ArbitrationAction, ArbitrationResult, EvidenceSignal, arbitrate
+from skeleton.learning.school.energy import EnergyBudget, EnergyDecision, EnergyStrategy, choose_energy_strategy
+from skeleton.learning.school.engine import SchoolEngine, SchoolPlan
+from skeleton.learning.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_pathway, pathways_for
+from skeleton.learning.school.epistemics import BeliefState, EpistemicEngine, EpistemicEvidence, EpistemicUpdate, EvidencePolarity, MisconceptionStage, contradiction_matrix
+from skeleton.learning.school.knowledge import KnowledgeAssertion, KnowledgeCandidate, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeState, RelationKind, infer_ready_frontier, rank_knowledge
+from skeleton.learning.school.learning_control import LearningControl, LearningControlDecision, LearningState
+from skeleton.learning.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
+from skeleton.learning.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
+from skeleton.learning.school.jeeves import JeevesControlPlane, JeevesDecision, JeevesSessionPlan
+from skeleton.learning.school.outcomes import OutcomeKind, OutcomeResult, SessionOutcome, apply_outcome
+from skeleton.learning.school.policy_calibration import PolicyCalibrator, PolicyStats
+from skeleton.learning.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
+from skeleton.learning.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
+from skeleton.learning.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
+from skeleton.learning.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, ReplaySnapshot, replay_digest
+from skeleton.learning.school.runtime_replay import RuntimeAudit, RuntimeReplaySnapshot, audit_runtime, replay_digest as runtime_replay_digest
+from skeleton.learning.school.runtime_audit_api import capture_runtime, complete_runtime
+from skeleton.learning.school.runtime_attestation import RuntimeAttestation, verify_attestation
+from skeleton.learning.school.runtime_capsule import RuntimeIntegrityCapsule
+from skeleton.learning.school.session_audit import SessionAudit, audit_session, policy_chain
+from skeleton.learning.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
+from skeleton.learning.school.session import JeevesSessionEngine, SessionDecision
+from skeleton.learning.school.student import SkillState, StudentProfile
 
 __all__ = [
     "PipelineKind", "PipelinePlan", "PipelineRequest", "PipelineStage", "PipelineStep", "pipeline_capabilities", "plan_pipeline",

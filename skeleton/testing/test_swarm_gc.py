@@ -22,8 +22,8 @@ def test_gc_reclaims_terminal_resident_capacity() -> None:
 
 def test_gc_preserves_live_tasks() -> None:
     runtime = SwarmRuntime(max_tasks=10)
-    runtime.submit(SwarmTask("queued", {}))
     _complete(runtime, "done")
+    runtime.submit(SwarmTask("queued", {}))
     rebuilt, _ = compact_runtime(runtime, keep_terminal=0)
     assert rebuilt.task("queued").state is TaskState.QUEUED
     assert rebuilt.task("done") is None

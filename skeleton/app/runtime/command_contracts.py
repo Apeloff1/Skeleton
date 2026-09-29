@@ -359,7 +359,9 @@ class CommandResult:
             "correlation_id": self.correlation_id,
         }
         if self.ok:
-            payload["data"] = public_contract_payload(dict(self.data))
+            payload["data"] = public_contract_payload(
+                dict(self.data), repository_audit=self.command == "capabilities"
+            )
         else:
             payload["error"] = (self.error or CommandError("internal_error", "command failed")).to_dict()
         return payload

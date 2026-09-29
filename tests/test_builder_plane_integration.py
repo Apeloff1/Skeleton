@@ -16,6 +16,7 @@ from skeleton.automation.builder_plane import (
     builder_worker_branch,
     compile_builder_manifest,
     compile_builder_proposal_receipt,
+    compile_builder_repair_receipt,
     validate_builder_custody,
     validate_builder_proposal_receipt,
     validate_builder_worker_evidence,
@@ -813,6 +814,21 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
         value["status"] = "pull-request-updated"
         value["pull_request"] = 93
         value["repair_parent_sha"] = repair_parent_sha
+        from skeleton.automation.build_repair import RepairEvidence
+        repair = RepairEvidence(
+            followup_fingerprint="e" * 64, architecture_fingerprint="f" * 64,
+            before_fingerprint="1" * 64, after_fingerprint="2" * 64,
+            validation_fingerprint="3" * 64, review_verdict="accept",
+            review_rounds=1, model_calls=2, changed_paths=("skeleton/feature.py",),
+        )
+        current = manifest()
+        value["builder_repair_receipt"] = compile_builder_repair_receipt(
+            current, pull_request=93, parent_sha="d" * 40,
+            proposal_digest="c" * 64, branch=builder_worker_branch(current),
+            files=({"path": "skeleton/feature.py", "content": "VALUE = 1\n"},),
+            tests=("focused regression",), changed_lines=12,
+            repair_evidence={**repair.as_dict(), "fingerprint": repair.fingerprint},
+        ).as_dict()
         return value
 
     def test_updated_pr_evidence_is_receipt_and_manifest_bound(self) -> None:

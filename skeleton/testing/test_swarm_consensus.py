@@ -47,27 +47,34 @@ def test_simple_majority_all_dead_voters_raises_with_ballot():
     dead = _voter()
     dead.last_heartbeat = 0.0  # silent forever → not alive
     with pytest.raises(ConsensusError) as info:
-        SimpleMajorityConsensus().propose("anything", [dead])
+        SimpleMajorityConsensus().propose("anything", [dead], ballots={str(dead.agent_id): "yes"})
     assert "details" in info.value.ballot
 
 
 def test_simple_majority_can_pass():
     voters = [_voter() for _ in range(5)]
-    accepted, ballot = SimpleMajorityConsensus().propose("ship it", voters)
-    # high-prediction voters vote yes with p=1.0
+    accepted, ballot = SimpleMajorityConsensus().propose(
+        "ship it", voters, ballots={str(voter.agent_id): "yes" for voter in voters}
+    )
     assert accepted is True
     assert ballot["alive_voters"] == 5
 
 
 def test_bft_insufficient_nodes_raises_consensus_error_not_type_error():
+    voter = _voter()
+    consensus = ByzantineFaultTolerantConsensus(f=1)
+    assert consensus.required_nodes == 4
     with pytest.raises(ConsensusError) as info:
-        ByzantineFaultTolerantConsensus(f=1).propose("x", [_voter()])
-    assert info.value.ballot["required"] == 4
+        consensus.propose("x", [voter], ballots={str(voter.agent_id): "accept"})
+    assert info.value.ballot["alive_nodes"] == 1
+    assert info.value.ballot["required"] == 3
 
 
 def test_bft_runs_without_attribute_error():
     voters = [_voter() for _ in range(4)]
-    accepted, ballot = ByzantineFaultTolerantConsensus(f=1).propose("x", voters)
+    accepted, ballot = ByzantineFaultTolerantConsensus(f=1).propose(
+        "x", voters, ballots={str(voter.agent_id): "accept" for voter in voters}
+    )
     assert accepted is True
-    assert ballot["protocol"] == "pbft_inspired"
+    assert ballot["protocol"] == "explicit-bft"
     assert ballot["proposal_hash"]

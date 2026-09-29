@@ -45,4 +45,4 @@ def test_tree031_records_taxonomy_only_classification() -> None:
 
     assert batch["mode"] == "taxonomy-classification"
     assert batch["state"] == "classified"
-    assert plan["batches"][-1]["id"] == "TREE-031"
+    assert batch["destination"] == ".machine/repository.toml research-lineage zone"

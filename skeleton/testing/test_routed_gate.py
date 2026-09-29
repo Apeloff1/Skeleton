@@ -35,7 +35,7 @@ def test_divergent_candidates_abstain():
     calls = {"n": 0}
     def varied(q):
         calls["n"] += 1
-        return ModelResponse(text=f"answer_{calls['n']}", confidence=0.55)
+        return ModelResponse(text=f"answer_{calls['n']}", confidence=0.75)
     rg = RoutedGate(CascadeRouter(varied, strong), UncertaintyGate())
     a = rg.answer("ambiguous question")
     assert a.abstained and a.model == "none"

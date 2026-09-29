@@ -121,6 +121,18 @@ def main() -> int:
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
+    unit = job_block(text, "unit")
+    normalized_unit = " ".join(unit.split())
+    require(
+        "python tests/run_unit.py" in normalized_unit,
+        "legacy canonical unit runner must remain enabled",
+        failures,
+    )
+    require(
+        "python -m pytest -q --noconftest -p pytest_asyncio.plugin skeleton/testing --tb=short" in normalized_unit,
+        "unit gate must run the complete canonical domain suite with the explicit asyncio plugin",
+        failures,
+    )
     require(
         'ports:\n          - "27017:27017"' in text,
         "Mongo service port must use explicit quoted list syntax",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -31,9 +32,41 @@ def test_repository_migration_plan_is_unique_and_canonical() -> None:
     batches = payload["batches"]
     ids = [item["id"] for item in batches]
     assert len(ids) == len(set(ids))
+    assert all(re.fullmatch(r"TREE-\d{3}", value) for value in ids)
+    routes = [(item["source"], item["destination"]) for item in batches]
+    assert len(routes) == len(set(routes))
+    move_modes = {
+        "move-with-shims",
+        "move-with-shim",
+        "facade-convergence-with-shims",
+        "intra-domain-extraction-with-shims",
+    }
     for item in batches:
-        assert item["source"].startswith("skeleton/")
-        assert item["destination"].startswith("skeleton/")
         assert item["source"] != item["destination"]
-        assert item["state"] in {"planned", "canonicalized"}
-        assert item["mode"] == "move-with-shims"
+        assert item["notes"]
+        if item["mode"] == "taxonomy-classification":
+            assert item["state"] == "classified"
+            assert item["compatibility"] is None
+            assert item["destination"].startswith(".machine/repository.toml ")
+            assert (root / ".machine/repository.toml").is_file()
+        else:
+            assert item["mode"] in move_modes
+            assert item["state"] in {"planned", "canonicalized"}
+            assert item["destination"].startswith("skeleton/")
+            assert item["compatibility"]
+            if item["state"] == "canonicalized":
+                assert (root / item["destination"]).exists(), item["id"]
+
+        # Compound migrations enumerate modules or glob families. Each retained
+        # source must still exist, including compatibility and classified roots.
+        for expression in item["source"].split(" + "):
+            match = re.search(r"\{([^}]+)\}", expression)
+            patterns = (
+                [expression[:match.start()] + member + expression[match.end():]
+                 for member in match[1].split(",")]
+                if match else [expression]
+            )
+            for pattern in patterns:
+                assert not Path(pattern).is_absolute()
+                assert ".." not in Path(pattern).parts
+                assert any(root.glob(pattern.rstrip("/"))), (item["id"], pattern)

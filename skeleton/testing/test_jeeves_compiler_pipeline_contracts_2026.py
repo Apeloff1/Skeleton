@@ -77,6 +77,7 @@ class _AnalysisDeclaringNoopPass(CompilationPass):
         invalidated_analyses=frozenset({AnalysisDomain.ALIAS}),
         deterministic=True,
         thread_safe=True,
+        replay_safe=True,
     )
 
     def apply(self, module: IRModule) -> IRModule:

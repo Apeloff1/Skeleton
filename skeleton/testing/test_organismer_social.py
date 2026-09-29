@@ -41,8 +41,8 @@ def test_ingest_mixes_paper_and_post():
     card = ingest(stim)
     assert card["papers"] == 1
     assert card["x_posts"] == 1
-    assert "arxiv" in card["houses"]
-    assert "x-status" in card["houses"]
+    assert "arxiv" in card["source_ids"]
+    assert "x-status" in card["source_ids"]
     assert card["stored_prose"] == 0
 
 
@@ -273,7 +273,8 @@ def test_field_card_lists_pointers():
     assert card["stored_prose"] == 0
 
 
-def test_budget_choose_splits():
+def test_budget_choose_splits(monkeypatch):
+    monkeypatch.setattr("skeleton.kernel.profiles.live_overlay", lambda: {})
     from skeleton.organism.budget import choose, walk_limit
     tight = choose(0.80, stale_n=0, atoms=90, atom_cap=100)
     slack = choose(0.10, stale_n=0, atoms=10, atom_cap=100)
@@ -309,7 +310,9 @@ def test_walk_is_bounded(tmp_path):
     card = walk(org, persist=False, n=3)
     assert card["kind"] == "run"
     assert card["n"] <= 3
-    assert card["limit"] == 3
+    from skeleton.organism.budget import walk_limit
+    from skeleton.organism.caps import live
+    assert card["limit"] == walk_limit(live().tier, 3)
     assert card.get("topics")
     assert card["stored_prose"] == 0
 

@@ -11,13 +11,25 @@ from typing import Any, Dict, Optional
 from skeleton.cortex.deck import CommandDeck
 
 
-def product_card(*, root=None) -> Dict[str, Any]:
-    deck = CommandDeck(root=root)
+def product_card(org=None, *, neo=None, root=None, deck=None) -> Dict[str, Any]:
+    deck = deck or CommandDeck(neo, root=getattr(org, "root", root))
+    from skeleton.organism.quality_state import quality_snapshot
+    from skeleton.organism.repair_card import repair_card
+    quality = {"quality": quality_snapshot(root=deck.root), "repair_card": repair_card(root=deck.root)}
+    if org is not None:
+        from skeleton import __version__
+        from skeleton.organism.health import health_card
+        from skeleton.research.social.field import field_card
+        return {**quality, "kind": "product", "version": __version__, "target": org.TARGET,
+                "health": health_card(org, neo=neo), "field": field_card()["pointers"],
+                "endpoints": ["GET /cortex/product", "GET /cortex/ready"],
+                "operator": deck.master_card(), "stored_prose": 0}
     return {
+        **quality,
         "kind": "product-card",
         "policy": deck.policy_state(),
         "versions": deck.policy_versions(limit=4),
-        "repair_orchestrator": deck.repair_orchestrate("forge", "_probe"),
+        "repair_orchestrator": deck.repair_sessions("forge"),
         "lattice_hud": deck.lattice_hud(),
         "steering": deck.steering_composite(),
         "kv_cache": deck.kv_cache_stats(),
@@ -41,7 +53,7 @@ def product_card(*, root=None) -> Dict[str, Any]:
             "audit": deck.audit_card(),
             "event_store": deck.event_store_card(),
         },
-        "dashboard": deck.dashboard_card(),
+        "dashboard": deck.dashboard.summary(),
         "feature_flags": deck.feature_flag_card(),
         "config": deck.config_card(),
         "schema_registry": deck.schema_card(),

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from skeleton.memory.guarded_compaction import RotGuardedCompactor
 from skeleton.memory.compaction import ContextCompactor, Turn
 from skeleton.memory.rot_guard import ContextRotGuard
@@ -20,6 +22,18 @@ def test_fresh_context_passes_untouched():
     assert not out.compacted
     assert len(out.turns) == 4
     assert out.report.verdict == "fresh"
+
+
+def test_rot_risk_grows_with_distance_but_missing_constraint_is_always_rot():
+    guard = ContextRotGuard(attention_budget=100)
+    constraint = "KEEP THE REQUIRED RULE"
+    short = guard.assess(constraint + "\nhello", constraints=[constraint])
+    long = guard.assess(constraint + "\n" + "context " * 150, constraints=[constraint])
+    absent = guard.assess("hello", constraints=[constraint])
+    assert short.verdict == "fresh"
+    assert long.verdict == "rot"
+    assert short.risk < long.risk
+    assert absent.verdict == "rot"
 
 
 def test_rotten_context_compacts():
@@ -61,7 +75,8 @@ def test_compact_turns_none_without_payload():
 
     assert compact_turns(None) is None
     assert compact_turns([]) is None
-    assert compact_turns([{"role": "user"}]) is None  # no content
+    with pytest.raises(ValueError, match="content must be a string"):
+        compact_turns([{"role": "user"}])
 
 
 def test_compact_turns_returns_api_shape():
@@ -76,4 +91,3 @@ def test_compact_turns_returns_api_shape():
     assert isinstance(out["compacted"], bool)
     assert out["turns"][0]["role"] == "user"
     assert "report" in out
-

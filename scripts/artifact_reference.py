@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 from typing import Any, Iterable
 
 
@@ -69,8 +71,12 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
     try:
         if path.stat().st_size > MAX_MANIFEST_BYTES:
             raise ArtifactReferenceError("artifact reference manifest exceeds size bound")
-        raw = path.read_text(encoding="utf-8")
-    except OSError as exc:
+        with path.open("rb") as handle:
+            encoded = handle.read(MAX_MANIFEST_BYTES + 1)
+        if len(encoded) > MAX_MANIFEST_BYTES:
+            raise ArtifactReferenceError("artifact reference manifest exceeds size bound")
+        raw = encoded.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
         raise ArtifactReferenceError(
             f"cannot read artifact reference manifest: {path}"
         ) from exc
@@ -98,7 +104,7 @@ def _relative_snapshot_path(value: Any, *, field: str) -> str:
     path = Path(text)
     if path.is_absolute() or text.startswith("/") or text.endswith("/"):
         raise ArtifactReferenceError(f"{field} must be a normalized relative path")
-    if any(part in {"", ".", ".."} for part in path.parts):
+    if "\\" in text or ":" in text or any(part in {"", ".", ".."} for part in text.split("/")):
         raise ArtifactReferenceError(f"{field} contains invalid path segments")
     if not text.startswith("satellites/branch-snapshots/"):
         raise ArtifactReferenceError(
@@ -171,7 +177,7 @@ def validate_manifest(
         raise ArtifactReferenceError(
             f"manifest keys mismatch; missing={missing} extra={extra}"
         )
-    if payload["schema"] != SCHEMA:
+    if type(payload["schema"]) is not int or payload["schema"] != SCHEMA:
         raise ArtifactReferenceError(
             f"unsupported artifact reference schema: {payload['schema']!r}"
         )
@@ -320,52 +326,62 @@ def materialize(
     match = next((entry for entry in references if entry["id"] == artifact_id), None)
     if match is None:
         raise ArtifactReferenceError(f"unknown artifact id: {artifact_id}")
-    if output.exists() and not force:
+    if (output.exists() or output.is_symlink()) and not force:
         raise ArtifactReferenceError(f"refusing to overwrite existing path: {output}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Verify a private sibling before publication, preserving the previous
+    # output on any subprocess or integrity failure, even with --force.
+    descriptor, temporary = tempfile.mkstemp(prefix=".artifact-", dir=output.parent)
+    staged = Path(temporary)
     digest = hashlib.sha256()
-    process = subprocess.Popen(
-        ["git", "cat-file", "blob", match["git_blob_oid"]],
-        cwd=repo_root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    assert process.stdout is not None
+    written = 0
+    process = None
     try:
-        with output.open("wb") as handle:
+        with os.fdopen(descriptor, "wb") as handle:
+            process = subprocess.Popen(
+                ["git", "cat-file", "blob", match["git_blob_oid"]],
+                cwd=repo_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            assert process.stdout is not None
             for chunk in iter(lambda: process.stdout.read(1024 * 1024), b""):
+                written += len(chunk)
+                if written > match["size_bytes"]:
+                    raise ArtifactReferenceError("materialized artifact size mismatch")
                 digest.update(chunk)
                 handle.write(chunk)
         _, stderr = process.communicate()
-    except BaseException:
-        process.kill()
-        output.unlink(missing_ok=True)
-        raise
-    if process.returncode != 0:
-        output.unlink(missing_ok=True)
-        raise ArtifactReferenceError(
-            f"git cat-file failed: {stderr.decode('utf-8', errors='replace').strip()}"
-        )
-
-    if output.stat().st_size != match["size_bytes"]:
-        output.unlink(missing_ok=True)
-        raise ArtifactReferenceError("materialized artifact size mismatch")
-    observed_sha256 = digest.hexdigest()
-    if observed_sha256 != match["sha256"]:
-        output.unlink(missing_ok=True)
-        raise ArtifactReferenceError("materialized artifact SHA-256 mismatch")
-    observed_oid = (
-        _git(repo_root, "hash-object", "--", str(output.resolve()))
-        .stdout.decode("ascii")
-        .strip()
-    )
-    if observed_oid != match["git_blob_oid"]:
-        output.unlink(missing_ok=True)
-        raise ArtifactReferenceError("materialized artifact Git object mismatch")
-    if match["mode"] == "100755":
-        output.chmod(output.stat().st_mode | 0o111)
-    return output
+        if process.returncode != 0:
+            raise ArtifactReferenceError(
+                f"git cat-file failed: {stderr.decode('utf-8', errors='replace').strip()}"
+            )
+        if written != match["size_bytes"]:
+            raise ArtifactReferenceError("materialized artifact size mismatch")
+        if digest.hexdigest() != match["sha256"]:
+            raise ArtifactReferenceError("materialized artifact SHA-256 mismatch")
+        observed_oid = _git(repo_root, "hash-object", "--", str(staged.resolve())).stdout.decode("ascii").strip()
+        if observed_oid != match["git_blob_oid"]:
+            raise ArtifactReferenceError("materialized artifact Git object mismatch")
+        staged.chmod(0o755 if match["mode"] == "100755" else 0o644)
+        if force:
+            os.replace(staged, output)
+        else:
+            # An existence check alone races with another writer. Linking a
+            # sibling publishes atomically and fails if a destination appears.
+            try:
+                os.link(staged, output)
+            except FileExistsError as exc:
+                raise ArtifactReferenceError(f"refusing to overwrite existing path: {output}") from exc
+        return output
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ArtifactReferenceError(f"artifact materialization failed: {exc}") from exc
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.communicate()
+        staged.unlink(missing_ok=True)
 
 
 def _parser() -> argparse.ArgumentParser:

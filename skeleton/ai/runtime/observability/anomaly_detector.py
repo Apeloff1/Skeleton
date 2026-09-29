@@ -65,11 +65,14 @@ class AnomalyDetector:
 
         elif self.config.method == "ema":
             delta = value - self._ema
-            self._ema += self.config.ema_alpha * delta
-            self._ema_var = (1 - self.config.ema_alpha) * self._ema_var + self.config.ema_alpha * (delta ** 2)
+            # Compare against the previous baseline. Including this sample in
+            # its own threshold masks large excursions (especially after a
+            # constant history).
             threshold = self.config.ema_threshold_multiplier * math.sqrt(self._ema_var)
             score = abs(delta)
             is_anomaly = score > threshold
+            self._ema += self.config.ema_alpha * delta
+            self._ema_var = (1 - self.config.ema_alpha) * self._ema_var + self.config.ema_alpha * (delta ** 2)
 
         if is_anomaly:
             anomaly = {

@@ -36,6 +36,7 @@ from .builder_plane import (
     validate_builder_worker_evidence,
 )
 from .bot_manager import (
+    authorized_builder_available,
     load_state,
     record_worker_outcome,
     save_state,
@@ -421,6 +422,23 @@ def _supervisor_provenance(
             "manual supervisor execution identity mismatch"
         )
     return fingerprint
+
+
+def dispatchable_specialists(
+    state: dict[str, dict],
+    *,
+    build_authorization: BuildAuthorization | None = None,
+) -> list[str]:
+    """Select candidates without overriding disable/circuit-breaker state.
+
+    This is scheduling only. Execution still revalidates the exact live build
+    authorization and worker custody before launching a registered worker.
+    """
+    due = select_specialists_due(state)
+    if build_authorization is not None and authorized_builder_available(state):
+        if "feature-builder" not in due:
+            due.append("feature-builder")
+    return due
 
 
 def route(
@@ -917,7 +935,7 @@ def main() -> int:
             ) from exc
 
     state = load_state()
-    due = select_specialists_due(state)
+    due = dispatchable_specialists(state, build_authorization=build_authorization)
     assignments = route(
         plan,
         due,

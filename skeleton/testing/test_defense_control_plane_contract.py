@@ -48,7 +48,12 @@ def test_symlinked_control_fails_closed(tmp_path: Path) -> None:
     _copy_contract_tree(tmp_path)
     path = tmp_path / "skeleton/security/scanner_integrity.py"
     path.unlink()
-    path.symlink_to(tmp_path / "skeleton/security/defense_plane.py")
+    try:
+        path.symlink_to(tmp_path / "skeleton/security/defense_plane.py")
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks symlink privilege; covered on Linux")
+        raise
 
     assert "symlink" in _codes(tmp_path)
 

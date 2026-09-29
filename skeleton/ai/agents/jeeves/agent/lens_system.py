@@ -639,7 +639,19 @@ class SemanticLensRouter:
         family_counts: dict[LensFamily, int] = {}
         pool = [value for _, value in scored]
 
-        # First pass: maximize perpendicular family coverage.
+        # Directly requested concepts must survive catalog growth. Reserve at
+        # most half the budget for matched cues, retaining room for independent
+        # families and keeping the existing per-family bound.
+        family_limit = max(2, math.ceil(limit / 3))
+        for value in pool:
+            if len(chosen) >= max(1, limit // 2):
+                break
+            if not value.matched_cues or family_counts.get(value.lens.family, 0) >= family_limit:
+                continue
+            chosen.append(value)
+            family_counts[value.lens.family] = family_counts.get(value.lens.family, 0) + 1
+
+        # Expand perpendicular family coverage with the remaining budget.
         for value in pool:
             if len(chosen) >= limit:
                 break
@@ -654,7 +666,7 @@ class SemanticLensRouter:
             if value in chosen:
                 continue
             family_count = family_counts.get(value.lens.family, 0)
-            if family_count >= max(2, math.ceil(limit / 3)):
+            if family_count >= family_limit:
                 continue
             chosen.append(value)
             family_counts[value.lens.family] = family_count + 1

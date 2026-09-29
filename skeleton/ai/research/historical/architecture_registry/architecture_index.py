@@ -281,7 +281,7 @@ PLAN_CHECKPOINTS = {
     "PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY": {
         "created_at": "2026-09-21T22:39:00+02:00",
         "tracks": ("AD",),
-        "domain_count": 19,
+        "domain_count": 24,
         "planning_status": "planning_covered",
         "local_reproduction_status": "reproduction_pending",
         "production_authority_granted": False,

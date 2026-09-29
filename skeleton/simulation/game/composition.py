@@ -366,7 +366,7 @@ class GameplayComposition:
     components: Tuple[BoundMechanic, ...]
     replay_evidence: CompositionReplayEvidence
     systems_by_id: Mapping[str, Mapping[str, Any]] = field(
-        init=False, repr=False, default=MappingProxyType({})
+        init=False, repr=False, default_factory=lambda: MappingProxyType({})
     )
 
     def __post_init__(self) -> None:
@@ -407,7 +407,7 @@ class CompositionState:
 @dataclass(frozen=True)
 class CompositionEvent:
     kind: CompositionEventKind
-    payload: Mapping[str, Any] = MappingProxyType({})
+    payload: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, CompositionEventKind):

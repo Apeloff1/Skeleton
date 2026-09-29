@@ -20,7 +20,7 @@ import os
 from threading import Lock
 from typing import Any, Mapping
 
-from core.shift_supervisor.prompts import compose_role_prompt
+from skeleton.automation.shift_supervisor.prompts import compose_role_prompt
 
 from .studio_registry import STUDIO, StudioBot, find_specialist
 

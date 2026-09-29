@@ -95,7 +95,7 @@ def analyze_impact(
     ))
     tests = tuple(sorted(
         item.name for item in model.subsystems
-        if item.test_files and (
+        if item.test_surface_count and (
             item.name in zones
             or item.name in all_affected
             or item.name == "tests"

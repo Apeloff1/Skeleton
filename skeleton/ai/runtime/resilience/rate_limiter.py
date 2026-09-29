@@ -7,6 +7,8 @@ subsystems from overload.
 from __future__ import annotations
 
 import time
+import math
+from threading import RLock
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -19,7 +21,7 @@ class TokenBucket:
     last_refill_ns: int = 0
 
     def _refill(self) -> None:
-        now = time.time_ns()
+        now = time.monotonic_ns()
         elapsed = (now - self.last_refill_ns) / 1e9
         self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate)
         self.last_refill_ns = now
@@ -42,10 +44,18 @@ class TokenBucket:
 class RateLimiter:
     """Token-bucket rate limiter with per-key tracking."""
 
-    def __init__(self, default_capacity: float = 10.0, default_refill_rate: float = 1.0):
-        self.default_capacity = default_capacity
-        self.default_refill_rate = default_refill_rate
+    def __init__(self, default_capacity: float = 10.0, default_refill_rate: float = 1.0,
+                 *, capacity: float | None = None, refill_rate: float | None = None):
+        self.default_capacity = self._positive(default_capacity if capacity is None else capacity)
+        self.default_refill_rate = self._positive(default_refill_rate if refill_rate is None else refill_rate)
+        self._lock = RLock()
         self._buckets: Dict[str, TokenBucket] = {}
+
+    @staticmethod
+    def _positive(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise ValueError("rate, capacity, and amount must be finite and positive")
+        return float(value)
 
     def _bucket(self, key: str) -> TokenBucket:
         if key not in self._buckets:
@@ -53,23 +63,27 @@ class RateLimiter:
                 capacity=self.default_capacity,
                 refill_rate=self.default_refill_rate,
                 tokens=self.default_capacity,
-                last_refill_ns=time.time_ns(),
+                last_refill_ns=time.monotonic_ns(),
             )
         return self._buckets[key]
 
     def allow(self, key: str, amount: float = 1.0) -> bool:
-        return self._bucket(key).consume(amount)
+        amount = self._positive(amount)
+        with self._lock:
+            return self._bucket(key).consume(amount)
 
     def wait_time(self, key: str, amount: float = 1.0) -> float:
-        return self._bucket(key).wait_time_ms(amount)
+        amount = self._positive(amount)
+        with self._lock:
+            return self._bucket(key).wait_time_ms(amount)
 
     def set_rate(self, key: str, capacity: float, refill_rate: float) -> None:
-        self._buckets[key] = TokenBucket(
-            capacity=capacity,
-            refill_rate=refill_rate,
-            tokens=capacity,
-            last_refill_ns=time.time_ns(),
-        )
+        capacity, refill_rate = self._positive(capacity), self._positive(refill_rate)
+        with self._lock:
+            self._buckets[key] = TokenBucket(
+                capacity=capacity, refill_rate=refill_rate, tokens=capacity,
+                last_refill_ns=time.monotonic_ns(),
+            )
 
     def card(self) -> Dict[str, Any]:
         return {

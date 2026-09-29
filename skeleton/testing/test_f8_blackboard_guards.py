@@ -47,6 +47,9 @@ def test_release_restores_to_read():
     bb = Blackboard(min_confidence=0.5)
     entry = bb.post("t", {}, producer="a", confidence=0.1)
     assert entry.quarantined and bb.read() == []
+    with pytest.raises(ValueError, match="still poisonous"):
+        bb.release(entry.entry_id)
+    entry.confidence = 0.9
     released = bb.release(entry.entry_id)
     assert released.quarantined is False
     assert bb.read() == [entry]

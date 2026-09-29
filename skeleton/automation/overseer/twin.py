@@ -35,7 +35,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from skeleton.automation.overseer.mpc import ChannelModel
+from skeleton.automation.overseer.mpc import ChannelModel, _finite
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +171,7 @@ class MetaCognition:
     # --- Scorecards ----------------------------------------------------------
 
     def observe_error(self, channel: str, error: float) -> None:
+        error = _finite("error", error)
         errs = self._errors.setdefault(channel, [])
         errs.append(error)
         if len(errs) > self.WINDOW:
@@ -181,10 +182,13 @@ class MetaCognition:
         if len(errs) < 4:
             return None
         mae = sum(abs(e) for e in errs) / len(errs)
-        overshoot = max((-e for e in errs), default=0.0)
-        sign_changes = sum(1 for i in range(1, len(errs))
-                           if (errs[i] > 0) != (errs[i - 1] > 0))
-        oscillation = sign_changes / (len(errs) - 1)
+        overshoot = max(0.0, max((-e for e in errs), default=0.0))
+        # Sign jitter inside the highest-grade error tolerance is not
+        # meaningful control oscillation.
+        significant = [e for e in errs if abs(e) >= 0.03]
+        sign_changes = sum(1 for i in range(1, len(significant))
+                           if (significant[i] > 0) != (significant[i - 1] > 0))
+        oscillation = sign_changes / max(1, len(significant) - 1)
         settling = 0
         for e in reversed(errs):
             if abs(e) > 0.05:
@@ -204,6 +208,7 @@ class MetaCognition:
 
     def observe_regret(self, delta: float) -> None:
         """delta = actual - best counterfactual (positive = we did worse)."""
+        delta = _finite("regret", delta)
         self._regret_window.append(max(0.0, delta))
         if len(self._regret_window) > self.WINDOW:
             self._regret_window.pop(0)
@@ -229,13 +234,15 @@ class MetaCognition:
     def consider_rewrite(self, parameter: str, current: float,
                          proposed: float, reason: str) -> Optional[ParameterRewrite]:
         """Rewrite a parameter if regret is persistent; bounded ±25%."""
+        current = _finite("current", current)
+        proposed = _finite("proposed", proposed)
         if self.mean_regret() < self.REGRET_THRESHOLD:
             return None
         if current == 0:
             return None
         delta = (proposed - current) / abs(current)
         delta = max(-self.MAX_REWRITE_DELTA, min(self.MAX_REWRITE_DELTA, delta))
-        new_value = current * (1.0 + delta)
+        new_value = current + abs(current) * delta
         rewrite = ParameterRewrite(parameter, round(current, 4), round(new_value, 4), reason)
         self.rewrites.append(rewrite)
         self._stats["rewrites"] += 1

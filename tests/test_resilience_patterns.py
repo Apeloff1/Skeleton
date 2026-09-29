@@ -24,7 +24,7 @@ class TestResiliencePatterns:
     def test_bulkhead_card(self):
         deck = CommandDeck()
         card = deck.bulkhead_card()
-        assert "active_threads" in card
+        assert card["in_flight"] == 0
 
     def test_load_shedder_card(self):
         deck = CommandDeck()

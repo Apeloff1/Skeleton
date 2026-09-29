@@ -76,7 +76,7 @@ class TestForgeVerifier(unittest.TestCase):
         verifier = ForgeVerifier(root=self.tmp)
         report = verifier.verify(files, request="test")
         self.assertFalse(report.accepted)
-        self.assertEqual(report.reason, "project_closure")  # door.gd edit breaks nothing else, unsafe caught in file reports
+        self.assertEqual(report.reason, "unsafe_code")  # unsafe source is rejected before project closure
 
     def test_stats_track_acceptance(self):
         from skeleton.intelligence.forge_verifier import ForgeVerifier

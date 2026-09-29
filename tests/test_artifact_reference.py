@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
+from unittest.mock import patch
 from pathlib import Path
 import subprocess
 import tempfile
@@ -34,6 +36,7 @@ def _fixture(root: Path, *, executable: bool = False):
     repo = root / "repo"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q")
+    _git(repo, "config", "core.autocrlf", "false")
     _git(repo, "config", "user.name", "Artifact Test")
     _git(repo, "config", "user.email", "artifact-test@example.invalid")
 
@@ -80,6 +83,101 @@ def _fixture(root: Path, *, executable: bool = False):
 
 
 class ArtifactReferenceTests(unittest.TestCase):
+    def test_reference_paths_require_portable_normalized_segments(self):
+        for suffix in ("a//b", "a/./b", "a/../b", "a\\b", "a:b"):
+            with self.subTest(suffix=suffix):
+                with self.assertRaises(refs.ArtifactReferenceError):
+                    refs._relative_snapshot_path("satellites/branch-snapshots/" + suffix, field="target_path")
+
+    def test_failed_integrity_preserves_existing_output_even_with_force(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest, _, _ = _fixture(root)
+            entries = list(refs.validate_file(manifest, repo_root=repo))
+            entries[0] = dict(entries[0], sha256="0" * 64)
+            output = root / "existing.bin"
+            output.write_bytes(b"keep-me")
+            with patch.object(refs, "validate_file", return_value=entries):
+                with self.assertRaisesRegex(refs.ArtifactReferenceError, "SHA-256 mismatch"):
+                    refs.materialize("demo-blob", output, manifest_path=manifest, repo_root=repo, force=True)
+            self.assertEqual(output.read_bytes(), b"keep-me")
+            self.assertEqual(list(root.glob(".artifact-*")), [])
+
+    def test_concurrent_destination_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest, _, _ = _fixture(root)
+            output = root / "raced.bin"
+            original_link = os.link
+
+            def concurrent_link(source, destination):
+                Path(destination).write_bytes(b"another-writer")
+                return original_link(source, destination)
+
+            with patch.object(refs.os, "link", side_effect=concurrent_link):
+                with self.assertRaisesRegex(refs.ArtifactReferenceError, "refusing to overwrite"):
+                    refs.materialize("demo-blob", output, manifest_path=manifest, repo_root=repo)
+            self.assertEqual(output.read_bytes(), b"another-writer")
+            self.assertEqual(list(root.glob(".artifact-*")), [])
+
+    def test_subprocess_start_failure_preserves_output_and_removes_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest, _, _ = _fixture(root)
+            entries = refs.validate_file(manifest, repo_root=repo)
+            output = root / "existing.bin"
+            output.write_bytes(b"keep-me")
+            with patch.object(refs, "validate_file", return_value=entries), patch.object(refs.subprocess, "Popen", side_effect=OSError("unavailable")):
+                with self.assertRaisesRegex(refs.ArtifactReferenceError, "unavailable"):
+                    refs.materialize("demo-blob", output, manifest_path=manifest, repo_root=repo, force=True)
+            self.assertEqual(output.read_bytes(), b"keep-me")
+            self.assertEqual(list(root.glob(".artifact-*")), [])
+
+
+    def test_size_bound_failure_preserves_previous_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest, _, _ = _fixture(root)
+            entries = list(refs.validate_file(manifest, repo_root=repo))
+            entries[0] = dict(entries[0], size_bytes=1)
+            output = root / "existing.bin"
+            output.write_bytes(b"keep-me")
+            with patch.object(refs, "validate_file", return_value=entries):
+                with self.assertRaisesRegex(refs.ArtifactReferenceError, "size mismatch"):
+                    refs.materialize("demo-blob", output, manifest_path=manifest, repo_root=repo, force=True)
+            self.assertEqual(output.read_bytes(), b"keep-me")
+            self.assertEqual(list(root.glob(".artifact-*")), [])
+
+    def test_force_publishes_verified_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest, _, payload = _fixture(root)
+            output = root / "existing.bin"
+            output.write_bytes(b"old-content")
+            refs.materialize("demo-blob", output, manifest_path=manifest, repo_root=repo, force=True)
+            self.assertEqual(output.read_bytes(), payload)
+            self.assertEqual(list(root.glob(".artifact-*")), [])
+
+    def test_boolean_schema_is_not_a_version_number(self):
+        with self.assertRaisesRegex(refs.ArtifactReferenceError, "unsupported.*schema"):
+            refs.validate_manifest({"schema": True, "source_commit": "0" * 40, "artifacts": []})
+
+    def test_manifest_read_is_bounded_even_when_stat_is_stale(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "manifest.json"
+            manifest.write_bytes(b" " * (refs.MAX_MANIFEST_BYTES + 1))
+            with patch.object(Path, "stat", return_value=SimpleNamespace(st_size=1)):
+                with self.assertRaisesRegex(refs.ArtifactReferenceError, "size bound"):
+                    refs.load_manifest(manifest)
+
+    def test_non_utf8_manifest_fails_with_domain_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "manifest.json"
+            manifest.write_bytes(bytes([255, 254]))
+            with self.assertRaisesRegex(refs.ArtifactReferenceError, "cannot read"):
+                refs.load_manifest(manifest)
+
     def test_reference_validates_against_git_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo, manifest_path, _, _ = _fixture(Path(tmp))
@@ -104,7 +202,8 @@ class ArtifactReferenceTests(unittest.TestCase):
             )
 
             self.assertEqual(restored.read_bytes(), payload)
-            self.assertTrue(restored.stat().st_mode & 0o111)
+            if os.name != "nt":
+                self.assertTrue(restored.stat().st_mode & 0o111)
             expected = refs.validate_file(manifest_path, repo_root=repo)[0]["git_blob_oid"]
             self.assertEqual(_git(repo, "hash-object", str(restored)), expected)
 

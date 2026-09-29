@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Small dependency-free runner for the legacy GameForge unit modules.
 
-The GameForge cortex has intentionally strengthened several model-ownership
-contracts over time. Queue28/Queue29 trains PFC's internal transformer, while
-the live CI repair also forbids unfitted tract mouths from being absorbed into
-Neo or falsely promoting the owned LM to fitted state. A few older assertions
-encode those superseded pre-transfer assumptions. We execute the legacy tests
-and may suppress only the exact obsolete assertion lines documented below.
-Any different assertion failure in the same test remains a hard failure, and
-successor contract tests exercise the replacement behavior directly.
+The legacy tests exercise the current model-ownership contracts directly,
+including PFC training and the requirement to train a source before absorbing
+its model. No checked-in assertion is currently suppressed.
 
 This runner intentionally stays lightweight, but it also preserves pytest's
 important per-test instance isolation, executes awaitable test results to
@@ -67,34 +62,9 @@ UNSUPPORTED_CLASS_LIFECYCLE_HOOKS = (
     "teardown_method",
 )
 
-# These are not generic skips. The target is resolved before any test body runs,
-# and suppression is permitted only when the terminal traceback points at the
-# one unique source line documented here.
-SUPERSEDED_ASSERTIONS = MappingProxyType(
-    {
-        ("TestNeural", "test_train_fits_all_four_neurals"): MappingProxyType(
-            {
-                "module": "tests.test_cortex",
-                "successor": "TestQueue28Queue29.test_tied_cosine_all_slot_lms",
-                "assertion": 'assert lms["pfc"]["transformer_steps"] == 0',
-            }
-        ),
-        ("TestQueue24", "test_acquire_copies_the_model"): MappingProxyType(
-            {
-                "module": "tests.test_cortex",
-                "successor": "TestAcquireAbsorbContract.test_unfitted_source_is_stored_without_promoting_neo",
-                "assertion": 'assert got["absorb"]["absorbed"] == 1',
-            }
-        ),
-        ("TestQueue25", "test_surpass_is_neo_decode"): MappingProxyType(
-            {
-                "module": "tests.test_cortex",
-                "successor": "TestAcquireAbsorbContract.test_trained_source_absorbs_and_surpass_decodes_from_neo",
-                "assertion": 'assert a.amalgam.kind == "own-lm" and b.amalgam.kind == "own-lm"',
-            }
-        ),
-    }
-)
+# Keep the exact-location suppression machinery fail-closed for explicit
+# callers, but the repository suite must pass without legacy exceptions.
+SUPERSEDED_ASSERTIONS = MappingProxyType({})
 
 T = TypeVar("T")
 TestCallable = Callable[[], object]

@@ -95,6 +95,7 @@ def _observations() -> tuple[SemanticObservation, ...]:
             evidence_ids=("semantic-ev-2",),
             tags=("drift", "independent"),
         ),
+        SemanticObservation("semantic-advisory-o3", "A held-out sample tests the changed target mapping.", 2, evidence_ids=("semantic-ev-3",)),
     )
 
 
@@ -113,6 +114,7 @@ def _finding(
         observation_ids=(
             "semantic-advisory-o1",
             "semantic-advisory-o2",
+            "semantic-advisory-o3",
         ),
         interpretation=(
             f"{lens_key} is one bounded interpretation of the observations."
@@ -451,7 +453,7 @@ def test_run_with_semantics_binds_advisory_before_drive() -> None:
     assert result["signal_ids"]
     scoped_plane = runtime.semantic_plane_for(inputs)
     assert scoped_plane is not runtime.semantic_plane
-    assert scoped_plane.prediction_ledger.open_forecasts()
+    assert scoped_plane.prediction_ledger.open()
 
 
 def test_lens_conflict_contributes_to_adaptive_frontier_uncertainty() -> None:

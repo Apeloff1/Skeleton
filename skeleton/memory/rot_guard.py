@@ -135,9 +135,12 @@ class ContextRotGuard:
 
         burial = (sum(burial_scores) / len(burial_scores)) if burial_scores else 0.0
         dilution = min(1.0, total_tokens / max(1, self.attention_budget))
-        risk = 0.55 * dilution + 0.35 * burial + 0.10 * (
+        # Position alone must not label a tiny prompt stale. Scale the
+        # distance/repetition penalty by occupancy of the attention budget;
+        # an absent explicit constraint still forces rot below.
+        risk = dilution * (0.55 + 0.35 * burial + 0.10 * (
             1.0 if restated == 0 and positions else 0.0
-        )
+        ))
         absent = supplied and any(item and item not in positions for item in constraints)
         if absent:
             risk = max(risk, self.rot_at)

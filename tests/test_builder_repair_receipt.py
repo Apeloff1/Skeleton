@@ -310,3 +310,46 @@ class BuilderRepairWorkerEvidenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepairReceiptBoundaryTests(unittest.TestCase):
+    def test_snapshot_cannot_be_mutated_through_export(self):
+        original = receipt()
+        exported = original.as_dict()
+        exported["repair_evidence"]["changed_paths"].append("skeleton/extra.py")
+        self.assertEqual(original, receipt())
+
+    def test_bool_versions_and_pull_requests_are_rejected(self):
+        from dataclasses import replace
+        for changes in ({"version": True}, {"pull_request": True}):
+            with self.subTest(changes=changes), self.assertRaises(BuilderPlaneError):
+                replace(receipt(), **changes)
+
+    def test_noncanonical_json_is_rejected(self):
+        from dataclasses import replace
+        value = receipt()
+        with self.assertRaises(BuilderPlaneError):
+            replace(value, evidence_json=json.dumps(json.loads(value.evidence_json), indent=2).encode())
+
+    def test_review_bounds_remain_enforced_with_valid_digest(self):
+        from dataclasses import replace
+        for changes in ({"review_verdict": "reject"}, {"review_rounds": 3},
+                        {"model_calls": 7}, {"model_calls": True},
+                        {"after_fingerprint": "1" * 64}):
+            evidence = repair_evidence()
+            evidence.update(changes)
+            evidence["fingerprint"] = hashlib.sha256(canonical_json(
+                {k: v for k, v in evidence.items() if k != "fingerprint"}
+            )).hexdigest()
+            with self.subTest(changes=changes), self.assertRaises(BuilderPlaneError):
+                replace(receipt(), evidence_json=canonical_json(evidence))
+
+    def test_utf8_repository_context_uses_byte_budget(self):
+        from unittest.mock import patch
+        from skeleton.automation import specialist_bots
+        with patch.object(specialist_bots.subprocess, "check_output",
+                          side_effect=["skeleton/example.py\n", "\u00e9" * 10]) as read:
+            with patch.object(specialist_bots, "MAX_CONTEXT_FILE_BYTES", 5):
+                value = specialist_bots.repository_context()
+        self.assertTrue(value.endswith("\u00e9\u00e9"))
+        self.assertTrue(all(call.kwargs["encoding"] == "utf-8" for call in read.call_args_list))

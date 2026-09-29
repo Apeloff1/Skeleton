@@ -192,8 +192,8 @@ class TestTemporalLattice(unittest.TestCase):
         from skeleton.foundation import TemporalLattice
         lat = TemporalLattice()
         lat.response("requests_answered",
-                     lambda e: e["topic"] == "tick",
-                     lambda e: e["topic"] == "tick")  # trivially satisfied
+                     lambda e: e["topic"] == "tick" and e["index"] < 9,
+                     lambda e: e["topic"] == "tick")  # every request has a later response
         self.assertEqual(lat.violations(self._timeline()), [])
 
     def test_until_pattern(self):

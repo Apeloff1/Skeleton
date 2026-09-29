@@ -259,12 +259,14 @@ def test_same_scope_semantic_forecast_state_drift_blocks_resume() -> None:
             "The deployment shows concept drift under a changed regime.",
             0,
         ),
+        SemanticObservation("scope-state-o2", "A later sample shows the changed target mapping.", 1),
+        SemanticObservation("scope-state-o3", "A held-out sample tests persistent conditional drift.", 2),
     )
     finding = SemanticFinding(
         finding_id="scope-state-f1",
         lens_key="concept_drift",
         family=LensFamily.PREDICTIVE,
-        observation_ids=("scope-state-o1",),
+        observation_ids=("scope-state-o1", "scope-state-o2", "scope-state-o3"),
         interpretation="Concept drift is a bounded semantic hypothesis.",
         prediction="A later sample should preserve or refute the drift signal.",
         confidence=0.82,

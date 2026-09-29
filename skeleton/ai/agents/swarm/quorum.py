@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Tuple
 
-from ..kernel.errors import SkeletonError
+from skeleton.kernel.errors import SkeletonError
 
 
 class QuorumError(SkeletonError):

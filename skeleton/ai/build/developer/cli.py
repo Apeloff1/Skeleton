@@ -27,7 +27,7 @@ def dev_help_text() -> str:
 
     skeleton dev scaffold <name> [options]
         Generate a new project from a template
-        --template, -t    Template name (minimal-agent, game-forge, swarm-orchestrator)
+        --template, -t    minimal-agent, game-forge, swarm-orchestrator, api-gateway
         --dir, -d         Target directory (default: current)
         --dry-run         Preview without creating files
 
@@ -64,22 +64,27 @@ def dev_help_text() -> str:
         --gates           Fail-closed cockpit gates
         --retune          Auto-retune out-of-range knobs
         --knobs           JSON knob object
+        --json            JSON output
 
     skeleton dev bridge [options]
         Doctor ↔ cockpit bridge plan
         --apply           Apply proposed clamps
         --card            Doctor card JSON
+        --json            JSON output
 
     skeleton dev regen [options]
         STU-TOOLS weakest-surface regenerate
         --apply           Apply (default dry-run)
-        --artefacts       JSON file of path->content
+        --artefacts       JSON object of path->content
         --allow-empty     Allow empty regen plans
+        --json            JSON output
 
     skeleton dev stu-tools [options]
         Full STU-TOOLS pipeline (health/visualize/doctor/regen)
         --paths           Comma list of paths
         --apply-regen     Apply regen mutations
+        --ci-bundle       Include cockpit, bridge, and coverage checks
+        --json            JSON output
 
     skeleton dev extension <name> [options]
         Generate boilerplate for new subsystems
@@ -88,6 +93,15 @@ def dev_help_text() -> str:
         --with-api        Generate API routes
 
   UTILITY COMMANDS
+
+    skeleton dev snapshot [--name NAME] [--root DIR] [--ingest FILE]
+        Save memory plane state; optionally ingest a UTF-8 text file first
+
+    skeleton dev restore [--name NAME] [--root DIR]
+        Restore memory plane state from a named snapshot
+
+    skeleton dev snapshots [--root DIR]
+        List available memory snapshots
 
     skeleton dev list-templates
         Show all available project templates
@@ -124,7 +138,7 @@ def dev_help_text() -> str:
 
 def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
     """Main entry point for `skeleton dev` commands."""
-    argv = argv or sys.argv[1:]
+    argv = list(sys.argv[1:] if argv is None else argv)
 
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(dev_help_text())
@@ -138,8 +152,8 @@ def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
         engine = ScaffoldEngine(Path("."))
         templates = engine.list_templates()
         print("Available templates:")
-        for t in templates:
-            print(f"  • {t['name']:<20} — {t['description']}")
+        for name, metadata in templates.items():
+            print(f"  • {name:<20} — {metadata['description']}")
         return {"templates": templates}
 
     if command == "validate":
@@ -162,7 +176,11 @@ def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
 
     # Delegate to the command registry
     from skeleton.developer.commands import run_dev_command
-    return run_dev_command(command, args)
+    try:
+        return run_dev_command(command, args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return {"error": str(exc)}
 
 
 def show_docs(topic: str) -> Dict[str, Any]:
@@ -270,19 +288,35 @@ def integrate_with_main() -> str:
 # Add to skeleton/__main__.py in the main command dispatcher:
 #
 #     elif cmd == "dev":
-#         from skeleton.developer.cli import run_dev_cli
+#         from skeleton.developer.cli import dev_exit_code, run_dev_cli
 #         result = run_dev_cli(args)
 #         if isinstance(result, dict):
 #             print(json.dumps(result, indent=2, default=str))
-#         sys.exit(0 if (isinstance(result, dict) and "error" not in result) else 1)
+#         sys.exit(dev_exit_code(result))
 #
 # Also add "dev" to the CLI help text under "Operator deck commands" or as a new section.
 """.strip()
 
 
-# Entry point for direct execution
+def dev_exit_code(result: Any) -> int:
+    """Translate programmatic command results into a process exit status."""
+    if not isinstance(result, dict) or "error" in result:
+        return 1
+    if any(result.get(key) is False for key in ("valid", "passed")):
+        return 1
+    # Developer gate verdicts use integer 0/1, not boolean-only flags.
+    if "ok" in result and result["ok"] not in (True, 1):
+        return 1
+    return 0
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """Console-script adapter; never pass a result mapping to sys.exit."""
+    result = run_dev_cli(argv)
+    if isinstance(result, dict) and result.get("status") != "help_shown":
+        print(json.dumps(result, indent=2, default=str))
+    return dev_exit_code(result)
+
+
 if __name__ == "__main__":
-    result = run_dev_cli()
-    if isinstance(result, dict) and "error" in result:
-        sys.exit(1)
-    sys.exit(0)
+    raise SystemExit(main())

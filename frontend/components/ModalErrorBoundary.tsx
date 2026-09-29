@@ -13,7 +13,7 @@
  */
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { ErrorState } from './ui/ErrorState';
+import { ErrorState } from './primitives/ErrorState';
 import theme from '../theme/tokens';
 import { isDevErrorDetails, safeErrorMessage } from '../utils/safeError';
 

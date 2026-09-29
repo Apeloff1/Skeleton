@@ -24,12 +24,12 @@ def vault_card() -> Dict[str, Any]:
     kms_ok = 0
     keys_n = 0
     try:
-        EnvelopeKMS()
+        kms = EnvelopeKMS()
         kms_ok = 1
     except Exception:
         kms_ok = 0
     try:
-        keys_n = len(getattr(KeyRegistry(), "_keys", {}) or {})
+        keys_n = len(KeyRegistry(kms)._versions)
     except Exception:
         keys_n = 0
     return {
@@ -52,17 +52,17 @@ def retrieve_card(cue: str = "", *, org=None) -> Dict[str, Any]:
     if org is not None:
         wiki_topics = list((org.galaxy.mesh.wiki.topics or {}).keys())[:24]
         root = getattr(org, "root", None)
-    wiki = [ScoredResult(item_id=t, score=1.0 / (i + 1), source="wiki") for i, t in enumerate(wiki_topics)]
-    field = [ScoredResult(item_id=p["topic"], score=1.0 / (i + 1), source="field") for i, p in enumerate(SOTA_POINTERS[:24])]
+    wiki = [ScoredResult(content="", fragment_id=t, score=1.0 / (i + 1), plane="wiki") for i, t in enumerate(wiki_topics)]
+    field = [ScoredResult(content="", fragment_id=p["topic"], score=1.0 / (i + 1), plane="field") for i, p in enumerate(SOTA_POINTERS[:24])]
     helix_hits = recall(cue or "memory", root=root).get("hits") or []
-    helix = [ScoredResult(item_id=str(h.get("sha") or h.get("topic") or i)[:16], score=float(h.get("score") or 0), source="helix") for i, h in enumerate(helix_hits)]
-    fused = Fuser(FusionStrategy.RRF, top_k=8).fuse({"wiki": wiki, "field": field, "helix": helix})
+    helix = [ScoredResult(content="", fragment_id=str(h.get("sha") or h.get("topic") or i)[:16], score=float(h.get("score") or 0), plane="helix") for i, h in enumerate(helix_hits)]
+    fused = Fuser(FusionStrategy.RRF).fuse({"wiki": wiki, "field": field, "helix": helix}, top_k=8)
     return {
         "kind": "retrieve",
         "cue": (cue or "")[:80],
         "n": len(fused),
-        "ids": [r.item_id for r in fused],
-        "sources": sorted({r.source for r in fused}),
+        "ids": [r.fragment_id for r in fused],
+        "sources": sorted({r.plane for r in fused}),
         "stored_prose": 0,
     }
 

@@ -3,12 +3,22 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
+import pytest
+
 from skeleton.cortex.antiplag import guard, score
 from skeleton.cortex.deck import CommandDeck
 from skeleton.cortex.dodeca import FACES, face_card
 from skeleton.cortex.laws import LAWS, LawError, check
 from skeleton.cortex.refs import lookup, refer
 from skeleton.organism.quality_state import latest_repair, load_quality
+
+
+@pytest.fixture(autouse=True)
+def isolated_reference_storage(tmp_path, monkeypatch):
+    from skeleton.cortex import acquire_repo
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(acquire_repo, "repo_root", lambda start=None: tmp_path)
 
 
 class _Engine:

@@ -92,7 +92,7 @@ def test_handoff_full_lifecycle():
     env = reg.submit("translate", {"text": "hello"}, requester="planner")
     assert env.state is TaskState.SUBMITTED
     reg.accept(env.task_id, assignee="translator-1")
-    reg.complete(env.task_id, artefacts=[{"out": "bonjour"}])
+    reg.complete(env.task_id, artefacts=[{"id": "translation-1", "out": "bonjour"}])
     done = reg.get(env.task_id)
     assert done.state is TaskState.COMPLETED
     assert done.assignee == "translator-1"
@@ -125,7 +125,7 @@ def test_handoff_fail_records_error():
 # ── Improve loop ─────────────────────────────────────────────────────────
 
 def test_improve_loop_keeps_only_strict_improvements():
-    loop = ImproveLoop(max_iterations=10)
+    loop = ImproveLoop(max_iterations=3)
     scores = iter([0.5, 0.7, 0.6, 0.9])
     def gen(best, i):
         return i

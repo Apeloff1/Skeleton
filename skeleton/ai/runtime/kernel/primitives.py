@@ -263,6 +263,12 @@ class EntropyPool:
     def shuffle(self, seq):
         self._rng.shuffle(seq)
 
+    def random_bytes(self, length: int) -> bytes:
+        """Seeded simulation bytes; never use this pool for cryptographic keys."""
+        if isinstance(length, bool) or not isinstance(length, int) or not 0 <= length <= 1_048_576:
+            raise ValueError("length must be an integer between 0 and 1048576")
+        return self._rng.randbytes(length)
+
     def stats(self) -> Dict[str, Any]:
         return {"seed": self._seed, "calls": 0}
 

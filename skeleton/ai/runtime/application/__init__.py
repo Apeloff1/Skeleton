@@ -139,6 +139,8 @@ from .runtime_commands import build_runtime_command_service
 from .unified_invoke import UnifiedRequest, invoke_unified, normalize_request
 
 __all__ = [
+    "SCHEMA_VERSION",
+    "SUPPORTED_MODE",
     "ALLOW_LIST_AUDIT_KIND",
     "ADMIT_WRITE_AUDIT_KIND",
     "API_ROUTE_AUDIT_KIND",

@@ -104,9 +104,6 @@ class TranslationValidationReport:
                     for value in self.counterexamples
                 ],
                 "metadata": self.metadata,
-                "source_assurance": self.source_assurance.fingerprint if self.source_assurance else None,
-                "candidate_assurance": self.candidate_assurance.fingerprint if self.candidate_assurance else None,
-                "reproducer": self.reproducer.fingerprint if self.reproducer else None,
             }
         )
 
@@ -174,6 +171,9 @@ class PassApplication:
                 "error": self.error,
                 "created_at": self.created_at,
                 "metadata": self.metadata,
+                "source_assurance": self.source_assurance.fingerprint if self.source_assurance else None,
+                "candidate_assurance": self.candidate_assurance.fingerprint if self.candidate_assurance else None,
+                "reproducer": self.reproducer.fingerprint if self.reproducer else None,
             }
         )
 

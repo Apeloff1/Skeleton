@@ -7,9 +7,9 @@ def test_export_restore_round_trip_preserves_terminal_and_queued_work() -> None:
     runtime = SwarmRuntime(max_tasks=50, default_lease_seconds=17)
     runtime.register_worker("worker", capabilities={"cpu"}, capacity=2)
     runtime.submit(SwarmTask("done", {"x": 1}, required_capabilities=frozenset({"cpu"})))
-    runtime.submit(SwarmTask("queued", {"x": 2}, priority=7))
     runtime.lease("worker", limit=1)
     runtime.succeed("worker", "done")
+    runtime.submit(SwarmTask("queued", {"x": 2}, priority=7))
 
     state = runtime.export_state()
     restored = SwarmRuntime.from_state(state)

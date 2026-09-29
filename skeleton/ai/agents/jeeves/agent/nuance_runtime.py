@@ -1164,6 +1164,10 @@ class ScientificContextCompiler:
                     "predictive_weight": row["predictive_weight"],
                     "domain_status": row["domain_status"],
                     "decision_feature_authorized": row["decision_feature_authorized"],
+                    "factual_assertion_authorized": row["factual_assertion_authorized"],
+                    "causal_assertion_authorized": row["causal_assertion_authorized"],
+                    "transfer_warning": row["transfer_warning"][:240],
+                    "lineage": row["lineage"][:4],
                 }
                 for row in lenses
             ]

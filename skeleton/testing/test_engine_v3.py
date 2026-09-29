@@ -6,6 +6,34 @@ import unittest
 
 
 class TestSystemIdentifier(unittest.TestCase):
+    def test_invalid_forgetting_and_samples_do_not_poison_model(self):
+        from skeleton.overseer.mpc import SystemIdentifier
+        for value in (0.0, -1.0, 1.1, float("nan"), float("inf"), True):
+            with self.subTest(forgetting=value), self.assertRaises(ValueError):
+                SystemIdentifier(forgetting=value)
+        sid = SystemIdentifier()
+        sid.observe("cpu", 0.5, 0.8, 0.2)
+        before = sid.stats()
+        for sample in ((float("nan"), 0.8, 0.2), (0.5, float("inf"), 0.2), (0.5, 0.8, True)):
+            with self.subTest(sample=sample), self.assertRaises(ValueError):
+                sid.observe("cpu", *sample)
+            self.assertEqual(sid.stats(), before)
+        self.assertEqual(sid.observe("cpu", 0.6, 0.8, 0.2).samples, 1)
+
+    def test_covariance_matches_single_observation_information_inverse(self):
+        from skeleton.overseer.mpc import SystemIdentifier
+        sid = SystemIdentifier(forgetting=1.0)
+        sid.observe("cpu", 1.0, 2.0, 2.0)
+        sid.observe("cpu", 0.5, 0.0, 0.0)
+        # Inverse of 0.01 I + phi phi^T, phi=(1,2,2), via Sherman-Morrison.
+        phi = (1.0, 2.0, 2.0)
+        covariance = sid._cov["cpu"]
+        for i in range(3):
+            for j in range(3):
+                expected = (100.0 if i == j else 0.0) - 10000.0 * phi[i] * phi[j] / 901.0
+                self.assertAlmostEqual(covariance[i][j], expected)
+                self.assertAlmostEqual(covariance[i][j], covariance[j][i])
+
     def test_model_converges_on_stable_dynamics(self):
         from skeleton.overseer.mpc import SystemIdentifier
         sid = SystemIdentifier()
@@ -41,6 +69,35 @@ class TestSystemIdentifier(unittest.TestCase):
 
 
 class TestMPC(unittest.TestCase):
+    def test_terminal_wall_is_hard_even_when_wall_penalty_is_zero(self):
+        from skeleton.overseer.mpc import ChannelModel, ModelPredictiveController
+        mpc = ModelPredictiveController(horizon=1, weights={"wall": 0.0})
+        result = mpc.plan({"thermal": ChannelModel("thermal", a=0.0, b=100.0, c=0.0)},
+                          {"thermal": 70.0}, {"thermal": 95.0}, current_u=0.8)
+        self.assertEqual(result.control, 0.8)
+        self.assertLessEqual(result.planned_path[-1], 85.0)
+        self.assertTrue(result.constraint_wall_hit)
+
+    def test_infeasible_plan_minimizes_violation_before_tracking_cost(self):
+        from skeleton.overseer.mpc import ChannelModel, ModelPredictiveController
+        mpc = ModelPredictiveController(horizon=2, walls={"cpu": 1.0},
+                                       weights={"track": 1e12, "wall": 0.0})
+        result = mpc.plan({"cpu": ChannelModel("cpu", a=1.0, b=1.0, c=0.0)},
+                          {"cpu": 2.0}, {"cpu": 3.0}, current_u=0.8)
+        self.assertEqual(result.control, 0.05)
+        self.assertTrue(result.constraint_wall_hit)
+
+    def test_invalid_plan_inputs_fail_before_planning(self):
+        from skeleton.overseer.mpc import ModelPredictiveController
+        for horizon in (0, -1, True, 2.5):
+            with self.subTest(horizon=horizon), self.assertRaises(ValueError):
+                ModelPredictiveController(horizon=horizon)
+        mpc = ModelPredictiveController()
+        for control in (float("nan"), float("inf"), 0.0, 1.1, True):
+            with self.subTest(control=control), self.assertRaises(ValueError):
+                mpc.plan({}, {}, {}, current_u=control)
+        self.assertEqual(mpc.stats()["plans"], 0)
+
     def _models(self):
         from skeleton.overseer.mpc import ChannelModel
         return {
@@ -57,11 +114,12 @@ class TestMPC(unittest.TestCase):
         self.assertLessEqual(result.control, 1.0)
         self.assertGreater(result.candidates_evaluated, 1)
 
-    def test_hold_is_always_feasible(self):
+    def test_no_model_preserves_current_control(self):
         from skeleton.overseer.mpc import ModelPredictiveController
         mpc = ModelPredictiveController()
         result = mpc.plan({}, {}, {}, current_u=0.7)
         self.assertEqual(result.trajectory_name, "hold")
+        self.assertEqual(result.control, 0.7)
 
     def test_wall_violation_marks_result(self):
         from skeleton.overseer.mpc import ModelPredictiveController, ChannelModel
@@ -96,6 +154,20 @@ class TestDigitalTwin(unittest.TestCase):
 
 
 class TestMetaCognition(unittest.TestCase):
+    def test_nonfinite_inputs_cannot_poison_errors_or_parameter_rewrites(self):
+        from skeleton.overseer.twin import MetaCognition
+        meta = MetaCognition()
+        for value in (float("nan"), float("inf"), -float("inf"), True):
+            with self.subTest(value=value):
+                for action in (lambda: meta.observe_error("cpu", value),
+                               lambda: meta.observe_regret(value),
+                               lambda: meta.consider_rewrite("gain", -1.0, value, "test")):
+                    with self.assertRaises(ValueError):
+                        action()
+        self.assertEqual(meta._errors, {})
+        self.assertEqual(meta._regret_window, [])
+        self.assertEqual(meta.rewrites, [])
+
     def test_scorecard_grades(self):
         from skeleton.overseer.twin import MetaCognition
         meta = MetaCognition()
@@ -118,7 +190,7 @@ class TestMetaCognition(unittest.TestCase):
         meta = MetaCognition()
         for _ in range(10):
             meta.observe_regret(0.8)
-        rw = meta.consider_rewrite("setpoints.thermal", 66.0, 50.0, "test")
+        rw = meta.consider_rewrite("setpoints.thermal", 66.0, 40.0, "test")
         self.assertIsNotNone(rw)
         # Bounded to -25%: 66 * 0.75 = 49.5
         self.assertAlmostEqual(rw.after, 49.5, places=2)
@@ -129,6 +201,17 @@ class TestMetaCognition(unittest.TestCase):
         meta = MetaCognition()
         meta.observe_regret(0.1)
         self.assertIsNone(meta.consider_rewrite("x", 1.0, 0.5, "test"))
+
+    def test_negative_parameter_moves_toward_proposal_within_bound(self):
+        from skeleton.overseer.twin import MetaCognition
+        for proposed, expected in ((-20.0, -12.5), (-1.0, -7.5), (-9.0, -9.0)):
+            with self.subTest(proposed=proposed):
+                meta = MetaCognition()
+                for _ in range(10):
+                    meta.observe_regret(0.8)
+                rewrite = meta.consider_rewrite("gain", -10.0, proposed, "regression")
+                self.assertIsNotNone(rewrite)
+                self.assertEqual(rewrite.after, expected)
 
     def test_trust_drops_with_persistent_regret(self):
         from skeleton.overseer.twin import MetaCognition

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.persist.cards import persist_card
-from skeleton.persist.store import Persist
+from skeleton.persistence.core.cards import persist_card
+from skeleton.persistence.core.store import Persist
 
 
 class PersistEngine:

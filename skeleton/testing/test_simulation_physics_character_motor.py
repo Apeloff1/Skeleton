@@ -269,7 +269,9 @@ def test_wall_contact_clips_inward_velocity_and_preserves_tangent() -> None:
     )
 
     assert result.move.hits
-    assert result.velocity.x <= 1.0e-6
+    wall_hit = next(hit for hit in result.move.hits if hit.body_id == "wall")
+    assert wall_hit.normal.x < -0.99
+    assert result.velocity.dot(wall_hit.normal) >= -1.0e-6
     assert result.velocity.z > 1.5
     assert controller.position.z > 0.5
 

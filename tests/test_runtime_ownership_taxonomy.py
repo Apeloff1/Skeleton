@@ -1,61 +1,47 @@
-"""Regression coverage for TREE-033 runtime ownership refinement."""
-
-from __future__ import annotations
-
-import json
-import tomllib
+"""Upstream ownership refinement reconciled with canonical namespace migrations."""
 from pathlib import Path
+import json
+from skeleton.repo_machine.config import load_machine_config
+from skeleton.repo_machine.atlas import placement_for_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _zones() -> dict[str, dict]:
-    with (ROOT / ".machine" / "repository.toml").open("rb") as fh:
-        return {zone["name"]: zone for zone in tomllib.load(fh)["zone"]}
+def test_simulation_zone_only_owns_actual_simulation_surfaces():
+    config = load_machine_config(ROOT)
+    simulation = next(zone for zone in config.zones if zone.name == "simulation")
+    assert set(simulation.prefixes) == {"skeleton/simulation/", "godot.pointer"}
 
 
-def test_simulation_zone_only_owns_actual_simulation_surfaces() -> None:
-    zones = _zones()
-    simulation = zones["simulation"]
-
-    assert simulation["prefixes"] == ["skeleton/simulation/", "godot.pointer"]
-    for misplaced in (
-        "skeleton/era/",
-        "skeleton/galaxy/",
-        "skeleton/organism/",
-        "skeleton/social/",
+def test_legacy_roots_do_not_reclaim_canonical_runtime_ownership():
+    config = load_machine_config(ROOT)
+    for legacy, canonical, owner in (
+        ("skeleton/galaxy/core.py", "skeleton/distributed/galaxy/core.py", "distributed-runtime"),
+        ("skeleton/social/graph.py", "skeleton/research/social/graph.py", "research-evidence"),
+        ("skeleton/era/bind.py", "skeleton/simulation/era/bind.py", "simulation-runtime"),
     ):
-        assert misplaced not in simulation["prefixes"]
+        old = placement_for_path(config, legacy)
+        current = placement_for_path(config, canonical)
+        assert old.lifecycle == "transitional"
+        assert current.lifecycle == "canonical"
+        assert old.owner == current.owner == owner
+    organism = placement_for_path(config, "skeleton/organism/engine.py")
+    assert (organism.zone, organism.owner, organism.lifecycle) == ("organism-runtime", "core-runtime", "support")
 
 
-def test_specialized_roots_follow_their_documented_runtime_roles() -> None:
-    zones = _zones()
-
-    galaxy = zones["distributed-runtime"]
-    assert galaxy["prefixes"] == ["skeleton/galaxy/"]
-    assert galaxy["owner"] == "ai-runtime"
-    assert galaxy["lifecycle"] == "canonical"
-
-    organism = zones["organism-runtime"]
-    assert organism["prefixes"] == ["skeleton/organism/"]
-    assert organism["owner"] == "core-runtime"
-    assert organism["lifecycle"] == "support"
-
-    social = zones["social-research-intake"]
-    assert social["prefixes"] == ["skeleton/social/"]
-    assert social["owner"] == "ai-runtime"
-    assert social["lifecycle"] == "transitional"
-
-    era = zones["era-lineage"]
-    assert era["prefixes"] == ["skeleton/era/"]
-    assert era["owner"] == "core-runtime"
-    assert era["lifecycle"] == "historical"
-
-
-def test_tree033_records_taxonomy_only_refinement() -> None:
-    plan = json.loads((ROOT / "machine" / "repository_migration_plan.json").read_text(encoding="utf-8"))
-    batch = next(item for item in plan["batches"] if item["id"] == "TREE-033")
-
+def test_refinement_retains_source_identity_without_batch_id_collision():
+    plan = json.loads((ROOT / "machine/repository_migration_plan.json").read_text(encoding="utf-8"))
+    ids = [batch["id"] for batch in plan["batches"]]
+    assert len(ids) == len(set(ids))
+    batch = next(item for item in plan["batches"] if item["id"] == "TREE-041")
     assert batch["mode"] == "taxonomy-classification"
     assert batch["state"] == "classified"
-    assert plan["batches"][-1]["id"] == "TREE-033"
+    assert batch["source_batch_id"] == "TREE-033"
+    assert batch["source_commit"] == "f5e19db27aceaa22224b9dce247eecd2cb30d0f6"
+    assert next(item for item in plan["batches"] if item["id"] == "TREE-033")["destination"] == "skeleton/simulation/era/"
+
+
+def test_zone_prefixes_do_not_silently_shadow_duplicate_owners():
+    config = load_machine_config(ROOT)
+    prefixes = [prefix for zone in config.zones for prefix in zone.prefixes]
+    assert len(prefixes) == len(set(prefixes))

@@ -38,4 +38,4 @@ def test_tree032_records_apps_taxonomy_classification() -> None:
     assert batch["source"] == "apps/"
     assert batch["mode"] == "taxonomy-classification"
     assert batch["state"] == "classified"
-    assert plan["batches"][-1]["id"] == "TREE-032"
+    assert batch["destination"] == ".machine/repository.toml application-workspace zones"

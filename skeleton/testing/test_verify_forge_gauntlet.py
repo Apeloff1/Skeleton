@@ -31,15 +31,19 @@ def test_verify_forge_script_exists_and_is_runnable():
 
 def test_verify_forge_script_contains_key_gates():
     text = SCRIPT.read_text(encoding="utf-8")
-    assert "compileall" in text
-    assert "run_unit" in text or "tests.test_forge" in text or "forge unit" in text
-    assert "VERDICT" in text
-    assert "ALL GATES PASSED" in text
+    assert "bp.validate()" in text
+    assert 'target="json"' in text
+    assert "check_files(files)" in text
+    assert "forge_verify_until_green" in text
+    assert 'target="godot", repair=True' in text
+    assert 'result["verification"]["accepted"]' in text
     assert "set -euo pipefail" in text
 
 
 def test_verify_forge_script_smoke_optional():
     """Best-effort subprocess run; skip on timeout — static gates are enough for S-size."""
+    if os.name == "nt":
+        pytest.skip("POSIX shell smoke runs in Linux CI")
     if not SCRIPT.is_file():
         pytest.skip("gauntlet script missing")
     if not os.access(SCRIPT, os.X_OK):
@@ -56,6 +60,6 @@ def test_verify_forge_script_smoke_optional():
     except subprocess.TimeoutExpired:
         pytest.skip("gauntlet smoke timed out — file assertions are sufficient")
     out = (proc.stdout or "") + (proc.stderr or "")
-    assert "STEP:" in out or proc.returncode == 0
-    if proc.returncode == 0:
-        assert "VERDICT: ALL GATES PASSED" in out
+    assert proc.returncode == 0, out
+    assert "forge json target: OK" in out
+    assert "forge materialise(godot, repair=True): OK" in out

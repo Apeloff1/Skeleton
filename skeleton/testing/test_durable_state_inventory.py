@@ -259,3 +259,17 @@ def test_duplicate_store_id_fails_closed(tmp_path: Path) -> None:
         require_families=False,
     )
     assert any("duplicate store_id fails closed" in item for item in violations)
+
+
+def test_declared_mirror_requires_exact_classified_owner(tmp_path):
+    import json
+    store = _classified()
+    source = 'skeleton/organism'
+    destination = 'skeleton/ai/runtime/organism'
+    _write(tmp_path, store.owner_path, 'VALUE = 1\n')
+    _write(tmp_path, destination + '/quality_state.py', 'VALUE = 1\n')
+    _write(tmp_path, 'machine/ai_file_tree.json', json.dumps({'mappings': [{'source': source, 'destination': destination}]}))
+    assert collect_violations(tmp_path, inventory=(store,), require_families=False) == []
+    _write(tmp_path, destination + '/quality_state.py', 'VALUE = 2\n')
+    violations = collect_violations(tmp_path, inventory=(store,), require_families=False)
+    assert any('unknown durable store' in value for value in violations)

@@ -1,5 +1,7 @@
 """Skeleton agent orchestration primitives."""
 
+from skeleton.automation.agents.mesh import AgentMesh
+
 from skeleton.automation.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 from skeleton.automation.agents.delegation_qualification import (
     AGENT_DELEGATION_ACCOUNTABILITY_ID,
@@ -102,6 +104,7 @@ from skeleton.automation.agents.swarm_tenant_checkpoint import TenantCheckpointS
 from skeleton.automation.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSnapshot, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 __all__ = [
+    "AgentMesh",
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
     "AUTONOMY_CONTROL_ACCOUNTABILITY_ID", "AUTONOMY_CONTROL_SCHEMA_VERSION",
     "AUTONOMY_CONTROL_TASK_ID", "AutonomyAuthorization", "AutonomyControlError",

@@ -113,7 +113,7 @@ def append_quality(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dic
 
 def append_repair(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any]:
     payload = dict(entry)
-    payload.setdefault("kind", "repair")
+    payload["kind"] = "repair"
     payload.setdefault("surface", payload.get("surface") or "forge")
     payload.setdefault("accepted", bool(payload.get("ok")))
     payload.setdefault("reason", payload.get("reason") or "repair")

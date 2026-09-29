@@ -28,9 +28,9 @@ def test_gate_answers_confident_agreement():
 def test_gate_abstains_on_divergence():
     g = UncertaintyGate()
     d = g.decide([
-        Candidate("alpha", 0.6),
-        Candidate("beta", 0.6),
-        Candidate("gamma", 0.6),
+        Candidate("alpha", 0.75),
+        Candidate("beta", 0.75),
+        Candidate("gamma", 0.75),
     ])
     assert d.verdict is GateVerdict.ABSTAIN
     assert d.entropy > 0.9

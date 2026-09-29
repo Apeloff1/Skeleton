@@ -46,3 +46,16 @@ def test_adapter_stats_compose_both_sides():
     assert stats["mesh"]["agents"] == 1
     assert stats["handoff"]["tasks"] == 1
     assert stats["handoff"]["by_state"].get("working") == 1
+
+
+def test_handoff_excludes_quarantined_agents():
+    from skeleton.automation.agents.mesh import AgentLiveness
+
+    mesh = AgentMesh()
+    quarantined = mesh.join({"translate"})
+    quarantined.liveness = AgentLiveness.QUARANTINED
+    healthy = mesh.join({"translate"})
+    healthy.load = 0.7
+    adapter = MeshHandoffAdapter(HandoffRegistry(), mesh)
+    task = adapter.submit("translate", {}, requester="planner")
+    assert task.assignee == str(healthy.agent_id)

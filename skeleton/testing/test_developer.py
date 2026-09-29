@@ -23,28 +23,27 @@ class TestScaffoldEngine(TestCase):
         import shutil
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def test_list_templates_returns_three(self):
+    def test_list_templates_returns_four(self):
         templates = self.engine.list_templates()
-        self.assertEqual(len(templates), 3)
-        names = {t["name"] for t in templates}
-        self.assertEqual(names, {"minimal-agent", "game-forge", "swarm-orchestrator"})
+        self.assertEqual(len(templates), 4)
+        names = set(templates)
+        self.assertEqual(names, {"minimal-agent", "game-forge", "swarm-orchestrator", "api-gateway"})
 
     def test_scaffold_minimal_agent(self):
         dest = self.engine.scaffold("minimal-agent", "test-agent")
         self.assertTrue(dest.exists())
-        self.assertTrue((dest / "src" / "agent.py").exists())
-        self.assertTrue((dest / "tests" / "test_agent.py").exists())
-        self.assertTrue((dest / "config" / "settings.yaml").exists())
+        self.assertTrue((dest / "agent.py").exists())
+        self.assertTrue((dest / "main.py").exists())
         self.assertTrue((dest / "README.md").exists())
 
     def test_scaffold_game_forge(self):
         dest = self.engine.scaffold("game-forge", "test-game")
-        self.assertTrue((dest / "src" / "game.py").exists())
-        self.assertTrue((dest / "scripts" / "build.sh").exists())
+        self.assertTrue((dest / "game.py").exists())
+        self.assertTrue((dest / "main.py").exists())
 
     def test_scaffold_swarm(self):
         dest = self.engine.scaffold("swarm-orchestrator", "test-swarm")
-        self.assertTrue((dest / "src" / "coordination" / "hive.py").exists())
+        self.assertTrue((dest / "swarm.py").exists())
 
     def test_scaffold_duplicate_raises(self):
         self.engine.scaffold("minimal-agent", "dup")
@@ -54,11 +53,10 @@ class TestScaffoldEngine(TestCase):
     def test_validate_project(self):
         dest = self.engine.scaffold("minimal-agent", "val")
         results = self.engine.validate_project(dest)
-        self.assertTrue(results["has_src"])
-        self.assertTrue(results["has_tests"])
-        self.assertTrue(results["has_config"])
-        self.assertTrue(results["has_readme"])
-        self.assertGreater(len(results["skeleton_imports"]), 0)
+        self.assertTrue(results["valid"])
+        self.assertEqual(results["missing"], [])
+        self.assertEqual(results["python_files"], ["agent.py", "main.py"])
+
 
 
 class TestProjectWizard(TestCase):
@@ -93,7 +91,7 @@ class TestProjectWizard(TestCase):
 class TestSubsystemExplorer(TestCase):
     def test_discover_with_mock_state(self):
         from skeleton.developer.wizard import SubsystemExplorer
-        from skeleton import Genesis
+        from skeleton.bootstrap.genesis import Genesis
 
         genesis = Genesis(seed=42).boot()
         mock_state = type("MockState", (), {"genesis": genesis})()
@@ -105,7 +103,7 @@ class TestSubsystemExplorer(TestCase):
 
     def test_summary_healthy(self):
         from skeleton.developer.wizard import SubsystemExplorer
-        from skeleton import Genesis
+        from skeleton.bootstrap.genesis import Genesis
 
         genesis = Genesis(seed=42).boot()
         mock_state = type("MockState", (), {"genesis": genesis})()
@@ -117,7 +115,7 @@ class TestSubsystemExplorer(TestCase):
 
     def test_render_table(self):
         from skeleton.developer.wizard import SubsystemExplorer
-        from skeleton import Genesis
+        from skeleton.bootstrap.genesis import Genesis
 
         genesis = Genesis(seed=42).boot()
         mock_state = type("MockState", (), {"genesis": genesis})()
@@ -192,6 +190,19 @@ class TestDevCommands(TestCase):
 
 
 class TestDevCliEntry(TestCase):
+    def test_explicit_empty_arguments_do_not_consume_host_arguments(self):
+        from skeleton.developer.cli import run_dev_cli
+        with patch("sys.argv", ["host", "restore", "--name", "unintended"]):
+            result = run_dev_cli([])
+        self.assertEqual(result["status"], "help_shown")
+
+    def test_help_covers_every_registered_and_direct_command(self):
+        from skeleton.architecture import CLI_COMMANDS
+        from skeleton.developer.cli import dev_help_text
+        help_text = dev_help_text()
+        for row in CLI_COMMANDS:
+            self.assertIn("skeleton dev " + row["command"], help_text)
+
     def test_help_shown(self):
         from skeleton.developer.cli import run_dev_cli
         result = run_dev_cli(["help"])
@@ -201,7 +212,7 @@ class TestDevCliEntry(TestCase):
         from skeleton.developer.cli import run_dev_cli
         result = run_dev_cli(["list-templates"])
         self.assertIn("templates", result)
-        self.assertEqual(len(result["templates"]), 3)
+        self.assertEqual(len(result["templates"]), 4)
 
     def test_docs_overview(self):
         from skeleton.developer.cli import show_docs
@@ -212,3 +223,17 @@ class TestDevCliEntry(TestCase):
         from skeleton.developer.cli import show_docs
         result = show_docs("nonexistent")
         self.assertIn("No documentation found", result["content"])
+
+
+def test_snapshot_ingests_utf8_independently_of_host_locale(tmp_path):
+    from skeleton.developer.persistence_commands import SnapshotCommand
+    text = "Memory for Troms\u00f8: \u6771\u4eac \U0001f331"
+    source = tmp_path / "notes.txt"
+    source.write_text(text, encoding="utf-8")
+    with patch("skeleton.deploy.harness.Harness") as harness_type:
+        harness = harness_type.return_value
+        harness.genesis.get.return_value.ingest_document.return_value = 1
+        harness.snapshot_state.return_value = {"planes": ["rag"]}
+        result = SnapshotCommand()(["--root", str(tmp_path / "state"), "--ingest", str(source)])
+        harness.genesis.get.return_value.ingest_document.assert_called_once_with("notes", text)
+        assert result["ingested_chunks"] == 1

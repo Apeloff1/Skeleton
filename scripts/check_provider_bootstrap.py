@@ -178,17 +178,31 @@ def _python_source(path: Path) -> str:
     )
 
 
-def _imported_modules(path: Path) -> list[str]:
-    tree = _python_tree(path)
+@lru_cache(maxsize=16_384)
+def _cached_imported_modules(path_text: str, mtime_ns: int, size: int) -> tuple[str, ...]:
+    """Share immutable import analysis without retaining another tree cache."""
+    tree = _cached_python_tree(path_text, mtime_ns, size)
     if tree is None:
-        return []
+        return ()
     modules: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             modules.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.append(node.module)
-    return modules
+    return tuple(modules)
+
+
+def _imported_modules(path: Path) -> list[str]:
+    try:
+        metadata = path.stat()
+    except OSError:
+        return []
+    # The metadata key changes with the source. Return a fresh list so a
+    # consumer cannot alter another boundary check's import evidence.
+    return list(_cached_imported_modules(
+        str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
+    ))
 
 
 def _provider_sdk_imports(path: Path) -> list[str]:
