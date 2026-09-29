@@ -363,11 +363,47 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "distributed-runtime"
+prefixes = ["skeleton/galaxy/"]
+owner = "ai-runtime"
+criticality = "high"
+purpose = "Federation, transport, election, consensus, synchronization and fleet coordination for distributed and multi-agent runtime."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "organism-runtime"
+prefixes = ["skeleton/organism/"]
+owner = "core-runtime"
+criticality = "high"
+purpose = "Owner-sensitive engine-organism control plane: runtime DAG, health, policy, quality, recovery and operator control; security-owned secrets remain gated until explicit cutover."
+audience = "internal"
+lifecycle = "support"
+
+[[zone]]
+name = "social-research-intake"
+prefixes = ["skeleton/social/"]
+owner = "ai-runtime"
+criticality = "medium"
+purpose = "Research evidence intake, archive/source ingestion, coverage, graph and SOTA discovery; results carry no serving authority."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "era-lineage"
+prefixes = ["skeleton/era/"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Historical GB-39 era-bind and GameForge facade retained for lineage and compatibility; no new runtime authority."
+audience = "internal"
+lifecycle = "historical"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
-purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
+purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
 audience = "both"
 lifecycle = "canonical"
 
