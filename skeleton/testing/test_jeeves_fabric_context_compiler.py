@@ -94,7 +94,7 @@ def _external_record(
     fingerprint: str | None = None,
     source_ref: str = "external-alpha",
     provider: str = "test-external",
-    token_estimate: int = 12,
+    token_estimate: int | None = None,
 ) -> DeepContextRecord:
     return DeepContextRecord(
         source_tier=SourceTier.EXTERNAL,
@@ -106,7 +106,7 @@ def _external_record(
         trust=0.92,
         confidence=0.88,
         salience=0.80,
-        token_estimate=token_estimate,
+        token_estimate=max(1, (len(content) + 3) // 4) if token_estimate is None else token_estimate,
         tags=("alpha", "canonical"),
         metadata={"fixture": True},
     )
@@ -183,7 +183,7 @@ def test_base_context_compiler_restores_explicit_fabric_contract() -> None:
             trust=record.trust,
             confidence=record.trust,
             salience=record.salience,
-            token_estimate=max(1, len(record.content) // 4),
+            token_estimate=max(1, (len(record.content) + 3) // 4),
             tags=record.tags,
         ),
         cue=record.content,
@@ -531,7 +531,8 @@ def test_wrong_provider_same_ref_does_not_resolve_provider_bound_card() -> None:
     result = fabric.retrieve(namespace.key, "shared provider ref")
 
     assert "shared-provider-ref" in result.unresolved_source_refs
-    assert any(record.source_provider == "provider-b" for record in result.records)
+    # A strong provider-bound hit does not authorize a different provider fetch.
+    assert not result.records
 
 
 def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> None:
@@ -666,12 +667,14 @@ def test_identical_content_from_independent_providers_preserves_both_provenance_
 def test_equal_rank_same_source_conflict_is_order_invariant() -> None:
     left = _external_record(
         content="left version",
+        token_estimate=4,
         fingerprint="1" * 64,
         source_ref="conflicted-ref",
         provider="provider-a",
     )
     right = _external_record(
         content="right version",
+        token_estimate=4,
         fingerprint="f" * 64,
         source_ref="conflicted-ref",
         provider="provider-a",

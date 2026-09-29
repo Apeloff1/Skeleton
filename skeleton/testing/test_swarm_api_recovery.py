@@ -22,7 +22,7 @@ def test_worker_listing_and_heartbeat_surface_runtime_state() -> None:
     runtime.register_worker("w", capabilities={"cpu"}, capacity=3)
 
     beat = heartbeat("w", runtime)
-    listed = list_workers(runtime)
+    listed = list_workers(runtime=runtime)
 
     assert beat["heartbeats"] == 1
     assert beat["available"] == 3
@@ -40,7 +40,7 @@ def test_api_renew_cancel_and_revive_dead_letter_flow() -> None:
     assert renewed["lease_deadline"] is not None
 
     runtime.fail("w", "job", "fatal")
-    dead = dead_letters(runtime)
+    dead = dead_letters(runtime=runtime)
     assert [item["id"] for item in dead["tasks"]] == ["job"]
 
     revived = revive_task("job", ReviveRequest(reset_attempts=True), runtime)
@@ -62,8 +62,8 @@ def test_task_listing_can_filter_state() -> None:
     leased_id = next(task.id for task in runtime.tasks() if task.state is TaskState.LEASED)
     runtime.succeed("w", leased_id)
 
-    queued = list_tasks("queued", runtime)
-    succeeded = list_tasks("succeeded", runtime)
+    queued = list_tasks("queued", runtime=runtime)
+    succeeded = list_tasks("succeeded", runtime=runtime)
 
     assert all(task["state"] == "queued" for task in queued["tasks"])
     assert all(task["state"] == "succeeded" for task in succeeded["tasks"])

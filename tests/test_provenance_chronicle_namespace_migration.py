@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,11 +32,17 @@ def test_ai_tree_governs_provenance_parent_and_chronicle_child() -> None:
 
     assert provenance["source"] == "skeleton/provenance"
     assert provenance["destination"] == "skeleton/ai/runtime/provenance"
-    assert provenance["source_git_object_sha"] == "0198cb43f5bd16c81f5c8ad333c771d02bdccb60"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert provenance["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{provenance["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert provenance["overlay_children"] == ["chronicle"]
     assert chronicle["source"] == "skeleton/provenance/chronicle"
     assert chronicle["destination"] == "skeleton/ai/runtime/provenance/chronicle"
-    assert chronicle["source_git_object_sha"] == "5831cc060b6fd0f260437150b172796da8318e43"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert chronicle["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{chronicle["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert "skeleton/provenance" not in manifest["planned_path_audit"]["planned_but_absent"]
 
 

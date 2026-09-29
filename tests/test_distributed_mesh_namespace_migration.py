@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,10 @@ def test_ai_tree_retargets_mesh_to_canonical_distributed_owner() -> None:
 
     assert mesh["source"] == "skeleton/distributed/mesh"
     assert mesh["destination"] == "skeleton/ai/runtime/distributed/mesh"
-    assert mesh["source_git_object_sha"] == "73d773eca32320c058c5e1853c9799872538ef62"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert mesh["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{mesh["source"]}'], cwd=ROOT, text=True
+    ).strip()
 
 
 def test_mesh_migration_follows_network_wave() -> None:

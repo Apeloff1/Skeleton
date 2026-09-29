@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,10 @@ def test_ai_tree_retargets_social_to_canonical_research_owner() -> None:
 
     assert social["source"] == "skeleton/research/social"
     assert social["destination"] == "skeleton/ai/research/social"
-    assert social["source_git_object_sha"] == "8648d7d27f18e87620b1603d1adc4335a887d690"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert social["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{social["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert "skeleton/research" not in manifest["planned_path_audit"]["planned_but_absent"]
 
 

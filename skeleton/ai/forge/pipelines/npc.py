@@ -170,7 +170,7 @@ class NpcPipeline:
             raise GenerationError("NPC generation failed", cause=exc,
                                   context={"run_id": run_id}) from exc
 
-        verifier = NpcVerifier()
+        verifier = NpcVerifier(root=self._root)
         quality = verifier.verify(spec.to_dict(), description=description)
         spec.quality = quality.to_dict()
         spec.quality_stats = verifier.stats()

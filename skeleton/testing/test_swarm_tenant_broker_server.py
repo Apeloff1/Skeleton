@@ -32,7 +32,7 @@ def test_server_health_fails_on_tenant_runtime_mismatch() -> None:
 
 def test_app_mounts_tenant_broker_routes() -> None:
     app = create_app()
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/v1/swarm/tenant-broker/status" in paths
     assert "/api/v1/swarm/tenant-broker/submit" in paths
     assert "/api/v1/swarm/tenant-broker/workers/{worker_id}/tasks/{task_id}/success" in paths

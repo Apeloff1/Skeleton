@@ -23,6 +23,8 @@ def _system():
         limit=1,
         minimum_score=0.0,
     )[0]
+    # These lifecycle tests exercise one bridge, independent of catalog growth.
+    topology._bridge_candidates = (candidate,)
     policy = TopologyBridgePolicy(
         minimum_trials=4,
         minimum_independent_runs=2,

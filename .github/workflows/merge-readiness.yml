@@ -67,7 +67,7 @@ jobs:
       - name: Install focused unit-test runtime
         run: >-
           python -m pip install --disable-pip-version-check
-          "pytest>=8,<9" "fastapi>=0.110,<1"
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1" "motor==3.7.1" "pymongo==4.18.1" "fastapi>=0.110,<1"
           "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.1"
       - name: Compile canonical Python package
         run: python -m compileall -q skeleton
@@ -186,7 +186,7 @@ jobs:
       - name: Install focused test dependency
         run: >-
           python -m pip install --disable-pip-version-check
-          "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.1"
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "httpx>=0.27,<1" "motor==3.7.1" "pymongo==4.18.1" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.1"
       - name: Compile automation package
         run: >-
           python -m compileall -q
@@ -204,7 +204,7 @@ jobs:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_pr_automation.py
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
@@ -262,6 +262,36 @@ jobs:
           tests/test_worker_health.py
           tests/test_traffic_manager.py
           skeleton/testing/test_bot_manager.py
+          skeleton/testing/test_architecture_index_completeness.py
+          skeleton/testing/test_consensus.py
+          skeleton/testing/test_deep.py
+          skeleton/testing/test_game_logic_repair.py
+          skeleton/testing/test_jeeves_fabric_context_compiler.py
+          skeleton/testing/test_jeeves_historical_authorization_integration.py
+          skeleton/testing/test_jeeves_semantic_topology_learning.py
+          skeleton/testing/test_jeeves_semantic_topology_research_bridge.py
+          skeleton/testing/test_pipeline_npc_quality.py
+          skeleton/testing/test_pipeline_repair.py
+          skeleton/testing/test_plan_repair.py
+          skeleton/testing/test_ready_wave_runner.py
+          skeleton/testing/test_scanner_integrity.py
+          skeleton/testing/test_simulation_physics_character.py
+          skeleton/testing/test_simulation_physics_character_motor.py
+          skeleton/testing/test_sota_wave2.py
+          skeleton/testing/test_swarm_api_recovery.py
+          skeleton/testing/test_swarm_dag.py
+          skeleton/testing/test_swarm_gc.py
+          skeleton/testing/test_swarm_hardened_health.py
+          skeleton/testing/test_swarm_health_semantics.py
+          skeleton/testing/test_swarm_ingress_server.py
+          skeleton/testing/test_swarm_new_route_wiring.py
+          skeleton/testing/test_swarm_operator_recovery_api.py
+          skeleton/testing/test_swarm_public_recovery_api.py
+          skeleton/testing/test_swarm_route_wiring.py
+          skeleton/testing/test_swarm_runtime_persistence.py
+          skeleton/testing/test_swarm_tenant_broker_server.py
+          skeleton/testing/test_engine_cross_service_boundary.py
+          skeleton/testing/test_app_runtime_contract.py
       - name: Validate Linux filesystem and tool transaction boundaries
         env:
           PYTHONPATH: "."

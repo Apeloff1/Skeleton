@@ -17,5 +17,5 @@ def test_hardened_health_marks_queued_without_workers_as_degraded() -> None:
 def test_hardened_health_marks_empty_runtime_as_idle() -> None:
     health = HardenedSwarmRuntime().health()
 
-    assert health["status"] == "ok"
+    assert health["status"] == "healthy"
     assert health["availability"] == "idle"

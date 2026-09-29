@@ -13,7 +13,7 @@ def test_server_state_reports_ingress_status() -> None:
 
 def test_app_mounts_ingress_routes() -> None:
     app = create_app()
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/v1/swarm/ingress/status" in paths
     assert "/api/v1/swarm/ingress/tenants/{tenant}" in paths
     assert "/api/v1/swarm/ingress/admit" in paths

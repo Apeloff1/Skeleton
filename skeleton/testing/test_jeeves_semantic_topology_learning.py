@@ -94,6 +94,10 @@ def _system():
         reject_empirical_rate=0.25,
     )
     lab = SemanticTopologyLearningLab(topology, policy=policy)
+    # Research ranking is independent of the static topology ordering.
+    candidate_id = lab.research_obligations(limit=1, minimum_candidate_score=0.0)[0].metadata["candidate_id"]
+    candidate = next(item for item in topology.bridge_candidates(limit=10_000, minimum_score=0.0)
+                     if item.candidate_id == candidate_id)
     return registry, topology, candidate, lab
 
 
@@ -737,7 +741,7 @@ def test_active_bridge_is_revoked_when_new_trials_break_calibration() -> None:
     assert lab.learned_rules() == ()
 
     obligations = lab.research_obligations(
-        limit=100,
+        limit=10_000,
         minimum_candidate_score=0.0,
     )
     obligation = next(

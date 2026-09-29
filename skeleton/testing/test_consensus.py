@@ -53,7 +53,8 @@ class TestConsensusEngine(unittest.TestCase):
             na._registry.register("strict-b", tb.address)
             nb._registry.register("strict-a", ta.address)
 
-            # Beta rejects any topic containing 'danger'
+            # Rejection requires a majority, not one veto in a two-node tie.
+            ea.add_voter(lambda topic, value: "danger" not in topic)
             eb.add_voter(lambda topic, value: "danger" not in topic)
 
             rejected = ea.propose("danger.zone", {"x": 1}, wait=True, timeout=2.0)
@@ -79,6 +80,18 @@ class TestConsensusEngine(unittest.TestCase):
             self.assertEqual(peer_copy.status, "accepted")
         finally:
             ta.stop(); tb.stop()
+
+    def test_local_policy_can_reject_single_node_proposal(self):
+        node, transport, engine = _node("local-policy")
+        try:
+            engine.add_voter(lambda topic, value: False)
+            proposal = engine.propose("forbidden", {})
+            self.assertEqual(proposal.status, "rejected")
+            engine._on_vote({"proposal_id": proposal.proposal_id, "voter": node.node_id, "accept": True})
+            self.assertEqual(proposal.votes, {node.node_id: False})
+            self.assertEqual(engine.stats()["rejected"], 1)
+        finally:
+            transport.stop()
 
     def test_proposal_tally_logic(self):
         from skeleton.galaxy.consensus import Proposal

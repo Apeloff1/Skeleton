@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,11 +32,17 @@ def test_ai_tree_governs_tools_parent_and_integrations_child() -> None:
 
     assert tools["source"] == "skeleton/tools"
     assert tools["destination"] == "skeleton/ai/runtime/tools"
-    assert tools["source_git_object_sha"] == "63239f151af1b31b36db84ead936f9557aa62fb1"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert tools["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{tools["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert tools["overlay_children"] == ["integrations"]
     assert integrations["source"] == "skeleton/tools/integrations"
     assert integrations["destination"] == "skeleton/ai/runtime/tools/integrations"
-    assert integrations["source_git_object_sha"] == "7a342bbbcfac4bd26124df1c96bbf86df1b183d7"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert integrations["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{integrations["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert "skeleton/tools" not in manifest["planned_path_audit"]["planned_but_absent"]
 
 

@@ -67,22 +67,57 @@ coverage exercising the real model on a bounded repository fixture. An unavailab
 provider is rejected before building an unused model prompt. Full repository
 validation remains in the repository-model and architecture checks.
 
+## Runtime and test integration completion batch
+
+NPC validation accepts the actual serialized node/behavior identifiers and rejects
+malformed non-string identifiers. NPC, dialogue and game-logic verifiers load the
+selected project's policy root. Invalid repair proposals remain proposals: tests
+no longer require repair code to invent missing content or bypass verification.
+
+Galaxy proposers apply their local approval policy to their own proposals, just
+as receiving nodes do. Terminal proposals ignore later votes, and resolution is
+not counted twice. Majority requirements are unchanged.
+
+The API mounts the shared command router directly. GameForge's canonical guarded
+handlers remain the sole mounted owners of intake/run; the redundant legacy
+wrapper no longer changes the generated API schema. A regression rejects duplicate
+operation identifiers while checking that both GameForge and command routes exist.
+
+Canonical pytest discovery explicitly includes the backend import root. Async
+contracts in the isolated CI job explicitly load their installed runner plugin.
+Migration tests validate current staged-tree identities instead of frozen hashes
+from the original migrations. Deck tests isolate provenance storage from tracked
+reference data. Swarm recovery fixtures now establish actual leases and bindings;
+OpenAPI route checks also work with deferred FastAPI router inclusion.
+
+Research lifecycle fixtures use explicit provider identity and bounded bridge
+populations where the contract concerns a single bridge. Ranking tests remain
+separate; promotion, calibration, privacy budgets and evidence gates are unchanged.
+The architecture index records all 24 documented research domains without claiming
+local reproduction or granting production authority.
+
 ## Remaining validation scope
 
-An exploratory canonical run on the initial repair snapshot produced 16,164
-passes, 331 failures and 91 skips. The combined final regression
-matrix passes 927 tests across 57 files, including repair receipts, generated
-projects, checkpoint binding, compiler rollback and operator/context integration.
-Six existing platform skips and three explicitly deselected POSIX mutation tests
-apply to this Windows run; the Linux CI command retains those mutation tests. This does not establish
-that the complete exploratory suite is clean. Earlier focused counts overlap
-this matrix and must not be added to it.
+The initial exploratory canonical run produced 16,164 passes, 331 failures and
+91 skips. A later full diagnostic against the e9e3c12 source snapshot produced
+16,324 passes, 214 failures, 86 skips and one collection error. Subsequent repairs
+fix the backend collection error and multiple pipeline, swarm, research and
+numeric fixtures; the complete exploratory suite has not been rerun on the final
+repair snapshot and is not claimed clean.
 
-Remaining failures include older consumer fixtures and deeper runtime contracts.
-POSIX filesystem, executable-mode and transaction tests require Linux; Windows
-must continue to reject operations when its platform cannot supply the required
-security primitives. Merge Readiness runs the Linux boundary tests explicitly.
-No remaining failure is hidden by adding quarantine entries or weakening guards.
+The latest integration matrix passed 2,434 tests across 155 files spanning the
+affected runtimes, repository contracts, automation and API boundaries. Its log
+and machine-readable results accompany the delivery evidence. Six existing platform skips and four explicitly
+deselected POSIX mutation/publication tests apply to the Windows run. Linux CI
+retains every one of those tests and separately exercises rooted filesystem and
+transaction boundaries. No quarantine entries or weaker production guards were
+introduced to hide failures. Earlier focused counts overlap this matrix.
+
+Remaining diagnostic failures include stale CLI/route inventory expectations,
+consumer fixtures for evolved scientific/semantic contracts, deeper engine and
+forecasting behavior, and platform-dependent filesystem/shell cases. The repository
+organization audit also retains advisory findings and a broad dependency cycle;
+passing targeted checks is not a claim that these architectural debts are retired.
 
 ## Verification and rollback
 

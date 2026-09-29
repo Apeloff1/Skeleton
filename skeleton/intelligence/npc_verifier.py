@@ -137,7 +137,8 @@ def _steps(value: Any) -> list:
         return []
     return [
         item for item in value
-        if isinstance(item, Mapping) and str(item.get("text") or item.get("id") or "").strip()
+        if isinstance(item, Mapping) and any(isinstance(item.get(key), str) and item[key].strip()
+               for key in ("text", "id", "node_id", "line", "name"))
     ]
 
 

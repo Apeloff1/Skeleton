@@ -192,8 +192,9 @@ def test_evidence_digest_is_stable_for_equivalent_security_evidence() -> None:
     second = ScannerHarness("security-test")
     second.add_rule("finding", Severity.MEDIUM, lambda _root: "same", "repair")
 
-    first_report = first.scan()
-    second_report = second.scan()
+    with patch("skeleton.security.scanner_integrity.time.time_ns", side_effect=[10, 20, 30, 40]):
+        first_report = first.scan()
+        second_report = second.scan()
 
     assert first_report.started_ns != second_report.started_ns or first_report.finished_ns != second_report.finished_ns
     assert first_report.evidence_digest == second_report.evidence_digest

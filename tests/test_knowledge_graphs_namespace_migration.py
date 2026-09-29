@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,11 +32,17 @@ def test_ai_tree_governs_knowledge_parent_and_graph_child() -> None:
 
     assert knowledge["source"] == "skeleton/knowledge"
     assert knowledge["destination"] == "skeleton/ai/runtime/knowledge"
-    assert knowledge["source_git_object_sha"] == "518f871ec380c08d8226adbfb0122493efd85d13"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert knowledge["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{knowledge["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert knowledge["overlay_children"] == ["graphs"]
     assert graphs["source"] == "skeleton/knowledge/graphs"
     assert graphs["destination"] == "skeleton/ai/runtime/knowledge/graphs"
-    assert graphs["source_git_object_sha"] == "5a5b5627f3b15e783798900eaa8758eaccfee94f"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert graphs["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{graphs["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert "skeleton/knowledge" not in manifest["planned_path_audit"]["planned_but_absent"]
 
 

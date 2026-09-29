@@ -88,8 +88,10 @@ class ConsensusEngine:
             value=value,
             proposer=self._node.node_id,
         )
-        # Proposer votes for its own proposal
-        proposal.votes[self._node.node_id] = True
+        # The proposer obeys the same local policy as a receiving peer.
+        proposal.votes[self._node.node_id] = self._auto_accept and all(
+            fn(topic, value) for fn in self._voters
+        )
         self._proposals[proposal.proposal_id] = proposal
         self._stats["proposed"] += 1
 
@@ -113,6 +115,8 @@ class ConsensusEngine:
         return proposal
 
     def _resolve(self, proposal: Proposal) -> None:
+        if proposal.status != "open":
+            return
         outcome = proposal.tally(self._electorate())
         if outcome is None:
             return
@@ -164,7 +168,7 @@ class ConsensusEngine:
     def _on_vote(self, payload: Dict[str, Any]) -> None:
         """A vote arrived for one of our proposals."""
         proposal = self._proposals.get(payload["proposal_id"])
-        if proposal is None or proposal.proposer != self._node.node_id:
+        if proposal is None or proposal.proposer != self._node.node_id or proposal.status != "open":
             return
         proposal.votes[payload["voter"]] = bool(payload["accept"])
         self._resolve(proposal)

@@ -22,7 +22,7 @@ def test_public_recovery_exports_are_importable() -> None:
 
 def test_operator_mounts_recovery_and_retention_routes() -> None:
     app = create_app()
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/v1/swarm/operator/checkpoint" in paths
     assert "/api/v1/swarm/operator/restore-latest" in paths
     assert "/api/v1/swarm/operator/recovery" in paths

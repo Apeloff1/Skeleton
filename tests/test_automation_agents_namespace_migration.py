@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +35,10 @@ def test_ai_tree_retargets_agents_and_overlays_automation_parent() -> None:
 
     assert agents["source"] == "skeleton/automation/agents"
     assert agents["destination"] == "skeleton/ai/agents/core"
-    assert agents["source_git_object_sha"] == "90d2fb55348611e5d4b15337c1b5b2240c38d23e"
+    tree = subprocess.check_output(["git", "write-tree"], cwd=ROOT, text=True).strip()
+    assert agents["source_git_object_sha"] == subprocess.check_output(
+        ["git", "rev-parse", f'{tree}:{agents["source"]}'], cwd=ROOT, text=True
+    ).strip()
     assert "agents" in automation["overlay_children"]
 
 

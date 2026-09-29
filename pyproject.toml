@@ -4,6 +4,7 @@ target-version = ["py311"]
 
 [tool.pytest.ini_options]
 testpaths = ["skeleton/testing"]
+pythonpath = [".", "backend"]
 python_files = ["test_*.py"]
 
 [tool.mypy]

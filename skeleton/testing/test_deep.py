@@ -126,7 +126,7 @@ class TestCausalEngine(unittest.TestCase):
     def test_what_if_severs_parents(self):
         eng = self._feed()
         iv = eng.what_if("y", 0.0)
-        self.assertIn("x", iv.severed)
+        self.assertIn("x", iv.severed_parents)
 
     def test_attribution_decomposes(self):
         eng = self._feed()
@@ -147,35 +147,37 @@ class TestDifferentialPrivacy(unittest.TestCase):
         acc = PrivacyAccountant(session_budget=0.3, per_plane_budget=0.2)
         self.assertTrue(acc.spend(0.2, "laplace", "count", "rag"))
         self.assertFalse(acc.spend(0.2, "laplace", "count", "rag"))  # over session budget
-        self.assertEqual(acc.remaining(), 0.1)
+        self.assertAlmostEqual(acc.remaining(), 0.1)
 
     def test_laplace_count_noised_and_reproducible(self):
         from skeleton.memory.dp import LaplaceMechanism, PrivacyAccountant
-        mech = LaplaceMechanism(PrivacyAccountant(session_budget=10.0))
-        a = mech.privatize_count(100, 0.5, "q1")
-        b = mech.privatize_count(100, 0.5, "q1")
+        mech = LaplaceMechanism(PrivacyAccountant(session_budget=10.0, per_plane_budget=10.0))
+        a = mech.privatize_count(100, 0.5, "q1", plane="rag")
+        b = mech.privatize_count(100, 0.5, "q1", plane="rag")
+        self.assertIsNotNone(a)
+        self.assertIsNotNone(b)
         self.assertEqual(a, b)  # same query id → same noise
         self.assertNotEqual(a, 100.0)  # noise actually applied (overwhelmingly likely)
 
     def test_laplace_mean_within_sensitivity_scale(self):
         from skeleton.memory.dp import LaplaceMechanism, PrivacyAccountant
-        mech = LaplaceMechanism(PrivacyAccountant(session_budget=10.0))
-        out = mech.privatize_mean([0.5] * 100, 0.5, "m1", value_range=(0.0, 1.0))
+        mech = LaplaceMechanism(PrivacyAccountant(session_budget=10.0, per_plane_budget=10.0))
+        out = mech.privatize_mean([0.5] * 100, 0.5, "m1", value_range=(0.0, 1.0), plane="rag")
         self.assertIsNotNone(out)
         self.assertLess(abs(out - 0.5), 0.5)  # scale = 1/100/0.5 = 0.02, tight
 
     def test_exponential_selects_from_options(self):
         from skeleton.memory.dp import ExponentialMechanism, PrivacyAccountant
-        mech = ExponentialMechanism(PrivacyAccountant(session_budget=10.0))
-        pick = mech.select({"a": 1.0, "b": 0.1, "c": 0.0}, 1.0, "s1")
+        mech = ExponentialMechanism(PrivacyAccountant(session_budget=10.0, per_plane_budget=10.0))
+        pick = mech.select({"a": 1.0, "b": 0.1, "c": 0.0}, 1.0, "s1", plane="rag")
         self.assertIn(pick, {"a", "b", "c"})
 
     def test_budget_exhaustion_refuses_query(self):
         from skeleton.memory.dp import LaplaceMechanism, PrivacyAccountant
         acc = PrivacyAccountant(session_budget=0.15)
         mech = LaplaceMechanism(acc)
-        self.assertIsNotNone(mech.privatize_count(5, 0.1, "q1"))
-        self.assertIsNone(mech.privatize_count(5, 0.1, "q2"))  # budget exhausted
+        self.assertIsNotNone(mech.privatize_count(5, 0.1, "q1", plane="rag"))
+        self.assertIsNone(mech.privatize_count(5, 0.1, "q2", plane="rag"))  # budget exhausted
 
     def test_private_plane_adapter_no_raw_leak(self):
         from skeleton.memory.dp import DifferentialPrivacy
@@ -183,7 +185,7 @@ class TestDifferentialPrivacy(unittest.TestCase):
         mag = MAGStore("dp-test")
         mag.record("e1", "secret episode content", tags=["alpha"])
         mag.record("e2", "another private note", tags=["alpha", "beta"])
-        dp = DifferentialPrivacy(session_budget=5.0)
+        dp = DifferentialPrivacy(session_budget=5.0, per_plane_budget=1.0)
         adapter = dp.wrap("mag", mag)
         hist = adapter.tag_histogram(epsilon=0.5)
         self.assertIsNotNone(hist)

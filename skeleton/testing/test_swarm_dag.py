@@ -100,7 +100,7 @@ def test_fail_does_not_unlock_dependents():
 
     wave = dag.ready_wave()
     assert wave == []
-    assert dag.get("b").status == TaskStatus.PENDING
+    assert dag.get("b").status == TaskStatus.BLOCKED
 
 
 def test_fail_only_on_running():

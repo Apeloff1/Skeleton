@@ -29,6 +29,7 @@ NOW = 9_000_000.0
 
 
 class FakeProvider:
+    name = "authorization-fixture"
     supports_system_prompt = True
 
     def available(self) -> bool:

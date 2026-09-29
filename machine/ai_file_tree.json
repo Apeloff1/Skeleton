@@ -213,7 +213,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "1ee7fbd18489713a01711fb4b261df9e4fbfecc5",
+      "source_git_object_sha": "84b618b21f1d8f9c44e29ee67ec14f4d8aa2a2ef",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -343,7 +343,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "5e2d7c09c42b2f7df6e42edf4bd74d6d576810b3",
+      "source_git_object_sha": "c966370b80a04e46f13a553c32d655a0c48df427",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -963,7 +963,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "cf02d2227013d8f52a5a70627e65d0ddd9b552ef",
+      "source_git_object_sha": "8253240982efcc80de90b88d36571f02978df9d8",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1324,7 +1324,7 @@
       "source": "skeleton/foundation",
       "destination": "skeleton/ai/runtime/foundation",
       "kind": "tree",
-      "source_git_object_sha": "680e852be37378e18675d5dcfeb61029f23ff3d4",
+      "source_git_object_sha": "31cf0ac9bd4311fcab850cf02aa27b6208ed2b07",
       "role": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
       "work_package_refs": [
         "WP-W01",
@@ -1366,7 +1366,7 @@
       "source": "skeleton/distributed/galaxy",
       "destination": "skeleton/ai/runtime/distributed/galaxy",
       "kind": "tree",
-      "source_git_object_sha": "fea95fb293259929d5c9f296088f29931f4dfb40",
+      "source_git_object_sha": "856181c8606aead7995556b849fc96df41ce31e6",
       "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
       "work_package_refs": [
         "WP-W16",
@@ -2599,7 +2599,7 @@
       "source": "skeleton/forge/pipelines",
       "destination": "skeleton/ai/forge/pipelines",
       "kind": "tree",
-      "source_git_object_sha": "03912efb7c94bbbe49b3fdd8fd08eb2841d8b235",
+      "source_git_object_sha": "20c2d74e342513c0ca5d2e432cb603a1e4295454",
       "role": "Canonical generation-pipeline package under skeleton/forge/pipelines; mirrored exactly into the governed AI Forge surface.",
       "work_package_refs": [
         "WP-W27"
@@ -2909,7 +2909,7 @@
       "source": "skeleton/foundation/architecture/index.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_index.py",
       "kind": "file",
-      "source_git_object_sha": "72e7ec1b400c53e6132bb329a211a4521ad9731a",
+      "source_git_object_sha": "62c7e75869d1650d02273f328f3dc668d68a1ecb",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -4746,7 +4746,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "88d6e639850cf96e163fae754d57fa115f157bb8",
+      "source_git_object_sha": "f6ac62091cb6c9bf4018ae4e7927cbf93f51c3d0",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"

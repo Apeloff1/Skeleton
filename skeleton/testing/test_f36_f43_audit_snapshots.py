@@ -112,14 +112,12 @@ def test_live_hmac_audit_locks_probe_only_open_live_handlers(monkeypatch) -> Non
     assert rows["GET /cortex/status"]["hmac_open"] is False
 
 
-def test_nested_router_audit_locks_gameforge_command_include(monkeypatch) -> None:
+def test_nested_router_audit_excludes_unmounted_gameforge_wrapper(monkeypatch) -> None:
     _assert_import_free(monkeypatch, nested_router_audit_snapshot, NESTED_ROUTER_AUDIT_KIND)
     payload = nested_router_audit_snapshot()
-    assert len(payload["includes"]) == 1
-    row = payload["includes"][0]
-    assert row["host_module"] == "skeleton.api.gameforge_routes"
-    assert row["included_module"] == "skeleton.api.command_routes"
-    assert row["prefix"] == ""
+    assert payload["includes"] == []
+    with pytest.raises(KeyError, match="unknown include"):
+        get_nested_router_audit_row("skeleton.api.gameforge_routes")
 
 
 def test_env_flag_audit_locks_own_and_seal_names(monkeypatch) -> None:
@@ -179,9 +177,9 @@ def test_cli_http_and_command_parity_for_new_audits(capsys) -> None:
     assert asyncio.run(routes.application_live_hmac_audit_row("GET", "api/v1/health/live")) == get_live_hmac_audit_row(
         "GET /api/v1/health/live"
     )
-    assert asyncio.run(routes.application_nested_router_audit_row("skeleton.api.gameforge_routes")) == get_nested_router_audit_row(
-        "skeleton.api.gameforge_routes"
-    )
+    with pytest.raises(HTTPException) as retired_include:
+        asyncio.run(routes.application_nested_router_audit_row("skeleton.api.gameforge_routes"))
+    assert retired_include.value.status_code == 404
     assert asyncio.run(routes.application_env_flag_audit_row("SKELETON_OWN")) == get_env_flag_audit_row("SKELETON_OWN")
     with pytest.raises(HTTPException) as missing:
         asyncio.run(routes.application_env_flag_audit_row("MISSING"))
