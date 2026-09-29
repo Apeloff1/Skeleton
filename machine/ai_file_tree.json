@@ -307,10 +307,10 @@
     },
     {
       "id": "AIFT-BUILD-PLANNING",
-      "source": "core/shift_supervisor",
+      "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "dc3300593b0049186fcce43f7921e947a829afd6",
+      "source_git_object_sha": "9e784b949d6b8cb2dbd76684b9ccc6ce03bfa1d0",
       "role": "transitional planning scheduling and build-control harness",
       "work_package_refs": [
         "WP-W11",
@@ -333,7 +333,7 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "canonical_automation_shift_supervisor_with_legacy_core_shims"
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -406,11 +406,11 @@
     },
     {
       "id": "AIFT-AGENTS",
-      "source": "skeleton/agents",
+      "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "940ef2520e015bf13d7eba00813a792b575a7b3d",
-      "role": "core agent/swarm execution runtime",
+      "source_git_object_sha": "90d2fb55348611e5d4b15337c1b5b2240c38d23e",
+      "role": "canonical automation-owned agent/swarm execution runtime mirrored into AI agent core",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -435,14 +435,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_agents_with_legacy_root_shims"
     },
     {
       "id": "AIFT-AUTOMATION",
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "source_git_object_sha": "580a40ef8c915834d19fccc18905bdde808d6024",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -511,7 +511,7 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "canonical_automation_tree_with_exact_nested_domain_mirrors"
     },
     {
       "id": "AIFT-ARTIFACT-PLANE",
@@ -1557,10 +1557,10 @@
     },
     {
       "id": "AIFT-OVERSEER",
-      "source": "skeleton/overseer",
+      "source": "skeleton/automation/overseer",
       "destination": "skeleton/ai/runtime/distributed/overseer",
       "kind": "tree",
-      "source_git_object_sha": "ec0dbf04244ebe3ec9521a3c72fed2d7d9945b3c",
+      "source_git_object_sha": "168caafd2a3f001fec00f7eb08ae990b707871fc",
       "role": "Governor, digital-twin, hardware, recovery, fleet, and model-predictive control code is runtime supervision/scheduling infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -1589,7 +1589,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_overseer_with_legacy_root_shims"
     },
     {
       "id": "AIFT-PR-AUTOMATION",
@@ -1732,10 +1732,10 @@
     },
     {
       "id": "AIFT-SWARM",
-      "source": "skeleton/swarm",
+      "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "a340e961569a134a27bb5302baa0778e75d7a1dd",
+      "source_git_object_sha": "9a9d9d0ad1b2816389e96734899c81b9969ce53b",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1764,7 +1764,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_swarm_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GRAPHS",
@@ -2172,10 +2172,10 @@
     },
     {
       "id": "AIFT-HIVE",
-      "source": "skeleton/hive",
+      "source": "skeleton/automation/hive",
       "destination": "skeleton/ai/agents/swarm/hive",
       "kind": "tree",
-      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788",
+      "source_git_object_sha": "b67b286d9450ba6780a4dc92b611ce3c2aa0fd28",
       "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
       "work_package_refs": [
         "WP-W15",
@@ -2199,7 +2199,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_hive_with_legacy_root_shims"
     },
     {
       "id": "AIFT-JVM-REGISTRY",

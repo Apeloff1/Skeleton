@@ -84,8 +84,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "agents-compat"
+prefixes = ["skeleton/agents/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only agent runtime namespace; canonical agent and swarm execution lives under skeleton/automation/agents/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", ".emergent/"]
+prefixes = ["skeleton/automation/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
