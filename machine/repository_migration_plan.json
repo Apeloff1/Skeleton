@@ -304,6 +304,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/network/",
       "notes": "Four network/runtime modules moved from the generic platform bucket into canonical distributed ownership. __init__.py and model_placement.py were rewritten from skeleton.network to skeleton.distributed.network; remote_execution.py and replication.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/network and the legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-034",
+      "source": "skeleton/mesh/",
+      "destination": "skeleton/distributed/mesh/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/mesh/",
+      "notes": "Ten mesh/distributed-runtime modules moved from the generic platform bucket into canonical skeleton/distributed/mesh ownership. capacity_qualification.py was rewritten from skeleton.mesh to skeleton.distributed.mesh; the other nine modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/mesh and the legacy root is compatibility-only."
     }
   ]
 }
