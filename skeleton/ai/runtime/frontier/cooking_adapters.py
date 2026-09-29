@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from skeleton.frontier.bait import CatchBonuses
+from skeleton.frontier.ecology.bait import CatchBonuses
 from skeleton.frontier.cooking import ActiveCookingBuff
 from skeleton.frontier.energy import EnergyBoosterSpec
 
