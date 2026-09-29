@@ -63,8 +63,12 @@ def _fixture(root: Path, *, executable: bool = False):
                 "target_path": "satellites/branch-snapshots/demo/backend/blob.bin",
                 "source_path": "satellites/branch-snapshots/demo/backend/blob.bin",
                 "git_blob_oid": blob_oid,
+                "sha256": __import__("hashlib").sha256(payload).hexdigest(),
                 "size_bytes": len(payload),
                 "mode": "100755" if executable else "100644",
+                "license": "NOASSERTION",
+                "redistribution_status": "test-only",
+                "provenance_note": "Synthetic regression fixture.",
             }
         ],
     }
@@ -103,6 +107,23 @@ class ArtifactReferenceTests(unittest.TestCase):
             expected = refs.validate_file(manifest_path, repo_root=repo)[0]["git_blob_oid"]
             self.assertEqual(_git(repo, "hash-object", str(restored)), expected)
 
+    def test_materialize_rejects_sha256_mismatch_and_removes_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, manifest_path, manifest, _ = _fixture(root)
+            manifest["artifacts"][0]["sha256"] = "0" * 64
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "tampered.bin"
+
+            with self.assertRaisesRegex(refs.ArtifactReferenceError, "SHA-256 mismatch"):
+                refs.materialize(
+                    "demo-blob",
+                    output,
+                    manifest_path=manifest_path,
+                    repo_root=repo,
+                )
+            self.assertFalse(output.exists())
+
     def test_materialize_refuses_overwrite_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -139,6 +160,7 @@ class ArtifactReferenceTests(unittest.TestCase):
     def test_malformed_reference_fails_closed(self) -> None:
         cases = [
             ("git_blob_oid", "0" * 40, "resolves to"),
+            ("sha256", "not-a-sha256", "64 lowercase hex"),
             ("size_bytes", 1, "blob size"),
             ("mode", "120000", "unsupported mode"),
             ("target_path", "../escape.bin", "invalid path segments"),
