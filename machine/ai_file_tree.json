@@ -235,8 +235,8 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "5a887b888f0b0efabea046ea6da2486f3c33337f",
-      "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, and ecology/lifecycle systems under ecology/, mirrored exactly into skeleton/ai/runtime/frontier.",
+      "source_git_object_sha": "28bcf428007655b79aecdc6a1a4ab2e5233d1d84",
+      "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, and commerce/cooking/crafting/energy/equipment systems under economy/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
         "WP-W05",
@@ -252,7 +252,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_and_ecology_compatibility_shims"
+      "source_disposition": "canonical_frontier_tree_with_flat_runtime_progression_ecology_and_economy_compatibility_shims"
     },
     {
       "id": "AIFT-SKILLS",
