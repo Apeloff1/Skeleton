@@ -57,8 +57,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "swarm-compat"
+prefixes = ["skeleton/swarm/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Swarm namespace; canonical runtime lives under skeleton/automation/swarm/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/"]
+prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/hive/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
