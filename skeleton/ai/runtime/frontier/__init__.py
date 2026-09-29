@@ -1,13 +1,13 @@
 """Frontier consolidation contracts and program metadata."""
 
-from skeleton.frontier.achievement_adapters import (
+from skeleton.frontier.progression.achievement_adapters import (
     achievement_event,
     achievement_event_to_memory_item,
     achievement_identity,
     achievement_spec_digest,
     achievement_state_memory_item,
 )
-from skeleton.frontier.achievements import (
+from skeleton.frontier.progression.achievements import (
     AchievementRequirement,
     AchievementRewardPlan,
     AchievementSpec,
@@ -130,7 +130,7 @@ from skeleton.frontier.runtime.events import (
     JournalEntry,
     SQLiteEventJournal,
 )
-from skeleton.frontier.logbook import (
+from skeleton.frontier.progression.logbook import (
     CaptainLogEntry,
     MILESTONE_IMPORTANCE,
     can_delete,
@@ -158,7 +158,7 @@ from skeleton.frontier.runtime.memory_adapters import (
 from skeleton.frontier.npc import NPCGenerator, NPCSpec
 from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
 from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
-from skeleton.frontier.quests import (
+from skeleton.frontier.progression.quests import (
     ObjectiveProgress,
     QuestProgressState,
     QuestSpec,
@@ -170,7 +170,7 @@ from skeleton.frontier.quests import (
     select_quests_by_type,
     update_objective_progress,
 )
-from skeleton.frontier.reputation import (
+from skeleton.frontier.progression.reputation import (
     DEFAULT_REPUTATION_LEVELS,
     FactionSpec,
     ReputationChangeResult,

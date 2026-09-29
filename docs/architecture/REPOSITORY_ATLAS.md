@@ -46,7 +46,8 @@ Skeleton/
 │   │   └── platform/         engine adapter boundary (Godot)
 │   ├── world/                deterministic world/scene state
 │   ├── frontier/             frontier gameplay/product runtime
-│   │   └── runtime/          contracts, execution, streams, memory/control plane
+│   │   ├── runtime/          contracts, execution, streams, memory/control plane
+│   │   └── progression/      achievements, quests, reputation, passes/meta systems
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis
@@ -130,6 +131,7 @@ compatibility shims:
 | `skeleton.pipelines.*` | `skeleton.forge.pipelines.*` | transitional shim |
 | `skeleton.creator.*` | `skeleton.forge.creator.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
+| `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be

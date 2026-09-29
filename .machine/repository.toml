@@ -259,7 +259,7 @@ name = "frontier-runtime"
 prefixes = ["skeleton/frontier/"]
 owner = "frontier-runtime"
 criticality = "high"
-purpose = "Frontier domain runtime spanning gameplay and product systems, with orchestration, state, model routing and control-plane primitives nested under skeleton/frontier/runtime/."
+purpose = "Frontier domain runtime with control-plane primitives nested under skeleton/frontier/runtime/ and progression/meta-game systems nested under skeleton/frontier/progression/; remaining ecology/economy domains stay explicit pending later extraction."
 audience = "both"
 lifecycle = "canonical"
 
