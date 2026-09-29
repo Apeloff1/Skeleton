@@ -113,6 +113,29 @@ def _positive_size(value: Any) -> int:
     return value
 
 
+def _blob_sha256(repo_root: Path, blob_oid: str) -> str:
+    process = subprocess.Popen(
+        ["git", "cat-file", "blob", blob_oid],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert process.stdout is not None
+    digest = hashlib.sha256()
+    while True:
+        chunk = process.stdout.read(1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+    _, stderr = process.communicate()
+    if process.returncode != 0:
+        raise ArtifactReferenceError(
+            f"git cat-file failed while hashing {blob_oid}: "
+            f"{stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    return digest.hexdigest()
+
+
 def _resolve_blob(repo_root: Path, source_commit: str, source_path: str) -> str:
     result = _git(
         repo_root,
@@ -164,6 +187,7 @@ def validate_manifest(
 
     ids: set[str] = set()
     targets: set[str] = set()
+    sha256_by_blob: dict[str, str] = {}
     validated: list[dict[str, Any]] = []
     for index, raw in enumerate(artifacts):
         if not isinstance(raw, dict):
@@ -225,6 +249,14 @@ def validate_manifest(
         if observed_size != size_bytes:
             raise ArtifactReferenceError(
                 f"{artifact_id}: blob size {observed_size} != declared {size_bytes}"
+            )
+        observed_sha256 = sha256_by_blob.get(blob_oid)
+        if observed_sha256 is None:
+            observed_sha256 = _blob_sha256(repo_root, blob_oid)
+            sha256_by_blob[blob_oid] = observed_sha256
+        if observed_sha256 != sha256:
+            raise ArtifactReferenceError(
+                f"{artifact_id}: blob SHA-256 {observed_sha256} != declared {sha256}"
             )
 
         if require_targets_removed:
