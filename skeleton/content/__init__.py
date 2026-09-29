@@ -1,5 +1,3 @@
-"""Domain knowledge packs used by Skeleton AI pipelines."""
+"""Compatibility shim for :mod:`skeleton.simulation.content`."""
 
-from .lorebuffa import LOREBUFFA_AI_PACK, get_npc_context
-
-__all__ = ["LOREBUFFA_AI_PACK", "get_npc_context"]
+from skeleton.simulation.content import *  # noqa: F401,F403
