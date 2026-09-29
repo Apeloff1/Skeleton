@@ -10,9 +10,6 @@ from dataclasses import dataclass, field
 import json
 import secrets
 from threading import RLock
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
 @dataclass(frozen=True)
@@ -47,15 +44,26 @@ class EnvelopeKMS:
         return context.encode("utf-8")
 
     def derive_key(self, context: str) -> bytes:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
         with self._lock:
             return HKDF(algorithm=hashes.SHA256(), length=32, salt=None,
                         info=b"skeleton-vault-v1:" + self._context(context)).derive(
                             self._masters[self._generation])
 
+    @staticmethod
+    def _cipher(key: bytes):
+        # Inspection and packaging can import Skeleton without loading native
+        # cryptography. Actual encryption still requires the declared library;
+        # there is deliberately no unauthenticated fallback.
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        return AESGCM(key)
+
     def _wrap(self, key_id, context, raw, generation):
         nonce = secrets.token_bytes(12)
         aad = json.dumps([key_id, context, generation], separators=(",", ":")).encode()
-        wrapped = AESGCM(self._masters[generation]).encrypt(nonce, raw, aad)
+        wrapped = self._cipher(self._masters[generation]).encrypt(nonce, raw, aad)
         return DataKey(key_id, context, generation, nonce, wrapped)
 
     def unwrap_key(self, key: DataKey) -> bytes:
@@ -63,7 +71,7 @@ class EnvelopeKMS:
             raise TypeError("key must be DataKey")
         with self._lock:
             aad = json.dumps([key.key_id, key.context, key.version], separators=(",", ":")).encode()
-            return AESGCM(self._masters[key.version]).decrypt(key.nonce, key.wrapped_key, aad)
+            return self._cipher(self._masters[key.version]).decrypt(key.nonce, key.wrapped_key, aad)
 
     def generate_data_key(self, context: str) -> DataKey:
         self._context(context)
@@ -79,7 +87,7 @@ class EnvelopeKMS:
         with self._lock:
             key = self.generate_data_key(context)
             nonce = secrets.token_bytes(12)
-            ciphertext = AESGCM(self.unwrap_key(key)).encrypt(nonce, plaintext, aad)
+            ciphertext = self._cipher(self.unwrap_key(key)).encrypt(nonce, plaintext, aad)
             return {"algorithm": self.ALGORITHM, "context": context,
                     "key_id": key.key_id, "version": key.version,
                     "wrapped_key": key.wrapped_key.hex(), "key_nonce": key.nonce.hex(),
@@ -95,7 +103,7 @@ class EnvelopeKMS:
         key = DataKey(envelope["key_id"], envelope["context"], version,
                       bytes.fromhex(envelope["key_nonce"]), bytes.fromhex(envelope["wrapped_key"]))
         with self._lock:
-            return AESGCM(self.unwrap_key(key)).decrypt(
+            return self._cipher(self.unwrap_key(key)).decrypt(
                 bytes.fromhex(envelope["nonce"]), bytes.fromhex(envelope["ciphertext"]), aad)
 
     def rotate_master(self, new_master: bytes) -> int:

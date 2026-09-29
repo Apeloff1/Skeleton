@@ -247,3 +247,30 @@ def test_retry_card_counts_actual_retries():
     retry.tune('test', base_delay_s=0)
     assert retry.execute('test', operation)['success']
     assert retry.card()['total_retries'] == 1
+
+
+
+def test_lightweight_import_does_not_load_cryptography():
+    import subprocess
+    import sys
+    from pathlib import Path
+    code = """
+import builtins
+original = builtins.__import__
+def guarded(name, *args, **kwargs):
+    if name == 'cryptography' or name.startswith('cryptography.'):
+        raise ModuleNotFoundError('cryptography intentionally unavailable')
+    return original(name, *args, **kwargs)
+builtins.__import__ = guarded
+import skeleton
+from skeleton.vault.kms import EnvelopeKMS
+try:
+    EnvelopeKMS().encrypt(b'payload', 'test')
+except ModuleNotFoundError as error:
+    assert 'cryptography' in str(error)
+else:
+    raise AssertionError('encryption must not fall back without cryptography')
+"""
+    result = subprocess.run([sys.executable, '-c', code], cwd=Path(__file__).resolve().parents[2],
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr

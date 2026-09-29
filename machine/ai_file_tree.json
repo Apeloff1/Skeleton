@@ -377,7 +377,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "bbdfbb9cff34d420fa90c7247d3a6efc26fe678e",
+      "source_git_object_sha": "4ab17d6d08267ed36154459f6d7ee7b9ca18a077",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
