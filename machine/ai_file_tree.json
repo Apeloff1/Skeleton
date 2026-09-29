@@ -63,7 +63,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "1e753fb40702a6bd420f16d79791d4ea6efd73da",
+      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -77,7 +77,7 @@
       ],
       "parity_mode": "compatibility_facade",
       "facade_required_import": "from skeleton.provider_runtime import",
-      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover.",
+      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover; its provider-neutral contract dependency now resolves through skeleton/providers/contract.py.",
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
