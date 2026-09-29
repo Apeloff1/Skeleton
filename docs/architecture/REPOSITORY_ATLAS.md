@@ -28,9 +28,9 @@ Skeleton/
 │   │   └── architecture/     canonical architecture index + round history
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
+│   │   └── agents/           agent runtime/orchestration
 │   ├── distributed/          distributed runtime infrastructure
 │   │   └── galaxy/           federation, transport, consensus, election and fleet coordination
-│   │   └── agents/           agent runtime/orchestration
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
 │   ├── memory/               runtime memory
