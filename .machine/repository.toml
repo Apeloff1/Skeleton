@@ -66,8 +66,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "hive-compat"
+prefixes = ["skeleton/hive/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Hive namespace; canonical runtime lives under skeleton/automation/hive/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/hive/", ".emergent/"]
+prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
