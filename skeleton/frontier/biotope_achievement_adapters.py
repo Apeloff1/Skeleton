@@ -7,7 +7,7 @@ requirements (distinct species, all-biotope coverage, trophy coverage and
 per-biotope mastery) are never produced by its catch recorder.
 
 This module does not add another achievement engine. It normalizes source-shaped
-records into :mod:`skeleton.frontier.achievements`, derives monotonic evidence
+records into :mod:`skeleton.frontier.progression.achievements`, derives monotonic evidence
 from catches, then delegates qualification/claim semantics to that existing
 canonical kernel.
 """
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
-from skeleton.frontier.achievements import (
+from skeleton.frontier.progression.achievements import (
     AchievementRequirement,
     AchievementSpec,
     AchievementState,

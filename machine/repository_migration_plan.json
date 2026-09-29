@@ -151,6 +151,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier runtime modules",
       "notes": "Sixteen Frontier runtime/control-plane modules were extracted into skeleton/frontier/runtime/. Internal runtime imports and public frontier exports now target the nested canonical paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, preserving exact whole-tree and runtime-subtree parity."
+    },
+    {
+      "id": "TREE-017",
+      "source": "skeleton/frontier/{achievement_adapters,achievements,encyclopedia,guild,logbook,lucky_wheel,quests,reputation,season_pass,tournament,vip,vip_daily}.py",
+      "destination": "skeleton/frontier/progression/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier progression/meta modules",
+      "notes": "Twelve Frontier progression/meta-game modules were extracted into skeleton/frontier/progression/. Internal progression/runtime references and public frontier exports now target canonical nested paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, and biotope_achievement_adapters now imports canonical progression/runtime dependencies. Whole-tree source/AI parity remains exact."
     }
   ]
 }
