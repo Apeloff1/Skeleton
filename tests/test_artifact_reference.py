@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -63,7 +64,7 @@ def _fixture(root: Path, *, executable: bool = False):
                 "target_path": "satellites/branch-snapshots/demo/backend/blob.bin",
                 "source_path": "satellites/branch-snapshots/demo/backend/blob.bin",
                 "git_blob_oid": blob_oid,
-                "sha256": __import__("hashlib").sha256(payload).hexdigest(),
+                "sha256": hashlib.sha256(payload).hexdigest(),
                 "size_bytes": len(payload),
                 "mode": "100755" if executable else "100644",
                 "license": "NOASSERTION",
