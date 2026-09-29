@@ -138,11 +138,20 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "graphs-compat"
+prefixes = ["skeleton/graphs/"]
+owner = "knowledge-runtime"
+criticality = "low"
+purpose = "Compatibility-only graph namespace; canonical graph, spectral, motif and GAT primitives live under skeleton/knowledge/graphs/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "knowledge"
-prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/graphs/", "skeleton/chronicle/"]
+prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/knowledge/", "skeleton/chronicle/"]
 owner = "knowledge-runtime"
 criticality = "high"
-purpose = "Runtime memory, retrieval, indexing, graph and chronology services."
+purpose = "Runtime memory, retrieval, reusable knowledge/reasoning substrate, indexing, graphs and chronology services."
 audience = "both"
 lifecycle = "canonical"
 

@@ -37,6 +37,8 @@ Skeleton/
 │   ├── shells/               policy-bound execution plane
 │   ├── memory/               runtime memory
 │   ├── retrieval/            retrieval/ranking/fusion
+│   ├── knowledge/             reusable knowledge/reasoning substrate
+│   │   └── graphs/            graph, spectral, motif and GAT primitives
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
 │   ├── kv/                   paged/tiered KV-cache control plane
@@ -153,6 +155,7 @@ compatibility shims:
 | `skeleton.galaxy.*` | `skeleton.distributed.galaxy.*` | transitional shim |
 | `skeleton.network.*` | `skeleton.distributed.network.*` | transitional shim |
 | `skeleton.mesh.*` | `skeleton.distributed.mesh.*` | transitional shim |
+| `skeleton.graphs.*` | `skeleton.knowledge.graphs.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

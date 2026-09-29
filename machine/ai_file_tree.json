@@ -1777,11 +1777,39 @@
       "source_disposition": "canonical_automation_swarm_with_legacy_root_shims"
     },
     {
+      "id": "AIFT-KNOWLEDGE",
+      "source": "skeleton/knowledge",
+      "destination": "skeleton/ai/runtime/knowledge",
+      "kind": "tree",
+      "source_git_object_sha": "518f871ec380c08d8226adbfb0122493efd85d13",
+      "role": "Canonical reusable knowledge and reasoning substrate parent with independently governed graph primitives.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-012"
+      ],
+      "overlay_children": [
+        "graphs"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_knowledge_parent_with_governed_graphs_overlay"
+    },
+    {
       "id": "AIFT-GRAPHS",
-      "source": "skeleton/graphs",
+      "source": "skeleton/knowledge/graphs",
       "destination": "skeleton/ai/runtime/knowledge/graphs",
       "kind": "tree",
-      "source_git_object_sha": "faaf484c2d16019039f8c16a6c5383ed01247d05",
+      "source_git_object_sha": "5a5b5627f3b15e783798900eaa8758eaccfee94f",
       "role": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
       "work_package_refs": [
         "WP-W09",
@@ -1805,7 +1833,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_knowledge_graphs_with_legacy_root_shims"
     },
     {
       "id": "AIFT-INTEGRATIONS",
@@ -4853,6 +4881,11 @@
         "planned_path": "skeleton/mesh",
         "implemented_path": "skeleton/distributed/mesh",
         "mapping_id": "AIFT-MESH"
+      },
+      {
+        "planned_path": "skeleton/graphs",
+        "implemented_path": "skeleton/knowledge/graphs",
+        "mapping_id": "AIFT-GRAPHS"
       }
     ],
     "planned_but_absent": [
@@ -4867,7 +4900,6 @@
       "skeleton/experiments",
       "skeleton/hardware",
       "skeleton/inference",
-      "skeleton/knowledge",
       "skeleton/modeling",
       "skeleton/multimodal",
       "skeleton/planning",
@@ -5420,6 +5452,11 @@
       "path": "skeleton/mesh",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-034"
+    },
+    {
+      "path": "skeleton/graphs",
+      "owner": "knowledge compatibility boundary",
+      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-035"
     }
   ],
   "classification_coverage": {
