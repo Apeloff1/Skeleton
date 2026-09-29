@@ -372,8 +372,26 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "galaxy-compat"
+prefixes = ["skeleton/galaxy/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Galaxy namespace; canonical federation, transport, consensus and fleet coordination live under skeleton/distributed/galaxy/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "distributed"
+prefixes = ["skeleton/distributed/"]
+owner = "distributed-runtime"
+criticality = "critical"
+purpose = "Canonical distributed runtime infrastructure for federation, transport, election, consensus, synchronization and fleet coordination."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/galaxy/", "skeleton/organism/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/organism/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."

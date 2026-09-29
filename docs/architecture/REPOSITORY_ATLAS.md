@@ -29,6 +29,8 @@ Skeleton/
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
 │   │   └── agents/           agent runtime/orchestration
+│   ├── distributed/          distributed runtime infrastructure
+│   │   └── galaxy/           federation, transport, consensus, election and fleet coordination
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
 │   ├── memory/               runtime memory
@@ -146,6 +148,7 @@ compatibility shims:
 | `skeleton.game.*` | `skeleton.simulation.game.*` | transitional shim |
 | `skeleton.era.*` | `skeleton.simulation.era.*` | transitional shim |
 | `skeleton.social.*` | `skeleton.research.social.*` | transitional shim |
+| `skeleton.galaxy.*` | `skeleton.distributed.galaxy.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

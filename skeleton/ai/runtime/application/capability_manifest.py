@@ -57,7 +57,7 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
     ),
     Capability(
         id="galaxy",
-        module="skeleton.galaxy",
+        module="skeleton.distributed.galaxy",
         description="Federation, transport, consensus, synchronization, and fleet coordination.",
     ),
     Capability(

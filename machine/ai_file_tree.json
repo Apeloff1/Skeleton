@@ -1332,10 +1332,10 @@
     },
     {
       "id": "AIFT-GALAXY",
-      "source": "skeleton/galaxy",
+      "source": "skeleton/distributed/galaxy",
       "destination": "skeleton/ai/runtime/distributed/galaxy",
       "kind": "tree",
-      "source_git_object_sha": "c376f28b7e4241b4327551fd64d7bed6655ff7ab",
+      "source_git_object_sha": "4edf8f5dbd7323a5581072a3430b1ad85c81f2dd",
       "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
       "work_package_refs": [
         "WP-W16",
@@ -1361,7 +1361,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_galaxy_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GATE-PLANE",
@@ -4838,6 +4838,11 @@
         "planned_path": "skeleton/social",
         "implemented_path": "skeleton/research/social",
         "mapping_id": "AIFT-SOCIAL"
+      },
+      {
+        "planned_path": "skeleton/galaxy",
+        "implemented_path": "skeleton/distributed/galaxy",
+        "mapping_id": "AIFT-GALAXY"
       }
     ],
     "planned_but_absent": [
@@ -4846,7 +4851,6 @@
       "skeleton/autonomy",
       "skeleton/compute",
       "skeleton/connectors",
-      "skeleton/distributed",
       "skeleton/document",
       "skeleton/document_vision",
       "skeleton/education",
@@ -5391,6 +5395,11 @@
       "path": "skeleton/social",
       "owner": "research compatibility boundary",
       "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-031"
+    },
+    {
+      "path": "skeleton/galaxy",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-032"
     }
   ],
   "classification_coverage": {
