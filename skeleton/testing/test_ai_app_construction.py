@@ -126,7 +126,7 @@ def test_provider_families_have_one_shared_receipt_contract() -> None:
     contract = _contract()
     enforcement = contract["provider_bootstrap"]["runtime_enforcement"]
 
-    assert enforcement["loader"] == "skeleton/provider_contract.py"
+    assert enforcement["loader"] == "skeleton/providers/contract.py"
     assert enforcement["activation_boundary"] == "skeleton/provider_runtime.py"
     assert set(enforcement["compatibility_boundaries"]) == {
         "backend/core/ai_provider.py",
