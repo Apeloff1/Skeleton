@@ -223,6 +223,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/swarm/",
       "notes": "Twenty-one Swarm modules moved under canonical automation ownership. Nine modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-025",
+      "source": "skeleton/hive/",
+      "destination": "skeleton/automation/hive/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/hive/",
+      "notes": "Eight Hive modules moved under canonical automation ownership. Six modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
     }
   ]
 }

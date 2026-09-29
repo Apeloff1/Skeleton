@@ -1,19 +1,6 @@
-"""Hive 1.0 facade (GB-25). No chain. No coin."""
+"""Compatibility namespace for canonical automation Hive runtime.
 
-from __future__ import annotations
-
-from skeleton.hive.capabilities import capabilities
-from skeleton.hive.cards import hive_card
-from skeleton.hive.engine import HiveEngine
-from skeleton.hive.kernel import Hive
-from skeleton.hive.law import PACKET, VERSION, WALK_CAP
-
-__all__ = [
-    "PACKET",
-    "VERSION",
-    "WALK_CAP",
-    "Hive",
-    "HiveEngine",
-    "capabilities",
-    "hive_card",
-]
+New code should import from :mod:`skeleton.automation.hive`.
+"""
+from skeleton.automation.hive import *  # noqa: F401,F403
+from skeleton.automation.hive import __all__ as __all__

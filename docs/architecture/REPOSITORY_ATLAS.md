@@ -139,6 +139,7 @@ compatibility shims:
 | `skeleton.content.*` | `skeleton.simulation.content.*` | transitional shim |
 | `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
+| `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
 | `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
 | `skeleton.frontier.{aquarium,bait,biotope,breeding,...}` | `skeleton.frontier.ecology.*` | transitional module shims |
