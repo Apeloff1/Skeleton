@@ -47,7 +47,8 @@ Skeleton/
 │   ├── world/                deterministic world/scene state
 │   ├── frontier/             frontier gameplay/product runtime
 │   │   ├── runtime/          contracts, execution, streams, memory/control plane
-│   │   └── progression/      achievements, quests, reputation, passes/meta systems
+│   │   ├── progression/      achievements, quests, reputation, passes/meta systems
+│   │   └── ecology/          aquarium, bait, biotope, breeding + adapters
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis
@@ -132,6 +133,7 @@ compatibility shims:
 | `skeleton.creator.*` | `skeleton.forge.creator.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
 | `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
+| `skeleton.frontier.{aquarium,bait,biotope,breeding,...}` | `skeleton.frontier.ecology.*` | transitional module shims |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
