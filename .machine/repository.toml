@@ -201,6 +201,15 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "kv-cache-compat"
+prefixes = ["skeleton/kv_cache.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only KV-cache facade; canonical public surface lives in the skeleton/kv package."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "platform"
 prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
 owner = "platform-runtime"
