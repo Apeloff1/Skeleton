@@ -70,6 +70,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
       "notes": "Architecture index and rounds 3-22 moved into a cohesive foundation/architecture namespace; legacy root modules remain compatibility shims, and the canonical index imports canonical round modules."
+    },
+    {
+      "id": "TREE-008",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/ai/providers/contract.py",
+      "mode": "cutover-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/provider_contract.py",
+      "notes": "The AI provider contract copy was already byte-identical to the root implementation. Canonical ownership moved to skeleton/ai/providers/contract.py; the root module is now a compatibility shim. The credential-bearing skeleton/provider_runtime.py remains owner-sensitive in place and imports the canonical contract directly."
     }
   ]
 }
