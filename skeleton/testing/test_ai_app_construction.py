@@ -126,7 +126,7 @@ def test_provider_families_have_one_shared_receipt_contract() -> None:
     contract = _contract()
     enforcement = contract["provider_bootstrap"]["runtime_enforcement"]
 
-    assert enforcement["loader"] == "skeleton/provider_contract.py"
+    assert enforcement["loader"] == "skeleton/providers/contract.py"
     assert enforcement["activation_boundary"] == "skeleton/provider_runtime.py"
     assert set(enforcement["compatibility_boundaries"]) == {
         "backend/core/ai_provider.py",
@@ -164,8 +164,8 @@ def test_operation_and_stream_architecture_is_materialized() -> None:
     assert errors == []
     assert summary["operation_stream"] == {
         "operation_owner": "skeleton/contracts/operation.py",
-        "stream_owner": "skeleton/frontier/operation_stream.py",
-        "durable_store": "skeleton/frontier/operation_stream_store.py",
+        "stream_owner": "skeleton/frontier/runtime/operation_stream.py",
+        "durable_store": "skeleton/frontier/runtime/operation_stream_store.py",
         "stream_schema_version": 1,
     }
 
@@ -182,7 +182,7 @@ def test_operation_and_stream_architecture_is_materialized() -> None:
     assert stream["schema_version"] == 1
     assert (
         stream["durable_reference_store"]
-        == "skeleton/frontier/operation_stream_store.py:SQLiteOperationEventStore"
+        == "skeleton/frontier/runtime/operation_stream_store.py:SQLiteOperationEventStore"
     )
 
     operation_fields = set(
@@ -265,7 +265,7 @@ def test_dependency_and_acceptance_relationships_are_separate() -> None:
 
     assert contract["relationship_semantics"]["runtime_dependency"]["field"] == "depends_on"
     assert contract["relationship_semantics"]["acceptance_target"]["field"] == "validates"
-    assert planes["model-routing"]["owner"] == "skeleton/frontier/model_routing.py"
+    assert planes["model-routing"]["owner"] == "skeleton/frontier/runtime/model_routing.py"
     assert "model-routing" in planes["orchestration"]["depends_on"]
 
     release = planes["deployment-release"]
