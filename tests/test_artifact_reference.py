@@ -108,6 +108,15 @@ class ArtifactReferenceTests(unittest.TestCase):
             expected = refs.validate_file(manifest_path, repo_root=repo)[0]["git_blob_oid"]
             self.assertEqual(_git(repo, "hash-object", str(restored)), expected)
 
+    def test_check_rejects_well_formed_sha256_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, manifest_path, manifest, _ = _fixture(Path(tmp))
+            manifest["artifacts"][0]["sha256"] = "0" * 64
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with self.assertRaisesRegex(refs.ArtifactReferenceError, "blob SHA-256"):
+                refs.validate_file(manifest_path, repo_root=repo)
+
     def test_materialize_rejects_sha256_mismatch_and_removes_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
