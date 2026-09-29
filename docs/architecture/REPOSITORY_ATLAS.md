@@ -20,6 +20,7 @@ Skeleton/
 ├── skeleton/                 canonical Python application/runtime namespace
 │   ├── ai/                   AI runtime, providers, learning, research
 │   ├── app/                  whole-application assembly/operator surface
+│   ├── bootstrap/            engine startup and subsystem wiring
 │   ├── kernel/               foundational primitives
 │   ├── core/                 core runtime services
 │   ├── foundation/           foundational cross-cutting primitives
@@ -115,6 +116,7 @@ compatibility shims:
 | `skeleton.architecture_index` | `skeleton.foundation.architecture.index` | transitional shim |
 | `skeleton.architecture_round*` | `skeleton.foundation.architecture.rounds.round*` | transitional shim |
 | `skeleton.jvm_accelerators` | `skeleton.native.jvm_registry` | transitional shim |
+| `skeleton.genesis` | `skeleton.bootstrap.genesis` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
