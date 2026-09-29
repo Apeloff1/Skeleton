@@ -94,3 +94,18 @@ model.
 The important invariant is **one navigable repository, two views**: humans get
 a stable conceptual tree; machines get the same taxonomy plus live topology and
 counts.
+
+
+## Active namespace migrations
+
+The first consolidation wave is now structured around canonical source plus
+compatibility shims:
+
+| Legacy import surface | Canonical source | State |
+| --- | --- | --- |
+| `skeleton.deployment.*` | `skeleton.deploy.strategies.*` | transitional shim |
+| `skeleton.contexts.*` | `skeleton.context.domains.*` | transitional shim |
+
+New code should use the canonical namespaces. Compatibility surfaces stay
+readable until reference audits and downstream migrations prove they can be
+removed safely.

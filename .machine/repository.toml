@@ -67,12 +67,21 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "ai"
-prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/", "skeleton/contexts/"]
+prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
 owner = "ai-runtime"
 criticality = "high"
 purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
 audience = "both"
 lifecycle = "canonical"
+
+[[zone]]
+name = "context-compat"
+prefixes = ["skeleton/contexts/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only plural context namespace; canonical implementations live under skeleton/context/domains/."
+audience = "internal"
+lifecycle = "transitional"
 
 [[zone]]
 name = "shell-runtime"
@@ -138,8 +147,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "deployment-compat"
+prefixes = ["skeleton/deployment/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only deployment namespace; canonical strategy implementations live under skeleton/deploy/strategies/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/deployment/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "skeleton/jvm_accelerators.py", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "skeleton/jvm_accelerators.py", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
