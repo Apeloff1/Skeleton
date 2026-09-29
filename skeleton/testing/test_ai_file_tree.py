@@ -160,7 +160,7 @@ def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
     retained = {item["path"]: item for item in manifest["retained_outside_ai_tree"]}
 
     assert retained["skeleton/architecture.py"]["owner"] == "architecture authority"
-    assert retained["skeleton/architecture_index.py"]["owner"] == "architecture authority"
+    assert retained["skeleton/foundation/architecture/index.py"]["owner"] == "architecture authority"
     assert retained["skeleton/acquired"]["owner"] == "quarantine/provenance"
     assert retained["skeleton/release"]["owner"] == "release engineering"
     assert retained["skeleton/ubuntu"]["owner"] == "deployment/platform support"
