@@ -116,7 +116,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "d808e2da42400ca8eae4ccd7a310b11a2954e058",
+      "source_git_object_sha": "b638c194161e9095cd3d748ac91661cf2adb8866",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -143,7 +143,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "6e808777ce8fc27375ae5cedf7ddd969ccabc73b",
+      "source_git_object_sha": "3d555d4e8e516f82e1ef6c2be24c7324b432c105",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -307,11 +307,11 @@
     },
     {
       "id": "AIFT-BUILD-PLANNING",
-      "source": "core/shift_supervisor",
+      "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "dc3300593b0049186fcce43f7921e947a829afd6",
-      "role": "transitional planning scheduling and build-control harness",
+      "source_git_object_sha": "9e784b949d6b8cb2dbd76684b9ccc6ce03bfa1d0",
+      "role": "canonical shift-supervisor planning, scheduling, and build-control harness",
       "work_package_refs": [
         "WP-W11",
         "WP-W12",
@@ -323,8 +323,8 @@
         {
           "path": "model_gateway.py",
           "mode": "compatibility_facade",
-          "facade_required_import": "from core.shift_supervisor.model_gateway import",
-          "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
+          "facade_required_import": "from skeleton.automation.shift_supervisor.model_gateway import",
+          "note": "Credential-bearing model gateway remains singular at skeleton/automation/shift_supervisor/model_gateway.py."
         }
       ],
       "move_tags": [
@@ -333,7 +333,7 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "canonical_automation_owner_with_legacy_core_shims"
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -442,7 +442,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "source_git_object_sha": "f88a6552af2fe9cf6108db4a6cf4223ed05408b1",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -511,7 +511,10 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "source_exclusions": [
+        "shift_supervisor"
+      ]
     },
     {
       "id": "AIFT-ARTIFACT-PLANE",
@@ -585,7 +588,7 @@
       "source": "skeleton/contexts",
       "destination": "skeleton/ai/runtime/contexts",
       "kind": "tree",
-      "source_git_object_sha": "8f3df332fdca226208a0c4f7cbd4560b291b15fe",
+      "source_git_object_sha": "d5ea539263767deeae93bf191927895d954b3ed3",
       "role": "legacy/extended context runtime support",
       "work_package_refs": [
         "WP-W00",
@@ -1083,10 +1086,10 @@
     },
     {
       "id": "AIFT-APPLICATION",
-      "source": "skeleton/application",
+      "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "8115bf017e1ee7bf1617c1df22bb89118f876550",
+      "source_git_object_sha": "21a4d73cabe30e2c30c76fbe8491c8cf992c0897",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1116,7 +1119,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_app_runtime_with_legacy_application_shims"
     },
     {
       "id": "AIFT-BUILD",
@@ -1292,7 +1295,7 @@
       "source": "skeleton/foundation",
       "destination": "skeleton/ai/runtime/foundation",
       "kind": "tree",
-      "source_git_object_sha": "19f7f0add28f457427da23f03a1f6437c7c9965e",
+      "source_git_object_sha": "0a6b0fdaff569b241a6b73cd5eade4c89144d754",
       "role": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
       "work_package_refs": [
         "WP-W01",
@@ -1324,7 +1327,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "retain_until_import_inversion_and_regression_gates",
+      "source_exclusions": [
+        "architecture"
+      ]
     },
     {
       "id": "AIFT-GALAXY",
@@ -2443,7 +2449,7 @@
       "source": "skeleton/persist",
       "destination": "skeleton/ai/runtime/persistence/legacy_persist",
       "kind": "tree",
-      "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072",
+      "source_git_object_sha": "42bb0bea4894c765999b4eb2e82fe12c4ab2895b",
       "role": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
       "work_package_refs": [
         "WP-W03",
@@ -4713,6 +4719,41 @@
         "planned_path": "planned:native",
         "implemented_path": "skeleton/native",
         "mapping_id": "AIFT-NATIVE"
+      },
+      {
+        "planned_path": "skeleton/application",
+        "implemented_path": "skeleton/app/runtime",
+        "mapping_id": "AIFT-APPLICATION"
+      },
+      {
+        "planned_path": "skeleton/genesis.py",
+        "implemented_path": "skeleton/bootstrap/genesis.py",
+        "mapping_id": "AIFT-GENESIS"
+      },
+      {
+        "planned_path": "skeleton/provider_contract.py",
+        "implemented_path": "skeleton/providers/contract.py",
+        "mapping_id": "AIFT-PROVIDER-CONTRACT"
+      },
+      {
+        "planned_path": "skeleton/pipelines",
+        "implemented_path": "skeleton/forge/pipelines",
+        "mapping_id": "AIFT-PIPELINES"
+      },
+      {
+        "planned_path": "skeleton/platform",
+        "implemented_path": "skeleton/simulation/platform",
+        "mapping_id": "AIFT-PLATFORM"
+      },
+      {
+        "planned_path": "skeleton/jvm_accelerators.py",
+        "implemented_path": "skeleton/native",
+        "mapping_id": "AIFT-NATIVE"
+      },
+      {
+        "planned_path": "skeleton/kv_cache.py",
+        "implemented_path": "skeleton/kv/__init__.py",
+        "mapping_id": "AIFT-KV-CACHE"
       }
     ],
     "planned_but_absent": [
@@ -5057,6 +5098,116 @@
       "path": "skeleton/cue",
       "owner": "package/compatibility boundary",
       "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/foundation/architecture",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_index.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round3.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round10.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round11.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round12.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round13.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round14.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round15.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round16.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round17.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round18.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round19.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round20.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round21.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture_round22.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     }
   ],
   "classification_coverage": {
@@ -5069,7 +5220,7 @@
     "payload_git_sha": "e7eabe27778d01cc4b6f44f6580b7bfa6506df90",
     "migrated_assignment_count": 20,
     "migrated_sources": [
-      "skeleton/application",
+      "skeleton/app/runtime",
       "skeleton/build",
       "skeleton/chronicle",
       "skeleton/core",

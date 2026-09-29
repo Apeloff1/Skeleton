@@ -1,11 +1,11 @@
-"""Compatibility facade for the transitional shift-supervisor model gateway.
+"""Compatibility facade for the canonical shift-supervisor model gateway.
 
-The credential-bearing implementation remains at
-`core.shift_supervisor.model_gateway` during the staged AI-tree migration.
-Keeping this destination as a pure re-export prevents a second credential or
-network owner inside `skeleton.ai`.
+The credential-bearing implementation remains singular at
+`skeleton.automation.shift_supervisor.model_gateway`. Keeping this AI-tree
+destination as a pure re-export prevents a second credential or network owner
+inside `skeleton.ai`.
 """
 
-from core.shift_supervisor.model_gateway import ModelGateway, ModelRequestError
+from skeleton.automation.shift_supervisor.model_gateway import ModelGateway, ModelRequestError
 
 __all__ = ["ModelGateway", "ModelRequestError"]
