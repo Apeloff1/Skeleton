@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Mapping, Protocol, Sequence
@@ -146,7 +146,7 @@ class GodotNodeSpec:
     position: tuple[float, float]
     primitive: str
     size: tuple[float, float] | None = None
-    attributes: Mapping[str, Any] = MappingProxyType({})
+    attributes: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
 
     def to_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {

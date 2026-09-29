@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.persist.law import CITATION, LAYER, OWN_ENV, PACKET, VERSION
+from skeleton.persistence.core.law import CITATION, LAYER, OWN_ENV, PACKET, VERSION
 
 
 def capabilities() -> dict[str, Any]:

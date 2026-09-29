@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from skeleton.school.engine import SchoolEngine
-from skeleton.school.learning_control import LearningControl, LearningState
-from skeleton.school.memory import MemoryKind, MemoryMatch, MemoryStore
-from skeleton.school.student import StudentProfile
+from skeleton.learning.school.engine import SchoolEngine
+from skeleton.learning.school.learning_control import LearningControl, LearningState
+from skeleton.learning.school.memory import MemoryKind, MemoryMatch, MemoryStore
+from skeleton.learning.school.student import StudentProfile
 
 
 @dataclass(frozen=True)

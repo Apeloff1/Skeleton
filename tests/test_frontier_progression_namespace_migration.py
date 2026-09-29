@@ -70,7 +70,7 @@ def test_canonical_progression_modules_do_not_import_flat_predecessors() -> None
 
 def test_biotope_achievement_adapter_targets_canonical_progression() -> None:
     source = (
-        ROOT / "skeleton/frontier/biotope_achievement_adapters.py"
+        ROOT / "skeleton/frontier/ecology/biotope_achievement_adapters.py"
     ).read_text(encoding="utf-8")
 
     assert "skeleton.frontier.progression.achievements" in source

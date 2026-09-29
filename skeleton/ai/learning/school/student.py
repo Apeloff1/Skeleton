@@ -71,12 +71,14 @@ class StudentProfile:
         evidence: str | None = None,
     ) -> SkillState:
         self.total_hours = max(0.0, self.total_hours + max(0.0, minutes) / 60.0)
-        return self.skill(skill_id).update(
+        state = self.skill(skill_id)
+        state.update(
             score,
             confidence=confidence,
             step=step,
             evidence=evidence,
         )
+        return state
 
     def readiness(self, skill_id: str, threshold: float = 0.7) -> bool:
         return self.skill(skill_id).mastery >= threshold

@@ -224,6 +224,12 @@ jobs:
           tests/test_repo_machine_growth.py
           tests/test_repo_machine_catalog.py
           tests/test_repo_machine_sota.py
+          tests/test_repo_machine_atlas.py
+          tests/test_repo_machine_live_taxonomy.py
+          tests/test_app_workspace_taxonomy.py
+          tests/test_research_lineage_taxonomy.py
+          tests/test_repository_integration.py
+          tests/test_*namespace_migration*.py
           tests/test_autonomous_supervisor.py
           tests/test_autonomous_builder_e2e_contract.py
           tests/test_build_authority.py

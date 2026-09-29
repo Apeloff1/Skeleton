@@ -116,7 +116,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "b638c194161e9095cd3d748ac91661cf2adb8866",
+      "source_git_object_sha": "9b0eefc00b04436a55462825b48503d40b1a9945",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "da019cf730244a8788b3e6b3e3cc0f6eed2eb459",
+      "source_git_object_sha": "eb3efb3107b598c8f5621529e8d91785b904bdcf",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -708,7 +708,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "d070a8f416237ede18c124076dfe2d22f278ee36",
+      "source_git_object_sha": "b8fef588e94373c09eb4e541a9c05aa7a21535da",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -775,7 +775,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "e083364d7faea043ee10a8d9069cec7c41e4aa11",
+      "source_git_object_sha": "f8a04c9194fc79aa3d8edfdd28ee66674d38efba",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -938,7 +938,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "e109d865ed3f55e7b318ba9bb03611b287f434b0",
+      "source_git_object_sha": "74399a5415f67f8740a8c80e42edd597dd48cf62",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1086,7 +1086,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "e2659f6139d3263873b4913d103f84534dd2ed53",
+      "source_git_object_sha": "6d0ee60f124e6ba501dff132eb0d4922574b389d",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1152,11 +1152,43 @@
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
+      "id": "AIFT-PROVENANCE",
+      "source": "skeleton/provenance",
+      "destination": "skeleton/ai/runtime/provenance",
+      "kind": "tree",
+      "source_git_object_sha": "0198cb43f5bd16c81f5c8ad333c771d02bdccb60",
+      "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W17",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ],
+      "overlay_children": [
+        "chronicle"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_provenance_parent_with_governed_chronicle_overlay"
+    },
+    {
       "id": "AIFT-CHRONICLE",
-      "source": "skeleton/chronicle",
+      "source": "skeleton/provenance/chronicle",
       "destination": "skeleton/ai/runtime/provenance/chronicle",
       "kind": "tree",
-      "source_git_object_sha": "ee6ebd667a67fab74eb295e1914a0ab205c77217",
+      "source_git_object_sha": "5831cc060b6fd0f260437150b172796da8318e43",
       "role": "Append-only Merkle chronicle behavior is provenance/event evidence and belongs under the governed runtime provenance owner.",
       "work_package_refs": [
         "WP-W03",
@@ -1184,7 +1216,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_provenance_chronicle_with_legacy_root_shims"
     },
     {
       "id": "AIFT-CORE",
@@ -1331,10 +1363,10 @@
     },
     {
       "id": "AIFT-GALAXY",
-      "source": "skeleton/galaxy",
+      "source": "skeleton/distributed/galaxy",
       "destination": "skeleton/ai/runtime/distributed/galaxy",
       "kind": "tree",
-      "source_git_object_sha": "c376f28b7e4241b4327551fd64d7bed6655ff7ab",
+      "source_git_object_sha": "4edf8f5dbd7323a5581072a3430b1ad85c81f2dd",
       "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
       "work_package_refs": [
         "WP-W16",
@@ -1360,7 +1392,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_galaxy_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GATE-PLANE",
@@ -1501,10 +1533,10 @@
     },
     {
       "id": "AIFT-MESH",
-      "source": "skeleton/mesh",
+      "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "8fd4dfc796dc23e95aecffa182dfdc9dcf18dc98",
+      "source_git_object_sha": "73d773eca32320c058c5e1853c9799872538ef62",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -1530,14 +1562,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_mesh_with_legacy_root_shims"
     },
     {
       "id": "AIFT-NETWORK",
-      "source": "skeleton/network",
+      "source": "skeleton/distributed/network",
       "destination": "skeleton/ai/runtime/distributed/network",
       "kind": "tree",
-      "source_git_object_sha": "991ff2d003b9c1668762311b1bb85b236128c1a1",
+      "source_git_object_sha": "66273902c841caa8ea1c9e248d1e494c2bfc8812",
       "role": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
       "work_package_refs": [
         "WP-W19",
@@ -1562,7 +1594,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_network_with_legacy_root_shims"
     },
     {
       "id": "AIFT-OVERSEER",
@@ -1744,7 +1776,7 @@
       "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "9a9d9d0ad1b2816389e96734899c81b9969ce53b",
+      "source_git_object_sha": "5aaea3da1c06ecd88cce425e425937d6836f392b",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1776,11 +1808,39 @@
       "source_disposition": "canonical_automation_swarm_with_legacy_root_shims"
     },
     {
+      "id": "AIFT-KNOWLEDGE",
+      "source": "skeleton/knowledge",
+      "destination": "skeleton/ai/runtime/knowledge",
+      "kind": "tree",
+      "source_git_object_sha": "518f871ec380c08d8226adbfb0122493efd85d13",
+      "role": "Canonical reusable knowledge and reasoning substrate parent with independently governed graph primitives.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-012"
+      ],
+      "overlay_children": [
+        "graphs"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_knowledge_parent_with_governed_graphs_overlay"
+    },
+    {
       "id": "AIFT-GRAPHS",
-      "source": "skeleton/graphs",
+      "source": "skeleton/knowledge/graphs",
       "destination": "skeleton/ai/runtime/knowledge/graphs",
       "kind": "tree",
-      "source_git_object_sha": "faaf484c2d16019039f8c16a6c5383ed01247d05",
+      "source_git_object_sha": "5a5b5627f3b15e783798900eaa8758eaccfee94f",
       "role": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
       "work_package_refs": [
         "WP-W09",
@@ -1804,14 +1864,44 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_knowledge_graphs_with_legacy_root_shims"
+    },
+    {
+      "id": "AIFT-TOOLS",
+      "source": "skeleton/tools",
+      "destination": "skeleton/ai/runtime/tools",
+      "kind": "tree",
+      "source_git_object_sha": "63239f151af1b31b36db84ead936f9557aa62fb1",
+      "role": "Canonical governed tool-edge runtime parent with independently governed connector and webhook integrations.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-015",
+        "VOL-026"
+      ],
+      "overlay_children": [
+        "integrations"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_tools_parent_with_governed_integrations_overlay"
     },
     {
       "id": "AIFT-INTEGRATIONS",
-      "source": "skeleton/integrations",
+      "source": "skeleton/tools/integrations",
       "destination": "skeleton/ai/runtime/tools/integrations",
       "kind": "tree",
-      "source_git_object_sha": "e0ad81df2a6baf6b340aabafd144ddf5660c13d9",
+      "source_git_object_sha": "7a342bbbcfac4bd26124df1c96bbf86df1b183d7",
       "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
       "work_package_refs": [
         "WP-W13",
@@ -1837,7 +1927,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_tools_integrations_with_legacy_root_shims"
     },
     {
       "id": "AIFT-INVENTORY",
@@ -1883,11 +1973,11 @@
     },
     {
       "id": "AIFT-SOCIAL",
-      "source": "skeleton/social",
+      "source": "skeleton/research/social",
       "destination": "skeleton/ai/research/social",
       "kind": "tree",
-      "source_git_object_sha": "0f7c484c4d2692f789dc603b60f9c5f854693276",
-      "role": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
+      "source_git_object_sha": "8648d7d27f18e87620b1603d1adc4335a887d690",
+      "role": "Canonical archive/source ingestion, coverage, graph and SOTA discovery code under research evidence ownership, mirrored exactly into AI research without serving authority.",
       "work_package_refs": [
         "WP-W26"
       ],
@@ -1911,7 +2001,7 @@
         "cutover:quarantine"
       ],
       "move_batch": "B4-research-quarantine",
-      "source_disposition": "retain_until_characterized_and_verified"
+      "source_disposition": "canonical_research_social_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SUPPORT",
@@ -2152,7 +2242,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "9abc5257e09e0bfafc2bee544483798b1280dd89",
+      "source_git_object_sha": "9eb835cc336c227853b76af09659a28c480fcfe8",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2178,6 +2268,37 @@
       ],
       "move_batch": "B2-domain-build",
       "source_disposition": "canonical_simulation_game_with_legacy_root_shims"
+    },
+    {
+      "id": "AIFT-ERA",
+      "source": "skeleton/simulation/era",
+      "destination": "skeleton/ai/simulation/era",
+      "kind": "tree",
+      "source_git_object_sha": "b3f65097f5347feedf00308bc06b89ed61f0f6a1",
+      "role": "Canonical era binding, citation law, capability card and Forge reference policy under simulation ownership, mirrored exactly into the governed AI simulation tree.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve citation-required Forge behavior",
+        "preserve deterministic era binding",
+        "keep era policy inside simulation ownership"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "canonical_simulation_era_with_legacy_root_shims"
     },
     {
       "id": "AIFT-HIVE",
@@ -2247,7 +2368,7 @@
       "source": "skeleton/simulation/platform",
       "destination": "skeleton/ai/simulation/platform",
       "kind": "tree",
-      "source_git_object_sha": "f4b94bdbecb7958f7525d5ba613d075782132b13",
+      "source_git_object_sha": "d79871ec76b61c04c4fb40ef1424b8647113678e",
       "role": "Canonical engine-neutral Godot adapter boundary under skeleton/simulation/platform; mirrored into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2280,7 +2401,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee",
+      "source_git_object_sha": "4f14ed170585eec28d6ae8fcad300690275e09a5",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -2446,7 +2567,7 @@
       "source": "skeleton/persistence/core",
       "destination": "skeleton/ai/runtime/persistence/core",
       "kind": "tree",
-      "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072",
+      "source_git_object_sha": "2e7aeb47a116023866687992ca88c69fc2898cd9",
       "role": "Canonical low-level persistence primitives nested under skeleton/persistence/core and mirrored as the governed core overlay.",
       "work_package_refs": [
         "WP-W03",
@@ -2510,7 +2631,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -4619,6 +4740,54 @@
       ],
       "move_batch": "B3-compat-convergence",
       "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-DISTRIBUTED",
+      "source": "skeleton/distributed",
+      "destination": "skeleton/ai/runtime/distributed",
+      "kind": "tree",
+      "source_git_object_sha": "ffa1be723381caa86e3c21ec163ecba957c0d9af",
+      "role": "Distributed coordination packages; subdomains retain their declared owners.",
+      "work_package_refs": [
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "galaxy",
+        "mesh",
+        "network",
+        "overseer"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_parent_with_independently_governed_children"
+    },
+    {
+      "id": "AIFT-RESEARCH",
+      "source": "skeleton/research/__init__.py",
+      "destination": "skeleton/ai/research/__init__.py",
+      "kind": "file",
+      "source_git_object_sha": "8d4beabff6281e385dd926a5ff2911c4b3ee401d",
+      "role": "Research namespace entrypoint; social and existing AI research lineage remain independently governed.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children"
     }
   ],
   "ci_enforcement": {
@@ -4801,6 +4970,46 @@
         "planned_path": "skeleton/school",
         "implemented_path": "skeleton/learning/school",
         "mapping_id": "AIFT-SCHOOL"
+      },
+      {
+        "planned_path": "skeleton/era",
+        "implemented_path": "skeleton/simulation/era",
+        "mapping_id": "AIFT-ERA"
+      },
+      {
+        "planned_path": "skeleton/social",
+        "implemented_path": "skeleton/research/social",
+        "mapping_id": "AIFT-SOCIAL"
+      },
+      {
+        "planned_path": "skeleton/galaxy",
+        "implemented_path": "skeleton/distributed/galaxy",
+        "mapping_id": "AIFT-GALAXY"
+      },
+      {
+        "planned_path": "skeleton/network",
+        "implemented_path": "skeleton/distributed/network",
+        "mapping_id": "AIFT-NETWORK"
+      },
+      {
+        "planned_path": "skeleton/mesh",
+        "implemented_path": "skeleton/distributed/mesh",
+        "mapping_id": "AIFT-MESH"
+      },
+      {
+        "planned_path": "skeleton/graphs",
+        "implemented_path": "skeleton/knowledge/graphs",
+        "mapping_id": "AIFT-GRAPHS"
+      },
+      {
+        "planned_path": "skeleton/chronicle",
+        "implemented_path": "skeleton/provenance/chronicle",
+        "mapping_id": "AIFT-CHRONICLE"
+      },
+      {
+        "planned_path": "skeleton/integrations",
+        "implemented_path": "skeleton/tools/integrations",
+        "mapping_id": "AIFT-INTEGRATIONS"
       }
     ],
     "planned_but_absent": [
@@ -4809,14 +5018,12 @@
       "skeleton/autonomy",
       "skeleton/compute",
       "skeleton/connectors",
-      "skeleton/distributed",
       "skeleton/document",
       "skeleton/document_vision",
       "skeleton/education",
       "skeleton/experiments",
       "skeleton/hardware",
       "skeleton/inference",
-      "skeleton/knowledge",
       "skeleton/modeling",
       "skeleton/multimodal",
       "skeleton/planning",
@@ -4824,14 +5031,11 @@
       "skeleton/policy",
       "skeleton/product",
       "skeleton/product_shell",
-      "skeleton/provenance",
       "skeleton/repo_engineering",
-      "skeleton/research",
       "skeleton/routing",
       "skeleton/safety",
       "skeleton/speech",
       "skeleton/storage",
-      "skeleton/tools",
       "skeleton/training",
       "skeleton/verification",
       "skeleton/video",
@@ -5133,8 +5337,8 @@
     },
     {
       "path": "skeleton/era",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level era compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
     },
     {
       "path": "skeleton/genos",
@@ -5355,6 +5559,41 @@
       "path": "skeleton/school",
       "owner": "learning compatibility boundary",
       "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
+    },
+    {
+      "path": "skeleton/social",
+      "owner": "research compatibility boundary",
+      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-034"
+    },
+    {
+      "path": "skeleton/galaxy",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
+    },
+    {
+      "path": "skeleton/network",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-036"
+    },
+    {
+      "path": "skeleton/mesh",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-037"
+    },
+    {
+      "path": "skeleton/graphs",
+      "owner": "knowledge compatibility boundary",
+      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-038"
+    },
+    {
+      "path": "skeleton/chronicle",
+      "owner": "provenance compatibility boundary",
+      "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-039"
+    },
+    {
+      "path": "skeleton/integrations",
+      "owner": "tools compatibility boundary",
+      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-040"
     }
   ],
   "classification_coverage": {
@@ -5586,21 +5825,21 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 154,
+    "governed_mapping_count": 160,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 34,
+    "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B1-core-runtime": 54,
+      "B1-core-runtime": 58,
       "B3-owner-sensitive": 7,
-      "B2-domain-build": 12,
-      "B4-research-quarantine": 53,
+      "B2-domain-build": 13,
+      "B4-research-quarantine": 54,
       "B3-compat-convergence": 28
     },
     "fresh_object_audit_required": true,
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
-    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled 154-mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion."
+    "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion."
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",

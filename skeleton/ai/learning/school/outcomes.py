@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from uuid import uuid4
-from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryStore
-from skeleton.school.progression import ProgressionSnapshot, evaluate_progression
-from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind
-from skeleton.school.student import StudentProfile
+from skeleton.learning.school.memory import LearnerMemory, MemoryKind, MemoryStore
+from skeleton.learning.school.progression import ProgressionSnapshot, evaluate_progression
+from skeleton.learning.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind
+from skeleton.learning.school.student import StudentProfile
 
 
 class OutcomeKind(str, Enum):

@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord
-from skeleton.school.replay import replay_digest
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord
+from skeleton.learning.school.replay import replay_digest
 
 
 @dataclass(frozen=True)

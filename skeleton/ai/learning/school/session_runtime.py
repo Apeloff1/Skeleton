@@ -5,16 +5,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Sequence
 
-from skeleton.school.ai_pipeline import PipelineKind, PipelineRequest, plan_pipeline
-from skeleton.school.cocoding import CodingPhase, CoCodingContext, HandoffStage, choose_action, next_handoff
-from skeleton.school.curriculum import CurriculumGraph
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, EvidenceKind, EvidenceRef
-from skeleton.school.decision_policy import EvidenceSignal, arbitrate
-from skeleton.school.epistemics import EpistemicEngine, EvidencePolarity, EpistemicEvidence
-from skeleton.school.jeeves import JeevesControlPlane, JeevesSessionPlan
-from skeleton.school.knowledge import KnowledgeGraph, KnowledgeState, rank_knowledge
-from skeleton.school.outcomes import OutcomeResult, SessionOutcome
-from skeleton.school.student import StudentProfile
+from skeleton.learning.school.ai_pipeline import PipelineKind, PipelineRequest, plan_pipeline
+from skeleton.learning.school.cocoding import CodingPhase, CoCodingContext, HandoffStage, choose_action, next_handoff
+from skeleton.learning.school.curriculum import CurriculumGraph
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionLedger, EvidenceKind, EvidenceRef
+from skeleton.learning.school.decision_policy import EvidenceSignal, arbitrate
+from skeleton.learning.school.epistemics import EpistemicEngine, EvidencePolarity, EpistemicEvidence
+from skeleton.learning.school.jeeves import JeevesControlPlane, JeevesSessionPlan
+from skeleton.learning.school.knowledge import KnowledgeGraph, KnowledgeState, rank_knowledge
+from skeleton.learning.school.outcomes import OutcomeResult, SessionOutcome
+from skeleton.learning.school.student import StudentProfile
 
 
 class SessionPhase(str, Enum):

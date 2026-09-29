@@ -2,6 +2,11 @@
 
 AI game engine and agent orchestration framework.
 
+Start with the [Repository Atlas](docs/architecture/REPOSITORY_ATLAS.md) for the
+file tree, canonical owners, and compatibility imports. The
+[integration guide](docs/architecture/REPOSITORY_INTEGRATION.md) explains the
+combined namespace migrations and how to validate changes to them.
+
 ## Quick Start
 
 ```bash
@@ -96,7 +101,7 @@ authority, lifecycle, failure, and CI contract.
 | `skeleton.kernel` | Core primitives and error types |
 | `skeleton.memory` | Multi-plane retrieval and storage |
 | `skeleton.intelligence` | Reasoning and adaptive learning |
-| `skeleton.swarm` | Multi-agent coordination |
+| `skeleton.automation.swarm` | Multi-agent coordination |
 | `skeleton.forge` | Blueprint-based system composition |
 | `skeleton.resilience` | Security and fault tolerance |
 | `skeleton.observability` | Metrics and anomaly detection |
@@ -106,20 +111,26 @@ authority, lifecycle, failure, and CI contract.
 | `skeleton.deploy` | Deployment harness |
 | `skeleton.testing` | Test framework |
 | `skeleton.organism` | Runtime state and feature flags |
-| `skeleton.pipelines` | High-level task pipelines |
+| `skeleton.forge.pipelines` | High-level task pipelines |
 | `skeleton.vault` | Access control and encryption |
 | `skeleton.retrieval` | Search and fusion |
-| `skeleton.agents` | Agent coordination |
+| `skeleton.automation.agents` | Agent coordination |
 | `skeleton.context` | Questionnaire and intake |
 | `skeleton.config` | Layered configuration |
-| `skeleton.content` | Reusable domain knowledge packs |
+| `skeleton.simulation.content` | Reusable domain knowledge packs |
+| `skeleton.learning.school` | Curriculum, assessment, and learner state |
+| `skeleton.distributed` | Galaxy, mesh, and network coordination |
+| `skeleton.knowledge.graphs` | Graph and reasoning primitives |
+| `skeleton.provenance.chronicle` | Evidence and tamper-evident history |
+| `skeleton.tools.integrations` | Connectors and authenticated webhooks |
+| `skeleton.research.social` | Research evidence intake |
 
 ## Lorebuffa AI Domain Pack
 
 The Skeleton AI now has a domain adapter for the AI-relevant work developed in Lorebuffa. It keeps the generic engine clean while importing the useful world-model concepts: NPC personas, faction context, schedules, voice styles, reputation-aware dialogue choices, and quest objective patterns.
 
 ```python
-from skeleton.pipelines.lorebuffa_npc import LorebuffaNpcPipeline
+from skeleton.forge.pipelines.lorebuffa_npc import LorebuffaNpcPipeline
 
 npc = LorebuffaNpcPipeline().run(
     "A veteran fisherman who hides a dangerous secret.",

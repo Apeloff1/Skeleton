@@ -9,6 +9,6 @@ export { default as ErrorState } from './ErrorState';
 export { default as EmptyState } from './EmptyState';
 export { default as SectionHeader } from './SectionHeader';
 // Canonical async-state primitives live under components/UI. Re-export them
-// here so legacy lowercase barrel imports do not create duplicate TS modules.
+// here so the reusable primitives share the same async-state implementation.
 export { default as Skeleton } from '../UI/Skeleton';
 export { default as RetryBanner } from '../UI/RetryBanner';

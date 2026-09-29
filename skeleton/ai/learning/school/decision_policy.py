@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
-from skeleton.school.knowledge import KnowledgeState
+from skeleton.learning.school.knowledge import KnowledgeState
 class ArbitrationAction(str,Enum):
  RETEACH="reteach"; RETRIEVE="retrieve"; PRACTICE="practice"; CHALLENGE="challenge"; TRANSFER="transfer"; REFLECT="reflect"; PAUSE="pause"
 @dataclass(frozen=True)

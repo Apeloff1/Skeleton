@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
-from skeleton.school.code_intelligence import CodeIntelligenceReport, CodeSignalKind
+from skeleton.learning.school.code_intelligence import CodeIntelligenceReport, CodeSignalKind
 
 class DebugFocus(str, Enum):
     ROOT_CAUSE="root_cause"; SECURITY="security"; PERFORMANCE="performance"; CORRECTNESS="correctness"; TESTING="testing"

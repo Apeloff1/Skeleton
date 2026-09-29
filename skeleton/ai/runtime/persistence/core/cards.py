@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from skeleton.persist.law import CITATION, PACKET, STORED_PROSE
+from skeleton.persistence.core.law import CITATION, PACKET, STORED_PROSE
 
 
 def persist_card(

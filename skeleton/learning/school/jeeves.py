@@ -4,17 +4,17 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 from typing import Sequence
-from skeleton.school.counterfactual import CounterfactualResult, default_candidates, compete
-from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
-from skeleton.school.energy import EnergyBudget, EnergyDecision, choose_energy_strategy
-from skeleton.school.epistemics import EpistemicEngine
-from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
-from skeleton.school.memory import LearnerMemory, MemoryMatch, MemoryStore
-from skeleton.school.outcomes import OutcomeKind, OutcomeResult, SessionOutcome, apply_outcome
-from skeleton.school.policy_calibration import PolicyCalibrator
-from skeleton.school.progression import ProgressionSnapshot, evaluate_progression
-from skeleton.school.reflection import ReflectionJournal
-from skeleton.school.student import StudentProfile
+from skeleton.learning.school.counterfactual import CounterfactualResult, default_candidates, compete
+from skeleton.learning.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
+from skeleton.learning.school.energy import EnergyBudget, EnergyDecision, choose_energy_strategy
+from skeleton.learning.school.epistemics import EpistemicEngine
+from skeleton.learning.school.learning_control import LearningControl, LearningControlDecision, LearningState
+from skeleton.learning.school.memory import LearnerMemory, MemoryMatch, MemoryStore
+from skeleton.learning.school.outcomes import OutcomeKind, OutcomeResult, SessionOutcome, apply_outcome
+from skeleton.learning.school.policy_calibration import PolicyCalibrator
+from skeleton.learning.school.progression import ProgressionSnapshot, evaluate_progression
+from skeleton.learning.school.reflection import ReflectionJournal
+from skeleton.learning.school.student import StudentProfile
 
 
 @dataclass(frozen=True)

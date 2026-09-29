@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
+from skeleton.kernel.ids import AgentId
+
 from .types import AgentState, CapabilityVector
 
 

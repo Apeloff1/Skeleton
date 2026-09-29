@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from skeleton.school.assessment import AssessmentEngine
-from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
-from skeleton.school.student import StudentProfile
+from skeleton.learning.school.assessment import AssessmentEngine
+from skeleton.learning.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
+from skeleton.learning.school.student import StudentProfile
 
 
 @dataclass(frozen=True)

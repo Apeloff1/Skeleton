@@ -223,6 +223,27 @@ def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool
     return planned_source.startswith(source.rstrip("/") + "/")
 
 
+def _mappings_cover_planned_source(mappings: list[object], planned_source: str) -> bool:
+    """A namespace may compose separate owners only if every member is governed.
+
+    This keeps research lineage in its existing destination-only namespaces
+    without copying it into a new source parent just to satisfy tree parity.
+    """
+    if any(_mapping_covers_planned_source(mapping, planned_source) for mapping in mappings):
+        return True
+    source = ROOT / planned_source
+    if not source.is_dir():
+        return False
+    members = _tree_files(source)
+    return bool(members) and all(
+        any(
+            _mapping_covers_planned_source(mapping, f"{planned_source}/{member}")
+            for mapping in mappings
+        )
+        for member in members
+    )
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     required = [
@@ -298,10 +319,7 @@ def validate() -> list[str]:
         if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
     }
     for planned_source in sorted(_planned_implementation_sources(master_plan)):
-        governed = any(
-            _mapping_covers_planned_source(mapping, planned_source)
-            for mapping in mappings
-        )
+        governed = _mappings_cover_planned_source(mappings, planned_source)
         if (
             _source_exists(planned_source)
             and not governed
@@ -370,7 +388,7 @@ def validate() -> list[str]:
             item.get("parity_mode") == "compatibility_facade"
             or bool(item.get("parity_exceptions"))
         )
-        quarantine = dst.startswith("skeleton/ai/research/")
+        quarantine = dst == "skeleton/ai/research" or dst.startswith("skeleton/ai/research/")
         compat_convergence = dst.startswith("skeleton/ai/compat/")
         expected_cutover = (
             "cutover:quarantine"
@@ -783,7 +801,10 @@ def validate() -> list[str]:
         for path_value in tracked
         if path_value and len(Path(path_value).parts) >= 2
     }
-    unclassified_live = sorted(tracked_top_level - classified_top_level)
+    unclassified_live = sorted(
+        root for root in tracked_top_level - classified_top_level
+        if not _mappings_cover_planned_source(mappings, root)
+    )
     if unclassified_live:
         errors.append(
             "git-tracked top-level skeleton paths lack AI-tree move/retain classification: "

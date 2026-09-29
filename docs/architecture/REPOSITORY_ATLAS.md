@@ -31,27 +31,40 @@ Skeleton/
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
 │   │   └── agents/           agent runtime/orchestration
+│   ├── distributed/          distributed runtime infrastructure
+│   │   ├── galaxy/           federation, transport, consensus, election and fleet coordination
+│   │   ├── mesh/             service discovery, hedging, deduplication and traffic/capacity control
+│   │   └── network/          replication, remote execution and model placement
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
 │   ├── learning/             controlled learning runtime
 │   │   └── school/           curriculum, assessment, learner state and tutoring
 │   ├── memory/               runtime memory
 │   ├── retrieval/            retrieval/ranking/fusion
+│   ├── knowledge/             reusable knowledge/reasoning substrate
+│   │   └── graphs/            graph, spectral, motif and GAT primitives
+│   ├── provenance/            append-only evidence and tamper-evident history
+│   │   └── chronicle/         Merkle chronicle, helix cards and independent verification
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
 │   ├── kv/                   paged/tiered KV-cache control plane
 │   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
+│   ├── tools/                governed tool execution and connector edges
+│   │   └── integrations/     connectors, GitHub adapter and authenticated webhooks
 │   ├── build/ + forge/       build/construction systems
 │   │   ├── creator/          intent compiler + reversible design edits
 │   │   └── pipelines/        content/game generation pipelines
 │   ├── release/ + deploy*/   delivery lifecycle
 │   ├── simulation/           canonical simulation/world-model runtime
-│   │   ├── game/             mechanics, deterministic replay and game systems
 │   │   ├── content/          domain knowledge / NPC-dialogue world model
 │   │   ├── economy/          treasury, quota and catalog economy simulation
+│   │   ├── era/              era binding, citation law and Forge reference policy
+│   │   ├── game/             mechanics, deterministic replay and game systems
 │   │   ├── platform/         engine adapter boundary (Godot)
 │   │   └── world/            deterministic world/scene state
+│   ├── research/             provenance-preserving research/evidence intake
+│   │   └── social/           archive/source ingest, coverage, graph and SOTA discovery
 │   ├── frontier/             frontier gameplay/product runtime
 │   │   ├── runtime/          contracts, execution, streams, memory/control plane
 │   │   ├── progression/      achievements, quests, reputation, passes/meta systems
@@ -170,6 +183,14 @@ compatibility shims:
 | `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
 | `skeleton.world.*` | `skeleton.simulation.world.*` | transitional shim |
 | `skeleton.game.*` | `skeleton.simulation.game.*` | transitional shim |
+| `skeleton.era.*` | `skeleton.simulation.era.*` | transitional shim |
+| `skeleton.social.*` | `skeleton.research.social.*` | transitional shim |
+| `skeleton.galaxy.*` | `skeleton.distributed.galaxy.*` | transitional shim |
+| `skeleton.network.*` | `skeleton.distributed.network.*` | transitional shim |
+| `skeleton.mesh.*` | `skeleton.distributed.mesh.*` | transitional shim |
+| `skeleton.graphs.*` | `skeleton.knowledge.graphs.*` | transitional shim |
+| `skeleton.chronicle.*` | `skeleton.provenance.chronicle.*` | transitional shim |
+| `skeleton.integrations.*` | `skeleton.tools.integrations.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

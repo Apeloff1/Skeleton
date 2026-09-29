@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from typing import Sequence
-from skeleton.school.decision_ledger import DecisionDisposition, DecisionRecord
+from skeleton.learning.school.decision_ledger import DecisionDisposition, DecisionRecord
 
 
 @dataclass(frozen=True)

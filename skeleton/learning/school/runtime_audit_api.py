@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from skeleton.school.runtime_replay import RuntimeReplaySnapshot
-from skeleton.school.session_runtime import SessionPhase, SessionTransition
+from skeleton.learning.school.runtime_replay import RuntimeReplaySnapshot
+from skeleton.learning.school.session_runtime import SessionPhase, SessionTransition
 
 if TYPE_CHECKING:
-    from skeleton.school.session_runtime import JeevesSessionRuntime
+    from skeleton.learning.school.session_runtime import JeevesSessionRuntime
 
 
 def capture_runtime(runtime: "JeevesSessionRuntime") -> RuntimeReplaySnapshot:

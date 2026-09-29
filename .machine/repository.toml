@@ -138,11 +138,38 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "graphs-compat"
+prefixes = ["skeleton/graphs/"]
+owner = "knowledge-runtime"
+criticality = "low"
+purpose = "Compatibility-only graph namespace; canonical graph, spectral, motif and GAT primitives live under skeleton/knowledge/graphs/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "chronicle-compat"
+prefixes = ["skeleton/chronicle/"]
+owner = "provenance-runtime"
+criticality = "low"
+purpose = "Compatibility-only Chronicle namespace; canonical append-only provenance and tamper-evident event history live under skeleton/provenance/chronicle/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "provenance"
+prefixes = ["skeleton/provenance/"]
+owner = "provenance-runtime"
+criticality = "high"
+purpose = "Canonical append-only event evidence, Merkle history, tamper detection and independent provenance verification."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "knowledge"
-prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/graphs/", "skeleton/chronicle/"]
+prefixes = ["skeleton/memory/", "skeleton/retrieval/", "skeleton/knowledge/"]
 owner = "knowledge-runtime"
 criticality = "high"
-purpose = "Runtime memory, retrieval, indexing, graph and chronology services."
+purpose = "Runtime memory, retrieval, reusable knowledge/reasoning substrate, indexing and graph services."
 audience = "both"
 lifecycle = "canonical"
 
@@ -283,7 +310,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "platform"
-prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
+prefixes = ["skeleton/native/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/"]
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."
@@ -363,8 +390,71 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "era-compat"
+prefixes = ["skeleton/era/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only era binding namespace; canonical era binding and cited Forge references live under skeleton/simulation/era/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "social-compat"
+prefixes = ["skeleton/social/"]
+owner = "research-evidence"
+criticality = "low"
+purpose = "Compatibility-only social/research evidence namespace; canonical source ingestion, graph and coverage logic lives under skeleton/research/social/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "research"
+prefixes = ["skeleton/research/"]
+owner = "research-evidence"
+criticality = "medium"
+purpose = "Untrusted evidence intake, provenance-preserving discovery, source coverage and research support surfaces."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "galaxy-compat"
+prefixes = ["skeleton/galaxy/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Galaxy namespace; canonical federation, transport, consensus and fleet coordination live under skeleton/distributed/galaxy/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "network-compat"
+prefixes = ["skeleton/network/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Network namespace; canonical replication, remote execution and model placement live under skeleton/distributed/network/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "mesh-compat"
+prefixes = ["skeleton/mesh/"]
+owner = "distributed-runtime"
+criticality = "low"
+purpose = "Compatibility-only Mesh namespace; canonical service discovery, hedging, deduplication, capacity and traffic control live under skeleton/distributed/mesh/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "distributed"
+prefixes = ["skeleton/distributed/"]
+owner = "distributed-runtime"
+criticality = "critical"
+purpose = "Canonical distributed runtime infrastructure for federation, transport, election, consensus, synchronization and fleet coordination."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/organism/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
@@ -417,11 +507,29 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "integrations-compat"
+prefixes = ["skeleton/integrations/"]
+owner = "tool-runtime"
+criticality = "low"
+purpose = "Compatibility-only integrations namespace; canonical connector and webhook tool edges live under skeleton/tools/integrations/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "tools"
+prefixes = ["skeleton/tools/"]
+owner = "tool-runtime"
+criticality = "high"
+purpose = "Canonical governed tool execution edges, connector adapters and authenticated webhook integrations."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "integrations"
-prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_runtime.py"]
+prefixes = ["skeleton/skills/", "skeleton/provider_runtime.py"]
 owner = "integration-runtime"
 criticality = "medium"
-purpose = "External provider, tool, skill and service integration boundaries."
+purpose = "Provider, skill and service integration boundaries that remain outside the canonical tool-edge package."
 audience = "both"
 lifecycle = "canonical"
 
@@ -494,6 +602,10 @@ prefixes = [
   ".venv/",
   "venv/",
   "node_modules/",
+  "frontend/node_modules/",
+  "frontend/dist/",
+  "frontend/.expo/",
+  "skeleton.egg-info/",
   "dist/",
   "build/",
   "coverage/",
