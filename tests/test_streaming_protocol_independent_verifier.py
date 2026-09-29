@@ -127,7 +127,7 @@ def test_streaming_verifier_rejects_canonical_mirror_drift(
     tmp_path: Path,
 ) -> None:
     root = _repo(tmp_path)
-    mirror = root / "skeleton/ai/runtime/frontier/operation_stream.py"
+    mirror = root / "skeleton/ai/runtime/frontier/runtime/operation_stream.py"
     mirror.write_text("# drift\n", encoding="utf-8")
 
     receipt = verify_repository(root)

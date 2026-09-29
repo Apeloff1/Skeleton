@@ -9,12 +9,12 @@ NOW = datetime(2026, 9, 15, 13, 30, tzinfo=timezone.utc)
 
 
 def test_gameplay_facade_exposes_single_canonical_biotope_surface():
-    assert gameplay.BiotopeProgress.__module__ == "skeleton.frontier.biotope"
-    assert gameplay.BiotopeSpec.__module__ == "skeleton.frontier.biotope"
-    assert gameplay.BiotopeStageSpec.__module__ == "skeleton.frontier.biotope"
-    assert gameplay.biotope_event.__module__ == "skeleton.frontier.biotope_adapters"
-    assert gameplay.enter_biotope_stage.__module__ == "skeleton.frontier.biotope"
-    assert gameplay.unlock_biotope_stage.__module__ == "skeleton.frontier.biotope"
+    assert gameplay.BiotopeProgress.__module__ == "skeleton.frontier.ecology.biotope"
+    assert gameplay.BiotopeSpec.__module__ == "skeleton.frontier.ecology.biotope"
+    assert gameplay.BiotopeStageSpec.__module__ == "skeleton.frontier.ecology.biotope"
+    assert gameplay.biotope_event.__module__ == "skeleton.frontier.ecology.biotope_adapters"
+    assert gameplay.enter_biotope_stage.__module__ == "skeleton.frontier.ecology.biotope"
+    assert gameplay.unlock_biotope_stage.__module__ == "skeleton.frontier.ecology.biotope"
 
 
 def test_gameplay_facade_composes_biotope_progress_with_event_memory():
