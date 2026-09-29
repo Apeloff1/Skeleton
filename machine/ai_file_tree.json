@@ -313,7 +313,7 @@
       "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "9e784b949d6b8cb2dbd76684b9ccc6ce03bfa1d0",
+      "source_git_object_sha": "8b87745546bc650451f28301488542cbed7ab796",
       "role": "transitional planning scheduling and build-control harness",
       "work_package_refs": [
         "WP-W11",
@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "580a40ef8c915834d19fccc18905bdde808d6024",
+      "source_git_object_sha": "da019cf730244a8788b3e6b3e3cc0f6eed2eb459",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -5419,7 +5419,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The current 134-mapping main line retains its recorded audit evidence. Wave 2B adds 20 mappings whose source Git tree/blob identities were rechecked against current main and match exactly; full 154-mapping validator/CI evidence remains required.",
+    "note": "TREE-028 provider-governance repair refreshed AIFT-AUTOMATION and AIFT-BUILD-PLANNING source tree identities; fresh exact-head validator/CI evidence remains required.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [
