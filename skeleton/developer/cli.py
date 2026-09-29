@@ -27,7 +27,7 @@ def dev_help_text() -> str:
 
     skeleton dev scaffold <name> [options]
         Generate a new project from a template
-        --template, -t    Template name (minimal-agent, game-forge, swarm-orchestrator)
+        --template, -t    minimal-agent, game-forge, swarm-orchestrator, api-gateway
         --dir, -d         Target directory (default: current)
         --dry-run         Preview without creating files
 
@@ -64,22 +64,27 @@ def dev_help_text() -> str:
         --gates           Fail-closed cockpit gates
         --retune          Auto-retune out-of-range knobs
         --knobs           JSON knob object
+        --json            JSON output
 
     skeleton dev bridge [options]
         Doctor ↔ cockpit bridge plan
         --apply           Apply proposed clamps
         --card            Doctor card JSON
+        --json            JSON output
 
     skeleton dev regen [options]
         STU-TOOLS weakest-surface regenerate
         --apply           Apply (default dry-run)
-        --artefacts       JSON file of path->content
+        --artefacts       JSON object of path->content
         --allow-empty     Allow empty regen plans
+        --json            JSON output
 
     skeleton dev stu-tools [options]
         Full STU-TOOLS pipeline (health/visualize/doctor/regen)
         --paths           Comma list of paths
         --apply-regen     Apply regen mutations
+        --ci-bundle       Include cockpit, bridge, and coverage checks
+        --json            JSON output
 
     skeleton dev extension <name> [options]
         Generate boilerplate for new subsystems
@@ -88,6 +93,15 @@ def dev_help_text() -> str:
         --with-api        Generate API routes
 
   UTILITY COMMANDS
+
+    skeleton dev snapshot [--name NAME] [--root DIR] [--ingest FILE]
+        Save memory plane state; optionally ingest a UTF-8 text file first
+
+    skeleton dev restore [--name NAME] [--root DIR]
+        Restore memory plane state from a named snapshot
+
+    skeleton dev snapshots [--root DIR]
+        List available memory snapshots
 
     skeleton dev list-templates
         Show all available project templates
@@ -124,7 +138,7 @@ def dev_help_text() -> str:
 
 def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
     """Main entry point for `skeleton dev` commands."""
-    argv = argv or sys.argv[1:]
+    argv = list(sys.argv[1:] if argv is None else argv)
 
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(dev_help_text())

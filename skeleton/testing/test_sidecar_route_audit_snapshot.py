@@ -53,6 +53,7 @@ def test_sidecar_route_audit_locks_duplicate_gameforge_and_undocumented_commands
     assert payload["missing_from_architecture"] == [
         "GET /api/v1/commands/contracts",
         "POST /api/v1/commands/execute/{command}",
+        "POST /api/v1/commands/invoke",
     ]
     assert "POST /api/v1/gameforge/intake" in payload["protected_mismatch"]
     assert "POST /api/v1/gameforge/run" in payload["protected_mismatch"]

@@ -121,8 +121,10 @@ def test_bind_era_http_allow_lists_era_ids() -> None:
         asyncio.run(routes.jeeves_bind_era({"era": "like elden ring"}, state=state))
     assert extra.value.status_code == 422
     assert "must be one of" in str(extra.value.detail)
-    for era in list_eras():
-        assert era in str(extra.value.detail)
+    assert str(extra.value.detail).startswith("era must be one of ")
+    # Public errors are bounded; the complete catalog is available separately.
+    assert len(str(extra.value.detail)) <= 320
+    assert len(list_eras()) > 1
 
 
 def test_session_mode_audit_locks_core_llm_core_parity(monkeypatch) -> None:

@@ -18,6 +18,7 @@ from skeleton.application import (
 
 _ROW_KEYS = {"command", "in_help", "in_dispatch", "runtime_present"}
 _COMMANDS = [
+    "app",
     "run",
     "forge",
     "test",
@@ -29,6 +30,7 @@ _COMMANDS = [
     "walk",
     "contracts",
     "capabilities",
+    "invoke",
     "command",
     "status",
     "config",

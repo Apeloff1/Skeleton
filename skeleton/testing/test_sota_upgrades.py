@@ -20,7 +20,7 @@ from skeleton.cortex.port import Thought
 # ── PlaneWeightLearner ───────────────────────────────────────────────────
 
 def test_learner_starts_at_base_weights():
-    lw = PlaneWeightLearner({"rag": 1.0, "cag": 1.4})
+    lw = PlaneWeightLearner({"rag": 1.0, "cag": 1.4, "mag": 1.0, "kag": 1.0})
     w = lw.effective_weights()
     assert w["cag"] == 1.4 and w["mag"] == 1.0
 

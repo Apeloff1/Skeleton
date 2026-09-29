@@ -99,7 +99,7 @@ def test_b001_runs_on_existing_hardened_git_index(tmp_path: Path) -> None:
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "repo-intel@example.invalid")
     _git(repo, "config", "user.name", "Repo Intel Test")
-    (repo / "tracked.txt").write_text("safe\n", encoding="utf-8")
+    (repo / "tracked.txt").write_text("safe\n", encoding="utf-8", newline="\n")
     _git(repo, "add", "tracked.txt")
     _git(repo, "commit", "-q", "-m", "base")
 

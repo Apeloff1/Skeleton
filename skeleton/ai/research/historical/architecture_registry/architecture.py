@@ -316,6 +316,14 @@ CLI_COMMANDS: List[Dict[str, Any]] = [
     {"command": "list-templates", "args": "", "description": "Show available templates"},
     {"command": "validate", "args": "<path>", "description": "Validate project conventions"},
     {"command": "docs", "args": "[topic]", "description": "Show documentation"},
+    {"command": "doctor", "args": "[--json] [--gates] [--card]", "description": "Inspect system health and doctor gates"},
+    {"command": "cockpit", "args": "[--json] [--gates] [--retune] [--knobs]", "description": "Inspect and tune cockpit controls"},
+    {"command": "bridge", "args": "[--json] [--apply] [--card]", "description": "Inspect or apply doctor bridge clamps"},
+    {"command": "regen", "args": "[--json] [--apply] [--artefacts] [--allow-empty]", "description": "Plan or apply artifact regeneration"},
+    {"command": "stu-tools", "args": "[--json] [--paths] [--apply-regen] [--ci-bundle]", "description": "Run developer health and regeneration tools"},
+    {"command": "snapshot", "args": "[--name] [--root] [--ingest]", "description": "Save memory plane state"},
+    {"command": "restore", "args": "[--name] [--root]", "description": "Restore memory plane state from a snapshot"},
+    {"command": "snapshots", "args": "[--root]", "description": "List available memory snapshots"},
 ]
 
 # Template registry

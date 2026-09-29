@@ -191,7 +191,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "692e54eb17c267f00a0d609c7f8c1925a693e3a4",
+      "source_git_object_sha": "606b5cc78039d2635b18f71e24a56d04cea430f7",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -213,7 +213,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "84b618b21f1d8f9c44e29ee67ec14f4d8aa2a2ef",
+      "source_git_object_sha": "d72dd3ce38d6da7f7a97901e1c8cf21fd8c2da5e",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -286,7 +286,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "fcd00024ec3a19067927827b5ad92998dd0f4398",
+      "source_git_object_sha": "d277b7146bf2b0a8037330faec15b4c159de6b09",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "4cf0ce78d06cfe09f69412baa81cdddb78308d4f",
+      "source_git_object_sha": "49045cd3647e9c2e86c36886126a41bf960b2713",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1086,7 +1086,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "eccb7faf2adb10fc8d5cfb10ebe49dce4578dca6",
+      "source_git_object_sha": "6ded5b0bfaf1f85fa49f89d185b7294afd95cea3",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1292,7 +1292,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "37a23fa41250dd4c0115851d74203e604dc18720",
+      "source_git_object_sha": "c0a8f2f196ae68471add2a1f19eec9da1a5bc49f",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",
@@ -1601,7 +1601,7 @@
       "source": "skeleton/automation/overseer",
       "destination": "skeleton/ai/runtime/distributed/overseer",
       "kind": "tree",
-      "source_git_object_sha": "168caafd2a3f001fec00f7eb08ae990b707871fc",
+      "source_git_object_sha": "2677167ed7e1490c8b00801b4e5aa5909f341019",
       "role": "Governor, digital-twin, hardware, recovery, fleet, and model-predictive control code is runtime supervision/scheduling infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -2874,7 +2874,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "ab778794d5fabf5f669d7697e37f6ac439a339a9",
+      "source_git_object_sha": "fa5ce86b5a439b89b45cf505c45527758bce7f9f",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",

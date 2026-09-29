@@ -124,8 +124,10 @@ class CascadeRouter:
         cheap_name: str = "cheap",
         strong_name: str = "strong",
     ) -> None:
-        if _bad_unit(route_threshold) or _bad_unit(escalate_below):
-            raise ValueError("thresholds must be in [0, 1]")
+        if _bad_unit(route_threshold):
+            raise ValueError("route_threshold must be in [0, 1]")
+        if _bad_unit(escalate_below):
+            raise ValueError("escalate_below must be in [0, 1]")
         if _bad_cost(cheap_cost) or _bad_cost(strong_cost):
             raise ValueError("model costs must be non-negative")
         if not cheap_name or not strong_name:

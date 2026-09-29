@@ -23,9 +23,9 @@ Model-predictive control (receding horizon):
 - Cost per trajectory: weighted tracking error + control effort +
   slew penalty + constraint violation (hard thermal/memory walls).
 - The first element of the winning sequence is applied; the horizon
-  recedes. Feasibility is guaranteed by always including 'hold'.
-- Constraints are HARD: thermal and memory walls are never crossed
-  in simulation, so they're never crossed in actuation.
+  recedes. Feasible trajectories always outrank violating trajectories.
+- If every trajectory violates a wall, minimize predicted violation and
+  report the wall hit. Model predictions cannot guarantee physical safety.
 """
 
 from __future__ import annotations
@@ -39,6 +39,11 @@ from typing import Any, Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 # Recursive Least Squares system identification (per channel)
 # ---------------------------------------------------------------------------
+
+def _finite(name: str, value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite number")
+    return float(value)
 
 @dataclass
 class ChannelModel:
@@ -65,12 +70,15 @@ class SystemIdentifier:
     """Online RLS with forgetting for all resource channels."""
 
     def __init__(self, forgetting: float = 0.98):
-        self.lam = forgetting
+        self.lam = _finite("forgetting", forgetting)
+        if not 0.0 < self.lam <= 1.0:
+            raise ValueError("forgetting must be in (0, 1]")
         self._models: Dict[str, ChannelModel] = {}
         self._prev: Dict[str, Tuple[float, float, float]] = {}  # (x, u, d)
         self._cov: Dict[str, List[List[float]]] = {}
 
     def observe(self, name: str, x: float, u: float, d: float) -> ChannelModel:
+        x, u, d = (_finite(label, value) for label, value in (("state", x), ("control", u), ("demand", d)))
         model = self._models.setdefault(name, ChannelModel(name=name))
         prev = self._prev.get(name)
         if prev is not None:
@@ -91,10 +99,13 @@ class SystemIdentifier:
             model.a = min(0.999, max(0.0, params[0]))
             model.b = params[1]
             model.c = params[2]
-            # Covariance update (Joseph-free simplified form)
-            for i in range(3):
-                for j in range(3):
-                    P[i][j] = (P[i][j] - K[i] * phi[j] * sum(phi[k] * P[k][j] for k in range(3)) / max(1.0, denom)) / self.lam
+            # RLS covariance: (P - K phi^T P) / lambda. Read the entire
+            # old matrix before writing; in-place updates break symmetry.
+            phiP = [sum(phi[k] * P[k][j] for k in range(3)) for j in range(3)]
+            self._cov[name] = [
+                [(P[i][j] - K[i] * phiP[j]) / self.lam for j in range(3)]
+                for i in range(3)
+            ]
 
             # Innovation statistics (EMA)
             model.innovation = innovation
@@ -146,7 +157,7 @@ class MPCResult:
 
 
 # Deterministic trajectory library over H steps (throttle multipliers
-# relative to current output). Always includes 'hold' for feasibility.
+# relative to current output). Includes 'hold' as the unchanged baseline.
 def _trajectory_library(current: float, horizon: int) -> Dict[str, List[float]]:
     clamp = lambda v: max(0.05, min(1.0, v))
     return {
@@ -162,18 +173,28 @@ def _trajectory_library(current: float, horizon: int) -> Dict[str, List[float]]:
 class ModelPredictiveController:
     """Receding-horizon MPC over identified channel models.
 
-    Hard walls: any simulated step crossing a constraint wall is
-    assigned infinite cost — feasibility is structural, not tuned.
+    Feasibility outranks tuning cost, including at the final predicted state.
+    If no candidate is feasible, choose the least predicted violation and
+    report the wall hit; holding an already unsafe state is not a guarantee.
     """
 
     def __init__(self, horizon: int = 8,
                  walls: Optional[Dict[str, float]] = None,
                  weights: Optional[Dict[str, float]] = None):
+        if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon < 1:
+            raise ValueError("horizon must be a positive integer")
         self.horizon = horizon
         # Hard constraint walls per channel (never cross)
-        self.walls = walls or {"thermal": 85.0, "memory": 0.92}
+        self.walls = dict({"thermal": 85.0, "memory": 0.92} if walls is None else walls)
+        for channel, wall in self.walls.items():
+            _finite(f"wall {channel}", wall)
         # Cost weights: tracking / effort / slew / constraint
-        self.weights = weights or {"track": 1.0, "effort": 0.1, "slew": 0.3, "wall": 1e6}
+        self.weights = {"track": 1.0, "effort": 0.1, "slew": 0.3, "wall": 1e6}
+        if weights is not None:
+            self.weights.update(weights)
+        for key, weight in self.weights.items():
+            if _finite(f"weight {key}", weight) < 0:
+                raise ValueError("weights must be non-negative")
         self._stats = {"plans": 0, "wall_hits": 0}
 
     def plan(self, models: Dict[str, ChannelModel],
@@ -181,9 +202,22 @@ class ModelPredictiveController:
              setpoints: Dict[str, float],
              current_u: float,
              demand: float = 0.0) -> MPCResult:
+        current_u = _finite("current_u", current_u)
+        demand = _finite("demand", demand)
+        if not 0.05 <= current_u <= 1.0:
+            raise ValueError("current_u must be in [0.05, 1]")
+        for channel, value in (*states.items(), *setpoints.items()):
+            _finite(channel, value)
+        for channel, model in models.items():
+            for coefficient in (model.a, model.b, model.c):
+                _finite(f"model {channel}", coefficient)
         self._stats["plans"] += 1
         library = _trajectory_library(current_u, self.horizon)
+        if not models:
+            # No learned dynamics means no evidence for changing control.
+            return MPCResult(library["hold"][0], "hold", 0.0, 1, False, [])
         best_name, best_cost, best_path = "hold", math.inf, library["hold"]
+        best_rank = (True, math.inf, math.inf)
         wall_hit_global = False
 
         for name, seq in library.items():
@@ -191,6 +225,7 @@ class ModelPredictiveController:
             sim_states = dict(states)
             path: List[float] = []
             wall_hit = False
+            violation = 0.0
 
             for step, u in enumerate(seq):
                 step_cost = 0.0
@@ -198,17 +233,18 @@ class ModelPredictiveController:
                     x = sim_states.get(ch, 0.0)
                     sp = setpoints.get(ch, x)
                     step_cost += self.weights["track"] * (x - sp) ** 2
-                    # Constraint walls (hard)
+                    # Check both endpoints so the terminal prediction cannot
+                    # escape the wall check. User-defined channel walls count too.
                     wall = self.walls.get(ch)
+                    predicted = _finite(f"prediction {ch}", model.predict(x, u, demand))
                     if wall is not None:
-                        if ch == "memory" and x > wall:
-                            step_cost += self.weights["wall"]
-                            wall_hit = True
-                        if ch == "thermal" and x > wall:
+                        excess = max(0.0, x - wall) + max(0.0, predicted - wall)
+                        if excess > 0.0:
+                            violation += excess / max(1.0, abs(wall))
                             step_cost += self.weights["wall"]
                             wall_hit = True
                     # Simulate the identified model forward
-                    sim_states[ch] = model.predict(x, u, demand)
+                    sim_states[ch] = predicted
                 # Effort + slew
                 step_cost += self.weights["effort"] * (1.0 - u) ** 2
                 if step > 0:
@@ -218,8 +254,10 @@ class ModelPredictiveController:
 
             if wall_hit:
                 wall_hit_global = True
-            if cost < best_cost:
+            rank = (wall_hit, violation, cost)
+            if rank < best_rank:
                 best_name, best_cost, best_path = name, cost, path
+                best_rank = rank
 
         if wall_hit_global:
             self._stats["wall_hits"] += 1

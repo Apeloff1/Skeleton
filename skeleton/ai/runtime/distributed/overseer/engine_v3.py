@@ -14,7 +14,7 @@ Tick pipeline:
     → SystemIdentifier: RLS model update per channel (a, b, c)
     → anomaly scan: channels whose model is failing
     → MPC: receding-horizon optimization over trajectory library
-      with HARD constraint walls (thermal/memory never crossed)
+      prioritizing feasible paths and reporting predicted wall violations
     → DigitalTwin: counterfactual grid over recent history
     → MetaCognition: scorecards + regret + trust + bounded rewrites
     → trust gate: low-trust decisions fall back to conservative control

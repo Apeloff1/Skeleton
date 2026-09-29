@@ -55,7 +55,7 @@ class TestProviderFactory(unittest.TestCase):
 
 class TestJeevesWithProvider(unittest.TestCase):
     def test_ask_uses_provider(self):
-        from skeleton.jeeves.core import JeevesCore, SessionMode
+        from skeleton.jeeves.llm_core import JeevesCore, SessionMode
         from skeleton.jeeves.providers import LocalEchoProvider
 
         jeeves = JeevesCore(provider=LocalEchoProvider())
@@ -66,7 +66,7 @@ class TestJeevesWithProvider(unittest.TestCase):
         self.assertEqual(jeeves.provider_name, "local-echo")
 
     def test_session_records_provider(self):
-        from skeleton.jeeves.core import JeevesCore
+        from skeleton.jeeves.llm_core import JeevesCore
         from skeleton.jeeves.providers import LocalEchoProvider
 
         jeeves = JeevesCore(provider=LocalEchoProvider())

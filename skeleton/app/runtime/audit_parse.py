@@ -740,7 +740,11 @@ def create_app_included_routers() -> list[dict[str, object]]:
     return rows
 
 
-_SKIP_MOUNTED_MODULES = frozenset({"skeleton.api.routes", "skeleton.api.gameforge_routes"})
+_SKIP_MOUNTED_MODULES = frozenset({
+    "skeleton.api.routes",
+    "skeleton.api.gameforge_routes",
+    "skeleton.api.command_routes",  # covered by the sidecar audit
+})
 
 
 def mounted_router_handlers() -> list[dict[str, object]]:

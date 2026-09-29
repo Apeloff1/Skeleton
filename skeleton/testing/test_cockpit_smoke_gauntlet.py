@@ -52,6 +52,8 @@ def test_cockpit_smoke_script_contains_key_gates():
 
 def test_cockpit_smoke_script_smoke_optional():
     """Best-effort subprocess run; skip on timeout — static gates are enough for S-size."""
+    if os.name == "nt":
+        pytest.skip("POSIX shell smoke runs in Linux CI")
     if not SCRIPT.is_file():
         pytest.skip("gauntlet script missing")
     if not os.access(SCRIPT, os.X_OK):

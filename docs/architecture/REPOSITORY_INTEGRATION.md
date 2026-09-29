@@ -66,6 +66,24 @@ validators. Run namespace/taxonomy regressions, affected gameplay and School
 tests, and the engine assembly suite. The Merge Readiness workflow now includes
 namespace, taxonomy, atlas, and combined-integration regression coverage.
 
+The required Unit job also executes the complete `skeleton/testing` suite on
+Linux, with plugin autoload disabled and the asyncio plugin explicitly enabled.
+It retains the legacy unit runner, whose checked-in tests now require no
+superseded-assertion exceptions. For a local development environment and a full
+domain check:
+
+```sh
+python -m pip install -e ".[dev]"
+python -m pytest -q skeleton/testing
+python tests/run_unit.py
+```
+
+Filesystem security and transaction tests that exercise descriptor-relative
+POSIX operations require Linux. Unsupported hosts must retain the runtime's
+fail-closed behavior; a Windows failure at that boundary does not justify
+replacing it with unguarded path operations. Optional shell smoke tests and
+symlink fixtures report unavailable platform capabilities explicitly.
+
 `tests/test_repository_integration.py` verifies the **staged Git tree** against
 the updated mapping identities. Stage the integration before running it locally;
 CI naturally validates the committed checkout. Source/mirror parity is separately
@@ -76,9 +94,22 @@ apply `frontend/scripts/patch-node-modules.js`, then run `yarn typecheck`,
 `yarn test:operation-stream`, `yarn test:conversation`, and `yarn export:web`.
 
 Windows checkouts of historical paths may require repository-local
-`git config core.longpaths true`. If the host also restricts Python filesystem
-path lengths, invoke the file-tree check through an extended absolute path
-(`\\?\C:\...\scripts\check_ai_file_tree.py`) or use a short checkout directory.
+`git config core.longpaths true`. The AI file-tree checker uses extended absolute
+paths on Windows so deep, governed historical members are validated rather than
+misreported as missing. Other tools that do not support long paths may still
+require a short checkout directory.
+
+Developer command help and `architecture.CLI_COMMANDS` include the registry's
+doctor, cockpit, bridge, regeneration, and snapshot commands. An explicit empty
+CLI argument list displays help without consuming arguments from its host
+process. Snapshot text ingestion uses UTF-8 on every platform.
+
+Model-predictive control ranks feasible trajectories ahead of tuning cost and
+checks their terminal predictions. If every candidate violates a wall, it picks
+the least predicted violation and reports the wall hit. This is a bounded model
+decision, not a guarantee about physical hardware. Model learning uses a
+consistent covariance update; invalid numeric observations and parameter
+proposals fail before entering the learning history.
 
 The migration is reversible as one integration change: revert its code, mirrors,
 metadata, tests, and frontend moves together. It changes no stored user data or

@@ -50,14 +50,16 @@ def test_mounted_route_audit_is_import_free(monkeypatch) -> None:
 
 def test_mounted_route_audit_locks_swarm_family_and_cockpit() -> None:
     payload = mounted_route_audit_snapshot()
-    assert len(payload["routes"]) == 71
-    assert len(payload["missing_from_architecture"]) == 71
+    assert len(payload["routes"]) == 88
+    assert len(payload["missing_from_architecture"]) == 88
     assert payload["protected_mismatch"] == []
     sources = {row["source"] for row in payload["routes"]}
     assert "cockpit" in sources
     assert "swarm_routes" in sources
+    assert "engine_routes" in sources
     assert "gameforge" not in sources
     assert "command" not in sources
+    assert "command_routes" not in sources
     rows = {row["key"]: row for row in payload["routes"]}
     for row in payload["routes"]:
         assert set(row) == _ROW_KEYS

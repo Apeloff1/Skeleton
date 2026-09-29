@@ -49,7 +49,12 @@ def test_checker_admission_rejects_symlink(tmp_path, monkeypatch):
     target = tmp_path / "check_fake_contract.py"
     target.write_text("raise SystemExit(0)\n", encoding="utf-8")
     link = tmp_path / "check_link_contract.py"
-    link.symlink_to(target)
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks symlink privilege; covered on Linux")
+        raise
     monkeypatch.setattr(module, "ROOT", tmp_path)
     with pytest.raises(RuntimeError):
         module._admit_checker("check_link_contract.py")

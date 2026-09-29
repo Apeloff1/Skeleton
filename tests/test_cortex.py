@@ -374,7 +374,7 @@ class TestNeural:
             assert lms[slot]["neural_steps"] > 0, slot
             assert lms[slot]["ngram_fitted"] > 0, slot
         assert lms["midbrain"]["transformer_steps"] > 0
-        assert lms["pfc"]["transformer_steps"] == 0
+        assert lms["pfc"]["transformer_steps"] > 0
         assert lms["neo"]["transformer_steps"] > 0
 
     def test_left_neural_backend_keeps_mix_numbers(self):
@@ -1544,6 +1544,7 @@ class TestQueue24:
         from skeleton.cortex import JeevesCortex
         from skeleton.cortex.hive import merkle_card
         neo = JeevesCortex()
+        assert neo.slots["left"].fit("compile ttk hp dps recipe sim") >= 1
         neo.think("compile ttk hp dps recipe sim")
         before = merkle_card(neo)
         e0 = [row[:] for row in neo.transformer.E[:2]]
@@ -1563,6 +1564,7 @@ class TestQueue25:
         from skeleton.cortex import JeevesCortex
         neo = JeevesCortex()
         stim = "compile ttk hp dps recipe sim"
+        assert neo.slots["left"].fit(stim) >= 1
         neo.think(stim)
         neo.acquire("left")
         neo.surpass("left")

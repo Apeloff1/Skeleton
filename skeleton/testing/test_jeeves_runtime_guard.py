@@ -180,7 +180,8 @@ def test_second_same_state_action_is_model_gated_not_cold_start() -> None:
     assert second.prediction.observations == 1
     assert second.admission_mode is GuardAdmissionMode.MODEL_GATED
     assert second.decision.selected_action is not None
-    assert calls == [(7, "run-guard-1"), (7, "run-guard-1")]
+    assert calls == [(7, "run-guard-1")]
+    assert second.observation.cached is True
     _finalize(guard, second)
 
 

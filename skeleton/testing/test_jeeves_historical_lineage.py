@@ -190,7 +190,7 @@ def test_non_severe_regression_can_break_domain_budget() -> None:
         policy=DriftPolicy(material_delta=0.005, severe_regression=0.10, max_regressed_domains=0),
     ).compare(child)
     assert report.severe_regression is False
-    assert report.regressed_domains == (BenchmarkDomain.REASONING,)
+    assert report.regressed_domains == (BenchmarkDomain.CODING, BenchmarkDomain.REASONING,)
     assert report.structural_break is True
 
 

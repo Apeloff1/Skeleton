@@ -24,6 +24,18 @@ def test_fresh_context_passes_untouched():
     assert out.report.verdict == "fresh"
 
 
+def test_rot_risk_grows_with_distance_but_missing_constraint_is_always_rot():
+    guard = ContextRotGuard(attention_budget=100)
+    constraint = "KEEP THE REQUIRED RULE"
+    short = guard.assess(constraint + "\nhello", constraints=[constraint])
+    long = guard.assess(constraint + "\n" + "context " * 150, constraints=[constraint])
+    absent = guard.assess("hello", constraints=[constraint])
+    assert short.verdict == "fresh"
+    assert long.verdict == "rot"
+    assert short.risk < long.risk
+    assert absent.verdict == "rot"
+
+
 def test_rotten_context_compacts():
     gc = RotGuardedCompactor(
         guard=ContextRotGuard(attention_budget=50, rot_at=0.5),

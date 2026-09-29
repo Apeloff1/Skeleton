@@ -60,7 +60,7 @@ class TestWorkloadProfiler(unittest.TestCase):
         for _ in range(5):
             p = prof.observe(0.02, 0.0)
         self.assertEqual(p.regime, WorkloadRegime.IDLE)
-        for _ in range(6):
+        for _ in range(prof.window + prof.DWELL_MIN):
             p = prof.observe(0.85, 0.1)
         self.assertIn(p.regime, (WorkloadRegime.BATCH, WorkloadRegime.SUSTAINED))
         self.assertGreaterEqual(p.dwell_ticks, 1)
@@ -68,7 +68,7 @@ class TestWorkloadProfiler(unittest.TestCase):
     def test_burst_detection(self):
         from skeleton.overseer.predict import WorkloadProfiler, WorkloadRegime
         prof = WorkloadProfiler()
-        for v in (0.1, 0.7, 0.05, 0.65, 0.1, 0.6, 0.05, 0.7, 0.1, 0.65):
+        for v in (0.0, 0.9) * 8:
             p = prof.observe(v, 0.2)
         self.assertEqual(p.regime, WorkloadRegime.BURST)
 

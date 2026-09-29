@@ -25,7 +25,7 @@ from skeleton.creator.intent_compiler import (
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "intent_compiler"
-COMPILER_PATH = Path(__file__).resolve().parents[1] / "creator" / "intent_compiler.py"
+COMPILER_PATH = Path(__file__).resolve().parents[1] / "forge" / "creator" / "intent_compiler.py"
 
 
 def _load_fixture(name: str) -> dict:

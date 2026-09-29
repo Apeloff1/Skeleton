@@ -6,6 +6,7 @@ from skeleton.jeeves.agent.context_pipeline import (
     ContextTier,
     LayeredContextResolver,
     ResolutionStage,
+    ResolutionPolicy,
 )
 from skeleton.jeeves.agent.episodic_scaffold import (
     EpisodicScaffoldIndex,
@@ -119,6 +120,7 @@ def test_memory_game_is_the_first_and_sufficient_fast_path():
     resolver = LayeredContextResolver(
         cards=cards,
         memory=MemoryManager(clock=clock),
+        policy=ResolutionPolicy(stop_confidence=0.0),
     )
     governor = AdaptiveContextGovernor(resolver, clock=clock)
 
@@ -466,7 +468,7 @@ def test_scaffolded_memory_game_remains_layered_context_compatible():
         context_tags=("board",),
         entity_cues=("rook",),
     )
-    resolver = LayeredContextResolver(cards=cards, memory=MemoryManager(clock=clock))
+    resolver = LayeredContextResolver(cards=cards, memory=MemoryManager(clock=clock), policy=ResolutionPolicy(stop_confidence=0.0))
 
     resolution = resolver.resolve(
         namespace,

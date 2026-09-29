@@ -49,9 +49,9 @@ def test_maximal_registry_merges_frontier_and_rare_catalog_without_duplicate_key
 def test_maximal_router_keeps_perpendicular_family_diversity() -> None:
     observations = (
         SemanticObservation("film", "A graphic match and cut juxtapose two visual shapes.", 0, tags=("film",)),
-        SemanticObservation("text", "Some readers infer a stronger unstated alternative.", 1, tags=("language",)),
+        SemanticObservation("text", "Some, but not all, readers infer that a stronger alternative may or may not hold.", 1, tags=("language",)),
         SemanticObservation("game", "A hidden role player bluffs while a cooldown opens a response window.", 2, tags=("game",)),
-        SemanticObservation("memory", "The user recalls the content but is unsure where it came from.", 3, tags=("memory",)),
+        SemanticObservation("memory", "I remember the content but not the source: where was it heard or read, and who said it?", 3, tags=("memory",)),
     )
     selection = MaximalLensRouter().select_maximal(observations, max_lenses=20)
     assert selection.perpendicular is True

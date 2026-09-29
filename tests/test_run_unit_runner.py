@@ -418,9 +418,5 @@ def test_superseded_registry_has_no_stale_jeeves_escape_hatch() -> None:
     assert ("TestJeevesLM", "test_unfitted_does_not_speak") not in runner.SUPERSEDED_ASSERTIONS
 
 
-def test_registered_legacy_assertion_still_exists_in_target_method() -> None:
-    key = ("TestNeural", "test_train_fits_all_four_neurals")
-    spec = runner.SUPERSEDED_ASSERTIONS[key]
-    source = inspect.getsource(cortex_tests.TestNeural.test_train_fits_all_four_neurals)
-    assert spec["module"] == "tests.test_cortex"
-    assert spec["assertion"] in source
+def test_repository_suite_requires_no_suppressed_legacy_assertions() -> None:
+    assert dict(runner.SUPERSEDED_ASSERTIONS) == {}

@@ -190,6 +190,19 @@ class TestDevCommands(TestCase):
 
 
 class TestDevCliEntry(TestCase):
+    def test_explicit_empty_arguments_do_not_consume_host_arguments(self):
+        from skeleton.developer.cli import run_dev_cli
+        with patch("sys.argv", ["host", "restore", "--name", "unintended"]):
+            result = run_dev_cli([])
+        self.assertEqual(result["status"], "help_shown")
+
+    def test_help_covers_every_registered_and_direct_command(self):
+        from skeleton.architecture import CLI_COMMANDS
+        from skeleton.developer.cli import dev_help_text
+        help_text = dev_help_text()
+        for row in CLI_COMMANDS:
+            self.assertIn("skeleton dev " + row["command"], help_text)
+
     def test_help_shown(self):
         from skeleton.developer.cli import run_dev_cli
         result = run_dev_cli(["help"])
@@ -210,3 +223,17 @@ class TestDevCliEntry(TestCase):
         from skeleton.developer.cli import show_docs
         result = show_docs("nonexistent")
         self.assertIn("No documentation found", result["content"])
+
+
+def test_snapshot_ingests_utf8_independently_of_host_locale(tmp_path):
+    from skeleton.developer.persistence_commands import SnapshotCommand
+    text = "Memory for Troms\u00f8: \u6771\u4eac \U0001f331"
+    source = tmp_path / "notes.txt"
+    source.write_text(text, encoding="utf-8")
+    with patch("skeleton.deploy.harness.Harness") as harness_type:
+        harness = harness_type.return_value
+        harness.genesis.get.return_value.ingest_document.return_value = 1
+        harness.snapshot_state.return_value = {"planes": ["rag"]}
+        result = SnapshotCommand()(["--root", str(tmp_path / "state"), "--ingest", str(source)])
+        harness.genesis.get.return_value.ingest_document.assert_called_once_with("notes", text)
+        assert result["ingested_chunks"] == 1

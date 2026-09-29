@@ -47,7 +47,7 @@ def test_developer_cli_audit_is_import_free(monkeypatch) -> None:
 
 def test_developer_cli_audit_locks_registry_and_help_split() -> None:
     payload = developer_cli_audit_snapshot()
-    assert payload["missing_from_architecture"] == ["snapshot", "restore", "snapshots"]
+    assert payload["missing_from_architecture"] == []
     assert payload["missing_from_runtime"] == []
     rows = {row["command"]: row for row in payload["commands"]}
     for row in payload["commands"]:
@@ -65,7 +65,7 @@ def test_developer_cli_audit_locks_registry_and_help_split() -> None:
     assert listed["in_cli_dispatch"] is True
 
     snapshot = rows["snapshot"]
-    assert snapshot["architecture_documented"] is False
+    assert snapshot["architecture_documented"] is True
     assert snapshot["in_registry"] is True
 
 
