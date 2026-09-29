@@ -48,7 +48,8 @@ Skeleton/
 │   ├── frontier/             frontier gameplay/product runtime
 │   │   ├── runtime/          contracts, execution, streams, memory/control plane
 │   │   ├── progression/      achievements, quests, reputation, passes/meta systems
-│   │   └── ecology/          aquarium, bait, biotope, breeding + adapters
+│   │   ├── ecology/          aquarium, bait, biotope, breeding + adapters
+│   │   └── economy/          commerce, cooking, crafting, energy, equipment
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis
