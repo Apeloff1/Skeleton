@@ -39,6 +39,8 @@ Skeleton/
 │   ├── retrieval/            retrieval/ranking/fusion
 │   ├── knowledge/             reusable knowledge/reasoning substrate
 │   │   └── graphs/            graph, spectral, motif and GAT primitives
+│   ├── provenance/            append-only evidence and tamper-evident history
+│   │   └── chronicle/         Merkle chronicle, helix cards and independent verification
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
 │   ├── kv/                   paged/tiered KV-cache control plane
@@ -156,6 +158,7 @@ compatibility shims:
 | `skeleton.network.*` | `skeleton.distributed.network.*` | transitional shim |
 | `skeleton.mesh.*` | `skeleton.distributed.mesh.*` | transitional shim |
 | `skeleton.graphs.*` | `skeleton.knowledge.graphs.*` | transitional shim |
+| `skeleton.chronicle.*` | `skeleton.provenance.chronicle.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
