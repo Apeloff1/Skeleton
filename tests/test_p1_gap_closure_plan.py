@@ -92,20 +92,26 @@ def test_gap_obligations_are_unique_and_exactly_joined_to_volumes() -> None:
     assert len(set(obligation_ids)) == 168
 
 
-def test_current_empty_registry_remains_explicitly_unbound() -> None:
+def test_current_registry_preserves_existing_bindings_as_non_authoritative() -> None:
     module = _module()
     report = module.build_gap_closure_plan(ROOT)
 
-    assert report["bound_gap_obligation_count"] == 0
-    assert report["unbound_gap_obligation_count"] == 168
+    assert report["bound_gap_obligation_count"] == 12
+    assert report["unbound_gap_obligation_count"] == 156
 
     for packet in report["packets"]:
-        assert packet["bound_gap_count"] == 0
-        assert packet["unbound_gap_count"] == packet["gap_count"]
+        assert packet["bound_gap_count"] == sum(1 for obligation in packet["obligations"] if obligation["binding_present"])
+        assert packet["unbound_gap_count"] == packet["gap_count"] - packet["bound_gap_count"]
         assert all(
-            obligation["binding_present"] is False
+            obligation["binding_present"] in {True, False}
             for obligation in packet["obligations"]
         )
+    assert sum(
+        1
+        for packet in report["packets"]
+        for obligation in packet["obligations"]
+        if obligation["binding_present"]
+    ) == 12
 
 
 def test_resolution_paths_preserve_evidence_or_human_acceptance_boundary() -> None:
