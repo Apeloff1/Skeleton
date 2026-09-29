@@ -1400,11 +1400,11 @@
     },
     {
       "id": "AIFT-GENESIS",
-      "source": "skeleton/genesis.py",
+      "source": "skeleton/bootstrap/genesis.py",
       "destination": "skeleton/ai/runtime/bootstrap/genesis.py",
       "kind": "file",
       "source_git_object_sha": "be99fd15d0feb66a848e44c70a7208cafaddb9d4",
-      "role": "Genesis is the engine bootstrap/wiring orchestrator and should become a governed bootstrap entry beneath the canonical AI runtime.",
+      "role": "Canonical engine bootstrap/wiring orchestrator under skeleton/bootstrap; mirrored into the governed AI runtime bootstrap surface.",
       "work_package_refs": [
         "WP-W02",
         "WP-W19",
@@ -1429,7 +1429,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_bootstrap_owner_with_legacy_root_shim"
     },
     {
       "id": "AIFT-KV",
