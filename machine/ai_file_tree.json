@@ -4756,6 +4756,21 @@
         "planned_path": "skeleton/creator",
         "implemented_path": "skeleton/forge/creator",
         "mapping_id": "AIFT-CREATOR"
+      },
+      {
+        "planned_path": "skeleton/overseer",
+        "implemented_path": "skeleton/automation/overseer",
+        "mapping_id": "AIFT-OVERSEER"
+      },
+      {
+        "planned_path": "skeleton/swarm",
+        "implemented_path": "skeleton/automation/swarm",
+        "mapping_id": "AIFT-SWARM"
+      },
+      {
+        "planned_path": "skeleton/hive",
+        "implemented_path": "skeleton/automation/hive",
+        "mapping_id": "AIFT-HIVE"
       }
     ],
     "planned_but_absent": [
