@@ -292,12 +292,21 @@ def validate() -> list[str]:
         errors.append(f"cannot parse AI master plan for file-tree coverage: {exc}")
         master_plan = {}
 
+    planned_aliases = {
+        item.get("planned_path")
+        for item in data.get("planned_path_audit", {}).get("covered_aliases", [])
+        if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
+    }
     for planned_source in sorted(_planned_implementation_sources(master_plan)):
         governed = any(
             _mapping_covers_planned_source(mapping, planned_source)
             for mapping in mappings
         )
-        if _source_exists(planned_source) and not governed:
+        if (
+            _source_exists(planned_source)
+            and not governed
+            and planned_source not in planned_aliases
+        ):
             errors.append(
                 "extant planned implementation path is not governed by AI file tree: "
                 f"{planned_source}"
