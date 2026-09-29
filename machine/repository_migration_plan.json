@@ -115,6 +115,15 @@
       "state": "classified",
       "compatibility": null,
       "notes": "Classified the final previously-unmentioned skeleton top-level runtime roots without moving code: frontier receives an explicit canonical frontier-runtime zone; pipelines joins build/Forge delivery ownership; platform joins simulation as the Godot adapter boundary."
+    },
+    {
+      "id": "TREE-013",
+      "source": "skeleton/platform/",
+      "destination": "skeleton/simulation/platform/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/platform/",
+      "notes": "The two-file Godot adapter package moved into canonical simulation ownership. godot_adapter.py moved byte-identically; the canonical package and AI simulation mirror are tree-identical. Legacy skeleton/platform remains compatibility-only, AIFT-PLATFORM follows the canonical path, and the parent AIFT-SIMULATION platform overlay was retired because platform is now present in both governed trees."
     }
   ]
 }
