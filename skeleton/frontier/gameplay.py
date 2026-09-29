@@ -5,7 +5,7 @@ promoted gameplay policies. It intentionally composes existing primitives rather
 than duplicating their job, economy, event or persistence responsibilities.
 """
 
-from skeleton.frontier.aquarium import (
+from skeleton.frontier.ecology.aquarium import (
     AquariumDecorationSpec,
     AquariumLikeLedger,
     AquariumPosition,
@@ -33,7 +33,7 @@ from skeleton.frontier.aquarium import (
     tank_from_record,
     theme_from_record,
 )
-from skeleton.frontier.aquarium_adapters import (
+from skeleton.frontier.ecology.aquarium_adapters import (
     aquarium_event,
     aquarium_event_to_memory_item,
     aquarium_identity,
@@ -41,7 +41,7 @@ from skeleton.frontier.aquarium_adapters import (
     aquarium_state_memory_item,
     aquarium_state_payload,
 )
-from skeleton.frontier.biotope import (
+from skeleton.frontier.ecology.biotope import (
     BiotopeBonus,
     BiotopeCatchPlan,
     BiotopeProgress,
@@ -58,7 +58,7 @@ from skeleton.frontier.biotope import (
     unlockable_biotopes,
     unlockable_stages as unlockable_biotope_stages,
 )
-from skeleton.frontier.biotope_adapters import (
+from skeleton.frontier.ecology.biotope_adapters import (
     biotope_event,
     biotope_event_to_memory_item,
     biotope_identity,
@@ -66,7 +66,7 @@ from skeleton.frontier.biotope_adapters import (
     biotope_progress_memory_item,
     biotope_progress_payload,
 )
-from skeleton.frontier.bait import (
+from skeleton.frontier.ecology.bait import (
     BaitEquipPlan,
     BaitLoadout,
     BaitSpec,
@@ -86,7 +86,7 @@ from skeleton.frontier.bait import (
     spot_unlock_requirements,
     use_bait,
 )
-from skeleton.frontier.breeding import (
+from skeleton.frontier.ecology.breeding import (
     BreedingJob,
     BreedingParent,
     BreedingProgress,
@@ -110,7 +110,7 @@ from skeleton.frontier.breeding import (
     start_breeding,
     trait_value_multiplier,
 )
-from skeleton.frontier.breeding_adapters import (
+from skeleton.frontier.ecology.breeding_adapters import (
     achievement_signals_from_offspring,
     breeding_event_to_memory_item,
     breeding_offspring_digest,
