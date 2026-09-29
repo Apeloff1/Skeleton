@@ -9,7 +9,7 @@ def test_stage7_verifier_follows_canonical_frontier_stream_store() -> None:
     assert legacy not in BOUNDARIES
     assert any(
         source == canonical
-        and mirror == "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
+        and mirror == "skeleton/ai/runtime/frontier/runtime/operation_stream_store_mongo.py"
         for source, mirror in MIRROR_PAIRS
     )
     assert all(source != legacy for source, _mirror in MIRROR_PAIRS)

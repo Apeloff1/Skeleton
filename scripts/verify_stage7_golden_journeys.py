@@ -98,7 +98,7 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
     ),
     (
         "skeleton/frontier/runtime/operation_stream_store_mongo.py",
-        "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py",
+        "skeleton/ai/runtime/frontier/runtime/operation_stream_store_mongo.py",
     ),
     (
         "skeleton/persistence/operation_store_mongo.py",
