@@ -112,7 +112,8 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
         "AUDITED_PLANE_IDS", "AUTHZ_AUDIT_KIND", "CAPABILITIES",
         "CAPABILITIES_BY_ID", "CAPABILITY_LOADER", "CAPABILITY_MANIFEST_VERSION", "CAPABILITY_VIEW_AUDIT_KIND",
         "CHARTER_AUDIT_KIND", "CLI_SHARED_AUDIT_KIND", "CODENAME_AUDIT_KIND", "CONTRACT_AUDIT_KIND", "CONTRACT_VERSION",
-        "CONTRACT_VERSION_AUDIT_KIND",
+        "CONTRACT_VERSION_AUDIT_KIND", "SCHEMA_VERSION", "SUPPORTED_MODE",
+        "UnifiedRequest", "invoke_unified", "normalize_request",
         "CORTEX_ROUTE_AUDIT_KIND", "DEVELOPER_CLI_AUDIT_KIND", "DEV_TOKEN_AUDIT_KIND",
         "ENV_FLAG_AUDIT_KIND", "EXPORT_AUDIT_KIND", "GATE_DOMAIN_AUDIT_KIND", "GATE_LIMIT_AUDIT_KIND",
         "GATE_STACK_AUDIT_KIND", "GENESIS_BOOT_AUDIT_KIND",
@@ -337,6 +338,11 @@ def get_phase(phase_name: str) -> Optional[Dict[str, Any]]:
 def get_package(package_name: str) -> Optional[Dict[str, Any]]:
     """Get package definition by name."""
     aliases = {
+        "skeleton.app.runtime": "skeleton.application",
+        "skeleton.automation.swarm": "skeleton.swarm",
+        "skeleton.automation.agents": "skeleton.agents",
+        "skeleton.forge.pipelines": "skeleton.pipelines",
+        "skeleton.simulation.content": "skeleton.content",
         "skeleton.distributed.galaxy": "skeleton.galaxy",
         "skeleton.research.social": "skeleton.social",
         "skeleton.distributed.network": "skeleton.network",

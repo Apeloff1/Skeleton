@@ -274,3 +274,12 @@ else:
     result = subprocess.run([sys.executable, '-c', code], cwd=Path(__file__).resolve().parents[2],
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
+
+
+def test_architecture_audit_resolves_canonical_packages_and_compatibility_exports():
+    from skeleton.app.runtime.audit_parse import public_exports
+    from skeleton.app.runtime import export_audit_snapshot
+    rows = export_audit_snapshot()["capabilities"]
+    assert all(row["in_architecture_registry"] for row in rows)
+    assert public_exports("skeleton.application") == public_exports("skeleton.app.runtime")
+    assert public_exports("skeleton.social") == public_exports("skeleton.research.social")

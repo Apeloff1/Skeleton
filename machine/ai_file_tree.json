@@ -445,7 +445,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "4f7f9bdf08e444bfcf4ab34d86ff74c8e2ac4b86",
+      "source_git_object_sha": "7c4595007d17a930721fae16e4070f96b689ef1e",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -810,7 +810,7 @@
       "source": "skeleton/resilience",
       "destination": "skeleton/ai/runtime/resilience",
       "kind": "tree",
-      "source_git_object_sha": "2a79d6079abc1fcd787347f59b3da374a7ac0572",
+      "source_git_object_sha": "22f84205b51d03628cdbb069af6977305b4912b3",
       "role": "failure recovery and resilience runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1086,7 +1086,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "7a063ae35483851e90d4820e0cd020d785686cb9",
+      "source_git_object_sha": "eccb7faf2adb10fc8d5cfb10ebe49dce4578dca6",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -2874,7 +2874,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "8a99fa64cf3c4eb0501c224b226be442c5cb0b21",
+      "source_git_object_sha": "ab778794d5fabf5f669d7697e37f6ac439a339a9",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",

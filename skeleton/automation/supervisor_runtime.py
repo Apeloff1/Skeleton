@@ -856,6 +856,17 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
             )
         admitted["builder_proposal_receipt"] = builder_receipt
 
+    repair_receipt = value.get("builder_repair_receipt")
+    if repair_receipt is not None:
+        if worker != "feature-builder" or status != "pull-request-updated":
+            raise SupervisorRuntimeError("Builder repair receipt escaped its admitted worker status")
+        from .builder_repair_receipts import BuilderRepairReceipt
+        from .builder_plane import BuilderPlaneError
+        try:
+            admitted["builder_repair_receipt"] = BuilderRepairReceipt.from_payload(repair_receipt).as_dict()
+        except (BuilderPlaneError, TypeError, ValueError) as exc:
+            raise SupervisorRuntimeError("invalid builder repair receipt") from exc
+
     # Evidence that claims a mutation must carry the immutable custody proofs
     # needed to correlate the remote proposal with this exact execution.
     if status in {
@@ -884,10 +895,11 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
             validate_fingerprint(admitted["builder_manifest_digest"])
         if (
             worker == "feature-builder"
-            and "builder_proposal_receipt" not in admitted
+            and ((status == "pull-request-created" and "builder_proposal_receipt" not in admitted)
+                 or (status == "pull-request-updated" and "builder_repair_receipt" not in admitted))
         ):
             raise SupervisorRuntimeError(
-                "feature-builder created-PR evidence is missing proposal receipt"
+                "feature-builder mutation evidence is missing its required receipt"
             )
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(

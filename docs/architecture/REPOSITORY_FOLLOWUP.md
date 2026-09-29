@@ -24,24 +24,42 @@ Canonical capability owners and provider boundaries are unchanged.
 - Source and governed AI mirrors remain synchronized. Merge Readiness now
   exercises replication, path recovery, handoff, and Galaxy bridge contracts.
 
-## Outstanding broader compatibility failures
+## Expanded integration repairs
 
-Expanding beyond the original merge checks exposed failures in
-`test_galaxy_brains.py` and `test_organismer_social.py`. These are tracked here;
-they are not suppressed, quarantined, or represented as passing:
+The previously listed command-deck, organism diagnostic, Vault, guarded
+compaction, social-label and resource-budget mismatches have been repaired and
+covered by focused regression tests. Deck commands now use existing capability
+owners; diagnostic reads do not dispatch repairs. Context and compaction paths
+respect whole-record budgets and retained constraints. Graph persistence retains
+confidence and provenance and validates a full restore before mutating state.
 
-| Area | Observed mismatch |
-| --- | --- |
-| Cortex command deck | Older callers pass a model positionally; the current constructor treats it as a filesystem root. |
-| Organism diagnostics | Callers provide an organism and `neo`/`fix` arguments to doctor/nervous APIs that now accept only a root. |
-| Vault integration | The key registry imports `DataKey` and `EnvelopeKMS`, which are absent from its KMS module. |
-| Context loop | The journal loop imports the missing `RotGuardedCompactor`; guarded compaction currently exposes `compact_turns`. |
-| Social tests | Historical source-house labels differ from the current `X`/`arXiv` labels. |
-| Resource budget tests | The old tiny-tier walk expectation differs from the current bound. |
+Vault now uses authenticated AES-256-GCM envelopes with context-bound associated
+data and atomic rotation. Native cryptography is loaded only when cryptographic
+operations run; lightweight tooling imports remain usable without that optional
+runtime being imported. The installation dependency remains declared. Old XOR
+envelopes are rejected, not silently migrated. Retained master keys are in-memory
+only: this component is not a durable external key-management service.
 
-Resolve these through declared capability contracts and current production
-consumers before changing behavior. In particular, do not invent cryptographic
-implementations or report preserved memory constraints without evidence.
+Builder follow-up repairs now carry a bounded immutable receipt binding the
+existing proposal, PR head, PR number, accepted review and admitted follow-up.
+Both worker parsing and manifest admission validate that evidence. This adds no
+execution or merge authority. Missing, tampered, over-budget or mismatched repair
+evidence fails closed. Repository context explicitly decodes UTF-8 and truncates
+content on a byte budget without splitting a character.
+
+## Remaining validation scope
+
+An exploratory canonical run on the initial repair snapshot produced 16,164
+passes, 331 failures and 91 skips. Subsequent fixes passed a focused 565-test
+matrix; this does not establish that the complete exploratory suite is clean.
+A later 124-test builder matrix covers repair receipts and existing automation
+contracts. Counts refer to separate snapshots and must not be added together.
+
+Remaining failures include older consumer fixtures and deeper runtime contracts.
+POSIX filesystem, executable-mode and transaction tests require Linux; Windows
+must continue to reject operations when its platform cannot supply the required
+security primitives. Merge Readiness runs the Linux boundary tests explicitly.
+No remaining failure is hidden by adding quarantine entries or weakening guards.
 
 ## Verification and rollback
 
@@ -50,6 +68,8 @@ AI-tree parity, then the focused tests listed in Merge Readiness. The replicatio
 suite covers malformed packets, bounded buffers, acknowledgements, atomic failure,
 prediction reconciliation, and rollback. Bridge tests use local loopback nodes.
 
-Revert the extraction and its mirrors together. No packet schema or stored
-format changes are introduced. Reverting the path helpers restores the prior
+Revert each canonical change with its governed mirrors and manifest identities.
+The replication extraction preserves packet schemas. Vault envelope changes
+require preserving access to the applicable master keys; do not roll back readers
+without accounting for data written in the authenticated format. Reverting the path helpers restores the prior
 missing-import failure and should not delete any subsequently persisted files.

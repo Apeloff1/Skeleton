@@ -45,6 +45,8 @@ jobs:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Validate merge-readiness workflow contract
         run: python scripts/check_merge_readiness_contract.py
+      - name: Validate composed contract system
+        run: python scripts/check_contract_system.py
       - name: Validate flaky-test quarantine registry
         run: python scripts/check_flaky_quarantine.py
 
@@ -246,6 +248,8 @@ jobs:
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
+          tests/test_builder_repair_receipt.py
+          tests/test_build_repair.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py

@@ -51,7 +51,7 @@ def module_init_path(module: str) -> Path | None:
 
 
 def public_exports(module: str) -> list[str]:
-    init_path = module_init_path(module)
+    init_path = module_source_path(module)
     if init_path is None or not init_path.is_file():
         return []
     try:

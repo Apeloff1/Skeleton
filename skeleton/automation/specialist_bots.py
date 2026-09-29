@@ -38,6 +38,7 @@ from .builder_plane import (
     BuilderPlaneError,
     builder_worker_branch,
     compile_builder_proposal_receipt,
+    compile_builder_repair_receipt,
     manifest_prompt_fragment,
     validate_builder_custody,
 )
@@ -646,11 +647,13 @@ def repository_context() -> str:
                 "docs",
             ],
             text=True,
+            encoding="utf-8",
             stderr=subprocess.DEVNULL,
             timeout=20,
         )
     except (
         OSError,
+        UnicodeError,
         subprocess.CalledProcessError,
         subprocess.TimeoutExpired,
     ):
@@ -677,17 +680,19 @@ def repository_context() -> str:
             text = subprocess.check_output(
                 ["git", "show", f"HEAD:{path}"],
                 text=True,
+                encoding="utf-8",
                 stderr=subprocess.DEVNULL,
                 timeout=10,
             )
         except (
             OSError,
+            UnicodeError,
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired,
         ):
             continue
 
-        body = text[:MAX_CONTEXT_FILE_BYTES]
+        body = text.encode("utf-8")[:MAX_CONTEXT_FILE_BYTES].decode("utf-8", errors="ignore")
         chunk = f"\n--- {path} ---\n{body}"
         size = len(chunk.encode("utf-8"))
         if total + size > MAX_CONTEXT_BYTES:
@@ -1211,6 +1216,7 @@ def main() -> int:
             files=result["files"],
         )
         builder_receipt = None
+        builder_repair_receipt = None
         if builder_manifest is not None:
             try:
                 builder_receipt = compile_builder_proposal_receipt(
@@ -1221,6 +1227,14 @@ def main() -> int:
                     tests=result["tests"],
                     changed_lines=changed_lines,
                 )
+                if followup is not None:
+                    builder_repair_receipt = compile_builder_repair_receipt(
+                        builder_manifest, pull_request=followup.pr_number,
+                        parent_sha=followup.head_sha, proposal_digest=digest,
+                        branch=branch, files=result["files"], tests=result["tests"],
+                        changed_lines=changed_lines, repair_evidence=result.get("repair_evidence"),
+                        followup_fingerprint=followup.fingerprint,
+                    )
             except BuilderPlaneError as exc:
                 raise WorkerAdmissionError(
                     "feature-builder proposal receipt rejected"
@@ -1550,6 +1564,9 @@ def main() -> int:
                 builder_manifest.manifest_digest
                 if builder_manifest is not None
                 else None
+            ),
+            "builder_repair_receipt": (
+                builder_repair_receipt.as_dict() if builder_repair_receipt is not None else None
             ),
             "builder_proposal_receipt": (
                 builder_receipt.as_dict()
