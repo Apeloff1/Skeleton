@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+
 from skeleton.cortex.dodeca import FACES
 
 
@@ -14,45 +15,51 @@ class DeckInteractions:
 
     def _organism(self):
         if not hasattr(self, '_organism_state'):
-            from skeleton.organism.organismer import Organismer
             from skeleton.distributed.galaxy.system import GalaxySystem
+            from skeleton.organism.organismer import Organismer
             self._organism_state = Organismer(root=self.root, galaxy=GalaxySystem(root=self.root))
         return self._organism_state
 
     def speak(self, stimulus, context=None):
-        from skeleton.cortex.refs import lookup, record_provenance
-        from skeleton.cortex.laws import check
-        from skeleton.cortex.antiplag import guard
-        ref = lookup(stimulus)
-        model = self._model()
-        improvement = None
-        if ref:
-            record_provenance(ref, action='lookup', root=self.root)
-            improvement = model.ascend(stimulus)
-            text = str(ref.get('dialect') or ref.get('era') or '')
-            guard(text, str(ref['title']))
-        else:
-            thought = model.think(stimulus, context=context)
-            text = str(getattr(getattr(thought, 'amalgam', None), 'text', ''))
-        card = check({'kind': 'speak', 'hit': int(ref is not None), 'amalgam': text,
-                      'improve': improvement, 'stored_prose': 0, 'law': 'ok'})
-        self.last_ref = ref
-        self.traces.append(card)
-        self.traces[:] = self.traces[-128:]
-        return card
+        from skeleton.cortex.refs import reference_scope
+        with reference_scope(self.root):
+            from skeleton.cortex.antiplag import guard
+            from skeleton.cortex.laws import check
+            from skeleton.cortex.refs import lookup, record_provenance
+            ref = lookup(stimulus)
+            model = self._model()
+            improvement = None
+            if ref:
+                record_provenance(ref, action='lookup', root=self.root)
+                improvement = model.ascend(stimulus)
+                text = str(ref.get('dialect') or ref.get('era') or '')
+                guard(text, str(ref['title']))
+            else:
+                thought = model.think(stimulus, context=context)
+                text = str(getattr(getattr(thought, 'amalgam', None), 'text', ''))
+            card = check({'kind': 'speak', 'hit': int(ref is not None), 'amalgam': text,
+                          'improve': improvement, 'stored_prose': 0, 'law': 'ok'})
+            self.last_ref = ref
+            self.traces.append(card)
+            self.traces[:] = self.traces[-128:]
+            return card
+
 
     def plan(self, stimulus, *, repair=False):
-        from skeleton.cortex.era_bind import resolve
-        from skeleton.organism.quality_state import append_quality
-        from skeleton.intelligence.plan_repair import attempt_plan_repair
-        card = resolve(stimulus)
-        quality = self.verify_plan(card, vision=stimulus)
-        append_quality({**quality, 'surface': 'plan'}, root=self.root)
-        if repair and not quality['accepted']:
-            card['repair'] = attempt_plan_repair(card, vision=stimulus, root=self.root)
-        card['quality'] = quality
-        card['quality_stats'] = self.verifiers['plan'].stats()
-        return card
+        from skeleton.cortex.refs import reference_scope
+        with reference_scope(self.root):
+            from skeleton.cortex.era_bind import resolve
+            from skeleton.intelligence.plan_repair import attempt_plan_repair
+            from skeleton.organism.quality_state import append_quality
+            card = resolve(stimulus)
+            quality = self.verify_plan(card, vision=stimulus)
+            append_quality({**quality, 'surface': 'plan'}, root=self.root)
+            if repair and not quality['accepted']:
+                card['repair'] = attempt_plan_repair(card, vision=stimulus, root=self.root)
+            card['quality'] = quality
+            card['quality_stats'] = self.verifiers['plan'].stats()
+            return card
+
 
     def pick(self, position):
         if isinstance(position, bool) or not isinstance(position, int) or not 0 <= position < len(FACES):

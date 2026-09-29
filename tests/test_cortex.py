@@ -11,7 +11,8 @@ from unittest.mock import patch
 def _isolated_reference_provenance():
     from skeleton.cortex import refs
 
-    tracked = refs.provenance_path()
+    from skeleton.cortex.acquire_repo import acquired_dir
+    tracked = acquired_dir() / "gaming" / "provenance.jsonl"
     before = tracked.read_bytes()
     with TemporaryDirectory() as directory:
         destination = Path(directory) / "provenance.jsonl"
