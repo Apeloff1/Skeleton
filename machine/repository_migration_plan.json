@@ -133,6 +133,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/pipelines/",
       "notes": "Nineteen generation-pipeline modules moved under canonical Forge ownership. Eleven internal references were rewritten to skeleton.forge.pipelines; eight modules moved byte-identically. The canonical package is mirrored exactly at skeleton/ai/forge/pipelines, the legacy root remains compatibility-only, AIFT-PIPELINES follows the canonical path, and the parent AIFT-FORGE pipelines overlay was retired."
+    },
+    {
+      "id": "TREE-015",
+      "source": "skeleton/creator/",
+      "destination": "skeleton/forge/creator/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/creator/",
+      "notes": "The two-file engine-neutral creator intent compiler moved under canonical Forge ownership. intent_compiler.py moved byte-identically; package self-imports were rewritten to skeleton.forge.creator; the canonical creator subtree and AI Forge mirror are exact. AIFT-CREATOR follows the canonical path, and AIFT-FORGE no longer requires any overlay children."
     }
   ]
 }
