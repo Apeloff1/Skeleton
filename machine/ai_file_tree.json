@@ -1535,10 +1535,10 @@
     },
     {
       "id": "AIFT-NETWORK",
-      "source": "skeleton/network",
+      "source": "skeleton/distributed/network",
       "destination": "skeleton/ai/runtime/distributed/network",
       "kind": "tree",
-      "source_git_object_sha": "991ff2d003b9c1668762311b1bb85b236128c1a1",
+      "source_git_object_sha": "66273902c841caa8ea1c9e248d1e494c2bfc8812",
       "role": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
       "work_package_refs": [
         "WP-W19",
@@ -1563,7 +1563,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_network_with_legacy_root_shims"
     },
     {
       "id": "AIFT-OVERSEER",
@@ -4843,6 +4843,11 @@
         "planned_path": "skeleton/galaxy",
         "implemented_path": "skeleton/distributed/galaxy",
         "mapping_id": "AIFT-GALAXY"
+      },
+      {
+        "planned_path": "skeleton/network",
+        "implemented_path": "skeleton/distributed/network",
+        "mapping_id": "AIFT-NETWORK"
       }
     ],
     "planned_but_absent": [
@@ -5400,6 +5405,11 @@
       "path": "skeleton/galaxy",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-032"
+    },
+    {
+      "path": "skeleton/network",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-033"
     }
   ],
   "classification_coverage": {
