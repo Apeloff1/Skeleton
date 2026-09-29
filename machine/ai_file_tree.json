@@ -939,7 +939,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "e109d865ed3f55e7b318ba9bb03611b287f434b0",
+      "source_git_object_sha": "a9f8fbe017177927ac3125d1830031634a5cf85f",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1087,7 +1087,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "e2659f6139d3263873b4913d103f84534dd2ed53",
+      "source_git_object_sha": "21a4d73cabe30e2c30c76fbe8491c8cf992c0897",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1117,7 +1117,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_app_runtime_with_legacy_application_shims_and_direct_capability_resolution"
+      "source_disposition": "canonical_app_runtime_with_legacy_application_shims"
     },
     {
       "id": "AIFT-BUILD",
@@ -2179,6 +2179,37 @@
       ],
       "move_batch": "B2-domain-build",
       "source_disposition": "canonical_simulation_game_with_legacy_root_shims"
+    },
+    {
+      "id": "AIFT-ERA",
+      "source": "skeleton/simulation/era",
+      "destination": "skeleton/ai/simulation/era",
+      "kind": "tree",
+      "source_git_object_sha": "b3f65097f5347feedf00308bc06b89ed61f0f6a1",
+      "role": "Canonical era binding, citation law, capability card and Forge reference policy under simulation ownership, mirrored exactly into the governed AI simulation tree.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve citation-required Forge behavior",
+        "preserve deterministic era binding",
+        "keep era policy inside simulation ownership"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "canonical_simulation_era_with_legacy_root_shims"
     },
     {
       "id": "AIFT-HIVE",
@@ -4797,6 +4828,11 @@
         "planned_path": "skeleton/game",
         "implemented_path": "skeleton/simulation/game",
         "mapping_id": "AIFT-GAME"
+      },
+      {
+        "planned_path": "skeleton/era",
+        "implemented_path": "skeleton/simulation/era",
+        "mapping_id": "AIFT-ERA"
       }
     ],
     "planned_but_absent": [
@@ -5129,8 +5165,8 @@
     },
     {
       "path": "skeleton/era",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level era compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
     },
     {
       "path": "skeleton/genos",
@@ -5426,7 +5462,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "TREE-028 capability import inversion refreshes AIFT-APPLICATION while TREE-029 simulation/game convergence remains preserved; canonical application and simulation mirrors are exact and fresh exact-head CI remains required.",
+    "note": "TREE-028 provider-governance identities are preserved while TREE-029 converges game under simulation; fresh exact-head parity/CI evidence remains required.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [

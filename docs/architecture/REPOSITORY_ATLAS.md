@@ -45,6 +45,7 @@ Skeleton/
 │   ├── simulation/           canonical simulation/world-model runtime
 │   │   ├── content/          domain knowledge / NPC-dialogue world model
 │   │   ├── economy/          treasury, quota and catalog economy simulation
+│   │   ├── era/              era binding, citation law and Forge reference policy
 │   │   ├── game/             mechanics, deterministic replay and game systems
 │   │   ├── platform/         engine adapter boundary (Godot)
 │   │   └── world/            deterministic world/scene state
@@ -141,6 +142,7 @@ compatibility shims:
 | `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
 | `skeleton.world.*` | `skeleton.simulation.world.*` | transitional shim |
 | `skeleton.game.*` | `skeleton.simulation.game.*` | transitional shim |
+| `skeleton.era.*` | `skeleton.simulation.era.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |

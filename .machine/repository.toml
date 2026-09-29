@@ -345,8 +345,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "era-compat"
+prefixes = ["skeleton/era/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only era binding namespace; canonical era binding and cited Forge references live under skeleton/simulation/era/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."

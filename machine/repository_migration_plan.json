@@ -33,7 +33,7 @@
       "mode": "move-with-shims",
       "state": "canonicalized",
       "compatibility": "skeleton/application/",
-      "notes": "Fifty-one application modules moved to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims. Capability discovery/loading now resolves the canonical post-migration owners directly for application, swarm, pipelines, agents and content, eliminating runtime dependence on those compatibility roots."
+      "notes": "Fifty-one application modules moved byte-identically to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims."
     },
     {
       "id": "TREE-004",
@@ -268,6 +268,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/game/",
       "notes": "The full 13-file game mechanics/replay package moved under canonical simulation ownership. Seven modules with absolute skeleton.game self-imports were rewritten to skeleton.simulation.game and mirrored identically into AI simulation; six modules moved byte-identically. The legacy root remains compatibility-only, AIFT-GAME follows the nested canonical path, and the final AIFT-SIMULATION game overlay was retired, making skeleton/simulation and skeleton/ai/simulation exact Git-tree mirrors."
+    },
+    {
+      "id": "TREE-030",
+      "source": "skeleton/era/",
+      "destination": "skeleton/simulation/era/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/era/",
+      "notes": "Six era-binding modules moved under canonical simulation ownership. Four modules with absolute skeleton.era self-imports were rewritten to skeleton.simulation.era; admit.py and law.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/simulation/era, the legacy root is compatibility-only, AIFT-ERA governs the nested owner, and full simulation/AI-simulation tree parity remains exact."
     }
   ]
 }
