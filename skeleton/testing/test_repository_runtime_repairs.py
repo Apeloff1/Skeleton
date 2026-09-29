@@ -283,3 +283,62 @@ def test_architecture_audit_resolves_canonical_packages_and_compatibility_export
     assert all(row["in_architecture_registry"] for row in rows)
     assert public_exports("skeleton.application") == public_exports("skeleton.app.runtime")
     assert public_exports("skeleton.social") == public_exports("skeleton.research.social")
+
+
+@pytest.mark.parametrize("template", ["minimal-agent", "game-forge", "swarm-orchestrator", "api-gateway"])
+def test_generated_template_runs_with_current_package(tmp_path, template):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    from skeleton.developer.scaffold import ScaffoldEngine
+    project = ScaffoldEngine(tmp_path).scaffold(template, "example")
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2]))
+    if template == "api-gateway":
+        code = """
+import sys
+from types import SimpleNamespace
+from service import GatewayService
+service = GatewayService()
+assert service.app.title == 'Skeleton API'
+seen = []
+sys.modules['uvicorn'] = SimpleNamespace(run=lambda *args, **kwargs: seen.append((args, kwargs)))
+service.start()
+assert seen[0][0] == (service.app,)
+assert seen[0][1] == {'host': '127.0.0.1', 'port': 8000}
+"""
+        command = [sys.executable, "-c", code]
+    else:
+        command = [sys.executable, "main.py"]
+    result = subprocess.run(command, cwd=project, env=env, capture_output=True, text=True, timeout=45)
+    assert result.returncode == 0, result.stderr
+
+
+def test_generated_swarm_delivers_independent_messages(tmp_path):
+    import runpy
+    from skeleton.developer.scaffold import ScaffoldEngine
+    project = ScaffoldEngine(tmp_path).scaffold("swarm-orchestrator", "example")
+    swarm = runpy.run_path(str(project / "swarm.py"))["SwarmOrchestrator"]()
+    class Receiver:
+        def receive(self, message):
+            value = message["value"]
+            message["value"] = "modified"
+            return value
+    swarm.add_agent(Receiver())
+    swarm.add_agent(Receiver())
+    original = {"value": "original"}
+    assert swarm.broadcast(original) == ["original", "original"]
+    assert original == {"value": "original"}
+    with pytest.raises(TypeError):
+        swarm.add_agent(object())
+
+
+def test_scaffold_force_preflights_nonregular_targets(tmp_path):
+    from skeleton.developer.scaffold import ScaffoldEngine
+    project = tmp_path / "example"
+    project.mkdir()
+    (project / "agent.py").write_text("preserve me")
+    (project / "main.py").mkdir()
+    with pytest.raises(ValueError, match="non-regular"):
+        ScaffoldEngine(tmp_path).scaffold("minimal-agent", "example", force=True)
+    assert (project / "agent.py").read_text() == "preserve me"

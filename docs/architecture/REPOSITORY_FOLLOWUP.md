@@ -47,13 +47,23 @@ execution or merge authority. Missing, tampered, over-budget or mismatched repai
 evidence fails closed. Repository context explicitly decodes UTF-8 and truncates
 content on a byte budget without splitting a character.
 
+Developer starters now construct a real Forge blueprint, create the canonical
+API application and invoke an actual local server, and deliver swarm messages to
+explicit receivers. Template listing consumes the existing metadata mapping.
+Forced generation preflights non-regular file targets before overwriting anything.
+Generated-project regressions execute all four templates in isolated processes;
+the API test constructs the app and intercepts server startup without opening a
+listener. Checkpoint and compiler test fixtures use explicit run identity and
+replay declarations so their tamper, rollback and effect checks execute again.
+
 ## Remaining validation scope
 
 An exploratory canonical run on the initial repair snapshot produced 16,164
-passes, 331 failures and 91 skips. Subsequent fixes passed a focused 565-test
-matrix; this does not establish that the complete exploratory suite is clean.
-A later 124-test builder matrix covers repair receipts and existing automation
-contracts. Counts refer to separate snapshots and must not be added together.
+passes, 331 failures and 91 skips. The combined final regression
+matrix passes 738 tests across 49 files, including repair receipts, generated
+projects, checkpoint binding and compiler rollback. This does not establish
+that the complete exploratory suite is clean. Earlier focused counts overlap
+this matrix and must not be added to it.
 
 Remaining failures include older consumer fixtures and deeper runtime contracts.
 POSIX filesystem, executable-mode and transaction tests require Linux; Windows

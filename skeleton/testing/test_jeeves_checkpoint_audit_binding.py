@@ -35,7 +35,8 @@ def _inputs(run_id: str = "run-checkpoint-binding") -> RunInputs:
 
 def test_new_frontier_checkpoint_is_reciprocally_bound_before_persistence() -> None:
     runtime = _runtime()
-    state = runtime._new_state(_inputs())
+    inputs = _inputs()
+    state = runtime._new_state(inputs.run_id, inputs)
     checkpoint = runtime.checkpointer.latest(state.run_id)
 
     assert checkpoint is not None
@@ -55,7 +56,8 @@ def test_new_frontier_checkpoint_is_reciprocally_bound_before_persistence() -> N
 
 def test_checkpoint_content_tamper_breaks_reciprocal_binding() -> None:
     runtime = _runtime()
-    state = runtime._new_state(_inputs("run-checkpoint-tamper"))
+    inputs = _inputs("run-checkpoint-tamper")
+    state = runtime._new_state(inputs.run_id, inputs)
     checkpoint = runtime.checkpointer.latest(state.run_id)
     assert checkpoint is not None
 
@@ -71,7 +73,8 @@ def test_checkpoint_content_tamper_breaks_reciprocal_binding() -> None:
 
 def test_checkpoint_audit_prefix_tamper_breaks_binding() -> None:
     runtime = _runtime()
-    state = runtime._new_state(_inputs("run-checkpoint-prefix-tamper"))
+    inputs = _inputs("run-checkpoint-prefix-tamper")
+    state = runtime._new_state(inputs.run_id, inputs)
     checkpoint = runtime.checkpointer.latest(state.run_id)
     assert checkpoint is not None
 
@@ -85,7 +88,8 @@ def test_checkpoint_audit_prefix_tamper_breaks_binding() -> None:
 
 def test_missing_audit_binding_rejects_otherwise_valid_checkpoint() -> None:
     runtime = _runtime()
-    state = runtime._new_state(_inputs("run-checkpoint-missing-binding"))
+    inputs = _inputs("run-checkpoint-missing-binding")
+    state = runtime._new_state(inputs.run_id, inputs)
     checkpoint = runtime.checkpointer.latest(state.run_id)
     assert checkpoint is not None
 
@@ -97,7 +101,8 @@ def test_missing_audit_binding_rejects_otherwise_valid_checkpoint() -> None:
 
 def test_second_checkpoint_binds_to_prefix_including_prior_binding() -> None:
     runtime = _runtime()
-    state = runtime._new_state(_inputs("run-checkpoint-second"))
+    inputs = _inputs("run-checkpoint-second")
+    state = runtime._new_state(inputs.run_id, inputs)
     first = runtime.checkpointer.latest(state.run_id)
     assert first is not None
     first_ledger = runtime.runtime_guard.audit_store.get(state.run_id)

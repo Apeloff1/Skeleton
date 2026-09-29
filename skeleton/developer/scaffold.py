@@ -20,12 +20,12 @@ TEMPLATES: Dict[str, Dict[str, Any]] = {
         "description": "Lightweight agent core with minimal dependencies",
         "files": {
             "agent.py": '''"""Minimal agent implementation."""
-from skeleton.forge.universal import Blueprint
+from skeleton.forge.universal import Forge
 
 class MinimalAgent:
     """A lightweight agent built on Skeleton."""
     def __init__(self):
-        self.blueprint = Blueprint()
+        self.blueprint = Forge().new_blueprint("minimal-agent")
         self.state = {}
 
     def act(self, perception: dict) -> dict:
@@ -90,22 +90,25 @@ python main.py
         "description": "Multi-agent orchestration and coordination",
         "files": {
             "swarm.py": '''"""Swarm orchestrator scaffold."""
-from skeleton.forge.universal import Blueprint
-from typing import List
+from typing import Protocol
+
+class MessageReceiver(Protocol):
+    def receive(self, message: dict) -> object: ...
 
 class SwarmOrchestrator:
     """Orchestrate multiple agents in a swarm."""
     def __init__(self):
-        self.agents: List[Blueprint] = []
+        self.agents: list[MessageReceiver] = []
 
-    def add_agent(self, agent: Blueprint):
+    def add_agent(self, agent: MessageReceiver):
         """Add an agent to the swarm."""
+        if not callable(getattr(agent, "receive", None)):
+            raise TypeError("agent must supply receive(message)")
         self.agents.append(agent)
 
     def broadcast(self, message: dict):
         """Broadcast a message to all agents."""
-        for agent in self.agents:
-            pass  # Agent processing
+        return [agent.receive(dict(message)) for agent in self.agents]
 ''',
             "main.py": '''"""Entry point for swarm orchestrator."""
 from swarm import SwarmOrchestrator
@@ -130,16 +133,17 @@ python main.py
         "description": "REST API service template with routes",
         "files": {
             "service.py": '''"""API gateway service scaffold."""
-from skeleton.api.routes import Router
+from skeleton.api.server import create_app
 
 class GatewayService:
     """A REST API gateway built on Skeleton."""
     def __init__(self):
-        self.router = Router()
+        self.app = create_app()
 
-    def start(self, host="0.0.0.0", port=8000):
+    def start(self, host="127.0.0.1", port=8000):
         """Start the gateway service."""
-        print(f"Gateway starting on {host}:{port}")
+        import uvicorn
+        uvicorn.run(self.app, host=host, port=port)
 ''',
             "main.py": '''"""Entry point for API gateway."""
 from service import GatewayService
@@ -150,7 +154,10 @@ if __name__ == "__main__":
 ''',
             "README.md": """# API Gateway
 
-REST API service template using Skeleton routes.
+REST API service template using the canonical Skeleton application, including
+its existing authentication, lifecycle and error handling. Install Skeleton
+with its API dependencies and uvicorn before starting the service.
+The default listener is local to this computer.
 
 ## Usage
 
@@ -192,8 +199,8 @@ class ScaffoldEngine:
     def _project_dir(self, name: str) -> Path:
         safe_name = _validate_project_name(name)
         root = self.output_dir.expanduser().resolve()
-        candidate = (root / safe_name).resolve()
-        if candidate.parent != root:
+        candidate = root / safe_name
+        if candidate.resolve().parent != root:
             raise ValueError("project path escapes configured output directory")
         return candidate
 
@@ -211,8 +218,12 @@ class ScaffoldEngine:
         if project_dir.exists() and not project_dir.is_dir():
             raise ValueError("project destination exists and is not a directory")
 
-        project_dir.mkdir(parents=True, exist_ok=True)
         template_spec = TEMPLATES[template]
+        for filename in template_spec["files"]:
+            target = project_dir / filename
+            if target.is_symlink() or (target.exists() and not target.is_file()):
+                raise ValueError("refusing to replace a non-regular template file")
+        project_dir.mkdir(parents=True, exist_ok=True)
         for filename, content in template_spec["files"].items():
             target = project_dir / filename
             target.parent.mkdir(parents=True, exist_ok=True)

@@ -1292,7 +1292,7 @@
       "source": "skeleton/developer",
       "destination": "skeleton/ai/build/developer",
       "kind": "tree",
-      "source_git_object_sha": "ed36bcb01c8fb4093685c804c09c291075f3d21b",
+      "source_git_object_sha": "37a23fa41250dd4c0115851d74203e604dc18720",
       "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
       "work_package_refs": [
         "WP-W27",

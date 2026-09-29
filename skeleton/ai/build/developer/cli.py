@@ -138,8 +138,8 @@ def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
         engine = ScaffoldEngine(Path("."))
         templates = engine.list_templates()
         print("Available templates:")
-        for t in templates:
-            print(f"  • {t['name']:<20} — {t['description']}")
+        for name, metadata in templates.items():
+            print(f"  • {name:<20} — {metadata['description']}")
         return {"templates": templates}
 
     if command == "validate":

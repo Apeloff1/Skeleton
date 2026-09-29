@@ -232,6 +232,9 @@ jobs:
           tests/test_research_lineage_taxonomy.py
           tests/test_repository_integration.py
           skeleton/testing/test_repository_runtime_repairs.py
+          skeleton/testing/test_developer.py
+          skeleton/testing/test_jeeves_checkpoint_audit_binding.py
+          skeleton/testing/test_jeeves_scientific_compiler.py
           tests/test_command_deck.py
           tests/test_new_subsystems.py
           skeleton/testing/test_jeeves_context_mesh.py
