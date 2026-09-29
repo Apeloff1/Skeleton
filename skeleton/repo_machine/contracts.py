@@ -40,8 +40,8 @@ def derive_contracts(model: RepositoryModel) -> tuple[SubsystemContract, ...]:
     for subsystem in model.subsystems:
         violations: list[str] = []
         requires_tests = subsystem.code_files > 0 and subsystem.criticality in {"high", "critical"}
-        if requires_tests and subsystem.test_files == 0:
-            violations.append("required local test surface missing")
+        if requires_tests and subsystem.test_surface_count == 0:
+            violations.append("required test surface missing")
         if subsystem.name in cycles:
             violations.append("participates in a cross-zone dependency cycle")
         if subsystem.name == "unclassified" and subsystem.file_count:

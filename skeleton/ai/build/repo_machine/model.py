@@ -213,6 +213,13 @@ class SubsystemRecord:
     entrypoints: tuple[str, ...] = ()
     dependencies: tuple[str, ...] = ()
     dependents: tuple[str, ...] = ()
+    referenced_test_files: int = 0
+    test_evidence: tuple[str, ...] = ()
+
+    @property
+    def test_surface_count(self) -> int:
+        """Local plus external importing test files; not executed coverage."""
+        return self.test_files + self.referenced_test_files
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -222,6 +229,8 @@ class SubsystemRecord:
             "file_count": self.file_count,
             "code_files": self.code_files,
             "test_files": self.test_files,
+            "referenced_test_files": self.referenced_test_files,
+            "test_evidence": list(self.test_evidence),
             "workflow_files": self.workflow_files,
             "total_lines": self.total_lines,
             "total_bytes": self.total_bytes,

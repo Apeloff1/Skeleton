@@ -124,9 +124,9 @@ def structural_hotspots(
         if subsystem.name in cycle_zones:
             score += 20
             reasons.append("cross-zone cycle participant")
-        if subsystem.code_files >= 20 and subsystem.test_files == 0:
+        if subsystem.code_files >= 20 and subsystem.test_surface_count == 0:
             score += 20
-            reasons.append("large code surface without local tests")
+            reasons.append("large code surface without local or directly importing tests")
         if score:
             hotspots.append(Hotspot(
                 identity=f"zone:{subsystem.name}",

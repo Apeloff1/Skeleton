@@ -87,3 +87,13 @@ def test_repaired_runtime_roots_have_expected_owners() -> None:
         canonical_platform.owner,
         canonical_platform.lifecycle,
     ) == ("simulation", "simulation-runtime", "canonical")
+
+
+def test_runtime_journals_do_not_hide_canonical_provenance_sources() -> None:
+    from skeleton.repo_machine.builder import RepositoryModelBuilder
+
+    builder = RepositoryModelBuilder(ROOT)
+    assert builder._ignored("chronicle/board.json")
+    assert builder._ignored(".skeleton/organism/chronicle/index.json")
+    assert not builder._ignored("skeleton/provenance/chronicle/store.py")
+    assert placement_for_path(builder.config, "skeleton/provenance/chronicle/store.py").zone == "provenance"

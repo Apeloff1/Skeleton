@@ -53,6 +53,8 @@ class AtlasZone:
     total_lines: int
     dependencies: tuple[str, ...]
     dependents: tuple[str, ...]
+    referenced_test_files: int = 0
+    test_evidence: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -66,6 +68,8 @@ class AtlasZone:
             "file_count": self.file_count,
             "code_files": self.code_files,
             "test_files": self.test_files,
+            "referenced_test_files": self.referenced_test_files,
+            "test_evidence": list(self.test_evidence),
             "workflow_files": self.workflow_files,
             "total_lines": self.total_lines,
             "dependencies": list(self.dependencies),
@@ -180,6 +184,8 @@ def _atlas_zone(rule: ZoneRule, subsystem: object | None) -> AtlasZone:
         file_count=subsystem.file_count,
         code_files=subsystem.code_files,
         test_files=subsystem.test_files,
+        referenced_test_files=subsystem.referenced_test_files,
+        test_evidence=subsystem.test_evidence,
         workflow_files=subsystem.workflow_files,
         total_lines=subsystem.total_lines,
         dependencies=subsystem.dependencies,

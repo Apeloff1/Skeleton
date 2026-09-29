@@ -1704,7 +1704,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "9cb6e7bd266d9b3af9c12eaac715bc6884577ae8",
+      "source_git_object_sha": "18117ddf740aaa063b90736cbbb1d6664b9a7bf0",
       "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
       "work_package_refs": [
         "WP-W11",

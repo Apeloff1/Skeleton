@@ -34,7 +34,7 @@ def repository_health(model: RepositoryModel) -> HealthReport:
     total = max(1, len(model.files))
     unclassified_ratio = model.unclassified_count / total
     code_zones = [item for item in model.subsystems if item.code_files > 0]
-    tested = [item for item in code_zones if item.test_files > 0]
+    tested = [item for item in code_zones if item.test_surface_count > 0]
     tested_zone_ratio = len(tested) / max(1, len(code_zones))
 
     score = 100

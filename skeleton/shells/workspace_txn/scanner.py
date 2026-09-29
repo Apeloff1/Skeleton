@@ -249,8 +249,11 @@ class WorkspaceScanner:
                         stats.errors += 1
                     continue
                 try:
-                    metadata = child.stat(follow_symlinks=False)
                     absolute = Path(child.path)
+                    # DirEntry.stat omits device/inode identity on Windows and
+                    # can cache stale metadata. Read fresh, non-following metadata
+                    # before comparing it with the opened file descriptor.
+                    metadata = absolute.lstat()
                     entry = self._make_entry(absolute, normalized, metadata, stats)
                 except (OSError, WorkspaceScanError) as exc:
                     stats.errors += 1

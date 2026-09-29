@@ -136,6 +136,107 @@ class RepoMachineTests(unittest.TestCase):
             self.assertTrue(missing)
             self.assertEqual(missing[0].zone, "alpha")
 
+    def test_central_tests_are_linked_by_import_with_bounded_evidence(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "tests").mkdir()
+            for index in range(4):
+                (root / "alpha" / f"m{index}.py").write_text("VALUE = 1\n", encoding="utf-8")
+            for index in range(35):
+                (root / "tests" / f"test_m{index:02}.py").write_text(
+                    "from alpha import m0\nimport alpha.m0\n", encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            alpha = next(item for item in model.subsystems if item.name == "alpha")
+            self.assertEqual(alpha.test_files, 0)  # physical placement stays accurate
+            self.assertEqual(alpha.referenced_test_files, 35)  # each file counts once
+            self.assertEqual(alpha.test_surface_count, 35)
+            self.assertEqual(len(alpha.test_evidence), 32)
+            self.assertEqual(alpha.test_evidence, tuple(sorted(alpha.test_evidence)))
+            self.assertFalse(any(item.code == "quality.missing-zone-tests" and item.zone == "alpha"
+                                 for item in model.findings))
+            self.assertTrue(any(edge.kind == "test-import" and edge.target == "alpha" for edge in model.edges))
+
+    def test_test_filename_similarity_alone_does_not_claim_test_surface(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "tests").mkdir()
+            for index in range(4):
+                (root / "alpha" / f"m{index}.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / "tests" / "test_alpha.py").write_text("assert True\n", encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            self.assertTrue(any(item.code == "quality.missing-zone-tests" and item.zone == "alpha"
+                                for item in model.findings))
+
+    def test_test_backedge_is_not_a_runtime_cycle_but_source_dependency_is_reported(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "tests").mkdir()
+            (root / "alpha" / "a.py").write_text("import tests.test_a\n", encoding="utf-8")
+            (root / "tests" / "test_a.py").write_text("import alpha.a\n", encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            self.assertEqual(model.cycles, ())
+            self.assertTrue(any(item.code == "topology.production-test-import" and item.path == "alpha/a.py"
+                                for item in model.findings))
+            self.assertTrue(any(edge.source == "alpha" and edge.target == "tests" and edge.kind == "import"
+                                for edge in model.edges))
+
+    def test_historical_tests_do_not_satisfy_current_test_requirement(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            path = root / ".machine" / "repository.toml"
+            path.write_text(CONFIG.replace('owner = "quality"', 'owner = "quality"\nlifecycle = "historical"'), encoding="utf-8")
+            (root / "alpha").mkdir()
+            (root / "tests").mkdir()
+            (root / "alpha" / "a.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / "tests" / "test_a.py").write_text("import alpha.a\n", encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            alpha = next(item for item in model.subsystems if item.name == "alpha")
+            self.assertEqual(alpha.referenced_test_files, 0)
+
+    def test_frontend_relative_imports_and_test_links_use_source_paths(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "beta" / "widget").mkdir(parents=True)
+            (root / "tests").mkdir()
+            (root / "alpha" / "app.ts").write_text(
+                'import { widget } from "../beta/widget";\nimport "../beta/setup.js";\n', encoding="utf-8")
+            (root / "beta" / "widget" / "index.tsx").write_text("export const widget = 1;\n", encoding="utf-8")
+            (root / "beta" / "setup.js").write_text("export const setup = true;\n", encoding="utf-8")
+            (root / "tests" / "app.test.ts").write_text('import "../alpha/app";\n', encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            self.assertTrue(any(edge.source == "alpha" and edge.target == "beta" and edge.evidence_count == 2
+                                for edge in model.edges))
+            alpha = next(item for item in model.subsystems if item.name == "alpha")
+            self.assertEqual(alpha.test_evidence, ("tests/app.test.ts",))
+
+    def test_frontend_import_resolution_does_not_cross_repository_or_language(self) -> None:
+        from skeleton.repo_machine.builder import _internal_target
+        self.assertIsNone(_internal_target("../../outside", "alpha/app.ts", {"../outside.ts"}))
+        self.assertIsNone(_internal_target("react", "alpha/app.ts", {"react.py"}))
+
+    def test_python_import_resolution_stays_inside_package_and_language(self) -> None:
+        from skeleton.repo_machine.builder import _internal_target
+        self.assertIsNone(_internal_target("..outside", "alpha/app.py", {"outside.py"}))
+        self.assertIsNone(_internal_target("react", "alpha/app.py", {"react.ts"}))
+        self.assertEqual(_internal_target(".other", "alpha/app.py", {"alpha/other.py"}), "alpha/other.py")
+
+    def test_local_test_references_are_not_counted_twice(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "alpha" / "a.py").write_text("import alpha.test_a\n", encoding="utf-8")
+            (root / "alpha" / "test_a.py").write_text("import alpha.a\n", encoding="utf-8")
+            model = RepositoryModelBuilder(root).build()
+            alpha = next(item for item in model.subsystems if item.name == "alpha")
+            self.assertEqual(alpha.test_files, 1)
+            self.assertEqual(alpha.referenced_test_files, 0)
+            self.assertEqual(alpha.test_surface_count, 1)
+            self.assertTrue(any(item.code == "topology.production-test-import" for item in model.findings))
+
     def test_machine_context_is_json_serializable_and_bounded_shape(self) -> None:
         with self.fixture() as temp:
             root = Path(temp)

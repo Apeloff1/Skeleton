@@ -63,7 +63,7 @@ def derive_zone_budgets(model: RepositoryModel) -> tuple[ZoneBudget, ...]:
             max_files = min(max_files, 12)
             reasons.append("very large subsystem uses smaller change batches")
 
-        if subsystem.test_files == 0 and subsystem.code_files:
+        if subsystem.test_surface_count == 0 and subsystem.code_files:
             max_files = min(max_files, 6)
             max_lines = min(max_lines, 800)
             reasons.append("untested code surface requires conservative edits")
