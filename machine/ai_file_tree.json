@@ -1090,7 +1090,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "21a4d73cabe30e2c30c76fbe8491c8cf992c0897",
+      "source_git_object_sha": "e2659f6139d3263873b4913d103f84534dd2ed53",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1120,7 +1120,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_app_runtime_with_legacy_application_shims"
+      "source_disposition": "canonical_app_runtime_with_legacy_application_shims_and_direct_capability_resolution"
     },
     {
       "id": "AIFT-BUILD",
@@ -5419,7 +5419,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "TREE-028 provider-governance repair refreshed AIFT-AUTOMATION and AIFT-BUILD-PLANNING source tree identities; fresh exact-head validator/CI evidence remains required.",
+    "note": "TREE-028 import-inversion follow-through refreshed AIFT-APPLICATION after capability discovery/loading switched from compatibility roots to canonical application/swarm/pipelines/agents/content namespaces; exact source/AI application tree parity verified.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [

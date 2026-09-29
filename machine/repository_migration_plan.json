@@ -33,7 +33,7 @@
       "mode": "move-with-shims",
       "state": "canonicalized",
       "compatibility": "skeleton/application/",
-      "notes": "Fifty-one application modules moved byte-identically to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims."
+      "notes": "Fifty-one application modules moved to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims. Capability discovery/loading now resolves the canonical post-migration owners directly for application, swarm, pipelines, agents and content, eliminating runtime dependence on those compatibility roots."
     },
     {
       "id": "TREE-004",
