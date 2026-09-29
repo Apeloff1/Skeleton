@@ -960,7 +960,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "64b73768128390fa7dbd23133de4a1d7e54d2dff",
+      "source_git_object_sha": "53b5269b302f1f89f7f2fe65f7e4c41855011ce3",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -972,8 +972,7 @@
         "VOL-023"
       ],
       "overlay_children": [
-        "creator",
-        "pipelines"
+        "creator"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -2473,11 +2472,11 @@
     },
     {
       "id": "AIFT-PIPELINES",
-      "source": "skeleton/pipelines",
+      "source": "skeleton/forge/pipelines",
       "destination": "skeleton/ai/forge/pipelines",
       "kind": "tree",
-      "source_git_object_sha": "a1dff95046b9d6c9959142129061e3feaaed78fb",
-      "role": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
+      "source_git_object_sha": "87dde8479832fcf0a904d5e5a9149c545f8b9a1b",
+      "role": "Canonical generation-pipeline package under skeleton/forge/pipelines; mirrored exactly into the governed AI Forge surface.",
       "work_package_refs": [
         "WP-W27"
       ],
@@ -2500,7 +2499,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_forge_pipelines_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SHEAF",

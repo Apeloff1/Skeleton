@@ -26,21 +26,39 @@ def test_repaired_runtime_roots_have_expected_owners() -> None:
     config = load_machine_config(ROOT)
 
     frontier = placement_for_path(config, "skeleton/frontier/agent_runtime.py")
-    pipelines = placement_for_path(config, "skeleton/pipelines/gameforge.py")
-    platform = placement_for_path(config, "skeleton/platform/godot_adapter.py")
+    legacy_pipelines = placement_for_path(config, "skeleton/pipelines/gameforge.py")
+    canonical_pipelines = placement_for_path(
+        config, "skeleton/forge/pipelines/gameforge.py"
+    )
+    legacy_platform = placement_for_path(
+        config, "skeleton/platform/godot_adapter.py"
+    )
+    canonical_platform = placement_for_path(
+        config, "skeleton/simulation/platform/godot_adapter.py"
+    )
 
     assert (frontier.zone, frontier.owner, frontier.lifecycle) == (
         "frontier-runtime",
         "frontier-runtime",
         "canonical",
     )
-    assert (pipelines.zone, pipelines.owner, pipelines.lifecycle) == (
-        "build-delivery",
-        "delivery-plane",
-        "canonical",
-    )
-    assert (platform.zone, platform.owner, platform.lifecycle) == (
-        "simulation",
-        "simulation-runtime",
-        "canonical",
-    )
+    assert (
+        legacy_pipelines.zone,
+        legacy_pipelines.owner,
+        legacy_pipelines.lifecycle,
+    ) == ("pipelines-compat", "delivery-plane", "transitional")
+    assert (
+        canonical_pipelines.zone,
+        canonical_pipelines.owner,
+        canonical_pipelines.lifecycle,
+    ) == ("build-delivery", "delivery-plane", "canonical")
+    assert (
+        legacy_platform.zone,
+        legacy_platform.owner,
+        legacy_platform.lifecycle,
+    ) == ("platform-compat", "simulation-runtime", "transitional")
+    assert (
+        canonical_platform.zone,
+        canonical_platform.owner,
+        canonical_platform.lifecycle,
+    ) == ("simulation", "simulation-runtime", "canonical")

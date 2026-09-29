@@ -124,6 +124,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/platform/",
       "notes": "The two-file Godot adapter package moved into canonical simulation ownership. godot_adapter.py moved byte-identically; the canonical package and AI simulation mirror are tree-identical. Legacy skeleton/platform remains compatibility-only, AIFT-PLATFORM follows the canonical path, and the parent AIFT-SIMULATION platform overlay was retired because platform is now present in both governed trees."
+    },
+    {
+      "id": "TREE-014",
+      "source": "skeleton/pipelines/",
+      "destination": "skeleton/forge/pipelines/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/pipelines/",
+      "notes": "Nineteen generation-pipeline modules moved under canonical Forge ownership. Eleven internal references were rewritten to skeleton.forge.pipelines; eight modules moved byte-identically. The canonical package is mirrored exactly at skeleton/ai/forge/pipelines, the legacy root remains compatibility-only, AIFT-PIPELINES follows the canonical path, and the parent AIFT-FORGE pipelines overlay was retired."
     }
   ]
 }
