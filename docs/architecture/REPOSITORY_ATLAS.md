@@ -50,7 +50,8 @@ Skeleton/
 │   │   ├── progression/      achievements, quests, reputation, passes/meta systems
 │   │   ├── ecology/          aquarium, bait, biotope, breeding + adapters
 │   │   ├── economy/          commerce, cooking, crafting, energy, equipment
-│   │   └── characters/       NPC generation, adapters and archetype profiles
+│   │   ├── characters/       NPC generation, adapters and archetype profiles
+│   │   └── game/             gameplay orchestration, ship and world systems
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis
