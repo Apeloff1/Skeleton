@@ -73,4 +73,35 @@ Existing large/binary tracked files are migration debt until moved to the correc
 
 ## Pull-request expectations
 
-A PR introducing a new large asset must explain why the chosen storage lane is correct. For LFS/external assets, reviewers should verify provenance and license before merge. For generated release outputs, the PR should change the build recipe—not commit the output itself.
+A PR introducing a new large asset must explain why the chosen storage lane is correct. For LFS/external assets, reviewers should verify provenance and license before merge. For generated release outputs, the PR should change the build recipeâ€”not commit the output itself.
+
+## Restoring referenced satellite artifacts
+
+Nine historical satellite binaries now use immutable records in
+`satellites/ARTIFACT_REFERENCES.json`. The records bind the original Git commit
+and blob, SHA-256, size, mode, license and redistribution status. A full-history
+checkout is required to resolve those objects; restoring a historical binary
+never executes it or grants it release approval.
+
+Verify the records and confirm their old paths are no longer tracked:
+
+```bash
+python scripts/artifact_reference.py --check
+```
+
+Restore an explicitly selected artifact to a separate local output directory:
+
+```bash
+python scripts/artifact_reference.py --materialize frontier-godot --output build/restored/godot
+```
+
+The tool verifies a temporary sibling before publishing it. Without `--force`,
+an existing output or one created by a competing writer is preserved. With
+`--force`, the previous output is replaced only after size, SHA-256 and Git blob
+verification pass. Failures remove the temporary file and preserve the previous
+output. Publication requires atomic replacement or hard-link support from the
+output filesystem. POSIX executable mode is restored on supporting systems;
+Windows does not expose the same permission bits.
+
+Keep restored files out of source Git. Normal development and unit fixtures
+must not depend on these historical binaries being present.

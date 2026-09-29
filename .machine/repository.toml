@@ -453,11 +453,20 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "organism-runtime"
+prefixes = ["skeleton/organism/"]
+owner = "core-runtime"
+criticality = "high"
+purpose = "Owner-sensitive engine-organism control plane: runtime DAG, health, policy, quality, recovery and operator control; security-owned secrets remain gated until explicit cutover."
+audience = "internal"
+lifecycle = "support"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/organism/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
-purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."
+purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
 audience = "both"
 lifecycle = "canonical"
 

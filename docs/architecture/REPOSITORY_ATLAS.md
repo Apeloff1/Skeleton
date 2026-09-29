@@ -122,6 +122,26 @@ Skeleton/
 | `transitional` | Migration/import/staging surface | Do not grant new runtime authority silently |
 | `historical` | Provenance/reference only | No new active implementation |
 
+## Runtime ownership refinement
+
+The upstream taxonomy refinement is recorded as TREE-041, preserving its
+original TREE-033 identifier and commit as provenance. It is reconciled with
+the integrated canonical migrations rather than assigning ownership back to
+compatibility facades:
+
+- `skeleton/distributed/galaxy/` owns federation, transport, consensus and fleet
+  coordination under `distributed-runtime`; `skeleton/galaxy/` is compatibility-only.
+- `skeleton/research/social/` owns research evidence intake under
+  `research-evidence`; `skeleton/social/` is compatibility-only. Discovery
+  results carry no serving authority.
+- `skeleton/simulation/era/` owns era binding under `simulation-runtime`;
+  `skeleton/era/` preserves the legacy import surface.
+- `skeleton/organism/` is a separate `core-runtime` support zone for runtime DAG,
+  health, policy, quality, recovery and operator control. Security-owned secret
+  handling remains singular until an explicit security-owner cutover.
+- `skeleton/simulation/` owns deterministic simulation/world-model code and the
+  Godot adapter pointer, without inheriting Organism ownership.
+
 ## Research lineage and unresolved specialized roots
 
 The machine taxonomy distinguishes preserved research lineage from unresolved

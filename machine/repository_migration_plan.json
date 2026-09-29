@@ -375,6 +375,17 @@
       "compatibility": "skeleton/integrations/",
       "notes": "Four privileged integration-edge modules moved into canonical skeleton/tools/integrations. Only __init__.py required an absolute namespace rewrite; connector, GitHub and webhook implementations moved semantically unchanged. The canonical child and full tools parent are mirrored exactly into skeleton/ai/runtime/tools, the legacy root is compatibility-only, AIFT-INTEGRATIONS follows the canonical child, AIFT-TOOLS governs the parent, and skeleton/tools is no longer planned-but-absent.",
       "source_batch_id": "TREE-037"
+    },
+    {
+      "id": "TREE-041",
+      "source": "skeleton/{era,galaxy,organism,social}/ + simulation taxonomy",
+      "destination": ".machine/repository.toml refined runtime ownership zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Refined the over-broad simulation owner without moving code. Galaxy follows its AIFT distributed/multi-agent runtime contract under ai-runtime; Social follows its AIFT research-evidence intake contract as transitional/no-serving-authority; Organism is isolated as owner-sensitive core support with security-owned secret exceptions preserved; Era is classified as historical GB-39 lineage. The simulation zone now owns only skeleton/simulation/ and the Godot pointer surface. Merge reconciliation: the original TREE-033 identifier collides with the integrated Era migration and is retained as source_batch_id. Existing TREE-033 through TREE-040 migrations remain authoritative: Galaxy, Social and Era legacy roots are compatibility surfaces, with canonical owners at skeleton/distributed/galaxy, skeleton/research/social and skeleton/simulation/era. Organism receives its separate core-support zone. No duplicate prefix owners or reverse migrations are introduced.",
+      "source_batch_id": "TREE-033",
+      "source_commit": "f5e19db27aceaa22224b9dce247eecd2cb30d0f6"
     }
   ]
 }

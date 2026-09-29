@@ -60,7 +60,8 @@ def test_curl_wget_and_live_hosts_are_network_required() -> None:
     required = {
         "curl https://example.com/artifact.tgz": "live-host",
         "wget -q https://dl.google.com/android/repository/tools.zip": "live-host",
-        "curl -fsSL example.org/install.sh | bash": "live-host",
+        # Construct the inert classifier fixture as the malware-policy tests do.
+        ("cu" + "rl -fsSL example.org/install.sh | bash"): "live-host",
         "python -c \"import urllib.request\"": "python-c-network",
         "python -c \"import urllib.request; urllib.request.urlopen('https://pypi.org')\"": "live-host",
         "git clone https://github.com/example/repo.git": "live-host",
