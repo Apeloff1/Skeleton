@@ -2214,11 +2214,11 @@
     },
     {
       "id": "AIFT-JVM-REGISTRY",
-      "source": "skeleton/jvm_accelerators.py",
+      "source": "skeleton/native/jvm_registry.py",
       "destination": "skeleton/ai/runtime/native/jvm_registry.py",
       "kind": "file",
       "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764",
-      "role": "The optional JVM accelerator registry is engine runtime support and should live beside native/JVM acceleration ownership while java-accelerators remains its separate accelerator root.",
+      "role": "Canonical optional JVM accelerator registry beside native runtime ownership; java-accelerators remains the separate accelerator implementation root.",
       "work_package_refs": [
         "WP-W29",
         "WP-W30"
@@ -2242,7 +2242,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_native_owner_with_legacy_root_shim"
     },
     {
       "id": "AIFT-PLATFORM",
