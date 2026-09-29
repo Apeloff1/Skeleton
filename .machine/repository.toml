@@ -75,8 +75,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "overseer-compat"
+prefixes = ["skeleton/overseer/"]
+owner = "automation-control-plane"
+criticality = "low"
+purpose = "Compatibility-only Overseer namespace; canonical runtime lives under skeleton/automation/overseer/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", ".emergent/"]
+prefixes = ["skeleton/automation/", "skeleton/agents/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
