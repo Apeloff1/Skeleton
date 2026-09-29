@@ -318,8 +318,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "world-compat"
+prefixes = ["skeleton/world/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only world-state namespace; canonical scene/world ownership lives under skeleton/simulation/world/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/world/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/game/", "skeleton/era/", "skeleton/galaxy/", "skeleton/organism/", "skeleton/social/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and era-specific engines."

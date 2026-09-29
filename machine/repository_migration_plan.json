@@ -241,6 +241,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/overseer/",
       "notes": "Sixteen Overseer modules moved under canonical automation ownership. Eight modules with absolute self-imports were rewritten to canonical paths; remaining modules moved byte-identically. The legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-027",
+      "source": "skeleton/world/",
+      "destination": "skeleton/simulation/world/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/world/",
+      "notes": "The two-file deterministic scene/world package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-WORLD follows skeleton/simulation/world, and the parent AIFT-SIMULATION world overlay was retired after exact governed-tree parity verification, leaving only game as an overlay."
     }
   ]
 }

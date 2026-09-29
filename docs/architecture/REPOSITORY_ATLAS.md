@@ -45,8 +45,8 @@ Skeleton/
 │   ├── simulation/ + game/   simulation/game runtime
 │   │   ├── content/          domain knowledge / NPC-dialogue world model
 │   │   ├── economy/          treasury, quota and catalog economy simulation
-│   │   └── platform/         engine adapter boundary (Godot)
-│   ├── world/                deterministic world/scene state
+│   │   ├── platform/         engine adapter boundary (Godot)
+│   │   └── world/            deterministic world/scene state
 │   ├── frontier/             frontier gameplay/product runtime
 │   │   ├── runtime/          contracts, execution, streams, memory/control plane
 │   │   ├── progression/      achievements, quests, reputation, passes/meta systems
@@ -138,6 +138,7 @@ compatibility shims:
 | `skeleton.creator.*` | `skeleton.forge.creator.*` | transitional shim |
 | `skeleton.content.*` | `skeleton.simulation.content.*` | transitional shim |
 | `skeleton.economy.*` | `skeleton.simulation.economy.*` | transitional shim |
+| `skeleton.world.*` | `skeleton.simulation.world.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
