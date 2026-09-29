@@ -127,10 +127,10 @@ def test_model_routing_interface_owner_is_engine_canonical() -> None:
     assert routing_edges
     for entry in routing_edges:
         if entry["source_plane"] == "model-routing":
-            assert entry["source_owner"] == "skeleton/frontier/model_routing.py"
+            assert entry["source_owner"] == "skeleton/frontier/runtime/model_routing.py"
             assert entry["source_zone"] == "engine"
         if entry["target_plane"] == "model-routing":
-            assert entry["target_owner"] == "skeleton/frontier/model_routing.py"
+            assert entry["target_owner"] == "skeleton/frontier/runtime/model_routing.py"
             assert entry["target_zone"] == "engine"
 
 
