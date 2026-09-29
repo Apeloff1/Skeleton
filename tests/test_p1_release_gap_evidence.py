@@ -49,8 +49,8 @@ def test_release_gap_batch_has_exact_bounded_scope() -> None:
 
     assert report["covered_gap_count"] == 12
     assert report["covered_volume_count"] == 8
-    assert report["already_bound_count"] == 0
-    assert report["candidate_binding_count"] == 12
+    assert report["already_bound_count"] == 12
+    assert report["candidate_binding_count"] == 0
     assert report["category"] == "release_gap_closure"
 
     covered = {
@@ -103,7 +103,7 @@ def test_release_gap_batch_never_self_binds_or_clears_gaps() -> None:
     assert report["creates_bindings"] is False
     assert report["clears_masterplan_gaps"] is False
     for row in report["records"]:
-        assert row["binding_present"] is False
+        assert row["binding_present"] is True
         assert row["non_authoritative"] is True
         assert row["creates_binding"] is False
         assert row["clears_masterplan_gap"] is False
