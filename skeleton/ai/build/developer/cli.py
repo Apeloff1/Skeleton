@@ -176,7 +176,11 @@ def run_dev_cli(argv: Optional[List[str]] = None) -> Any:
 
     # Delegate to the command registry
     from skeleton.developer.commands import run_dev_command
-    return run_dev_command(command, args)
+    try:
+        return run_dev_command(command, args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return {"error": str(exc)}
 
 
 def show_docs(topic: str) -> Dict[str, Any]:
@@ -284,19 +288,35 @@ def integrate_with_main() -> str:
 # Add to skeleton/__main__.py in the main command dispatcher:
 #
 #     elif cmd == "dev":
-#         from skeleton.developer.cli import run_dev_cli
+#         from skeleton.developer.cli import dev_exit_code, run_dev_cli
 #         result = run_dev_cli(args)
 #         if isinstance(result, dict):
 #             print(json.dumps(result, indent=2, default=str))
-#         sys.exit(0 if (isinstance(result, dict) and "error" not in result) else 1)
+#         sys.exit(dev_exit_code(result))
 #
 # Also add "dev" to the CLI help text under "Operator deck commands" or as a new section.
 """.strip()
 
 
-# Entry point for direct execution
+def dev_exit_code(result: Any) -> int:
+    """Translate programmatic command results into a process exit status."""
+    if not isinstance(result, dict) or "error" in result:
+        return 1
+    if any(result.get(key) is False for key in ("valid", "passed")):
+        return 1
+    # Developer gate verdicts use integer 0/1, not boolean-only flags.
+    if "ok" in result and result["ok"] not in (True, 1):
+        return 1
+    return 0
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """Console-script adapter; never pass a result mapping to sys.exit."""
+    result = run_dev_cli(argv)
+    if isinstance(result, dict) and result.get("status") != "help_shown":
+        print(json.dumps(result, indent=2, default=str))
+    return dev_exit_code(result)
+
+
 if __name__ == "__main__":
-    result = run_dev_cli()
-    if isinstance(result, dict) and "error" in result:
-        sys.exit(1)
-    sys.exit(0)
+    raise SystemExit(main())

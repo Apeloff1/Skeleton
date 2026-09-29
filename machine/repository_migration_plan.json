@@ -378,7 +378,7 @@
     },
     {
       "id": "TREE-041",
-      "source": "skeleton/{era,galaxy,organism,social}/ + simulation taxonomy",
+      "source": "skeleton/{era,galaxy,organism,social}/ + .machine/repository.toml",
       "destination": ".machine/repository.toml refined runtime ownership zones",
       "mode": "taxonomy-classification",
       "state": "classified",

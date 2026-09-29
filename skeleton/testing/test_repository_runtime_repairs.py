@@ -369,3 +369,61 @@ def test_operator_policy_and_quality_are_scoped_to_deck_root(tmp_path):
     append_quality({"surface": "npc", "accepted": False, "score": 0.2, "reason": "test"}, root=first.root)
     assert product_card(deck=first)["repair_card"]["activity"]["n"] > 0
     assert product_card(deck=second)["repair_card"]["activity"]["n"] == 0
+
+
+@pytest.mark.parametrize("entrypoint", ["developer", "root"])
+def test_developer_entrypoints_report_validation_exit_status(tmp_path, capsys, entrypoint):
+    from skeleton.developer.cli import main as developer_main
+    from skeleton.__main__ import main as root_main
+    from skeleton.developer.scaffold import ScaffoldEngine
+
+    def invoke(args):
+        return developer_main(args) if entrypoint == "developer" else root_main(["dev", *args])
+
+    assert invoke(["--help"]) == 0
+    assert invoke(["validate", str(tmp_path)]) == 1
+    project = ScaffoldEngine(tmp_path).scaffold("minimal-agent", "valid-project")
+    assert invoke(["validate", str(project)]) == 0
+    assert invoke(["validate", str(tmp_path / "missing")]) == 1
+    assert capsys.readouterr().err == ""
+    assert invoke(["not-a-command"]) == 1
+    assert "Unknown dev command" in capsys.readouterr().err
+
+
+def test_installed_developer_entrypoint_uses_integer_adapter():
+    import importlib
+    import tomllib
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    with (root / "pyproject.toml").open("rb") as handle:
+        entry = tomllib.load(handle)["project"]["scripts"]["skeleton-dev"]
+    module_name, function_name = entry.split(":")
+    function = getattr(importlib.import_module(module_name), function_name)
+    assert function(["--help"]) == 0
+
+
+@pytest.mark.parametrize("entrypoint", ["developer", "root"])
+def test_developer_gate_failure_is_a_process_failure(monkeypatch, capsys, entrypoint):
+    from skeleton.developer.cli import main as developer_main
+    from skeleton.__main__ import main as root_main
+    import skeleton.developer.commands as commands
+    from skeleton.developer.health_gates import gate_health_snapshot
+    from skeleton.developer.health_deepen import snapshot_from_summary
+
+    # Use the gate's actual verdict schema instead of an exception or parser error.
+    verdict = gate_health_snapshot(snapshot_from_summary({}))
+    monkeypatch.setattr(commands, "run_dev_command", lambda name, args: {"ok": verdict.ok, "verdict": verdict.to_dict()})
+    args = ["health", "--gates"]
+    code = developer_main(args) if entrypoint == "developer" else root_main(["dev", *args])
+    assert verdict.ok == 0
+    assert code == 1
+    assert '"ok": 0' in capsys.readouterr().out
+
+
+def test_standalone_developer_dry_run_emits_result_without_writing(tmp_path, capsys):
+    import json
+    from skeleton.developer.cli import main
+    assert main(["scaffold", "preview", "--dir", str(tmp_path), "--dry-run"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["action"] == "dry_run"
+    assert not (tmp_path / "preview").exists()

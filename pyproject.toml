@@ -48,5 +48,5 @@ dev = ["pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.27,<1", "black>=26.5.
 
 [project.scripts]
 skeleton = "skeleton.__main__:main"
-skeleton-dev = "skeleton.developer.cli:run_dev_cli"
+skeleton-dev = "skeleton.developer.cli:main"
 skeleton-repo-machine = "skeleton.repo_machine.cli:main"
