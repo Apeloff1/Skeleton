@@ -274,3 +274,29 @@ def test_backend_tool_registry_has_no_provider_edge_after_llm_retirement() -> No
     discovered = discover_provider_surfaces(ROOT)
     assert relative not in discovered
     assert validate_provider_bootstrap(ROOT) == []
+
+
+def test_shift_supervisor_model_gateway_is_declared_automation_provider_surface() -> None:
+    import json
+
+    contract = json.loads(
+        (ROOT / "machine" / "ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    surfaces = {
+        item["owner"]: item for item in contract["provider_surfaces"]
+    }
+    entry = surfaces["skeleton/automation/shift_supervisor/model_gateway.py"]
+
+    assert entry["family"] == "automation_model"
+    assert entry["surface_class"] == "automation_provider_explicitly_separate_and_receipt-gated"
+    assert entry["credential_owner"] is True
+    assert entry["network_transport_owner"] is True
+    assert entry["sdk_client_owner"] is False
+    assert set(entry["discovery_edge_classes"]) == {"credential", "network_transport"}
+
+    discovered = discover_provider_surfaces(ROOT)
+    assert set(discovered["skeleton/automation/shift_supervisor/model_gateway.py"]["edge_classes"]) == {
+        "credential",
+        "network_transport",
+    }
+    assert validate_provider_bootstrap(ROOT) == []

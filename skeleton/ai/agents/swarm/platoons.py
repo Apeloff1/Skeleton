@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from skeleton.swarm.mesh import Platoons, standard_platoons
+from skeleton.automation.swarm.mesh import Platoons, standard_platoons
 
 __all__ = ["Platoons", "standard_platoons"]

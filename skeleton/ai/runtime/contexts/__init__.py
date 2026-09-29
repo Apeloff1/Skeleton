@@ -1,8 +1,8 @@
 """Skeleton Contexts — The Context Fabric (with ResponseCycle)."""
 
-from skeleton.contexts.workorder import WorkOrderEngine, WorkOrder, WorkOrderContext
-from skeleton.contexts.backlog import BacklogContext, TensorCube, WorkChain, BacklogItem
-from skeleton.contexts.planning import (
+from skeleton.context.domains.workorder import WorkOrderEngine, WorkOrder, WorkOrderContext
+from skeleton.context.domains.backlog import BacklogContext, TensorCube, WorkChain, BacklogItem
+from skeleton.context.domains.planning import (
     PlanningContext,
     Plan,
     PlanStep,
@@ -10,9 +10,9 @@ from skeleton.contexts.planning import (
     QueuedItem,
     PROBABILITY_SYSTEMS,
 )
-from skeleton.contexts.oracle import OracleMatrix, OracleReading, FateString
-from skeleton.contexts.syntax import ContextSyntaxFixer, SyntaxIssue
-from skeleton.contexts.cycle import ResponseCycle, ConnectorExecutor, CycleReport
+from skeleton.context.domains.oracle import OracleMatrix, OracleReading, FateString
+from skeleton.context.domains.syntax import ContextSyntaxFixer, SyntaxIssue
+from skeleton.context.domains.cycle import ResponseCycle, ConnectorExecutor, CycleReport
 from typing import Any, Dict, Optional
 from skeleton.kernel.events import EventBus
 

@@ -8,6 +8,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from skeleton.provider_contract import ProviderArchitectureError, load_provider_architecture
 from skeleton.security.activation_security import enforce_bot_activation_security
 from .prompts import compose_system_prompt
 
@@ -53,7 +54,10 @@ class ModelGateway:
 
     def _config(self) -> tuple[str, str, str]:
         endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/responses").strip()
-        api_key = os.getenv(self.api_key_env, "").strip()
+        if self.api_key_env == "OPENAI_API_KEY":
+            api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        else:
+            api_key = os.getenv(self.api_key_env, "").strip()
         model = os.getenv(self.model_env, "gpt-5.6").strip()
         if not endpoint:
             raise ModelRequestError(f"{self.endpoint_env} is empty")
@@ -61,6 +65,15 @@ class ModelGateway:
             raise ModelRequestError(f"{self.api_key_env} is not configured")
         if not model:
             raise ModelRequestError(f"{self.model_env} is empty")
+        try:
+            load_provider_architecture(
+                "repository-automation",
+                provider_family="automation_model",
+            )
+        except ProviderArchitectureError as exc:
+            raise ModelRequestError(
+                "repository automation provider architecture acknowledgement failed"
+            ) from exc
         return endpoint, api_key, model
 
     def _web_search_enabled(self) -> bool:

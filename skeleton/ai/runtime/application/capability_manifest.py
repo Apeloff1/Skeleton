@@ -27,7 +27,7 @@ class Capability:
 CAPABILITIES: Final[tuple[Capability, ...]] = (
     Capability(
         id="application",
-        module="skeleton.application",
+        module="skeleton.app.runtime",
         description="Shared command contracts and runtime command orchestration.",
     ),
     Capability(
@@ -77,7 +77,7 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
     ),
     Capability(
         id="swarm",
-        module="skeleton.swarm",
+        module="skeleton.automation.swarm",
         description="Multi-agent routing, stigmergy, consensus, and platoon coordination.",
     ),
     Capability(
@@ -112,7 +112,7 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
     ),
     Capability(
         id="pipelines",
-        module="skeleton.pipelines",
+        module="skeleton.forge.pipelines",
         description="NPC, game-logic, and animation generation pipelines.",
     ),
     Capability(
@@ -127,7 +127,7 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
     ),
     Capability(
         id="agents",
-        module="skeleton.agents",
+        module="skeleton.automation.agents",
         description="Agent pools, task assignment, and coordination.",
     ),
     Capability(
@@ -142,7 +142,7 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
     ),
     Capability(
         id="content",
-        module="skeleton.content",
+        module="skeleton.simulation.content",
         description="Reusable domain knowledge packs and adapters.",
     ),
 )

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from skeleton.kernel.events import EventBus
-from skeleton.swarm.law import N_CAP
+from skeleton.automation.swarm.law import N_CAP
 
 
 class Mesh:

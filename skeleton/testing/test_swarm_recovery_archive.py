@@ -2,12 +2,12 @@ import copy
 
 import pytest
 
-from skeleton.agents.swarm_broker import SwarmBroker
-from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
-from skeleton.agents.swarm_ingress import SwarmIngressGovernor
-from skeleton.agents.swarm_recovery import MAX_RECOVERY_ARCHIVE_BYTES, SwarmRecoveryManager
-from skeleton.agents.swarm_runtime import SwarmTask
-from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
+from skeleton.automation.agents.swarm_broker import SwarmBroker
+from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+from skeleton.automation.agents.swarm_recovery import MAX_RECOVERY_ARCHIVE_BYTES, SwarmRecoveryManager
+from skeleton.automation.agents.swarm_runtime import SwarmTask
+from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
 
 
 def _tenant_broker(runtime: HardenedSwarmRuntime) -> TenantSwarmBroker:
@@ -161,7 +161,7 @@ def test_recovery_archive_rejects_extended_tenant_record_even_when_resealed() ->
 
 
 def test_recovery_archive_rejects_oversized_byte_payload_before_decode(monkeypatch) -> None:
-    monkeypatch.setattr("skeleton.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 32)
+    monkeypatch.setattr("skeleton.automation.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 32)
     with pytest.raises(ValueError, match="maximum size"):
         SwarmRecoveryManager.from_archive_bytes(b"{" + b" " * 64 + b"}")
 
@@ -171,7 +171,7 @@ def test_recovery_archive_export_enforces_core_size_bound(monkeypatch) -> None:
     runtime.submit(SwarmTask("large", {"blob": "x" * 4096}))
     manager = SwarmRecoveryManager()
     manager.checkpoint(runtime)
-    monkeypatch.setattr("skeleton.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 512)
+    monkeypatch.setattr("skeleton.automation.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 512)
 
     with pytest.raises(ValueError, match="maximum size"):
         manager.export_archive()

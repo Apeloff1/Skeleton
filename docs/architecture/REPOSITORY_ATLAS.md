@@ -28,7 +28,7 @@ Skeleton/
 │   │   └── architecture/     canonical architecture index + round history
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
-│   ├── agents/               agent runtime/orchestration
+│   │   └── agents/           agent runtime/orchestration
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
 │   ├── memory/               runtime memory
@@ -142,6 +142,7 @@ compatibility shims:
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
+| `skeleton.agents.*` | `skeleton.automation.agents.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
 | `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
 | `skeleton.frontier.{aquarium,bait,biotope,breeding,...}` | `skeleton.frontier.ecology.*` | transitional module shims |

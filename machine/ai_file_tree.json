@@ -116,7 +116,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "d808e2da42400ca8eae4ccd7a310b11a2954e058",
+      "source_git_object_sha": "b638c194161e9095cd3d748ac91661cf2adb8866",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -128,7 +128,7 @@
         "AIQ-S4-EXEC-01"
       ],
       "overlay_children": [
-        "legacy_persist"
+        "core"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -136,7 +136,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_persistence_tree_with_governed_core_overlay"
     },
     {
       "id": "AIFT-CONTEXT",
@@ -158,7 +158,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_context_with_governed_domains_overlay",
+      "overlay_children": [
+        "domains"
+      ]
     },
     {
       "id": "AIFT-RETRIEVAL",
@@ -307,10 +310,10 @@
     },
     {
       "id": "AIFT-BUILD-PLANNING",
-      "source": "core/shift_supervisor",
+      "source": "skeleton/automation/shift_supervisor",
       "destination": "skeleton/ai/build/shift_supervisor",
       "kind": "tree",
-      "source_git_object_sha": "dc3300593b0049186fcce43f7921e947a829afd6",
+      "source_git_object_sha": "8b87745546bc650451f28301488542cbed7ab796",
       "role": "transitional planning scheduling and build-control harness",
       "work_package_refs": [
         "WP-W11",
@@ -323,8 +326,8 @@
         {
           "path": "model_gateway.py",
           "mode": "compatibility_facade",
-          "facade_required_import": "from core.shift_supervisor.model_gateway import",
-          "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
+          "facade_required_import": "from skeleton.automation.shift_supervisor.model_gateway import",
+          "note": "Credential-bearing model gateway remains singular at skeleton/automation/shift_supervisor/model_gateway.py; the AI-tree destination is a non-owning facade."
         }
       ],
       "move_tags": [
@@ -333,7 +336,7 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "canonical_automation_shift_supervisor_with_legacy_core_shims"
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -406,11 +409,11 @@
     },
     {
       "id": "AIFT-AGENTS",
-      "source": "skeleton/agents",
+      "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "940ef2520e015bf13d7eba00813a792b575a7b3d",
-      "role": "core agent/swarm execution runtime",
+      "source_git_object_sha": "90d2fb55348611e5d4b15337c1b5b2240c38d23e",
+      "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -435,14 +438,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_agents_with_legacy_root_shims"
     },
     {
       "id": "AIFT-AUTOMATION",
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "source_git_object_sha": "da019cf730244a8788b3e6b3e3cc0f6eed2eb459",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -511,7 +514,14 @@
         "cutover:owner-sensitive"
       ],
       "move_batch": "B3-owner-sensitive",
-      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover",
+      "overlay_children": [
+        "agents",
+        "swarm",
+        "hive",
+        "overseer",
+        "shift_supervisor"
+      ]
     },
     {
       "id": "AIFT-ARTIFACT-PLANE",
@@ -582,11 +592,11 @@
     },
     {
       "id": "AIFT-CONTEXTS",
-      "source": "skeleton/contexts",
+      "source": "skeleton/context/domains",
       "destination": "skeleton/ai/runtime/contexts",
       "kind": "tree",
-      "source_git_object_sha": "8f3df332fdca226208a0c4f7cbd4560b291b15fe",
-      "role": "legacy/extended context runtime support",
+      "source_git_object_sha": "5d933e1eaae1f8dc9da9af805eb186d12164f352",
+      "role": "Canonical context-domain runtime under skeleton/context/domains, mirrored into the governed AI runtime.",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -610,7 +620,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_context_domains_with_legacy_plural_shims"
     },
     {
       "id": "AIFT-SECURITY",
@@ -1077,10 +1087,10 @@
     },
     {
       "id": "AIFT-APPLICATION",
-      "source": "skeleton/application",
+      "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "8115bf017e1ee7bf1617c1df22bb89118f876550",
+      "source_git_object_sha": "e2659f6139d3263873b4913d103f84534dd2ed53",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1110,7 +1120,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_app_runtime_with_legacy_application_shims_and_direct_capability_resolution"
     },
     {
       "id": "AIFT-BUILD",
@@ -1286,7 +1296,7 @@
       "source": "skeleton/foundation",
       "destination": "skeleton/ai/runtime/foundation",
       "kind": "tree",
-      "source_git_object_sha": "19f7f0add28f457427da23f03a1f6437c7c9965e",
+      "source_git_object_sha": "0a6b0fdaff569b241a6b73cd5eade4c89144d754",
       "role": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
       "work_package_refs": [
         "WP-W01",
@@ -1318,7 +1328,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_foundation_with_separately_governed_architecture_history",
+      "overlay_children": [
+        "architecture"
+      ]
     },
     {
       "id": "AIFT-GALAXY",
@@ -1557,10 +1570,10 @@
     },
     {
       "id": "AIFT-OVERSEER",
-      "source": "skeleton/overseer",
+      "source": "skeleton/automation/overseer",
       "destination": "skeleton/ai/runtime/distributed/overseer",
       "kind": "tree",
-      "source_git_object_sha": "ec0dbf04244ebe3ec9521a3c72fed2d7d9945b3c",
+      "source_git_object_sha": "168caafd2a3f001fec00f7eb08ae990b707871fc",
       "role": "Governor, digital-twin, hardware, recovery, fleet, and model-predictive control code is runtime supervision/scheduling infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -1589,7 +1602,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_overseer_with_legacy_root_shims"
     },
     {
       "id": "AIFT-PR-AUTOMATION",
@@ -1663,7 +1676,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "65244048f5a78b62e83615d8be4984a9debe7832",
+      "source_git_object_sha": "9cb6e7bd266d9b3af9c12eaac715bc6884577ae8",
       "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
       "work_package_refs": [
         "WP-W11",
@@ -1732,10 +1745,10 @@
     },
     {
       "id": "AIFT-SWARM",
-      "source": "skeleton/swarm",
+      "source": "skeleton/automation/swarm",
       "destination": "skeleton/ai/agents/swarm",
       "kind": "tree",
-      "source_git_object_sha": "a340e961569a134a27bb5302baa0778e75d7a1dd",
+      "source_git_object_sha": "9a9d9d0ad1b2816389e96734899c81b9969ce53b",
       "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
       "work_package_refs": [
         "WP-W15",
@@ -1764,7 +1777,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_swarm_with_legacy_root_shims"
     },
     {
       "id": "AIFT-GRAPHS",
@@ -2172,10 +2185,10 @@
     },
     {
       "id": "AIFT-HIVE",
-      "source": "skeleton/hive",
+      "source": "skeleton/automation/hive",
       "destination": "skeleton/ai/agents/swarm/hive",
       "kind": "tree",
-      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788",
+      "source_git_object_sha": "b67b286d9450ba6780a4dc92b611ce3c2aa0fd28",
       "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
       "work_package_refs": [
         "WP-W15",
@@ -2199,7 +2212,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_automation_hive_with_legacy_root_shims"
     },
     {
       "id": "AIFT-JVM-REGISTRY",
@@ -2434,11 +2447,11 @@
     },
     {
       "id": "AIFT-PERSIST-LEGACY",
-      "source": "skeleton/persist",
-      "destination": "skeleton/ai/runtime/persistence/legacy_persist",
+      "source": "skeleton/persistence/core",
+      "destination": "skeleton/ai/runtime/persistence/core",
       "kind": "tree",
       "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072",
-      "role": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
+      "role": "Canonical low-level persistence primitives nested under skeleton/persistence/core and mirrored as the governed core overlay.",
       "work_package_refs": [
         "WP-W03",
         "WP-W04"
@@ -2462,7 +2475,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_persistence_core_with_legacy_persist_shims"
     },
     {
       "id": "AIFT-PIPELINES",
@@ -4707,6 +4720,81 @@
         "planned_path": "planned:native",
         "implemented_path": "skeleton/native",
         "mapping_id": "AIFT-NATIVE"
+      },
+      {
+        "planned_path": "skeleton/agents",
+        "implemented_path": "skeleton/automation/agents",
+        "mapping_id": "AIFT-AGENTS"
+      },
+      {
+        "planned_path": "skeleton/application",
+        "implemented_path": "skeleton/app/runtime",
+        "mapping_id": "AIFT-APPLICATION"
+      },
+      {
+        "planned_path": "skeleton/contexts",
+        "implemented_path": "skeleton/context/domains",
+        "mapping_id": "AIFT-CONTEXTS"
+      },
+      {
+        "planned_path": "skeleton/persist",
+        "implemented_path": "skeleton/persistence/core",
+        "mapping_id": "AIFT-PERSIST-LEGACY"
+      },
+      {
+        "planned_path": "skeleton/swarm",
+        "implemented_path": "skeleton/automation/swarm",
+        "mapping_id": "AIFT-SWARM"
+      },
+      {
+        "planned_path": "skeleton/hive",
+        "implemented_path": "skeleton/automation/hive",
+        "mapping_id": "AIFT-HIVE"
+      },
+      {
+        "planned_path": "skeleton/overseer",
+        "implemented_path": "skeleton/automation/overseer",
+        "mapping_id": "AIFT-OVERSEER"
+      },
+      {
+        "planned_path": "skeleton/genesis.py",
+        "implemented_path": "skeleton/bootstrap/genesis.py",
+        "mapping_id": "AIFT-GENESIS"
+      },
+      {
+        "planned_path": "skeleton/provider_contract.py",
+        "implemented_path": "skeleton/providers/contract.py",
+        "mapping_id": "AIFT-PROVIDER-CONTRACT"
+      },
+      {
+        "planned_path": "skeleton/content",
+        "implemented_path": "skeleton/simulation/content",
+        "mapping_id": "AIFT-CONTENT"
+      },
+      {
+        "planned_path": "skeleton/economy",
+        "implemented_path": "skeleton/simulation/economy",
+        "mapping_id": "AIFT-ECONOMY"
+      },
+      {
+        "planned_path": "skeleton/world",
+        "implemented_path": "skeleton/simulation/world",
+        "mapping_id": "AIFT-WORLD"
+      },
+      {
+        "planned_path": "skeleton/platform",
+        "implemented_path": "skeleton/simulation/platform",
+        "mapping_id": "AIFT-PLATFORM"
+      },
+      {
+        "planned_path": "skeleton/pipelines",
+        "implemented_path": "skeleton/forge/pipelines",
+        "mapping_id": "AIFT-PIPELINES"
+      },
+      {
+        "planned_path": "skeleton/creator",
+        "implemented_path": "skeleton/forge/creator",
+        "mapping_id": "AIFT-CREATOR"
       }
     ],
     "planned_but_absent": [
@@ -5051,6 +5139,206 @@
       "path": "skeleton/cue",
       "owner": "package/compatibility boundary",
       "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/agents",
+      "owner": "automation compatibility boundary",
+      "reason": "legacy skeleton.agents namespace remains a compatibility shim after TREE-028"
+    },
+    {
+      "path": "skeleton/application",
+      "owner": "application compatibility boundary",
+      "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
+    },
+    {
+      "path": "skeleton/contexts",
+      "owner": "context compatibility boundary",
+      "reason": "legacy plural contexts namespace remains a shim for skeleton/context/domains"
+    },
+    {
+      "path": "skeleton/persist",
+      "owner": "persistence compatibility boundary",
+      "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
+    },
+    {
+      "path": "skeleton/swarm",
+      "owner": "automation compatibility boundary",
+      "reason": "legacy swarm namespace remains a shim for skeleton/automation/swarm"
+    },
+    {
+      "path": "skeleton/hive",
+      "owner": "automation compatibility boundary",
+      "reason": "legacy hive namespace remains a shim for skeleton/automation/hive"
+    },
+    {
+      "path": "skeleton/overseer",
+      "owner": "automation compatibility boundary",
+      "reason": "legacy overseer namespace remains a shim for skeleton/automation/overseer"
+    },
+    {
+      "path": "skeleton/content",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy content namespace remains a shim for skeleton/simulation/content"
+    },
+    {
+      "path": "skeleton/creator",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy creator namespace remains a shim for skeleton/forge/creator"
+    },
+    {
+      "path": "skeleton/economy",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy economy namespace remains a shim for skeleton/simulation/economy"
+    },
+    {
+      "path": "skeleton/world",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy world namespace remains a shim for skeleton/simulation/world"
+    },
+    {
+      "path": "skeleton/platform",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy platform namespace remains a shim for skeleton/simulation/platform"
+    },
+    {
+      "path": "skeleton/pipelines",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy pipelines namespace remains a shim for skeleton/forge/pipelines"
+    },
+    {
+      "path": "skeleton/genesis.py",
+      "owner": "bootstrap compatibility boundary",
+      "reason": "legacy genesis entrypoint remains a shim for skeleton/bootstrap/genesis.py"
+    },
+    {
+      "path": "skeleton/provider_contract.py",
+      "owner": "provider compatibility boundary",
+      "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/jvm_accelerators.py",
+      "owner": "native compatibility boundary",
+      "reason": "legacy JVM accelerator registry remains a compatibility entrypoint"
+    },
+    {
+      "path": "skeleton/kv_cache.py",
+      "owner": "KV compatibility boundary",
+      "reason": "legacy KV cache facade remains a compatibility entrypoint"
+    },
+    {
+      "path": "skeleton/bootstrap",
+      "owner": "core bootstrap owner",
+      "reason": "bootstrap contains canonical package wiring; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/providers",
+      "owner": "integration contract owner",
+      "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/architecture_index.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture index remains a compatibility shim for skeleton/foundation/architecture/index.py"
+    },
+    {
+      "path": "skeleton/architecture_round3.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 3 remains a shim for skeleton/foundation/architecture/rounds/round3.py"
+    },
+    {
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 4 remains a shim for skeleton/foundation/architecture/rounds/round4.py"
+    },
+    {
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 5 remains a shim for skeleton/foundation/architecture/rounds/round5.py"
+    },
+    {
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 6 remains a shim for skeleton/foundation/architecture/rounds/round6.py"
+    },
+    {
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 7 remains a shim for skeleton/foundation/architecture/rounds/round7.py"
+    },
+    {
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 8 remains a shim for skeleton/foundation/architecture/rounds/round8.py"
+    },
+    {
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 9 remains a shim for skeleton/foundation/architecture/rounds/round9.py"
+    },
+    {
+      "path": "skeleton/architecture_round10.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 10 remains a shim for skeleton/foundation/architecture/rounds/round10.py"
+    },
+    {
+      "path": "skeleton/architecture_round11.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 11 remains a shim for skeleton/foundation/architecture/rounds/round11.py"
+    },
+    {
+      "path": "skeleton/architecture_round12.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 12 remains a shim for skeleton/foundation/architecture/rounds/round12.py"
+    },
+    {
+      "path": "skeleton/architecture_round13.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 13 remains a shim for skeleton/foundation/architecture/rounds/round13.py"
+    },
+    {
+      "path": "skeleton/architecture_round14.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 14 remains a shim for skeleton/foundation/architecture/rounds/round14.py"
+    },
+    {
+      "path": "skeleton/architecture_round15.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 15 remains a shim for skeleton/foundation/architecture/rounds/round15.py"
+    },
+    {
+      "path": "skeleton/architecture_round16.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 16 remains a shim for skeleton/foundation/architecture/rounds/round16.py"
+    },
+    {
+      "path": "skeleton/architecture_round17.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 17 remains a shim for skeleton/foundation/architecture/rounds/round17.py"
+    },
+    {
+      "path": "skeleton/architecture_round18.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 18 remains a shim for skeleton/foundation/architecture/rounds/round18.py"
+    },
+    {
+      "path": "skeleton/architecture_round19.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 19 remains a shim for skeleton/foundation/architecture/rounds/round19.py"
+    },
+    {
+      "path": "skeleton/architecture_round20.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 20 remains a shim for skeleton/foundation/architecture/rounds/round20.py"
+    },
+    {
+      "path": "skeleton/architecture_round21.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 21 remains a shim for skeleton/foundation/architecture/rounds/round21.py"
+    },
+    {
+      "path": "skeleton/architecture_round22.py",
+      "owner": "architecture compatibility boundary",
+      "reason": "legacy architecture round 22 remains a shim for skeleton/foundation/architecture/rounds/round22.py"
     }
   ],
   "classification_coverage": {
@@ -5131,7 +5419,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The current 134-mapping main line retains its recorded audit evidence. Wave 2B adds 20 mappings whose source Git tree/blob identities were rechecked against current main and match exactly; full 154-mapping validator/CI evidence remains required.",
+    "note": "TREE-028 import-inversion follow-through refreshed AIFT-APPLICATION after capability discovery/loading switched from compatibility roots to canonical application/swarm/pipelines/agents/content namespaces; exact source/AI application tree parity verified.",
     "current_mapping_count": 154,
     "audit_scope_status": "validated_134_mapping_line_extended_to_154_requires_full_refresh",
     "pending_mapping_ids": [

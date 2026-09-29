@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from skeleton.hive.capabilities import capabilities
-from skeleton.hive.cards import hive_card
-from skeleton.hive.engine import HiveEngine
-from skeleton.hive.kernel import Hive
-from skeleton.hive.law import PACKET, VERSION, WALK_CAP
+from skeleton.automation.hive.capabilities import capabilities
+from skeleton.automation.hive.cards import hive_card
+from skeleton.automation.hive.engine import HiveEngine
+from skeleton.automation.hive.kernel import Hive
+from skeleton.automation.hive.law import PACKET, VERSION, WALK_CAP
 
 __all__ = [
     "PACKET",

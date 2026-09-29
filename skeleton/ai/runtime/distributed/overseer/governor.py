@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.overseer.hardware import (
+from skeleton.automation.overseer.hardware import (
     DeviceClass,
     HardwareChange,
     HardwareProbe,

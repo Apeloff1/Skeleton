@@ -6,12 +6,12 @@ NOW = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
 
 
 def test_gameplay_facade_uses_single_canonical_aquarium_module():
-    assert gameplay.AquariumState.__module__ == "skeleton.frontier.aquarium"
-    assert gameplay.AquariumTankSpec.__module__ == "skeleton.frontier.aquarium"
-    assert gameplay.AquariumThemeSpec.__module__ == "skeleton.frontier.aquarium"
-    assert gameplay.DisplayFish.__module__ == "skeleton.frontier.aquarium"
-    assert gameplay.aquarium_event.__module__ == "skeleton.frontier.aquarium_adapters"
-    assert gameplay.quote_equipment_purchase.__module__ == "skeleton.frontier.equipment"
+    assert gameplay.AquariumState.__module__ == "skeleton.frontier.ecology.aquarium"
+    assert gameplay.AquariumTankSpec.__module__ == "skeleton.frontier.ecology.aquarium"
+    assert gameplay.AquariumThemeSpec.__module__ == "skeleton.frontier.ecology.aquarium"
+    assert gameplay.DisplayFish.__module__ == "skeleton.frontier.ecology.aquarium"
+    assert gameplay.aquarium_event.__module__ == "skeleton.frontier.ecology.aquarium_adapters"
+    assert gameplay.quote_equipment_purchase.__module__ == "skeleton.frontier.economy.equipment"
 
 
 def test_gameplay_facade_projects_canonical_aquarium_state_to_memory():

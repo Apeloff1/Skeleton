@@ -26,14 +26,14 @@ import time
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.overseer.governor import (
+from skeleton.automation.overseer.governor import (
     BudgetEnforcer,
     BudgetProfile,
     ResourceGovernor,
     ThrottleDecision,
 )
-from skeleton.overseer.hardware import HardwareProbe, HardwareProfile, HardwareState
-from skeleton.overseer.graphs import (
+from skeleton.automation.overseer.hardware import HardwareProbe, HardwareProfile, HardwareState
+from skeleton.automation.overseer.graphs import (
     FateGraph,
     FlowGraph,
     HealthGraph,

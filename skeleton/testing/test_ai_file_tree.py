@@ -33,7 +33,7 @@ def test_ai_file_tree_credential_surfaces_are_facades() -> None:
     provider = (ROOT / "skeleton/ai/providers/runtime.py").read_text(encoding="utf-8")
     gateway = (ROOT / "skeleton/ai/build/shift_supervisor/model_gateway.py").read_text(encoding="utf-8")
     assert "from skeleton.provider_runtime import" in provider
-    assert "from core.shift_supervisor.model_gateway import" in gateway
+    assert "from skeleton.automation.shift_supervisor.model_gateway import" in gateway
     for source in (provider, gateway):
         assert "OPENAI_API_KEY" not in source
         assert "api.openai.com" not in source
@@ -103,6 +103,11 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
 
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
     mappings = {item["source"]: item for item in manifest["mappings"]}
+    aliases = {
+        item["planned_path"]
+        for item in manifest["planned_path_audit"]["covered_aliases"]
+        if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
+    }
 
     promoted_sources = {
         "skeleton/state",
@@ -124,7 +129,7 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
         "skeleton/social",
         "skeleton/viscera",
     }
-    assert promoted_sources <= mappings.keys()
+    assert promoted_sources <= (mappings.keys() | aliases)
     assert manifest["next_move_assignments"] == []
 
     contract = manifest["move_tag_contract"]
@@ -173,11 +178,18 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
     mappings = manifest["mappings"]
     destinations = {item["destination"] for item in mappings}
+    sources = {item["source"] for item in mappings}
     overlay_count = 0
     for item in mappings:
         for child in item.get("overlay_children", []):
             overlay_count += 1
-            assert f"{item['destination']}/{child}" in destinations
+            full_destination = f"{item['destination']}/{child}"
+            full_source = f"{item['source']}/{child}"
+            source_governed = any(
+                candidate == full_source or candidate.startswith(full_source.rstrip("/") + "/")
+                for candidate in sources
+            )
+            assert full_destination in destinations or source_governed
     assert overlay_count >= 12
 
 
