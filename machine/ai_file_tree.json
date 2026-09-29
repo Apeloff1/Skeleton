@@ -2787,10 +2787,10 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-INDEX-LEGACY",
-      "source": "skeleton/architecture_index.py",
+      "source": "skeleton/foundation/architecture/index.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_index.py",
       "kind": "file",
-      "source_git_object_sha": "dc0cc3cc241bdfd066fefec4bac64978b3249da4",
+      "source_git_object_sha": "72e7ec1b400c53e6132bb329a211a4521ad9731a",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -2822,7 +2822,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R03",
-      "source": "skeleton/architecture_round3.py",
+      "source": "skeleton/foundation/architecture/rounds/round3.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round3.py",
       "kind": "file",
       "source_git_object_sha": "1749fb191a5ae10a85f31201fc559b62fa8fe201",
@@ -2857,7 +2857,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R04",
-      "source": "skeleton/architecture_round4.py",
+      "source": "skeleton/foundation/architecture/rounds/round4.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round4.py",
       "kind": "file",
       "source_git_object_sha": "37494202290c896bfd336ff49723833d924acef5",
@@ -2892,7 +2892,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R05",
-      "source": "skeleton/architecture_round5.py",
+      "source": "skeleton/foundation/architecture/rounds/round5.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round5.py",
       "kind": "file",
       "source_git_object_sha": "193ba887f3af884e2b7903a2d7ef25d54ca26b62",
@@ -2927,7 +2927,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R06",
-      "source": "skeleton/architecture_round6.py",
+      "source": "skeleton/foundation/architecture/rounds/round6.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round6.py",
       "kind": "file",
       "source_git_object_sha": "a26f8dce143001fea8d216326d6cfd27b1975879",
@@ -2962,7 +2962,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R07",
-      "source": "skeleton/architecture_round7.py",
+      "source": "skeleton/foundation/architecture/rounds/round7.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round7.py",
       "kind": "file",
       "source_git_object_sha": "b4010f8645cd133a0f482986393b6e604f19efa7",
@@ -2997,7 +2997,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R08",
-      "source": "skeleton/architecture_round8.py",
+      "source": "skeleton/foundation/architecture/rounds/round8.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round8.py",
       "kind": "file",
       "source_git_object_sha": "b5c4ca3e7f377dbd3b2244c7bd4c7e1ea4c819f4",
@@ -3032,7 +3032,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R09",
-      "source": "skeleton/architecture_round9.py",
+      "source": "skeleton/foundation/architecture/rounds/round9.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round9.py",
       "kind": "file",
       "source_git_object_sha": "da3777be7a99bcf38c81ba4b91ee54b3ec80b1e4",
@@ -3067,7 +3067,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R10",
-      "source": "skeleton/architecture_round10.py",
+      "source": "skeleton/foundation/architecture/rounds/round10.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round10.py",
       "kind": "file",
       "source_git_object_sha": "b8a97d10c23c06563eb0edeb24816fd0181a9951",
@@ -3102,7 +3102,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R11",
-      "source": "skeleton/architecture_round11.py",
+      "source": "skeleton/foundation/architecture/rounds/round11.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round11.py",
       "kind": "file",
       "source_git_object_sha": "edcd8b04bbe4270286adaed96025186aa4999a68",
@@ -3137,7 +3137,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R12",
-      "source": "skeleton/architecture_round12.py",
+      "source": "skeleton/foundation/architecture/rounds/round12.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round12.py",
       "kind": "file",
       "source_git_object_sha": "614e0b2ed6862aa0887551ec7b44ccf970ce1873",
@@ -3172,7 +3172,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R13",
-      "source": "skeleton/architecture_round13.py",
+      "source": "skeleton/foundation/architecture/rounds/round13.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round13.py",
       "kind": "file",
       "source_git_object_sha": "364914860027b2639afd040ce4791aeed3a62016",
@@ -3207,7 +3207,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R14",
-      "source": "skeleton/architecture_round14.py",
+      "source": "skeleton/foundation/architecture/rounds/round14.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round14.py",
       "kind": "file",
       "source_git_object_sha": "936e2a3cdaf0e4b5f9cdf43b240f6eac8ff75934",
@@ -3242,7 +3242,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R15",
-      "source": "skeleton/architecture_round15.py",
+      "source": "skeleton/foundation/architecture/rounds/round15.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round15.py",
       "kind": "file",
       "source_git_object_sha": "f016b8e5a293e6f5e4418fd32164eeab27b7c515",
@@ -3277,7 +3277,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R16",
-      "source": "skeleton/architecture_round16.py",
+      "source": "skeleton/foundation/architecture/rounds/round16.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round16.py",
       "kind": "file",
       "source_git_object_sha": "8b82415ba83d672d8cdf258887fe1706980be825",
@@ -3312,7 +3312,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R17",
-      "source": "skeleton/architecture_round17.py",
+      "source": "skeleton/foundation/architecture/rounds/round17.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round17.py",
       "kind": "file",
       "source_git_object_sha": "7a9e471574c8a2e01eaba11014e82dd4308f9227",
@@ -3347,7 +3347,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R18",
-      "source": "skeleton/architecture_round18.py",
+      "source": "skeleton/foundation/architecture/rounds/round18.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round18.py",
       "kind": "file",
       "source_git_object_sha": "4d1246adde8961f08ee5d725bec7b84e8ed08b84",
@@ -3382,7 +3382,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R19",
-      "source": "skeleton/architecture_round19.py",
+      "source": "skeleton/foundation/architecture/rounds/round19.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round19.py",
       "kind": "file",
       "source_git_object_sha": "d64f5b0437c46df9d1206d0b72a8ed21e9a2f653",
@@ -3417,7 +3417,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R20",
-      "source": "skeleton/architecture_round20.py",
+      "source": "skeleton/foundation/architecture/rounds/round20.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round20.py",
       "kind": "file",
       "source_git_object_sha": "f19f13b731224db383b2c2a3288f1c4d3122b4dd",
@@ -3452,7 +3452,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R21",
-      "source": "skeleton/architecture_round21.py",
+      "source": "skeleton/foundation/architecture/rounds/round21.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round21.py",
       "kind": "file",
       "source_git_object_sha": "3d55af787fc345c0fb88514cef2be31658062f46",
@@ -3487,7 +3487,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R22",
-      "source": "skeleton/architecture_round22.py",
+      "source": "skeleton/foundation/architecture/rounds/round22.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round22.py",
       "kind": "file",
       "source_git_object_sha": "03e08ee64e14ad01807644b684639539b9b05323",
@@ -4899,107 +4899,107 @@
       "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
-      "path": "skeleton/architecture_index.py",
+      "path": "skeleton/foundation/architecture/index.py",
       "owner": "architecture authority",
       "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
     },
     {
-      "path": "skeleton/architecture_round3.py",
+      "path": "skeleton/foundation/architecture/rounds/round3.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round4.py",
+      "path": "skeleton/foundation/architecture/rounds/round4.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round5.py",
+      "path": "skeleton/foundation/architecture/rounds/round5.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round6.py",
+      "path": "skeleton/foundation/architecture/rounds/round6.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round7.py",
+      "path": "skeleton/foundation/architecture/rounds/round7.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round8.py",
+      "path": "skeleton/foundation/architecture/rounds/round8.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round9.py",
+      "path": "skeleton/foundation/architecture/rounds/round9.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round10.py",
+      "path": "skeleton/foundation/architecture/rounds/round10.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round11.py",
+      "path": "skeleton/foundation/architecture/rounds/round11.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round12.py",
+      "path": "skeleton/foundation/architecture/rounds/round12.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round13.py",
+      "path": "skeleton/foundation/architecture/rounds/round13.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round14.py",
+      "path": "skeleton/foundation/architecture/rounds/round14.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round15.py",
+      "path": "skeleton/foundation/architecture/rounds/round15.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round16.py",
+      "path": "skeleton/foundation/architecture/rounds/round16.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round17.py",
+      "path": "skeleton/foundation/architecture/rounds/round17.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round18.py",
+      "path": "skeleton/foundation/architecture/rounds/round18.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round19.py",
+      "path": "skeleton/foundation/architecture/rounds/round19.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round20.py",
+      "path": "skeleton/foundation/architecture/rounds/round20.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round21.py",
+      "path": "skeleton/foundation/architecture/rounds/round21.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round22.py",
+      "path": "skeleton/foundation/architecture/rounds/round22.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },

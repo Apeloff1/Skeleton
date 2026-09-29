@@ -13,26 +13,26 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from skeleton import architecture as base
-from skeleton import architecture_round3 as r3
-from skeleton import architecture_round4 as r4
-from skeleton import architecture_round5 as r5
-from skeleton import architecture_round6 as r6
-from skeleton import architecture_round7 as r7
-from skeleton import architecture_round8 as r8
-from skeleton import architecture_round9 as r9
-from skeleton import architecture_round10 as r10
-from skeleton import architecture_round11 as r11
-from skeleton import architecture_round12 as r12
-from skeleton import architecture_round13 as r13
-from skeleton import architecture_round14 as r14
-from skeleton import architecture_round15 as r15
-from skeleton import architecture_round16 as r16
-from skeleton import architecture_round17 as r17
-from skeleton import architecture_round18 as r18
-from skeleton import architecture_round19 as r19
-from skeleton import architecture_round20 as r20
-from skeleton import architecture_round21 as r21
-from skeleton import architecture_round22 as r22
+from skeleton.foundation.architecture.rounds import round3 as r3
+from skeleton.foundation.architecture.rounds import round4 as r4
+from skeleton.foundation.architecture.rounds import round5 as r5
+from skeleton.foundation.architecture.rounds import round6 as r6
+from skeleton.foundation.architecture.rounds import round7 as r7
+from skeleton.foundation.architecture.rounds import round8 as r8
+from skeleton.foundation.architecture.rounds import round9 as r9
+from skeleton.foundation.architecture.rounds import round10 as r10
+from skeleton.foundation.architecture.rounds import round11 as r11
+from skeleton.foundation.architecture.rounds import round12 as r12
+from skeleton.foundation.architecture.rounds import round13 as r13
+from skeleton.foundation.architecture.rounds import round14 as r14
+from skeleton.foundation.architecture.rounds import round15 as r15
+from skeleton.foundation.architecture.rounds import round16 as r16
+from skeleton.foundation.architecture.rounds import round17 as r17
+from skeleton.foundation.architecture.rounds import round18 as r18
+from skeleton.foundation.architecture.rounds import round19 as r19
+from skeleton.foundation.architecture.rounds import round20 as r20
+from skeleton.foundation.architecture.rounds import round21 as r21
+from skeleton.foundation.architecture.rounds import round22 as r22
 
 
 GENESIS_PHASES = [
