@@ -19,6 +19,7 @@ Skeleton/
 ├── .github/                  hosted CI, merge policy and repository automation
 ├── skeleton/                 canonical Python application/runtime namespace
 │   ├── ai/                   AI runtime, providers, learning, research
+│   │   └── providers/        canonical provider contracts/adapters
 │   ├── app/                  whole-application assembly/operator surface
 │   ├── kernel/               foundational primitives
 │   ├── core/                 core runtime services
@@ -113,6 +114,7 @@ compatibility shims:
 | `core.activation_security` | `skeleton.security.activation_security` | transitional shim |
 | `skeleton.architecture_index` | `skeleton.foundation.architecture.index` | transitional shim |
 | `skeleton.architecture_round*` | `skeleton.foundation.architecture.rounds.round*` | transitional shim |
+| `skeleton.provider_contract` | `skeleton.ai.providers.contract` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
