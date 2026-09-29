@@ -31,9 +31,9 @@
       "source": "skeleton/application/",
       "destination": "skeleton/app/runtime/",
       "mode": "move-with-shims",
-      "state": "planned",
+      "state": "canonicalized",
       "compatibility": "skeleton/application/",
-      "notes": "Large application/audit runtime family; requires automated shim generation and reference inventory."
+      "notes": "Fifty-one application modules moved byte-identically to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims."
     },
     {
       "id": "TREE-004",

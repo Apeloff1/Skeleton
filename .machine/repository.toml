@@ -102,8 +102,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "application-compat"
+prefixes = ["skeleton/application/"]
+owner = "application-runtime"
+criticality = "low"
+purpose = "Compatibility-only application namespace; canonical implementation lives under skeleton/app/runtime/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/application/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
