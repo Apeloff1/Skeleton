@@ -187,6 +187,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier NPC modules",
       "notes": "Three Frontier NPC/character modules were extracted into skeleton/frontier/characters/. npc.py and npc_profiles.py moved byte-identically; npc_adapters.py now imports the canonical character module. Public frontier exports target the nested paths, flat module paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-021",
+      "source": "skeleton/frontier/{gameplay,ship,world}.py",
+      "destination": "skeleton/frontier/game/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier game/world modules",
+      "notes": "The final three large Frontier gameplay/world modules were extracted into skeleton/frontier/game/. ship.py and world.py moved byte-identically; gameplay.py now consumes canonical ecology/economy paths. Public frontier exports target the nested ship/world modules, flat gameplay/ship/world paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
     }
   ]
 }
