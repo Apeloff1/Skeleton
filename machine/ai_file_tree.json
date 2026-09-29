@@ -929,7 +929,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "957d1af8304715ce73370c8230cf7edf46d23c3c",
+      "source_git_object_sha": "2f78155ea4cb98be0547e340f1b0fea142fed9a3",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -942,8 +942,7 @@
         "VOL-019"
       ],
       "overlay_children": [
-        "game",
-        "world"
+        "game"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -2300,11 +2299,11 @@
     },
     {
       "id": "AIFT-WORLD",
-      "source": "skeleton/world",
+      "source": "skeleton/simulation/world",
       "destination": "skeleton/ai/simulation/world",
       "kind": "tree",
       "source_git_object_sha": "965d35c8a027bfd77688ecf7bd8eec2e70724e71",
-      "role": "Scene/world state is canonical simulation input and should converge under the already governed simulation tree.",
+      "role": "Canonical deterministic scene/world state under skeleton/simulation/world, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
         "WP-W12"
@@ -2328,7 +2327,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_world_with_legacy_root_shims"
     },
     {
       "id": "AIFT-CIRCULATION",
