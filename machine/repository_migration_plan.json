@@ -313,6 +313,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/mesh/",
       "notes": "Ten mesh/distributed-runtime modules moved from the generic platform bucket into canonical skeleton/distributed/mesh ownership. capacity_qualification.py was rewritten from skeleton.mesh to skeleton.distributed.mesh; the other nine modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/mesh and the legacy root is compatibility-only."
+    },
+    {
+      "id": "TREE-035",
+      "source": "skeleton/graphs/",
+      "destination": "skeleton/knowledge/graphs/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/graphs/",
+      "notes": "Thirteen graph/knowledge modules moved into canonical skeleton/knowledge/graphs. Eleven modules with absolute skeleton.graphs imports were rewritten to skeleton.knowledge.graphs; law.py and linalg.py moved semantically unchanged. The canonical child and full knowledge parent are mirrored exactly into skeleton/ai/runtime/knowledge, the legacy root is compatibility-only, AIFT-GRAPHS follows the canonical child, AIFT-KNOWLEDGE governs the parent, and skeleton/knowledge is no longer planned-but-absent."
     }
   ]
 }
