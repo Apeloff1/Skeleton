@@ -1502,10 +1502,10 @@
     },
     {
       "id": "AIFT-MESH",
-      "source": "skeleton/mesh",
+      "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "8fd4dfc796dc23e95aecffa182dfdc9dcf18dc98",
+      "source_git_object_sha": "73d773eca32320c058c5e1853c9799872538ef62",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -1531,7 +1531,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_distributed_mesh_with_legacy_root_shims"
     },
     {
       "id": "AIFT-NETWORK",
@@ -4848,6 +4848,11 @@
         "planned_path": "skeleton/network",
         "implemented_path": "skeleton/distributed/network",
         "mapping_id": "AIFT-NETWORK"
+      },
+      {
+        "planned_path": "skeleton/mesh",
+        "implemented_path": "skeleton/distributed/mesh",
+        "mapping_id": "AIFT-MESH"
       }
     ],
     "planned_but_absent": [
@@ -5410,6 +5415,11 @@
       "path": "skeleton/network",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-033"
+    },
+    {
+      "path": "skeleton/mesh",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-034"
     }
   ],
   "classification_coverage": {

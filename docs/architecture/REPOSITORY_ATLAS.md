@@ -31,6 +31,7 @@ Skeleton/
 │   │   └── agents/           agent runtime/orchestration
 │   ├── distributed/          distributed runtime infrastructure
 │   │   ├── galaxy/           federation, transport, consensus, election and fleet coordination
+│   │   ├── mesh/             service discovery, hedging, deduplication and traffic/capacity control
 │   │   └── network/          replication, remote execution and model placement
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
@@ -151,6 +152,7 @@ compatibility shims:
 | `skeleton.social.*` | `skeleton.research.social.*` | transitional shim |
 | `skeleton.galaxy.*` | `skeleton.distributed.galaxy.*` | transitional shim |
 | `skeleton.network.*` | `skeleton.distributed.network.*` | transitional shim |
+| `skeleton.mesh.*` | `skeleton.distributed.mesh.*` | transitional shim |
 | `skeleton.swarm.*` | `skeleton.automation.swarm.*` | transitional shim |
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
