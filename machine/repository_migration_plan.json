@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "canonical_source_only": true,
+    "compatibility_before_deletion": true,
+    "require_reference_audit": true,
+    "require_regression_validation": true,
+    "delete_legacy_only_after_zero_live_references": true
+  },
+  "batches": [
+    {
+      "id": "TREE-001",
+      "source": "skeleton/deployment/",
+      "destination": "skeleton/deploy/strategies/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/deployment/",
+      "notes": "Four deployment strategy implementations moved byte-identically; legacy module imports are shims."
+    },
+    {
+      "id": "TREE-002",
+      "source": "skeleton/contexts/",
+      "destination": "skeleton/context/domains/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/contexts/",
+      "notes": "Seven context-domain implementations moved byte-identically; plural namespace remains a shim."
+    },
+    {
+      "id": "TREE-003",
+      "source": "skeleton/application/",
+      "destination": "skeleton/app/runtime/",
+      "mode": "move-with-shims",
+      "state": "planned",
+      "compatibility": "skeleton/application/",
+      "notes": "Large application/audit runtime family; requires automated shim generation and reference inventory."
+    },
+    {
+      "id": "TREE-004",
+      "source": "skeleton/persist/",
+      "destination": "skeleton/persistence/core/",
+      "mode": "move-with-shims",
+      "state": "planned",
+      "compatibility": "skeleton/persist/",
+      "notes": "Persistence primitive family; preserve public import surface during migration."
+    }
+  ]
+}
