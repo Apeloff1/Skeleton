@@ -105,6 +105,7 @@ compatibility shims:
 | --- | --- | --- |
 | `skeleton.deployment.*` | `skeleton.deploy.strategies.*` | transitional shim |
 | `skeleton.contexts.*` | `skeleton.context.domains.*` | transitional shim |
+| `skeleton.application.*` | `skeleton.app.runtime.*` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
