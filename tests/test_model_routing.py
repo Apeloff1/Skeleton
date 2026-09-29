@@ -7,7 +7,7 @@ import math
 
 import pytest
 
-from skeleton.frontier.model_routing import (
+from skeleton.frontier.runtime.model_routing import (
     ModelRouter,
     ModelRouteRequest,
     ProviderMetadataError,
@@ -15,7 +15,7 @@ from skeleton.frontier.model_routing import (
     RouteEvalCase,
     RouteEvalContract,
 )
-from skeleton.frontier.model_runtime import (
+from skeleton.frontier.runtime.model_runtime import (
     ChatResponse,
     ModelCapability,
     ModelMessage,

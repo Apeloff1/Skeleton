@@ -7,11 +7,17 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/frontier/operation_stream.py"
+      - "skeleton/frontier/runtime/operation_stream.py"
       - "skeleton/frontier/operation_stream_store.py"
+      - "skeleton/frontier/runtime/operation_stream_store.py"
       - "skeleton/frontier/operation_stream_store_mongo.py"
+      - "skeleton/frontier/runtime/operation_stream_store_mongo.py"
       - "skeleton/ai/runtime/frontier/operation_stream.py"
+      - "skeleton/ai/runtime/frontier/runtime/operation_stream.py"
       - "skeleton/ai/runtime/frontier/operation_stream_store.py"
+      - "skeleton/ai/runtime/frontier/runtime/operation_stream_store.py"
       - "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py"
+      - "skeleton/ai/runtime/frontier/runtime/operation_stream_store_mongo.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_*.py"

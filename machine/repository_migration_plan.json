@@ -142,6 +142,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/creator/",
       "notes": "The two-file engine-neutral creator intent compiler moved under canonical Forge ownership. intent_compiler.py moved byte-identically; package self-imports were rewritten to skeleton.forge.creator; the canonical creator subtree and AI Forge mirror are exact. AIFT-CREATOR follows the canonical path, and AIFT-FORGE no longer requires any overlay children."
+    },
+    {
+      "id": "TREE-016",
+      "source": "skeleton/frontier/{agent_runtime,capabilities,contracts,events,hyper_kv_cache,memory,memory_adapters,model_routing,model_runtime,operation_stream,operation_stream_store,operation_stream_store_mongo,orchestration,resilience,retrieval_context,runtime_events}.py",
+      "destination": "skeleton/frontier/runtime/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier runtime modules",
+      "notes": "Sixteen Frontier runtime/control-plane modules were extracted into skeleton/frontier/runtime/. Internal runtime imports and public frontier exports now target the nested canonical paths; flat module paths remain compatibility shims. The same transformation was applied to skeleton/ai/runtime/frontier, preserving exact whole-tree and runtime-subtree parity."
     }
   ]
 }

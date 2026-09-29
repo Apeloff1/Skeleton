@@ -6,10 +6,10 @@ import asyncio
 
 import pytest
 
-from skeleton.frontier.agent_runtime import AgentRuntime
-from skeleton.frontier.contracts import stable_content_digest
-from skeleton.frontier.memory import InMemoryStore
-from skeleton.frontier.retrieval_context import MemoryRetriever
+from skeleton.frontier.runtime.agent_runtime import AgentRuntime
+from skeleton.frontier.runtime.contracts import stable_content_digest
+from skeleton.frontier.runtime.memory import InMemoryStore
+from skeleton.frontier.runtime.retrieval_context import MemoryRetriever
 
 
 _SECRET_DETAIL = "api-key=do-not-persist"

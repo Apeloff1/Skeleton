@@ -26,7 +26,7 @@ DEPENDENCIES = {
 }
 
 BOUNDARIES: dict[str, tuple[str, ...]] = {
-    "skeleton/frontier/operation_stream.py": (
+    "skeleton/frontier/runtime/operation_stream.py": (
         "class StreamEvent",
         "class ReplayCursor",
         "class OperationEventLog",
@@ -34,14 +34,14 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "StreamReplayGapError",
         "StreamTerminalError",
     ),
-    "skeleton/frontier/operation_stream_store.py": (
+    "skeleton/frontier/runtime/operation_stream_store.py": (
         "class SQLiteOperationEventStore",
         "class StreamConsumerCheckpoint",
         "class StreamWorkerLease",
         "acquire_worker_lease",
         "compact_acknowledged",
     ),
-    "skeleton/frontier/operation_stream_store_mongo.py": (
+    "skeleton/frontier/runtime/operation_stream_store_mongo.py": (
         "class MongoOperationEventStore",
         "validate_transaction_capability",
         "acquire_worker_lease",
@@ -93,16 +93,16 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
 
 MIRROR_PAIRS = (
     (
-        "skeleton/frontier/operation_stream.py",
-        "skeleton/ai/runtime/frontier/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream.py",
+        "skeleton/ai/runtime/frontier/runtime/operation_stream.py",
     ),
     (
-        "skeleton/frontier/operation_stream_store.py",
-        "skeleton/ai/runtime/frontier/operation_stream_store.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
+        "skeleton/ai/runtime/frontier/runtime/operation_stream_store.py",
     ),
     (
-        "skeleton/frontier/operation_stream_store_mongo.py",
-        "skeleton/ai/runtime/frontier/operation_stream_store_mongo.py",
+        "skeleton/frontier/runtime/operation_stream_store_mongo.py",
+        "skeleton/ai/runtime/frontier/runtime/operation_stream_store_mongo.py",
     ),
 )
 

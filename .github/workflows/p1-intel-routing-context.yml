@@ -10,6 +10,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/frontier/model_routing.py"
+      - "skeleton/frontier/runtime/model_routing.py"
       - "skeleton/intelligence/admission.py"
       - "skeleton/intelligence/quality.py"
       - "skeleton/context/compiler.py"
@@ -30,6 +31,7 @@ on:
       - "skeleton/intelligence/__init__.py"
       - "skeleton/ai/runtime/intelligence/__init__.py"
       - "skeleton/frontier/model_routing.py"
+      - "skeleton/frontier/runtime/model_routing.py"
       - "skeleton/intelligence/admission.py"
       - "skeleton/intelligence/quality.py"
       - "skeleton/context/compiler.py"
@@ -91,7 +93,7 @@ jobs:
           python -m compileall -q
           skeleton/intelligence/routing_context_receipt.py
           skeleton/ai/runtime/intelligence/routing_context_receipt.py
-          skeleton/frontier/model_routing.py
+          skeleton/frontier/runtime/model_routing.py
           skeleton/context
           skeleton/intelligence/admission.py
           skeleton/intelligence/quality.py
