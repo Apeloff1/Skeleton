@@ -929,7 +929,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "d7f2bce60e4333095ea911d6272afce25d233b61",
+      "source_git_object_sha": "3bc6aa8cd6ddba2f81d34df3d472a83b4aea97bb",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -945,7 +945,6 @@
         "content",
         "economy",
         "game",
-        "platform",
         "world"
       ],
       "move_tags": [
@@ -2243,11 +2242,11 @@
     },
     {
       "id": "AIFT-PLATFORM",
-      "source": "skeleton/platform",
+      "source": "skeleton/simulation/platform",
       "destination": "skeleton/ai/simulation/platform",
       "kind": "tree",
-      "source_git_object_sha": "3d1c2ef9c429dbf09363fcb8fb82e6f23754f43a",
-      "role": "The engine-neutral Godot adapter translates simulation/game documents and should sit with simulation/forge integration.",
+      "source_git_object_sha": "f4b94bdbecb7958f7525d5ba613d075782132b13",
+      "role": "Canonical engine-neutral Godot adapter boundary under skeleton/simulation/platform; mirrored into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
         "WP-W27"
@@ -2272,7 +2271,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_platform_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SCHOOL",
