@@ -295,6 +295,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/galaxy/",
       "notes": "Twenty-seven Galaxy distributed-runtime modules moved out of simulation ownership into skeleton/distributed/galaxy. Sixteen modules with absolute skeleton.galaxy imports were rewritten to skeleton.distributed.galaxy; the remaining modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/galaxy, the legacy root is compatibility-only, AIFT-GALAXY follows the canonical distributed source, and skeleton/distributed is no longer planned-but-absent."
+    },
+    {
+      "id": "TREE-033",
+      "source": "skeleton/network/",
+      "destination": "skeleton/distributed/network/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/network/",
+      "notes": "Four network/runtime modules moved from the generic platform bucket into canonical distributed ownership. __init__.py and model_placement.py were rewritten from skeleton.network to skeleton.distributed.network; remote_execution.py and replication.py moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/network and the legacy root is compatibility-only."
     }
   ]
 }
