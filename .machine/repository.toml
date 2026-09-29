@@ -129,8 +129,17 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "content-compat"
+prefixes = ["skeleton/content/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only domain-knowledge namespace; canonical content knowledge lives under skeleton/simulation/content/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."

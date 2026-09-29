@@ -196,6 +196,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier game/world modules",
       "notes": "The final three large Frontier gameplay/world modules were extracted into skeleton/frontier/game/. ship.py and world.py moved byte-identically; gameplay.py now consumes canonical ecology/economy paths. Public frontier exports target the nested ship/world modules, flat gameplay/ship/world paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-022",
+      "source": "skeleton/content/",
+      "destination": "skeleton/simulation/content/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/content/",
+      "notes": "The two-file Lorebuffa-derived domain-knowledge package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-CONTENT follows skeleton/simulation/content, and the parent AIFT-SIMULATION content overlay was retired after exact governed-tree parity verification."
     }
   ]
 }
