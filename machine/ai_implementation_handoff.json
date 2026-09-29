@@ -252,7 +252,7 @@
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "target_files": {
         "contracts": [
-          "skeleton/provider_contract.py"
+          "skeleton/providers/contract.py"
         ],
         "runtime": [
           "skeleton/provider_runtime.py"
@@ -272,7 +272,7 @@
         ]
       },
       "ordered_steps": [
-        "centralize receipt/digest/declaration logic in skeleton/provider_contract.py",
+        "centralize receipt/digest/declaration logic in skeleton/providers/contract.py",
         "make backend compatibility loader a re-export",
         "receipt-gate automation and Jeeves network providers",
         "inventory every provider-bearing surface and classify it",
@@ -860,7 +860,7 @@
       "objective": "Extend the single canonical provider owner from text/media transport into a complete provider-neutral interaction protocol for structured outputs and governed tool calling.",
       "target_files": {
         "contracts": [
-          "skeleton/provider_contract.py",
+          "skeleton/providers/contract.py",
           "machine/ai_runtime_schemas.json"
         ],
         "runtime": [
@@ -906,7 +906,7 @@
       "closure_gate": "the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts",
       "current_evidence": [
         "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
-        "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
+        "skeleton/providers/contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
         "skeleton/provider_runtime.py accepts neutral tool definitions, structured_output_schema, tool_choice, specific_tool_id and deadline on ProviderRequest",
         "skeleton/provider_runtime.py normalizes provider-native tool calls, structured output, usage and finish reasons before returning ProviderResponse",
         "skeleton/provider_runtime.py rejects provider tool calls that were not offered by the admitted request",

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GAP_ID = "gap-provider-interaction-protocol"
 
 SOURCE_TOKENS = {
-    "skeleton/provider_contract.py": (
+    "skeleton/providers/contract.py": (
         "class FinishReason",
         "class ProviderDeltaKind",
         "class ProviderToolDefinition",

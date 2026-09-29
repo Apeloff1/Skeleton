@@ -536,9 +536,9 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 errors.append(f"provider compatibility loader missing: {relative}")
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
-            if "from skeleton.provider_contract import" not in text:
+            if "from skeleton.providers.contract import" not in text:
                 errors.append(
-                    f"provider compatibility loader is not a shared-contract re-export: {relative}"
+                    f"provider compatibility loader is not a canonical shared-contract re-export: {relative}"
                 )
 
     compatibility_boundaries = runtime.get("compatibility_boundaries", [])

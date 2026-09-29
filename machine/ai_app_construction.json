@@ -62,7 +62,7 @@
       }
     ],
     "runtime_enforcement": {
-      "loader": "skeleton/provider_contract.py",
+      "loader": "skeleton/providers/contract.py",
       "activation_boundary": "skeleton/provider_runtime.py",
       "docker_materialization": "backend/Dockerfile",
       "receipt_required": true,
@@ -218,7 +218,7 @@
       ],
       "evidence": [
         "skeleton/provider_runtime.py",
-        "skeleton/provider_contract.py",
+        "skeleton/providers/contract.py",
         "backend/core/ai_provider.py",
         "backend/core/ai_provider_compat.py",
         "skeleton/jeeves/providers.py",
@@ -3505,7 +3505,7 @@
       "gap": "gap-provider-surface-convergence",
       "wave": 1,
       "owners": [
-        "skeleton/provider_contract.py",
+        "skeleton/providers/contract.py",
         "skeleton/provider_runtime.py",
         "backend/core/ai_provider.py",
         "backend/core/ai_provider_compat.py",
@@ -3517,7 +3517,7 @@
       ],
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "steps": [
-        "centralize receipt/digest/declaration logic in skeleton/provider_contract.py",
+        "centralize receipt/digest/declaration logic in skeleton/providers/contract.py",
         "make backend compatibility loader a re-export",
         "receipt-gate automation and Jeeves network providers",
         "inventory every provider-bearing surface and classify it",
@@ -3989,7 +3989,7 @@
       "wave": 1,
       "owners": [
         "skeleton/provider_runtime.py",
-        "skeleton/provider_contract.py",
+        "skeleton/providers/contract.py",
         "skeleton/skills",
         "skeleton/intelligence"
       ],
@@ -4017,7 +4017,7 @@
       ],
       "exit": "the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts",
       "planned_outputs": [
-        "skeleton/provider_contract.py provider-neutral interaction contracts",
+        "skeleton/providers/contract.py provider-neutral interaction contracts",
         "skeleton/provider_runtime.py canonical protocol translation and neutral delta adapter",
         "machine/ai_runtime_schemas.json provider interaction schemas",
         "skeleton/testing/test_provider_contract.py protocol/transport regression suite",
@@ -6212,7 +6212,7 @@
     "invariant": "all provider-native types terminate inside skeleton/provider_runtime.py",
     "current_evidence": [
       "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
-      "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
+      "skeleton/providers/contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
       "skeleton/provider_runtime.py accepts neutral tool definitions, structured_output_schema, tool_choice, specific_tool_id and deadline on ProviderRequest",
       "skeleton/provider_runtime.py normalizes provider-native tool calls, structured output, usage and finish reasons before returning ProviderResponse",
       "skeleton/provider_runtime.py rejects provider tool calls that were not offered by the admitted request",
