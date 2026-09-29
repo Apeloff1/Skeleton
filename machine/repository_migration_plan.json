@@ -178,6 +178,15 @@
       "state": "canonicalized",
       "compatibility": "flat skeleton/frontier economy modules",
       "notes": "Eight Frontier economy/production modules were extracted into skeleton/frontier/economy/. Five modules had internal runtime/ecology/economy imports rewritten to canonical nested paths; crafting.py, energy.py, and equipment.py moved byte-identically. Public frontier exports now target the canonical economy modules, flat module paths remain compatibility shims, and the same transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
+    },
+    {
+      "id": "TREE-020",
+      "source": "skeleton/frontier/{npc,npc_adapters,npc_profiles}.py",
+      "destination": "skeleton/frontier/characters/",
+      "mode": "intra-domain-extraction-with-shims",
+      "state": "canonicalized",
+      "compatibility": "flat skeleton/frontier NPC modules",
+      "notes": "Three Frontier NPC/character modules were extracted into skeleton/frontier/characters/. npc.py and npc_profiles.py moved byte-identically; npc_adapters.py now imports the canonical character module. Public frontier exports target the nested paths, flat module paths remain compatibility shims, and the identical transformation was applied to skeleton/ai/runtime/frontier with exact whole-tree parity."
     }
   ]
 }
