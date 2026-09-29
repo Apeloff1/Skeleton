@@ -426,8 +426,17 @@ audience = "internal"
 lifecycle = "historical"
 
 [[zone]]
+name = "turn-compat"
+prefixes = ["skeleton/turn/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only GB-41 TurnEngine facade retained while reusable turn semantics converge into canonical conversation/execution owners; this path carries no production authority."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "specialized-runtime"
-prefixes = ["skeleton/cue/", "skeleton/genos/", "skeleton/parse/", "skeleton/turn/"]
+prefixes = ["skeleton/cue/", "skeleton/genos/", "skeleton/parse/"]
 owner = "core-runtime"
 criticality = "medium"
 purpose = "Unresolved specialized runtime subsystems that remain explicit until a concrete canonical owner and cutover contract are approved."

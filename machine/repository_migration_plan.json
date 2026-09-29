@@ -286,6 +286,15 @@
       "state": "classified",
       "compatibility": null,
       "notes": "Aligned repository taxonomy with the existing AI research map: circulation, HOAG, motive, sheaf, spine and viscera are historical/research-quarantine lineage with no production authority. Their source trees remain preserved for provenance and characterization; generic specialized-runtime support ownership now covers only unresolved cue, genos, parse and turn surfaces."
+    },
+    {
+      "id": "TREE-032",
+      "source": "skeleton/turn/",
+      "destination": ".machine/repository.toml turn-compat zone",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": "skeleton/turn/",
+      "notes": "Reclassified the legacy GB-41 TurnEngine surface from generic specialized runtime support to an explicit transitional compatibility boundary. The source remains preserved while reusable turn semantics converge into canonical conversation/execution owners; no production authority is granted by this classification."
     }
   ]
 }

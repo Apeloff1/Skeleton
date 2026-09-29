@@ -113,9 +113,10 @@ runtime ownership:
   `skeleton/motive/`, `skeleton/sheaf/`, `skeleton/spine/`, and
   `skeleton/viscera/`. These paths preserve provenance and experimental
   mechanisms but carry no production authority.
-- Unresolved specialized runtime: `skeleton/cue/`, `skeleton/genos/`,
-  `skeleton/parse/`, and `skeleton/turn/`. These remain explicit until a
-  canonical owner and cutover contract are approved.
+- Transitional compatibility: `skeleton/turn/` remains a GB-41 facade while reusable turn semantics converge into canonical conversation/execution owners.
+- Unresolved specialized runtime: `skeleton/cue/`, `skeleton/genos/`, and
+  `skeleton/parse/`. These remain explicit until a canonical owner and cutover
+  contract are approved.
 
 ## Machine discovery
 
