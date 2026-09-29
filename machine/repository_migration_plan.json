@@ -40,9 +40,9 @@
       "source": "skeleton/persist/",
       "destination": "skeleton/persistence/core/",
       "mode": "move-with-shims",
-      "state": "planned",
+      "state": "canonicalized",
       "compatibility": "skeleton/persist/",
-      "notes": "Persistence primitive family; preserve public import surface during migration."
+      "notes": "Seven persistence primitive modules moved byte-identically to skeleton/persistence/core/; skeleton/persist remains compatibility-only."
     }
   ]
 }
