@@ -5,6 +5,7 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 
+from .atlas import build_repository_atlas
 from .budgets import derive_zone_budgets
 from .catalog import build_catalog
 from .contracts import contract_map
@@ -77,6 +78,7 @@ def generate_workspace(
     written.append(manifest.name)
 
     artifacts = {
+        "atlas.json": build_repository_atlas(model, config).as_dict(),
         "health.json": repository_health(model).as_dict(),
         "metrics.json": structural_metrics(model).as_dict(),
         "catalog.json": build_catalog(model).as_dict(),

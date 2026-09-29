@@ -128,6 +128,7 @@ def _compare(
     *,
     parity_exceptions: dict[str, dict[str, object]] | None = None,
     overlay_children: set[str] | None = None,
+    source_exclusions: set[str] | None = None,
 ) -> list[str]:
     if source.is_symlink() or destination.is_symlink():
         return [f"symlink mapping forbidden: {source} -> {destination}"]
@@ -140,23 +141,30 @@ def _compare(
 
     exceptions = parity_exceptions or {}
     overlays = overlay_children or set()
+    exclusions = source_exclusions or set()
     src = _tree_files(source)
     dst = _tree_files(destination)
+    governed_src = {
+        rel: path
+        for rel, path in src.items()
+        if not any(rel == excluded or rel.startswith(excluded + "/") for excluded in exclusions)
+    }
     governed_dst = {
         rel: path
         for rel, path in dst.items()
         if not any(rel == overlay or rel.startswith(overlay + "/") for overlay in overlays)
     }
-    if set(src) != set(governed_dst):
-        missing = sorted(set(src) - set(governed_dst))
-        extra = sorted(set(governed_dst) - set(src))
+    if set(governed_src) != set(governed_dst):
+        missing = sorted(set(governed_src) - set(governed_dst))
+        extra = sorted(set(governed_dst) - set(governed_src))
         return [
             f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
-            f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)}"
+            f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)} "
+            f"source_exclusions={sorted(exclusions)}"
         ]
 
     errors: list[str] = []
-    for rel in sorted(src):
+    for rel in sorted(governed_src):
         exception = exceptions.get(rel)
         if exception:
             if exception.get("mode") != "compatibility_facade":
@@ -302,6 +310,16 @@ def validate() -> list[str]:
         item.get("destination")
         for item in mappings
         if isinstance(item, dict) and isinstance(item.get("destination"), str)
+    }
+    declared_sources = {
+        item.get("source")
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("source"), str)
+    }
+    declared_retained_paths = {
+        item.get("path")
+        for item in data.get("retained_outside_ai_tree", [])
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
     }
 
     seen_ids: set[str] = set()
@@ -454,19 +472,53 @@ def validate() -> list[str]:
                             )
                             continue
                         overlays.add(overlay)
+                raw_source_exclusions = item.get("source_exclusions", [])
+                source_exclusions: set[str] = set()
+                if not isinstance(raw_source_exclusions, list):
+                    errors.append(f"{mid}: source_exclusions must be a list")
+                else:
+                    for excluded in raw_source_exclusions:
+                        if (
+                            not isinstance(excluded, str)
+                            or not excluded
+                            or excluded.startswith("/")
+                            or ".." in Path(excluded).parts
+                        ):
+                            errors.append(f"{mid}: invalid source exclusion")
+                            continue
+                        if excluded in source_exclusions:
+                            errors.append(f"{mid}: duplicate source exclusion {excluded}")
+                            continue
+                        full_source = f"{src.rstrip('/')}/{excluded}"
+                        independently_governed = any(
+                            other != src and (
+                                other == full_source
+                                or other.startswith(full_source.rstrip("/") + "/")
+                            )
+                            for other in declared_sources
+                        )
+                        explicitly_retained = full_source in declared_retained_paths
+                        if not independently_governed and not explicitly_retained:
+                            errors.append(
+                                f"{mid}: source exclusion is neither independently governed "
+                                f"nor explicitly retained: {full_source}"
+                            )
+                            continue
+                        source_exclusions.add(excluded)
                 errors.extend(
                     _compare(
                         source,
                         destination,
                         parity_exceptions=exceptions,
                         overlay_children=overlays,
+                        source_exclusions=source_exclusions,
                     )
                 )
             else:
                 errors.append(f"{mid}: unknown parity_mode {parity_mode!r}")
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
-        has_build |= src == "core/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
+        has_build |= src == "skeleton/automation/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
 
     if not has_jeeves:
         errors.append("Jeeves engine mapping is mandatory")
@@ -596,6 +648,11 @@ def validate() -> list[str]:
     pending_ids: set[str] = set()
     pending_sources: set[str] = set()
     pending_destinations: set[str] = set()
+    covered_alias_sources = {
+        item.get("planned_path")
+        for item in data.get("planned_path_audit", {}).get("covered_aliases", [])
+        if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
+    }
     required_pending_sources = {
         "skeleton/state",
         "skeleton/network",
@@ -613,7 +670,7 @@ def validate() -> list[str]:
         "skeleton/overseer",
         "skeleton/pr_automation",
         "skeleton/chronicle",
-    } - mapped_sources
+    } - mapped_sources - covered_alias_sources
     if required_pending_sources and len(assignments) < len(required_pending_sources):
         errors.append(
             "next_move_assignments must contain every still-unmapped plan-derived source"
@@ -703,7 +760,9 @@ def validate() -> list[str]:
         if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
             return None
         parts = Path(path_value).parts
-        return path_value if len(parts) == 2 else None
+        if len(parts) < 2:
+            return None
+        return "/".join(parts[:2])
 
     classified_top_level: set[str] = {"skeleton/ai"}
     for item in mappings:
@@ -717,6 +776,11 @@ def validate() -> list[str]:
             if root:
                 classified_top_level.add(root)
     if isinstance(audit, dict):
+        for item in audit.get("covered_aliases", []):
+            if isinstance(item, dict):
+                root = _first_level(item.get("planned_path"))
+                if root:
+                    classified_top_level.add(root)
         for item in audit.get("intentionally_external", []):
             if isinstance(item, dict):
                 root = _first_level(item.get("path"))
@@ -726,7 +790,10 @@ def validate() -> list[str]:
             root = _first_level(path_value)
             if root:
                 classified_top_level.add(root)
-    classified_top_level.update(retained_paths)
+    for path_value in retained_paths:
+        root = _first_level(path_value)
+        if root:
+            classified_top_level.add(root)
 
     try:
         tracked = subprocess.run(
