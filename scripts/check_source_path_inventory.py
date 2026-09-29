@@ -104,6 +104,7 @@ FIRST_PARTY_PREFIXES = (
     "machine/",
     "packaging/",
     "complete/",
+    "apps/",
 )
 
 BINARY_SUFFIXES = frozenset(
