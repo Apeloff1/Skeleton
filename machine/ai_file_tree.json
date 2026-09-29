@@ -40,7 +40,7 @@
       "source": "skeleton/provider_contract.py",
       "destination": "skeleton/ai/providers/contract.py",
       "kind": "file",
-      "source_git_object_sha": "dd06c93cf39d6f4f12f58348aebd04c8084f36cc",
+      "source_git_object_sha": "17c1972145d85489735dc72bdb1351ad7d9abb50",
       "role": "provider-neutral request/receipt contract",
       "work_package_refs": [
         "WP-W00",
@@ -56,7 +56,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "compatibility_facade_until_legacy_imports_reach_zero",
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.ai.providers.contract import",
+      "note": "Canonical provider contract lives at skeleton/ai/providers/contract.py; skeleton/provider_contract.py is the compatibility facade."
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
