@@ -147,8 +147,17 @@ audience = "human"
 lifecycle = "canonical"
 
 [[zone]]
+name = "architecture-history-compat"
+prefixes = ["skeleton/architecture_index.py", "skeleton/architecture_round"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only architecture index and numbered round modules; canonical history lives under skeleton/foundation/architecture/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "foundation"
-prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/architecture_", "skeleton/genesis.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/genesis.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
 owner = "core-runtime"
 criticality = "critical"
 purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."

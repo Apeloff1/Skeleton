@@ -61,6 +61,15 @@
       "state": "canonicalized",
       "compatibility": "core/activation_security.py",
       "notes": "Canonical implementation pre-existed under skeleton/security; the top-level core file is already a compatibility entrypoint."
+    },
+    {
+      "id": "TREE-007",
+      "source": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "destination": "skeleton/foundation/architecture/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "notes": "Architecture index and rounds 3-22 moved into a cohesive foundation/architecture namespace; legacy root modules remain compatibility shims, and the canonical index imports canonical round modules."
     }
   ]
 }

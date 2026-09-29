@@ -22,6 +22,8 @@ Skeleton/
 │   ├── app/                  whole-application assembly/operator surface
 │   ├── kernel/               foundational primitives
 │   ├── core/                 core runtime services
+│   ├── foundation/           foundational cross-cutting primitives
+│   │   └── architecture/     canonical architecture index + round history
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
 │   ├── agents/               agent runtime/orchestration
@@ -109,6 +111,8 @@ compatibility shims:
 | `skeleton.persist.*` | `skeleton.persistence.core.*` | transitional shim |
 | `core.shift_supervisor.*` | `skeleton.automation.shift_supervisor.*` | transitional shim |
 | `core.activation_security` | `skeleton.security.activation_security` | transitional shim |
+| `skeleton.architecture_index` | `skeleton.foundation.architecture.index` | transitional shim |
+| `skeleton.architecture_round*` | `skeleton.foundation.architecture.rounds.round*` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
