@@ -205,6 +205,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/content/",
       "notes": "The two-file Lorebuffa-derived domain-knowledge package moved byte-identically under canonical simulation ownership. The legacy root remains compatibility-only, AIFT-CONTENT follows skeleton/simulation/content, and the parent AIFT-SIMULATION content overlay was retired after exact governed-tree parity verification."
+    },
+    {
+      "id": "TREE-023",
+      "source": "skeleton/economy/",
+      "destination": "skeleton/simulation/economy/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/economy/",
+      "notes": "The six-file simulation economy package moved under canonical simulation ownership. Package-internal imports were rewritten to skeleton.simulation.economy while law.py, quota.py and treasury.py moved byte-identically. The legacy root remains compatibility-only, AIFT-ECONOMY follows the nested canonical path, and the parent AIFT-SIMULATION economy overlay was retired after exact governed-tree parity verification."
     }
   ]
 }
