@@ -31,6 +31,8 @@ Skeleton/
 │   │   └── agents/           agent runtime/orchestration
 │   ├── jeeves/               Jeeves assurance/reasoning planes
 │   ├── shells/               policy-bound execution plane
+│   ├── learning/             controlled learning runtime
+│   │   └── school/           curriculum, assessment, learner state and tutoring
 │   ├── memory/               runtime memory
 │   ├── retrieval/            retrieval/ranking/fusion
 │   ├── security/ + vault/    trust, policy and authorization
@@ -145,6 +147,7 @@ compatibility shims:
 | `skeleton.hive.*` | `skeleton.automation.hive.*` | transitional shim |
 | `skeleton.overseer.*` | `skeleton.automation.overseer.*` | transitional shim |
 | `skeleton.agents.*` | `skeleton.automation.agents.*` | transitional shim |
+| `skeleton.school.*` | `skeleton.learning.school.*` | transitional shim |
 | `skeleton.frontier.{agent_runtime,contracts,events,...}` | `skeleton.frontier.runtime.*` | transitional module shims |
 | `skeleton.frontier.{achievements,quests,reputation,...}` | `skeleton.frontier.progression.*` | transitional module shims |
 | `skeleton.frontier.{aquarium,bait,biotope,breeding,...}` | `skeleton.frontier.ecology.*` | transitional module shims |
