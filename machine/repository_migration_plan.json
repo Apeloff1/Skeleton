@@ -97,6 +97,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/provider_contract.py",
       "notes": "The provider-neutral contract moved byte-identically into a dedicated canonical providers namespace. The root module remains a compatibility shim; skeleton/provider_runtime.py remains owner-sensitive in place but now imports the canonical contract. The AI providers contract mirror remains byte-identical and its mapping source follows skeleton/providers/contract.py."
+    },
+    {
+      "id": "TREE-011",
+      "source": "skeleton/kv_cache.py",
+      "destination": "skeleton/kv/__init__.py",
+      "mode": "facade-convergence-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/kv_cache.py + skeleton/ai/runtime/inference/kv_cache.py",
+      "notes": "The duplicate KV-cache facade was collapsed onto the existing canonical skeleton.kv package surface. The root and legacy AI sibling remain compatibility shims; AIFT-KV-CACHE now binds identical canonical package __init__ files. This wave also removes the stale AIFT-NATIVE jvm_registry.py overlay exclusion after TREE-008 made that file part of both native trees."
     }
   ]
 }

@@ -1,29 +1,3 @@
-"""Stable facade for the paged KV-cache control plane."""
+"""Compatibility shim for :mod:`skeleton.ai.runtime.inference.kv`."""
 
-from .kv import (
-    CacheTier,
-    KVCacheConfig,
-    KVCacheManager,
-    KVCacheMatch,
-    KVCacheStats,
-    KVCacheTransaction,
-    KVIntegrityReport,
-    KVNamespace,
-    KVPageInput,
-    KVReuseEstimate,
-    KVStorageAdapter,
-)
-
-__all__ = [
-    "CacheTier",
-    "KVCacheConfig",
-    "KVCacheManager",
-    "KVCacheMatch",
-    "KVCacheStats",
-    "KVCacheTransaction",
-    "KVIntegrityReport",
-    "KVNamespace",
-    "KVPageInput",
-    "KVReuseEstimate",
-    "KVStorageAdapter",
-]
+from skeleton.ai.runtime.inference.kv import *  # noqa: F401,F403

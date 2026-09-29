@@ -35,6 +35,7 @@ Skeleton/
 │   ├── retrieval/            retrieval/ranking/fusion
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
+│   ├── kv/                   paged/tiered KV-cache control plane
 │   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
 │   ├── build/ + forge/       build/construction systems
@@ -119,6 +120,7 @@ compatibility shims:
 | `skeleton.jvm_accelerators` | `skeleton.native.jvm_registry` | transitional shim |
 | `skeleton.genesis` | `skeleton.bootstrap.genesis` | transitional shim |
 | `skeleton.provider_contract` | `skeleton.providers.contract` | transitional shim |
+| `skeleton.kv_cache` | `skeleton.kv` | transitional shim |
 
 New code should use the canonical namespaces. Compatibility surfaces stay
 readable until reference audits and downstream migrations prove they can be
