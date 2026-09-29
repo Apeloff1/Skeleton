@@ -19,9 +19,13 @@ Skeleton/
 ├── .github/                  hosted CI, merge policy and repository automation
 ├── skeleton/                 canonical Python application/runtime namespace
 │   ├── ai/                   AI runtime, providers, learning, research
+│   ├── providers/            canonical provider-neutral contracts
 │   ├── app/                  whole-application assembly/operator surface
+│   ├── bootstrap/            engine startup and subsystem wiring
 │   ├── kernel/               foundational primitives
 │   ├── core/                 core runtime services
+│   ├── foundation/           foundational cross-cutting primitives
+│   │   └── architecture/     canonical architecture index + round history
 │   ├── contracts/            stable internal contracts
 │   ├── automation/           autonomous control-plane implementation
 │   ├── agents/               agent runtime/orchestration
@@ -31,11 +35,16 @@ Skeleton/
 │   ├── retrieval/            retrieval/ranking/fusion
 │   ├── security/ + vault/    trust, policy and authorization
 │   ├── state/ + persistence/ durable state/storage
+│   ├── kv/                   paged/tiered KV-cache control plane
+│   ├── native/                native execution + accelerator registry
 │   ├── observability/        telemetry and diagnostics
 │   ├── build/ + forge/       build/construction systems
+│   │   └── pipelines/        content/game generation pipelines
 │   ├── release/ + deploy*/   delivery lifecycle
 │   ├── simulation/ + game/   simulation/game runtime
+│   │   └── platform/         engine adapter boundary (Godot)
 │   ├── world/                deterministic world/scene state
+│   ├── frontier/             frontier gameplay/orchestration runtime
 │   ├── repo_machine/         live repository model and atlas
 │   ├── pr_automation/        PR/merge control
 │   ├── repo_intelligence/    repository analysis
@@ -94,3 +103,30 @@ model.
 The important invariant is **one navigable repository, two views**: humans get
 a stable conceptual tree; machines get the same taxonomy plus live topology and
 counts.
+
+
+## Active namespace migrations
+
+The first consolidation wave is now structured around canonical source plus
+compatibility shims:
+
+| Legacy import surface | Canonical source | State |
+| --- | --- | --- |
+| `skeleton.deployment.*` | `skeleton.deploy.strategies.*` | transitional shim |
+| `skeleton.contexts.*` | `skeleton.context.domains.*` | transitional shim |
+| `skeleton.application.*` | `skeleton.app.runtime.*` | transitional shim |
+| `skeleton.persist.*` | `skeleton.persistence.core.*` | transitional shim |
+| `core.shift_supervisor.*` | `skeleton.automation.shift_supervisor.*` | transitional shim |
+| `core.activation_security` | `skeleton.security.activation_security` | transitional shim |
+| `skeleton.architecture_index` | `skeleton.foundation.architecture.index` | transitional shim |
+| `skeleton.architecture_round*` | `skeleton.foundation.architecture.rounds.round*` | transitional shim |
+| `skeleton.jvm_accelerators` | `skeleton.native.jvm_registry` | transitional shim |
+| `skeleton.genesis` | `skeleton.bootstrap.genesis` | transitional shim |
+| `skeleton.provider_contract` | `skeleton.providers.contract` | transitional shim |
+| `skeleton.kv_cache` | `skeleton.kv` | transitional shim |
+| `skeleton.platform.*` | `skeleton.simulation.platform.*` | transitional shim |
+| `skeleton.pipelines.*` | `skeleton.forge.pipelines.*` | transitional shim |
+
+New code should use the canonical namespaces. Compatibility surfaces stay
+readable until reference audits and downstream migrations prove they can be
+removed safely.

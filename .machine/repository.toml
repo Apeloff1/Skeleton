@@ -39,8 +39,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "core-compat"
+prefixes = ["core/"]
+owner = "repository-control-plane"
+criticality = "low"
+purpose = "Compatibility-only top-level core namespace; canonical implementations live under skeleton/security and skeleton/automation."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/", "core/activation_security.py"]
+prefixes = ["skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -49,7 +58,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/", "core/shift_supervisor/"]
+prefixes = ["skeleton/automation/", "skeleton/agents/", "skeleton/overseer/", "skeleton/swarm/", "skeleton/hive/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."
@@ -67,12 +76,21 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "ai"
-prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/", "skeleton/contexts/"]
+prefixes = ["skeleton/ai/", "skeleton/cognition/", "skeleton/cortex/", "skeleton/intelligence/", "skeleton/learning/", "skeleton/context/"]
 owner = "ai-runtime"
 criticality = "high"
 purpose = "Canonical AI runtime, cognition, context, learning, model/provider adaptation and research-facing execution."
 audience = "both"
 lifecycle = "canonical"
+
+[[zone]]
+name = "context-compat"
+prefixes = ["skeleton/contexts/"]
+owner = "ai-runtime"
+criticality = "low"
+purpose = "Compatibility-only plural context namespace; canonical implementations live under skeleton/context/domains/."
+audience = "internal"
+lifecycle = "transitional"
 
 [[zone]]
 name = "shell-runtime"
@@ -93,8 +111,17 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "application-compat"
+prefixes = ["skeleton/application/"]
+owner = "application-runtime"
+criticality = "low"
+purpose = "Compatibility-only application namespace; canonical implementation lives under skeleton/app/runtime/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/application/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/content/", "skeleton/assets/", "skeleton/creator/", "skeleton/support/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."
@@ -120,8 +147,35 @@ audience = "human"
 lifecycle = "canonical"
 
 [[zone]]
+name = "architecture-history-compat"
+prefixes = ["skeleton/architecture_index.py", "skeleton/architecture_round"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only architecture index and numbered round modules; canonical history lives under skeleton/foundation/architecture/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "genesis-compat"
+prefixes = ["skeleton/genesis.py"]
+owner = "core-runtime"
+criticality = "low"
+purpose = "Compatibility-only Genesis entrypoint; canonical engine bootstrap lives under skeleton/bootstrap/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "bootstrap"
+prefixes = ["skeleton/bootstrap/"]
+owner = "core-runtime"
+criticality = "critical"
+purpose = "Canonical engine bootstrap, boot ordering and subsystem wiring."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "foundation"
-prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/architecture_", "skeleton/genesis.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
+prefixes = ["skeleton/kernel/", "skeleton/core/", "skeleton/foundation/", "skeleton/primitives/", "skeleton/contracts/", "skeleton/config/", "skeleton/__init__.py", "skeleton/__main__.py", "skeleton/README.py", "skeleton/architecture.py", "skeleton/manifest.py", "skeleton/quickstart.py", "skeleton/requirements.py", "skeleton/setup_config.py"]
 owner = "core-runtime"
 criticality = "critical"
 purpose = "Foundational contracts, kernel primitives, configuration and package-level boot architecture."
@@ -129,8 +183,35 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "persist-compat"
+prefixes = ["skeleton/persist/"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only persistence namespace; canonical primitives live under skeleton/persistence/core/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "jvm-registry-compat"
+prefixes = ["skeleton/jvm_accelerators.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only JVM accelerator registry entrypoint; canonical registry lives at skeleton/native/jvm_registry.py."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "kv-cache-compat"
+prefixes = ["skeleton/kv_cache.py"]
+owner = "platform-runtime"
+criticality = "low"
+purpose = "Compatibility-only KV-cache facade; canonical public surface lives in the skeleton/kv package."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "platform"
-prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persist/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
+prefixes = ["skeleton/native/", "skeleton/network/", "skeleton/data/", "skeleton/kv/", "skeleton/state/", "skeleton/persistence/", "skeleton/observability/", "skeleton/telemetry/", "skeleton/reliability/", "skeleton/resilience/", "skeleton/mesh/"]
 owner = "platform-runtime"
 criticality = "high"
 purpose = "State, storage, networking, native execution, observability and resilience substrate."
@@ -138,13 +219,49 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "deployment-compat"
+prefixes = ["skeleton/deployment/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only deployment namespace; canonical strategy implementations live under skeleton/deploy/strategies/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "pipelines-compat"
+prefixes = ["skeleton/pipelines/"]
+owner = "delivery-plane"
+criticality = "low"
+purpose = "Compatibility-only generation-pipeline namespace; canonical pipeline ownership lives under skeleton/forge/pipelines/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "build-delivery"
-prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/deployment/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "skeleton/jvm_accelerators.py", "deploy.py"]
+prefixes = ["skeleton/build/", "skeleton/forge/", "skeleton/deploy/", "skeleton/release/", "skeleton/developer/", "skeleton/ubuntu/", "packaging/", "java-accelerators/", "deploy.py"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Build graph, packaging, installers, release, deployment and developer delivery tooling."
 audience = "both"
 lifecycle = "canonical"
+
+[[zone]]
+name = "frontier-runtime"
+prefixes = ["skeleton/frontier/"]
+owner = "frontier-runtime"
+criticality = "high"
+purpose = "Frontier consolidation runtime spanning gameplay, orchestration, state, model routing and product-domain contracts."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "platform-compat"
+prefixes = ["skeleton/platform/"]
+owner = "simulation-runtime"
+criticality = "low"
+purpose = "Compatibility-only engine-adapter namespace; canonical Godot adapter ownership lives under skeleton/simulation/platform/."
+audience = "internal"
+lifecycle = "transitional"
 
 [[zone]]
 name = "simulation"
@@ -183,8 +300,26 @@ audience = "machine"
 lifecycle = "canonical"
 
 [[zone]]
+name = "provider-contract-compat"
+prefixes = ["skeleton/provider_contract.py"]
+owner = "integration-runtime"
+criticality = "low"
+purpose = "Compatibility-only provider-contract entrypoint; canonical provider-neutral contracts live under skeleton/providers/."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "providers"
+prefixes = ["skeleton/providers/"]
+owner = "integration-runtime"
+criticality = "high"
+purpose = "Canonical provider-neutral contracts and provider-boundary interfaces; credential-bearing runtime ownership is governed separately."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "integrations"
-prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_contract.py", "skeleton/provider_runtime.py"]
+prefixes = ["skeleton/integrations/", "skeleton/skills/", "skeleton/provider_runtime.py"]
 owner = "integration-runtime"
 criticality = "medium"
 purpose = "External provider, tool, skill and service integration boundaries."

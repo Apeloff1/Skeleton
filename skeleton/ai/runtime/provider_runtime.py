@@ -31,7 +31,7 @@ from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from skeleton.contracts.context import ContextEnvelope
-from skeleton.provider_contract import (
+from skeleton.providers.contract import (
     FinishReason,
     ProviderArchitectureError,
     ProviderArchitectureReceipt,

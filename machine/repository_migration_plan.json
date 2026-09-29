@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "canonical_source_only": true,
+    "compatibility_before_deletion": true,
+    "require_reference_audit": true,
+    "require_regression_validation": true,
+    "delete_legacy_only_after_zero_live_references": true
+  },
+  "batches": [
+    {
+      "id": "TREE-001",
+      "source": "skeleton/deployment/",
+      "destination": "skeleton/deploy/strategies/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/deployment/",
+      "notes": "Four deployment strategy implementations moved byte-identically; legacy module imports are shims."
+    },
+    {
+      "id": "TREE-002",
+      "source": "skeleton/contexts/",
+      "destination": "skeleton/context/domains/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/contexts/",
+      "notes": "Seven context-domain implementations moved byte-identically; plural namespace remains a shim."
+    },
+    {
+      "id": "TREE-003",
+      "source": "skeleton/application/",
+      "destination": "skeleton/app/runtime/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/application/",
+      "notes": "Fifty-one application modules moved byte-identically to skeleton/app/runtime/; legacy skeleton/application modules are compatibility shims."
+    },
+    {
+      "id": "TREE-004",
+      "source": "skeleton/persist/",
+      "destination": "skeleton/persistence/core/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/persist/",
+      "notes": "Seven persistence primitive modules moved byte-identically to skeleton/persistence/core/; skeleton/persist remains compatibility-only."
+    },
+    {
+      "id": "TREE-005",
+      "source": "core/shift_supervisor/",
+      "destination": "skeleton/automation/shift_supervisor/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/shift_supervisor/",
+      "notes": "Runtime Python moved under skeleton/automation, embedded assurance tests moved to tests/shift_supervisor, and human docs moved to docs/operations/shift-supervisor."
+    },
+    {
+      "id": "TREE-006",
+      "source": "core/activation_security.py",
+      "destination": "skeleton/security/activation_security.py",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "core/activation_security.py",
+      "notes": "Canonical implementation pre-existed under skeleton/security; the top-level core file is already a compatibility entrypoint."
+    },
+    {
+      "id": "TREE-007",
+      "source": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "destination": "skeleton/foundation/architecture/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/architecture_index.py + skeleton/architecture_round*.py",
+      "notes": "Architecture index and rounds 3-22 moved into a cohesive foundation/architecture namespace; legacy root modules remain compatibility shims, and the canonical index imports canonical round modules."
+    },
+    {
+      "id": "TREE-008",
+      "source": "skeleton/jvm_accelerators.py",
+      "destination": "skeleton/native/jvm_registry.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/jvm_accelerators.py",
+      "notes": "The optional JVM accelerator registry moved byte-identically beside native runtime ownership. The root module is now a compatibility shim; the canonical AI runtime mirror remains byte-identical and its mapping source now follows skeleton/native/jvm_registry.py. The separate java-accelerators/ implementation root remains unchanged."
+    },
+    {
+      "id": "TREE-009",
+      "source": "skeleton/genesis.py",
+      "destination": "skeleton/bootstrap/genesis.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/genesis.py",
+      "notes": "Genesis moved byte-identically into a dedicated canonical bootstrap namespace. The package root remains a compatibility shim, the governed AI runtime bootstrap mirror stays byte-identical, and AIFT-GENESIS now follows the canonical source path."
+    },
+    {
+      "id": "TREE-010",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/providers/contract.py",
+      "mode": "move-with-shim",
+      "state": "canonicalized",
+      "compatibility": "skeleton/provider_contract.py",
+      "notes": "The provider-neutral contract moved byte-identically into a dedicated canonical providers namespace. The root module remains a compatibility shim; skeleton/provider_runtime.py remains owner-sensitive in place but now imports the canonical contract. The AI providers contract mirror remains byte-identical and its mapping source follows skeleton/providers/contract.py."
+    },
+    {
+      "id": "TREE-011",
+      "source": "skeleton/kv_cache.py",
+      "destination": "skeleton/kv/__init__.py",
+      "mode": "facade-convergence-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/kv_cache.py + skeleton/ai/runtime/inference/kv_cache.py",
+      "notes": "The duplicate KV-cache facade was collapsed onto the existing canonical skeleton.kv package surface. The root and legacy AI sibling remain compatibility shims; AIFT-KV-CACHE now binds identical canonical package __init__ files. This wave also removes the stale AIFT-NATIVE jvm_registry.py overlay exclusion after TREE-008 made that file part of both native trees."
+    },
+    {
+      "id": "TREE-012",
+      "source": "skeleton/frontier/ + skeleton/pipelines/ + skeleton/platform/",
+      "destination": ".machine/repository.toml canonical zones",
+      "mode": "taxonomy-classification",
+      "state": "classified",
+      "compatibility": null,
+      "notes": "Classified the final previously-unmentioned skeleton top-level runtime roots without moving code: frontier receives an explicit canonical frontier-runtime zone; pipelines joins build/Forge delivery ownership; platform joins simulation as the Godot adapter boundary."
+    },
+    {
+      "id": "TREE-013",
+      "source": "skeleton/platform/",
+      "destination": "skeleton/simulation/platform/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/platform/",
+      "notes": "The two-file Godot adapter package moved into canonical simulation ownership. godot_adapter.py moved byte-identically; the canonical package and AI simulation mirror are tree-identical. Legacy skeleton/platform remains compatibility-only, AIFT-PLATFORM follows the canonical path, and the parent AIFT-SIMULATION platform overlay was retired because platform is now present in both governed trees."
+    },
+    {
+      "id": "TREE-014",
+      "source": "skeleton/pipelines/",
+      "destination": "skeleton/forge/pipelines/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/pipelines/",
+      "notes": "Nineteen generation-pipeline modules moved under canonical Forge ownership. Eleven internal references were rewritten to skeleton.forge.pipelines; eight modules moved byte-identically. The canonical package is mirrored exactly at skeleton/ai/forge/pipelines, the legacy root remains compatibility-only, AIFT-PIPELINES follows the canonical path, and the parent AIFT-FORGE pipelines overlay was retired."
+    }
+  ]
+}

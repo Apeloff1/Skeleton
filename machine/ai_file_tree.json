@@ -37,11 +37,11 @@
   "mappings": [
     {
       "id": "AIFT-PROVIDER-CONTRACT",
-      "source": "skeleton/provider_contract.py",
+      "source": "skeleton/providers/contract.py",
       "destination": "skeleton/ai/providers/contract.py",
       "kind": "file",
-      "source_git_object_sha": "dd06c93cf39d6f4f12f58348aebd04c8084f36cc",
-      "role": "provider-neutral request/receipt contract",
+      "source_git_object_sha": "be3aa103c948e93e327e0b57bea97db3953cc798",
+      "role": "Canonical provider-neutral request/receipt contract under skeleton/providers; mirrored into the governed AI providers surface.",
       "work_package_refs": [
         "WP-W00",
         "WP-W05"
@@ -56,14 +56,14 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_provider_contract_with_legacy_root_shim"
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "1e753fb40702a6bd420f16d79791d4ea6efd73da",
+      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -77,7 +77,7 @@
       ],
       "parity_mode": "compatibility_facade",
       "facade_required_import": "from skeleton.provider_runtime import",
-      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover.",
+      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover; its provider-neutral contract dependency now resolves through skeleton/providers/contract.py.",
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
@@ -929,7 +929,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "d7f2bce60e4333095ea911d6272afce25d233b61",
+      "source_git_object_sha": "3bc6aa8cd6ddba2f81d34df3d472a83b4aea97bb",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -945,7 +945,6 @@
         "content",
         "economy",
         "game",
-        "platform",
         "world"
       ],
       "move_tags": [
@@ -961,7 +960,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "64b73768128390fa7dbd23133de4a1d7e54d2dff",
+      "source_git_object_sha": "53b5269b302f1f89f7f2fe65f7e4c41855011ce3",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -973,8 +972,7 @@
         "VOL-023"
       ],
       "overlay_children": [
-        "creator",
-        "pipelines"
+        "creator"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -989,7 +987,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "69804584a7f002f1bcd1709dc2c50cab12597e5b",
+      "source_git_object_sha": "143dd478f3e24d32268547b69826d5d485ff9edc",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
@@ -1001,9 +999,6 @@
       "work_package_linkage_basis": "VOL-032 is a runtime/native-core implementation path whose stable ABI belongs to kernel lifecycle and whose promotion/fallback obligations belong to production hardening.",
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ],
-      "overlay_children": [
-        "jvm_registry.py"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -1400,11 +1395,11 @@
     },
     {
       "id": "AIFT-GENESIS",
-      "source": "skeleton/genesis.py",
+      "source": "skeleton/bootstrap/genesis.py",
       "destination": "skeleton/ai/runtime/bootstrap/genesis.py",
       "kind": "file",
       "source_git_object_sha": "be99fd15d0feb66a848e44c70a7208cafaddb9d4",
-      "role": "Genesis is the engine bootstrap/wiring orchestrator and should become a governed bootstrap entry beneath the canonical AI runtime.",
+      "role": "Canonical engine bootstrap/wiring orchestrator under skeleton/bootstrap; mirrored into the governed AI runtime bootstrap surface.",
       "work_package_refs": [
         "WP-W02",
         "WP-W19",
@@ -1429,7 +1424,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_bootstrap_owner_with_legacy_root_shim"
     },
     {
       "id": "AIFT-KV",
@@ -1468,11 +1463,11 @@
     },
     {
       "id": "AIFT-KV-CACHE",
-      "source": "skeleton/kv_cache.py",
-      "destination": "skeleton/ai/runtime/inference/kv_cache.py",
+      "source": "skeleton/kv/__init__.py",
+      "destination": "skeleton/ai/runtime/inference/kv/__init__.py",
       "kind": "file",
-      "source_git_object_sha": "78ff394cc150afc8e0d85f5c4d9f8a603d0ac068",
-      "role": "The standalone KV-cache implementation is inference/runtime state and must converge beside the already assigned KV package.",
+      "source_git_object_sha": "b4bc60a3ed0e919889e9dce3aafa045ace22fffe",
+      "role": "Canonical KV-cache public facade is the skeleton.kv package surface; the legacy root module and legacy AI sibling remain compatibility shims.",
       "work_package_refs": [
         "WP-W05",
         "WP-W19",
@@ -1487,7 +1482,7 @@
         "VOL-029",
         "VOL-387"
       ],
-      "migration_action": "mirror_then_cutover",
+      "migration_action": "converge_facade_then_cutover",
       "cutover_preconditions": [
         "prove cache reuse is semantics-preserving",
         "bound capacity and eviction",
@@ -1499,7 +1494,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_package_facade_with_legacy_shims"
     },
     {
       "id": "AIFT-MESH",
@@ -2214,11 +2209,11 @@
     },
     {
       "id": "AIFT-JVM-REGISTRY",
-      "source": "skeleton/jvm_accelerators.py",
+      "source": "skeleton/native/jvm_registry.py",
       "destination": "skeleton/ai/runtime/native/jvm_registry.py",
       "kind": "file",
       "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764",
-      "role": "The optional JVM accelerator registry is engine runtime support and should live beside native/JVM acceleration ownership while java-accelerators remains its separate accelerator root.",
+      "role": "Canonical optional JVM accelerator registry beside native runtime ownership; java-accelerators remains the separate accelerator implementation root.",
       "work_package_refs": [
         "WP-W29",
         "WP-W30"
@@ -2242,15 +2237,15 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_native_owner_with_legacy_root_shim"
     },
     {
       "id": "AIFT-PLATFORM",
-      "source": "skeleton/platform",
+      "source": "skeleton/simulation/platform",
       "destination": "skeleton/ai/simulation/platform",
       "kind": "tree",
-      "source_git_object_sha": "3d1c2ef9c429dbf09363fcb8fb82e6f23754f43a",
-      "role": "The engine-neutral Godot adapter translates simulation/game documents and should sit with simulation/forge integration.",
+      "source_git_object_sha": "f4b94bdbecb7958f7525d5ba613d075782132b13",
+      "role": "Canonical engine-neutral Godot adapter boundary under skeleton/simulation/platform; mirrored into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
         "WP-W27"
@@ -2275,7 +2270,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_simulation_platform_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SCHOOL",
@@ -2477,11 +2472,11 @@
     },
     {
       "id": "AIFT-PIPELINES",
-      "source": "skeleton/pipelines",
+      "source": "skeleton/forge/pipelines",
       "destination": "skeleton/ai/forge/pipelines",
       "kind": "tree",
-      "source_git_object_sha": "a1dff95046b9d6c9959142129061e3feaaed78fb",
-      "role": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
+      "source_git_object_sha": "87dde8479832fcf0a904d5e5a9149c545f8b9a1b",
+      "role": "Canonical generation-pipeline package under skeleton/forge/pipelines; mirrored exactly into the governed AI Forge surface.",
       "work_package_refs": [
         "WP-W27"
       ],
@@ -2504,7 +2499,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B2-domain-build",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_forge_pipelines_with_legacy_root_shims"
     },
     {
       "id": "AIFT-SHEAF",
@@ -2787,10 +2782,10 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-INDEX-LEGACY",
-      "source": "skeleton/architecture_index.py",
+      "source": "skeleton/foundation/architecture/index.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_index.py",
       "kind": "file",
-      "source_git_object_sha": "dc0cc3cc241bdfd066fefec4bac64978b3249da4",
+      "source_git_object_sha": "72e7ec1b400c53e6132bb329a211a4521ad9731a",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -2822,7 +2817,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R03",
-      "source": "skeleton/architecture_round3.py",
+      "source": "skeleton/foundation/architecture/rounds/round3.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round3.py",
       "kind": "file",
       "source_git_object_sha": "1749fb191a5ae10a85f31201fc559b62fa8fe201",
@@ -2857,7 +2852,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R04",
-      "source": "skeleton/architecture_round4.py",
+      "source": "skeleton/foundation/architecture/rounds/round4.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round4.py",
       "kind": "file",
       "source_git_object_sha": "37494202290c896bfd336ff49723833d924acef5",
@@ -2892,7 +2887,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R05",
-      "source": "skeleton/architecture_round5.py",
+      "source": "skeleton/foundation/architecture/rounds/round5.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round5.py",
       "kind": "file",
       "source_git_object_sha": "193ba887f3af884e2b7903a2d7ef25d54ca26b62",
@@ -2927,7 +2922,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R06",
-      "source": "skeleton/architecture_round6.py",
+      "source": "skeleton/foundation/architecture/rounds/round6.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round6.py",
       "kind": "file",
       "source_git_object_sha": "a26f8dce143001fea8d216326d6cfd27b1975879",
@@ -2962,7 +2957,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R07",
-      "source": "skeleton/architecture_round7.py",
+      "source": "skeleton/foundation/architecture/rounds/round7.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round7.py",
       "kind": "file",
       "source_git_object_sha": "b4010f8645cd133a0f482986393b6e604f19efa7",
@@ -2997,7 +2992,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R08",
-      "source": "skeleton/architecture_round8.py",
+      "source": "skeleton/foundation/architecture/rounds/round8.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round8.py",
       "kind": "file",
       "source_git_object_sha": "b5c4ca3e7f377dbd3b2244c7bd4c7e1ea4c819f4",
@@ -3032,7 +3027,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R09",
-      "source": "skeleton/architecture_round9.py",
+      "source": "skeleton/foundation/architecture/rounds/round9.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round9.py",
       "kind": "file",
       "source_git_object_sha": "da3777be7a99bcf38c81ba4b91ee54b3ec80b1e4",
@@ -3067,7 +3062,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R10",
-      "source": "skeleton/architecture_round10.py",
+      "source": "skeleton/foundation/architecture/rounds/round10.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round10.py",
       "kind": "file",
       "source_git_object_sha": "b8a97d10c23c06563eb0edeb24816fd0181a9951",
@@ -3102,7 +3097,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R11",
-      "source": "skeleton/architecture_round11.py",
+      "source": "skeleton/foundation/architecture/rounds/round11.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round11.py",
       "kind": "file",
       "source_git_object_sha": "edcd8b04bbe4270286adaed96025186aa4999a68",
@@ -3137,7 +3132,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R12",
-      "source": "skeleton/architecture_round12.py",
+      "source": "skeleton/foundation/architecture/rounds/round12.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round12.py",
       "kind": "file",
       "source_git_object_sha": "614e0b2ed6862aa0887551ec7b44ccf970ce1873",
@@ -3172,7 +3167,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R13",
-      "source": "skeleton/architecture_round13.py",
+      "source": "skeleton/foundation/architecture/rounds/round13.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round13.py",
       "kind": "file",
       "source_git_object_sha": "364914860027b2639afd040ce4791aeed3a62016",
@@ -3207,7 +3202,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R14",
-      "source": "skeleton/architecture_round14.py",
+      "source": "skeleton/foundation/architecture/rounds/round14.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round14.py",
       "kind": "file",
       "source_git_object_sha": "936e2a3cdaf0e4b5f9cdf43b240f6eac8ff75934",
@@ -3242,7 +3237,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R15",
-      "source": "skeleton/architecture_round15.py",
+      "source": "skeleton/foundation/architecture/rounds/round15.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round15.py",
       "kind": "file",
       "source_git_object_sha": "f016b8e5a293e6f5e4418fd32164eeab27b7c515",
@@ -3277,7 +3272,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R16",
-      "source": "skeleton/architecture_round16.py",
+      "source": "skeleton/foundation/architecture/rounds/round16.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round16.py",
       "kind": "file",
       "source_git_object_sha": "8b82415ba83d672d8cdf258887fe1706980be825",
@@ -3312,7 +3307,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R17",
-      "source": "skeleton/architecture_round17.py",
+      "source": "skeleton/foundation/architecture/rounds/round17.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round17.py",
       "kind": "file",
       "source_git_object_sha": "7a9e471574c8a2e01eaba11014e82dd4308f9227",
@@ -3347,7 +3342,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R18",
-      "source": "skeleton/architecture_round18.py",
+      "source": "skeleton/foundation/architecture/rounds/round18.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round18.py",
       "kind": "file",
       "source_git_object_sha": "4d1246adde8961f08ee5d725bec7b84e8ed08b84",
@@ -3382,7 +3377,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R19",
-      "source": "skeleton/architecture_round19.py",
+      "source": "skeleton/foundation/architecture/rounds/round19.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round19.py",
       "kind": "file",
       "source_git_object_sha": "d64f5b0437c46df9d1206d0b72a8ed21e9a2f653",
@@ -3417,7 +3412,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R20",
-      "source": "skeleton/architecture_round20.py",
+      "source": "skeleton/foundation/architecture/rounds/round20.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round20.py",
       "kind": "file",
       "source_git_object_sha": "f19f13b731224db383b2c2a3288f1c4d3122b4dd",
@@ -3452,7 +3447,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R21",
-      "source": "skeleton/architecture_round21.py",
+      "source": "skeleton/foundation/architecture/rounds/round21.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round21.py",
       "kind": "file",
       "source_git_object_sha": "3d55af787fc345c0fb88514cef2be31658062f46",
@@ -3487,7 +3482,7 @@
     },
     {
       "id": "AIFT-ARCHITECTURE-R22",
-      "source": "skeleton/architecture_round22.py",
+      "source": "skeleton/foundation/architecture/rounds/round22.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round22.py",
       "kind": "file",
       "source_git_object_sha": "03e08ee64e14ad01807644b684639539b9b05323",
@@ -4899,107 +4894,107 @@
       "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
-      "path": "skeleton/architecture_index.py",
+      "path": "skeleton/foundation/architecture/index.py",
       "owner": "architecture authority",
       "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
     },
     {
-      "path": "skeleton/architecture_round3.py",
+      "path": "skeleton/foundation/architecture/rounds/round3.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round4.py",
+      "path": "skeleton/foundation/architecture/rounds/round4.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round5.py",
+      "path": "skeleton/foundation/architecture/rounds/round5.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round6.py",
+      "path": "skeleton/foundation/architecture/rounds/round6.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round7.py",
+      "path": "skeleton/foundation/architecture/rounds/round7.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round8.py",
+      "path": "skeleton/foundation/architecture/rounds/round8.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round9.py",
+      "path": "skeleton/foundation/architecture/rounds/round9.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round10.py",
+      "path": "skeleton/foundation/architecture/rounds/round10.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round11.py",
+      "path": "skeleton/foundation/architecture/rounds/round11.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round12.py",
+      "path": "skeleton/foundation/architecture/rounds/round12.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round13.py",
+      "path": "skeleton/foundation/architecture/rounds/round13.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round14.py",
+      "path": "skeleton/foundation/architecture/rounds/round14.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round15.py",
+      "path": "skeleton/foundation/architecture/rounds/round15.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round16.py",
+      "path": "skeleton/foundation/architecture/rounds/round16.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round17.py",
+      "path": "skeleton/foundation/architecture/rounds/round17.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round18.py",
+      "path": "skeleton/foundation/architecture/rounds/round18.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round19.py",
+      "path": "skeleton/foundation/architecture/rounds/round19.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round20.py",
+      "path": "skeleton/foundation/architecture/rounds/round20.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round21.py",
+      "path": "skeleton/foundation/architecture/rounds/round21.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },
     {
-      "path": "skeleton/architecture_round22.py",
+      "path": "skeleton/foundation/architecture/rounds/round22.py",
       "owner": "architecture history",
       "reason": "historical architecture round retained as design lineage, not runtime implementation"
     },

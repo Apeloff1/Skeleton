@@ -1,19 +1,5 @@
-"""Persist 1.0 facade (GB-27). One core. Two gates."""
+"""Compatibility namespace for canonical persistence primitives.
 
-from __future__ import annotations
-
-from skeleton.persist.capabilities import capabilities
-from skeleton.persist.cards import persist_card
-from skeleton.persist.engine import PersistEngine
-from skeleton.persist.law import OWN_ENV, PACKET, VERSION
-from skeleton.persist.store import Persist
-
-__all__ = [
-    "OWN_ENV",
-    "PACKET",
-    "VERSION",
-    "Persist",
-    "PersistEngine",
-    "capabilities",
-    "persist_card",
-]
+New code should import from :mod:`skeleton.persistence.core`.
+"""
+from skeleton.persistence.core import *  # noqa: F401,F403

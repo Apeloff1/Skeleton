@@ -1,29 +1,3 @@
-"""
-Skeleton Pipelines Package
+"""Compatibility shim for :mod:`skeleton.forge.pipelines`."""
 
-Exports:
-- NPCPipeline / GameLogicPipeline / AnimationPipeline: Content generators
-- GameForge: End-to-end game generation orchestrator
-- GameSpec: Packaged output artifact
-"""
-
-from skeleton.pipelines.generation import (
-    AnimationPipeline,
-    AnimationSpec,
-    GameLogicPipeline,
-    GameLogicSpec,
-    NPCPipeline,
-    NPCSpec,
-)
-from skeleton.pipelines.gameforge import GameForge, GameSpec
-
-__all__ = [
-    "NPCPipeline",
-    "NPCSpec",
-    "GameLogicPipeline",
-    "GameLogicSpec",
-    "AnimationPipeline",
-    "AnimationSpec",
-    "GameForge",
-    "GameSpec",
-]
+from skeleton.forge.pipelines import *  # noqa: F401,F403
