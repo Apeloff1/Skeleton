@@ -21,7 +21,7 @@ _CAPABILITY_IMPORTERS = {
     "jeeves": ("skeleton.jeeves", lambda: import_module("skeleton.jeeves")),
     "organism": ("skeleton.organism", lambda: import_module("skeleton.organism")),
     "social": ("skeleton.social", lambda: import_module("skeleton.social")),
-    "galaxy": ("skeleton.galaxy", lambda: import_module("skeleton.galaxy")),
+    "galaxy": ("skeleton.distributed.galaxy", lambda: import_module("skeleton.distributed.galaxy")),
     "kernel": ("skeleton.kernel", lambda: import_module("skeleton.kernel")),
     "memory": ("skeleton.memory", lambda: import_module("skeleton.memory")),
     "intelligence": ("skeleton.intelligence", lambda: import_module("skeleton.intelligence")),

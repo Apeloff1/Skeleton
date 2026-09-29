@@ -286,6 +286,15 @@
       "state": "canonicalized",
       "compatibility": "skeleton/social/",
       "notes": "Eleven social/research evidence modules moved out of simulation ownership into canonical skeleton/research/social. Eight modules with absolute skeleton.social imports were rewritten to skeleton.research.social; all eleven canonical modules are mirrored exactly at skeleton/ai/research/social. The legacy root is compatibility-only, AIFT-SOCIAL now follows the canonical research source, and skeleton/research is no longer planned-but-absent."
+    },
+    {
+      "id": "TREE-032",
+      "source": "skeleton/galaxy/",
+      "destination": "skeleton/distributed/galaxy/",
+      "mode": "move-with-shims",
+      "state": "canonicalized",
+      "compatibility": "skeleton/galaxy/",
+      "notes": "Twenty-seven Galaxy distributed-runtime modules moved out of simulation ownership into skeleton/distributed/galaxy. Sixteen modules with absolute skeleton.galaxy imports were rewritten to skeleton.distributed.galaxy; the remaining modules moved semantically unchanged. The canonical subtree is mirrored exactly at skeleton/ai/runtime/distributed/galaxy, the legacy root is compatibility-only, AIFT-GALAXY follows the canonical distributed source, and skeleton/distributed is no longer planned-but-absent."
     }
   ]
 }
