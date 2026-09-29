@@ -8,6 +8,7 @@ on:
     paths:
       - "skeleton/provider_runtime.py"
       - "skeleton/provider_contract.py"
+      - "skeleton/providers/contract.py"
       - "skeleton/provider_governance.py"
       - "skeleton/intelligence/**"
       - "skeleton/api/**"
