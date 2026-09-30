@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      PYTHONPATH: ".:backend"
+      PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
 
@@ -82,24 +82,35 @@ jobs:
           "pydantic-settings>=2.15.0"
 
       - name: Run wave-3 runtime regressions
-        run: >-
-          python -m pytest -q --noconftest
-          skeleton/testing/test_shell_service_state_reconcile.py
-          skeleton/testing/test_tool_receipt_store.py
-          skeleton/testing/test_provider_stream_reliability_profiles.py
-          backend/tests/test_durable_outbox.py
-          backend/tests/test_operation_projection.py
-          skeleton/testing/test_shell_ai_durable_orphan_scan.py
-          backend/tests/test_tenant_storage_boundary.py
-          skeleton/testing/test_swarm_tenant_broker.py
-          skeleton/testing/test_swarm_dead_replay.py
-          skeleton/testing/test_guarded_compaction.py
-          tests/test_delta_memory_compaction.py
-          skeleton/testing/test_data_lifecycle.py
-          skeleton/testing/test_memory_projection.py
-          tests/test_p1_adversarial_wave3_evidence.py
-          tests/test_p1_adversarial_ac09_binding.py
-          tests/test_p1_risk_evidence_reconciliation.py
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.:backend python -m pytest -q --noconftest \
+            backend/tests/test_durable_outbox.py \
+            backend/tests/test_operation_projection.py \
+            backend/tests/test_tenant_storage_boundary.py
+          PYTHONPATH=. python -m pytest -q --noconftest \
+            skeleton/testing/test_shell_service_state_reconcile.py \
+            skeleton/testing/test_tool_receipt_store.py::test_sync_durable_receipt_replays_after_restart_without_handler \
+            skeleton/testing/test_tool_receipt_store.py::test_durable_store_rejects_idempotency_key_reuse_with_different_args \
+            skeleton/testing/test_tool_receipt_store.py::test_durable_receipt_preserves_execution_turn_call_lineage_across_restart \
+            skeleton/testing/test_tool_receipt_store.py::test_durable_receipt_preserves_privacy_context_across_restart \
+            skeleton/testing/test_provider_stream_reliability_profiles.py \
+            skeleton/testing/test_shell_ai_durable_orphan_scan.py \
+            skeleton/testing/test_swarm_tenant_broker.py \
+            skeleton/testing/test_swarm_dead_replay.py \
+            skeleton/testing/test_guarded_compaction.py \
+            tests/test_delta_memory_compaction.py \
+            skeleton/testing/test_data_lifecycle.py \
+            skeleton/testing/test_memory_projection.py::test_projection_is_rebuildable_from_canonical_authority \
+            skeleton/testing/test_memory_projection.py::test_tombstone_deletes_projection_without_erasing_canonical_lineage \
+            skeleton/testing/test_memory_projection.py::test_real_tfidf_and_vector_stores_rebuild_from_canonical_authority \
+            skeleton/testing/test_memory_projection.py::test_outbox_tombstone_removes_derived_memory \
+            skeleton/testing/test_memory_projection.py::test_stale_pending_event_cannot_regress_rebuilt_projection \
+            skeleton/testing/test_memory_projection.py::test_current_projection_event_must_match_canonical_record \
+            skeleton/testing/test_memory_projection.py::test_material_projection_rebuild_is_admitted_and_reconciled \
+            tests/test_p1_adversarial_wave3_evidence.py \
+            tests/test_p1_adversarial_ac09_binding.py \
+            tests/test_p1_risk_evidence_reconciliation.py
 
       - name: Compile wave-3 evidence twice
         run: |
