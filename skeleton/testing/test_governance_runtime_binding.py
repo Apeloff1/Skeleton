@@ -145,7 +145,7 @@ def test_skeleton_runtime_declares_canonical_mongo_driver_dependencies() -> None
     compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
 
     assert '"motor==3.7.1"' in pyproject
-    assert '"pymongo==4.18.1"' in pyproject
+    assert '"pymongo==4.18.2"' in pyproject
     assert "SKL_MONGO_URI=" in compose
     assert "SKL_MONGO_DATABASE=skeleton" in compose
 
