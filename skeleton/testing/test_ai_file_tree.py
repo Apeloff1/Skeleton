@@ -121,7 +121,7 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
         "skeleton/repo_machine",
         "skeleton/acquired/learning.py",
         "skeleton/persist",
-        "skeleton/application",
+        "skeleton/app/runtime",
         "skeleton/core",
         "skeleton/data",
         "skeleton/bootstrap/genesis.py",
@@ -248,6 +248,43 @@ def test_ai_file_tree_ignores_runtime_generated_membership_noise(tmp_path: Path)
     (generated / "module.cpython-311.pyc").write_bytes(b"runtime-only")
 
     assert module._compare(source, destination) == []
+
+
+def test_ai_file_tree_source_exclusions_are_explicit_and_bounded(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (destination / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    excluded = source / "history"
+    excluded.mkdir()
+    (excluded / "legacy.py").write_text("LEGACY = True\n", encoding="utf-8")
+
+    assert module._compare(source, destination) != []
+    assert module._compare(source, destination, source_exclusions={"history"}) == []
+
+
+def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = {item["id"]: item for item in manifest["mappings"]}
+
+    assert mappings["AIFT-APPLICATION"]["source"] == "skeleton/app/runtime"
+    assert mappings["AIFT-BUILD-PLANNING"]["source"] == "skeleton/automation/shift_supervisor"
+    assert mappings["AIFT-AUTOMATION"]["source_exclusions"] == ["shift_supervisor"]
+    assert mappings["AIFT-FOUNDATION"]["source_exclusions"] == ["architecture"]
+
+    aliases = {
+        item["planned_path"]: item["implemented_path"]
+        for item in manifest["planned_path_audit"]["covered_aliases"]
+    }
+    assert aliases["skeleton/application"] == "skeleton/app/runtime"
+    assert aliases["skeleton/genesis.py"] == "skeleton/bootstrap/genesis.py"
+    assert aliases["skeleton/provider_contract.py"] == "skeleton/providers/contract.py"
+    assert aliases["skeleton/creator"] == "skeleton/forge/creator"
 
 
 def test_ai_file_tree_classifies_all_machine_authority_roots() -> None:

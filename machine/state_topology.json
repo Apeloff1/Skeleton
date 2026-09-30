@@ -108,7 +108,7 @@
       "restore": "reopen operation_stream.sqlite, preserve sequence/terminal/consumer watermarks, then reconcile any unpublished operation outbox rows",
       "migration": "schema migration must preserve event identity, sequence, terminal fences, consumer acknowledgements and replay-gap semantics",
       "evidence": [
-        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
         "skeleton/testing/test_operation_stream_store.py",
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
@@ -192,7 +192,7 @@
       "evidence": [
         "skeleton/memory/vector.py",
         "skeleton/retrieval/index.py",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/runtime/operation_stream.py"
       ]
     },
     {
@@ -494,8 +494,8 @@
       ],
       "rebuildable": false,
       "evidence": [
-        "skeleton/frontier/operation_stream_store.py",
-        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
+        "skeleton/frontier/runtime/operation_stream.py",
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
         "docker-compose.yml",
@@ -530,7 +530,7 @@
       "evidence": [
         "skeleton/retrieval/index.py",
         "skeleton/memory/vector.py",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/runtime/operation_stream.py"
       ]
     },
     {
@@ -853,8 +853,8 @@
       "rebuildable": false,
       "evidence": [
         "machine/ai_app_construction.json",
-        "skeleton/frontier/memory.py",
-        "skeleton/frontier/retrieval_context.py",
+        "skeleton/frontier/runtime/memory.py",
+        "skeleton/frontier/runtime/retrieval_context.py",
         "skeleton/memory/frontier_adapter.py",
         "skeleton/contracts/memory_record.py",
         "skeleton/persistence/memory_repository.py",

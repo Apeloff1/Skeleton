@@ -229,3 +229,23 @@ def test_durable_projection_is_non_authoritative_but_not_required_to_be_rebuilda
     assert stream["source_of_truth"] is False
     assert stream["rebuildable"] is False
     assert stream["derived_from"] == ["canonical-operation-state"]
+
+
+def test_frontier_state_evidence_uses_canonical_runtime_namespace() -> None:
+    topology = _topology()
+    serialized = json.dumps(topology)
+
+    expected = {
+        "skeleton/frontier/runtime/memory.py",
+        "skeleton/frontier/runtime/retrieval_context.py",
+        "skeleton/frontier/runtime/operation_stream.py",
+        "skeleton/frontier/runtime/operation_stream_store.py",
+    }
+    assert all(path in serialized for path in expected)
+    for legacy in (
+        "skeleton/frontier/memory.py",
+        "skeleton/frontier/retrieval_context.py",
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/operation_stream_store.py",
+    ):
+        assert legacy not in serialized
