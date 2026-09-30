@@ -40,15 +40,15 @@ def test_wave3_has_exact_nine_axis_scope() -> None:
 def test_wave3_candidates_match_live_required_modes() -> None:
     report = _report()
     assert report["axis_count"] == EXPECTED_AXIS_COUNT
-    assert report["already_bound_count"] == 0
-    assert report["candidate_binding_count"] == EXPECTED_AXIS_COUNT
+    assert report["already_bound_count"] == EXPECTED_AXIS_COUNT
+    assert report["candidate_binding_count"] == 0
 
     by_axis = {row["axis_id"]: row for row in report["candidates"]}
     assert set(by_axis) == set(AXIS_IDS)
 
     for axis_id, mode_proofs in AXIS_PROOFS.items():
         candidate = by_axis[axis_id]
-        assert candidate["binding_present"] is False
+        assert candidate["binding_present"] is True
         assert tuple(candidate["required_evidence_modes"]) == tuple(mode_proofs)
         assert {item["category"] for item in candidate["evidence"]} == set(mode_proofs)
         assert candidate["obligation_id"].startswith(f"P1-ADVERSARIAL-{axis_id}-")
