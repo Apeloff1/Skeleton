@@ -35,6 +35,7 @@ on:
       - "scripts/build_p1_adversarial_ac20_evidence.py"
       - "tests/test_p1_adversarial_ac20_evidence.py"
       - "tests/test_p1_adversarial_ac20_binding.py"
+      - "tests/test_p1_adversarial_ac14_binding.py"
       - "tests/test_p1_adversarial_wave2_bindings.py"
       - ".github/workflows/p1-adversarial-ac20-evidence.yml"
   workflow_dispatch:
@@ -113,6 +114,7 @@ jobs:
           skeleton/testing/test_ai_adversarial_closure.py
           tests/test_p1_adversarial_ac20_evidence.py
           tests/test_p1_adversarial_ac20_binding.py
+          tests/test_p1_adversarial_ac14_binding.py
           tests/test_p1_adversarial_wave2_bindings.py
           tests/test_p1_bulk_volume_obligation_bindings.py
           tests/test_p1_risk_evidence_reconciliation.py
@@ -188,7 +190,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier is 492 resolved and 21 blocking
+      - name: Confirm governed frontier is 493 resolved and 20 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac20/reconciliation.json             --print-summary
@@ -199,17 +201,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac20/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 492:
+          if report["binding_count"] != 493:
               raise SystemExit("AC-20 verifier mutated binding count")
-          if report["resolved_count"] != 492:
+          if report["resolved_count"] != 493:
               raise SystemExit("AC-20 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 21:
+          if report["unresolved_blocking_count"] != 20:
               raise SystemExit("AC-20 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-20 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 492,
-              "unbound": 21,
+              "evidence": 493,
+              "unbound": 20,
           }:
               raise SystemExit("AC-20 verifier mutated disposition counts")
           PY
