@@ -9,7 +9,6 @@ import {
   TextInput, ActivityIndicator, Animated, Platform,
   Linking, KeyboardAvoidingView, Keyboard,
 } from 'react-native';
-import type { ScrollViewInstance } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -678,8 +677,8 @@ export default function GalaxyStudioFactoryModal
   const [popBusy, setPopBusy] = useState(false);
   const [popResult, setPopResult] = useState<any | null>(null);
 
-  const pickScrollRef = useRef<ScrollViewInstance>(null);
-  const logScrollRef = useRef<ScrollViewInstance>(null);
+  const pickScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const logScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
     if (visible) {
