@@ -249,3 +249,23 @@ def test_frontier_state_evidence_uses_canonical_runtime_namespace() -> None:
         "skeleton/frontier/operation_stream_store.py",
     ):
         assert legacy not in serialized
+
+
+def test_local_reference_provenance_declares_executable_evidence() -> None:
+    topology = _topology()
+    domain = next(
+        item
+        for item in topology["state_domains"]
+        if item["id"] == "local-reference-provenance"
+    )
+
+    expected = {
+        "skeleton/cortex/reference_provenance.py",
+        "skeleton/cortex/refs.py",
+        "skeleton/cortex/deck_interactions.py",
+        "skeleton/testing/test_reference_provenance.py",
+        "docs/architecture/REFERENCE_PROVENANCE.md",
+    }
+    assert expected <= set(domain["evidence"])
+    for relative in expected:
+        assert (REPO_ROOT / relative).exists()

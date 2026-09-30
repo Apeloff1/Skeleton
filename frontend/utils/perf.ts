@@ -23,13 +23,13 @@
  *     network responses ("the same query within 5s returns cached").
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { InteractionManager } from 'react-native';
-
 
 const requestIdleTask = (callback: () => void) => {
   const id = setTimeout(callback, 0);
   return { cancel: () => clearTimeout(id) };
-};import { recordEvent } from './modalLogger';
+};
+
+import { recordEvent } from './modalLogger';
 import { traceStep } from './bootTracer';
 import { getFeatureFlag } from './featureFlags';
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 
 @contextmanager
@@ -12,13 +11,15 @@ def _isolated_reference_provenance():
     from skeleton.cortex import refs
 
     tracked = refs.provenance_path()
-    before = tracked.read_bytes()
+    before = tracked.read_bytes() if tracked.is_file() else None
     with TemporaryDirectory() as directory:
-        destination = Path(directory) / "provenance.jsonl"
-        with patch.object(refs, "provenance_path", return_value=destination):
+        root = Path(directory)
+        destination = refs.provenance_path(root)
+        with refs.reference_scope(root):
             yield
         assert destination.is_file(), "reference operations must still record provenance"
-    assert tracked.read_bytes() == before, "tests must not modify the reference corpus"
+    after = tracked.read_bytes() if tracked.is_file() else None
+    assert after == before, "tests must not modify the caller workspace provenance"
 
 
 try:

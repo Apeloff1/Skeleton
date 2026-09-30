@@ -368,3 +368,25 @@ def test_fully_functional_ai_core_planes_remain_partial_while_p0_gaps_are_open()
     for gap in contract["gap_register"]:
         if gap["id"] in closure_p0 and gap["status"] == "open":
             assert planes[gap["plane"]]["state"] == "partial"
+
+
+def test_shift_supervisor_model_gateway_has_one_credential_bearing_surface() -> None:
+    contract = _contract()
+    surfaces = [
+        surface
+        for surface in contract["provider_surfaces"]
+        if surface["id"] == "shift-supervisor-model-gateway"
+    ]
+
+    assert len(surfaces) == 1
+    surface = surfaces[0]
+    assert surface["owner"] == "skeleton/automation/shift_supervisor/model_gateway.py"
+    assert surface["family"] == "automation_model"
+    assert surface["credential_bearing"] is True
+    assert surface["credential_owner"] is True
+    assert surface["network_transport_owner"] is True
+    assert surface["receipt_required"] is True
+    assert set(surface["discovery_edge_classes"]) == {
+        "credential",
+        "network_transport",
+    }

@@ -31,11 +31,7 @@ export const Screen: React.FC<ScreenProps> = ({
   return (
     <View style={[styles.root, { backgroundColor: bg }, style]}>
       {Platform.OS !== 'web' && (
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="transparent"
-          translucent
-        />
+        <StatusBar barStyle="light-content" />
       )}
       {gradient && !background && (
         <LinearGradient
