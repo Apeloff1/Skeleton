@@ -1,0 +1,197 @@
+name: P1 Bulk Volume Obligation Evidence Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/risk-classification-bindings-batch1-20260930
+      - p1/bulk-volume-obligation-evidence-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "scripts/reconcile_p1_risk_evidence.py"
+      - "scripts/build_p1_bulk_volume_obligation_evidence.py"
+      - "tests/test_p1_bulk_volume_obligation_evidence.py"
+      - "tests/test_p1_bulk_volume_obligation_bindings.py"
+      - ".github/workflows/p1-bulk-volume-obligation-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-bulk-volume-obligation-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify all materialized P1 volume obligations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate canonical P1 governance inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+
+      - name: Run bulk evidence regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_master_plan.py
+          skeleton/testing/test_risk_evidence.py
+          tests/test_p1_risk_evidence_reconciliation.py
+          tests/test_p1_risk_classification_bindings_batch1.py
+          tests/test_p1_bulk_volume_obligation_evidence.py
+          tests/test_p1_bulk_volume_obligation_bindings.py
+
+      - name: Compile exact-head bulk candidates
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-bulk-volume-evidence
+          python scripts/build_p1_bulk_volume_obligation_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-bulk-volume-evidence/report.json             --print-summary
+          python scripts/build_p1_bulk_volume_obligation_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-bulk-volume-evidence/replay.json
+          cmp .p1-bulk-volume-evidence/report.json .p1-bulk-volume-evidence/replay.json
+
+      - name: Prove bounded mass-candidate frontier
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-bulk-volume-evidence/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = {
+              "covered_volume_count": 107,
+              "covered_obligation_count": 489,
+              "covered_risk_count": 281,
+              "covered_gap_count": 208,
+              "already_bound_count": 489,
+              "candidate_binding_count": 0,
+              "candidate_risk_count": 0,
+              "candidate_gap_count": 0,
+              "adversarial_axis_count": 0,
+          }
+          for key, value in expected.items():
+              if report[key] != value:
+                  raise SystemExit(
+                      f"{key} drift: expected {value}, got {report[key]}"
+                  )
+          if report["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("bulk evidence report is not exact-head bound")
+          for field in (
+              "creates_bindings",
+              "accepts_risk",
+              "lowers_severity",
+              "clears_source_obligations",
+              "promotes_maturity",
+          ):
+              if report[field] is not False:
+                  raise SystemExit(f"authority boundary drift: {field}")
+          for row in report["records"]:
+              if row["recommended_severity"] != "high":
+                  raise SystemExit(
+                      "bulk evidence cannot downgrade severity: "
+                      + row["obligation_id"]
+                  )
+              if row["recommended_disposition"] != "evidence":
+                  raise SystemExit(
+                      "bulk evidence disposition drift: " + row["obligation_id"]
+                  )
+              if row["candidate_evidence_ref"]["digest"] != row["packet_digest"]:
+                  raise SystemExit(
+                      "bulk packet digest drift: " + row["obligation_id"]
+                  )
+              if not row["candidate_evidence_ref"]["source"].endswith(
+                  ":" + os.environ["EXPECTED_SHA"]
+              ):
+                  raise SystemExit(
+                      "bulk packet is not exact-head bound: " + row["obligation_id"]
+                  )
+          print("P1 bulk volume evidence:", report["report_digest"])
+          for row in report["records"]:
+              if row["binding_present"]:
+                  continue
+              seed = {
+                  "obligation_id": row["obligation_id"],
+                  "obligation_digest": row["obligation_digest"],
+                  "owner_id": row["owner_id"],
+                  "kind": row["kind"],
+                  "severity": row["recommended_severity"],
+                  "disposition": row["recommended_disposition"],
+                  "evidence": row["candidate_evidence_ref"],
+              }
+              print(
+                  "P1_BULK_BINDING_SEED "
+                  + json.dumps(seed, sort_keys=True, separators=(",", ":"))
+              )
+          PY
+
+      - name: Confirm governed registry remains unchanged
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py --evaluated-at "2026-10-01T12:00:00+00:00" --out .p1-bulk-volume-evidence/risk-report.json --print-summary
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-bulk-volume-evidence/risk-report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["binding_count"] != 493:
+              raise SystemExit("bulk verifier mutated binding count")
+          if report["resolved_count"] != 493:
+              raise SystemExit("bulk verifier mutated resolution count")
+          if report["unresolved_blocking_count"] != 20:
+              raise SystemExit("bulk verifier mutated blocking frontier")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("bulk verifier mutated classification frontier")
+          if report["disposition_counts"] != {
+              "evidence": 493,
+              "unbound": 20,
+          }:
+              raise SystemExit("bulk verifier mutated disposition counts")
+          print(
+              "Governed frontier unchanged:",
+              report["resolved_count"],
+              report["unresolved_blocking_count"],
+              report["unclassified_count"],
+          )
+          PY
