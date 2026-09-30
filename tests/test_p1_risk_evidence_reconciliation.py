@@ -21,7 +21,7 @@ from scripts.reconcile_p1_risk_evidence import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NOW = datetime(2026, 9, 27, 20, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def _copy_file(root: Path, relative: Path) -> None:
@@ -98,13 +98,13 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
-    assert report["binding_count"] == 12
-    assert report["resolved_count"] == 12
-    assert report["unresolved_blocking_count"] == 501
+    assert report["binding_count"] == 22
+    assert report["resolved_count"] == 22
+    assert report["unresolved_blocking_count"] == 491
     assert report["unclassified_count"] == 281
     assert report["disposition_counts"] == {
-        "evidence": 12,
-        "unbound": 501,
+        "evidence": 22,
+        "unbound": 491,
     }
     assert report["non_authoritative"] is True
     assert report["source_mutation_detected"] is False

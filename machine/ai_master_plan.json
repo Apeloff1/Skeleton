@@ -690,7 +690,8 @@
         "skeleton/intelligence/quality.py",
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
-        ".github/workflows/p1-intel-routing-context.yml"
+        ".github/workflows/p1-intel-routing-context.yml",
+        "skeleton/frontier/runtime/model_routing.py"
       ],
       "tests": [
         "skeleton/testing/test_routing_context_receipt.py",
@@ -754,7 +755,8 @@
         "skeleton/frontier/model_routing.py",
         "skeleton/intelligence/admission.py",
         "skeleton/intelligence/quality.py",
-        ".github/workflows/p1-intel-routing-context.yml"
+        ".github/workflows/p1-intel-routing-context.yml",
+        "skeleton/frontier/runtime/model_routing.py"
       ],
       "tests": [
         "skeleton/testing/test_context_compiler.py",
@@ -2310,7 +2312,8 @@
         "skeleton/intelligence/quality.py",
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
-        ".github/workflows/p1-intel-routing-context.yml"
+        ".github/workflows/p1-intel-routing-context.yml",
+        "skeleton/frontier/runtime/model_routing.py"
       ],
       "tests": [
         "skeleton/testing/test_frontier_observability_correlation.py",
@@ -2712,7 +2715,8 @@
         "frontend",
         "skeleton/frontier/operation_stream.py",
         "backend/core/operation_projection.py",
-        ".github/workflows/p1-streaming-projection-authority.yml"
+        ".github/workflows/p1-streaming-projection-authority.yml",
+        "skeleton/frontier/runtime/operation_stream.py"
       ],
       "tests": [
         "backend/tests/test_operation_stream_transport.py",
@@ -2842,7 +2846,8 @@
         "backend/core/product_shell_projection.py",
         "frontend/services/productProjection.ts",
         "frontend/services/operationStreamReducer.ts",
-        ".github/workflows/p1-product-workspace-projection.yml"
+        ".github/workflows/p1-product-workspace-projection.yml",
+        "skeleton/frontier/runtime/operation_stream.py"
       ],
       "tests": [
         "backend/tests/test_operation_projection.py",
@@ -2973,7 +2978,8 @@
         "backend/core/tenant_storage_boundary.py",
         "frontend/src/product/tenantStorageBoundary.ts",
         "frontend/src/auth/gameforgeAuth.ts",
-        ".github/workflows/p1-tenant-storage-boundary.yml"
+        ".github/workflows/p1-tenant-storage-boundary.yml",
+        "skeleton/frontier/runtime/operation_stream.py"
       ],
       "tests": [
         "backend/tests/test_operation_projection.py",

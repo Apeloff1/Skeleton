@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_HEAD = "cca2769f760d6bb703ad9153fd1cb4752e3c244c"
 BOUND_AT = "2026-09-28T20:34:16Z"
 REVIEW_AT = "2026-10-28T20:34:16Z"
-NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 EXPECTED_IDS = {
     "P1-GAP-VOL-047:gap:c05917d472-9743acc54597c970",
@@ -44,7 +44,11 @@ def _load(path: Path) -> dict:
 
 def test_batch1_registry_contains_only_exact_verified_gap_bindings() -> None:
     registry = _load(ROOT / REGISTRY)
-    records = registry["records"]
+    records = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] == "release_gap_closure"
+    ]
 
     assert len(records) == 12
     assert {row["obligation_id"] for row in records} == EXPECTED_IDS
@@ -82,7 +86,14 @@ def test_batch1_bindings_match_live_canonical_obligation_digests() -> None:
         )
     }
 
-    for row in registry["records"]:
+    batch1 = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] == "release_gap_closure"
+    ]
+    assert len(batch1) == 12
+
+    for row in batch1:
         obligation = obligations[row["obligation_id"]]
         assert row["obligation_digest"] == obligation.obligation_digest
         assert obligation.kind.value == "gap"
@@ -90,7 +101,7 @@ def test_batch1_bindings_match_live_canonical_obligation_digests() -> None:
         assert obligation.blocking_by_default is True
 
 
-def test_batch1_risk_reconciliation_resolves_only_twelve_obligations() -> None:
+def test_batch1_remains_twelve_bindings_inside_combined_reconciliation() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["inventory"] == {
@@ -100,13 +111,13 @@ def test_batch1_risk_reconciliation_resolves_only_twelve_obligations() -> None:
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
-    assert report["binding_count"] == 12
-    assert report["resolved_count"] == 12
-    assert report["unresolved_blocking_count"] == 501
+    assert report["binding_count"] == 22
+    assert report["resolved_count"] == 22
+    assert report["unresolved_blocking_count"] == 491
     assert report["unclassified_count"] == 281
     assert report["disposition_counts"] == {
-        "evidence": 12,
-        "unbound": 501,
+        "evidence": 22,
+        "unbound": 491,
     }
 
 

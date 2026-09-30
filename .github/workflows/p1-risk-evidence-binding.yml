@@ -22,6 +22,7 @@ on:
       - "tests/test_p1_release_gap_bindings_batch1.py"
       - "scripts/build_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   pull_request:
     branches:
@@ -46,6 +47,7 @@ on:
       - "tests/test_p1_release_gap_bindings_batch1.py"
       - "scripts/build_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
@@ -102,8 +104,9 @@ jobs:
           tests/test_p1_risk_evidence_reconciliation.py
           tests/test_p1_release_gap_bindings_batch1.py
           tests/test_p1_control_plane_gap_evidence.py
+          tests/test_p1_control_plane_gap_bindings_batch2.py
 
-      - name: Build exact-head control-plane gap candidates
+      - name: Validate exact-head control-plane gap binding state
         run: |
           set -euo pipefail
           mkdir -p .p1-control-plane-gap
@@ -130,10 +133,10 @@ jobs:
               raise SystemExit("control-plane batch must cover exactly 10 gaps")
           if report["covered_volume_count"] != 5:
               raise SystemExit("control-plane batch must cover exactly 5 volumes")
-          if report["already_bound_count"] != 0:
-              raise SystemExit("control-plane batch overlaps governed bindings")
-          if report["candidate_binding_count"] != 10:
-              raise SystemExit("control-plane batch must emit 10 candidates")
+          if report["already_bound_count"] != 10:
+              raise SystemExit("control-plane batch must have exactly 10 governed bindings")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("control-plane batch must have zero unbound candidates")
           if report["non_authoritative"] is not True:
               raise SystemExit("control-plane gap report became authoritative")
           for field in (
@@ -144,7 +147,7 @@ jobs:
           ):
               if report[field] is not False:
                   raise SystemExit(f"authority-boundary drift: {field}")
-          print("P1 control-plane gap candidates:", report["report_digest"])
+          print("P1 control-plane gap binding state:", report["report_digest"])
           PY
 
       - name: Reconcile exact-head P1 risk evidence inventory
@@ -194,17 +197,17 @@ jobs:
                   "risk obligation inventory drift: "
                   + repr(report["inventory"])
               )
-          if report["binding_count"] != 12:
+          if report["binding_count"] != 22:
               raise SystemExit("unexpected governed risk binding count")
-          if report["resolved_count"] != 12:
+          if report["resolved_count"] != 22:
               raise SystemExit("unexpected resolved risk obligation count")
-          if report["unresolved_blocking_count"] != 501:
+          if report["unresolved_blocking_count"] != 491:
               raise SystemExit("unexpected unresolved blocking obligation count")
           if report["unclassified_count"] != 281:
               raise SystemExit("unexpected unclassified risk count")
           if report["disposition_counts"] != {
-              "evidence": 12,
-              "unbound": 501,
+              "evidence": 22,
+              "unbound": 491,
           }:
               raise SystemExit(
                   "unexpected risk disposition counts: "
@@ -298,6 +301,7 @@ jobs:
                       "tests/test_p1_risk_evidence_reconciliation.py",
                       "tests/test_p1_release_gap_bindings_batch1.py",
                       "tests/test_p1_control_plane_gap_evidence.py",
+                      "tests/test_p1_control_plane_gap_bindings_batch2.py",
                   ]
               ),
               encoding="utf-8",

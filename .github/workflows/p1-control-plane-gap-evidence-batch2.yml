@@ -30,6 +30,7 @@ on:
       - "tests/test_p1_reproducibility_bundle.py"
       - "skeleton/testing/test_architecture_scope_freeze.py"
       - "tests/test_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
       - ".github/workflows/p1-reproducibility-bundle.yml"
       - ".github/workflows/p1-scope-freeze.yml"
@@ -89,6 +90,7 @@ jobs:
           tests/test_p1_reproducibility_bundle.py
           skeleton/testing/test_architecture_scope_freeze.py
           tests/test_p1_control_plane_gap_evidence.py
+          tests/test_p1_control_plane_gap_bindings_batch2.py
 
       - name: Build exact-head batch 2 candidates
         run: |
@@ -123,10 +125,10 @@ jobs:
               raise SystemExit("batch 2 must cover exactly 10 canonical gaps")
           if report["covered_volume_count"] != 5:
               raise SystemExit("batch 2 must cover exactly 5 canonical volumes")
-          if report["already_bound_count"] != 0:
-              raise SystemExit("batch 2 unexpectedly overlaps existing bindings")
-          if report["candidate_binding_count"] != 10:
-              raise SystemExit("batch 2 must emit exactly 10 candidates")
+          if report["already_bound_count"] != 10:
+              raise SystemExit("batch 2 must have exactly 10 governed bindings")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("batch 2 must have zero unbound candidates after binding")
           for field in (
               "non_authoritative",
               "creates_bindings",
@@ -140,9 +142,9 @@ jobs:
           if len(report.get("report_digest", "")) != 64:
               raise SystemExit("invalid batch 2 report digest")
           for row in report["records"]:
-              if row["binding_present"]:
+              if not row["binding_present"]:
                   raise SystemExit(
-                      "batch 2 candidate already has a governed binding: "
+                      "batch 2 governed binding is missing: "
                       + row["obligation_id"]
                   )
               ref = row["candidate_evidence_ref"]
@@ -173,11 +175,11 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 12:
+          if report["binding_count"] != 22:
               raise SystemExit("verifier branch mutated governed binding count")
-          if report["resolved_count"] != 12:
+          if report["resolved_count"] != 22:
               raise SystemExit("verifier branch mutated governed resolution count")
-          if report["unresolved_blocking_count"] != 501:
+          if report["unresolved_blocking_count"] != 491:
               raise SystemExit("verifier branch mutated blocking obligation count")
           if report["unclassified_count"] != 281:
               raise SystemExit("verifier branch mutated risk classification count")
