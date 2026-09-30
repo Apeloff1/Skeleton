@@ -25,6 +25,7 @@ on:
       - "tests/test_p1_control_plane_gap_bindings_batch2.py"
       - "scripts/build_p1_learning_eval_gap_evidence.py"
       - "tests/test_p1_learning_eval_gap_evidence.py"
+      - "tests/test_p1_learning_eval_gap_bindings_batch3.py"
       - "skeleton/eval/experiment_registry.py"
       - "skeleton/eval/benchmark_registry.py"
       - "skeleton/eval/champion_registry.py"
@@ -40,6 +41,7 @@ on:
   pull_request:
     branches:
       - main
+      - p1/learning-eval-gap-batch3-current-main-20260930
       - p1/reference-provenance-topology-evidence-20260930
       - p1/release-lane-materialize-20260928
     types: [opened, synchronize, reopened, ready_for_review]
@@ -64,6 +66,7 @@ on:
       - "tests/test_p1_control_plane_gap_bindings_batch2.py"
       - "scripts/build_p1_learning_eval_gap_evidence.py"
       - "tests/test_p1_learning_eval_gap_evidence.py"
+      - "tests/test_p1_learning_eval_gap_bindings_batch3.py"
       - "skeleton/eval/experiment_registry.py"
       - "skeleton/eval/benchmark_registry.py"
       - "skeleton/eval/champion_registry.py"
@@ -133,6 +136,7 @@ jobs:
           tests/test_p1_control_plane_gap_evidence.py
           tests/test_p1_control_plane_gap_bindings_batch2.py
           tests/test_p1_learning_eval_gap_evidence.py
+          tests/test_p1_learning_eval_gap_bindings_batch3.py
 
       - name: Validate exact-head control-plane gap binding state
         run: |
@@ -178,7 +182,7 @@ jobs:
           print("P1 control-plane gap binding state:", report["report_digest"])
           PY
 
-      - name: Build exact-head learning evaluation gap batch 3 candidates
+      - name: Validate exact-head learning evaluation gap batch 3 binding state
         run: |
           set -euo pipefail
           mkdir -p .p1-learning-eval-gap
@@ -207,10 +211,10 @@ jobs:
               raise SystemExit("learning/eval batch 3 must cover 12 gaps")
           if report["covered_volume_count"] != 6:
               raise SystemExit("learning/eval batch 3 must cover 6 volumes")
-          if report["already_bound_count"] != 0:
-              raise SystemExit("learning/eval batch 3 overlaps governed bindings")
-          if report["candidate_binding_count"] != 12:
-              raise SystemExit("learning/eval batch 3 must emit 12 candidates")
+          if report["already_bound_count"] != 12:
+              raise SystemExit("learning/eval batch 3 must have exactly 12 governed bindings")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("learning/eval batch 3 must have zero unbound candidates")
           if report["non_authoritative"] is not True:
               raise SystemExit("learning/eval batch 3 became authoritative")
           for field in (
@@ -222,9 +226,9 @@ jobs:
               if report[field] is not False:
                   raise SystemExit(f"learning/eval authority drift: {field}")
           for row in report["records"]:
-              if row["binding_present"]:
+              if not row["binding_present"]:
                   raise SystemExit(
-                      "learning/eval batch 3 already bound: "
+                      "learning/eval batch 3 governed binding missing: "
                       + row["obligation_id"]
                   )
           print("P1 learning/eval batch 3:", report["report_digest"])
@@ -277,17 +281,17 @@ jobs:
                   "risk obligation inventory drift: "
                   + repr(report["inventory"])
               )
-          if report["binding_count"] != 22:
+          if report["binding_count"] != 34:
               raise SystemExit("unexpected governed risk binding count")
-          if report["resolved_count"] != 22:
+          if report["resolved_count"] != 34:
               raise SystemExit("unexpected resolved risk obligation count")
-          if report["unresolved_blocking_count"] != 491:
+          if report["unresolved_blocking_count"] != 479:
               raise SystemExit("unexpected unresolved blocking obligation count")
           if report["unclassified_count"] != 281:
               raise SystemExit("unexpected unclassified risk count")
           if report["disposition_counts"] != {
-              "evidence": 22,
-              "unbound": 491,
+              "evidence": 34,
+              "unbound": 479,
           }:
               raise SystemExit(
                   "unexpected risk disposition counts: "
@@ -384,6 +388,7 @@ jobs:
                       "tests/test_p1_control_plane_gap_evidence.py",
                       "tests/test_p1_control_plane_gap_bindings_batch2.py",
                       "tests/test_p1_learning_eval_gap_evidence.py",
+                      "tests/test_p1_learning_eval_gap_bindings_batch3.py",
                   ]
               ),
               encoding="utf-8",
