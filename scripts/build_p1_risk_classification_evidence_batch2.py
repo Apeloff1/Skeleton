@@ -131,7 +131,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
             "backend/core/operation_stream_transport.py": [
                 "def resync_snapshot(",
                 "def compact_acknowledged(",
-                "compact only history acknowledged by every active consumer",
+                "Compact only history acknowledged by every active consumer.",
             ],
             "backend/tests/test_operation_stream_transport.py": [
                 "test_transport_replay_preserves_explicit_compaction_gap",
@@ -255,7 +255,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
         "markers": {
             "backend/core/api_contract_registry.py": [
                 "consumers: tuple[str, ...]",
-                "authority-semantics-changed",
+                "tenant-scope-semantics-changed",
                 "consumer-removed",
             ],
             "backend/tests/test_api_contract_registry.py": [
