@@ -8446,7 +8446,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-13-0765da9a17a8326d",
+      "obligation_digest": "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T19:15:00Z",
+      "review_at": "2026-10-30T19:15:00Z",
+      "evidence": [
+        {
+          "category": "fuzz",
+          "digest": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
+          "source": "p1:adversarial-ac13-evidence:AC-13:fuzz:8435144dcee7fcb087ad9806504d2d38c9094147"
+        },
+        {
+          "category": "parser_limits",
+          "digest": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
+          "source": "p1:adversarial-ac13-evidence:AC-13:parser_limits:8435144dcee7fcb087ad9806504d2d38c9094147"
+        },
+        {
+          "category": "decompression_bomb",
+          "digest": "f5d3d691340ce80e0564ae744b6959d469d50c468b057b368a6858d461197021",
+          "source": "p1:adversarial-ac13-evidence:AC-13:decompression_bomb:8435144dcee7fcb087ad9806504d2d38c9094147"
+        },
+        {
+          "category": "complexity_budget",
+          "digest": "58a85997b9cff610e15f6c05370083536d4d9628ea5a62fda562d48ebe594fe9",
+          "source": "p1:adversarial-ac13-evidence:AC-13:complexity_budget:8435144dcee7fcb087ad9806504d2d38c9094147"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Verified adversarial wave 2 now includes AC-11, AC-14, AC-15, and AC-20; remaining axes stay blocking until mode-complete independent evidence exists."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. AC-13 hostile-input/parser-bomb evidence is exact-head verified; remaining adversarial axes stay blocking until their required evidence modes are independently proven."
 }
