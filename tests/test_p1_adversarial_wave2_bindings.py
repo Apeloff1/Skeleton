@@ -42,6 +42,8 @@ EXPECTED = {
         "verifier_head": "8435144dcee7fcb087ad9806504d2d38c9094147",
         "verifier_run": 36763669209,
         "verifier_job": 110052302630,
+        "bound_at": "2026-09-30T19:20:00Z",
+        "review_at": "2026-10-30T19:20:00Z",
         "evidence": {
             "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
             "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
@@ -101,8 +103,8 @@ def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
         assert row["owner_id"] == "ACC-P1-EVID-04"
         assert row["severity"] == "high"
         assert row["disposition"] == "evidence"
-        assert row["bound_at"] == BOUND_AT
-        assert row["review_at"] == REVIEW_AT
+        assert row["bound_at"] == expected.get("bound_at", BOUND_AT)
+        assert row["review_at"] == expected.get("review_at", REVIEW_AT)
         assert row["accepted_risk"] is None
         assert expected["verifier_run"] > 0
         assert expected["verifier_job"] > 0
