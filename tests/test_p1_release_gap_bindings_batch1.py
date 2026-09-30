@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_HEAD = "cca2769f760d6bb703ad9153fd1cb4752e3c244c"
 BOUND_AT = "2026-09-28T20:34:16Z"
 REVIEW_AT = "2026-10-28T20:34:16Z"
-NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 EXPECTED_IDS = {
     "P1-GAP-VOL-047:gap:c05917d472-9743acc54597c970",
