@@ -136,7 +136,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_persistence_tree_with_governed_core_overlay"
+      "source_disposition": "canonical_persistence_tree_with_governed_core_overlay",
+      "source_exclusions": [
+        "core"
+      ]
     },
     {
       "id": "AIFT-CONTEXT",
@@ -160,6 +163,9 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_context_with_governed_domains_overlay",
       "overlay_children": [
+        "domains"
+      ],
+      "source_exclusions": [
         "domains"
       ]
     },
@@ -523,9 +529,10 @@
         "shift_supervisor"
       ],
       "source_exclusions": [
-        "shift_supervisor",
+        "agents",
         "hive",
         "overseer",
+        "shift_supervisor",
         "swarm"
       ]
     },
@@ -4659,7 +4666,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_provenance_parent_with_governed_chronicle_overlay"
+      "source_disposition": "canonical_provenance_parent_with_governed_chronicle_overlay",
+      "source_exclusions": [
+        "chronicle"
+      ]
     },
     {
       "id": "AIFT-KNOWLEDGE",
@@ -4687,7 +4697,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_knowledge_parent_with_governed_graphs_overlay"
+      "source_disposition": "canonical_knowledge_parent_with_governed_graphs_overlay",
+      "source_exclusions": [
+        "graphs"
+      ]
     },
     {
       "id": "AIFT-TOOLS",
@@ -4717,7 +4730,10 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_tools_parent_with_governed_integrations_overlay"
+      "source_disposition": "canonical_tools_parent_with_governed_integrations_overlay",
+      "source_exclusions": [
+        "integrations"
+      ]
     },
     {
       "id": "AIFT-ERA",
@@ -4775,7 +4791,12 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_parent_with_independently_governed_children"
+      "source_disposition": "canonical_parent_with_independently_governed_children",
+      "source_exclusions": [
+        "galaxy",
+        "mesh",
+        "network"
+      ]
     },
     {
       "id": "AIFT-RESEARCH",
