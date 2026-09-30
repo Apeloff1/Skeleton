@@ -8414,7 +8414,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-14-683997be530ee235",
+      "obligation_digest": "7d16b5bb575617c25697d08244e38700e55f5b431058c11ca6e7f7d9ceea0810",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T18:55:00Z",
+      "review_at": "2026-10-30T18:55:00Z",
+      "evidence": [
+        {
+          "category": "evidence_digest_check",
+          "digest": "7639f2acccbf381f7aecd706ccc17195861c7dd155449b305053273ddbc87e1f",
+          "source": "p1:adversarial-ac14-evidence:AC-14:evidence_digest_check:c255977275689aacdb8b7e2bb7764034da56dc30"
+        },
+        {
+          "category": "independent_verification",
+          "digest": "734abba56e727e08ea7995f162df031497ae386bb648cbfcbb86db4d64f4735d",
+          "source": "p1:adversarial-ac14-evidence:AC-14:independent_verification:c255977275689aacdb8b7e2bb7764034da56dc30"
+        },
+        {
+          "category": "failed_run_retention",
+          "digest": "8b17217cc58bd9f747a17c042fe9ffdc3c1f1943f7a0faafa6f8e53de17c4dc0",
+          "source": "p1:adversarial-ac14-evidence:AC-14:failed_run_retention:c255977275689aacdb8b7e2bb7764034da56dc30"
+        },
+        {
+          "category": "provenance_replay",
+          "digest": "8b47706a2c7068bb39247e1694acecf55f170b2981291aca2925c475f78c6ae0",
+          "source": "p1:adversarial-ac14-evidence:AC-14:provenance_replay:c255977275689aacdb8b7e2bb7764034da56dc30"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20, AC-11, and AC-15 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20, AC-11, AC-15, and AC-14 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
 }
