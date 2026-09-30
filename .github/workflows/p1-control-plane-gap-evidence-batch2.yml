@@ -175,11 +175,11 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 496:
+          if report["binding_count"] != 505:
               raise SystemExit("verifier branch mutated governed binding count")
-          if report["resolved_count"] != 496:
+          if report["resolved_count"] != 505:
               raise SystemExit("verifier branch mutated governed resolution count")
-          if report["unresolved_blocking_count"] != 17:
+          if report["unresolved_blocking_count"] != 8:
               raise SystemExit("verifier branch mutated blocking obligation count")
           if report["unclassified_count"] != 0:
               raise SystemExit("verifier branch mutated risk classification count")
