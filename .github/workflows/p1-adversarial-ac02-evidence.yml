@@ -64,6 +64,7 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
+          "fastapi>=0.116,<1"
           "pydantic[email]>=2.13.5"
           "pydantic-settings>=2.15.0"
 
