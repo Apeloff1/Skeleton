@@ -8510,6 +8510,38 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-12-09b6e9954d4be1de",
+      "obligation_digest": "e793561bdc5731f9d3d82d16c21f7e554f25b242bfd742586793d5d87b8c2afe",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:20:00Z",
+      "review_at": "2026-10-30T20:20:00Z",
+      "evidence": [
+        {
+          "category": "canonicalization_fuzz",
+          "digest": "b433bf8854f73ba4fcbd3a0077e28fcaa00a4d1372f2536c31b82c500ea529a9",
+          "source": "p1:adversarial-ac12-evidence:AC-12:canonicalization_fuzz:3755ce81ddf80263e68e38e07acd4a2fa8853271"
+        },
+        {
+          "category": "toctou_race",
+          "digest": "7081d5e8fd403d8ddbd6855c9bee21a8a871ec19d0410b8fe1cb82a992f91c25",
+          "source": "p1:adversarial-ac12-evidence:AC-12:toctou_race:3755ce81ddf80263e68e38e07acd4a2fa8853271"
+        },
+        {
+          "category": "resource_binding",
+          "digest": "f8daec812f1c5bb9cf786cc41ce0a2b6f2635ffa4125c571e68a119f9584f424",
+          "source": "p1:adversarial-ac12-evidence:AC-12:resource_binding:3755ce81ddf80263e68e38e07acd4a2fa8853271"
+        },
+        {
+          "category": "path_network_adversarial",
+          "digest": "f05b90edf32d9fc18f6f1b6cbcd5f543482c0e9a45d8b762f8ce76bcacee023e",
+          "source": "p1:adversarial-ac12-evidence:AC-12:path_network_adversarial:3755ce81ddf80263e68e38e07acd4a2fa8853271"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
   "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Governed adversarial closure now includes AC-11, AC-13, AC-14, AC-15, AC-20, and AC-22; remaining axes stay blocking until mode-complete evidence exists."
