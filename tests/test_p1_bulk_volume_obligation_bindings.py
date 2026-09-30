@@ -88,27 +88,27 @@ def test_bulk_bindings_match_live_canonical_obligations() -> None:
         assert obligation.source_ref.split(":", 1)[0] in row["owner_id"]
 
 
-def test_governed_frontier_is_496_resolved_17_adversarial() -> None:
+def test_governed_frontier_is_505_resolved_8_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 496
-    assert report["resolved_count"] == 496
-    assert report["unresolved_blocking_count"] == 17
+    assert report["binding_count"] == 505
+    assert report["resolved_count"] == 505
+    assert report["unresolved_blocking_count"] == 8
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 496,
-        "unbound": 17,
+        "evidence": 505,
+        "unbound": 8,
     }
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}
     unbound = [item for item in _obligations() if item.obligation_id not in bound]
 
-    assert len(unbound) == 17
+    assert len(unbound) == 8
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
+    } - {"AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-18", "AC-20", "AC-22", "AC-24"}
 
 
 def test_bulk_binding_does_not_mutate_masterplan_source_obligations() -> None:
