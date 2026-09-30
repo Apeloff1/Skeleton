@@ -119,8 +119,8 @@ jobs:
           )
           assert report["covered_gap_count"] == 12
           assert report["covered_volume_count"] == 8
-          assert report["already_bound_count"] == 0
-          assert report["candidate_binding_count"] == 12
+          assert report["already_bound_count"] == 12
+          assert report["candidate_binding_count"] == 0
           assert report["non_authoritative"] is True
           assert report["creates_bindings"] is False
           assert report["clears_masterplan_gaps"] is False
