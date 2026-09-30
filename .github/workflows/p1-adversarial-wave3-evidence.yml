@@ -114,17 +114,17 @@ jobs:
               raise SystemExit(f"wave3 axis set drifted: {report['axis_ids']!r}")
           if report["axis_count"] != 9:
               raise SystemExit("wave3 axis count mismatch")
-          if report["already_bound_count"] != 0:
-              raise SystemExit("wave3 unexpectedly contains already-bound axes")
-          if report["candidate_binding_count"] != 9:
-              raise SystemExit("wave3 candidate count mismatch")
+          if report["already_bound_count"] != 9:
+              raise SystemExit("wave3 expected all nine axes to be already bound")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("wave3 must have zero unbound candidates")
           if not report["non_authoritative"] or report["creates_bindings"]:
               raise SystemExit("wave3 authority boundary violated")
           if report["accepts_risk"] or report["lowers_severity"] or report["promotes_maturity"]:
               raise SystemExit("wave3 governance boundary violated")
           for candidate in report["candidates"]:
-              if candidate["binding_present"]:
-                  raise SystemExit(f"{candidate['axis_id']} is already bound")
+              if not candidate["binding_present"]:
+                  raise SystemExit(f"{candidate['axis_id']} is not bound")
               if len(candidate["evidence"]) != 4:
                   raise SystemExit(f"{candidate['axis_id']} evidence cardinality mismatch")
               if any(len(item["digest"]) != 64 for item in candidate["evidence"]):
