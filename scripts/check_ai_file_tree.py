@@ -229,6 +229,42 @@ def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool
     return planned_source.startswith(source.rstrip("/") + "/")
 
 
+def _mappings_cover_planned_source(
+    mappings: list[object],
+    planned_source: str,
+) -> bool:
+    """Return whether mappings completely govern one extant planned namespace.
+
+    A planned source can be governed either by one direct tree/file mapping or
+    by a composition of independently governed children. Namespace composition
+    is fail-closed: every tracked file beneath the planned root must be covered
+    by at least one mapping, and an empty namespace does not count as covered.
+    """
+
+    if any(
+        _mapping_covers_planned_source(mapping, planned_source)
+        for mapping in mappings
+    ):
+        return True
+
+    root = ROOT / planned_source
+    if not root.is_dir():
+        return False
+
+    members = _tree_files(root)
+    if not members:
+        return False
+
+    for relative in members:
+        member_source = f"{planned_source.rstrip('/')}/{relative}"
+        if not any(
+            _mapping_covers_planned_source(mapping, member_source)
+            for mapping in mappings
+        ):
+            return False
+    return True
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     required = [
@@ -299,9 +335,9 @@ def validate() -> list[str]:
         master_plan = {}
 
     for planned_source in sorted(_planned_implementation_sources(master_plan)):
-        governed = any(
-            _mapping_covers_planned_source(mapping, planned_source)
-            for mapping in mappings
+        governed = _mappings_cover_planned_source(
+            mappings,
+            planned_source,
         )
         if _source_exists(planned_source) and not governed:
             errors.append(
@@ -468,10 +504,20 @@ def validate() -> list[str]:
                             errors.append(f"{mid}: duplicate overlay child {overlay}")
                             continue
                         full_destination = f"{dst}/{overlay}"
-                        if full_destination not in declared_destinations:
+                        full_source = f"{src.rstrip('/')}/{overlay}"
+                        source_governed = any(
+                            other == full_source
+                            or other.startswith(full_source.rstrip("/") + "/")
+                            for other in declared_sources
+                            if other != src
+                        )
+                        if (
+                            full_destination not in declared_destinations
+                            and not source_governed
+                        ):
                             errors.append(
-                                f"{mid}: overlay child is not a governed mapping destination: "
-                                f"{full_destination}"
+                                f"{mid}: overlay child is not independently governed: "
+                                f"source={full_source} destination={full_destination}"
                             )
                             continue
                         overlays.add(overlay)
