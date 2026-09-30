@@ -19,6 +19,8 @@ from scripts.reconcile_p1_risk_evidence import (
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
+RESOLVED_AXES = frozenset({"AC-11", "AC-14", "AC-15", "AC-20"})
+EXPECTED_RESIDUAL_AXIS_COUNT = 20
 
 EXPECTED = {
     "AC-11": {
@@ -139,7 +141,7 @@ def test_wave2_advances_governed_frontier_to_493_20_0() -> None:
         if item.kind is RiskKind.ADVERSARIAL
         and item.obligation_id not in bound
     ]
-    assert len(unbound) == 20
+    assert len(unbound) == EXPECTED_RESIDUAL_AXIS_COUNT
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-14", "AC-15", "AC-20"}
+    } - RESOLVED_AXES
