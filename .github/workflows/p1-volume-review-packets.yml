@@ -1,0 +1,164 @@
+name: P1 Volume Review Packet Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/maturity-closure-ledger-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/reconcile_p1_maturity.py"
+      - "scripts/build_p1_maturity_closure_ledger.py"
+      - "scripts/build_p1_volume_review_packets.py"
+      - "tests/test_p1_maturity_closure_ledger.py"
+      - "tests/test_p1_volume_review_packets.py"
+      - ".github/workflows/p1-volume-review-packets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-volume-review-packets-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate unsigned exact-head P1 volume review packets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused reconciliation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile review-packet engines
+        run: |
+          python -m py_compile             scripts/reconcile_p1_maturity.py             scripts/build_p1_maturity_closure_ledger.py             scripts/build_p1_volume_review_packets.py
+
+      - name: Validate upstream evidence state
+        run: |
+          python scripts/reconcile_p1_volume_metadata.py --check
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run review-packet regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_maturity_closure_ledger.py
+          tests/test_p1_volume_review_packets.py
+
+      - name: Build exact-head unsigned review packets
+        run: |
+          mkdir -p .p1-review
+          python scripts/build_p1_volume_review_packets.py             --commit-sha "$EXPECTED_SHA"             --out .p1-review/packets.json
+
+      - name: Assert review boundary and sequencing
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path(".p1-review/packets.json").read_text(encoding="utf-8")
+          )
+          if manifest["source_commit"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("review manifest exact-head mismatch")
+          if manifest["review_packet_count"] != 104:
+              raise SystemExit("unexpected review-packet count")
+          if manifest["target_floor_eligible_count"] != 3:
+              raise SystemExit("unexpected floor-eligible count")
+          if manifest["signed"] is not False:
+              raise SystemExit("review manifest must remain unsigned")
+          if manifest["applicable"] is not False:
+              raise SystemExit("review manifest cannot be directly applicable")
+          for authority in (
+              "accountability_mutation_authority",
+              "maturity_mutation_authority",
+              "promotion_authority",
+          ):
+              if manifest[authority] is not False:
+                  raise SystemExit(f"review manifest carries {authority}")
+
+          gap_packets = 0
+          for packet in manifest["packets"]:
+              if packet["source_commit"] != os.environ["EXPECTED_SHA"]:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: packet head mismatch"
+                  )
+              if packet["signed"] is not False:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: packet unexpectedly signed"
+                  )
+              implementation = packet["implementation_review"]
+              verification = packet["verification_review"]
+              if implementation["prerequisite_actions"]:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: implementation review is "
+                      "incorrectly blocked by downstream actions"
+                  )
+              if verification["independence_required"] is not True:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: verifier independence missing"
+                  )
+              required = set(verification["prerequisite_actions"])
+              if "implementation_signoff" not in required:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: verifier may precede "
+                      "implementation signoff"
+                  )
+              if "accountability_maturity_status" not in required:
+                  raise SystemExit(
+                      f"{packet['volume_key']}: maturity status prerequisite "
+                      "missing"
+                  )
+              if "resolve_volume_gaps" in packet["required_actions"]:
+                  gap_packets += 1
+                  if "resolve_volume_gaps" not in required:
+                      raise SystemExit(
+                          f"{packet['volume_key']}: gap closure prerequisite "
+                          "missing"
+                      )
+
+          if gap_packets != 84:
+              raise SystemExit(
+                  f"unexpected gap-bearing review packet count: {gap_packets}"
+              )
+
+          print(
+              "P1 unsigned volume review packets OK:",
+              manifest["review_packet_count"],
+              "packets /",
+              gap_packets,
+              "gap-bearing",
+              manifest["manifest_digest"],
+          )
+          PY
