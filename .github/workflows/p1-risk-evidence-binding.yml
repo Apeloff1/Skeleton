@@ -260,17 +260,17 @@ jobs:
                   "risk obligation inventory drift: "
                   + repr(report["inventory"])
               )
-          if report["binding_count"] != 496:
+          if report["binding_count"] != 505:
               raise SystemExit("unexpected governed risk binding count")
-          if report["resolved_count"] != 496:
+          if report["resolved_count"] != 505:
               raise SystemExit("unexpected resolved risk obligation count")
-          if report["unresolved_blocking_count"] != 17:
+          if report["unresolved_blocking_count"] != 8:
               raise SystemExit("unexpected unresolved blocking obligation count")
           if report["unclassified_count"] != 0:
               raise SystemExit("unexpected unclassified risk count")
           if report["disposition_counts"] != {
-              "evidence": 496,
-              "unbound": 17,
+              "evidence": 505,
+              "unbound": 8,
           }:
               raise SystemExit(
                   "unexpected risk disposition counts: "
