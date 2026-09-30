@@ -216,6 +216,7 @@ jobs:
           skeleton/testing/test_ai_adversarial_closure.py
           tests/test_p1_adversarial_ac22_evidence.py
           tests/test_p1_adversarial_ac11_binding.py
+          tests/test_p1_adversarial_ac13_binding.py
           tests/test_p1_adversarial_ac14_binding.py
           tests/test_p1_adversarial_ac15_binding.py
           tests/test_p1_adversarial_ac20_binding.py
@@ -287,7 +288,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier remains 493 resolved and 20 blocking
+      - name: Confirm governed frontier remains 494 resolved and 19 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac22/reconciliation.json
@@ -298,17 +299,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac22/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 493:
+          if report["binding_count"] != 494:
               raise SystemExit("AC-22 verifier mutated binding count")
-          if report["resolved_count"] != 493:
+          if report["resolved_count"] != 494:
               raise SystemExit("AC-22 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 20:
+          if report["unresolved_blocking_count"] != 19:
               raise SystemExit("AC-22 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-22 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 493,
-              "unbound": 20,
+              "evidence": 494,
+              "unbound": 19,
           }:
               raise SystemExit("AC-22 verifier mutated disposition counts")
           PY
