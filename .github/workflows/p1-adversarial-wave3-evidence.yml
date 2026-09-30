@@ -1,0 +1,243 @@
+name: P1 Adversarial Wave 3 Evidence Gate
+
+on:
+  push:
+    branches:
+      - "p1/adversarial-wave3-evidence-*"
+  pull_request:
+    branches:
+      - main
+      - p1/closure-rollup-495-18-20260930
+      - p1/adversarial-ac09-binding-live-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_adversarial_closure.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "scripts/build_p1_adversarial_wave3_evidence.py"
+      - "tests/test_p1_adversarial_wave3_evidence.py"
+      - ".github/workflows/p1-adversarial-wave3-evidence.yml"
+      - "skeleton/shells/reconciler.py"
+      - "skeleton/shells/ai/idempotency.py"
+      - "skeleton/testing/test_shell_service_state_reconcile.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      - "backend/core/durable_outbox.py"
+      - "backend/tests/test_durable_outbox.py"
+      - "backend/core/operation_projection.py"
+      - "backend/tests/test_operation_projection.py"
+      - "skeleton/shells/ai/durable_orphan_scan.py"
+      - "skeleton/testing/test_shell_ai_durable_orphan_scan.py"
+      - "backend/core/tenant_storage_boundary.py"
+      - "backend/tests/test_tenant_storage_boundary.py"
+      - "skeleton/testing/test_swarm_tenant_broker.py"
+      - "skeleton/testing/test_swarm_dead_replay.py"
+      - "skeleton/vault/data_lifecycle.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_guarded_compaction.py"
+      - "tests/test_delta_memory_compaction.py"
+      - "skeleton/testing/test_memory_projection.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-wave3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify adversarial wave-3 evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "fastapi>=0.116,<1"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run wave-3 runtime regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_shell_service_state_reconcile.py
+          skeleton/testing/test_tool_receipt_store.py
+          skeleton/testing/test_provider_stream_reliability_profiles.py
+          backend/tests/test_durable_outbox.py
+          backend/tests/test_operation_projection.py
+          skeleton/testing/test_shell_ai_durable_orphan_scan.py
+          backend/tests/test_tenant_storage_boundary.py
+          skeleton/testing/test_swarm_tenant_broker.py
+          skeleton/testing/test_swarm_dead_replay.py
+          skeleton/testing/test_guarded_compaction.py
+          tests/test_delta_memory_compaction.py
+          skeleton/testing/test_data_lifecycle.py
+          skeleton/testing/test_memory_projection.py
+          tests/test_p1_adversarial_wave3_evidence.py
+          tests/test_p1_adversarial_ac09_binding.py
+          tests/test_p1_risk_evidence_reconciliation.py
+
+      - name: Compile wave-3 evidence twice
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-wave3
+          for axis in AC-05 AC-06 AC-17 AC-18; do
+            python scripts/build_p1_adversarial_wave3_evidence.py \
+              --axis "$axis" \
+              --expected-head "$EXPECTED_SHA" \
+              --out ".p1-wave3/$axis.json" \
+              --print-summary
+            python scripts/build_p1_adversarial_wave3_evidence.py \
+              --axis "$axis" \
+              --expected-head "$EXPECTED_SHA" \
+              --out ".p1-wave3/$axis.replay.json"
+            cmp ".p1-wave3/$axis.json" ".p1-wave3/$axis.replay.json"
+          done
+
+      - name: Prove wave-3 completeness and emit binding seeds
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "AC-05": {
+                  "unknown_outcome_reconciliation",
+                  "idempotency_replay",
+                  "provider_fault",
+                  "receipt_recovery",
+              },
+              "AC-06": {
+                  "reconciliation_drill",
+                  "duplicate_delivery",
+                  "orphan_sweep",
+                  "projection_rebuild",
+              },
+              "AC-17": {
+                  "tenant_isolation",
+                  "cache_key_collision",
+                  "dead_letter_replay",
+                  "artifact_acl",
+              },
+              "AC-18": {
+                  "reindex_rebuild",
+                  "compaction",
+                  "deletion_replay",
+                  "derived_data_invalidation",
+              },
+          }
+          for axis, modes in expected.items():
+              report = json.loads(
+                  Path(f".p1-wave3/{axis}.json").read_text(
+                      encoding="utf-8"
+                  )
+              )
+              candidate = report["candidate"]
+              if report["axis_id"] != axis:
+                  raise SystemExit(f"{axis} identity drift")
+              if report["candidate_count"] != 1:
+                  raise SystemExit(f"{axis} candidate count drift")
+              if report["already_bound_count"] != 0:
+                  raise SystemExit(f"{axis} unexpectedly already governed")
+              if report["candidate_binding_count"] != 1:
+                  raise SystemExit(f"{axis} binding count drift")
+              if set(candidate["required_evidence_modes"]) != modes:
+                  raise SystemExit(f"{axis} required evidence modes drift")
+              if {
+                  row["category"] for row in candidate["evidence"]
+              } != modes:
+                  raise SystemExit(f"{axis} evidence categories incomplete")
+              if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
+                  raise SystemExit(f"{axis} is not exact-head bound")
+              if candidate["recommended_severity"] != "high":
+                  raise SystemExit(f"{axis} severity drift")
+              if candidate["recommended_disposition"] != "evidence":
+                  raise SystemExit(f"{axis} disposition drift")
+              for field in (
+                  "creates_binding",
+                  "accepts_risk",
+                  "lowers_severity",
+                  "promotes_maturity",
+              ):
+                  if candidate[field] is not False:
+                      raise SystemExit(
+                          f"{axis} authority boundary drift: {field}"
+                      )
+              print(
+                  f"P1_WAVE3_BINDING_SEED {axis} "
+                  + json.dumps(
+                      {
+                          "obligation_id": candidate["obligation_id"],
+                          "obligation_digest": candidate[
+                              "obligation_digest"
+                          ],
+                          "owner_id": candidate["owner_id"],
+                          "severity": candidate[
+                              "recommended_severity"
+                          ],
+                          "disposition": candidate[
+                              "recommended_disposition"
+                          ],
+                          "evidence": candidate["evidence"],
+                      },
+                      sort_keys=True,
+                      separators=(",", ":"),
+                  )
+              )
+          PY
+
+      - name: Confirm governed frontier remains 497 resolved and 16 blocking
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py \
+            --evaluated-at "2026-10-01T12:00:00+00:00" \
+            --out .p1-wave3/reconciliation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-wave3/reconciliation.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["binding_count"] != 497:
+              raise SystemExit("wave-3 mutated binding count")
+          if report["resolved_count"] != 497:
+              raise SystemExit("wave-3 mutated resolved count")
+          if report["unresolved_blocking_count"] != 16:
+              raise SystemExit("wave-3 mutated blocking count")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("wave-3 reintroduced unclassified risks")
+          if report["disposition_counts"] != {
+              "evidence": 497,
+              "unbound": 16,
+          }:
+              raise SystemExit("wave-3 mutated disposition counts")
+          PY
