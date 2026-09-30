@@ -93,7 +93,7 @@ def _registry_rows() -> dict[str, dict]:
 
 def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
     rows = _registry_rows()
-    assert len(rows) == 2
+    assert len(rows) == len(EXPECTED)
 
     for axis_id, expected in EXPECTED.items():
         row = rows[expected["obligation_id"]]
