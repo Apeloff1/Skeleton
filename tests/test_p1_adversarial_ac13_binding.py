@@ -21,6 +21,8 @@ OBLIGATION_ID = "P1-ADVERSARIAL-AC-13-0765da9a17a8326d"
 OBLIGATION_DIGEST = "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735"
 OWNER_ID = "ACC-P1-EVID-04"
 VERIFIER_HEAD = "8435144dcee7fcb087ad9806504d2d38c9094147"
+VERIFIER_RUN_ID = 36763669209
+VERIFIER_JOB_ID = 110052302630
 BOUND_AT = "2026-09-30T19:20:00Z"
 REVIEW_AT = "2026-10-30T19:20:00Z"
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
@@ -66,6 +68,9 @@ def _obligation():
 
 def test_ac13_binding_pins_exact_head_evidence_receipt() -> None:
     row = _binding()
+
+    assert VERIFIER_RUN_ID == 36763669209
+    assert VERIFIER_JOB_ID == 110052302630
 
     assert row["obligation_id"] == OBLIGATION_ID
     assert row["obligation_digest"] == OBLIGATION_DIGEST
