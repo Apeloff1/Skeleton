@@ -61,7 +61,7 @@ def test_ac12_mode_contracts_cover_required_adversarial_boundaries() -> None:
     assert "test_stream_write_cannot_escape_after_parent_path_swap" in TOKENS[
         "toctou_race"
     ]
-    assert "verify_connected_peer" in TOKENS["resource_binding"]
+    assert "validate_connected_peer" in TOKENS["resource_binding"]
     assert "test_mixed_dns_answer_with_any_private_address_fails_closed" in TOKENS[
         "path_network_adversarial"
     ]
