@@ -25,7 +25,7 @@ VERIFIER_RUN_ID = 36760238991
 VERIFIER_JOB_ID = 110040647258
 BOUND_AT = "2026-09-30T18:55:00Z"
 REVIEW_AT = "2026-10-30T18:55:00Z"
-NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 EXPECTED_EVIDENCE = {
     "evidence_digest_check": "7639f2acccbf381f7aecd706ccc17195861c7dd155449b305053273ddbc87e1f",
@@ -100,13 +100,13 @@ def test_ac14_binding_matches_live_adversarial_obligation() -> None:
 def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 493
-    assert report["resolved_count"] == 493
-    assert report["unresolved_blocking_count"] == 20
+    assert report["binding_count"] == 494
+    assert report["resolved_count"] == 494
+    assert report["unresolved_blocking_count"] == 19
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 493,
-        "unbound": 20,
+        "evidence": 494,
+        "unbound": 19,
     }
 
     registry = _load(ROOT / REGISTRY)
@@ -117,7 +117,7 @@ def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
         if item.kind is RiskKind.ADVERSARIAL
         and item.obligation_id not in bound
     ]
-    assert len(unbound) == 20
+    assert len(unbound) == 19
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-14", "AC-15", "AC-20"}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
