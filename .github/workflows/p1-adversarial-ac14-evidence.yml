@@ -1,0 +1,202 @@
+name: P1 Adversarial AC-14 Evidence Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/adversarial-ac15-evidence-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "skeleton/contracts/canonical.py"
+      - "skeleton/contracts/risk_evidence.py"
+      - "scripts/verify_provider_surface_closure.py"
+      - "tests/test_provider_surface_independent_verifier.py"
+      - "scripts/verify_cost_admission_closure.py"
+      - "tests/test_cost_admission_independent_verifier.py"
+      - "scripts/build_p1_bulk_volume_obligation_evidence.py"
+      - "scripts/build_p1_adversarial_ac20_evidence.py"
+      - "scripts/build_p1_adversarial_ac15_evidence.py"
+      - "scripts/build_p1_adversarial_ac14_evidence.py"
+      - "tests/test_p1_adversarial_ac14_evidence.py"
+      - ".github/workflows/p1-adversarial-ac14-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-ac14-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify AC-14 evidence integrity and independence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_provider_surface_independent_verifier.py
+          tests/test_cost_admission_independent_verifier.py
+          tests/test_p1_adversarial_ac14_evidence.py
+
+      - name: Run independent provider verifier
+        env:
+          EVIDENCE_HEAD_SHA: "${{ env.EXPECTED_SHA }}"
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-ac14
+          python scripts/verify_provider_surface_closure.py             --evidence-out .p1-ac14/provider-receipt.json             --print-evidence
+
+      - name: Run independent cost verifier
+        env:
+          GITHUB_SHA: "${{ env.EXPECTED_SHA }}"
+        run: |
+          set -euo pipefail
+          python scripts/verify_cost_admission_closure.py             --evidence-out .p1-ac14/cost-receipt.json
+
+      - name: Assert independent exact-head receipts
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = os.environ["EXPECTED_SHA"]
+          provider = json.loads(
+              Path(".p1-ac14/provider-receipt.json").read_text(encoding="utf-8")
+          )
+          cost = json.loads(
+              Path(".p1-ac14/cost-receipt.json").read_text(encoding="utf-8")
+          )
+          if provider.get("head_sha") != expected or provider.get("valid") is not True:
+              raise SystemExit("independent provider receipt is not valid exact-head evidence")
+          if cost.get("head_sha") != expected or cost.get("valid") is not True:
+              raise SystemExit("independent cost receipt is not valid exact-head evidence")
+          if provider.get("verifier") != "independent-provider-surface-v1":
+              raise SystemExit("provider verifier identity drift")
+          if cost.get("verifier") != "independent-cost-admission-v1":
+              raise SystemExit("cost verifier identity drift")
+          PY
+
+      - name: Compile and replay AC-14 evidence
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_adversarial_ac14_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac14/report.json             --print-summary
+          python scripts/build_p1_adversarial_ac14_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac14/replay.json
+          cmp .p1-ac14/report.json .p1-ac14/replay.json
+          sha256sum .p1-ac14/report.json .p1-ac14/replay.json             > .p1-ac14/digests.sha256
+
+      - name: Prove AC-14 modes and emit binding seed
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac14/report.json").read_text(encoding="utf-8")
+          )
+          candidate = report["candidate"]
+          modes = {
+              "evidence_digest_check",
+              "independent_verification",
+              "failed_run_retention",
+              "provenance_replay",
+          }
+          if set(candidate["required_evidence_modes"]) != modes:
+              raise SystemExit("AC-14 required modes drift")
+          if {row["category"] for row in candidate["evidence"]} != modes:
+              raise SystemExit("AC-14 evidence categories incomplete")
+          if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AC-14 candidate is not exact-head bound")
+          if candidate["recommended_severity"] != "high":
+              raise SystemExit("AC-14 severity drift")
+          if candidate["recommended_disposition"] != "evidence":
+              raise SystemExit("AC-14 disposition drift")
+          for field in (
+              "creates_binding",
+              "accepts_risk",
+              "lowers_severity",
+              "promotes_maturity",
+          ):
+              if candidate[field] is not False:
+                  raise SystemExit(f"AC-14 authority drift: {field}")
+          print(
+              "P1_AC14_BINDING_SEED "
+              + json.dumps(
+                  {
+                      "obligation_id": candidate["obligation_id"],
+                      "obligation_digest": candidate["obligation_digest"],
+                      "owner_id": candidate["owner_id"],
+                      "severity": candidate["recommended_severity"],
+                      "disposition": candidate["recommended_disposition"],
+                      "evidence": candidate["evidence"],
+                  },
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+          )
+          PY
+
+      - name: Confirm governed frontier remains 490 resolved and 23 blocking
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac14/reconciliation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac14/reconciliation.json").read_text(encoding="utf-8")
+          )
+          if report["binding_count"] != 490:
+              raise SystemExit("AC-14 verifier mutated binding count")
+          if report["resolved_count"] != 490:
+              raise SystemExit("AC-14 verifier mutated resolved count")
+          if report["unresolved_blocking_count"] != 23:
+              raise SystemExit("AC-14 verifier mutated blocking count")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("AC-14 verifier reintroduced unclassified risks")
+          PY
+
+      - name: Retain AC-14 evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ac14-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .p1-ac14/
+          if-no-files-found: warn
+          retention-days: 30
