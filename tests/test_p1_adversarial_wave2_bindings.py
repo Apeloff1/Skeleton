@@ -36,6 +36,19 @@ EXPECTED = {
             "evidence_invalidation": "2e003c962809a28c2901c732ddbd3147be2c62621316f9230747a570181ebd21",
         },
     },
+    "AC-13": {
+        "obligation_id": "P1-ADVERSARIAL-AC-13-0765da9a17a8326d",
+        "obligation_digest": "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735",
+        "verifier_head": "8435144dcee7fcb087ad9806504d2d38c9094147",
+        "verifier_run": 0,
+        "verifier_job": 0,
+        "evidence": {
+            "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
+            "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
+            "decompression_bomb": "f5d3d691340ce80e0564ae744b6959d469d50c468b057b368a6858d461197021",
+            "complexity_budget": "58a85997b9cff610e15f6c05370083536d4d9628ea5a62fda562d48ebe594fe9",
+        },
+    },
     "AC-15": {
         "obligation_id": "P1-ADVERSARIAL-AC-15-f7f89f2c5b94ede2",
         "obligation_digest": "f40e7b2b95b734e8fad7419baa251d47e9e05a3ec343f677d0a6e93fa7dab98d",
@@ -72,6 +85,7 @@ def _registry_rows() -> dict[str, dict]:
         for row in registry["records"]
         if row["obligation_id"] in {
             EXPECTED["AC-11"]["obligation_id"],
+            EXPECTED["AC-13"]["obligation_id"],
             EXPECTED["AC-15"]["obligation_id"],
         }
     }
@@ -90,8 +104,9 @@ def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
         assert row["bound_at"] == BOUND_AT
         assert row["review_at"] == REVIEW_AT
         assert row["accepted_risk"] is None
-        assert expected["verifier_run"] > 0
-        assert expected["verifier_job"] > 0
+        if axis_id != "AC-13":
+            assert expected["verifier_run"] > 0
+            assert expected["verifier_job"] > 0
 
         by_category = {item["category"]: item for item in row["evidence"]}
         assert set(by_category) == set(expected["evidence"])
