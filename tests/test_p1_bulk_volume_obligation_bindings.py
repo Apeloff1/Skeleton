@@ -88,7 +88,7 @@ def test_bulk_bindings_match_live_canonical_obligations() -> None:
         assert obligation.source_ref.split(":", 1)[0] in row["owner_id"]
 
 
-def test_governed_frontier_is_489_resolved_24_adversarial() -> None:
+def test_governed_frontier_is_490_resolved_23_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["binding_count"] == 490
