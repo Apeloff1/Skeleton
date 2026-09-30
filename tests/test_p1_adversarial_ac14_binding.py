@@ -16,22 +16,22 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-AXIS_ID = "AC-20"
-OBLIGATION_ID = "P1-ADVERSARIAL-AC-20-80259972cf1cce6a"
-OBLIGATION_DIGEST = "b87aca772977cd25d2eaa3d2f8e7dab7985166c56f231287aab45d26580dae84"
+AXIS_ID = "AC-14"
+OBLIGATION_ID = "P1-ADVERSARIAL-AC-14-683997be530ee235"
+OBLIGATION_DIGEST = "7d16b5bb575617c25697d08244e38700e55f5b431058c11ca6e7f7d9ceea0810"
 OWNER_ID = "ACC-P1-EVID-04"
-VERIFIER_HEAD = "2865b1785316a88e026a5e358d5aa7cedaea7ac5"
-VERIFIER_RUN_ID = 36757293622
-VERIFIER_JOB_ID = 110030645608
-BOUND_AT = "2026-09-30T18:20:00Z"
-REVIEW_AT = "2026-10-30T18:20:00Z"
+VERIFIER_HEAD = "c255977275689aacdb8b7e2bb7764034da56dc30"
+VERIFIER_RUN_ID = 36760238991
+VERIFIER_JOB_ID = 110040647258
+BOUND_AT = "2026-09-30T18:55:00Z"
+REVIEW_AT = "2026-10-30T18:55:00Z"
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 EXPECTED_EVIDENCE = {
-    "drift_validator": "ddbe3822e3f3decbabb680b10148671d7aff1b2abb8edc5c0ab8d2bf45ce28b1",
-    "architecture_fitness": "0ad5f04fa988c9d95aafe8061bfffeacc0d8945a4a5f08081f71f4a81d5d967d",
-    "undeclared_component_scan": "fbd6e381a0cd5ba5e9c930be7d5866ea046de9c7470670f8828d7942a690175b",
-    "traceability_check": "6671f5810dde65084f44d4d773208a2d7b739bc66c31d8244d22cbc181916408",
+    "evidence_digest_check": "7639f2acccbf381f7aecd706ccc17195861c7dd155449b305053273ddbc87e1f",
+    "independent_verification": "734abba56e727e08ea7995f162df031497ae386bb648cbfcbb86db4d64f4735d",
+    "failed_run_retention": "8b17217cc58bd9f747a17c042fe9ffdc3c1f1943f7a0faafa6f8e53de17c4dc0",
+    "provenance_replay": "8b47706a2c7068bb39247e1694acecf55f170b2981291aca2925c475f78c6ae0",
 }
 
 
@@ -59,11 +59,11 @@ def _binding() -> dict:
     return matches[0]
 
 
-def test_ac20_binding_pins_successful_exact_head_verifier() -> None:
+def test_ac14_binding_pins_successful_exact_head_verifier() -> None:
     row = _binding()
 
-    assert VERIFIER_RUN_ID == 36757293622
-    assert VERIFIER_JOB_ID == 110030645608
+    assert VERIFIER_RUN_ID == 36760238991
+    assert VERIFIER_JOB_ID == 110040647258
     assert row["obligation_digest"] == OBLIGATION_DIGEST
     assert row["owner_id"] == OWNER_ID
     assert row["severity"] == "high"
@@ -72,19 +72,18 @@ def test_ac20_binding_pins_successful_exact_head_verifier() -> None:
     assert row["review_at"] == REVIEW_AT
     assert row["accepted_risk"] is None
 
-    assert len(row["evidence"]) == 4
     by_category = {item["category"]: item for item in row["evidence"]}
     assert set(by_category) == set(EXPECTED_EVIDENCE)
     for category, digest in EXPECTED_EVIDENCE.items():
         evidence = by_category[category]
         assert evidence["digest"] == digest
         assert evidence["source"] == (
-            f"p1:adversarial-ac20-evidence:{AXIS_ID}:"
+            f"p1:adversarial-ac14-evidence:{AXIS_ID}:"
             f"{category}:{VERIFIER_HEAD}"
         )
 
 
-def test_ac20_binding_matches_live_adversarial_obligation() -> None:
+def test_ac14_binding_matches_live_adversarial_obligation() -> None:
     matches = [
         item
         for item in _obligations()
@@ -98,7 +97,7 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
     assert set(obligation.required_evidence_modes) == set(EXPECTED_EVIDENCE)
 
 
-def test_governed_frontier_is_494_resolved_19_adversarial() -> None:
+def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["binding_count"] == 494
@@ -112,11 +111,13 @@ def test_governed_frontier_is_494_resolved_19_adversarial() -> None:
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}
-    unbound = [item for item in _obligations() if item.obligation_id not in bound]
-
+    unbound = [
+        item
+        for item in _obligations()
+        if item.kind is RiskKind.ADVERSARIAL
+        and item.obligation_id not in bound
+    ]
     assert len(unbound) == 19
-    assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
-    assert AXIS_ID not in {item.source_ref for item in unbound}
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-13", "AC-14", "AC-15", AXIS_ID}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}

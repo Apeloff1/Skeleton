@@ -7,6 +7,7 @@ on:
       - p1/bulk-volume-obligation-bindings-20260930
       - p1/bulk-volume-obligation-evidence-20260930
       - p1/risk-classification-evidence-batch1-20260930
+      - p1/closure-rollup-490-23-20260930
       - p1/adversarial-ac20-evidence-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -34,6 +35,8 @@ on:
       - "scripts/build_p1_adversarial_ac20_evidence.py"
       - "tests/test_p1_adversarial_ac20_evidence.py"
       - "tests/test_p1_adversarial_ac20_binding.py"
+      - "tests/test_p1_adversarial_ac14_binding.py"
+      - "tests/test_p1_adversarial_wave2_bindings.py"
       - ".github/workflows/p1-adversarial-ac20-evidence.yml"
   workflow_dispatch:
 
@@ -111,6 +114,8 @@ jobs:
           skeleton/testing/test_ai_adversarial_closure.py
           tests/test_p1_adversarial_ac20_evidence.py
           tests/test_p1_adversarial_ac20_binding.py
+          tests/test_p1_adversarial_ac14_binding.py
+          tests/test_p1_adversarial_wave2_bindings.py
           tests/test_p1_bulk_volume_obligation_bindings.py
           tests/test_p1_risk_evidence_reconciliation.py
 
@@ -185,7 +190,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier is 490 resolved and 23 blocking
+      - name: Confirm governed frontier is 494 resolved and 19 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac20/reconciliation.json             --print-summary
@@ -196,17 +201,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac20/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 490:
+          if report["binding_count"] != 494:
               raise SystemExit("AC-20 verifier mutated binding count")
-          if report["resolved_count"] != 490:
+          if report["resolved_count"] != 494:
               raise SystemExit("AC-20 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 23:
+          if report["unresolved_blocking_count"] != 19:
               raise SystemExit("AC-20 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-20 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 490,
-              "unbound": 23,
+              "evidence": 494,
+              "unbound": 19,
           }:
               raise SystemExit("AC-20 verifier mutated disposition counts")
           PY

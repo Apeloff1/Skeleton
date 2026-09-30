@@ -105,13 +105,13 @@ def test_batch1_verifier_identity_is_exact() -> None:
 
 def test_reconciliation_reduces_blocking_and_unclassified_together() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-    assert report["binding_count"] == 490
-    assert report["resolved_count"] == 490
-    assert report["unresolved_blocking_count"] == 23
+    assert report["binding_count"] == 494
+    assert report["resolved_count"] == 494
+    assert report["unresolved_blocking_count"] == 19
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 490,
-        "unbound": 23,
+        "evidence": 494,
+        "unbound": 19,
     }
 
 
