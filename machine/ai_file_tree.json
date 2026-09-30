@@ -578,7 +578,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "19723fdce08691712525e782a7ceffd286d9010b",
+      "source_git_object_sha": "9841184e84f716673cd2ff107984f67168e1be08",
       "role": "AI runtime observability audit and telemetry plane",
       "work_package_refs": [
         "WP-W00",
@@ -643,7 +643,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "62acf8347687d2c69fd1047fa593e5e9618d9270",
+      "source_git_object_sha": "6934c1f9b267ce23340110e4dc40bed60186d6a7",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -756,7 +756,7 @@
       "source": "skeleton/reliability",
       "destination": "skeleton/ai/runtime/reliability",
       "kind": "tree",
-      "source_git_object_sha": "149c3f61de5a974ab28ff13356051ad60aed745f",
+      "source_git_object_sha": "4d1fb70f9eaef063c0fd6c5fe90473d41451a81d",
       "role": "runtime reliability controls",
       "work_package_refs": [
         "WP-W00",

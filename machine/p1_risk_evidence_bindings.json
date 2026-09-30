@@ -8542,7 +8542,551 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-09-81fa5fab73acd823",
+      "obligation_digest": "5d866e90ebbdba4e26b9f24b6aa42794f273130a24fce46df4984f034d984c50",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:34:00Z",
+      "review_at": "2026-10-30T20:34:00Z",
+      "evidence": [
+        {
+          "category": "clock_skew",
+          "digest": "ebcbedea23563a43882148562273d28e8d2d7ee6c40647f4756a9671a1044a44",
+          "source": "p1:adversarial-ac09-evidence:AC-09:clock_skew:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "suspend_resume",
+          "digest": "da0640349f7afd7ea62526fb40e1115ee16e413acbce11b427e41d95994c8e31",
+          "source": "p1:adversarial-ac09-evidence:AC-09:suspend_resume:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "lease_fencing",
+          "digest": "d897ce6e204f1f5f0a45c234168fd84a5ecbfd694476fdffe9dafa2de0cf26d5",
+          "source": "p1:adversarial-ac09-evidence:AC-09:lease_fencing:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "expiry_property",
+          "digest": "ad0d810561314677bcb93b16e8b962e445829d8af7c1346e458cd2823ff73721",
+          "source": "p1:adversarial-ac09-evidence:AC-09:expiry_property:75275748906e00717f06f944d0c99d0dc6f5c962"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-02-7d64e5e5ff017e0d",
+      "obligation_digest": "5ba1f09d93f34e95e575d2ece8a228c3d3a6922e8f87d39ccc26d0fce2abc1a3",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "shutdown_race",
+          "digest": "711c124f8f7f699427cbb0e3ba0b3aa8b4b4be59a6eda386298744966aeae05f",
+          "source": "p1:adversarial-wave3:AC-02:shutdown_race:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "restart_replay",
+          "digest": "add716d1cfe4462e63e7d5a60abc1f940e77fc7c82c1236fcd995c8f11ed31ca",
+          "source": "p1:adversarial-wave3:AC-02:restart_replay:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "fault_injection",
+          "digest": "01268c47c6e1579c78cdf936d829bd2f80be5ccf502376cf2f902cdf4c32da9b",
+          "source": "p1:adversarial-wave3:AC-02:fault_injection:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "state_machine_property",
+          "digest": "20934f16364617c471b424dc9608841e0c98001b17dcbd7e1653ee06ed094cf7",
+          "source": "p1:adversarial-wave3:AC-02:state_machine_property:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-03-211e90dc21d34cd9",
+      "obligation_digest": "489b8318a58f93afe0f8596b040f2063ed3a785597595e5f38b52d99887852c6",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "resource_exhaustion",
+          "digest": "61cbd69ede147acb548ef6120a283db7a0fdeb8ec61a31b0852b0f768ac8cbc7",
+          "source": "p1:adversarial-wave3:AC-03:resource_exhaustion:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "load_test",
+          "digest": "bc55daf978fadaffe2bb82dfa5567baa140b56b5e6de692184447fd578e11da9",
+          "source": "p1:adversarial-wave3:AC-03:load_test:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "soak",
+          "digest": "5e9507eacfae075a7dd6071b344993e45f807301216ffca03e0339d42fd1634c",
+          "source": "p1:adversarial-wave3:AC-03:soak:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "degraded_mode",
+          "digest": "f0de3499ff826dce992b0104d6f0ab3d70ae435d492e5f48a9c5e0fdee1ca09c",
+          "source": "p1:adversarial-wave3:AC-03:degraded_mode:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-04-662da77bdcf0a3c7",
+      "obligation_digest": "9d9626a1e87403e4cc518726df2aea0efe33a5a0de25be5477eaa887ec1d90df",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "dependency_fault",
+          "digest": "e1d61e1a1b6c92467bf572fd3123543ca0cfc0fdc39771b7421e7466f0dfca01",
+          "source": "p1:adversarial-wave3:AC-04:dependency_fault:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "fallback_matrix",
+          "digest": "4e08ce651708a633f01ade1eb15244b2a093b0016ea3a36226a8b89a68110554",
+          "source": "p1:adversarial-wave3:AC-04:fallback_matrix:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "policy_regression",
+          "digest": "7149fa3b4d8d78190cf4f2a94601cf12abba15a696128b725a4b63e5f5f49c85",
+          "source": "p1:adversarial-wave3:AC-04:policy_regression:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "provider_outage",
+          "digest": "2cf00ecb98a3f836558eacd2d4509856db83176c3eb16b05cc3d348d9a3e48dd",
+          "source": "p1:adversarial-wave3:AC-04:provider_outage:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-05-a38d82bdc85e609d",
+      "obligation_digest": "cb78a506b1fc4b411ade9639254257a19c92a9c3f67241e4890e69b9da4c9539",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "unknown_outcome_reconciliation",
+          "digest": "f7572b622099ef0d0b218cdc2753c5f9710d956c4e536860d089ea32830ca568",
+          "source": "p1:adversarial-wave3:AC-05:unknown_outcome_reconciliation:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "idempotency_replay",
+          "digest": "89d1d00c3af6f7d49b484df5d819d4dd25f148c73851451c1f822cbea1c79793",
+          "source": "p1:adversarial-wave3:AC-05:idempotency_replay:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "provider_fault",
+          "digest": "fab2bd6d25e8140d15e43988963b6723c97899a1dd04ad7e26579d4fd349c7f2",
+          "source": "p1:adversarial-wave3:AC-05:provider_fault:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "receipt_recovery",
+          "digest": "eb1d7c7773db493c995494789463e42e56afe9bcb4dfbd7be633a36e6af9ebfa",
+          "source": "p1:adversarial-wave3:AC-05:receipt_recovery:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-06-df19f0b3509d9817",
+      "obligation_digest": "dcbbb38d6595162b4a801dcc8986430a8398fcd0d93d184743ae41d6729ec45f",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "reconciliation_drill",
+          "digest": "1f55c7b38f1bbea3734200d270f0ca43154f1fc6ecbbd474b7af6d57700f4ffa",
+          "source": "p1:adversarial-wave3:AC-06:reconciliation_drill:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "duplicate_delivery",
+          "digest": "3c0f4f4c63b2ab2d12c6d6517f20be709ff6fd027e82287690964d2d32706f25",
+          "source": "p1:adversarial-wave3:AC-06:duplicate_delivery:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "orphan_sweep",
+          "digest": "ecf659c47133e563f49f556f009106afc06896af08d9375f8a4b85726ea31c5c",
+          "source": "p1:adversarial-wave3:AC-06:orphan_sweep:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "projection_rebuild",
+          "digest": "1306af1d9bcc6c7fe03cfb8e2cb5f8aa19375d9a65770eb9d5c1d63c34fab9d7",
+          "source": "p1:adversarial-wave3:AC-06:projection_rebuild:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-07-a2990e55384a2d17",
+      "obligation_digest": "a9fbcf1cc7cffe6563ed30f4ad762c0a789c77e59a936069d94c85041587d3e0",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "mixed_version",
+          "digest": "50f7c7e782f2ebd9ea7baf090195f65d43847b40f6c4a0294b5e615cff9d3c05",
+          "source": "p1:adversarial-wave3:AC-07:mixed_version:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "upgrade_downgrade",
+          "digest": "8332ee08356dee02dc31805912febe48c21aa9dd5de62e3ce6e2e1662e027efe",
+          "source": "p1:adversarial-wave3:AC-07:upgrade_downgrade:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "schema_compatibility",
+          "digest": "a7d4de327301888c5e640352675717b284047e0b3b70221ef849d4c59f490612",
+          "source": "p1:adversarial-wave3:AC-07:schema_compatibility:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "rollback_rehearsal",
+          "digest": "abb550382c8f8c7df12ac50e4a996dedff9fca593daf0e214e446d8fbb8a4d2a",
+          "source": "p1:adversarial-wave3:AC-07:rollback_rehearsal:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-18-78285cc6ad723979",
+      "obligation_digest": "b9f35f59261deb42cf77661957e258e6c0387d6437b6a5b5cdc3015b298127da",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "reindex_rebuild",
+          "digest": "565f6e43153295bf4ba2d44afdd17a7ce94222811067bbc297d142af6bdda883",
+          "source": "p1:adversarial-wave3:AC-18:reindex_rebuild:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "compaction",
+          "digest": "90bb1248a7050b81ce630fbde551147cd28f6e8e6953824d235cf436b36c5348",
+          "source": "p1:adversarial-wave3:AC-18:compaction:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "deletion_replay",
+          "digest": "5f9400b3527c767dbac956f5a7fc2424fe89c7a0c1936fe6726dcd8f1c9ce8f2",
+          "source": "p1:adversarial-wave3:AC-18:deletion_replay:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "derived_data_invalidation",
+          "digest": "3b552b24bf1a8b59b0885ea1a5d8c96e34e00cea5fe0c95aa513584e71dfd158",
+          "source": "p1:adversarial-wave3:AC-18:derived_data_invalidation:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-24-efcf5eaba6cb7e1d",
+      "obligation_digest": "b7c5a1167165799da6982bbab75b192d94cbf09a34c468d4afbdc2ad49efc894",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:55:00Z",
+      "review_at": "2026-10-30T20:55:00Z",
+      "evidence": [
+        {
+          "category": "pairwise_fault_matrix",
+          "digest": "6b253d646eb6c6d4e43819a13dcd005f651b6799ffd858f94d913c7bd4b9321c",
+          "source": "p1:adversarial-wave3:AC-24:pairwise_fault_matrix:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "compound_chaos",
+          "digest": "8c18bed96cd46b0aa3a6cb019c14134adc5cc8a696377851e2ec4bacae577ff9",
+          "source": "p1:adversarial-wave3:AC-24:compound_chaos:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "recovery_replay",
+          "digest": "749b478343973300c3b3e2f8286ca1c93624397b32f929fc7c4929018669fd02",
+          "source": "p1:adversarial-wave3:AC-24:recovery_replay:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        },
+        {
+          "category": "signed_fault_bundle",
+          "digest": "d8f44dfb8949c280c962f0410a1e916eb7c1bbdc5f5929cf74559484a67ace98",
+          "source": "p1:adversarial-wave3:AC-24:signed_fault_bundle:0f146f51fa3b4c7627904a0138e33ec4c0c3de32"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-17-ed699bf2202b0b50",
+      "obligation_digest": "505ac11878c352c524f7275b5b8dd122f4e3ebc73e557e2ac6a08d40627949ca",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T21:12:00Z",
+      "review_at": "2026-10-30T21:12:00Z",
+      "evidence": [
+        {
+          "category": "tenant_isolation",
+          "digest": "d0ad5d339827cac8e031b73881c0d88efb385cc30d1972746a4c635d51fd6dff",
+          "source": "p1:adversarial-wave3-evidence:AC-17:tenant_isolation:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "cache_key_collision",
+          "digest": "e44935248a69b849be6977aad48855b0629e337d197ffc470dde51e70d313843",
+          "source": "p1:adversarial-wave3-evidence:AC-17:cache_key_collision:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "dead_letter_replay",
+          "digest": "bad924100c0e26479680ffb9143556a2a048fa63b502427b6115f5acde8ba00d",
+          "source": "p1:adversarial-wave3-evidence:AC-17:dead_letter_replay:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "artifact_acl",
+          "digest": "152d34024e968b3e4f4310d2df89b967f4eedb3e1f35a67cc0bd5e67c4095176",
+          "source": "p1:adversarial-wave3-evidence:AC-17:artifact_acl:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-16-2a23277d73b91c0b",
+      "obligation_digest": "8e1485cc8a1644fa68cf0e038905e787fe615b7154263b9c21718927eb6caca1",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:00:00Z",
+      "review_at": "2026-10-30T22:00:00Z",
+      "evidence": [
+        {
+          "category": "telemetry_outage",
+          "digest": "27245f773b1437957a3ab5213b133193927b9923dca8b5944839a9f14d593a6f",
+          "source": "p1:adversarial-ac16-evidence:AC-16:telemetry_outage:f6d9ece188b96fcb752d8d41b7e31299f0e1c053"
+        },
+        {
+          "category": "cardinality_bomb",
+          "digest": "c95aaebd65d644665b5c08b69abbdc8de65bec41f6b0b10a8baf0af5e359e3b4",
+          "source": "p1:adversarial-ac16-evidence:AC-16:cardinality_bomb:f6d9ece188b96fcb752d8d41b7e31299f0e1c053"
+        },
+        {
+          "category": "redaction_test",
+          "digest": "e39123691602d49333baa6e7b371a9272d6b48318e92122c454f212366ea1fe0",
+          "source": "p1:adversarial-ac16-evidence:AC-16:redaction_test:f6d9ece188b96fcb752d8d41b7e31299f0e1c053"
+        },
+        {
+          "category": "reconstruction_without_full_telemetry",
+          "digest": "b6e01e753281ac37f131c41cb8689ffe8c1365470b0d1c9d6fa36f1e06143a9d",
+          "source": "p1:adversarial-ac16-evidence:AC-16:reconstruction_without_full_telemetry:f6d9ece188b96fcb752d8d41b7e31299f0e1c053"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-19-e54597c74279060f",
+      "obligation_digest": "92e62c90aa0f786e39dbde96c977092e43561393f0b11185175a1463fc4cacc7",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:06:00Z",
+      "review_at": "2026-10-30T22:06:00Z",
+      "evidence": [
+        {
+          "category": "break_glass_drill",
+          "digest": "e542a940abb72a69c2a5f3ba4f3c3fb95c086dfb31f6bba277d312d714a52df3",
+          "source": "p1:adversarial-ac19-evidence:AC-19:break_glass_drill:c5e9dc1c9260ca9de629e8a8325d3eb413a4af69"
+        },
+        {
+          "category": "operator_error_simulation",
+          "digest": "fc8d3c4b80b53ce0b3d1d63e470e81d9f98b779678bc45debf67de5c4b9fc2e7",
+          "source": "p1:adversarial-ac19-evidence:AC-19:operator_error_simulation:c5e9dc1c9260ca9de629e8a8325d3eb413a4af69"
+        },
+        {
+          "category": "approval_fatigue",
+          "digest": "f3b025040eeaa05c3e43ad37c85b1b2f6f6514505b9f877e2c045fc1e4263ef5",
+          "source": "p1:adversarial-ac19-evidence:AC-19:approval_fatigue:c5e9dc1c9260ca9de629e8a8325d3eb413a4af69"
+        },
+        {
+          "category": "undo_recovery",
+          "digest": "f16464b3b2e09bbb149d1cf4fafb24d60b6655f1189e2482063c4df6b35c4c5c",
+          "source": "p1:adversarial-ac19-evidence:AC-19:undo_recovery:c5e9dc1c9260ca9de629e8a8325d3eb413a4af69"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-23-22bd0e0ac706c216",
+      "obligation_digest": "47bdac98bfdd06deb23e600dd418abae3f03ebcf08a11c551bdccbdade97e065",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:06:00Z",
+      "review_at": "2026-10-30T22:06:00Z",
+      "evidence": [
+        {
+          "category": "soak",
+          "digest": "106e36efadfba58b8dda00d1b6fa4ee5aba035e2d0f30b80461aa270700182d0",
+          "source": "p1:adversarial-ac23-evidence:AC-23:soak:7847bbadb5c0c245fcdf00212c064b3d00169786"
+        },
+        {
+          "category": "accelerated_time",
+          "digest": "0e7fced251b4c94cf39f887aa7329fc783cb66dfd2b7c21416e8ffc06f27b318",
+          "source": "p1:adversarial-ac23-evidence:AC-23:accelerated_time:7847bbadb5c0c245fcdf00212c064b3d00169786"
+        },
+        {
+          "category": "aging_simulation",
+          "digest": "ba9fcccd7168c1669c66afbf4a3fe98cb305e334a9fde37a3f8f5424a8813789",
+          "source": "p1:adversarial-ac23-evidence:AC-23:aging_simulation:7847bbadb5c0c245fcdf00212c064b3d00169786"
+        },
+        {
+          "category": "retirement_migration",
+          "digest": "58d7cf96853f730af5e7c384f069cc9334d237452dc0c970ae070a843d8d3094",
+          "source": "p1:adversarial-ac23-evidence:AC-23:retirement_migration:7847bbadb5c0c245fcdf00212c064b3d00169786"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-01-a8229f80cbb43d7c",
+      "obligation_digest": "7d467940f8a5792ae8672d4afe7617de5b3a60d1558f8dbf13a8152471add481",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:18:00Z",
+      "review_at": "2026-10-30T22:18:00Z",
+      "evidence": [
+        {
+          "category": "clean_machine_e2e",
+          "digest": "78892afd018913b33ec3ad3e5da2976283430f383d406b659120bfdd585d2fcd",
+          "source": "p1:adversarial-wave4-evidence:AC-01:clean_machine_e2e:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "trust_root_rotation",
+          "digest": "0fdb446237b2606ccf0eada73198e2b7c8ed06291f2888d0c9157e6cab6a30c6",
+          "source": "p1:adversarial-wave4-evidence:AC-01:trust_root_rotation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "bootstrap_fault_injection",
+          "digest": "e5d489c27558c560958102a053420f3988865394e05cf0a59d1b7e64e5b53258",
+          "source": "p1:adversarial-wave4-evidence:AC-01:bootstrap_fault_injection:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "recovery_drill",
+          "digest": "cae8710e47a94c7f17b6eec7564c817360332489498ed92d55619dd6e99f3b30",
+          "source": "p1:adversarial-wave4-evidence:AC-01:recovery_drill:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-08-17b003d162aa15f0",
+      "obligation_digest": "d772b28ffe6bacfa91412e9b61dd1527291c59a0ceb1f674f8e3535d395e9318",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:18:00Z",
+      "review_at": "2026-10-30T22:18:00Z",
+      "evidence": [
+        {
+          "category": "restore_drill",
+          "digest": "2e4b416e4a17aa6bbd285aa2a39bf349d1532759dd2dbb6cc3dda4155584791c",
+          "source": "p1:adversarial-wave4-evidence:AC-08:restore_drill:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "tombstone_propagation",
+          "digest": "0f1e4f3afdef4aa0a6eec7c14e575d674f21307c29f68a2e5ae80e88c6ab0a0f",
+          "source": "p1:adversarial-wave4-evidence:AC-08:tombstone_propagation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "external_reconciliation",
+          "digest": "506d8e744dcad6e9f8873deb906dcad7aefe3bb62906766e691f3ff70a5f4e9f",
+          "source": "p1:adversarial-wave4-evidence:AC-08:external_reconciliation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "credential_revalidation",
+          "digest": "9bc1c2b3cb7c7c1af348623245ef45ec4ac02fea886f3d93d5725f477df8e30b",
+          "source": "p1:adversarial-wave4-evidence:AC-08:credential_revalidation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-10-2359b7c9fd5bddd4",
+      "obligation_digest": "7b3090648ad00329ba08d07b80177ba1187fffcae5519bec9b283fabc16c6e4e",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:29:00Z",
+      "review_at": "2026-10-30T22:29:00Z",
+      "evidence": [
+        {
+          "category": "credential_rotation",
+          "digest": "17c3b265f44820df59de4ec4d2e031a235eafa9063ef38150250302efabd1310",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-10:credential_rotation:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "revocation_replay",
+          "digest": "60af119722dad4651b16052cd15e381f5bb06f1eee47735a589fccf5754a5a37",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-10:revocation_replay:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "identity_restore",
+          "digest": "7c9f42b16f5d42a6729fd17a64308bf4fa6e6e585f2fa5cd167bf86dcdd7b410",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-10:identity_restore:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "historical_signature_verify",
+          "digest": "7e66c5e51ffc4d4c6daa1bc4e8bffc172c5353be5708001a9f73f9c8a036b92f",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-10:historical_signature_verify:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-21-bd22a94e26b15053",
+      "obligation_digest": "a7c8d0be5f47977fa5a11d8a02177f7f3aa37f1692fd183b67aa40ef3511b7c7",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:29:00Z",
+      "review_at": "2026-10-30T22:29:00Z",
+      "evidence": [
+        {
+          "category": "recovery_dependency_graph",
+          "digest": "9446547c41c54663847c6420ff0d25509a180f6f94e1646aa3074c6e6f5371af",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-21:recovery_dependency_graph:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "safe_mode_drill",
+          "digest": "43f58297430c6bce7fa0993e26ebbe3743c3cdc11809861c02a1d67032b9efa3",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-21:safe_mode_drill:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "control_plane_isolation",
+          "digest": "a3cc1826b3842c2fd60a3b7efe4c1af6a1fc2bf19d059e00d25ac47826da5649",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-21:control_plane_isolation:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        },
+        {
+          "category": "cold_restore",
+          "digest": "c19299f0cf71374bce83e30d5d1d145037cb21b366e25eca4337f1db1dc657d9",
+          "source": "p1:adversarial-ac10-ac21-evidence:AC-21:cold_restore:66cc408a2a26dbfee74648b60e58ba9d82a40c55"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Governed adversarial closure now includes AC-11, AC-13, AC-14, AC-15, AC-20, and AC-22; remaining axes stay blocking until mode-complete evidence exists."
+  "note": "All 513 canonical P1 obligations are governed. AC-16, AC-19, and AC-23 evidence refs are refreshed to the latest successful exact-head implementation receipts; no blocking or unclassified P1 obligations remain."
 }
