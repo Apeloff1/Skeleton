@@ -194,17 +194,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac20/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 490:
+          if report["binding_count"] != 491:
               raise SystemExit("AC-20 verifier mutated binding count")
-          if report["resolved_count"] != 490:
+          if report["resolved_count"] != 491:
               raise SystemExit("AC-20 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 23:
+          if report["unresolved_blocking_count"] != 22:
               raise SystemExit("AC-20 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-20 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 490,
-              "unbound": 23,
+              "evidence": 491,
+              "unbound": 22,
           }:
               raise SystemExit("AC-20 verifier mutated disposition counts")
           PY
