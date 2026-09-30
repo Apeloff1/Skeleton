@@ -46,6 +46,12 @@ Machine P1 execution map: [`machine/ai_p1_execution_map.json`](../../machine/ai_
 
 Machine P1 task backlog: [`machine/ai_p1_task_backlog.json`](../../machine/ai_p1_task_backlog.json)
 
+P2 capability-expansion execution map: [`P2_EXECUTION_MAP.md`](P2_EXECUTION_MAP.md)
+
+Machine P2 execution map: [`machine/ai_p2_execution_map.json`](../../machine/ai_p2_execution_map.json)
+
+Machine P2 task backlog: [`machine/ai_p2_task_backlog.json`](../../machine/ai_p2_task_backlog.json)
+
 OpenAI OSS assimilation lane: [`OPENAI_OSS_ASSIMILATION_2026-09-25.md`](OPENAI_OSS_ASSIMILATION_2026-09-25.md)
 
 Machine OpenAI OSS provenance: [`machine/openai_oss_assimilation.json`](../../machine/openai_oss_assimilation.json)
@@ -149,12 +155,15 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 43. `docs/plan/P1_EXECUTION_MAP.md`
 44. `machine/ai_p1_execution_map.json`
 45. `machine/ai_p1_task_backlog.json`
-46. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
-47. `machine/openai_oss_assimilation.json`
-48. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
-49. `machine/xai_grok_oss_assimilation.json`
+46. `docs/plan/P2_EXECUTION_MAP.md`
+47. `machine/ai_p2_execution_map.json`
+48. `machine/ai_p2_task_backlog.json`
+49. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
+50. `machine/openai_oss_assimilation.json`
+51. `docs/plan/XAI_GROK_OSS_ASSIMILATION_2026-09-25.md`
+52. `machine/xai_grok_oss_assimilation.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–49 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the historical implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–45 define the bounded P1 trustworthy-production maturity frontier and its dependency-ordered 44-task execution DAG. Items 46–48 define the P2 capability-expansion boundary sourced exactly from P1's 314 deferred volumes, with explicit scheduled/queued ownership and fail-closed dependency validation. Items 49–52 deepen the frozen research/provider/runtime volumes with pinned OpenAI and xAI/Grok OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
 
 ## Index laws
 
@@ -205,6 +214,8 @@ The engineering pass then binds those packages to explicit interfaces, invariant
 The current execution frontier then binds live implementation candidates back to signed AIQ lifecycle state. It deliberately refuses to treat merged code as completion and orders the construction waves from Stage-0 evidence reconciliation through full-stack closure.
 
 The P1 execution map begins after that functional closure. It selects 107 primary volumes for trustworthy-production maturity, keeps 314 volumes explicitly deferred, and orders evidence, core intelligence quality, safe autonomy, product truth, controlled learning, release/recovery, distributed capacity and terminal promotion without expanding architecture breadth.
+
+The P2 execution map begins from that terminal P1 boundary and takes the 314 deferred volume references as its exact source scope. Its first tranche schedules 42 control-heavy volumes while keeping 272 explicitly queued, so breadth can deepen without losing scope accounting or reopening P1 guarantees.
 
 The task matrix propagates those obligations into every atomic AIQ item, preserving queue completion semantics while preventing task-local acceptance from narrowing package-level engineering proof.
 
