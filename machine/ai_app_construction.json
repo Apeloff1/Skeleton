@@ -2734,6 +2734,23 @@
       ]
     },
     {
+      "id": "shift-supervisor-model-gateway",
+      "family": "automation_model",
+      "role": "shift-supervisor planning JSON model execution within the governed repository-automation provider family",
+      "owner": "skeleton/automation/shift_supervisor/model_gateway.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "canonical",
+      "surface_class": "automation_provider_explicitly_separate_and_receipt-gated",
+      "credential_owner": true,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "credential",
+        "network_transport"
+      ]
+    },
+    {
       "id": "repository-automation-chatgpt-adapter",
       "family": "automation_model",
       "role": "legacy advisory ChatGPT adapter for repository automation; explicitly separate from product runtime provider ownership",
