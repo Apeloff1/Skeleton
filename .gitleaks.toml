@@ -37,3 +37,10 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows''']
   paths = ['''^docs/BUILD_PLAN\.md$''']
+
+  [[rules.allowlists]]
+  description = "AC-17 cache-key collision evidence URI carries a git SHA, not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''p1:adversarial-wave3-evidence:AC-17:cache_key_collision:[0-9a-f]{40}''']
+  paths = ['''^machine/p1_risk_evidence_bindings\.json$''']

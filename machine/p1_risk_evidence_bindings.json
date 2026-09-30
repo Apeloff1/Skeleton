@@ -8830,7 +8830,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-17-ed699bf2202b0b50",
+      "obligation_digest": "505ac11878c352c524f7275b5b8dd122f4e3ebc73e557e2ac6a08d40627949ca",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T21:12:00Z",
+      "review_at": "2026-10-30T21:12:00Z",
+      "evidence": [
+        {
+          "category": "tenant_isolation",
+          "digest": "d0ad5d339827cac8e031b73881c0d88efb385cc30d1972746a4c635d51fd6dff",
+          "source": "p1:adversarial-wave3-evidence:AC-17:tenant_isolation:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "cache_key_collision",
+          "digest": "e44935248a69b849be6977aad48855b0629e337d197ffc470dde51e70d313843",
+          "source": "p1:adversarial-wave3-evidence:AC-17:cache_key_collision:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "dead_letter_replay",
+          "digest": "bad924100c0e26479680ffb9143556a2a048fa63b502427b6115f5acde8ba00d",
+          "source": "p1:adversarial-wave3-evidence:AC-17:dead_letter_replay:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        },
+        {
+          "category": "artifact_acl",
+          "digest": "152d34024e968b3e4f4310d2df89b967f4eedb3e1f35a67cc0bd5e67c4095176",
+          "source": "p1:adversarial-wave3-evidence:AC-17:artifact_acl:e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Governed adversarial closure includes the verified wave-3 axes; remaining axes stay blocking until mode-complete evidence exists."
+  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-17 tenant/workspace isolation is now governed from its successful exact-head verifier receipt; remaining axes stay blocking until mode-complete evidence exists."
 }

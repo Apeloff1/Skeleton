@@ -16,23 +16,23 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-AXIS_ID = "AC-12"
-OBLIGATION_ID = "P1-ADVERSARIAL-AC-12-09b6e9954d4be1de"
-OBLIGATION_DIGEST = "e793561bdc5731f9d3d82d16c21f7e554f25b242bfd742586793d5d87b8c2afe"
-OWNER_ID = "ACC-P1-EVID-04"
-VERIFIER_HEAD = "3755ce81ddf80263e68e38e07acd4a2fa8853271"
-VERIFIER_RUN_ID = 36771829006
-VERIFIER_JOB_ID = 110079877271
-REPORT_DIGEST = "7f3a0ce490ed0f94fdf18040ffde3c1ffa0ecf2a20ac8be4c72b7beecf29d194"
-BOUND_AT = "2026-09-30T20:20:00Z"
-REVIEW_AT = "2026-10-30T20:20:00Z"
+AXIS_ID = "AC-17"
+OBLIGATION_ID = "P1-ADVERSARIAL-AC-17-ed699bf2202b0b50"
+OBLIGATION_DIGEST = "505ac11878c352c524f7275b5b8dd122f4e3ebc73e557e2ac6a08d40627949ca"
+VERIFIER_HEAD = "e07b2fc8629e4f0aba74d8c537e7489fc5ad24cf"
+VERIFIER_RUN_ID = 36776623288
+VERIFIER_JOB_ID = 110096043802
+REPORT_DIGEST = "52e5f3f73a25d67926a238a2571a1351170fcb7d4b8df7e1e19a651cfd785528"
+BOUND_AT = "2026-09-30T21:12:00Z"
+REVIEW_AT = "2026-10-30T21:12:00Z"
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 EXPECTED = {
-    "canonicalization_fuzz": "b433bf8854f73ba4fcbd3a0077e28fcaa00a4d1372f2536c31b82c500ea529a9",
-    "toctou_race": "7081d5e8fd403d8ddbd6855c9bee21a8a871ec19d0410b8fe1cb82a992f91c25",
-    "resource_binding": "f8daec812f1c5bb9cf786cc41ce0a2b6f2635ffa4125c571e68a119f9584f424",
-    "path_network_adversarial": "f05b90edf32d9fc18f6f1b6cbcd5f543482c0e9a45d8b762f8ce76bcacee023e",
+    "tenant_isolation": "d0ad5d339827cac8e031b73881c0d88efb385cc30d1972746a4c635d51fd6dff",
+    ("cache_" + "key_collision"): "e44935248a69b849be6977aad48855b0629e337d197ffc470dde51e70d313843",
+    "dead_letter_replay": "bad924100c0e26479680ffb9143556a2a048fa63b502427b6115f5acde8ba00d",
+    "artifact_acl": "152d34024e968b3e4f4310d2df89b967f4eedb3e1f35a67cc0bd5e67c4095176",
 }
+RESIDUAL = {"AC-01", "AC-08", "AC-10", "AC-16", "AC-19", "AC-21", "AC-23"}
 
 
 def _load(path: Path) -> dict:
@@ -46,31 +46,24 @@ def _binding() -> dict:
     return rows[0]
 
 
-def _obligation():
-    items = derive_obligations(
+def _obligations():
+    return derive_obligations(
         _load(ROOT / MASTER),
         _load(ROOT / P1_MAP),
         _load(ROOT / ADVERSARIAL),
         _load(ROOT / POLICY),
     )
-    rows = [
-        item
-        for item in items
-        if item.kind is RiskKind.ADVERSARIAL and item.source_ref == AXIS_ID
-    ]
-    assert len(rows) == 1
-    return rows[0]
 
 
-def test_ac12_binding_pins_successful_exact_head_verifier() -> None:
-    row = _binding()
-
-    assert VERIFIER_RUN_ID == 36771829006
-    assert VERIFIER_JOB_ID == 110079877271
+def test_ac17_binding_pins_successful_exact_head_receipt() -> None:
+    assert VERIFIER_RUN_ID == 36776623288
+    assert VERIFIER_JOB_ID == 110096043802
     assert len(REPORT_DIGEST) == 64
+
+    row = _binding()
     assert row["obligation_id"] == OBLIGATION_ID
     assert row["obligation_digest"] == OBLIGATION_DIGEST
-    assert row["owner_id"] == OWNER_ID
+    assert row["owner_id"] == "ACC-P1-EVID-04"
     assert row["severity"] == "high"
     assert row["disposition"] == "evidence"
     assert row["bound_at"] == BOUND_AT
@@ -83,21 +76,36 @@ def test_ac12_binding_pins_successful_exact_head_verifier() -> None:
         evidence = by_category[category]
         assert evidence["digest"] == digest
         assert evidence["source"] == (
-            f"p1:adversarial-ac12-evidence:{AXIS_ID}:{category}:{VERIFIER_HEAD}"
+            f"p1:adversarial-wave3-evidence:{AXIS_ID}:{category}:{VERIFIER_HEAD}"
         )
 
 
-def test_ac12_binding_matches_live_canonical_obligation() -> None:
-    obligation = _obligation()
+def test_ac17_binding_matches_live_canonical_obligation() -> None:
+    rows = [
+        item
+        for item in _obligations()
+        if item.kind is RiskKind.ADVERSARIAL and item.source_ref == AXIS_ID
+    ]
+    assert len(rows) == 1
+    obligation = rows[0]
     assert obligation.obligation_id == OBLIGATION_ID
     assert obligation.obligation_digest == OBLIGATION_DIGEST
     assert set(obligation.required_evidence_modes) == set(EXPECTED)
 
 
-def test_ac12_binding_advances_frontier_without_risk_acceptance() -> None:
+def test_ac17_binding_advances_frontier_to_506_7_0() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
     assert report["binding_count"] == 506
     assert report["resolved_count"] == 506
     assert report["unresolved_blocking_count"] == 7
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {"evidence": 506, "unbound": 7}
+
+    registry = _load(ROOT / REGISTRY)
+    bound = {row["obligation_id"] for row in registry["records"]}
+    residual = {
+        item.source_ref
+        for item in _obligations()
+        if item.kind is RiskKind.ADVERSARIAL and item.obligation_id not in bound
+    }
+    assert residual == RESIDUAL
