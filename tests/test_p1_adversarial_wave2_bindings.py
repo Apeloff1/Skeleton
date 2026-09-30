@@ -16,7 +16,7 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
 RESOLVED_AXES = frozenset({"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"})
@@ -25,7 +25,7 @@ EXPECTED_RESIDUAL_AXIS_COUNT = 19
 EXPECTED = {
     "AC-11": {
         "obligation_id": "P1-ADVERSARIAL-AC-11-3d29c2151a6e3351",
-        "obligation_digest": "0c867539f12df396af4716514ff7abb81ba649ea019ccd285f99de27847a184a",
+        "obligation_digest": "0c867539f12df396af4716514ff7abb81ba649ea020ccd285f99de27847a184a",
         "verifier_head": "9f7a70b8dda16e50d8c642165b0c90da9fed29db",
         "verifier_run": 36758958895,
         "verifier_job": 110036293521,
@@ -45,7 +45,7 @@ EXPECTED = {
         "evidence": {
             "budget_fault": "1f824dd862945c00e379e256dd0613a4c35e0a78c74cc8b4097899a624b677d2",
             "fanout_stress": "38856b532fe1671f5a9d06b456b2ca81fa7c7b6d834673d7a1e5422ff480a88b",
-            "quota_isolation": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401196ee",
+            "quota_isolation": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401206ee",
             "provider_reprice_simulation": "6cb6f58f37905309803f8a3fe990c977d29a1e250143f1234906f287ee0c3e44",
         },
     },
