@@ -15,6 +15,7 @@ import {
   Modal, TextInput, ActivityIndicator, KeyboardAvoidingView,
   Platform, Animated, Dimensions, Image,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
@@ -200,7 +201,7 @@ export const GameFactoryModal: React.FC<GameFactoryModalProps> = ({ visible, onC
   // Agent Summary (dynamic from API)
   const [agentSummary, setAgentSummary] = useState<any>(null);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   // ============================================================================
