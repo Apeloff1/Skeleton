@@ -1,11 +1,14 @@
-name: P1 Adversarial AC-12 Evidence Gate
+name: P1 Adversarial AC-09 Evidence Gate
 
 on:
+  push:
+    branches:
+      - "p1/adversarial-ac09-evidence-*"
   pull_request:
     branches:
       - main
-      - p1/adversarial-wave2-bindings-20260930
       - p1/risk-classification-evidence-batch1-20260930
+      - p1/closure-rollup-495-18-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -13,27 +16,27 @@ on:
       - "machine/ai_adversarial_closure.json"
       - "machine/p1_risk_evidence_policy.json"
       - "machine/p1_risk_evidence_bindings.json"
-      - "skeleton/security/rooted_fs.py"
-      - "skeleton/security/outbound_url.py"
-      - "skeleton/security/outbound_http.py"
-      - "skeleton/testing/test_security_rooted_fs.py"
-      - "skeleton/testing/test_outbound_url_resolution_security.py"
-      - "skeleton/testing/test_security_outbound_http.py"
-      - "scripts/build_p1_adversarial_ac12_evidence.py"
-      - "tests/test_p1_adversarial_ac12_evidence.py"
-      - ".github/workflows/p1-adversarial-ac12-evidence.yml"
+      - "skeleton/kernel/clocks.py"
+      - "skeleton/kernel/leases.py"
+      - "skeleton/testing/test_shell_leases_queue_rate.py"
+      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
+      - "skeleton/testing/test_swarm_lease_rollback.py"
+      - "skeleton/testing/test_shell_ai_execution_fence.py"
+      - "scripts/build_p1_adversarial_ac09_evidence.py"
+      - "tests/test_p1_adversarial_ac09_evidence.py"
+      - ".github/workflows/p1-adversarial-ac09-evidence.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: p1-adversarial-ac12-${{ github.event.pull_request.number || github.ref }}
+  group: p1-adversarial-ac09-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: Verify AC-12 canonicalization and exact-resource evidence
+    name: Verify AC-09 time expiry and lease evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -63,30 +66,32 @@ jobs:
           "pydantic[email]>=2.13.5"
           "pydantic-settings>=2.15.0"
 
-      - name: Run canonicalization TOCTOU and network adversarial regressions
+      - name: Run time expiry and fencing regressions
         run: >-
           python -m pytest -q --noconftest
-          skeleton/testing/test_security_rooted_fs.py
-          skeleton/testing/test_outbound_url_resolution_security.py
-          skeleton/testing/test_security_outbound_http.py
-          tests/test_p1_adversarial_ac12_evidence.py
+          skeleton/testing/test_shell_leases_queue_rate.py
+          skeleton/testing/test_swarm_exact_lease_atomicity.py
+          skeleton/testing/test_swarm_lease_rollback.py
+          skeleton/testing/test_shell_ai_execution_fence.py
+          tests/test_p1_adversarial_ac09_evidence.py
+          tests/test_p1_adversarial_ac09_binding.py
           tests/test_p1_adversarial_ac12_binding.py
-          tests/test_p1_adversarial_ac11_binding.py
-          tests/test_p1_adversarial_ac13_binding.py
-          tests/test_p1_adversarial_ac14_binding.py
-          tests/test_p1_adversarial_ac15_binding.py
-          tests/test_p1_adversarial_ac20_binding.py
           tests/test_p1_risk_evidence_reconciliation.py
 
-      - name: Compile exact-head AC-12 evidence twice
+      - name: Compile exact-head AC-09 evidence twice
         run: |
           set -euo pipefail
-          mkdir -p .p1-ac12
-          python scripts/build_p1_adversarial_ac12_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac12/report.json             --print-summary
-          python scripts/build_p1_adversarial_ac12_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-ac12/replay.json
-          cmp .p1-ac12/report.json .p1-ac12/replay.json
+          mkdir -p .p1-ac09
+          python scripts/build_p1_adversarial_ac09_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-ac09/report.json \
+            --print-summary
+          python scripts/build_p1_adversarial_ac09_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-ac09/replay.json
+          cmp .p1-ac09/report.json .p1-ac09/replay.json
 
-      - name: Prove AC-12 mode completeness and emit binding seed
+      - name: Prove AC-09 mode completeness and emit binding seed
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -94,34 +99,34 @@ jobs:
           import os
           from pathlib import Path
 
-          report = json.loads(Path(".p1-ac12/report.json").read_text(encoding="utf-8"))
+          report = json.loads(Path(".p1-ac09/report.json").read_text(encoding="utf-8"))
           candidate = report["candidate"]
           expected_modes = {
-              "canonicalization_fuzz",
-              "toctou_race",
-              "resource_binding",
-              "path_network_adversarial",
+              "clock_skew",
+              "suspend_resume",
+              "lease_fencing",
+              "expiry_property",
           }
-          if report["axis_id"] != "AC-12":
+          if report["axis_id"] != "AC-09":
               raise SystemExit("wrong adversarial axis")
           if report["candidate_count"] != 1:
-              raise SystemExit("AC-12 candidate count drift")
+              raise SystemExit("AC-09 candidate count drift")
           if report["already_bound_count"] != 1:
-              raise SystemExit("AC-12 governed binding not detected")
+              raise SystemExit("AC-09 governed binding not detected")
           if report["candidate_binding_count"] != 0:
-              raise SystemExit("AC-12 unexpectedly remains a binding candidate")
+              raise SystemExit("AC-09 unexpectedly remains a binding candidate")
           if candidate["binding_present"] is not True:
-              raise SystemExit("AC-12 candidate does not detect governed binding")
+              raise SystemExit("AC-09 candidate does not detect governed binding")
           if set(candidate["required_evidence_modes"]) != expected_modes:
-              raise SystemExit("AC-12 required evidence modes drift")
+              raise SystemExit("AC-09 required evidence modes drift")
           if {row["category"] for row in candidate["evidence"]} != expected_modes:
-              raise SystemExit("AC-12 evidence categories incomplete")
+              raise SystemExit("AC-09 evidence categories incomplete")
           if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
-              raise SystemExit("AC-12 candidate is not exact-head bound")
+              raise SystemExit("AC-09 candidate is not exact-head bound")
           if candidate["recommended_severity"] != "high":
-              raise SystemExit("AC-12 severity must remain high")
+              raise SystemExit("AC-09 severity must remain high")
           if candidate["recommended_disposition"] != "evidence":
-              raise SystemExit("AC-12 disposition must remain evidence")
+              raise SystemExit("AC-09 disposition must remain evidence")
           for field in (
               "creates_binding",
               "accepts_risk",
@@ -129,9 +134,9 @@ jobs:
               "promotes_maturity",
           ):
               if candidate[field] is not False:
-                  raise SystemExit(f"AC-12 authority boundary drift: {field}")
+                  raise SystemExit(f"AC-09 authority boundary drift: {field}")
           print(
-              "P1_AC12_BINDING_SEED "
+              "P1_AC09_BINDING_SEED "
               + json.dumps(
                   {
                       "obligation_id": candidate["obligation_id"],
@@ -150,25 +155,27 @@ jobs:
       - name: Confirm governed frontier remains 505 resolved and 8 blocking
         run: |
           set -euo pipefail
-          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac12/reconciliation.json
+          python scripts/reconcile_p1_risk_evidence.py \
+            --evaluated-at "2026-10-01T12:00:00+00:00" \
+            --out .p1-ac09/reconciliation.json
           python - <<'PY'
           import json
           from pathlib import Path
 
           report = json.loads(
-              Path(".p1-ac12/reconciliation.json").read_text(encoding="utf-8")
+              Path(".p1-ac09/reconciliation.json").read_text(encoding="utf-8")
           )
           if report["binding_count"] != 505:
-              raise SystemExit("AC-12 verifier mutated binding count")
+              raise SystemExit("AC-09 verifier mutated binding count")
           if report["resolved_count"] != 505:
-              raise SystemExit("AC-12 verifier mutated resolved count")
+              raise SystemExit("AC-09 verifier mutated resolved count")
           if report["unresolved_blocking_count"] != 8:
-              raise SystemExit("AC-12 verifier mutated blocking count")
+              raise SystemExit("AC-09 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
-              raise SystemExit("AC-12 verifier reintroduced unclassified risks")
+              raise SystemExit("AC-09 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
               "evidence": 505,
               "unbound": 8,
           }:
-              raise SystemExit("AC-12 verifier mutated disposition counts")
+              raise SystemExit("AC-09 verifier mutated disposition counts")
           PY

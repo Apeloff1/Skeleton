@@ -96,8 +96,8 @@ def test_ac12_binding_matches_live_canonical_obligation() -> None:
 
 def test_ac12_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-    assert report["binding_count"] == 496
-    assert report["resolved_count"] == 496
-    assert report["unresolved_blocking_count"] == 17
+    assert report["binding_count"] == 505
+    assert report["resolved_count"] == 505
+    assert report["unresolved_blocking_count"] == 8
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {"evidence": 496, "unbound": 17}
+    assert report["disposition_counts"] == {"evidence": 505, "unbound": 8}
