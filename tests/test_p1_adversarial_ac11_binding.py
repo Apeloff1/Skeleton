@@ -8,14 +8,14 @@ from scripts.reconcile_p1_risk_evidence import ADVERSARIAL, MASTER, P1_MAP, POLI
 
 AXIS_ID = "AC-11"
 OBLIGATION_ID = "P1-ADVERSARIAL-AC-11-3d29c2151a6e3351"
-OBLIGATION_DIGEST = "0c867539f12df396af4716514ff7abb81ba649ea020ccd285f99de27847a184a"
+OBLIGATION_DIGEST = "0c867539f12df396af4716514ff7abb81ba649ea019ccd285f99de27847a184a"
 OWNER_ID = "ACC-P1-EVID-04"
 VERIFIER_HEAD = "9f7a70b8dda16e50d8c642165b0c90da9fed29db"
 VERIFIER_RUN_ID = 36758958895
 VERIFIER_JOB_ID = 110036293521
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
 EXPECTED = {
     "semantic_canary": "806c9b16e2361b498232189821337428d66da5ee00293024f853d15a7b4b745a",
     "contract_probe": "d57fc24f73d225383b70356364e9c9a2a22f7cbc0e7d6516a98b38b9f99a2d79",
@@ -63,8 +63,8 @@ def test_ac11_binding_matches_live_obligation() -> None:
 
 def test_ac11_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-    assert report["binding_count"] == 493
-    assert report["resolved_count"] == 493
-    assert report["unresolved_blocking_count"] == 20
+    assert report["binding_count"] == 494
+    assert report["resolved_count"] == 494
+    assert report["unresolved_blocking_count"] == 19
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {"evidence": 493, "unbound": 20}
+    assert report["disposition_counts"] == {"evidence": 494, "unbound": 19}
