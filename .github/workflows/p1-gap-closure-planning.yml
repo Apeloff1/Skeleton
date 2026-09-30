@@ -99,8 +99,8 @@ jobs:
           )
           assert report["gap_blocked_volume_count"] == 84
           assert report["gap_obligation_count"] == 168
-          assert report["bound_gap_obligation_count"] == 0
-          assert report["unbound_gap_obligation_count"] == 168
+          assert report["bound_gap_obligation_count"] == 12
+          assert report["unbound_gap_obligation_count"] == 156
           assert report["target_counts"] == {
               "hardened": {
                   "volume_count": 70,
