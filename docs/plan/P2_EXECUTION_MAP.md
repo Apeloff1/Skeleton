@@ -2,8 +2,8 @@
 
 Map version: **0.1.0**
 
-Machine authority: [`machine/ai_p2_execution_map.json`](../../machine/ai_p2_execution_map.json)  
-Task backlog: [`machine/ai_p2_task_backlog.json`](../../machine/ai_p2_task_backlog.json)  
+Machine authority: [`machine/ai_p2_execution_map.json`](../../machine/ai_p2_execution_map.json)
+Task backlog: [`machine/ai_p2_task_backlog.json`](../../machine/ai_p2_task_backlog.json)
 Validator: [`scripts/check_p2_execution_map.py`](../../scripts/check_p2_execution_map.py)
 
 ## Boundary
