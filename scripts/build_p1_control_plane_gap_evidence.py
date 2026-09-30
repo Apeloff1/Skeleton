@@ -92,7 +92,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
                 "unresolved blocking obligations",
             ],
             ".github/workflows/p1-risk-evidence-binding.yml": [
-                "Prove strict terminal mode fails closed while work is unresolved",
+                "Prove strict terminal mode accepts fully resolved work",
                 "--require-resolved",
             ],
             "tests/test_p1_risk_evidence_reconciliation.py": [
