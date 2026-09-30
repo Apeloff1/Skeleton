@@ -8478,7 +8478,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-22-0debb8ba51d7d7f2",
+      "obligation_digest": "c62c08156de317799383d67f24efc9a9e4ed1932b5a255005f2708b2672271bd",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T19:40:00Z",
+      "review_at": "2026-10-30T19:40:00Z",
+      "evidence": [
+        {
+          "category": "hermetic_build",
+          "digest": "2d6af66d7de19fe59ecdbeb530417c32f7b8f3898fabf3c03ecc789b52ec2e7c",
+          "source": "p1:adversarial-ac22-evidence:AC-22:hermetic_build:2951c036fbe297dabc19f9021c008d6b69b7b5fe"
+        },
+        {
+          "category": "environment_replay",
+          "digest": "7e9ef4b551d9aab65a18002220b95cd9500947441228d32617de541749a200cc",
+          "source": "p1:adversarial-ac22-evidence:AC-22:environment_replay:2951c036fbe297dabc19f9021c008d6b69b7b5fe"
+        },
+        {
+          "category": "cross_environment_reproduction",
+          "digest": "ada856cd69b83dbb4d8cae575b69dc0bb4ba59d690b552fa2282293a096f4a2f",
+          "source": "p1:adversarial-ac22-evidence:AC-22:cross_environment_reproduction:2951c036fbe297dabc19f9021c008d6b69b7b5fe"
+        },
+        {
+          "category": "dependency_lock_check",
+          "digest": "253686df4a0c6833bcb5ae45643376a1b696470edcd23cd43a895301e94ab3a9",
+          "source": "p1:adversarial-ac22-evidence:AC-22:dependency_lock_check:2951c036fbe297dabc19f9021c008d6b69b7b5fe"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Verified adversarial closure now includes AC-11, AC-13, AC-14, AC-15, and AC-20; remaining axes stay blocking until mode-complete evidence exists."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Governed adversarial closure now includes AC-11, AC-13, AC-14, AC-15, AC-20, and AC-22; remaining axes stay blocking until mode-complete evidence exists."
 }
