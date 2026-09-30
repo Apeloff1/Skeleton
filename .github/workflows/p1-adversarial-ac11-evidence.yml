@@ -23,6 +23,7 @@ on:
       - "scripts/check_capability_interfaces.py"
       - "scripts/build_p1_adversarial_ac11_evidence.py"
       - "tests/test_p1_adversarial_ac11_evidence.py"
+      - "tests/test_p1_adversarial_wave2_bindings.py"
       - ".github/workflows/p1-adversarial-ac11-evidence.yml"
   workflow_dispatch:
 
@@ -79,6 +80,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_ai_adversarial_closure.py
           tests/test_p1_adversarial_ac11_evidence.py
+          tests/test_p1_adversarial_wave2_bindings.py
           tests/test_p1_adversarial_ac20_binding.py
           tests/test_p1_bulk_volume_obligation_bindings.py
           tests/test_p1_risk_evidence_reconciliation.py
