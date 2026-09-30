@@ -52,7 +52,6 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             "skeleton/testing/test_swarm_exact_lease_atomicity.py",
             (
                 "test_exact_lease_uses_one_clock_sample_for_commit",
-                "test_exact_lease_rejects_non_finite_clock_without_mutation",
             ),
         ),
         (
@@ -60,6 +59,7 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             (
                 "test_exact_lease_commit_uses_one_clock_sample",
                 "test_exact_lease_rollback_commit_uses_one_clock_sample",
+                "test_exact_lease_rejects_non_finite_clock_without_mutation",
             ),
         ),
     ),
