@@ -100,13 +100,13 @@ def test_ac14_binding_matches_live_adversarial_obligation() -> None:
 def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 494
-    assert report["resolved_count"] == 494
-    assert report["unresolved_blocking_count"] == 19
+    assert report["binding_count"] == 495
+    assert report["resolved_count"] == 495
+    assert report["unresolved_blocking_count"] == 18
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 494,
-        "unbound": 19,
+        "evidence": 495,
+        "unbound": 18,
     }
 
     registry = _load(ROOT / REGISTRY)
@@ -117,7 +117,7 @@ def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
         if item.kind is RiskKind.ADVERSARIAL
         and item.obligation_id not in bound
     ]
-    assert len(unbound) == 19
+    assert len(unbound) == 18
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
