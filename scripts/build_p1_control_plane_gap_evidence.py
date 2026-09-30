@@ -96,7 +96,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
                 "--require-resolved",
             ],
             "tests/test_p1_risk_evidence_reconciliation.py": [
-                'assert report["unresolved_blocking_count"] == 501',
+                'assert report["unresolved_blocking_count"] == 491',
             ],
         },
     },
