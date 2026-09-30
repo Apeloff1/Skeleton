@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - p1/adversarial-ac15-evidence-20260930
+      - p1/adversarial-wave2-bindings-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -23,6 +24,7 @@ on:
       - "scripts/build_p1_adversarial_ac15_evidence.py"
       - "scripts/build_p1_adversarial_ac14_evidence.py"
       - "tests/test_p1_adversarial_ac14_evidence.py"
+      - "tests/test_p1_adversarial_ac14_binding.py"
       - ".github/workflows/p1-adversarial-ac14-evidence.yml"
   workflow_dispatch:
 
@@ -71,6 +73,7 @@ jobs:
           tests/test_provider_surface_independent_verifier.py
           tests/test_cost_admission_independent_verifier.py
           tests/test_p1_adversarial_ac14_evidence.py
+          tests/test_p1_adversarial_ac14_binding.py
 
       - name: Run independent provider verifier
         env:
@@ -173,7 +176,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier remains 490 resolved and 23 blocking
+      - name: Confirm governed frontier remains 493 resolved and 20 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac14/reconciliation.json
@@ -184,11 +187,11 @@ jobs:
           report = json.loads(
               Path(".p1-ac14/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 490:
+          if report["binding_count"] != 493:
               raise SystemExit("AC-14 verifier mutated binding count")
-          if report["resolved_count"] != 490:
+          if report["resolved_count"] != 493:
               raise SystemExit("AC-14 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 23:
+          if report["unresolved_blocking_count"] != 20:
               raise SystemExit("AC-14 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-14 verifier reintroduced unclassified risks")
