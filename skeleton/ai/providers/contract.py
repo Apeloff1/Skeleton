@@ -26,8 +26,21 @@ import json
 import math
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+
+# Source and governed AI mirror are one logical contract module. Register both
+# import paths before defining classes so enum/dataclass identity cannot split
+# when callers import the staged mirror and compatibility source in one process.
+_this_module = sys.modules[__name__]
+for _contract_alias in (
+    "skeleton.providers.contract",
+    "skeleton.ai.providers.contract",
+):
+    sys.modules.setdefault(_contract_alias, _this_module)
+del _contract_alias, _this_module
 
 
 class ProviderArchitectureError(RuntimeError):
