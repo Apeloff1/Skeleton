@@ -1,0 +1,57 @@
+name: P1 Adversarial AC-09 Evidence Gate
+
+on:
+  push:
+    branches:
+      - "p1/adversarial-ac09-evidence-*"
+  pull_request:
+    branches:
+      - main
+      - p1/risk-classification-evidence-batch1-20260930
+      - p1/closure-rollup-495-18-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+          skeleton/testing/test_swarm_lease_rollback.py
+          skeleton/testing/test_shell_ai_execution_fence.py
+          tests/test_p1_adversarial_ac09_evidence.py
+          tests/test_p1_adversarial_ac09_binding.py
+          tests/test_p1_adversarial_ac12_binding.py
+          tests/test_p1_risk_evidence_reconciliation.py
+
+              raise SystemExit("wrong adversarial axis")
+          if report["candidate_count"] != 1:
+              raise SystemExit("AC-09 candidate count drift")
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-09 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-09 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-09 candidate does not detect governed binding")
+          if set(candidate["required_evidence_modes"]) != expected_modes:
+              raise SystemExit("AC-09 required evidence modes drift")
+          if {row["category"] for row in candidate["evidence"]} != expected_modes:
+          )
+          PY
+
+      - name: Confirm governed frontier remains 497 resolved and 16 blocking
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py \
+          report = json.loads(
+              Path(".p1-ac09/reconciliation.json").read_text(encoding="utf-8")
+          )
+          if report["binding_count"] != 497:
+              raise SystemExit("AC-09 verifier mutated binding count")
+          if report["resolved_count"] != 497:
+              raise SystemExit("AC-09 verifier mutated resolved count")
+          if report["unresolved_blocking_count"] != 16:
+              raise SystemExit("AC-09 verifier mutated blocking count")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("AC-09 verifier reintroduced unclassified risks")
+          if report["disposition_counts"] != {
+              "evidence": 497,
+              "unbound": 16,
+          }:
+              raise SystemExit("AC-09 verifier mutated disposition counts")
+          PY
