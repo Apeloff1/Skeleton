@@ -251,15 +251,10 @@ class KeyContinuityRing:
         entry = self._entries.get(envelope.key_id)
         if entry is None:
             raise KeyContinuityError("signature key is unknown")
-        if envelope.generation != entry.introduced_generation and (
-            envelope.key_id != self._active_key_id
-            or envelope.generation > generation
-        ):
-            # Signatures carry the generation in which they were emitted. A key
-            # can remain active across later generations, but cannot predate its
-            # introduction.
-            if envelope.generation < entry.introduced_generation:
-                raise KeyContinuityError("signature predates key introduction")
+        if envelope.generation < entry.introduced_generation:
+            raise KeyContinuityError("signature predates key introduction")
+        if envelope.generation > generation:
+            raise KeyContinuityError("signature postdates requested generation")
         if entry.introduced_generation > generation:
             raise KeyContinuityError("key did not exist at requested generation")
         if (
