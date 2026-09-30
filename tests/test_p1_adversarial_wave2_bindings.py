@@ -19,8 +19,8 @@ from scripts.reconcile_p1_risk_evidence import (
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-RESOLVED_AXES = frozenset({"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"})
-EXPECTED_RESIDUAL_AXIS_COUNT = 19
+RESOLVED_AXES = frozenset({"AC-11", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"})
+EXPECTED_RESIDUAL_AXIS_COUNT = 18
 
 EXPECTED = {
     "AC-11": {
@@ -42,8 +42,6 @@ EXPECTED = {
         "verifier_head": "8435144dcee7fcb087ad9806504d2d38c9094147",
         "verifier_run": 36763669209,
         "verifier_job": 110052302630,
-        "bound_at": "2026-09-30T19:20:00Z",
-        "review_at": "2026-10-30T19:20:00Z",
         "evidence": {
             "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
             "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
@@ -103,8 +101,8 @@ def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
         assert row["owner_id"] == "ACC-P1-EVID-04"
         assert row["severity"] == "high"
         assert row["disposition"] == "evidence"
-        assert row["bound_at"] == expected.get("bound_at", BOUND_AT)
-        assert row["review_at"] == expected.get("review_at", REVIEW_AT)
+        assert row["bound_at"] == BOUND_AT
+        assert row["review_at"] == REVIEW_AT
         assert row["accepted_risk"] is None
         assert expected["verifier_run"] > 0
         assert expected["verifier_job"] > 0
@@ -137,21 +135,21 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
         assert set(obligation.required_evidence_modes) == set(expected["evidence"])
 
 
-def test_wave2_advances_governed_frontier_to_494_19_0() -> None:
+def test_wave2_advances_governed_frontier_to_495_18_0() -> None:
     assert RESOLVED_AXES == frozenset(
-        {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
+        {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
     )
-    assert EXPECTED_RESIDUAL_AXIS_COUNT == 19
+    assert EXPECTED_RESIDUAL_AXIS_COUNT == 18
 
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 494
-    assert report["resolved_count"] == 494
-    assert report["unresolved_blocking_count"] == 19
+    assert report["binding_count"] == 495
+    assert report["resolved_count"] == 495
+    assert report["unresolved_blocking_count"] == 18
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 494,
-        "unbound": 19,
+        "evidence": 495,
+        "unbound": 18,
     }
 
     registry = _load(ROOT / REGISTRY)
