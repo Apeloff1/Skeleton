@@ -5,25 +5,34 @@ Provenance is an append-only log of pointer hashes — never page text.
 """
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from skeleton.cortex.acquire_repo import SPREE, acquired_dir, parse_ref, reference_of
-from skeleton.cortex.laws import check
+from skeleton.cortex.acquire_repo import SPREE, parse_ref, reference_of
 from skeleton.cortex.port import Thought
+from skeleton.cortex.reference_provenance import (
+    ReferenceProvenanceError,
+    append_reference,
+    read_reference_log,
+    reference_scope,
+    runtime_provenance_path,
+)
+
+__all__ = [
+    "GameRefPort", "ReferenceProvenanceError", "index", "lookup", "match",
+    "provenance_path", "read_provenance", "record_provenance", "refer", "reference_scope",
+]
 
 
 def _norm(s: str) -> str:
     return " ".join((s or "").lower().split())
 
 
-def index() -> List[Dict[str, Any]]:
+def index() -> list[dict[str, Any]]:
     return [reference_of(g) for g in SPREE]
 
 
-def match(stimulus: str) -> List[Dict[str, Any]]:
+def match(stimulus: str) -> list[dict[str, Any]]:
     text = _norm(stimulus)
     hits = []
     for ref in index():
@@ -37,36 +46,24 @@ def match(stimulus: str) -> List[Dict[str, Any]]:
     return hits
 
 
-def lookup(stimulus: str) -> Optional[Dict[str, Any]]:
+def lookup(stimulus: str) -> dict[str, Any] | None:
     hits = match(stimulus)
     return hits[0] if hits else None
 
 
-def provenance_path(root: Optional[Path] = None) -> Path:
-    return acquired_dir(root) / "gaming" / "provenance.jsonl"
+def provenance_path(root: Path | None = None) -> Path:
+    return runtime_provenance_path(root)
 
 
-def record_provenance(ref: Dict[str, Any], *, action: str, root: Optional[Path] = None) -> Dict[str, Any]:
-    pointer = {
-        "action": action,
-        "appid": ref.get("appid"),
-        "title": ref.get("title"),
-        "url": ref.get("url"),
-        "license": ref.get("license"),
-        "dialect": (ref.get("dialect") or "")[:160],
-        "stored_prose": 0,
-    }
-    check(pointer)
-    blob = json.dumps(pointer, sort_keys=True, default=str)
-    pointer["sha256"] = hashlib.sha256(blob.encode("utf-8")).hexdigest()
-    path = provenance_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(pointer, sort_keys=True) + "\n")
-    return pointer
+def record_provenance(ref: dict[str, Any], *, action: str, root: Path | None = None) -> dict[str, Any]:
+    return append_reference(provenance_path(root), ref, action=action)
 
 
-def refer(stimulus: str, *, live: bool = False) -> Dict[str, Any]:
+def read_provenance(root: Path | None = None, *, max_records: int = 10_000) -> list[dict[str, Any]]:
+    return read_reference_log(provenance_path(root), max_records=max_records)
+
+
+def refer(stimulus: str, *, live: bool = False, root: Path | None = None) -> dict[str, Any]:
     ref = lookup(stimulus)
     if ref is None:
         return {"hit": 0, "reason": "no-reference"}
@@ -74,20 +71,21 @@ def refer(stimulus: str, *, live: bool = False) -> Dict[str, Any]:
         parsed = parse_ref(int(ref["appid"]), title=str(ref["title"]), era=str(ref.get("era") or ""))
         if parsed.get("parsed"):
             ref = {**ref, **{k: parsed[k] for k in ("dialect", "title", "genres") if k in parsed}}
-    log = record_provenance(ref, action="live" if live else "lookup")
+    log = record_provenance(ref, action="live" if live else "lookup", root=root)
     return {"hit": 1, "ref": ref, "provenance": log, "live": int(live)}
 
 
 class GameRefPort:
     """ModelPort. Speaks house dialect for a matched title. Never a blurb."""
 
-    def __init__(self, slot: str = "right", *, name: str = "gameref") -> None:
+    def __init__(self, slot: str = "right", *, name: str = "gameref", root: Path | None = None) -> None:
         self.slot = slot
         self.name = name
         self.scale = "tool"
+        self.root = Path(root).resolve() if root is not None else None
 
-    def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
-        out = refer(stimulus, live=bool((context or {}).get("live")))
+    def think(self, stimulus: str, context: dict[str, Any]) -> Thought:
+        out = refer(stimulus, live=bool((context or {}).get("live")), root=self.root)
         if not out.get("hit"):
             return Thought(slot=self.slot, kind="ref-miss", text="", confidence=0.2,
                            tags=("ref", "miss", self.slot))
@@ -105,12 +103,13 @@ class GameRefPort:
     def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
         return self.think(stimulus or "", {}).text
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         return {"kind": "gameref", "slot": self.slot, "name": self.name}
 
     @classmethod
-    def from_snapshot(cls, data: Dict[str, Any], *, slot: str | None = None) -> "GameRefPort":
-        return cls(slot=slot or str((data or {}).get("slot") or "right"))
+    def from_snapshot(cls, data: dict[str, Any], *, slot: str | None = None, root: Path | None = None) -> GameRefPort:
+        return cls(slot=slot or str((data or {}).get("slot") or "right"),
+                   name=str((data or {}).get("name") or "gameref"), root=root)
 
     def perplexity(self, texts) -> float:
         return 1.0
