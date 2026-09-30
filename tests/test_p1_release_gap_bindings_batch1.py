@@ -111,13 +111,13 @@ def test_batch1_remains_twelve_bindings_inside_combined_reconciliation() -> None
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
-    assert report["binding_count"] == 492
-    assert report["resolved_count"] == 492
-    assert report["unresolved_blocking_count"] == 21
+    assert report["binding_count"] == 493
+    assert report["resolved_count"] == 493
+    assert report["unresolved_blocking_count"] == 20
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 492,
-        "unbound": 21,
+        "evidence": 493,
+        "unbound": 20,
     }
 
 
