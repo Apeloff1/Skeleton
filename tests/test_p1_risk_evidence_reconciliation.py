@@ -21,7 +21,7 @@ from scripts.reconcile_p1_risk_evidence import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NOW = datetime(2026, 9, 27, 20, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def _copy_file(root: Path, relative: Path) -> None:
