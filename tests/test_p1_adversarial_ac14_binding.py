@@ -25,7 +25,7 @@ VERIFIER_RUN_ID = 36760238991
 VERIFIER_JOB_ID = 110040647258
 BOUND_AT = "2026-09-30T18:55:00Z"
 REVIEW_AT = "2026-10-30T18:55:00Z"
-NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 EXPECTED_EVIDENCE = {
     "evidence_digest_check": "7639f2acccbf381f7aecd706ccc17195861c7dd155449b305053273ddbc87e1f",
