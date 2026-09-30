@@ -34,6 +34,14 @@ This ordering is designed to prevent a new breadth explosion before P2 has trust
 | P2-L5 | Evidence-bound documentation | P2-L2 | P2-DOC-01 |
 | P2-L6 | Profile-gated acceleration | P2-L4 | P2-NATIVE-01 |
 
+## Masterplan inheritance
+
+P2 is subordinate to the canonical masterplan rather than a parallel planning system. The machine map pins masterplan version/status, the Volume 420 breadth freeze, the canonical master-build sequence, and the masterplan maturity/anti-shortcut rules.
+
+For every scheduled primary volume, the P2 backlog now inherits the masterplan's exact title, depth-pass identity, accountability ID, current implementation state, signing requirement, contracts, risks, and gaps. The validator compares those inherited records to `machine/ai_master_plan.json` on every run. A task-local objective may add constraints, but it cannot shorten the masterplan's risk/gap/contract obligations.
+
+P2 task dependencies supplement the eight canonical `MBW-00..07` construction waves; they do not replace build-wave gates, AIQ dependencies, vertical-slice evidence, maturity rules, or signed accountability.
+
 ## Fail-closed invariants
 
 1. The P2 source set must equal the P1 `deferred_volume_refs` set exactly.
