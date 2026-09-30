@@ -17,6 +17,7 @@ and remain a separate closure lane.
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -103,14 +104,41 @@ def _git_manifest(
     if cached is not None:
         return dict(cached)
 
-    path = root / relative
-    if not path.exists():
-        raise BulkVolumeEvidenceError(f"materialized surface is missing: {relative}")
-    if path.is_symlink():
-        raise BulkVolumeEvidenceError(f"materialized surface must not be symlinked: {relative}")
+    has_glob = any(token in relative for token in ("*", "?", "["))
+    if has_glob:
+        matches = sorted(
+            Path(item)
+            for item in glob.glob(str(root / relative), recursive=True)
+        )
+        if not matches:
+            raise BulkVolumeEvidenceError(
+                f"materialized surface glob matched nothing: {relative}"
+            )
+        tracked_args = [
+            str(path.relative_to(root))
+            for path in matches
+            if path.exists() and not path.is_symlink()
+        ]
+        if not tracked_args:
+            raise BulkVolumeEvidenceError(
+                f"materialized surface glob has no safe matches: {relative}"
+            )
+        kind = "pathspec"
+    else:
+        path = root / relative
+        if not path.exists():
+            raise BulkVolumeEvidenceError(
+                f"materialized surface is missing: {relative}"
+            )
+        if path.is_symlink():
+            raise BulkVolumeEvidenceError(
+                f"materialized surface must not be symlinked: {relative}"
+            )
+        tracked_args = [relative]
+        kind = "file" if path.is_file() else "directory"
 
     result = subprocess.run(
-        ["git", "ls-files", "-s", "-z", "--", relative],
+        ["git", "ls-files", "-s", "-z", "--", *tracked_args],
         cwd=root,
         capture_output=True,
         check=False,
@@ -128,7 +156,7 @@ def _git_manifest(
 
     manifest = {
         "path": relative,
-        "kind": "file" if path.is_file() else "directory",
+        "kind": kind,
         "tracked_entry_count": len(entries),
         "tracked_manifest_digest": hashlib.sha256(raw).hexdigest(),
     }
