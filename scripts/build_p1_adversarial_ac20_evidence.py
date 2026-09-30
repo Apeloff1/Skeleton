@@ -179,8 +179,7 @@ def build_ac20_evidence(
         for row in records
         if isinstance(row, dict)
     }
-    if obligation.obligation_id in bound_ids:
-        raise AC20EvidenceError(f"{AXIS_ID} is already governed")
+    binding_present = obligation.obligation_id in bound_ids
 
     proof_modes: dict[str, dict[str, Any]] = {}
     evidence_refs: list[dict[str, str]] = []
@@ -220,6 +219,7 @@ def build_ac20_evidence(
         "recommended_severity": "high",
         "recommended_disposition": "evidence",
         "expected_head": expected_head,
+        "binding_present": binding_present,
         "required_evidence_modes": list(EXPECTED_MODES),
         "evidence": evidence_refs,
         "proof_modes": proof_modes,
@@ -238,6 +238,8 @@ def build_ac20_evidence(
         "expected_head": expected_head,
         "axis_id": AXIS_ID,
         "candidate_count": 1,
+        "already_bound_count": int(binding_present),
+        "candidate_binding_count": 0 if binding_present else 1,
         "required_evidence_mode_count": len(EXPECTED_MODES),
         "non_authoritative": True,
         "creates_bindings": False,
