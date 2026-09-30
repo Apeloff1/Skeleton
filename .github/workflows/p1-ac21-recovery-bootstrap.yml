@@ -10,6 +10,10 @@ on:
       - "skeleton/testing/test_recovery_bootstrap.py"
       - ".github/workflows/p1-ac21-recovery-bootstrap.yml"
 
+concurrency:
+  group: p1-ac21-recovery-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
