@@ -19,8 +19,8 @@ from scripts.reconcile_p1_risk_evidence import (
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-RESOLVED_AXES = frozenset({"AC-11", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"})
-EXPECTED_RESIDUAL_AXIS_COUNT = 18
+RESOLVED_AXES = frozenset({"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"})
+EXPECTED_RESIDUAL_AXIS_COUNT = 17
 
 EXPECTED = {
     "AC-11": {
@@ -137,21 +137,21 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
         assert set(obligation.required_evidence_modes) == set(expected["evidence"])
 
 
-def test_wave2_advances_governed_frontier_to_495_18_0() -> None:
+def test_wave2_advances_governed_frontier_to_496_17_0() -> None:
     assert RESOLVED_AXES == frozenset(
-        {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
+        {"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
     )
-    assert EXPECTED_RESIDUAL_AXIS_COUNT == 18
+    assert EXPECTED_RESIDUAL_AXIS_COUNT == 17
 
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 495
-    assert report["resolved_count"] == 495
-    assert report["unresolved_blocking_count"] == 18
+    assert report["binding_count"] == 496
+    assert report["resolved_count"] == 496
+    assert report["unresolved_blocking_count"] == 17
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 495,
-        "unbound": 18,
+        "evidence": 496,
+        "unbound": 17,
     }
 
     registry = _load(ROOT / REGISTRY)
