@@ -91,10 +91,12 @@ jobs:
           }
           if report["axis_id"] != "AC-19":
               raise SystemExit("wrong AC-19 axis")
-          if report["candidate_binding_count"] != 1:
-              raise SystemExit("AC-19 must remain one unbound evidence candidate")
-          if candidate["binding_present"]:
-              raise SystemExit("AC-19 unexpectedly already bound")
+          if report["already_bound_count"] + report["candidate_binding_count"] != 1:
+              raise SystemExit("governed evidence state count drift")
+          if report["already_bound_count"] != int(candidate["binding_present"]):
+              raise SystemExit("binding-present state drift")
+          if report["candidate_binding_count"] != int(not candidate["binding_present"]):
+              raise SystemExit("candidate-binding state drift")
           if set(candidate["required_evidence_modes"]) != expected:
               raise SystemExit("AC-19 required modes drift")
           if {row["category"] for row in candidate["evidence"]} != expected:

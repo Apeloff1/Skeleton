@@ -16,22 +16,22 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-AXIS_ID = "AC-13"
-OBLIGATION_ID = "P1-ADVERSARIAL-AC-13-0765da9a17a8326d"
-OBLIGATION_DIGEST = "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735"
+AXIS_ID = "AC-09"
+OBLIGATION_ID = "P1-ADVERSARIAL-AC-09-81fa5fab73acd823"
+OBLIGATION_DIGEST = "5d866e90ebbdba4e26b9f24b6aa42794f273130a24fce46df4984f034d984c50"
 OWNER_ID = "ACC-P1-EVID-04"
-VERIFIER_HEAD = "8435144dcee7fcb087ad9806504d2d38c9094147"
-VERIFIER_RUN_ID = 36763669209
-VERIFIER_JOB_ID = 110052302630
-BOUND_AT = "2026-09-30T19:20:00Z"
-REVIEW_AT = "2026-10-30T19:20:00Z"
+VERIFIER_HEAD = "75275748906e00717f06f944d0c99d0dc6f5c962"
+VERIFIER_RUN_ID = 36773407012
+VERIFIER_JOB_ID = 110085203668
+REPORT_DIGEST = "1a9a58ccbb18dfd59b9faab8b175152aa137faf0d157c3eabb6ea93db9ba8c93"
+BOUND_AT = "2026-09-30T20:34:00Z"
+REVIEW_AT = "2026-10-30T20:34:00Z"
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
-
 EXPECTED = {
-    "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
-    "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
-    "decompression_bomb": "f5d3d691340ce80e0564ae744b6959d469d50c468b057b368a6858d461197021",
-    "complexity_budget": "58a85997b9cff610e15f6c05370083536d4d9628ea5a62fda562d48ebe594fe9",
+    "clock_skew": "ebcbedea23563a43882148562273d28e8d2d7ee6c40647f4756a9671a1044a44",
+    "suspend_resume": "da0640349f7afd7ea62526fb40e1115ee16e413acbce11b427e41d95994c8e31",
+    "lease_fencing": "d897ce6e204f1f5f0a45c234168fd84a5ecbfd694476fdffe9dafa2de0cf26d5",
+    "expiry_property": "ad0d810561314677bcb93b16e8b962e445829d8af7c1346e458cd2823ff73721",
 }
 
 
@@ -41,11 +41,7 @@ def _load(path: Path) -> dict:
 
 def _binding() -> dict:
     registry = _load(ROOT / REGISTRY)
-    rows = [
-        row
-        for row in registry["records"]
-        if row["obligation_id"] == OBLIGATION_ID
-    ]
+    rows = [row for row in registry["records"] if row["obligation_id"] == OBLIGATION_ID]
     assert len(rows) == 1
     return rows[0]
 
@@ -58,20 +54,18 @@ def _obligation():
         _load(ROOT / POLICY),
     )
     rows = [
-        item
-        for item in items
+        item for item in items
         if item.kind is RiskKind.ADVERSARIAL and item.source_ref == AXIS_ID
     ]
     assert len(rows) == 1
     return rows[0]
 
 
-def test_ac13_binding_pins_exact_head_evidence_receipt() -> None:
+def test_ac09_binding_pins_successful_exact_head_verifier() -> None:
     row = _binding()
-
-    assert VERIFIER_RUN_ID == 36763669209
-    assert VERIFIER_JOB_ID == 110052302630
-
+    assert VERIFIER_RUN_ID == 36773407012
+    assert VERIFIER_JOB_ID == 110085203668
+    assert len(REPORT_DIGEST) == 64
     assert row["obligation_id"] == OBLIGATION_ID
     assert row["obligation_digest"] == OBLIGATION_DIGEST
     assert row["owner_id"] == OWNER_ID
@@ -84,29 +78,24 @@ def test_ac13_binding_pins_exact_head_evidence_receipt() -> None:
     by_category = {item["category"]: item for item in row["evidence"]}
     assert set(by_category) == set(EXPECTED)
     for category, digest in EXPECTED.items():
-        assert by_category[category]["digest"] == digest
-        assert by_category[category]["source"] == (
-            f"p1:adversarial-ac13-evidence:{AXIS_ID}:"
-            f"{category}:{VERIFIER_HEAD}"
+        evidence = by_category[category]
+        assert evidence["digest"] == digest
+        assert evidence["source"] == (
+            f"p1:adversarial-ac09-evidence:{AXIS_ID}:{category}:{VERIFIER_HEAD}"
         )
 
 
-def test_ac13_binding_matches_live_canonical_obligation() -> None:
+def test_ac09_binding_matches_live_canonical_obligation() -> None:
     obligation = _obligation()
-
     assert obligation.obligation_id == OBLIGATION_ID
     assert obligation.obligation_digest == OBLIGATION_DIGEST
     assert set(obligation.required_evidence_modes) == set(EXPECTED)
 
 
-def test_ac13_binding_advances_frontier_without_risk_acceptance() -> None:
+def test_ac09_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-
     assert report["binding_count"] == 513
     assert report["resolved_count"] == 513
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {
-        "evidence": 513,
-
-    }
+    assert report["disposition_counts"] == {"evidence": 513}

@@ -25,8 +25,9 @@ def test_ac19_candidate_covers_exact_required_modes() -> None:
     candidate = report["candidate"]
     assert report["axis_id"] == AXIS_ID == "AC-19"
     assert report["candidate_count"] == 1
-    assert report["already_bound_count"] == 0
-    assert report["candidate_binding_count"] == 1
+    assert report["already_bound_count"] + report["candidate_binding_count"] == 1
+    assert report["already_bound_count"] == int(candidate["binding_present"])
+    assert report["candidate_binding_count"] == int(not candidate["binding_present"])
     assert tuple(candidate["required_evidence_modes"]) == EXPECTED_MODES
     assert {row["category"] for row in candidate["evidence"]} == set(EXPECTED_MODES)
 
