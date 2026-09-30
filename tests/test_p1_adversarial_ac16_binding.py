@@ -32,7 +32,7 @@ EXPECTED = {
     "redaction_test": "6536921759d213dff2eb558a0258e5a77641f86d4017782a234f69e5d54002b5",
     "reconstruction_without_full_telemetry": "389108eacf53e236d8d0c09398a78551b68af70ac68223285280efed144faffe",
 }
-RESIDUAL = {"AC-01", "AC-08", "AC-10", "AC-19", "AC-21", "AC-23"}
+RESIDUAL = {"AC-01", "AC-08", "AC-10", "AC-21"}
 
 
 def _load(path: Path) -> dict:
@@ -93,13 +93,13 @@ def test_ac16_binding_matches_live_canonical_obligation() -> None:
     assert set(obligation.required_evidence_modes) == set(EXPECTED)
 
 
-def test_ac16_binding_advances_frontier_to_507_6_0() -> None:
+def test_ac16_binding_advances_frontier_to_509_4_0() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-    assert report["binding_count"] == 507
-    assert report["resolved_count"] == 507
-    assert report["unresolved_blocking_count"] == 6
+    assert report["binding_count"] == 509
+    assert report["resolved_count"] == 509
+    assert report["unresolved_blocking_count"] == 4
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {"evidence": 507, "unbound": 6}
+    assert report["disposition_counts"] == {"evidence": 509, "unbound": 4}
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}

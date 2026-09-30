@@ -8894,7 +8894,71 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-19-e54597c74279060f",
+      "obligation_digest": "92e62c90aa0f786e39dbde96c977092e43561393f0b11185175a1463fc4cacc7",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:06:00Z",
+      "review_at": "2026-10-30T22:06:00Z",
+      "evidence": [
+        {
+          "category": "break_glass_drill",
+          "digest": "fa73d6ae5955cc6688de2e3fb959d60f1a40e8c1bb972d998b7bdf6bc82f0e0b",
+          "source": "p1:adversarial-ac19-evidence:AC-19:break_glass_drill:e0be4f30379fa99a31d6ec17234db21367257e8b"
+        },
+        {
+          "category": "operator_error_simulation",
+          "digest": "8c259684a65a98225ff7d5ff0fe54cd53e733828c7e18cd8f52be02eabdabcac",
+          "source": "p1:adversarial-ac19-evidence:AC-19:operator_error_simulation:e0be4f30379fa99a31d6ec17234db21367257e8b"
+        },
+        {
+          "category": "approval_fatigue",
+          "digest": "a0369ba21158abfc6aa169a56021bac002251d212d16c8e2a89be2f108eda701",
+          "source": "p1:adversarial-ac19-evidence:AC-19:approval_fatigue:e0be4f30379fa99a31d6ec17234db21367257e8b"
+        },
+        {
+          "category": "undo_recovery",
+          "digest": "f788119eaca047a46105e6728fc8d5628e96f619735f9afab17103f72d96572f",
+          "source": "p1:adversarial-ac19-evidence:AC-19:undo_recovery:e0be4f30379fa99a31d6ec17234db21367257e8b"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-23-22bd0e0ac706c216",
+      "obligation_digest": "47bdac98bfdd06deb23e600dd418abae3f03ebcf08a11c551bdccbdade97e065",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:06:00Z",
+      "review_at": "2026-10-30T22:06:00Z",
+      "evidence": [
+        {
+          "category": "soak",
+          "digest": "b70df20f7ed41953a2d1dab12366e39735bd24a97b22b05ad26d90e7ee2e2817",
+          "source": "p1:adversarial-ac23-evidence:AC-23:soak:f15a30b856a857a267b3cfcb5633b6ed19a9618a"
+        },
+        {
+          "category": "accelerated_time",
+          "digest": "63f2c2d92a793d468a99c15b7d7c5ec9156204b6fc37a8781f6cfa65f6cb4295",
+          "source": "p1:adversarial-ac23-evidence:AC-23:accelerated_time:f15a30b856a857a267b3cfcb5633b6ed19a9618a"
+        },
+        {
+          "category": "aging_simulation",
+          "digest": "6b191a2cb9ee3f2f2621e398826ac8078586470a629f9ef571b94db75e0bd51d",
+          "source": "p1:adversarial-ac23-evidence:AC-23:aging_simulation:f15a30b856a857a267b3cfcb5633b6ed19a9618a"
+        },
+        {
+          "category": "retirement_migration",
+          "digest": "5be90488bd3a8a011907fdf4cd450ef148376ab7f4590a2e1a177b14f72fc5d1",
+          "source": "p1:adversarial-ac23-evidence:AC-23:retirement_migration:f15a30b856a857a267b3cfcb5633b6ed19a9618a"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-16 telemetry failure evidence and AC-17 isolation evidence are governed; remaining axes stay blocking until mode-complete evidence exists."
+  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-16, AC-17, AC-19, and AC-23 are governed from successful exact-head verifier receipts; AC-01, AC-08, AC-10, and AC-21 remain blocking."
 }

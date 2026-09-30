@@ -180,17 +180,17 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 507:
+          if report["binding_count"] != 509:
               raise SystemExit("classified-risk binding count drift")
-          if report["resolved_count"] != 507:
+          if report["resolved_count"] != 509:
               raise SystemExit("classified-risk resolution count drift")
-          if report["unresolved_blocking_count"] != 6:
+          if report["unresolved_blocking_count"] != 4:
               raise SystemExit("classified-risk blocking frontier drift")
           if report["unclassified_count"] != 0:
               raise SystemExit("classified-risk unclassified frontier drift")
           if report["disposition_counts"] != {
-              "evidence": 507,
-              "unbound": 6,
+              "evidence": 509,
+              "unbound": 4,
           }:
               raise SystemExit("classified-risk disposition counts drift")
           print(

@@ -19,8 +19,8 @@ from scripts.reconcile_p1_risk_evidence import (
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-RESOLVED_AXES = frozenset({"AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-16", "AC-17", "AC-18", "AC-20", "AC-22", "AC-24"})
-EXPECTED_RESIDUAL_AXIS_COUNT = 6
+RESOLVED_AXES = frozenset({"AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-16", "AC-17", "AC-18", "AC-19", "AC-20", "AC-22", "AC-23", "AC-24"})
+EXPECTED_RESIDUAL_AXIS_COUNT = 4
 
 EXPECTED = {
     "AC-11": {
@@ -137,21 +137,21 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
         assert set(obligation.required_evidence_modes) == set(expected["evidence"])
 
 
-def test_wave2_advances_governed_frontier_to_507_6_0() -> None:
+def test_wave2_advances_governed_frontier_to_509_4_0() -> None:
     assert RESOLVED_AXES == frozenset(
-        {"AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-16", "AC-17", "AC-18", "AC-20", "AC-22", "AC-24"}
+        {"AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-16", "AC-17", "AC-18", "AC-19", "AC-20", "AC-22", "AC-23", "AC-24"}
     )
-    assert EXPECTED_RESIDUAL_AXIS_COUNT == 6
+    assert EXPECTED_RESIDUAL_AXIS_COUNT == 4
 
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 507
-    assert report["resolved_count"] == 507
-    assert report["unresolved_blocking_count"] == 6
+    assert report["binding_count"] == 509
+    assert report["resolved_count"] == 509
+    assert report["unresolved_blocking_count"] == 4
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 507,
-        "unbound": 6,
+        "evidence": 509,
+        "unbound": 4,
     }
 
     registry = _load(ROOT / REGISTRY)
