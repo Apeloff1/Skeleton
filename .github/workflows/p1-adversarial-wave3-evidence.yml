@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      PYTHONPATH: ".:backend"
+      PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
       EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
 
@@ -76,11 +76,19 @@ jobs:
           "pytest>=8,<9"
           "pydantic[email]>=2.13.5"
           "pydantic-settings>=2.15.0"
+          "httpx>=0.28,<1"
 
-      - name: Run underlying adversarial controls
+      - name: Run repository adversarial controls
         run: |
           set -euo pipefail
-          python -m pytest -q --noconftest             skeleton/testing/test_worker_fairness_failover_shutdown.py             skeleton/testing/test_state_recovery_drill.py             skeleton/testing/test_process_resource_reliability_profiles.py             skeleton/testing/test_chaos_governor.py             backend/tests/test_ai_provider_reliability.py             tests/test_provider_capability_matrix.py             tests/test_jeeves_local_provider_policy.py             skeleton/testing/test_provider_stream_reliability_profiles.py             backend/tests/test_execution_receipts.py             skeleton/testing/test_shell_ai_durable_orphan_scan.py             tests/test_duplicate_work_audit.py             skeleton/testing/test_migration_rollback_compatibility.py             skeleton/testing/test_checkpoint_migrations.py             skeleton/testing/test_swarm_exact_lease_atomicity.py             skeleton/testing/test_guarded_compaction.py             tests/test_p1_adversarial_wave3_evidence.py
+          python -m pytest -q --noconftest             skeleton/testing/test_worker_fairness_failover_shutdown.py             skeleton/testing/test_state_recovery_drill.py             skeleton/testing/test_process_resource_reliability_profiles.py             skeleton/testing/test_chaos_governor.py             tests/test_provider_capability_matrix.py             tests/test_jeeves_local_provider_policy.py             skeleton/testing/test_provider_stream_reliability_profiles.py             skeleton/testing/test_shell_ai_durable_orphan_scan.py             tests/test_duplicate_work_audit.py             skeleton/testing/test_migration_rollback_compatibility.py             skeleton/testing/test_checkpoint_migrations.py             skeleton/testing/test_swarm_exact_lease_atomicity.py             skeleton/testing/test_guarded_compaction.py             tests/test_p1_adversarial_wave3_evidence.py
+
+      - name: Run backend receipt and provider controls
+        env:
+          PYTHONPATH: "backend:."
+        run: |
+          set -euo pipefail
+          python -m pytest -q --noconftest             backend/tests/test_ai_provider_reliability.py             backend/tests/test_execution_receipts.py
 
       - name: Build exact-head wave 3 evidence
         run: |
