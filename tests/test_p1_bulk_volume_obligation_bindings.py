@@ -108,7 +108,7 @@ def test_governed_frontier_is_494_resolved_19_adversarial() -> None:
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-14", "AC-15", "AC-20"}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
 
 
 def test_bulk_binding_does_not_mutate_masterplan_source_obligations() -> None:
