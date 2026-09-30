@@ -101,13 +101,13 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
 def test_governed_frontier_is_493_resolved_20_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 493
-    assert report["resolved_count"] == 493
-    assert report["unresolved_blocking_count"] == 20
+    assert report["binding_count"] == 494
+    assert report["resolved_count"] == 494
+    assert report["unresolved_blocking_count"] == 19
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 493,
-        "unbound": 20,
+        "evidence": 494,
+        "unbound": 19,
     }
 
     registry = _load(ROOT / REGISTRY)
