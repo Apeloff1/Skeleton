@@ -16,6 +16,7 @@ on:
       - "skeleton/testing/test_security_archive_sandbox.py"
       - "scripts/build_p1_adversarial_ac13_evidence.py"
       - "tests/test_p1_adversarial_ac13_evidence.py"
+      - "tests/test_p1_adversarial_ac13_binding.py"
       - ".github/workflows/p1-adversarial-ac13-evidence.yml"
   workflow_dispatch:
 
@@ -63,6 +64,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_security_archive_sandbox.py
           tests/test_p1_adversarial_ac13_evidence.py
+          tests/test_p1_adversarial_ac13_binding.py
           tests/test_p1_adversarial_ac11_binding.py
           tests/test_p1_adversarial_ac14_binding.py
           tests/test_p1_adversarial_ac15_binding.py
@@ -97,6 +99,12 @@ jobs:
               raise SystemExit("wrong adversarial axis")
           if report["candidate_count"] != 1:
               raise SystemExit("AC-13 candidate count drift")
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-13 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-13 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-13 candidate does not detect governed binding")
           if set(candidate["required_evidence_modes"]) != expected_modes:
               raise SystemExit("AC-13 required evidence modes drift")
           if {row["category"] for row in candidate["evidence"]} != expected_modes:
@@ -132,7 +140,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier remains 493 resolved and 20 blocking
+      - name: Confirm governed frontier remains 494 resolved and 19 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac13/reconciliation.json
@@ -143,17 +151,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac13/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 493:
+          if report["binding_count"] != 494:
               raise SystemExit("AC-13 verifier mutated binding count")
-          if report["resolved_count"] != 493:
+          if report["resolved_count"] != 494:
               raise SystemExit("AC-13 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 20:
+          if report["unresolved_blocking_count"] != 19:
               raise SystemExit("AC-13 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-13 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 493,
-              "unbound": 20,
+              "evidence": 494,
+              "unbound": 19,
           }:
               raise SystemExit("AC-13 verifier mutated disposition counts")
           PY
