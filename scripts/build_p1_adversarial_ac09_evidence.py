@@ -52,7 +52,6 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             "skeleton/testing/test_swarm_exact_lease_atomicity.py",
             (
                 "test_exact_lease_uses_one_clock_sample_for_commit",
-                "test_exact_lease_rejects_non_finite_clock_without_mutation",
             ),
         ),
         (
@@ -60,6 +59,7 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             (
                 "test_exact_lease_commit_uses_one_clock_sample",
                 "test_exact_lease_rollback_commit_uses_one_clock_sample",
+                "test_exact_lease_rejects_non_finite_clock_without_mutation",
             ),
         ),
     ),
@@ -254,9 +254,6 @@ def build_ac09_evidence(
         and row.get("obligation_id") == obligation.obligation_id
         for row in raw_records
     )
-    if binding_present:
-        raise AC09EvidenceError(f"{AXIS_ID} is already governed")
-
     proofs: dict[str, dict[str, Any]] = {}
     evidence: list[dict[str, str]] = []
     for mode in EXPECTED_MODES:
