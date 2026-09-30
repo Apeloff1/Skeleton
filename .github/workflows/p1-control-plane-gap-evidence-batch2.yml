@@ -1,0 +1,185 @@
+name: P1 Control Plane Gap Evidence Batch 2 Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "machine/p1_required_gate_authority.json"
+      - "machine/p1_reproducibility_policy.json"
+      - "machine/ai_scope_freeze_adrs.json"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/contracts/reproducibility.py"
+      - "scripts/reconcile_p1_risk_evidence.py"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "scripts/check_p1_reproducibility.py"
+      - "scripts/check_ai_scope_freeze.py"
+      - "scripts/build_p1_control_plane_gap_evidence.py"
+      - "skeleton/testing/test_risk_evidence.py"
+      - "tests/test_p1_risk_evidence_reconciliation.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - "skeleton/testing/test_reproducibility.py"
+      - "tests/test_p1_reproducibility_bundle.py"
+      - "skeleton/testing/test_architecture_scope_freeze.py"
+      - "tests/test_p1_control_plane_gap_evidence.py"
+      - ".github/workflows/p1-risk-evidence-binding.yml"
+      - ".github/workflows/p1-reproducibility-bundle.yml"
+      - ".github/workflows/p1-scope-freeze.yml"
+      - ".github/workflows/p1-control-plane-gap-evidence-batch2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-control-plane-gap-batch2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify P1 control-plane gap evidence batch 2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused verifier runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Validate canonical P1 planning inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run focused fail-closed control-plane regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_risk_evidence.py
+          tests/test_p1_risk_evidence_reconciliation.py
+          skeleton/testing/test_promotion_gates.py
+          tests/test_p1_required_gate_authority.py
+          skeleton/testing/test_reproducibility.py
+          tests/test_p1_reproducibility_bundle.py
+          skeleton/testing/test_architecture_scope_freeze.py
+          tests/test_p1_control_plane_gap_evidence.py
+
+      - name: Build exact-head batch 2 candidates
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-control-plane-gap
+          python scripts/build_p1_control_plane_gap_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-control-plane-gap/report.json \
+            --print-summary \
+            --print-candidates
+
+      - name: Prove deterministic replay and authority boundaries
+        run: |
+          set -euo pipefail
+          python scripts/build_p1_control_plane_gap_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-control-plane-gap/replay.json
+          cmp .p1-control-plane-gap/report.json .p1-control-plane-gap/replay.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-control-plane-gap/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("batch 2 report does not bind exact PR head")
+          if report["covered_gap_count"] != 10:
+              raise SystemExit("batch 2 must cover exactly 10 canonical gaps")
+          if report["covered_volume_count"] != 5:
+              raise SystemExit("batch 2 must cover exactly 5 canonical volumes")
+          if report["already_bound_count"] != 0:
+              raise SystemExit("batch 2 unexpectedly overlaps existing bindings")
+          if report["candidate_binding_count"] != 10:
+              raise SystemExit("batch 2 must emit exactly 10 candidates")
+          for field in (
+              "non_authoritative",
+              "creates_bindings",
+              "clears_masterplan_gaps",
+              "signs_accountability",
+              "promotes_maturity",
+          ):
+              expected = field == "non_authoritative"
+              if report[field] is not expected:
+                  raise SystemExit(f"authority-boundary drift: {field}")
+          if len(report.get("report_digest", "")) != 64:
+              raise SystemExit("invalid batch 2 report digest")
+          for row in report["records"]:
+              if row["binding_present"]:
+                  raise SystemExit(
+                      "batch 2 candidate already has a governed binding: "
+                      + row["obligation_id"]
+                  )
+              ref = row["candidate_evidence_ref"]
+              if ref["digest"] != row["packet_digest"]:
+                  raise SystemExit("candidate evidence digest drift")
+              if not ref["source"].endswith(":" + os.environ["EXPECTED_SHA"]):
+                  raise SystemExit("candidate evidence is not exact-head bound")
+          print(
+              "P1 control-plane batch 2 OK:",
+              report["report_digest"],
+          )
+          PY
+
+      - name: Reconcile governed registry remains unchanged
+        run: |
+          set -euo pipefail
+          EVALUATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          python scripts/reconcile_p1_risk_evidence.py \
+            --evaluated-at "$EVALUATED_AT" \
+            --out .p1-control-plane-gap/risk-report.json \
+            --print-summary
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-control-plane-gap/risk-report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["binding_count"] != 12:
+              raise SystemExit("verifier branch mutated governed binding count")
+          if report["resolved_count"] != 12:
+              raise SystemExit("verifier branch mutated governed resolution count")
+          if report["unresolved_blocking_count"] != 501:
+              raise SystemExit("verifier branch mutated blocking obligation count")
+          if report["unclassified_count"] != 281:
+              raise SystemExit("verifier branch mutated risk classification count")
+          print("Governed EVID-04 registry unchanged during candidate verification.")
+          PY

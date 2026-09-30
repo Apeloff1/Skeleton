@@ -20,6 +20,8 @@ on:
       - "skeleton/testing/test_risk_evidence.py"
       - "tests/test_p1_risk_evidence_reconciliation.py"
       - "tests/test_p1_release_gap_bindings_batch1.py"
+      - "scripts/build_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_evidence.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   pull_request:
     branches:
@@ -42,6 +44,8 @@ on:
       - "skeleton/testing/test_risk_evidence.py"
       - "tests/test_p1_risk_evidence_reconciliation.py"
       - "tests/test_p1_release_gap_bindings_batch1.py"
+      - "scripts/build_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_evidence.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
@@ -97,6 +101,51 @@ jobs:
           skeleton/testing/test_risk_evidence.py
           tests/test_p1_risk_evidence_reconciliation.py
           tests/test_p1_release_gap_bindings_batch1.py
+          tests/test_p1_control_plane_gap_evidence.py
+
+      - name: Build exact-head control-plane gap candidates
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-control-plane-gap
+          python scripts/build_p1_control_plane_gap_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-control-plane-gap/report.json \
+            --print-summary \
+            --print-candidates
+          python scripts/build_p1_control_plane_gap_evidence.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-control-plane-gap/replay.json
+          cmp .p1-control-plane-gap/report.json .p1-control-plane-gap/replay.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-control-plane-gap/report.json").read_text(encoding="utf-8")
+          )
+          if report["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("control-plane gap report is not exact-head bound")
+          if report["covered_gap_count"] != 10:
+              raise SystemExit("control-plane batch must cover exactly 10 gaps")
+          if report["covered_volume_count"] != 5:
+              raise SystemExit("control-plane batch must cover exactly 5 volumes")
+          if report["already_bound_count"] != 0:
+              raise SystemExit("control-plane batch overlaps governed bindings")
+          if report["candidate_binding_count"] != 10:
+              raise SystemExit("control-plane batch must emit 10 candidates")
+          if report["non_authoritative"] is not True:
+              raise SystemExit("control-plane gap report became authoritative")
+          for field in (
+              "creates_bindings",
+              "clears_masterplan_gaps",
+              "signs_accountability",
+              "promotes_maturity",
+          ):
+              if report[field] is not False:
+                  raise SystemExit(f"authority-boundary drift: {field}")
+          print("P1 control-plane gap candidates:", report["report_digest"])
+          PY
 
       - name: Reconcile exact-head P1 risk evidence inventory
         run: |
@@ -236,6 +285,7 @@ jobs:
               digest(
                   [
                       "scripts/reconcile_p1_risk_evidence.py",
+                      "scripts/build_p1_control_plane_gap_evidence.py",
                       "skeleton/contracts/risk_evidence.py",
                   ]
               ),
@@ -247,6 +297,7 @@ jobs:
                       "skeleton/testing/test_risk_evidence.py",
                       "tests/test_p1_risk_evidence_reconciliation.py",
                       "tests/test_p1_release_gap_bindings_batch1.py",
+                      "tests/test_p1_control_plane_gap_evidence.py",
                   ]
               ),
               encoding="utf-8",
