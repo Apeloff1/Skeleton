@@ -302,8 +302,8 @@ def main() -> int:
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.1.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.1.0 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.2.0") == 3,
+        "CI must use exactly three immutable setup-uv v10.2.0 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'
