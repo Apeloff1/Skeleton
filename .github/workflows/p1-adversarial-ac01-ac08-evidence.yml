@@ -1,0 +1,163 @@
+name: P1 Adversarial AC-01 AC-08 Evidence Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/build_p1_adversarial_wave4_evidence.py"
+      - "tests/test_p1_adversarial_wave4_evidence.py"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "backend/core/system_root_attestation.py"
+      - "backend/tests/test_system_root_attestation.py"
+      - "backend/tests/test_deployment_checkpoint_policy_rotation.py"
+      - "backend/tests/test_deployment_checkpoint_trust_advance.py"
+      - "skeleton/testing/test_app_bootstrap.py"
+      - "skeleton/testing/test_backup_restore_integration.py"
+      - "skeleton/testing/test_backup_restore_qualification.py"
+      - "skeleton/testing/test_swarm_restore_validation.py"
+      - "skeleton/testing/test_memory_projection.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "backend/core/operation_projection.py"
+      - "backend/tests/test_operation_projection.py"
+      - "backend/tests/test_auth_security.py"
+      - "backend/core/tenant_storage_boundary.py"
+      - ".github/workflows/p1-adversarial-ac01-ac08-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-ac01-ac08-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify AC-01 bootstrap and AC-08 restore evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9" "pytest-asyncio>=1.4.0"
+
+      - name: Run AC-01 and AC-08 runtime regressions
+        run: >-
+          python -m pytest -q --noconftest --import-mode=importlib -p pytest_asyncio.plugin
+          backend/tests/test_system_root_attestation.py
+          backend/tests/test_deployment_checkpoint_policy_rotation.py
+          backend/tests/test_deployment_checkpoint_trust_advance.py
+          skeleton/testing/test_app_bootstrap.py
+          skeleton/testing/test_backup_restore_integration.py
+          skeleton/testing/test_backup_restore_qualification.py
+          skeleton/testing/test_swarm_restore_validation.py
+          skeleton/testing/test_memory_projection.py
+          skeleton/testing/test_data_lifecycle.py
+          backend/tests/test_operation_projection.py
+          backend/tests/test_auth_security.py
+          tests/test_p1_adversarial_wave4_evidence.py
+
+      - name: Compile exact-head AC-01 and AC-08 evidence twice
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-ac01-ac08
+          for axis in AC-01 AC-08; do
+            python scripts/build_p1_adversarial_wave4_evidence.py \
+              --axis "$axis" \
+              --expected-head "$EXPECTED_SHA" \
+              --out ".p1-ac01-ac08/$axis.json" \
+              --print-summary
+            python scripts/build_p1_adversarial_wave4_evidence.py \
+              --axis "$axis" \
+              --expected-head "$EXPECTED_SHA" \
+              --out ".p1-ac01-ac08/$axis.replay.json"
+            cmp ".p1-ac01-ac08/$axis.json" ".p1-ac01-ac08/$axis.replay.json"
+          done
+
+      - name: Prove exact evidence modes and surface binding seeds
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "AC-01": {
+                  "clean_machine_e2e",
+                  "trust_root_rotation",
+                  "bootstrap_fault_injection",
+                  "recovery_drill",
+              },
+              "AC-08": {
+                  "restore_drill",
+                  "tombstone_propagation",
+                  "external_reconciliation",
+                  "credential_revalidation",
+              },
+          }
+          for axis, modes in expected.items():
+              report = json.loads(
+                  Path(f".p1-ac01-ac08/{axis}.json").read_text(encoding="utf-8")
+              )
+              candidate = report["candidate"]
+              if report["axis_id"] != axis:
+                  raise SystemExit(f"{axis} identity drift")
+              if report["already_bound_count"] != 0 or report["candidate_binding_count"] != 1:
+                  raise SystemExit(f"{axis} governed candidate count drift")
+              if candidate["binding_present"]:
+                  raise SystemExit(f"{axis} unexpectedly already bound")
+              if set(candidate["required_evidence_modes"]) != modes:
+                  raise SystemExit(f"{axis} required evidence modes drift")
+              if {row["category"] for row in candidate["evidence"]} != modes:
+                  raise SystemExit(f"{axis} evidence categories incomplete")
+              if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
+                  raise SystemExit(f"{axis} exact-head mismatch")
+              if candidate["recommended_severity"] != "high":
+                  raise SystemExit(f"{axis} severity drift")
+              if candidate["recommended_disposition"] != "evidence":
+                  raise SystemExit(f"{axis} disposition drift")
+              for field in (
+                  "creates_binding",
+                  "accepts_risk",
+                  "lowers_severity",
+                  "promotes_maturity",
+              ):
+                  if candidate[field] is not False:
+                      raise SystemExit(f"{axis} authority boundary drift: {field}")
+              seed = {
+                  "obligation_id": candidate["obligation_id"],
+                  "obligation_digest": candidate["obligation_digest"],
+                  "owner_id": candidate["owner_id"],
+                  "severity": candidate["recommended_severity"],
+                  "disposition": candidate["recommended_disposition"],
+                  "evidence": candidate["evidence"],
+              }
+              print(
+                  f"P1_AC01_AC08_BINDING_SEED {axis} "
+                  + json.dumps(seed, sort_keys=True, separators=(",", ":"))
+              )
+          PY
