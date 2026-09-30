@@ -89,6 +89,21 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             ("root_fingerprint", "_stat_identity", "O_NOFOLLOW"),
         ),
         (
+            "skeleton/security/outbound_url.py",
+            (
+                "ResolvedDestination",
+                "resolve_public_https_url",
+                "validate_connected_peer",
+            ),
+        ),
+        (
+            "skeleton/testing/test_outbound_url_resolution_security.py",
+            (
+                "test_connect_time_peer_must_match_approved_resolution_snapshot",
+                "test_connect_time_peer_can_never_be_private",
+            ),
+        ),
+        (
             "skeleton/distributed/network/remote_execution.py",
             (
                 "request_digest",
@@ -119,6 +134,20 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             (
                 "test_zip_symlink_member_is_rejected",
                 "test_destination_parent_symlink_is_rejected",
+            ),
+        ),
+        (
+            "skeleton/testing/test_outbound_url_resolution_security.py",
+            (
+                "test_mixed_dns_answer_with_any_private_address_fails_closed",
+                "test_redirect_revalidates_and_rejects_origin_or_security_change",
+            ),
+        ),
+        (
+            "skeleton/testing/test_security_outbound_http.py",
+            (
+                "test_redirect_cannot_change_security_boundary_by_default",
+                "test_get_requires_connected_peer_to_match_dns_snapshot",
             ),
         ),
         (
@@ -276,6 +305,7 @@ def build_ac12_evidence(
             "mode": mode,
             "expected_head": expected_head,
             "anchors": anchors,
+            "required_tokens": list(TOKENS[mode]),
         }
         proof["proof_digest"] = _digest(proof)
         proofs[mode] = proof
