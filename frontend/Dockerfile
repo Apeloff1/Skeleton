@@ -33,7 +33,7 @@ RUN yarn export:web
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
-FROM nginx:1.31-alpine-slim@sha256:17d54e4e48ae6b564266ffd4a688b1bced79e57e59a7f08929e0059672ed3501 AS production
+FROM nginx:1.31-alpine-slim@sha256:f761b94f2cb9e8e05e2943d5f773609596113ef69b54e2433a996d109a8f78b7 AS production
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,
