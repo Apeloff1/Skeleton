@@ -5,11 +5,14 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if os.name == "nt" and not str(ROOT).startswith("\\\\?\\"):
+    ROOT = Path("\\\\?\\" + str(ROOT))
 MANIFEST = ROOT / "machine" / "ai_file_tree.json"
 MASTER_PLAN = ROOT / "machine" / "ai_master_plan.json"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
