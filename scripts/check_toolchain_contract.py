@@ -15,6 +15,11 @@ NODE_VERSION = "24.20.0"
 UV_REQUIRED_VERSION = "==0.12.15"
 RUFF_CI_VERSION = "0.9.10"
 RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
+EXPO_SDK_VERSION = "~54.0.35"
+REACT_VERSION = "19.3.0"
+REACT_NATIVE_VERSION = "0.87.1"
+REACT_NATIVE_REANIMATED_VERSION = "~4.7.0"
+REACT_NATIVE_WORKLETS_VERSION = "0.13.0"
 
 PROCESS_TESTS = (
     "test_process_safety_gate.py",
@@ -225,6 +230,25 @@ def main() -> int:
         "frontend must require Node >=24",
         failures,
     )
+    frontend_deps = frontend.get("dependencies", {})
+    expected_frontend_matrix = {
+        "expo": EXPO_SDK_VERSION,
+        "react": REACT_VERSION,
+        "react-dom": REACT_VERSION,
+        "react-native": REACT_NATIVE_VERSION,
+        "react-native-reanimated": REACT_NATIVE_REANIMATED_VERSION,
+        "react-native-worklets": REACT_NATIVE_WORKLETS_VERSION,
+    }
+    actual_frontend_matrix = {
+        key: frontend_deps.get(key)
+        for key in expected_frontend_matrix
+    }
+    require(
+        actual_frontend_matrix == expected_frontend_matrix,
+        "Expo SDK 54 dependency matrix drifted: "
+        f"expected {expected_frontend_matrix!r}, got {actual_frontend_matrix!r}",
+        failures,
+    )
     for script in ("lint:ci", "typecheck", "export:web"):
         require(
             script in frontend.get("scripts", {}),
@@ -302,8 +326,8 @@ def main() -> int:
         failures,
     )
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.1.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.1.0 sites backed by the repository uv pin",
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.2.0") == 3,
+        "CI must use exactly three immutable setup-uv v10.2.0 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'
