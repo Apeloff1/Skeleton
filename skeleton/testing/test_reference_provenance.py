@@ -219,7 +219,7 @@ def test_reader_rejects_checksum_mismatch(tmp_path: Path) -> None:
     record["title"] = "tampered"
     path.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
 
-    with pytest.raises(ReferenceProvenanceError, match="checksum mismatch"):
+    with pytest.raises(ReferenceProvenanceError, match="invalid provenance record 1"):
         read_reference_log(path)
 
 
@@ -244,7 +244,7 @@ def test_reader_rejects_unknown_fields(tmp_path: Path) -> None:
     record["unexpected"] = "field"
     path.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
 
-    with pytest.raises(ReferenceProvenanceError, match="invalid record fields"):
+    with pytest.raises(ReferenceProvenanceError, match="invalid provenance record 1"):
         read_reference_log(path)
 
 
