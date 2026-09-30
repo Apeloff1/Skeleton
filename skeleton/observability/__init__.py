@@ -43,6 +43,12 @@ from skeleton.observability.redaction import (
     redact_text,
     safe_exception_text,
 )
+from skeleton.observability.resilient_telemetry import (
+    ReconstructionReceipt,
+    ResilientTelemetry,
+    ResilientTelemetryError,
+    TelemetryEmitResult,
+)
 from skeleton.observability.tracing import InMemoryExporter, Span, Tracer
 
 __all__ = [
@@ -86,4 +92,8 @@ __all__ = [
     "redact_payload",
     "redact_text",
     "safe_exception_text",
+    "ReconstructionReceipt",
+    "ResilientTelemetry",
+    "ResilientTelemetryError",
+    "TelemetryEmitResult",
 ]
