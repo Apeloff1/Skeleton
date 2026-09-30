@@ -1,3 +1,3 @@
-"""Compatibility shim for :mod:`skeleton.providers.contract`."""
+"""Compatibility shim for :mod:`skeleton.ai.providers.contract`."""
 
-from skeleton.providers.contract import *  # noqa: F401,F403
+from skeleton.ai.providers.contract import *  # noqa: F401,F403
