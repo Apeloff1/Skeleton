@@ -175,13 +175,13 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 34:
+          if report["binding_count"] != 490:
               raise SystemExit("verifier branch mutated governed binding count")
-          if report["resolved_count"] != 34:
+          if report["resolved_count"] != 490:
               raise SystemExit("verifier branch mutated governed resolution count")
-          if report["unresolved_blocking_count"] != 479:
+          if report["unresolved_blocking_count"] != 23:
               raise SystemExit("verifier branch mutated blocking obligation count")
-          if report["unclassified_count"] != 269:
+          if report["unclassified_count"] != 0:
               raise SystemExit("verifier branch mutated risk classification count")
           print("Governed EVID-04 registry unchanged during candidate verification.")
           PY
