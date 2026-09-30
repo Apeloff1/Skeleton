@@ -136,7 +136,7 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#0A0A0A' },
-  bg:   { ...StyleSheet.absoluteFillObject },
+  bg:   { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   content: {
     flex: 1,
     alignItems: 'center',
