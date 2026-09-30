@@ -101,20 +101,20 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
 def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 497
-    assert report["resolved_count"] == 497
-    assert report["unresolved_blocking_count"] == 16
+    assert report["binding_count"] == 505
+    assert report["resolved_count"] == 505
+    assert report["unresolved_blocking_count"] == 8
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 497,
-        "unbound": 16,
+        "evidence": 505,
+        "unbound": 8,
     }
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}
     unbound = [item for item in _obligations() if item.obligation_id not in bound]
 
-    assert len(unbound) == 16
+    assert len(unbound) == 8
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert AXIS_ID not in {item.source_ref for item in unbound}
     assert {item.source_ref for item in unbound} == {
