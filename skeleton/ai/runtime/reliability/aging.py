@@ -137,7 +137,7 @@ class AgingSimulator:
             raise AgingPolicyError("asset is not eligible for retirement")
         if not replacement_asset_id or replacement_asset_id == asset.asset_id:
             raise AgingPolicyError("replacement_asset_id must be new")
-        replacement_generation = asset.generation + 1
+        replacement_generation = (\n            1 if asset.generation >= self.policy.max_generation\n            else asset.generation + 1\n        )
         replacement = AgingAsset(
             asset_id=replacement_asset_id,
             generation=replacement_generation,
