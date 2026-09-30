@@ -6,6 +6,7 @@ on:
       - main
       - p1/adversarial-ac20-evidence-20260930
       - p1/closure-rollup-490-23-20260930
+      - p1/adversarial-wave2-bindings-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -85,6 +86,7 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_cost_admission_independent_verifier.py
           tests/test_p1_adversarial_ac15_evidence.py
+          tests/test_p1_adversarial_ac15_binding.py
           tests/test_p1_adversarial_wave2_bindings.py
           tests/test_p1_adversarial_ac20_binding.py
           tests/test_p1_risk_evidence_reconciliation.py
