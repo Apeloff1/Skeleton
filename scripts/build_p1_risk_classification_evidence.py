@@ -78,7 +78,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
             ],
             ".github/workflows/p1-risk-evidence-binding.yml": [
                 "--require-resolved",
-                "terminal-required",
+                "Prove strict terminal mode fails closed while work is unresolved",
             ],
         },
     },
@@ -111,8 +111,8 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
         "markers": {
             "scripts/reconcile_p1_risk_evidence.py": [
                 '"records": rows',
-                '"severity": default_severity.value',
-                '"blocking": default_blocking',
+                'unclassified = [',
+                'row["evaluation"]["severity"] == "unclassified"',
             ],
             "tests/test_p1_risk_evidence_reconciliation.py": [
                 "test_one_real_binding_changes_only_its_own_resolution",
