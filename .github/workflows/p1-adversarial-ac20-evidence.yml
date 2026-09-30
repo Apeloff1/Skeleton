@@ -6,6 +6,7 @@ on:
       - main
       - p1/bulk-volume-obligation-bindings-20260930
       - p1/bulk-volume-obligation-evidence-20260930
+      - p1/risk-classification-evidence-batch1-20260930
       - p1/adversarial-ac20-evidence-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
