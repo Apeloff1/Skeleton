@@ -89,6 +89,7 @@ def test_asset_over_generation_limit_requires_retirement_even_when_young() -> No
         replacement_asset_id="legacy-migrated",
     )
     assert replacement.generation == 1
+    assert sim.state(replacement) == "active"
 
 
 def test_retirement_cannot_happen_early_or_reuse_identity() -> None:
