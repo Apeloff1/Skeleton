@@ -8862,7 +8862,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-16-2a23277d73b91c0b",
+      "obligation_digest": "8e1485cc8a1644fa68cf0e038905e787fe615b7154263b9c21718927eb6caca1",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:00:00Z",
+      "review_at": "2026-10-30T22:00:00Z",
+      "evidence": [
+        {
+          "category": "telemetry_outage",
+          "digest": "8225c72fa7160e0b2d24e8586c52cd1dd933140a25559c8b0d819645d3969201",
+          "source": "p1:adversarial-ac16-evidence:AC-16:telemetry_outage:c38d6a97de32fe9c4ddab194bad099623714b649"
+        },
+        {
+          "category": "cardinality_bomb",
+          "digest": "7f0b6f3387cdc894f1267e355841192e62c6881f6841af5607922524cf8295e7",
+          "source": "p1:adversarial-ac16-evidence:AC-16:cardinality_bomb:c38d6a97de32fe9c4ddab194bad099623714b649"
+        },
+        {
+          "category": "redaction_test",
+          "digest": "6536921759d213dff2eb558a0258e5a77641f86d4017782a234f69e5d54002b5",
+          "source": "p1:adversarial-ac16-evidence:AC-16:redaction_test:c38d6a97de32fe9c4ddab194bad099623714b649"
+        },
+        {
+          "category": "reconstruction_without_full_telemetry",
+          "digest": "389108eacf53e236d8d0c09398a78551b68af70ac68223285280efed144faffe",
+          "source": "p1:adversarial-ac16-evidence:AC-16:reconstruction_without_full_telemetry:c38d6a97de32fe9c4ddab194bad099623714b649"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-17 tenant/workspace isolation is now governed from its successful exact-head verifier receipt; remaining axes stay blocking until mode-complete evidence exists."
+  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-16 telemetry failure evidence and AC-17 isolation evidence are governed; remaining axes stay blocking until mode-complete evidence exists."
 }

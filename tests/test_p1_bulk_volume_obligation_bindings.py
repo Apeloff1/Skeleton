@@ -91,20 +91,20 @@ def test_bulk_bindings_match_live_canonical_obligations() -> None:
 def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 506
-    assert report["resolved_count"] == 506
-    assert report["unresolved_blocking_count"] == 7
+    assert report["binding_count"] == 507
+    assert report["resolved_count"] == 507
+    assert report["unresolved_blocking_count"] == 6
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 506,
-        "unbound": 7,
+        "evidence": 507,
+        "unbound": 6,
     }
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}
     unbound = [item for item in _obligations() if item.obligation_id not in bound]
 
-    assert len(unbound) == 7
+    assert len(unbound) == 6
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
