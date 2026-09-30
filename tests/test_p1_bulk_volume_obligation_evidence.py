@@ -36,10 +36,10 @@ def test_bulk_volume_inventory_covers_the_full_primary_frontier() -> None:
     assert report["covered_obligation_count"] == EXPECTED_VOLUME_OBLIGATIONS == 489
     assert report["covered_risk_count"] == EXPECTED_VOLUME_RISKS == 281
     assert report["covered_gap_count"] == EXPECTED_VOLUME_GAPS == 208
-    assert report["already_bound_count"] == EXPECTED_EXISTING_BINDINGS == 34
-    assert report["candidate_binding_count"] == EXPECTED_CANDIDATES == 455
-    assert report["candidate_risk_count"] == EXPECTED_CANDIDATE_RISKS == 269
-    assert report["candidate_gap_count"] == EXPECTED_CANDIDATE_GAPS == 186
+    assert report["already_bound_count"] == EXPECTED_EXISTING_BINDINGS == 489
+    assert report["candidate_binding_count"] == EXPECTED_CANDIDATES == 0
+    assert report["candidate_risk_count"] == EXPECTED_CANDIDATE_RISKS == 0
+    assert report["candidate_gap_count"] == EXPECTED_CANDIDATE_GAPS == 0
     assert report["adversarial_axis_count"] == 0
 
 
@@ -53,19 +53,20 @@ def test_bulk_candidates_preserve_governance_authority_boundaries() -> None:
     assert report["clears_source_obligations"] is False
     assert report["promotes_maturity"] is False
 
-    candidates = [row for row in report["records"] if not row["binding_present"]]
-    assert len(candidates) == 455
-    assert all(row["recommended_severity"] == "high" for row in candidates)
-    assert all(row["recommended_disposition"] == "evidence" for row in candidates)
-    assert all(row["accepts_risk"] is False for row in candidates)
-    assert all(row["candidate_evidence_ref"]["category"] == CATEGORY for row in candidates)
+    records = report["records"]
+    assert len(records) == 489
+    assert all(row["binding_present"] is True for row in records)
+    assert all(row["recommended_severity"] == "high" for row in records)
+    assert all(row["recommended_disposition"] == "evidence" for row in records)
+    assert all(row["accepts_risk"] is False for row in records)
+    assert all(row["candidate_evidence_ref"]["category"] == CATEGORY for row in records)
     assert all(
         row["candidate_evidence_ref"]["digest"] == row["packet_digest"]
-        for row in candidates
+        for row in records
     )
     assert all(
         row["candidate_evidence_ref"]["source"].endswith(":" + TEST_HEAD)
-        for row in candidates
+        for row in records
     )
 
 
