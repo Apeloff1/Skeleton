@@ -81,8 +81,8 @@ def test_live_control_plane_batch_is_bounded_and_non_authoritative() -> None:
     assert report["expected_head"] == HEAD
     assert report["covered_gap_count"] == 10
     assert report["covered_volume_count"] == 5
-    assert report["already_bound_count"] == 0
-    assert report["candidate_binding_count"] == 10
+    assert report["already_bound_count"] == 10
+    assert report["candidate_binding_count"] == 0
     assert report["non_authoritative"] is True
     assert report["creates_bindings"] is False
     assert report["clears_masterplan_gaps"] is False
@@ -94,7 +94,7 @@ def test_live_control_plane_batch_is_bounded_and_non_authoritative() -> None:
     assert len(rows) == 10
     assert len({row["obligation_id"] for row in rows}) == 10
     assert {(row["volume_key"], row["statement"]) for row in rows} == EXPECTED_GAPS
-    assert all(row["binding_present"] is False for row in rows)
+    assert all(row["binding_present"] is True for row in rows)
     assert all(row["non_authoritative"] is True for row in rows)
     assert all(row["creates_binding"] is False for row in rows)
     assert all(row["clears_masterplan_gap"] is False for row in rows)
@@ -135,7 +135,7 @@ def test_live_registry_is_not_mutated_by_candidate_build() -> None:
 
     assert before == after
     assert report["creates_bindings"] is False
-    assert report["already_bound_count"] == 0
+    assert report["already_bound_count"] == 10
 
 
 @pytest.mark.parametrize(
@@ -208,10 +208,23 @@ def test_canonical_gap_drift_fails_closed(tmp_path: Path) -> None:
 
 def test_existing_binding_is_detected_but_not_rewritten(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
+    registry_path = root / REGISTRY
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["records"] = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] != "control_plane_gap_closure"
+    ]
+    registry_path.write_text(
+        json.dumps(registry, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     baseline = build_control_plane_gap_evidence(root, expected_head=HEAD)
+    assert baseline["already_bound_count"] == 0
+    assert baseline["candidate_binding_count"] == 10
     first = baseline["records"][0]
 
-    registry_path = root / REGISTRY
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     registry["records"].append(
         {
