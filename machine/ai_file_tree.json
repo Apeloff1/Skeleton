@@ -5872,8 +5872,8 @@
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B1-core-runtime": 58,
-      "B3-owner-sensitive": 7,
+      "B1-core-runtime": 57,
+      "B3-owner-sensitive": 8,
       "B2-domain-build": 13,
       "B4-research-quarantine": 54,
       "B3-compat-convergence": 28
