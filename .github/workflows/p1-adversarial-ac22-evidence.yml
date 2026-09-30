@@ -1,0 +1,315 @@
+name: P1 Adversarial AC-22 Evidence Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/adversarial-wave2-bindings-20260930
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "pyproject.toml"
+      - "backend/pyproject.toml"
+      - "backend/requirements.txt"
+      - "frontend/package.json"
+      - "frontend/yarn.lock"
+      - "scripts/check_toolchain_contract.py"
+      - "scripts/check_quality_gate_parity.py"
+      - "scripts/build_p1_adversarial_ac22_evidence.py"
+      - "tests/test_p1_adversarial_ac22_evidence.py"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/dependency-security.yml"
+      - ".github/workflows/p1-adversarial-ac22-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-ac22-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  x64:
+    name: Prove AC-22 x64 environment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    outputs:
+      manifest_digest: ${{ steps.receipt.outputs.manifest_digest }}
+      replay_digest: ${{ steps.replay.outputs.manifest_digest }}
+      arch: ${{ steps.receipt.outputs.arch }}
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head and x64 architecture
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(uname -m)" = "x86_64"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused P1 evidence runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Prove immutable and hermetic toolchain contract
+        run: |
+          set -euo pipefail
+          python scripts/check_toolchain_contract.py
+          python scripts/check_quality_gate_parity.py
+
+      - name: Compute canonical environment receipt
+        id: receipt
+        run: |
+          set -euo pipefail
+          DIGEST="$(python - <<'PY'
+          from scripts.build_p1_adversarial_ac22_evidence import build_environment_manifest
+          print(build_environment_manifest()["manifest_digest"])
+          PY
+          )"
+          echo "manifest_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Replay canonical environment receipt
+        id: replay
+        run: |
+          set -euo pipefail
+          DIGEST="$(python - <<'PY'
+          from scripts.build_p1_adversarial_ac22_evidence import build_environment_manifest
+          print(build_environment_manifest()["manifest_digest"])
+          PY
+          )"
+          echo "manifest_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          test "$DIGEST" = "${{ steps.receipt.outputs.manifest_digest }}"
+
+  arm64:
+    name: Prove AC-22 ARM64 environment
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    outputs:
+      manifest_digest: ${{ steps.receipt.outputs.manifest_digest }}
+      replay_digest: ${{ steps.replay.outputs.manifest_digest }}
+      arch: ${{ steps.receipt.outputs.arch }}
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head and ARM64 architecture
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(uname -m)" = "aarch64"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused P1 evidence runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Prove immutable and hermetic toolchain contract
+        run: |
+          set -euo pipefail
+          python scripts/check_toolchain_contract.py
+          python scripts/check_quality_gate_parity.py
+
+      - name: Compute canonical environment receipt
+        id: receipt
+        run: |
+          set -euo pipefail
+          DIGEST="$(python - <<'PY'
+          from scripts.build_p1_adversarial_ac22_evidence import build_environment_manifest
+          print(build_environment_manifest()["manifest_digest"])
+          PY
+          )"
+          echo "manifest_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Replay canonical environment receipt
+        id: replay
+        run: |
+          set -euo pipefail
+          DIGEST="$(python - <<'PY'
+          from scripts.build_p1_adversarial_ac22_evidence import build_environment_manifest
+          print(build_environment_manifest()["manifest_digest"])
+          PY
+          )"
+          echo "manifest_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          test "$DIGEST" = "${{ steps.receipt.outputs.manifest_digest }}"
+
+  verify:
+    name: Aggregate AC-22 reproducibility evidence
+    needs: [x64, arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      X64_MANIFEST_DIGEST: "${{ needs.x64.outputs.manifest_digest }}"
+      X64_REPLAY_DIGEST: "${{ needs.x64.outputs.replay_digest }}"
+      X64_ARCH: "${{ needs.x64.outputs.arch }}"
+      ARM64_MANIFEST_DIGEST: "${{ needs.arm64.outputs.manifest_digest }}"
+      ARM64_REPLAY_DIGEST: "${{ needs.arm64.outputs.replay_digest }}"
+      ARM64_ARCH: "${{ needs.arm64.outputs.arch }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head and cross-environment outputs
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$X64_ARCH" = "x86_64"
+          test "$ARM64_ARCH" = "aarch64"
+          test "$X64_MANIFEST_DIGEST" = "$X64_REPLAY_DIGEST"
+          test "$ARM64_MANIFEST_DIGEST" = "$ARM64_REPLAY_DIGEST"
+          test "$X64_MANIFEST_DIGEST" = "$ARM64_MANIFEST_DIGEST"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Run AC-22 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_adversarial_closure.py
+          tests/test_p1_adversarial_ac22_evidence.py
+          tests/test_p1_adversarial_ac11_binding.py
+          tests/test_p1_adversarial_ac13_binding.py
+          tests/test_p1_adversarial_ac14_binding.py
+          tests/test_p1_adversarial_ac15_binding.py
+          tests/test_p1_adversarial_ac20_binding.py
+          tests/test_p1_risk_evidence_reconciliation.py
+
+      - name: Compile exact-head AC-22 evidence twice
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-ac22
+          python scripts/build_p1_adversarial_ac22_evidence.py             --expected-head "$EXPECTED_SHA"             --x64-manifest-digest "$X64_MANIFEST_DIGEST"             --x64-replay-digest "$X64_REPLAY_DIGEST"             --arm64-manifest-digest "$ARM64_MANIFEST_DIGEST"             --arm64-replay-digest "$ARM64_REPLAY_DIGEST"             --x64-arch "$X64_ARCH"             --arm64-arch "$ARM64_ARCH"             --out .p1-ac22/report.json             --print-summary
+          python scripts/build_p1_adversarial_ac22_evidence.py             --expected-head "$EXPECTED_SHA"             --x64-manifest-digest "$X64_MANIFEST_DIGEST"             --x64-replay-digest "$X64_REPLAY_DIGEST"             --arm64-manifest-digest "$ARM64_MANIFEST_DIGEST"             --arm64-replay-digest "$ARM64_REPLAY_DIGEST"             --x64-arch "$X64_ARCH"             --arm64-arch "$ARM64_ARCH"             --out .p1-ac22/replay.json
+          cmp .p1-ac22/report.json .p1-ac22/replay.json
+
+      - name: Prove AC-22 authority boundary and emit binding seed
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(".p1-ac22/report.json").read_text(encoding="utf-8"))
+          candidate = report["candidate"]
+          expected_modes = {
+              "hermetic_build",
+              "environment_replay",
+              "cross_environment_reproduction",
+              "dependency_lock_check",
+          }
+          if report["axis_id"] != "AC-22":
+              raise SystemExit("wrong adversarial axis")
+          if report["candidate_count"] != 1:
+              raise SystemExit("AC-22 candidate count drift")
+          if set(candidate["required_evidence_modes"]) != expected_modes:
+              raise SystemExit("AC-22 required evidence modes drift")
+          if {row["category"] for row in candidate["evidence"]} != expected_modes:
+              raise SystemExit("AC-22 evidence categories incomplete")
+          if candidate["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("AC-22 candidate is not exact-head bound")
+          if candidate["recommended_severity"] != "high":
+              raise SystemExit("AC-22 severity must remain high")
+          if candidate["recommended_disposition"] != "evidence":
+              raise SystemExit("AC-22 disposition must remain evidence")
+          for field in (
+              "creates_binding",
+              "accepts_risk",
+              "lowers_severity",
+              "promotes_maturity",
+          ):
+              if candidate[field] is not False:
+                  raise SystemExit(f"AC-22 authority boundary drift: {field}")
+          print(
+              "P1_AC22_BINDING_SEED "
+              + json.dumps(
+                  {
+                      "obligation_id": candidate["obligation_id"],
+                      "obligation_digest": candidate["obligation_digest"],
+                      "owner_id": candidate["owner_id"],
+                      "severity": candidate["recommended_severity"],
+                      "disposition": candidate["recommended_disposition"],
+                      "evidence": candidate["evidence"],
+                      "environment_manifest_digest": candidate[
+                          "environment_manifest"
+                      ]["manifest_digest"],
+                  },
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+          )
+          PY
+
+      - name: Confirm governed frontier remains 494 resolved and 19 blocking
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac22/reconciliation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-ac22/reconciliation.json").read_text(encoding="utf-8")
+          )
+          if report["binding_count"] != 494:
+              raise SystemExit("AC-22 verifier mutated binding count")
+          if report["resolved_count"] != 494:
+              raise SystemExit("AC-22 verifier mutated resolved count")
+          if report["unresolved_blocking_count"] != 19:
+              raise SystemExit("AC-22 verifier mutated blocking count")
+          if report["unclassified_count"] != 0:
+              raise SystemExit("AC-22 verifier reintroduced unclassified risks")
+          if report["disposition_counts"] != {
+              "evidence": 494,
+              "unbound": 19,
+          }:
+              raise SystemExit("AC-22 verifier mutated disposition counts")
+          PY
