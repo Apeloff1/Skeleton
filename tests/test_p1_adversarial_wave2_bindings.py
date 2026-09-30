@@ -19,8 +19,8 @@ from scripts.reconcile_p1_risk_evidence import (
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-RESOLVED_AXES = frozenset({"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"})
-EXPECTED_RESIDUAL_AXIS_COUNT = 19
+RESOLVED_AXES = frozenset({"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"})
+EXPECTED_RESIDUAL_AXIS_COUNT = 17
 
 EXPECTED = {
     "AC-11": {
@@ -34,6 +34,21 @@ EXPECTED = {
             "contract_probe": "d57fc24f73d225383b70356364e9c9a2a22f7cbc0e7d6516a98b38b9f99a2d79",
             "drift_eval": "d823da5c04ff8b1abb70f3415f4bc57a13874a4fcee43e95be1594bcee5006fc",
             "evidence_invalidation": "2e003c962809a28c2901c732ddbd3147be2c62621316f9230747a570181ebd21",
+        },
+    },
+    "AC-13": {
+        "obligation_id": "P1-ADVERSARIAL-AC-13-0765da9a17a8326d",
+        "obligation_digest": "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735",
+        "verifier_head": "8435144dcee7fcb087ad9806504d2d38c9094147",
+        "verifier_run": 36763669209,
+        "verifier_job": 110052302630,
+        "bound_at": "2026-09-30T19:20:00Z",
+        "review_at": "2026-10-30T19:20:00Z",
+        "evidence": {
+            "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
+            "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
+            "decompression_bomb": "f5d3d691340ce80e0564ae744b6959d469d50c468b057b368a6858d461197021",
+            "complexity_budget": "58a85997b9cff610e15f6c05370083536d4d9628ea5a62fda562d48ebe594fe9",
         },
     },
     "AC-15": {
@@ -72,6 +87,7 @@ def _registry_rows() -> dict[str, dict]:
         for row in registry["records"]
         if row["obligation_id"] in {
             EXPECTED["AC-11"]["obligation_id"],
+            EXPECTED["AC-13"]["obligation_id"],
             EXPECTED["AC-15"]["obligation_id"],
         }
     }
@@ -79,7 +95,7 @@ def _registry_rows() -> dict[str, dict]:
 
 def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
     rows = _registry_rows()
-    assert len(rows) == 2
+    assert len(rows) == len(EXPECTED)
 
     for axis_id, expected in EXPECTED.items():
         row = rows[expected["obligation_id"]]
@@ -87,8 +103,8 @@ def test_wave2_bindings_pin_successful_exact_head_verifiers() -> None:
         assert row["owner_id"] == "ACC-P1-EVID-04"
         assert row["severity"] == "high"
         assert row["disposition"] == "evidence"
-        assert row["bound_at"] == BOUND_AT
-        assert row["review_at"] == REVIEW_AT
+        assert row["bound_at"] == expected.get("bound_at", BOUND_AT)
+        assert row["review_at"] == expected.get("review_at", REVIEW_AT)
         assert row["accepted_risk"] is None
         assert expected["verifier_run"] > 0
         assert expected["verifier_job"] > 0
@@ -121,16 +137,21 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
         assert set(obligation.required_evidence_modes) == set(expected["evidence"])
 
 
-def test_wave2_advances_governed_frontier_to_494_19_0() -> None:
+def test_wave2_advances_governed_frontier_to_496_17_0() -> None:
+    assert RESOLVED_AXES == frozenset(
+        {"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
+    )
+    assert EXPECTED_RESIDUAL_AXIS_COUNT == 17
+
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 494
-    assert report["resolved_count"] == 494
-    assert report["unresolved_blocking_count"] == 19
+    assert report["binding_count"] == 496
+    assert report["resolved_count"] == 496
+    assert report["unresolved_blocking_count"] == 17
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 494,
-        "unbound": 19,
+        "evidence": 496,
+        "unbound": 17,
     }
 
     registry = _load(ROOT / REGISTRY)

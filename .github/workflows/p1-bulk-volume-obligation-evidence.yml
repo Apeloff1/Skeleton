@@ -175,17 +175,17 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 494:
+          if report["binding_count"] != 496:
               raise SystemExit("bulk verifier mutated binding count")
-          if report["resolved_count"] != 494:
+          if report["resolved_count"] != 496:
               raise SystemExit("bulk verifier mutated resolution count")
-          if report["unresolved_blocking_count"] != 19:
+          if report["unresolved_blocking_count"] != 17:
               raise SystemExit("bulk verifier mutated blocking frontier")
           if report["unclassified_count"] != 0:
               raise SystemExit("bulk verifier mutated classification frontier")
           if report["disposition_counts"] != {
-              "evidence": 494,
-              "unbound": 19,
+              "evidence": 496,
+              "unbound": 17,
           }:
               raise SystemExit("bulk verifier mutated disposition counts")
           print(

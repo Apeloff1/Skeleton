@@ -96,8 +96,8 @@ def test_current_registry_preserves_existing_bindings_as_non_authoritative() -> 
     module = _module()
     report = module.build_gap_closure_plan(ROOT)
 
-    assert report["bound_gap_obligation_count"] == 12
-    assert report["unbound_gap_obligation_count"] == 156
+    assert report["bound_gap_obligation_count"] == 168
+    assert report["unbound_gap_obligation_count"] == 0
 
     for packet in report["packets"]:
         assert packet["bound_gap_count"] == sum(1 for obligation in packet["obligations"] if obligation["binding_present"])
@@ -111,7 +111,7 @@ def test_current_registry_preserves_existing_bindings_as_non_authoritative() -> 
         for packet in report["packets"]
         for obligation in packet["obligations"]
         if obligation["binding_present"]
-    ) == 12
+    ) == 168
 
 
 def test_resolution_paths_preserve_evidence_or_human_acceptance_boundary() -> None:
