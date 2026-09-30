@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - p1/adversarial-ac15-evidence-20260930
+      - p1/closure-rollup-490-23-20260930
       - p1/adversarial-wave2-bindings-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -74,6 +75,9 @@ jobs:
           tests/test_cost_admission_independent_verifier.py
           tests/test_p1_adversarial_ac14_evidence.py
           tests/test_p1_adversarial_ac14_binding.py
+          tests/test_p1_adversarial_wave2_bindings.py
+          tests/test_p1_adversarial_ac20_binding.py
+          tests/test_p1_risk_evidence_reconciliation.py
 
       - name: Run independent provider verifier
         env:
@@ -141,6 +145,12 @@ jobs:
               "failed_run_retention",
               "provenance_replay",
           }
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-14 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-14 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-14 candidate does not detect governed binding")
           if set(candidate["required_evidence_modes"]) != modes:
               raise SystemExit("AC-14 required modes drift")
           if {row["category"] for row in candidate["evidence"]} != modes:
