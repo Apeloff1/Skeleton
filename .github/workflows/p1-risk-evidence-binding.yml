@@ -23,11 +23,15 @@ on:
       - "scripts/build_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_bindings_batch2.py"
+      - "scripts/build_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_bindings_batch1.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   pull_request:
     branches:
       - main
       - p1/release-lane-materialize-20260928
+      - p1/risk-classification-evidence-batch1-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -48,6 +52,9 @@ on:
       - "scripts/build_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_evidence.py"
       - "tests/test_p1_control_plane_gap_bindings_batch2.py"
+      - "scripts/build_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_bindings_batch1.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
@@ -105,6 +112,8 @@ jobs:
           tests/test_p1_release_gap_bindings_batch1.py
           tests/test_p1_control_plane_gap_evidence.py
           tests/test_p1_control_plane_gap_bindings_batch2.py
+          tests/test_p1_risk_classification_evidence_batch1.py
+          tests/test_p1_risk_classification_bindings_batch1.py
 
       - name: Validate exact-head control-plane gap binding state
         run: |
@@ -148,6 +157,60 @@ jobs:
               if report[field] is not False:
                   raise SystemExit(f"authority-boundary drift: {field}")
           print("P1 control-plane gap binding state:", report["report_digest"])
+          PY
+
+      - name: Validate exact-head risk classification batch 1 binding state
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-risk-classification
+          python scripts/build_p1_risk_classification_evidence_batch1.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-risk-classification/report.json \
+            --print-summary \
+            --print-candidates
+          python scripts/build_p1_risk_classification_evidence_batch1.py \
+            --expected-head "$EXPECTED_SHA" \
+            --out .p1-risk-classification/replay.json
+          cmp .p1-risk-classification/report.json .p1-risk-classification/replay.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-risk-classification/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["covered_risk_count"] != 12:
+              raise SystemExit("classification batch must cover 12 risks")
+          if report["covered_volume_count"] != 4:
+              raise SystemExit("classification batch must cover 4 volumes")
+          if report["already_bound_count"] != 12:
+              raise SystemExit("classification batch must have 12 governed bindings")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("classification batch must have zero candidates")
+          if report["recommended_severity"] != "high":
+              raise SystemExit("classification severity drifted")
+          if report["recommended_disposition"] != "evidence":
+              raise SystemExit("classification disposition drifted")
+          for field in (
+              "creates_bindings",
+              "accepts_risk",
+              "lowers_severity",
+              "clears_source_risks",
+              "promotes_maturity",
+          ):
+              if report[field] is not False:
+                  raise SystemExit(f"classification authority drift: {field}")
+          for row in report["records"]:
+              if not row["binding_present"]:
+                  raise SystemExit(
+                      "classified risk binding missing: " + row["obligation_id"]
+                  )
+          print(
+              "P1 risk classification batch 1:",
+              report["report_digest"],
+          )
           PY
 
       - name: Reconcile exact-head P1 risk evidence inventory
@@ -197,17 +260,17 @@ jobs:
                   "risk obligation inventory drift: "
                   + repr(report["inventory"])
               )
-          if report["binding_count"] != 22:
+          if report["binding_count"] != 493:
               raise SystemExit("unexpected governed risk binding count")
-          if report["resolved_count"] != 22:
+          if report["resolved_count"] != 493:
               raise SystemExit("unexpected resolved risk obligation count")
-          if report["unresolved_blocking_count"] != 491:
+          if report["unresolved_blocking_count"] != 20:
               raise SystemExit("unexpected unresolved blocking obligation count")
-          if report["unclassified_count"] != 281:
+          if report["unclassified_count"] != 0:
               raise SystemExit("unexpected unclassified risk count")
           if report["disposition_counts"] != {
-              "evidence": 22,
-              "unbound": 491,
+              "evidence": 493,
+              "unbound": 20,
           }:
               raise SystemExit(
                   "unexpected risk disposition counts: "
@@ -289,6 +352,7 @@ jobs:
                   [
                       "scripts/reconcile_p1_risk_evidence.py",
                       "scripts/build_p1_control_plane_gap_evidence.py",
+                      "scripts/build_p1_risk_classification_evidence_batch1.py",
                       "skeleton/contracts/risk_evidence.py",
                   ]
               ),
@@ -302,6 +366,8 @@ jobs:
                       "tests/test_p1_release_gap_bindings_batch1.py",
                       "tests/test_p1_control_plane_gap_evidence.py",
                       "tests/test_p1_control_plane_gap_bindings_batch2.py",
+                      "tests/test_p1_risk_classification_evidence_batch1.py",
+                      "tests/test_p1_risk_classification_bindings_batch1.py",
                   ]
               ),
               encoding="utf-8",
