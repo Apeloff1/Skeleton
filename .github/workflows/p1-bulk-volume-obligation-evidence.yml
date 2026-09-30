@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - p1/risk-classification-bindings-batch1-20260930
+      - p1/bulk-volume-obligation-evidence-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -15,6 +16,7 @@ on:
       - "scripts/reconcile_p1_risk_evidence.py"
       - "scripts/build_p1_bulk_volume_obligation_evidence.py"
       - "tests/test_p1_bulk_volume_obligation_evidence.py"
+      - "tests/test_p1_bulk_volume_obligation_bindings.py"
       - ".github/workflows/p1-bulk-volume-obligation-evidence.yml"
   workflow_dispatch:
 
@@ -71,6 +73,7 @@ jobs:
           tests/test_p1_risk_evidence_reconciliation.py
           tests/test_p1_risk_classification_bindings_batch1.py
           tests/test_p1_bulk_volume_obligation_evidence.py
+          tests/test_p1_bulk_volume_obligation_bindings.py
 
       - name: Compile exact-head bulk candidates
         run: |
@@ -98,10 +101,10 @@ jobs:
               "covered_obligation_count": 489,
               "covered_risk_count": 281,
               "covered_gap_count": 208,
-              "already_bound_count": 34,
-              "candidate_binding_count": 455,
-              "candidate_risk_count": 269,
-              "candidate_gap_count": 186,
+              "already_bound_count": 489,
+              "candidate_binding_count": 0,
+              "candidate_risk_count": 0,
+              "candidate_gap_count": 0,
               "adversarial_axis_count": 0,
           }
           for key, value in expected.items():
@@ -172,17 +175,17 @@ jobs:
                   encoding="utf-8"
               )
           )
-          if report["binding_count"] != 34:
+          if report["binding_count"] != 489:
               raise SystemExit("bulk verifier mutated binding count")
-          if report["resolved_count"] != 34:
+          if report["resolved_count"] != 489:
               raise SystemExit("bulk verifier mutated resolution count")
-          if report["unresolved_blocking_count"] != 479:
+          if report["unresolved_blocking_count"] != 24:
               raise SystemExit("bulk verifier mutated blocking frontier")
-          if report["unclassified_count"] != 269:
+          if report["unclassified_count"] != 0:
               raise SystemExit("bulk verifier mutated classification frontier")
           if report["disposition_counts"] != {
-              "evidence": 34,
-              "unbound": 479,
+              "evidence": 489,
+              "unbound": 24,
           }:
               raise SystemExit("bulk verifier mutated disposition counts")
           print(

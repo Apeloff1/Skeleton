@@ -173,13 +173,13 @@ def test_combined_risk_reconciliation_resolves_twenty_two_obligations() -> None:
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
-    assert report["binding_count"] == 34
-    assert report["resolved_count"] == 34
-    assert report["unresolved_blocking_count"] == 479
-    assert report["unclassified_count"] == 269
+    assert report["binding_count"] == 489
+    assert report["resolved_count"] == 489
+    assert report["unresolved_blocking_count"] == 24
+    assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 34,
-        "unbound": 479,
+        "evidence": 489,
+        "unbound": 24,
     }
 
 
