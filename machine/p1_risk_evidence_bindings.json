@@ -8542,6 +8542,38 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-09-81fa5fab73acd823",
+      "obligation_digest": "5d866e90ebbdba4e26b9f24b6aa42794f273130a24fce46df4984f034d984c50",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T20:34:00Z",
+      "review_at": "2026-10-30T20:34:00Z",
+      "evidence": [
+        {
+          "category": "clock_skew",
+          "digest": "ebcbedea23563a43882148562273d28e8d2d7ee6c40647f4756a9671a1044a44",
+          "source": "p1:adversarial-ac09-evidence:AC-09:clock_skew:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "suspend_resume",
+          "digest": "da0640349f7afd7ea62526fb40e1115ee16e413acbce11b427e41d95994c8e31",
+          "source": "p1:adversarial-ac09-evidence:AC-09:suspend_resume:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "lease_fencing",
+          "digest": "d897ce6e204f1f5f0a45c234168fd84a5ecbfd694476fdffe9dafa2de0cf26d5",
+          "source": "p1:adversarial-ac09-evidence:AC-09:lease_fencing:75275748906e00717f06f944d0c99d0dc6f5c962"
+        },
+        {
+          "category": "expiry_property",
+          "digest": "ad0d810561314677bcb93b16e8b962e445829d8af7c1346e458cd2823ff73721",
+          "source": "p1:adversarial-ac09-evidence:AC-09:expiry_property:75275748906e00717f06f944d0c99d0dc6f5c962"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
   "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Governed adversarial closure now includes AC-11, AC-13, AC-14, AC-15, AC-20, and AC-22; remaining axes stay blocking until mode-complete evidence exists."
