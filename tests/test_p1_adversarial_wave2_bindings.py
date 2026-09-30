@@ -136,6 +136,11 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
 
 
 def test_wave2_advances_governed_frontier_to_494_19_0() -> None:
+    assert RESOLVED_AXES == frozenset(
+        {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
+    )
+    assert EXPECTED_RESIDUAL_AXIS_COUNT == 19
+
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["binding_count"] == 494
