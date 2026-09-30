@@ -172,7 +172,7 @@ AXIS_PROOFS: dict[str, dict[str, tuple[tuple[str, tuple[str, ...]], ...]]] = {
                 "skeleton/testing/test_provider_stream_reliability_profiles.py",
                 (
                     "TransientProviderError",
-                    "test_post_emission_failure_is_not_retried",
+                    "test_stream_never_retries_after_output_started",
                     "test_stream_retry_budget_is_exact_under_exhaustion",
                 ),
             ),
