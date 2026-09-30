@@ -16,6 +16,7 @@ on:
       - "skeleton/testing/test_security_archive_sandbox.py"
       - "scripts/build_p1_adversarial_ac13_evidence.py"
       - "tests/test_p1_adversarial_ac13_evidence.py"
+      - "tests/test_p1_adversarial_ac13_binding.py"
       - ".github/workflows/p1-adversarial-ac13-evidence.yml"
   workflow_dispatch:
 
@@ -63,6 +64,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_security_archive_sandbox.py
           tests/test_p1_adversarial_ac13_evidence.py
+          tests/test_p1_adversarial_ac13_binding.py
           tests/test_p1_adversarial_ac11_binding.py
           tests/test_p1_adversarial_ac14_binding.py
           tests/test_p1_adversarial_ac15_binding.py
@@ -97,6 +99,12 @@ jobs:
               raise SystemExit("wrong adversarial axis")
           if report["candidate_count"] != 1:
               raise SystemExit("AC-13 candidate count drift")
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-13 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-13 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-13 candidate does not detect governed binding")
           if set(candidate["required_evidence_modes"]) != expected_modes:
               raise SystemExit("AC-13 required evidence modes drift")
           if {row["category"] for row in candidate["evidence"]} != expected_modes:
