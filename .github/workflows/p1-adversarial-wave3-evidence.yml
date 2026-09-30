@@ -1,0 +1,138 @@
+name: P1 Adversarial Wave 3 Evidence Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/build_p1_adversarial_wave3_evidence.py"
+      - "tests/test_p1_adversarial_wave3_evidence.py"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "scripts/reconcile_p1_risk_evidence.py"
+      - "skeleton/testing/test_worker_fairness_failover_shutdown.py"
+      - "skeleton/testing/test_state_recovery_drill.py"
+      - "skeleton/resilience/recovery.py"
+      - "skeleton/reliability/chaos.py"
+      - "skeleton/testing/process_resource_reliability_profiles.py"
+      - "skeleton/testing/test_process_resource_reliability_profiles.py"
+      - "skeleton/testing/test_chaos_governor.py"
+      - "tests/test_provider_capability_matrix.py"
+      - "tests/test_jeeves_local_provider_policy.py"
+      - "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      - "backend/tests/test_execution_receipts.py"
+      - "skeleton/api/idempotency.py"
+      - "skeleton/testing/test_shell_ai_durable_orphan_scan.py"
+      - "tests/test_duplicate_work_audit.py"
+      - "skeleton/release/migration.py"
+      - "skeleton/testing/test_migration_rollback_compatibility.py"
+      - "skeleton/testing/test_checkpoint_migrations.py"
+      - ".github/workflows/p1-migration-rollback-compatibility.yml"
+      - "skeleton/kernel/leases.py"
+      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
+      - "skeleton/memory/guarded_compaction.py"
+      - "skeleton/testing/test_guarded_compaction.py"
+      - "scripts/state_recovery_drill.py"
+      - "skeleton/gate_plane/chaos_scenarios.py"
+      - "skeleton/shells/ai/signed_artifact.py"
+      - ".github/workflows/p1-adversarial-wave3-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-adversarial-wave3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify nine-axis adversarial evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+          "httpx>=0.28,<1"
+
+      - name: Run repository adversarial controls
+        run: |
+          set -euo pipefail
+          python -m pytest -q --noconftest             skeleton/testing/test_worker_fairness_failover_shutdown.py             skeleton/testing/test_state_recovery_drill.py             skeleton/testing/test_process_resource_reliability_profiles.py             skeleton/testing/test_chaos_governor.py             tests/test_provider_capability_matrix.py             tests/test_jeeves_local_provider_policy.py             skeleton/testing/test_provider_stream_reliability_profiles.py             skeleton/testing/test_shell_ai_durable_orphan_scan.py             tests/test_duplicate_work_audit.py             skeleton/testing/test_migration_rollback_compatibility.py             skeleton/testing/test_checkpoint_migrations.py             skeleton/testing/test_swarm_exact_lease_atomicity.py             skeleton/testing/test_guarded_compaction.py             tests/test_p1_adversarial_wave3_evidence.py
+
+      - name: Run backend receipt controls
+        env:
+          PYTHONPATH: "backend:."
+        run: |
+          set -euo pipefail
+          python -m pytest -q --noconftest             backend/tests/test_execution_receipts.py
+
+      - name: Build exact-head wave 3 evidence
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-wave3
+          python scripts/build_p1_adversarial_wave3_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-wave3/report.json             --print-summary             --print-candidates | tee .p1-wave3/stdout.log
+
+      - name: Assert wave 3 authority and exact candidate set
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(".p1-wave3/report.json").read_text(encoding="utf-8"))
+          expected = [
+              "AC-02", "AC-03", "AC-04", "AC-05", "AC-06",
+              "AC-07", "AC-09", "AC-18", "AC-24",
+          ]
+          if report["expected_head"] != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("wave3 exact-head mismatch")
+          if report["axis_ids"] != expected:
+              raise SystemExit(f"wave3 axis set drifted: {report['axis_ids']!r}")
+          if report["axis_count"] != 9:
+              raise SystemExit("wave3 axis count mismatch")
+          if report["already_bound_count"] != 0:
+              raise SystemExit("wave3 unexpectedly contains already-bound axes")
+          if report["candidate_binding_count"] != 9:
+              raise SystemExit("wave3 candidate count mismatch")
+          if not report["non_authoritative"] or report["creates_bindings"]:
+              raise SystemExit("wave3 authority boundary violated")
+          if report["accepts_risk"] or report["lowers_severity"] or report["promotes_maturity"]:
+              raise SystemExit("wave3 governance boundary violated")
+          for candidate in report["candidates"]:
+              if candidate["binding_present"]:
+                  raise SystemExit(f"{candidate['axis_id']} is already bound")
+              if len(candidate["evidence"]) != 4:
+                  raise SystemExit(f"{candidate['axis_id']} evidence cardinality mismatch")
+              if any(len(item["digest"]) != 64 for item in candidate["evidence"]):
+                  raise SystemExit(f"{candidate['axis_id']} invalid evidence digest")
+          print("P1 wave3 authority: OK (9 evidence-only candidates)")
+          PY
+
+      - name: Surface candidate binding payload
+        run: |
+          set -euo pipefail
+          grep '^P1_WAVE3_CANDIDATES=' .p1-wave3/stdout.log
