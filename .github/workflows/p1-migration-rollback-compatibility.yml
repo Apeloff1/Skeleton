@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/migration.py"
       - "skeleton/release/lifecycle.py"
       - "skeleton/release/qualification.py"
@@ -18,9 +19,11 @@ on:
   pull_request:
     branches:
       - main
+      - p1/learn-lane-materialize-20260928
       - p1/rel-02-installer-lifecycle-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/migration.py"
       - "skeleton/release/lifecycle.py"
       - "skeleton/release/qualification.py"

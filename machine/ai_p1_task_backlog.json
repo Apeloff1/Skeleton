@@ -2136,7 +2136,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309453",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597938",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2146,20 +2151,11 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "scripts",
-        ".github/workflows",
-        "machine",
-        "planned:skeleton/artifacts",
-        "skeleton/persistence",
-        "planned:skeleton/storage/cas"
+        "skeleton/release/qualification.py",
+        ".github/workflows/p1-release-evidence-bundle.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_release_provenance.py",
-        "planned:skeleton/testing/test_release_qualification.py",
-        "planned:skeleton/testing/test_artifact_manifest.py",
-        "planned:skeleton/testing/test_artifact_lifecycle.py",
-        "planned:skeleton/testing/test_cas_integrity.py",
-        "planned:skeleton/testing/test_cas_gc.py"
+        "skeleton/testing/test_release_qualification.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2201,7 +2197,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309291",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597852",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2211,22 +2212,11 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "installer",
-        "scripts",
-        "machine",
-        "updater",
-        "repair",
-        "uninstaller"
+        "skeleton/release/lifecycle.py",
+        ".github/workflows/p1-installer-lifecycle.yml"
       ],
       "test_targets": [
-        "planned:installer/tests/test_clean_install.py",
-        "planned:installer/tests/test_install_rollback.py",
-        "planned:updater/tests/test_atomic_update.py",
-        "planned:updater/tests/test_update_rollback.py",
-        "planned:repair/tests/test_diagnose_before_mutate.py",
-        "planned:repair/tests/test_repair_reconciliation.py",
-        "planned:uninstaller/tests/test_retention_policy.py",
-        "planned:uninstaller/tests/test_residual_state.py"
+        "skeleton/testing/test_installer_lifecycle.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2269,7 +2259,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310186",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598086",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2279,22 +2274,13 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "updater",
-        "installer",
-        "machine",
-        "deploy",
-        "scripts",
-        "config",
-        "skeleton",
-        "backend"
+        "skeleton/release/migration.py",
+        "skeleton/contracts/migration_tests.py",
+        "skeleton/ai/runtime/contracts/migration_tests.py",
+        ".github/workflows/p1-migration-rollback-compatibility.yml"
       ],
       "test_targets": [
-        "planned:updater/tests/test_atomic_update.py",
-        "planned:updater/tests/test_update_rollback.py",
-        "planned:deploy/tests/test_canary_gate.py",
-        "planned:deploy/tests/test_partial_rollback.py",
-        "planned:skeleton/testing/test_config_precedence.py",
-        "planned:skeleton/testing/test_config_validation.py"
+        "skeleton/testing/test_migration_rollback_compatibility.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2334,7 +2320,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098308997",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472597665",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2344,17 +2335,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "backup",
-        "skeleton/persistence",
-        "machine",
-        "recovery",
-        "docs"
+        "skeleton/release/restore.py",
+        ".github/workflows/p1-backup-restore-qualification.yml"
       ],
       "test_targets": [
-        "planned:backup/tests/test_backup_manifest.py",
-        "planned:backup/tests/test_backup_integrity.py",
-        "planned:recovery/tests/test_recovery_order.py",
-        "planned:recovery/tests/test_post_restore_reconcile.py"
+        "skeleton/testing/test_backup_restore_integration.py",
+        "skeleton/testing/test_backup_restore_qualification.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2395,7 +2381,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098310079",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598089",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2405,17 +2396,11 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "recovery",
-        "backup",
-        "docs",
-        "scripts",
-        "skeleton/observability"
+        "skeleton/release/disaster_recovery.py",
+        ".github/workflows/p1-disaster-recovery-feedback.yml"
       ],
       "test_targets": [
-        "planned:recovery/tests/test_recovery_order.py",
-        "planned:recovery/tests/test_post_restore_reconcile.py",
-        "planned:skeleton/testing/test_break_glass.py",
-        "planned:skeleton/testing/test_incident_evidence.py"
+        "skeleton/testing/test_disaster_recovery_qualification.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2454,7 +2439,12 @@
         "Clean-machine, rollback and recovery evidence is executable on the exact head.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
+        "github-actions-job:109098309784",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36472598091",
+        "https://github.com/Apeloff1/Skeleton/commit/45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+      ],
       "accountability_ref": "ACC-P1-REL-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2464,11 +2454,14 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/artifacts",
-        "docs"
+        "skeleton/release/attribution.py",
+        "machine/p1_release_attribution.json",
+        "scripts/check_p1_release_attribution.py",
+        ".github/workflows/p1-release-attribution.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_attribution_engine.py"
+        "skeleton/testing/test_release_attribution.py",
+        "tests/test_p1_release_attribution.py"
       ],
       "evidence_modes": [
         "clean_machine",
@@ -2511,7 +2504,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424893",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820961",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2521,18 +2519,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/distributed",
-        "planned:skeleton/workers",
-        "skeleton/ai",
-        "skeleton/network",
-        "skeleton/security",
-        "skeleton/runtime"
+        "skeleton/network/remote_execution.py",
+        "skeleton/ai/runtime/distributed/network/remote_execution.py",
+        ".github/workflows/p1-remote-worker-trust.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_stale_lease_fencing.py",
-        "planned:skeleton/testing/test_partition_semantics.py",
-        "planned:skeleton/testing/test_remote_execution_protocol.py",
-        "planned:skeleton/testing/test_worker_attestation.py"
+        "skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evidence_modes": [
         "load",
@@ -2576,7 +2568,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424008",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821015",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2586,21 +2583,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "planned:skeleton/compute",
-        "planned:skeleton/hardware",
-        "skeleton/ai",
-        "skeleton/network",
-        "skeleton/runtime",
-        "machine"
+        "skeleton/network/model_placement.py",
+        "skeleton/ai/runtime/distributed/network/model_placement.py",
+        ".github/workflows/p1-model-placement.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_resource_admission.py",
-        "planned:skeleton/testing/test_device_loss.py",
-        "planned:skeleton/testing/test_inference_control_plane.py",
-        "planned:skeleton/testing/test_model_placement.py",
-        "planned:skeleton/testing/test_model_warming.py",
-        "planned:skeleton/testing/test_hardware_topology.py",
-        "planned:skeleton/testing/test_network_topology_awareness.py"
+        "skeleton/testing/test_model_placement.py"
       ],
       "evidence_modes": [
         "load",
@@ -2640,7 +2628,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102423944",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821066",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2650,13 +2643,13 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai",
-        "skeleton/observability"
+        "skeleton/mesh/batching_autoscaling.py",
+        "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py",
+        ".github/workflows/p1-batching-autoscaling.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_continuous_batching.py",
-        "planned:skeleton/testing/test_inference_autoscaling.py"
+        "skeleton/testing/test_continuous_batching.py",
+        "skeleton/testing/test_inference_autoscaling.py"
       ],
       "evidence_modes": [
         "load",
@@ -2698,7 +2691,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424598",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820988",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-04",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2708,20 +2706,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "benchmarks",
-        "scripts",
-        "skeleton",
-        "skeleton/runtime",
-        "skeleton/observability",
-        "machine",
-        "skeleton/eval"
+        "skeleton/mesh/capacity_qualification.py",
+        "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py",
+        ".github/workflows/p1-capacity-qualification.yml"
       ],
       "test_targets": [
-        "planned:benchmarks/test_performance_contracts.py",
-        "planned:skeleton/testing/test_performance_budget_schema.py",
-        "planned:skeleton/testing/test_capacity_limits.py",
-        "planned:skeleton/testing/test_admission_thresholds.py",
-        "planned:skeleton/testing/test_inference_load_profiles.py"
+        "skeleton/testing/test_capacity_qualification.py"
       ],
       "evidence_modes": [
         "load",
@@ -2763,7 +2753,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424353",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473820997",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-05",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2773,16 +2768,12 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "skeleton/runtime",
-        "machine",
-        "skeleton/persistence"
+        "skeleton/observability/budget_accounting.py",
+        "skeleton/ai/runtime/observability/budget_accounting.py",
+        ".github/workflows/p1-budget-accounting.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_cost_budget.py",
-        "planned:skeleton/testing/test_cost_attribution.py",
-        "planned:skeleton/testing/test_compute_quotas.py",
-        "planned:skeleton/testing/test_budget_accounting_ledger.py"
+        "skeleton/testing/test_budget_accounting_ledger.py"
       ],
       "evidence_modes": [
         "load",
@@ -2823,7 +2814,12 @@
         "Load/partition/stale-worker and budget reconciliation tests pass under declared limits.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02",
+        "github-actions-job:109102424052",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36473821029",
+        "https://github.com/Apeloff1/Skeleton/commit/0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+      ],
       "accountability_ref": "ACC-P1-DIST-06",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2833,12 +2829,13 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "skeleton/observability",
-        "skeleton/eval"
+        "skeleton/observability/forecasting.py",
+        "skeleton/ai/runtime/observability/forecasting.py",
+        ".github/workflows/p1-forecast-anomaly-loop.yml"
       ],
       "test_targets": [
-        "planned:skeleton/testing/test_forecasting_engine.py",
-        "planned:skeleton/testing/test_cost_anomaly_detection.py"
+        "skeleton/testing/test_forecasting_engine.py",
+        "skeleton/testing/test_cost_anomaly_detection.py"
       ],
       "evidence_modes": [
         "load",
@@ -2884,7 +2881,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103654056",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474185989",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-01",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2894,10 +2896,16 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_terminal_evidence.py",
+        "skeleton/ai/runtime/contracts/p1_terminal_evidence.py",
+        "machine/p1_terminal_evidence_policy.json",
+        "scripts/check_p1_terminal_evidence_policy.py",
+        "scripts/build_p1_terminal_evidence.py",
+        ".github/workflows/p1-terminal-evidence-bundle.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_terminal_evidence.py",
+        "tests/test_p1_terminal_evidence_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
@@ -2934,7 +2942,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103654402",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474186005",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-02",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2944,10 +2957,17 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_failure_journeys.py",
+        "skeleton/ai/runtime/contracts/p1_failure_journeys.py",
+        "machine/p1_terminal_failure_journeys.json",
+        "scripts/check_p1_terminal_failure_journeys.py",
+        "scripts/build_p1_terminal_failure_journeys.py",
+        ".github/workflows/p1-terminal-failure-journeys.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_failure_journeys.py",
+        "tests/test_p1_terminal_failure_journey_builder.py",
+        "tests/test_p1_terminal_failure_journeys_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",
@@ -2984,7 +3004,12 @@
         "Independent exact-head promotion verification passes or records explicit rejection.",
         "Evidence is bound to the task accountability identity and cannot self-promote masterplan maturity."
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        "git-head:8d8119e7ceaadca3755b22423ee7d480585f146c",
+        "github-actions-job:109103653532",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36474185902",
+        "https://github.com/Apeloff1/Skeleton/commit/8d8119e7ceaadca3755b22423ee7d480585f146c"
+      ],
       "accountability_ref": "ACC-P1-PROM-03",
       "owner_kind": "P1-lane",
       "priority": "P1",
@@ -2994,10 +3019,18 @@
         "WP-W30"
       ],
       "implementation_paths": [
-        "machine/ai_p1_task_backlog.json"
+        "skeleton/contracts/p1_promotion_decision.py",
+        "skeleton/ai/runtime/contracts/p1_promotion_decision.py",
+        "machine/p1_promotion_decision_policy.json",
+        "scripts/check_p1_promotion_decision_policy.py",
+        "scripts/build_p1_promotion_intent.py",
+        "scripts/verify_p1_promotion_signature.py",
+        "scripts/finalize_p1_promotion_decision.py",
+        ".github/workflows/p1-independent-promotion-decision.yml"
       ],
       "test_targets": [
-        "tests/test_ai_p1_execution_map.py"
+        "skeleton/testing/test_p1_promotion_decision.py",
+        "tests/test_p1_promotion_decision_policy.py"
       ],
       "evidence_modes": [
         "exact_head_bundle",

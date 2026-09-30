@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/network/model_placement.py"
       - "skeleton/ai/runtime/distributed/network/model_placement.py"
       - "skeleton/network/remote_execution.py"
@@ -19,9 +20,11 @@ on:
   pull_request:
     branches:
       - main
+      - p1/release-lane-materialize-20260928
       - p1/dist-01-remote-worker-trust-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/network/model_placement.py"
       - "skeleton/ai/runtime/distributed/network/model_placement.py"
       - "skeleton/network/remote_execution.py"

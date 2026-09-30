@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/observability/forecasting.py"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"
@@ -17,8 +18,10 @@ on:
   pull_request:
     branches:
       - main
+      - p1/release-lane-materialize-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/observability/forecasting.py"
       - "skeleton/ai/runtime/observability/forecasting.py"
       - "skeleton/observability/budget_accounting.py"

@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/evidence.py"
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"
@@ -20,8 +21,10 @@ on:
   pull_request:
     branches:
       - main
+      - p1/learn-lane-materialize-20260928
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "machine/ai_p1_task_backlog.json"
       - "skeleton/release/evidence.py"
       - "skeleton/release/qualification.py"
       - "skeleton/release/__init__.py"

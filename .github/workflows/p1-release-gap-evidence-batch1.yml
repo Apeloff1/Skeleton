@@ -1,0 +1,139 @@
+name: P1 Release Gap Evidence Batch 1 Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/migration.py"
+      - "skeleton/release/restore.py"
+      - "skeleton/release/disaster_recovery.py"
+      - "skeleton/release/attribution.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - "skeleton/testing/test_installer_lifecycle.py"
+      - "skeleton/testing/test_migration_rollback_compatibility.py"
+      - "skeleton/testing/test_backup_restore_qualification.py"
+      - "skeleton/testing/test_backup_restore_integration.py"
+      - "skeleton/testing/test_disaster_recovery_qualification.py"
+      - "skeleton/testing/test_release_attribution.py"
+      - "tests/test_p1_release_attribution.py"
+      - "machine/ai_master_plan.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "scripts/build_p1_release_gap_evidence.py"
+      - "tests/test_p1_release_gap_evidence.py"
+      - ".github/workflows/p1-release-gap-evidence-batch1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-release-gap-evidence-batch1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Verify exact-head release gap closure evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused release test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile evidence and release contracts
+        run: |
+          set -euo pipefail
+          python -m py_compile             scripts/build_p1_release_gap_evidence.py             skeleton/release/lifecycle.py             skeleton/release/qualification.py             skeleton/release/migration.py             skeleton/release/restore.py             skeleton/release/disaster_recovery.py             skeleton/release/attribution.py
+
+      - name: Validate canonical planning and risk inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_p1_execution_map.py --print-summary
+          python scripts/reconcile_p1_volume_metadata.py --check
+
+      - name: Run bounded gap evidence tests and release regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_release_gap_evidence.py
+          skeleton/testing/test_release_qualification.py
+          skeleton/testing/test_installer_lifecycle.py
+          skeleton/testing/test_migration_rollback_compatibility.py
+          skeleton/testing/test_backup_restore_qualification.py
+          skeleton/testing/test_backup_restore_integration.py
+          skeleton/testing/test_disaster_recovery_qualification.py
+          skeleton/testing/test_release_attribution.py
+          tests/test_p1_release_attribution.py
+
+      - name: Build exact-head evidence report
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-release-gap-evidence
+          registry_before="$(sha256sum machine/p1_risk_evidence_bindings.json | awk '{print $1}')"
+          master_before="$(sha256sum machine/ai_master_plan.json | awk '{print $1}')"
+          python scripts/build_p1_release_gap_evidence.py             --expected-head "$EXPECTED_SHA"             --out .p1-release-gap-evidence/report.json             --print-summary
+          registry_after="$(sha256sum machine/p1_risk_evidence_bindings.json | awk '{print $1}')"
+          master_after="$(sha256sum machine/ai_master_plan.json | awk '{print $1}')"
+          test "$registry_before" = "$registry_after"
+          test "$master_before" = "$master_after"
+
+      - name: Emit candidate evidence identities
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-release-gap-evidence/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert report["covered_gap_count"] == 12
+          assert report["covered_volume_count"] == 8
+          assert report["already_bound_count"] == 12
+          assert report["candidate_binding_count"] == 0
+          assert report["non_authoritative"] is True
+          assert report["creates_bindings"] is False
+          assert report["clears_masterplan_gaps"] is False
+          print("REPORT_DIGEST", report["report_digest"])
+          for row in report["records"]:
+              evidence = row["candidate_evidence_ref"]
+              print(
+                  "GAP_EVIDENCE",
+                  row["volume_key"],
+                  row["obligation_id"],
+                  row["obligation_digest"],
+                  evidence["source"],
+                  evidence["digest"],
+                  evidence["category"],
+              )
+          PY

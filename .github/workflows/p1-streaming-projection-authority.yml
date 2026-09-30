@@ -1,4 +1,5 @@
 name: P1 Streaming Projection Authority Gate
+# Current-head gate: durable store import is canonical.
 
 on:
   push:

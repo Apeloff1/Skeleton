@@ -1,0 +1,128 @@
+name: P1 Volume Accountability Candidate Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - p1/maturity-volume-materialization-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_execution_map.json"
+      - "scripts/build_p1_volume_accountability_candidates.py"
+      - "scripts/reconcile_p1_maturity.py"
+      - "tests/test_p1_volume_accountability_candidates.py"
+      - ".github/workflows/p1-volume-accountability-candidates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-volume-accountability-candidates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate unsigned P1 volume accountability candidates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.EXPECTED_SHA }}
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic[email]>=2.13.5"
+          "pydantic-settings>=2.15.0"
+
+      - name: Compile accountability candidate engine
+        run: |
+          set -euo pipefail
+          python -m py_compile             scripts/build_p1_volume_accountability_candidates.py             scripts/reconcile_p1_maturity.py
+
+      - name: Validate canonical accountability and projection inputs
+        run: |
+          set -euo pipefail
+          python scripts/check_ai_build_accountability.py
+          python scripts/reconcile_p1_volume_metadata.py --check
+          python scripts/check_ai_p1_execution_map.py --print-summary
+
+      - name: Run accountability candidate regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_p1_volume_accountability_candidates.py
+
+      - name: Build unsigned candidate report
+        run: |
+          set -euo pipefail
+          mkdir -p .p1-accountability-candidates
+          python scripts/build_p1_volume_accountability_candidates.py             --out .p1-accountability-candidates/report.json             --print-summary
+
+      - name: Assert governed review boundary
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(".p1-accountability-candidates/report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          if report["volume_count"] != 107:
+              raise SystemExit("P1 accountability candidate volume count drift")
+          if report["implementation_review_ready_count"] != 107:
+              raise SystemExit("not all materialized volumes are implementation-review ready")
+          if report["verification_evidence_ready_count"] != 107:
+              raise SystemExit("verification evidence readiness drift")
+          if report["target_floor_eligible_count"] != 3:
+              raise SystemExit("candidate report changed maturity eligibility")
+          if report["creates_signatures"] is not False:
+              raise SystemExit("candidate report must never create signatures")
+          if report["mutates_accountability"] is not False:
+              raise SystemExit("candidate report must never mutate accountability")
+          if report["requires_distinct_verifier_identity"] is not True:
+              raise SystemExit("independent verifier identity requirement drifted")
+
+          for row in report["records"]:
+              forbidden = {
+                  "signer_id",
+                  "signature_method",
+                  "signature_ref",
+                  "signed_at_utc",
+              }
+              if forbidden & set(row):
+                  raise SystemExit(
+                      f"{row['volume_key']}: candidate leaked signing fields"
+                  )
+
+          print(
+              "P1 unsigned accountability candidate boundary OK:",
+              report["implementation_review_ready_count"],
+              report["verification_evidence_ready_count"],
+              report["gap_blocked_count"],
+              report["target_floor_eligible_count"],
+          )
+          PY

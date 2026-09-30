@@ -815,3 +815,308 @@ def test_learning_lane_dependency_chain_is_preserved() -> None:
         "P1-EVID-04",
     ]
     assert task_by_id["P1-LEARN-06"]["depends_on"] == ["P1-LEARN-05"]
+
+
+def test_release_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        ".github/workflows/p1-installer-lifecycle.yml",
+        ".github/workflows/p1-migration-rollback-compatibility.yml",
+        ".github/workflows/p1-backup-restore-qualification.yml",
+        ".github/workflows/p1-disaster-recovery-feedback.yml",
+        ".github/workflows/p1-release-attribution.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
+
+
+RELEASE_LANE_TASKS = (
+    "P1-REL-01",
+    "P1-REL-02",
+    "P1-REL-03",
+    "P1-REL-04",
+    "P1-REL-05",
+    "P1-REL-06",
+)
+
+
+RELEASE_LANE_EVIDENCE_HEAD = "45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5"
+RELEASE_LANE_EVIDENCE = {
+    "P1-REL-01": ("36472597938", ("109098309453",)),
+    "P1-REL-02": ("36472597852", ("109098309291",)),
+    "P1-REL-03": ("36472598086", ("109098310186",)),
+    "P1-REL-04": ("36472597665", ("109098308997",)),
+    "P1-REL-05": ("36472598089", ("109098310079",)),
+    "P1-REL-06": ("36472598091", ("109098309784",)),
+}
+
+
+def test_release_lane_uses_materialized_exact_head_evidence() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in RELEASE_LANE_TASKS:
+        task = task_by_id[task_id]
+
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+
+        for field in ("implementation_paths", "test_targets"):
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        run_id, job_ids = RELEASE_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{RELEASE_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + RELEASE_LANE_EVIDENCE_HEAD
+        ) in evidence
+
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_release_lane_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-REL-01"]["depends_on"] == [
+        "P1-EVID-05",
+        "P1-PROD-05",
+        "P1-LEARN-03",
+        "P1-AUTO-06",
+    ]
+    assert task_by_id["P1-REL-02"]["depends_on"] == ["P1-REL-01"]
+    assert task_by_id["P1-REL-03"]["depends_on"] == [
+        "P1-REL-01",
+        "P1-REL-02",
+    ]
+    assert task_by_id["P1-REL-04"]["depends_on"] == ["P1-REL-03"]
+    assert task_by_id["P1-REL-05"]["depends_on"] == [
+        "P1-REL-04",
+        "P1-LEARN-06",
+    ]
+    assert task_by_id["P1-REL-06"]["depends_on"] == ["P1-REL-01"]
+
+
+def test_distributed_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-remote-worker-trust.yml",
+        ".github/workflows/p1-model-placement.yml",
+        ".github/workflows/p1-batching-autoscaling.yml",
+        ".github/workflows/p1-capacity-qualification.yml",
+        ".github/workflows/p1-budget-accounting.yml",
+        ".github/workflows/p1-forecast-anomaly-loop.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
+
+
+DISTRIBUTED_LANE_TASKS = (
+    "P1-DIST-01",
+    "P1-DIST-02",
+    "P1-DIST-03",
+    "P1-DIST-04",
+    "P1-DIST-05",
+    "P1-DIST-06",
+)
+
+
+DISTRIBUTED_LANE_EVIDENCE_HEAD = "0fbbb1fb5cd560b02d6ec3f38fa40db5052b4a02"
+DISTRIBUTED_LANE_EVIDENCE = {
+    "P1-DIST-01": ("36473820961", ("109102424893",)),
+    "P1-DIST-02": ("36473821015", ("109102424008",)),
+    "P1-DIST-03": ("36473821066", ("109102423944",)),
+    "P1-DIST-04": ("36473820988", ("109102424598",)),
+    "P1-DIST-05": ("36473820997", ("109102424353",)),
+    "P1-DIST-06": ("36473821029", ("109102424052",)),
+}
+
+
+def test_distributed_lane_uses_materialized_exact_head_evidence() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in DISTRIBUTED_LANE_TASKS:
+        task = task_by_id[task_id]
+
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+
+        for field in ("implementation_paths", "test_targets"):
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        run_id, job_ids = DISTRIBUTED_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{DISTRIBUTED_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + DISTRIBUTED_LANE_EVIDENCE_HEAD
+        ) in evidence
+
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_distributed_lane_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-DIST-01"]["depends_on"] == [
+        "P1-EVID-03",
+        "P1-PROD-05",
+        "P1-AUTO-06",
+    ]
+    assert task_by_id["P1-DIST-02"]["depends_on"] == ["P1-DIST-01"]
+    assert task_by_id["P1-DIST-03"]["depends_on"] == ["P1-DIST-02"]
+    assert task_by_id["P1-DIST-04"]["depends_on"] == ["P1-DIST-03"]
+    assert task_by_id["P1-DIST-05"]["depends_on"] == [
+        "P1-DIST-01",
+        "P1-EVID-01",
+    ]
+    assert task_by_id["P1-DIST-06"]["depends_on"] == [
+        "P1-DIST-04",
+        "P1-DIST-05",
+    ]
+
+
+def test_terminal_lane_gates_watch_p1_backlog_changes() -> None:
+    workflows = (
+        ".github/workflows/p1-terminal-evidence-bundle.yml",
+        ".github/workflows/p1-terminal-failure-journeys.yml",
+        ".github/workflows/p1-independent-promotion-decision.yml",
+    )
+
+    for workflow in workflows:
+        text = (ROOT / workflow).read_text(encoding="utf-8")
+        trigger_section = text.split("  workflow_dispatch:", 1)[0]
+        assert (
+            trigger_section.count('"machine/ai_p1_task_backlog.json"') == 2
+        ), workflow
+
+
+TERMINAL_LANE_TASKS = (
+    "P1-PROM-01",
+    "P1-PROM-02",
+    "P1-PROM-03",
+)
+
+
+TERMINAL_LANE_EVIDENCE_HEAD = "8d8119e7ceaadca3755b22423ee7d480585f146c"
+TERMINAL_LANE_EVIDENCE = {
+    "P1-PROM-01": ("36474185989", ("109103654056",)),
+    "P1-PROM-02": ("36474186005", ("109103654402",)),
+    "P1-PROM-03": ("36474185902", ("109103653532",)),
+}
+
+
+def test_terminal_lane_uses_exact_head_evidence_without_promotion() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    for task_id in TERMINAL_LANE_TASKS:
+        task = task_by_id[task_id]
+
+        for field in ("implementation_paths", "test_targets", "evidence_refs"):
+            assert task[field]
+            assert all(
+                not str(reference).startswith("planned:")
+                for reference in task[field]
+            )
+
+        for field in ("implementation_paths", "test_targets"):
+            for reference in task[field]:
+                assert (ROOT / reference).is_file(), (
+                    task_id,
+                    field,
+                    reference,
+                )
+
+        run_id, job_ids = TERMINAL_LANE_EVIDENCE[task_id]
+        evidence = set(task["evidence_refs"])
+        assert f"git-head:{TERMINAL_LANE_EVIDENCE_HEAD}" in evidence
+        for job_id in job_ids:
+            assert f"github-actions-job:{job_id}" in evidence
+        assert (
+            f"https://github.com/Apeloff1/Skeleton/actions/runs/{run_id}"
+            in evidence
+        )
+        assert (
+            "https://github.com/Apeloff1/Skeleton/commit/"
+            + TERMINAL_LANE_EVIDENCE_HEAD
+        ) in evidence
+
+        assert task["status"] == "blocked"
+        assert task["accountability_status"] == "planned"
+        assert task["implementation_signed"] is False
+        assert task["verification_signed"] is False
+        assert task["completion_checkbox"] is False
+        assert task["completion_checkbox_mark"] == "[ ]"
+
+
+def test_terminal_lane_dependency_chain_is_preserved() -> None:
+    payload = json.loads((ROOT / BACKLOG_PATH).read_text(encoding="utf-8"))
+    task_by_id = {task["task_id"]: task for task in payload["tasks"]}
+
+    assert task_by_id["P1-PROM-01"]["depends_on"] == [
+        "P1-EVID-06",
+        "P1-PROD-04",
+        "P1-PROD-05",
+        "P1-LEARN-04",
+        "P1-LEARN-06",
+        "P1-REL-05",
+        "P1-REL-06",
+        "P1-DIST-06",
+        "P1-INTEL-06",
+        "P1-AUTO-06",
+    ]
+    assert task_by_id["P1-PROM-02"]["depends_on"] == ["P1-PROM-01"]
+    assert task_by_id["P1-PROM-03"]["depends_on"] == ["P1-PROM-02"]
