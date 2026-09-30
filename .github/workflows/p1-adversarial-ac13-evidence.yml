@@ -4,7 +4,8 @@ on:
   pull_request:
     branches:
       - main
-      - p1/adversarial-wave2-bindings-19260930
+      - p1/adversarial-wave2-bindings-20260930
+      - p1/adversarial-ac13-binding-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -68,7 +69,7 @@ jobs:
           tests/test_p1_adversarial_ac11_binding.py
           tests/test_p1_adversarial_ac14_binding.py
           tests/test_p1_adversarial_ac15_binding.py
-          tests/test_p1_adversarial_ac19_binding.py
+          tests/test_p1_adversarial_ac20_binding.py
           tests/test_p1_risk_evidence_reconciliation.py
 
       - name: Compile exact-head AC-13 evidence twice
