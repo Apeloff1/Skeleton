@@ -97,6 +97,13 @@ def _content_equivalent(source: Path, destination: Path) -> bool:
     return False
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def _validate_facade(
     destination: Path,
     *,
@@ -139,7 +146,7 @@ def _compare(
         return [f"mapping kind mismatch: {source} -> {destination}"]
     if source.is_file():
         return [] if _content_equivalent(source, destination) else [
-            f"file semantic/content drift: {source.relative_to(ROOT)} != {destination.relative_to(ROOT)}"
+            f"file semantic/content drift: {_display_path(source)} != {_display_path(destination)}"
         ]
 
     exceptions = parity_exceptions or {}
@@ -161,7 +168,7 @@ def _compare(
         missing = sorted(set(governed_src) - set(governed_dst))
         extra = sorted(set(governed_dst) - set(governed_src))
         return [
-            f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
+            f"tree membership drift: {_display_path(source)} -> {_display_path(destination)} "
             f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)} "
             f"source_exclusions={sorted(exclusions)}"
         ]
@@ -171,22 +178,22 @@ def _compare(
         exception = exceptions.get(rel)
         if exception:
             if exception.get("mode") != "compatibility_facade":
-                errors.append(f"{source.relative_to(ROOT)}/{rel}: unknown parity exception mode")
+                errors.append(f"{_display_path(source)}/{rel}: unknown parity exception mode")
                 continue
             required_import = exception.get("facade_required_import")
             if not isinstance(required_import, str) or not required_import:
-                errors.append(f"{source.relative_to(ROOT)}/{rel}: facade exception missing required import")
+                errors.append(f"{_display_path(source)}/{rel}: facade exception missing required import")
                 continue
             errors.extend(
                 _validate_facade(
                     dst[rel],
                     required_import=required_import,
-                    label=f"{source.relative_to(ROOT)}/{rel}",
+                    label=f"{_display_path(source)}/{rel}",
                 )
             )
             continue
         if not _content_equivalent(src[rel], governed_dst[rel]):
-            errors.append(f"tree semantic/content drift: {source.relative_to(ROOT)}/{rel}")
+            errors.append(f"tree semantic/content drift: {_display_path(source)}/{rel}")
     return errors
 
 
