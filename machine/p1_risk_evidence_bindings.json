@@ -8350,7 +8350,39 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-15-f7f89f2c5b94ede2",
+      "obligation_digest": "f40e7b2b95b734e8fad7419baa251d47e9e05a3ec343f677d0a6e93fa7dab98d",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "evidence": [
+        {
+          "category": "budget_fault",
+          "digest": "1f824dd862945c00e379e256dd0613a4c35e0a78c74cc8b4097899a624b677d2",
+          "source": "p1:adversarial-ac15-evidence:AC-15:budget_fault:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "fanout_stress",
+          "digest": "38856b532fe1671f5a9d06b456b2ca81fa7c7b6d834673d7a1e5422ff480a88b",
+          "source": "p1:adversarial-ac15-evidence:AC-15:fanout_stress:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "quota_isolation",
+          "digest": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401206ee",
+          "source": "p1:adversarial-ac15-evidence:AC-15:quota_isolation:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "provider_reprice_simulation",
+          "digest": "6cb6f58f37905309803f8a3fe990c977d29a1e250143f1234906f287ee0c3e44",
+          "source": "p1:adversarial-ac15-evidence:AC-15:provider_reprice_simulation:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        }
+      ],
+      "bound_at": "2026-09-30T18:36:00Z",
+      "review_at": "2026-10-30T18:36:00Z",
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20 and AC-15 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
 }
