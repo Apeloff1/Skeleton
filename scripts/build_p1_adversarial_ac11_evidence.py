@@ -208,9 +208,6 @@ def build_ac11_evidence(
         and row.get("obligation_id") == obligation.obligation_id
         for row in records
     )
-    if binding_present:
-        raise AC11EvidenceError(f"{AXIS_ID} is already governed")
-
     semantic_canary = {
         "axis_id": AXIS_ID,
         "mode": "semantic_canary",
@@ -283,6 +280,7 @@ def build_ac11_evidence(
         "recommended_severity": "high",
         "recommended_disposition": "evidence",
         "expected_head": expected_head,
+        "binding_present": binding_present,
         "required_evidence_modes": list(EXPECTED_MODES),
         "evidence": evidence,
         "proofs": proofs,
@@ -301,6 +299,8 @@ def build_ac11_evidence(
         "axis_id": AXIS_ID,
         "expected_head": expected_head,
         "candidate_count": 1,
+        "already_bound_count": int(binding_present),
+        "candidate_binding_count": 0 if binding_present else 1,
         "required_evidence_mode_count": len(EXPECTED_MODES),
         "non_authoritative": True,
         "creates_bindings": False,
