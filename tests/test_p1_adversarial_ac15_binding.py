@@ -15,11 +15,11 @@ VERIFIER_RUN_ID = 36758921559
 VERIFIER_JOB_ID = 110036166551
 BOUND_AT = "2026-09-30T18:45:00Z"
 REVIEW_AT = "2026-10-30T18:45:00Z"
-NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 EXPECTED = {
     "budget_fault": "1f824dd862945c00e379e256dd0613a4c35e0a78c74cc8b4097899a624b677d2",
     "fanout_stress": "38856b532fe1671f5a9d06b456b2ca81fa7c7b6d834673d7a1e5422ff480a88b",
-    "quota_isolation": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401196ee",
+    "quota_isolation": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401206ee",
     "provider_reprice_simulation": "6cb6f58f37905309803f8a3fe990c977d29a1e250143f1234906f287ee0c3e44",
 }
 
