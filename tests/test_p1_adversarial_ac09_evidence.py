@@ -28,6 +28,7 @@ def test_ac09_candidate_covers_exact_required_modes() -> None:
     candidate = report["candidate"]
 
     assert report["axis_id"] == AXIS_ID == "AC-09"
+    assert report["engine"] == "p1-adversarial-ac09-evidence-v1"
     assert report["candidate_count"] == 1
     assert report["already_bound_count"] == 0
     assert report["candidate_binding_count"] == 1
