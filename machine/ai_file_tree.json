@@ -40,7 +40,7 @@
       "source": "skeleton/providers/contract.py",
       "destination": "skeleton/ai/providers/contract.py",
       "kind": "file",
-      "source_git_object_sha": "be3aa103c948e93e327e0b57bea97db3953cc798",
+      "source_git_object_sha": "d8e812a92fe97a7a6ffec471caa2a8b4891fa067",
       "role": "Canonical provider-neutral request/receipt contract under skeleton/providers; mirrored into the governed AI providers surface.",
       "work_package_refs": [
         "WP-W00",
@@ -56,7 +56,8 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_provider_contract_with_legacy_root_shim"
+      "source_disposition": "canonical_provider_contract_with_legacy_root_shim",
+      "note": "Source and governed AI mirror remain byte-identical and register both import paths to one module identity before contract classes are defined."
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
