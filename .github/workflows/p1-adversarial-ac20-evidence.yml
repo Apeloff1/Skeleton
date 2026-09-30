@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - p1/bulk-volume-obligation-bindings-20260930
+      - p1/adversarial-ac20-evidence-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
@@ -30,6 +31,7 @@ on:
       - "scripts/check_ai_execution_frontier.py"
       - "scripts/build_p1_adversarial_ac20_evidence.py"
       - "tests/test_p1_adversarial_ac20_evidence.py"
+      - "tests/test_p1_adversarial_ac20_binding.py"
       - ".github/workflows/p1-adversarial-ac20-evidence.yml"
   workflow_dispatch:
 
@@ -106,6 +108,7 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_ai_adversarial_closure.py
           tests/test_p1_adversarial_ac20_evidence.py
+          tests/test_p1_adversarial_ac20_binding.py
           tests/test_p1_bulk_volume_obligation_bindings.py
           tests/test_p1_risk_evidence_reconciliation.py
 
@@ -139,6 +142,12 @@ jobs:
               raise SystemExit("wrong adversarial axis")
           if report["candidate_count"] != 1:
               raise SystemExit("AC-20 candidate count drift")
+          if report["already_bound_count"] != 1:
+              raise SystemExit("AC-20 governed binding not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("AC-20 unexpectedly remains a binding candidate")
+          if candidate["binding_present"] is not True:
+              raise SystemExit("AC-20 candidate does not detect governed binding")
           if set(candidate["required_evidence_modes"]) != expected_modes:
               raise SystemExit("AC-20 required evidence modes drift")
           if {row["category"] for row in candidate["evidence"]} != expected_modes:
@@ -174,7 +183,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier remains 489 resolved and 24 blocking
+      - name: Confirm governed frontier is 490 resolved and 23 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac20/reconciliation.json             --print-summary
@@ -185,17 +194,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac20/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 489:
+          if report["binding_count"] != 490:
               raise SystemExit("AC-20 verifier mutated binding count")
-          if report["resolved_count"] != 489:
+          if report["resolved_count"] != 490:
               raise SystemExit("AC-20 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 24:
+          if report["unresolved_blocking_count"] != 23:
               raise SystemExit("AC-20 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-20 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 489,
-              "unbound": 24,
+              "evidence": 490,
+              "unbound": 23,
           }:
               raise SystemExit("AC-20 verifier mutated disposition counts")
           PY
