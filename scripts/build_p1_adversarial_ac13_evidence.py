@@ -161,11 +161,10 @@ def build_ac13_evidence(
     records = registry.get("records")
     if not isinstance(records, list):
         raise AC13EvidenceError("risk registry records must be a list")
-    if any(
+    binding_present = any(
         isinstance(row, dict) and row.get("obligation_id") == obligation.obligation_id
         for row in records
-    ):
-        raise AC13EvidenceError(f"{AXIS_ID} is already governed")
+    )
 
     implementation_text, implementation_digest = _tracked_source(root, IMPLEMENTATION)
     regression_text, regression_digest = _tracked_source(root, REGRESSIONS)

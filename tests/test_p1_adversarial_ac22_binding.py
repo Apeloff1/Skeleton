@@ -16,22 +16,22 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-AXIS_ID = "AC-13"
-OBLIGATION_ID = "P1-ADVERSARIAL-AC-13-0765da9a17a8326d"
-OBLIGATION_DIGEST = "c35d0b3a1ae2045b89199ed6132937c23f6fbbac52dc3c492aeeeef508c3e735"
+AXIS_ID = "AC-22"
+OBLIGATION_ID = "P1-ADVERSARIAL-AC-22-0debb8ba51d7d7f2"
+OBLIGATION_DIGEST = "c62c08156de317799383d67f24efc9a9e4ed1932b5a255005f2708b2672271bd"
 OWNER_ID = "ACC-P1-EVID-04"
-VERIFIER_HEAD = "8435144dcee7fcb087ad9806504d2d38c9094147"
-VERIFIER_RUN_ID = 36763669209
-VERIFIER_JOB_ID = 110052302630
-BOUND_AT = "2026-09-30T19:20:00Z"
-REVIEW_AT = "2026-10-30T19:20:00Z"
+VERIFIER_HEAD = "2951c036fbe297dabc19f9021c008d6b69b7b5fe"
+VERIFIER_RUN_ID = 36766395171
+VERIFIER_JOB_ID = 110061859992
+ENVIRONMENT_MANIFEST_DIGEST = "6aa7bce943d27979295bbb754f4c6f8c07809eab6cea9ad034c5b310db9f4c10"
+BOUND_AT = "2026-09-30T19:40:00Z"
+REVIEW_AT = "2026-10-30T19:40:00Z"
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
-
 EXPECTED = {
-    "fuzz": "9d61662c531f7df2bde6f4781f67bb4eb055f8987bf1ffd091b0fc5ba31536e4",
-    "parser_limits": "9d1eb214a068510b06399c1dde76fe6ad00731ff3486bf64ffe245f6e95f83c1",
-    "decompression_bomb": "f5d3d691340ce80e0564ae744b6959d469d50c468b057b368a6858d461197021",
-    "complexity_budget": "58a85997b9cff610e15f6c05370083536d4d9628ea5a62fda562d48ebe594fe9",
+    "hermetic_build": "2d6af66d7de19fe59ecdbeb530417c32f7b8f3898fabf3c03ecc789b52ec2e7c",
+    "environment_replay": "7e9ef4b551d9aab65a18002220b95cd9500947441228d32617de541749a200cc",
+    "cross_environment_reproduction": "ada856cd69b83dbb4d8cae575b69dc0bb4ba59d690b552fa2282293a096f4a2f",
+    "dependency_lock_check": "253686df4a0c6833bcb5ae45643376a1b696470edcd23cd43a895301e94ab3a9",
 }
 
 
@@ -66,12 +66,12 @@ def _obligation():
     return rows[0]
 
 
-def test_ac13_binding_pins_exact_head_evidence_receipt() -> None:
+def test_ac22_binding_pins_successful_cross_environment_verifier() -> None:
     row = _binding()
 
-    assert VERIFIER_RUN_ID == 36763669209
-    assert VERIFIER_JOB_ID == 110052302630
-
+    assert VERIFIER_RUN_ID == 36766395171
+    assert VERIFIER_JOB_ID == 110061859992
+    assert len(ENVIRONMENT_MANIFEST_DIGEST) == 64
     assert row["obligation_id"] == OBLIGATION_ID
     assert row["obligation_digest"] == OBLIGATION_DIGEST
     assert row["owner_id"] == OWNER_ID
@@ -84,14 +84,15 @@ def test_ac13_binding_pins_exact_head_evidence_receipt() -> None:
     by_category = {item["category"]: item for item in row["evidence"]}
     assert set(by_category) == set(EXPECTED)
     for category, digest in EXPECTED.items():
-        assert by_category[category]["digest"] == digest
-        assert by_category[category]["source"] == (
-            f"p1:adversarial-ac13-evidence:{AXIS_ID}:"
+        evidence = by_category[category]
+        assert evidence["digest"] == digest
+        assert evidence["source"] == (
+            f"p1:adversarial-ac22-evidence:{AXIS_ID}:"
             f"{category}:{VERIFIER_HEAD}"
         )
 
 
-def test_ac13_binding_matches_live_canonical_obligation() -> None:
+def test_ac22_binding_matches_live_canonical_obligation() -> None:
     obligation = _obligation()
 
     assert obligation.obligation_id == OBLIGATION_ID
@@ -99,7 +100,7 @@ def test_ac13_binding_matches_live_canonical_obligation() -> None:
     assert set(obligation.required_evidence_modes) == set(EXPECTED)
 
 
-def test_ac13_binding_advances_frontier_without_risk_acceptance() -> None:
+def test_ac22_binding_advances_frontier_without_risk_acceptance() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["binding_count"] == 495
