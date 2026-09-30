@@ -8350,7 +8350,71 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-11-3d29c2151a6e3351",
+      "obligation_digest": "0c867539f12df396af4716514ff7abb81ba649ea020ccd285f99de27847a184a",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T18:45:00Z",
+      "review_at": "2026-10-30T18:45:00Z",
+      "evidence": [
+        {
+          "category": "semantic_canary",
+          "digest": "806c9b16e2361b498232189821337428d66da5ee00293024f853d15a7b4b745a",
+          "source": "p1:adversarial-ac11-evidence:AC-11:semantic_canary:9f7a70b8dda16e50d8c642165b0c90da9fed29db"
+        },
+        {
+          "category": "contract_probe",
+          "digest": "d57fc24f73d225383b70356364e9c9a2a22f7cbc0e7d6516a98b38b9f99a2d79",
+          "source": "p1:adversarial-ac11-evidence:AC-11:contract_probe:9f7a70b8dda16e50d8c642165b0c90da9fed29db"
+        },
+        {
+          "category": "drift_eval",
+          "digest": "d823da5c04ff8b1abb70f3415f4bc57a13874a4fcee43e95be1594bcee5006fc",
+          "source": "p1:adversarial-ac11-evidence:AC-11:drift_eval:9f7a70b8dda16e50d8c642165b0c90da9fed29db"
+        },
+        {
+          "category": "evidence_invalidation",
+          "digest": "2e003c962809a28c2901c732ddbd3147be2c62621316f9230747a570181ebd21",
+          "source": "p1:adversarial-ac11-evidence:AC-11:evidence_invalidation:9f7a70b8dda16e50d8c642165b0c90da9fed29db"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-15-f7f89f2c5b94ede2",
+      "obligation_digest": "f40e7b2b95b734e8fad7419baa251d47e9e05a3ec343f677d0a6e93fa7dab98d",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T18:45:00Z",
+      "review_at": "2026-10-30T18:45:00Z",
+      "evidence": [
+        {
+          "category": "budget_fault",
+          "digest": "1f824dd862945c00e379e256dd0613a4c35e0a78c74cc8b4097899a624b677d2",
+          "source": "p1:adversarial-ac15-evidence:AC-15:budget_fault:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "fanout_stress",
+          "digest": "38856b532fe1671f5a9d06b456b2ca81fa7c7b6d834673d7a1e5422ff480a88b",
+          "source": "p1:adversarial-ac15-evidence:AC-15:fanout_stress:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "quota_isolation",
+          "digest": "2b6a39fdb1f6ffa6f41edd55ca25c045770888e81c1d571ffe61a99c401206ee",
+          "source": "p1:adversarial-ac15-evidence:AC-15:quota_isolation:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        },
+        {
+          "category": "provider_reprice_simulation",
+          "digest": "6cb6f58f37905309803f8a3fe990c977d29a1e250143f1234906f287ee0c3e44",
+          "source": "p1:adversarial-ac15-evidence:AC-15:provider_reprice_simulation:32d7f55345db9f081ed8c6a8adb72a7012489e27"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. The 489 P1 volume obligations plus AC-20, AC-11, and AC-15 are evidence-bound; remaining adversarial axes stay blocking until their required evidence modes are independently verified."
 }
