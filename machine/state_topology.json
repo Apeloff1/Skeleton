@@ -197,19 +197,20 @@
     },
     {
       "id": "snapshot-files",
-      "technology": "JSON files",
+      "technology": "JSON and JSONL files",
       "runtime_service": null,
       "compose_file": null,
       "volumes": [],
       "durability": "operator-local-opt-in",
-      "production_role": "manual recovery/debug snapshot aid",
+      "production_role": "manual recovery/debug snapshot aid and caller-owned local reference observations; never application authorization",
       "network": "filesystem only",
       "authentication": "filesystem/process boundary",
       "backup": "not a substitute for authoritative store backup",
       "restore": "explicit opt-in restore into memory planes",
       "migration": "snapshot format compatibility required before durable operational use",
       "evidence": [
-        "skeleton/persistence/snapshots.py"
+        "skeleton/persistence/snapshots.py",
+        "skeleton/cortex/reference_provenance.py"
       ]
     },
     {
@@ -868,6 +869,32 @@
         "skeleton/vault/lifecycle_adapters.py"
       ],
       "gap": "gap-memory-durable-authority"
+    },
+    {
+      "id": "local-reference-provenance",
+      "owner_plane": "observability",
+      "physical_store": "snapshot-files",
+      "logical_location": "<selected workspace>/.skeleton/references/provenance.jsonl; current workspace by default",
+      "authority": "conditional-authoritative",
+      "source_of_truth": true,
+      "status": "local-observations-only",
+      "data_classes": [
+        "internal"
+      ],
+      "transaction_scope": "one bounded JSONL append and fsync under a process-local lock; one owning process per journal",
+      "consistency": "source of truth only for locally recorded reference observations, not user memory, model authority or authorization; SHA-256 detects accidental edits and does not authenticate writers; readers verify all bounded records before returning any",
+      "retention": "operator-controlled; 8 MiB journal limit; explicit archive before continuing; never automatic truncation",
+      "backup_restore": "preserve operator-owned journals when observation history matters; read_provenance verifies framing/schema/checksums before use; failures preserve evidence and fail closed",
+      "migration": "historical skeleton/acquired/gaming/provenance.jsonl remains unchanged; no automatic import, relocation or mutation; caller must explicitly select workspace when restoring a reference port",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "skeleton/cortex/reference_provenance.py",
+        "skeleton/cortex/refs.py",
+        "skeleton/cortex/deck_interactions.py",
+        "skeleton/testing/test_reference_provenance.py",
+        "docs/architecture/REFERENCE_PROVENANCE.md"
+      ]
     }
   ],
   "state_flows": [
