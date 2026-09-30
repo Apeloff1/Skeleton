@@ -57,11 +57,63 @@ def _assert_acyclic(nodes: set[str], edges: dict[str, list[str]], label: str) ->
 
 def validate(root: Path) -> dict:
     master = _load(root, "machine/ai_master_plan.json")
+    sequence = _load(root, "machine/ai_master_build_sequence.json")
     p1 = _load(root, "machine/ai_p1_execution_map.json")
     p2 = _load(root, "machine/ai_p2_execution_map.json")
     backlog = _load(root, "machine/ai_p2_task_backlog.json")
 
-    master_refs = {v["key"] for v in master.get("volumes", [])}
+    master_volumes = {v["key"]: v for v in master.get("volumes", [])}
+    master_refs = set(master_volumes)
+    alignment = p2.get("masterplan_alignment", {})
+    if master.get("status") != "active":
+        raise P2ValidationError(f"masterplan must be active, got {master.get('status')!r}")
+    if alignment.get("required_plan_version") != master.get("plan_version"):
+        raise P2ValidationError("P2 required_plan_version must match the canonical masterplan")
+    if alignment.get("required_master_status") != master.get("status"):
+        raise P2ValidationError("P2 required_master_status must match the canonical masterplan")
+
+    freeze = master.get("breadth_freeze", {})
+    p2_freeze = alignment.get("breadth_freeze", {})
+    if freeze.get("enabled") is not True or freeze.get("last_top_level_volume") != 420:
+        raise P2ValidationError(f"canonical masterplan breadth freeze is not intact: {freeze!r}")
+    if p2_freeze.get("required_enabled") is not True:
+        raise P2ValidationError("P2 must require the masterplan breadth freeze")
+    if p2_freeze.get("last_top_level_volume") != freeze.get("last_top_level_volume"):
+        raise P2ValidationError("P2 breadth-freeze volume must match the masterplan")
+    if p2_freeze.get("exception_register") != freeze.get("exception_register"):
+        raise P2ValidationError("P2 breadth-freeze exception register must match the masterplan")
+    if p2_freeze.get("rule") != freeze.get("rule"):
+        raise P2ValidationError("P2 breadth-freeze rule must match the masterplan")
+
+    build_alignment = alignment.get("master_build_sequence", {})
+    build_depth = master.get("build_depth_sequence", {})
+    if build_alignment.get("contract") != build_depth.get("contract"):
+        raise P2ValidationError("P2 must reference the canonical master build sequence")
+    if build_alignment.get("required_wave_range") != build_depth.get("wave_range"):
+        raise P2ValidationError("P2 master-build wave range drift")
+    if build_alignment.get("required_wave_count") != build_depth.get("wave_count"):
+        raise P2ValidationError("P2 master-build wave count drift")
+    if build_alignment.get("completion_mode") != build_depth.get("completion_mode"):
+        raise P2ValidationError("P2 completion mode must remain derived from canonical accountability")
+    if build_alignment.get("rule") != build_depth.get("rule"):
+        raise P2ValidationError("P2 master-build rule drift")
+    waves = sequence.get("waves", [])
+    if len(waves) != build_depth.get("wave_count"):
+        raise P2ValidationError("canonical master build sequence wave count mismatch")
+    if [waves[0].get("id"), waves[-1].get("id")] != build_depth.get("wave_range"):
+        raise P2ValidationError("canonical master build sequence range mismatch")
+
+    maturity_alignment = alignment.get("maturity_policy", {})
+    maturity = master.get("volume_maturity_policy", {})
+    if maturity_alignment.get("promotion_rule") != maturity.get("promotion_rule"):
+        raise P2ValidationError("P2 masterplan promotion rule drift")
+    if maturity_alignment.get("anti_shortcut") != maturity.get("anti_shortcut"):
+        raise P2ValidationError("P2 masterplan anti-shortcut rule drift")
+    if not alignment.get("inheritance_rule"):
+        raise P2ValidationError("P2 masterplan inheritance rule is required")
+    if not alignment.get("completion_rule"):
+        raise P2ValidationError("P2 masterplan completion rule is required")
+
     p1_deferred = p1.get("scope_summary", {}).get("deferred_volume_refs", [])
     p2_source = p2.get("source_scope", {}).get("volume_refs", [])
 
@@ -124,6 +176,55 @@ def validate(root: Path) -> dict:
     outside = sorted(set(owned_refs) - set(p2_source))
     if outside:
         raise P2ValidationError(f"task owns non-P2 volumes: {outside}")
+
+    obligation_fields = (
+        "title",
+        "depth_pass",
+        "accountability_id",
+        "implementation_status",
+        "completion_checkbox",
+        "signing_required",
+        "contracts",
+        "risks",
+        "gaps",
+    )
+    for task in tasks:
+        refs = task.get("primary_volume_refs", [])
+        obligations = task.get("masterplan_obligations")
+        if not isinstance(obligations, list) or len(obligations) != len(refs):
+            raise P2ValidationError(
+                f"task {task['task_id']} must inherit one masterplan obligation per primary volume"
+            )
+        obligation_by_ref = {}
+        for obligation in obligations:
+            if not isinstance(obligation, dict):
+                raise P2ValidationError(f"task {task['task_id']} has malformed masterplan obligation")
+            ref = obligation.get("volume_ref")
+            if ref in obligation_by_ref:
+                raise P2ValidationError(
+                    f"task {task['task_id']} duplicates masterplan obligation {ref}"
+                )
+            obligation_by_ref[ref] = obligation
+        if set(obligation_by_ref) != set(refs):
+            raise P2ValidationError(
+                f"task {task['task_id']} masterplan obligation refs must equal primary refs"
+            )
+        for ref in refs:
+            canonical = master_volumes[ref]
+            inherited = obligation_by_ref[ref]
+            for field in obligation_fields:
+                if inherited.get(field) != canonical.get(field):
+                    raise P2ValidationError(
+                        f"task {task['task_id']} narrows/drifts masterplan {ref}.{field}"
+                    )
+            if canonical.get("completion_checkbox") is not False:
+                raise P2ValidationError(
+                    f"scheduled masterplan volume {ref} is already completion-checked"
+                )
+            if canonical.get("signing_required") is not True:
+                raise P2ValidationError(
+                    f"scheduled masterplan volume {ref} must preserve signing requirement"
+                )
 
     for task in tasks:
         if task.get("completion_checkbox") is not False:
