@@ -15,13 +15,13 @@
  *                          (defers non-critical effects).
  */
 import React from 'react';
-import { InteractionManager } from 'react-native';
-
 
 const requestIdleTask = (callback: () => void) => {
   const id = setTimeout(callback, 0);
   return { cancel: () => clearTimeout(id) };
-};import api, { ApiResult } from '../utils/apiClient';
+};
+
+import api, { ApiResult } from '../utils/apiClient';
 
 export function useIsMounted() {
   const ref = React.useRef(true);
