@@ -120,6 +120,22 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
                 "test_completion_payload_substitution_blocks_commit",
             ),
         ),
+        (
+            "skeleton/security/outbound_url.py",
+            (
+                "ResolvedDestination",
+                "resolve_public_https_url",
+                "validate_connected_peer",
+            ),
+        ),
+        (
+            "skeleton/security/outbound_http.py",
+            (
+                "validate_connected_peer",
+                "response.peer_address",
+                "connected peer evidence rejected",
+            ),
+        ),
     ),
     "path_network_adversarial": (
         (
@@ -165,6 +181,22 @@ PROOFS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
                 "Validate remote worker trust and fencing",
                 "test_remote_execution_protocol.py",
                 "Emit exact-head DIST-01 evidence receipt",
+            ),
+        ),
+        (
+            "skeleton/testing/test_outbound_url_resolution_security.py",
+            (
+                "test_mixed_dns_answer_with_any_private_address_fails_closed",
+                "test_connect_time_peer_must_match_approved_resolution_snapshot",
+                "test_redirect_revalidates_and_rejects_origin_or_security_change",
+            ),
+        ),
+        (
+            "skeleton/testing/test_security_outbound_http.py",
+            (
+                "test_mixed_public_private_dns_evidence_is_rejected_before_transport",
+                "test_redirect_cannot_change_security_boundary_by_default",
+                "test_body_is_not_consumed_when_peer_evidence_fails",
             ),
         ),
     ),
