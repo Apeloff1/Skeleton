@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -130,8 +131,7 @@ def test_ac15_quota_isolation_prevents_noisy_tenant_from_consuming_peer_budget()
     assert ledger.snapshot("tenant-b")["reserved"]["cost_usd"] == pytest.approx(0.5)
 
 
-@pytest.mark.asyncio
-async def test_ac15_provider_reprice_simulation_fails_before_provider_io() -> None:
+def test_ac15_provider_reprice_simulation_fails_before_provider_io() -> None:
     class Responses:
         def __init__(self) -> None:
             self.calls: list[dict] = []
@@ -173,7 +173,7 @@ async def test_ac15_provider_reprice_simulation_fails_before_provider_io() -> No
         ProviderPolicyError,
         match="request denied by resource admission",
     ):
-        await adapter.generate(repriced)
+        asyncio.run(adapter.generate(repriced))
 
     assert responses.calls == []
     assert adapter.admission_runtime.snapshot()["active_operations"] == ()
