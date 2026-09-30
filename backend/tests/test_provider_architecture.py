@@ -176,3 +176,14 @@ def test_backend_provider_facade_reexports_engine_runtime() -> None:
     assert BackendOpenAIProviderAdapter is EngineOpenAIProviderAdapter
     assert BackendProviderRegistry is EngineProviderRegistry
     assert BackendProviderRequest is EngineProviderRequest
+
+
+def test_provider_architecture_exception_identity_is_canonical() -> None:
+    import core.provider_architecture as backend_contract
+    import skeleton.provider_runtime as runtime
+    import skeleton.providers.contract as canonical_contract
+
+    assert backend_contract.ProviderArchitectureError is canonical_contract.ProviderArchitectureError
+    assert runtime.ProviderArchitectureError is canonical_contract.ProviderArchitectureError
+    assert backend_contract.ProviderArchitectureReceipt is canonical_contract.ProviderArchitectureReceipt
+    assert runtime.ProviderArchitectureReceipt is canonical_contract.ProviderArchitectureReceipt

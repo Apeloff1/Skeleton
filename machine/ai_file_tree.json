@@ -53,10 +53,13 @@
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
-        "cutover:parity-ready"
+        "cutover:owner-sensitive"
       ],
-      "move_batch": "B1-core-runtime",
-      "source_disposition": "canonical_provider_contract_with_legacy_root_shim"
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "canonical_provider_contract_with_governed_ai_facade",
+      "note": "Provider-neutral class ownership remains at skeleton/providers/contract.py; the governed AI destination is a non-owning compatibility facade until explicit import/ownership cutover.",
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.providers.contract import"
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
@@ -5869,8 +5872,8 @@
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B1-core-runtime": 58,
-      "B3-owner-sensitive": 7,
+      "B1-core-runtime": 57,
+      "B3-owner-sensitive": 8,
       "B2-domain-build": 13,
       "B4-research-quarantine": 54,
       "B3-compat-convergence": 28

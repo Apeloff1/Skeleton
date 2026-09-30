@@ -32,8 +32,8 @@ def test_manifest_is_self_consistent():
     assert manifest.construction["interface_registry"] == "machine/capability_interfaces.json"
     assert manifest.construction["interface_validator"] == "scripts/check_capability_interfaces.py"
     assert manifest.construction["operation_contract"] == "skeleton/contracts/operation.py"
-    assert manifest.construction["stream_contract"] == "skeleton/frontier/operation_stream.py"
-    assert manifest.construction["stream_store"] == "skeleton/frontier/operation_stream_store.py"
+    assert manifest.construction["stream_contract"] == "skeleton/frontier/runtime/operation_stream.py"
+    assert manifest.construction["stream_store"] == "skeleton/frontier/runtime/operation_stream_store.py"
 
     for service in manifest.services:
         assert set(service.depends_on).issubset(manifest.service_names)

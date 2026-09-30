@@ -531,7 +531,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#0a0a14' },
-  bg: { ...StyleSheet.absoluteFillObject },
+  bg: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   center: {
     flex: 1,
     alignItems: 'center',

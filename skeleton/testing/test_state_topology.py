@@ -268,4 +268,4 @@ def test_local_reference_provenance_declares_executable_evidence() -> None:
     }
     assert expected <= set(domain["evidence"])
     for relative in expected:
-        assert (REPO_ROOT / relative).exists()
+        assert (ROOT / relative).exists()

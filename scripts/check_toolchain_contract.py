@@ -15,6 +15,11 @@ NODE_VERSION = "24.20.0"
 UV_REQUIRED_VERSION = "==0.12.15"
 RUFF_CI_VERSION = "0.9.10"
 RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
+EXPO_SDK_VERSION = "~54.0.35"
+REACT_VERSION = "19.1.0"
+REACT_NATIVE_VERSION = "0.81.5"
+REACT_NATIVE_REANIMATED_VERSION = "~4.1.1"
+REACT_NATIVE_WORKLETS_VERSION = "0.5.1"
 
 PROCESS_TESTS = (
     "test_process_safety_gate.py",
@@ -223,6 +228,25 @@ def main() -> int:
     require(
         frontend.get("engines", {}).get("node") == ">=24",
         "frontend must require Node >=24",
+        failures,
+    )
+    frontend_deps = frontend.get("dependencies", {})
+    expected_frontend_matrix = {
+        "expo": EXPO_SDK_VERSION,
+        "react": REACT_VERSION,
+        "react-dom": REACT_VERSION,
+        "react-native": REACT_NATIVE_VERSION,
+        "react-native-reanimated": REACT_NATIVE_REANIMATED_VERSION,
+        "react-native-worklets": REACT_NATIVE_WORKLETS_VERSION,
+    }
+    actual_frontend_matrix = {
+        key: frontend_deps.get(key)
+        for key in expected_frontend_matrix
+    }
+    require(
+        actual_frontend_matrix == expected_frontend_matrix,
+        "Expo SDK 54 dependency matrix drifted: "
+        f"expected {expected_frontend_matrix!r}, got {actual_frontend_matrix!r}",
         failures,
     )
     for script in ("lint:ci", "typecheck", "export:web"):
