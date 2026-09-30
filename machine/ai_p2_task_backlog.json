@@ -24,7 +24,8 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": []
     },
     {
       "task_id": "P2-ARCH-01",
@@ -58,7 +59,242 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-002",
+          "title": "System Architecture",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-002",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ArchitectureNode",
+            "OwnershipZone",
+            "DependencyEdge",
+            "BoundaryRule"
+          ],
+          "risks": [
+            "documentation/runtime split brain",
+            "transitional roots becoming accidental owners",
+            "cyclic dependency growth"
+          ],
+          "gaps": [
+            "expand architecture fitness checks to all generated/runtime components",
+            "automate owner lookup for newly created paths"
+          ]
+        },
+        {
+          "volume_ref": "VOL-003",
+          "title": "Canonical Contract System",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-003",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ContractDescriptor",
+            "SchemaVersion",
+            "CompatibilityRule",
+            "CanonicalEncoding"
+          ],
+          "risks": [
+            "schema drift",
+            "privileged defaults from unknown values",
+            "cross-language round-trip divergence"
+          ],
+          "gaps": [
+            "materialize shared conformance vectors",
+            "complete producer/consumer inventory for every canonical contract"
+          ]
+        },
+        {
+          "volume_ref": "VOL-004",
+          "title": "Kernel & Execution Foundation",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-004",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "OperationEnvelope",
+            "ExecutionContext",
+            "LifecycleState",
+            "ServiceHealth"
+          ],
+          "risks": [
+            "orphan tasks",
+            "readiness before dependencies are usable",
+            "shutdown ordering data loss"
+          ],
+          "gaps": [
+            "unify service supervision semantics across backend and engine",
+            "expand cancellation propagation coverage into all connectors"
+          ]
+        },
+        {
+          "volume_ref": "VOL-051",
+          "title": "Repository Architecture",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-051",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "RepositoryZone",
+            "OwnershipRule",
+            "MigrationDisposition"
+          ],
+          "risks": [
+            "competing canonical roots",
+            "dependency cycles",
+            "stale compatibility mirror"
+          ],
+          "gaps": [
+            "bind all AI roots to one ownership graph",
+            "materialize relocation parity gate"
+          ]
+        },
+        {
+          "volume_ref": "VOL-052",
+          "title": "Internal Python Architecture",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-052",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "PythonPackageLayer",
+            "DependencyRule",
+            "AdapterBoundary"
+          ],
+          "risks": [
+            "circular imports",
+            "import-time mutation",
+            "framework leakage"
+          ],
+          "gaps": [
+            "define package layer manifest",
+            "add import graph fitness test"
+          ]
+        },
+        {
+          "volume_ref": "VOL-053",
+          "title": "Import Architecture",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-053",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ImportRootPolicy",
+            "OptionalDependency",
+            "PluginImportContract"
+          ],
+          "risks": [
+            "module shadowing",
+            "environment-dependent imports",
+            "optional dependency drift"
+          ],
+          "gaps": [
+            "remove remaining path hacks",
+            "materialize packaged-wheel import test"
+          ]
+        },
+        {
+          "volume_ref": "VOL-054",
+          "title": "Machine Architecture Manifests",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-054",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ArchitectureManifest",
+            "CapabilityDescriptor",
+            "ManifestReference"
+          ],
+          "risks": [
+            "manifest drift",
+            "dangling path/reference",
+            "schema downgrade"
+          ],
+          "gaps": [
+            "unify manifest reference validation",
+            "bind generated docs to manifest digests"
+          ]
+        },
+        {
+          "volume_ref": "VOL-055",
+          "title": "Architecture Linter",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-055",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ArchitectureRule",
+            "ArchitectureViolation",
+            "ArchitectureWaiver"
+          ],
+          "risks": [
+            "silent rule gaps",
+            "waiver permanence",
+            "non-deterministic diagnostics"
+          ],
+          "gaps": [
+            "define rule registry",
+            "add waiver expiry enforcement"
+          ]
+        },
+        {
+          "volume_ref": "VOL-058",
+          "title": "ADR Program",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-058",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ADR",
+            "ADRSupersession",
+            "ADRImpact"
+          ],
+          "risks": [
+            "undocumented architecture change",
+            "stale ADR authority",
+            "missing impact analysis"
+          ],
+          "gaps": [
+            "create canonical ADR index schema",
+            "bind cross-cutting changes to ADR check"
+          ]
+        },
+        {
+          "volume_ref": "VOL-116",
+          "title": "Architecture Fitness Functions",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-116",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "FitnessFunction",
+            "FitnessViolation",
+            "FitnessWaiver"
+          ],
+          "risks": [
+            "stale fitness rule",
+            "broad exemption",
+            "false green"
+          ],
+          "gaps": [
+            "unify architecture check registry",
+            "bind rules to ADR/ownership"
+          ]
+        }
+      ]
     },
     {
       "task_id": "P2-TRACE-01",
@@ -94,7 +330,275 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-112",
+          "title": "Master Traceability Matrix",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-112",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "TraceNode",
+            "TraceEdge",
+            "TraceabilityMatrix"
+          ],
+          "risks": [
+            "dangling lineage",
+            "stale edges",
+            "false completeness"
+          ],
+          "gaps": [
+            "materialize canonical trace graph",
+            "bind PR impact checks to trace edges"
+          ]
+        },
+        {
+          "volume_ref": "VOL-113",
+          "title": "Capability Map",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-113",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CapabilityId",
+            "CapabilityDescriptor",
+            "CapabilityAvailability"
+          ],
+          "risks": [
+            "false capability advertising",
+            "stale dependency",
+            "silent degraded fallback"
+          ],
+          "gaps": [
+            "unify capability descriptors",
+            "bind runtime discovery to registry"
+          ]
+        },
+        {
+          "volume_ref": "VOL-122",
+          "title": "Requirements Engineering",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-122",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "Requirement",
+            "RequirementChange",
+            "RequirementAcceptance"
+          ],
+          "risks": [
+            "untestable requirements",
+            "conflicting requirements"
+          ],
+          "gaps": [
+            "materialize canonical requirement IDs",
+            "bind requirements to tests/evidence"
+          ]
+        },
+        {
+          "volume_ref": "VOL-123",
+          "title": "Non-Functional Requirements",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-123",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "NFR",
+            "NFRBudget",
+            "NFRMeasurement"
+          ],
+          "risks": [
+            "unmeasured targets",
+            "conflicting budgets"
+          ],
+          "gaps": [
+            "bind all production claims to NFR IDs",
+            "materialize measurement harnesses"
+          ]
+        },
+        {
+          "volume_ref": "VOL-124",
+          "title": "Capability Taxonomy",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-124",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CapabilityClass",
+            "CapabilityRelation",
+            "CapabilityTaxonomy"
+          ],
+          "risks": [
+            "duplicate capability concepts",
+            "taxonomy treated as runtime truth"
+          ],
+          "gaps": [
+            "normalize capability naming",
+            "map all volumes to capability classes"
+          ]
+        },
+        {
+          "volume_ref": "VOL-125",
+          "title": "Capability Maturity Model",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-125",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "MaturityState",
+            "PromotionEvidence",
+            "MaturityTransition"
+          ],
+          "risks": [
+            "status inflation",
+            "irreversible promotion"
+          ],
+          "gaps": [
+            "bind maturity to evidence digests",
+            "add automatic invalidation triggers"
+          ]
+        },
+        {
+          "volume_ref": "VOL-126",
+          "title": "Behavior Specifications",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-126",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "BehaviorSpec",
+            "Precondition",
+            "Postcondition"
+          ],
+          "risks": [
+            "implementation-shaped specs",
+            "missing negative behavior"
+          ],
+          "gaps": [
+            "define scenario schema",
+            "bind behaviors to requirement IDs"
+          ]
+        },
+        {
+          "volume_ref": "VOL-127",
+          "title": "State Machine Catalogue",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-127",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "StateMachine",
+            "StateTransition",
+            "StateInvariant"
+          ],
+          "risks": [
+            "implicit transitions",
+            "terminal resurrection"
+          ],
+          "gaps": [
+            "extract existing lifecycle machines",
+            "bind transition tests"
+          ]
+        },
+        {
+          "volume_ref": "VOL-128",
+          "title": "Interface Design Standard",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-128",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "InterfaceContract",
+            "InterfaceVersion",
+            "InterfaceError"
+          ],
+          "risks": [
+            "leaky abstractions",
+            "ambiguous cancellation"
+          ],
+          "gaps": [
+            "codify interface lint rules",
+            "bind public contracts to schema registry"
+          ]
+        },
+        {
+          "volume_ref": "VOL-129",
+          "title": "Schema Registry",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-129",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SchemaId",
+            "SchemaVersion",
+            "SchemaCompatibility"
+          ],
+          "risks": [
+            "schema drift",
+            "unknown field privilege escalation"
+          ],
+          "gaps": [
+            "inventory serialized contracts",
+            "materialize compatibility checker"
+          ]
+        },
+        {
+          "volume_ref": "VOL-130",
+          "title": "Compatibility Model",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-130",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CompatibilityRule",
+            "VersionWindow",
+            "DeprecationPolicy"
+          ],
+          "risks": [
+            "flag-day upgrade assumption",
+            "rollback incompatibility"
+          ],
+          "gaps": [
+            "bind schema/API versions to matrix",
+            "define support window policy"
+          ]
+        },
+        {
+          "volume_ref": "VOL-131",
+          "title": "Internal Protocols",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-131",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ProtocolEnvelope",
+            "ProtocolError",
+            "ProtocolDeadline"
+          ],
+          "risks": [
+            "duplicate command execution",
+            "deadline loss"
+          ],
+          "gaps": [
+            "unify protocol envelopes",
+            "bind protocols to tracing"
+          ]
+        }
+      ]
     },
     {
       "task_id": "P2-REPO-01",
@@ -131,7 +635,288 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-021",
+          "title": "Code Intelligence",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-021",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "RepositoryNode",
+            "SymbolRecord",
+            "DependencyRecord",
+            "ImpactQuery"
+          ],
+          "risks": [
+            "stale index",
+            "false dependency confidence",
+            "generated/vendor code pollution"
+          ],
+          "gaps": [
+            "complete cross-language graph extraction",
+            "connect ownership/test mapping to change planner"
+          ]
+        },
+        {
+          "volume_ref": "VOL-022",
+          "title": "Autonomous Repository Engineering",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-022",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ChangePlan",
+            "EditLease",
+            "PatchReceipt",
+            "ReviewVerdict"
+          ],
+          "risks": [
+            "destructive edits",
+            "test gaming",
+            "merge races",
+            "self-review bias"
+          ],
+          "gaps": [
+            "transactional workspace layer incomplete",
+            "independent reviewer/verifier routing needs full integration"
+          ]
+        },
+        {
+          "volume_ref": "VOL-092",
+          "title": "Repository Maintenance",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-092",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "MaintenanceTask",
+            "RepositoryOwnership",
+            "MaintenanceReceipt"
+          ],
+          "risks": [
+            "destructive cleanup",
+            "bot churn",
+            "orphan ownership"
+          ],
+          "gaps": [
+            "define maintenance ownership registry",
+            "bind deletion to reachability/retention checks"
+          ]
+        },
+        {
+          "volume_ref": "VOL-093",
+          "title": "Backlog Control",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-093",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "BacklogItem",
+            "BacklogDependency",
+            "BacklogDisposition"
+          ],
+          "risks": [
+            "duplicate work",
+            "orphan tasks",
+            "status inflation"
+          ],
+          "gaps": [
+            "establish canonical backlog IDs",
+            "bind backlog to gap/risk closure"
+          ]
+        },
+        {
+          "volume_ref": "VOL-094",
+          "title": "Priority Engine",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-094",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "PriorityInput",
+            "PriorityDecision",
+            "PriorityConstraint"
+          ],
+          "risks": [
+            "critical blocker starvation",
+            "metric gaming",
+            "oscillating priorities"
+          ],
+          "gaps": [
+            "define priority factor schema",
+            "add anti-starvation constraints"
+          ]
+        },
+        {
+          "volume_ref": "VOL-095",
+          "title": "Build Work Packages",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-095",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorkPackage",
+            "WorkPackageDependency",
+            "WorkPackageEvidence"
+          ],
+          "risks": [
+            "oversized package",
+            "hidden dependency",
+            "manual completion claim"
+          ],
+          "gaps": [
+            "bind all packages to exact requirements",
+            "materialize package evidence rollup"
+          ]
+        },
+        {
+          "volume_ref": "VOL-108",
+          "title": "Anti-Patterns",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-108",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AntiPattern",
+            "AntiPatternFinding",
+            "AntiPatternException"
+          ],
+          "risks": [
+            "prose-only guidance",
+            "exception normalization",
+            "false-positive detector fatigue"
+          ],
+          "gaps": [
+            "seed registry from historical failures",
+            "bind detectable patterns to CI"
+          ]
+        },
+        {
+          "volume_ref": "VOL-109",
+          "title": "Build Order",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-109",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "BuildOrder",
+            "BuildDependency",
+            "BuildStopCondition"
+          ],
+          "risks": [
+            "hidden cycle",
+            "premature downstream promotion",
+            "stale sequence"
+          ],
+          "gaps": [
+            "bind every AIQ task into construction DAG",
+            "materialize cycle/blocked-state reporting"
+          ]
+        },
+        {
+          "volume_ref": "VOL-110",
+          "title": "Definition of Done",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-110",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DefinitionOfDone",
+            "DoDRequirement",
+            "CompletionEvidence"
+          ],
+          "risks": [
+            "checkbox completion",
+            "evidence omission",
+            "scope-dependent requirement lost"
+          ],
+          "gaps": [
+            "unify maturity and DoD rules",
+            "bind change-impact triggers to DoD"
+          ]
+        },
+        {
+          "volume_ref": "VOL-115",
+          "title": "Technical Debt Ledger",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-115",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DebtItem",
+            "DebtImpact",
+            "DebtRetirement"
+          ],
+          "risks": [
+            "unowned debt",
+            "debt inflation",
+            "unsafe cleanup"
+          ],
+          "gaps": [
+            "establish debt IDs and ownership",
+            "bind debt to risk/backlog/ADR"
+          ]
+        },
+        {
+          "volume_ref": "VOL-118",
+          "title": "Roadmap Control",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-118",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "RoadmapItem",
+            "RoadmapDependency",
+            "RoadmapRevision"
+          ],
+          "risks": [
+            "schedule fiction",
+            "hidden scope growth",
+            "lost revision rationale"
+          ],
+          "gaps": [
+            "bind roadmap to build DAG",
+            "materialize revision lineage"
+          ]
+        },
+        {
+          "volume_ref": "VOL-119",
+          "title": "Completion Model",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-119",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CompletionState",
+            "CompletionRollup",
+            "CompletionBlocker"
+          ],
+          "risks": [
+            "manual status drift",
+            "averaged-away blocker",
+            "double counting"
+          ],
+          "gaps": [
+            "implement canonical rollup function",
+            "bind UI progress to derived completion only"
+          ]
+        }
+      ]
     },
     {
       "task_id": "P2-QUAL-01",
@@ -159,7 +944,101 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-070",
+          "title": "Quality Vector",
+          "depth_pass": "DP-041-080",
+          "accountability_id": "ACC-VOL-070",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "QualityVector",
+            "QualityDimension",
+            "QualityThreshold"
+          ],
+          "risks": [
+            "aggregate score hides failure",
+            "metric correlation bias",
+            "threshold drift"
+          ],
+          "gaps": [
+            "bind dimensions to eval suites",
+            "define non-compensable failure rules"
+          ]
+        },
+        {
+          "volume_ref": "VOL-081",
+          "title": "Formal Methods",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-081",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "FormalSpecification",
+            "ProofObligation",
+            "Counterexample"
+          ],
+          "risks": [
+            "spec/code drift",
+            "state explosion",
+            "proof overclaim"
+          ],
+          "gaps": [
+            "select P0 formal targets",
+            "establish model-to-code traceability"
+          ]
+        },
+        {
+          "volume_ref": "VOL-117",
+          "title": "Project Metrics",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-117",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ProjectMetric",
+            "MetricObservation",
+            "MetricDefinition"
+          ],
+          "risks": [
+            "vanity metrics",
+            "Goodhart effects",
+            "stale denominator"
+          ],
+          "gaps": [
+            "define metric registry",
+            "bind progress percentages to traceable state"
+          ]
+        },
+        {
+          "volume_ref": "VOL-120",
+          "title": "Final Assembly Test",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-120",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "FinalAssemblyPlan",
+            "FinalAssemblyRun",
+            "FinalAssemblyEvidence"
+          ],
+          "risks": [
+            "integration-only failure",
+            "environment mismatch",
+            "incomplete release evidence"
+          ],
+          "gaps": [
+            "materialize final assembly harness",
+            "bind release promotion to final evidence digest"
+          ]
+        }
+      ]
     },
     {
       "task_id": "P2-DOC-01",
@@ -185,7 +1064,55 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-089",
+          "title": "Documentation Engine",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-089",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "DocumentationSource",
+            "GeneratedSection",
+            "DocumentationCheck"
+          ],
+          "risks": [
+            "stale docs",
+            "generated overwrite",
+            "broken references"
+          ],
+          "gaps": [
+            "define generated-doc boundaries",
+            "materialize doc drift gate"
+          ]
+        },
+        {
+          "volume_ref": "VOL-090",
+          "title": "Generated Documentation",
+          "depth_pass": "DP-081-120",
+          "accountability_id": "ACC-VOL-090",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "GeneratedDocument",
+            "GeneratorIdentity",
+            "SourceDigestSet"
+          ],
+          "risks": [
+            "generated drift",
+            "review noise",
+            "manual derived edits"
+          ],
+          "gaps": [
+            "define generated artifact manifest",
+            "add regeneration cleanliness gate"
+          ]
+        }
+      ]
     },
     {
       "task_id": "P2-NATIVE-01",
@@ -211,7 +1138,58 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": []
+      "evidence_refs": [],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-032",
+          "title": "High-Performance Native Core",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-032",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "NativeCapability",
+            "ABIManifest",
+            "NativeCallResult"
+          ],
+          "risks": [
+            "undefined behavior",
+            "ABI drift",
+            "native crash corrupts process",
+            "silent numerical divergence"
+          ],
+          "gaps": [
+            "select acceleration targets by profiling evidence",
+            "expand isolation strategy for crash-prone native code"
+          ]
+        },
+        {
+          "volume_ref": "VOL-033",
+          "title": "Java / JVM Plane",
+          "depth_pass": "DP-000-040",
+          "accountability_id": "ACC-VOL-033",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "JvmCapability",
+            "JvmRequest",
+            "JvmResult",
+            "JvmRuntimeDescriptor"
+          ],
+          "risks": [
+            "classpath drift",
+            "GC pauses",
+            "serialization mismatch",
+            "duplicate runtime authority"
+          ],
+          "gaps": [
+            "identify workloads where JVM is actually beneficial",
+            "standardize protocol/version negotiation"
+          ]
+        }
+      ]
     }
   ],
   "summary": {
