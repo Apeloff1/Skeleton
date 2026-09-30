@@ -379,7 +379,211 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-000:risk:947b57f6b9-047ba09004303349",
+      "obligation_digest": "4531786454e5d1e82989a71e3f791fcf7368f5bc035113a42842be216bf6a8d8",
+      "owner_id": "ACC-VOL-000",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-000:risk:947b57f6b9-047ba09004303349:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "dde21edc83cb9b34acd543f0a737a22eb4a31191fd85d2babe60241277e9223a",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-000:risk:8a0e6cc591-ad0ad56c5a6d02c2",
+      "obligation_digest": "dff5d6c860383b3e655d41a4e78305cf8952b93440019ee3a84cb0013c4146d3",
+      "owner_id": "ACC-VOL-000",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-000:risk:8a0e6cc591-ad0ad56c5a6d02c2:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "35aade58460e1aba9a0b41e79b00b617c1113bc47f65dbd8c42aac2945d2c631",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-000:risk:6a720a8603-f539d90abe09b8bf",
+      "obligation_digest": "89c7026703a918b2c4e708294c44a2c6d1e189ca5a1bb79d6f11046a8faf6212",
+      "owner_id": "ACC-VOL-000",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-000:risk:6a720a8603-f539d90abe09b8bf:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "a36adc6e50d089e8b4f4034bb49fc6429e93d1e96a8901477e601b2a317ef4d4",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-038:risk:57039003e8-29e47fc7c41dc91b",
+      "obligation_digest": "57902e5c952132ee663ef279a254f9314cbddfaa365e036f2130ef79c5c1c2d1",
+      "owner_id": "ACC-VOL-038",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-038:risk:57039003e8-29e47fc7c41dc91b:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "167ec7b43f1df3f0f8532d35f68854315c1c49ce85b5b5000f87e35bd65e3b13",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-038:risk:6c8763dbe7-1303cab6d17bd5b8",
+      "obligation_digest": "62f1bde2568fc2b6625f43c7a7001e64078f537d07cad55ce070302f2913f0f6",
+      "owner_id": "ACC-VOL-038",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-038:risk:6c8763dbe7-1303cab6d17bd5b8:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "c06001d43484fac8f866b8f479b0688081473861119735e752dec4bd3b4f3be2",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-038:risk:7678e98834-42c2794c94e84d53",
+      "obligation_digest": "9103e4ee964ea46f2350bb53cc043fdea012c9847490d688e461a99fbe2331c3",
+      "owner_id": "ACC-VOL-038",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-038:risk:7678e98834-42c2794c94e84d53:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "2373c9f8f727245922e3c708a0910aafe5d54f6afd2547d2d4f518a16b52b8ad",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-056:risk:2022c8293c-22f89a3fd1f0e1c0",
+      "obligation_digest": "c2670a3c9fadec306b8b8830205bf2a0756c468fba4e34e7085a9368cf0470d2",
+      "owner_id": "ACC-VOL-056",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-056:risk:2022c8293c-22f89a3fd1f0e1c0:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "6ac60c14f2053485bbaa46be4d2fed44702552bcfed823aea2b532fe9f0f70eb",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-056:risk:33b74f9171-e831de5028cebb7b",
+      "obligation_digest": "fe3dd58158f106298bbd731edcf4a81b01b1eab4101b959d0a4668cd7254a847",
+      "owner_id": "ACC-VOL-056",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-056:risk:33b74f9171-e831de5028cebb7b:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "e06f578f6308693b6286264ab7f5d98ad129df376d23b93227441bea12081af9",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-056:risk:be5e15b86f-b936d9a800c95958",
+      "obligation_digest": "9a9b31ef90e2746dcb1f5728de4cc366788a84af78e69cfaf491b8ebafeab6aa",
+      "owner_id": "ACC-VOL-056",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-056:risk:be5e15b86f-b936d9a800c95958:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "fba1380cfe51a316584d8ca77670790645d8c5e50d306f20480ffab8ed328e16",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-057:risk:c99d0b6eef-d557975af885804d",
+      "obligation_digest": "4a682fbbd1864a0dae0e7f8354f1ba433a8f376d878aa6cbf24f4cc1e0b69eed",
+      "owner_id": "ACC-VOL-057",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-057:risk:c99d0b6eef-d557975af885804d:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "5ec43e571e18c2e4689a0712285d2e99ea366a68572db86057163aee4a5d1eae",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-057:risk:fa961d0ce2-d924d729e90b4dcf",
+      "obligation_digest": "14c5f6823a25ddee760c7d9d2a8b237a9788a1a45ae3961e1bd3db07b5334bd1",
+      "owner_id": "ACC-VOL-057",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-057:risk:fa961d0ce2-d924d729e90b4dcf:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "6ab1e5406561f97b27abeb2dab1f77ca9089af915469ed2930954b90cfe913fc",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-RISK-VOL-057:risk:a11b2c56e4-bee070e340b69ccf",
+      "obligation_digest": "55df2639ad38f7cbd1ad835ea485e7d3f5e38ed5bc2ce0b6ec6c8b7842fa714f",
+      "owner_id": "ACC-VOL-057",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T17:30:00Z",
+      "review_at": "2026-10-30T17:30:00Z",
+      "evidence": [
+        {
+          "source": "p1:risk-classification-evidence-batch1:P1-RISK-VOL-057:risk:a11b2c56e4-bee070e340b69ccf:a3925c5ac8e9b402bf92129fcec44688f09ebbfe",
+          "digest": "4f6ce32a492b3b3b00bafb1331146b80418fb1149b8fc316634714e578a4e471",
+          "category": "risk_control_evidence"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Batch 1 release-gap and batch 2 control-plane evidence remain independently regression-locked."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Risk classification batch 1 keeps all selected risks high-severity and evidence-resolved."
 }

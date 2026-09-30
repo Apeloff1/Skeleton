@@ -62,8 +62,8 @@ def test_live_batch_is_bounded_high_severity_and_non_authoritative() -> None:
     assert set(COVERAGE) == EXPECTED_RISKS
     assert report["covered_risk_count"] == 12
     assert report["covered_volume_count"] == 4
-    assert report["already_bound_count"] == 0
-    assert report["candidate_binding_count"] == 12
+    assert report["already_bound_count"] == 12
+    assert report["candidate_binding_count"] == 0
     assert report["recommended_severity"] == "high"
     assert report["recommended_disposition"] == "evidence"
     assert report["non_authoritative"] is True
@@ -76,7 +76,7 @@ def test_live_batch_is_bounded_high_severity_and_non_authoritative() -> None:
     rows = report["records"]
     assert {(row["volume_key"], row["statement"]) for row in rows} == EXPECTED_RISKS
     assert len({row["obligation_id"] for row in rows}) == 12
-    assert all(row["binding_present"] is False for row in rows)
+    assert all(row["binding_present"] is True for row in rows)
     assert all(row["recommended_severity"] == "high" for row in rows)
     assert all(row["recommended_disposition"] == "evidence" for row in rows)
     assert all(
@@ -131,6 +131,18 @@ def test_missing_contract_marker_fails_closed(tmp_path: Path) -> None:
 
 def test_canonical_risk_statement_drift_fails_closed(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
+    registry_path = root / REGISTRY
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["records"] = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] != "risk_control_evidence"
+    ]
+    registry_path.write_text(
+        json.dumps(registry, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     path = root / MASTER
     master = json.loads(path.read_text(encoding="utf-8"))
     volume = next(row for row in master["volumes"] if row["key"] == "VOL-000")
@@ -146,10 +158,23 @@ def test_canonical_risk_statement_drift_fails_closed(tmp_path: Path) -> None:
 
 def test_existing_binding_is_detected_without_rewrite(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
+    registry_path = root / REGISTRY
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["records"] = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] != "risk_control_evidence"
+    ]
+    registry_path.write_text(
+        json.dumps(registry, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     baseline = build_risk_classification_evidence(root, expected_head=HEAD)
+    assert baseline["already_bound_count"] == 0
+    assert baseline["candidate_binding_count"] == 12
     first = baseline["records"][0]
 
-    registry_path = root / REGISTRY
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     registry["records"].append({
         "obligation_id": first["obligation_id"],
