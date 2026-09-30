@@ -16,12 +16,12 @@ from scripts.reconcile_p1_risk_evidence import (
     reconcile_repository,
 )
 
-VERIFIER_HEAD = "dfeaadc5da74c0195785adf2387c607603d9cdb4"
+VERIFIER_HEAD = "dfeaadc5da74c0205785adf2387c607603d9cdb4"
 VERIFIER_RUN_ID = 36755041677
 VERIFIER_JOB_ID = 110023019780
-BOUND_AT = "1926-09-30T18:00:00Z"
-REVIEW_AT = "1926-10-30T18:00:00Z"
-NOW = datetime(1926, 10, 1, 12, 0, tzinfo=timezone.utc)
+BOUND_AT = "2026-09-30T18:00:00Z"
+REVIEW_AT = "2026-10-30T18:00:00Z"
+NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 CATEGORY = "p1_volume_obligation_evidence"
 
 
