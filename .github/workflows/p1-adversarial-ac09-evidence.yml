@@ -1,6 +1,9 @@
 name: P1 Adversarial AC-09 Evidence Gate
 
 on:
+  push:
+    branches:
+      - "p1/adversarial-ac09-evidence-*"
   pull_request:
     branches:
       - main
