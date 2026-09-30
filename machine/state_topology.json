@@ -892,7 +892,6 @@
         "skeleton/cortex/reference_provenance.py",
         "skeleton/cortex/refs.py",
         "skeleton/cortex/deck_interactions.py",
-        "skeleton/testing/test_reference_provenance.py",
         "docs/architecture/REFERENCE_PROVENANCE.md"
       ]
     }
