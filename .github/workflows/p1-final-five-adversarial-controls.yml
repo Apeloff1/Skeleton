@@ -1,0 +1,83 @@
+name: P1 Final Five Adversarial Controls
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/security/trust_roots.py"
+      - "skeleton/security/tenant_authority.py"
+      - "skeleton/release/external_restore.py"
+      - "skeleton/shells/break_glass.py"
+      - "skeleton/reliability/aging.py"
+      - "skeleton/ai/runtime/security/trust_roots.py"
+      - "skeleton/ai/runtime/security/tenant_authority.py"
+      - "skeleton/ai/runtime/reliability/aging.py"
+      - "skeleton/ai/runtime/kernel/keyholder.py"
+      - "skeleton/testing/test_trust_roots.py"
+      - "skeleton/testing/test_external_restore.py"
+      - "skeleton/testing/test_tenant_authority.py"
+      - "skeleton/testing/test_break_glass.py"
+      - "skeleton/testing/test_reliability_aging.py"
+      - ".github/workflows/p1-final-five-adversarial-controls.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-final-five-controls-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate final five adversarial controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+
+      - name: Compile control modules
+        run: >-
+          python -m compileall -q
+          skeleton/security/trust_roots.py
+          skeleton/security/tenant_authority.py
+          skeleton/release/external_restore.py
+          skeleton/shells/break_glass.py
+          skeleton/reliability/aging.py
+          skeleton/ai/runtime/security/trust_roots.py
+          skeleton/ai/runtime/security/tenant_authority.py
+          skeleton/ai/runtime/reliability/aging.py
+          skeleton/ai/runtime/kernel/keyholder.py
+
+      - name: Run final five regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_trust_roots.py
+          skeleton/testing/test_external_restore.py
+          skeleton/testing/test_tenant_authority.py
+          skeleton/testing/test_break_glass.py
+          skeleton/testing/test_reliability_aging.py
+          skeleton/testing/test_keyholder.py
+
+      - name: Validate canonical AI file tree parity
+        run: python scripts/check_ai_file_tree.py
