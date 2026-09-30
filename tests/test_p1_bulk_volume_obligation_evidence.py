@@ -93,7 +93,7 @@ def test_every_primary_volume_has_materialized_tracked_evidence_surfaces() -> No
             for surface in group:
                 assert surface["tracked_entry_count"] >= 1
                 assert len(surface["tracked_manifest_digest"]) == 64
-                assert surface["kind"] in {"file", "directory"}
+                assert surface["kind"] in {"file", "directory", "pathspec"}
 
         provenance = packet["provenance_classes"]
         assert provenance["git_head"] >= 1
