@@ -254,9 +254,6 @@ def build_ac09_evidence(
         and row.get("obligation_id") == obligation.obligation_id
         for row in raw_records
     )
-    if binding_present:
-        raise AC09EvidenceError(f"{AXIS_ID} is already governed")
-
     proofs: dict[str, dict[str, Any]] = {}
     evidence: list[dict[str, str]] = []
     for mode in EXPECTED_MODES:
