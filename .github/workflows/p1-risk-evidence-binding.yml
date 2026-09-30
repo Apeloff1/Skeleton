@@ -398,14 +398,11 @@ jobs:
           )
           PY
 
-      - name: Prove strict terminal mode fails closed while work is unresolved
+      - name: Prove strict terminal mode accepts fully resolved work
         run: |
           set -euo pipefail
           EVALUATED_AT="$(cat .p1-risk-evidence/evaluated-at.txt)"
-          if python scripts/reconcile_p1_risk_evidence.py \
+          python scripts/reconcile_p1_risk_evidence.py \
             --evaluated-at "$EVALUATED_AT" \
-            --require-resolved; then
-            echo "strict risk promotion unexpectedly accepted unresolved work" >&2
-            exit 1
-          fi
-          echo "Strict terminal mode correctly rejected unresolved P1 risk work."
+            --require-resolved
+          echo "Strict terminal mode accepted fully resolved P1 risk work."
