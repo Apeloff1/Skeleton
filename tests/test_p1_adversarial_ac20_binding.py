@@ -98,25 +98,25 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
     assert set(obligation.required_evidence_modes) == set(EXPECTED_EVIDENCE)
 
 
-def test_governed_frontier_is_494_resolved_19_adversarial() -> None:
+def test_governed_frontier_is_495_resolved_18_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 494
-    assert report["resolved_count"] == 494
-    assert report["unresolved_blocking_count"] == 19
+    assert report["binding_count"] == 495
+    assert report["resolved_count"] == 495
+    assert report["unresolved_blocking_count"] == 18
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 494,
-        "unbound": 19,
+        "evidence": 495,
+        "unbound": 18,
     }
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}
     unbound = [item for item in _obligations() if item.obligation_id not in bound]
 
-    assert len(unbound) == 19
+    assert len(unbound) == 18
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert AXIS_ID not in {item.source_ref for item in unbound}
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-13", "AC-14", "AC-15", AXIS_ID}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-22", AXIS_ID}
