@@ -167,7 +167,7 @@ PROOFS: dict[str, dict[str, tuple[ProofEntry, ...]]] = {
                 (
                     "class DurableOrphanScanner",
                     "DurableOrphanRecordState",
-                    "delete_safe",
+                    "safe_to_delete",
                 ),
             ),
             (
