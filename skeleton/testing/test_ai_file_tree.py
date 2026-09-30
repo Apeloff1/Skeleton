@@ -274,8 +274,24 @@ def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
 
     assert mappings["AIFT-APPLICATION"]["source"] == "skeleton/app/runtime"
     assert mappings["AIFT-BUILD-PLANNING"]["source"] == "skeleton/automation/shift_supervisor"
-    assert mappings["AIFT-AUTOMATION"]["source_exclusions"] == ["shift_supervisor"]
+    assert mappings["AIFT-PERSISTENCE"]["source_exclusions"] == ["core"]
+    assert mappings["AIFT-CONTEXT"]["source_exclusions"] == ["domains"]
+    assert mappings["AIFT-AUTOMATION"]["source_exclusions"] == [
+        "agents",
+        "hive",
+        "overseer",
+        "shift_supervisor",
+        "swarm",
+    ]
     assert mappings["AIFT-FOUNDATION"]["source_exclusions"] == ["architecture"]
+    assert mappings["AIFT-PROVENANCE"]["source_exclusions"] == ["chronicle"]
+    assert mappings["AIFT-KNOWLEDGE"]["source_exclusions"] == ["graphs"]
+    assert mappings["AIFT-TOOLS"]["source_exclusions"] == ["integrations"]
+    assert mappings["AIFT-DISTRIBUTED"]["source_exclusions"] == [
+        "galaxy",
+        "mesh",
+        "network",
+    ]
 
     aliases = {
         item["planned_path"]: item["implemented_path"]
