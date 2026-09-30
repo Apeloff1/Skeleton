@@ -44,7 +44,7 @@ EXPECTED_MODES = {
     "AC-18": {"reindex_rebuild", "compaction", "deletion_replay", "derived_data_invalidation"},
     "AC-24": {"pairwise_fault_matrix", "compound_chaos", "recovery_replay", "signed_fault_bundle"},
 }
-RESIDUAL = {"AC-01", "AC-08", "AC-10", "AC-21"}
+RESIDUAL = {"AC-10", "AC-21"}
 
 
 def _load(path: Path) -> dict:
@@ -93,13 +93,13 @@ def test_wave3_bindings_match_live_canonical_obligations() -> None:
         assert set(obligation.required_evidence_modes) == EXPECTED_MODES[axis_id]
 
 
-def test_wave3_bindings_advance_frontier_to_509_4_0() -> None:
+def test_wave3_bindings_advance_frontier_to_511_2_0() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
-    assert report["binding_count"] == 509
-    assert report["resolved_count"] == 509
-    assert report["unresolved_blocking_count"] == 4
+    assert report["binding_count"] == 511
+    assert report["resolved_count"] == 511
+    assert report["unresolved_blocking_count"] == 2
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {"evidence": 509, "unbound": 4}
+    assert report["disposition_counts"] == {"evidence": 511, "unbound": 2}
 
     registry = _load(ROOT / REGISTRY)
     bound = {row["obligation_id"] for row in registry["records"]}

@@ -152,7 +152,7 @@ jobs:
           )
           PY
 
-      - name: Confirm governed frontier remains 509 resolved and 4 blocking
+      - name: Confirm governed frontier remains 511 resolved and 2 blocking
         run: |
           set -euo pipefail
           python scripts/reconcile_p1_risk_evidence.py \
@@ -165,17 +165,17 @@ jobs:
           report = json.loads(
               Path(".p1-ac09/reconciliation.json").read_text(encoding="utf-8")
           )
-          if report["binding_count"] != 509:
+          if report["binding_count"] != 511:
               raise SystemExit("AC-09 verifier mutated binding count")
-          if report["resolved_count"] != 509:
+          if report["resolved_count"] != 511:
               raise SystemExit("AC-09 verifier mutated resolved count")
-          if report["unresolved_blocking_count"] != 4:
+          if report["unresolved_blocking_count"] != 2:
               raise SystemExit("AC-09 verifier mutated blocking count")
           if report["unclassified_count"] != 0:
               raise SystemExit("AC-09 verifier reintroduced unclassified risks")
           if report["disposition_counts"] != {
-              "evidence": 509,
-              "unbound": 4,
+              "evidence": 511,
+              "unbound": 2,
           }:
               raise SystemExit("AC-09 verifier mutated disposition counts")
           PY

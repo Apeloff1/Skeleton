@@ -65,7 +65,7 @@ jobs:
           tests/test_p1_adversarial_wave3_bindings.py
           tests/test_p1_risk_evidence_reconciliation.py
 
-      - name: Reconcile exact 509 resolved 4 blocking frontier
+      - name: Reconcile exact 511 resolved 2 blocking frontier
         run: |
           set -euo pipefail
           mkdir -p .p1-ac19-ac23-binding
@@ -80,9 +80,9 @@ jobs:
               )
           )
           expected = {
-              "binding_count": 509,
-              "resolved_count": 509,
-              "unresolved_blocking_count": 4,
+              "binding_count": 511,
+              "resolved_count": 511,
+              "unresolved_blocking_count": 2,
               "unclassified_count": 0,
           }
           for field, value in expected.items():
@@ -90,6 +90,6 @@ jobs:
                   raise SystemExit(
                       f"AC-19/AC-23 frontier drift: {field}={report[field]!r}"
                   )
-          if report["disposition_counts"] != {"evidence": 509, "unbound": 4}:
+          if report["disposition_counts"] != {"evidence": 511, "unbound": 2}:
               raise SystemExit("AC-19/AC-23 disposition frontier drift")
           PY

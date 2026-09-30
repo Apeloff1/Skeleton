@@ -8958,7 +8958,71 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-01-a8229f80cbb43d7c",
+      "obligation_digest": "7d467940f8a5792ae8672d4afe7617de5b3a60d1558f8dbf13a8152471add481",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:18:00Z",
+      "review_at": "2026-10-30T22:18:00Z",
+      "evidence": [
+        {
+          "category": "clean_machine_e2e",
+          "digest": "78892afd018913b33ec3ad3e5da2976283430f383d406b659120bfdd585d2fcd",
+          "source": "p1:adversarial-wave4-evidence:AC-01:clean_machine_e2e:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "trust_root_rotation",
+          "digest": "0fdb446237b2606ccf0eada73198e2b7c8ed06291f2888d0c9157e6cab6a30c6",
+          "source": "p1:adversarial-wave4-evidence:AC-01:trust_root_rotation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "bootstrap_fault_injection",
+          "digest": "e5d489c27558c560958102a053420f3988865394e05cf0a59d1b7e64e5b53258",
+          "source": "p1:adversarial-wave4-evidence:AC-01:bootstrap_fault_injection:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "recovery_drill",
+          "digest": "cae8710e47a94c7f17b6eec7564c817360332489498ed92d55619dd6e99f3b30",
+          "source": "p1:adversarial-wave4-evidence:AC-01:recovery_drill:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-ADVERSARIAL-AC-08-17b003d162aa15f0",
+      "obligation_digest": "d772b28ffe6bacfa91412e9b61dd1527291c59a0ceb1f674f8e3535d395e9318",
+      "owner_id": "ACC-P1-EVID-04",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T22:18:00Z",
+      "review_at": "2026-10-30T22:18:00Z",
+      "evidence": [
+        {
+          "category": "restore_drill",
+          "digest": "2e4b416e4a17aa6bbd285aa2a39bf349d1532759dd2dbb6cc3dda4155584791c",
+          "source": "p1:adversarial-wave4-evidence:AC-08:restore_drill:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "tombstone_propagation",
+          "digest": "0f1e4f3afdef4aa0a6eec7c14e575d674f21307c29f68a2e5ae80e88c6ab0a0f",
+          "source": "p1:adversarial-wave4-evidence:AC-08:tombstone_propagation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "external_reconciliation",
+          "digest": "506d8e744dcad6e9f8873deb906dcad7aefe3bb62906766e691f3ff70a5f4e9f",
+          "source": "p1:adversarial-wave4-evidence:AC-08:external_reconciliation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        },
+        {
+          "category": "credential_revalidation",
+          "digest": "9bc1c2b3cb7c7c1af348623245ef45ec4ac02fea886f3d93d5725f477df8e30b",
+          "source": "p1:adversarial-wave4-evidence:AC-08:credential_revalidation:7c3932ad71705ba0c6a95bf9bae620fa51866914"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-16, AC-17, AC-19, and AC-23 are governed from successful exact-head verifier receipts; AC-01, AC-08, AC-10, and AC-21 remain blocking."
+  "note": "Bindings are added only from materialized exact-head evidence or signed, time-bounded accepted-risk dispositions. AC-01 and AC-08 are governed from successful exact-head wave-4 receipts; only AC-10 and AC-21 remain blocking."
 }

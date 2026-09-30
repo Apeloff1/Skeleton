@@ -1,31 +1,33 @@
-name: P1 AC-16 Binding Gate
+name: P1 AC-01 AC-08 Binding Gate
 
 on:
   pull_request:
     branches:
       - main
-      - p1/closure-ac17-506-7-20260930
+      - p1/closure-ac19-ac23-509-4-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/p1_risk_evidence_bindings.json"
+      - "tests/test_p1_adversarial_ac01_ac08_binding.py"
+      - "tests/test_p1_adversarial_ac19_ac23_binding.py"
       - "tests/test_p1_adversarial_ac16_binding.py"
       - "tests/test_p1_adversarial_ac17_binding.py"
       - "tests/test_p1_adversarial_wave2_bindings.py"
       - "tests/test_p1_adversarial_wave3_bindings.py"
       - "tests/test_p1_risk_evidence_reconciliation.py"
-      - ".github/workflows/p1-ac16-binding.yml"
+      - ".github/workflows/p1-ac01-ac08-binding.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: p1-ac16-binding-${{ github.event.pull_request.number || github.ref }}
+  group: p1-ac01-ac08-binding-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: Verify governed AC-16 telemetry binding
+    name: Verify governed AC-01 and AC-08 bindings
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -54,9 +56,11 @@ jobs:
           -e .
           "pytest>=8,<9"
 
-      - name: Run AC-16 governed binding regressions
+      - name: Run governed binding regressions
         run: >-
           python -m pytest -q --noconftest
+          tests/test_p1_adversarial_ac01_ac08_binding.py
+          tests/test_p1_adversarial_ac19_ac23_binding.py
           tests/test_p1_adversarial_ac16_binding.py
           tests/test_p1_adversarial_ac17_binding.py
           tests/test_p1_adversarial_wave2_bindings.py
@@ -66,26 +70,39 @@ jobs:
       - name: Reconcile exact 511 resolved 2 blocking frontier
         run: |
           set -euo pipefail
-          mkdir -p .p1-ac16-binding
-          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac16-binding/reconciliation.json
+          mkdir -p .p1-ac01-ac08-binding
+          python scripts/reconcile_p1_risk_evidence.py             --evaluated-at "2026-10-01T12:00:00+00:00"             --out .p1-ac01-ac08-binding/reconciliation.json
           python - <<'PY'
           import json
           from pathlib import Path
 
           report = json.loads(
-              Path(".p1-ac16-binding/reconciliation.json").read_text(encoding="utf-8")
+              Path(".p1-ac01-ac08-binding/reconciliation.json").read_text(
+                  encoding="utf-8"
+              )
           )
-          expected_counts = {
+          expected = {
               "binding_count": 511,
               "resolved_count": 511,
               "unresolved_blocking_count": 2,
               "unclassified_count": 0,
           }
-          for field, expected in expected_counts.items():
-              if report[field] != expected:
+          for field, value in expected.items():
+              if report[field] != value:
                   raise SystemExit(
-                      f"AC-16 frontier drift: {field}={report[field]!r}"
+                      f"AC-01/AC-08 frontier drift: {field}={report[field]!r}"
                   )
           if report["disposition_counts"] != {"evidence": 511, "unbound": 2}:
-              raise SystemExit("AC-16 disposition frontier drift")
+              raise SystemExit("AC-01/AC-08 disposition frontier drift")
+
+          residual = {
+              row["obligation"]["source_ref"]
+              for row in report["records"]
+              if not row["evaluation"]["resolved"]
+              and row["obligation"]["kind"] == "adversarial"
+          }
+          if residual != {"AC-10", "AC-21"}:
+              raise SystemExit(
+                  f"AC-01/AC-08 residual axis drift: {sorted(residual)!r}"
+              )
           PY

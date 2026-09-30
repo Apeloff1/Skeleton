@@ -17,34 +17,31 @@ from scripts.reconcile_p1_risk_evidence import (
 )
 
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+VERIFIER_HEAD = "7c3932ad71705ba0c6a95bf9bae620fa51866914"
+VERIFIER_RUN_ID = 36784502045
+VERIFIER_JOB_ID = 110122546683
 RESIDUAL = {"AC-10", "AC-21"}
 EXPECTED = {
-    "AC-19": {
-        "obligation_id": "P1-ADVERSARIAL-AC-19-e54597c74279060f",
-        "obligation_digest": "92e62c90aa0f786e39dbde96c977092e43561393f0b11185175a1463fc4cacc7",
-        "verifier_head": "e0be4f30379fa99a31d6ec17234db21367257e8b",
-        "verifier_run_id": 36782752779,
-        "verifier_job_id": 110116782073,
-        "report_digest": "4843a9ef3a11b21392b88ca4e4052da099fc933b8126d80b9d919743ce289bf1",
+    "AC-01": {
+        "obligation_id": "P1-ADVERSARIAL-AC-01-a8229f80cbb43d7c",
+        "obligation_digest": "7d467940f8a5792ae8672d4afe7617de5b3a60d1558f8dbf13a8152471add481",
+        "report_digest": "fb01ba202132bdadded0ac4cc5af8517f0f52569110ddcb9bf9dc370caac6246",
         "modes": {
-            "break_glass_drill": "fa73d6ae5955cc6688de2e3fb959d60f1a40e8c1bb972d998b7bdf6bc82f0e0b",
-            "operator_error_simulation": "8c259684a65a98225ff7d5ff0fe54cd53e733828c7e18cd8f52be02eabdabcac",
-            "approval_fatigue": "a0369ba21158abfc6aa169a56021bac002251d212d16c8e2a89be2f108eda701",
-            "undo_recovery": "f788119eaca047a46105e6728fc8d5628e96f619735f9afab17103f72d96572f",
+            "clean_machine_e2e": "78892afd018913b33ec3ad3e5da2976283430f383d406b659120bfdd585d2fcd",
+            "trust_root_rotation": "0fdb446237b2606ccf0eada73198e2b7c8ed06291f2888d0c9157e6cab6a30c6",
+            "bootstrap_fault_injection": "e5d489c27558c560958102a053420f3988865394e05cf0a59d1b7e64e5b53258",
+            "recovery_drill": "cae8710e47a94c7f17b6eec7564c817360332489498ed92d55619dd6e99f3b30",
         },
     },
-    "AC-23": {
-        "obligation_id": "P1-ADVERSARIAL-AC-23-22bd0e0ac706c216",
-        "obligation_digest": "47bdac98bfdd06deb23e600dd418abae3f03ebcf08a11c551bdccbdade97e065",
-        "verifier_head": "f15a30b856a857a267b3cfcb5633b6ed19a9618a",
-        "verifier_run_id": 36782789242,
-        "verifier_job_id": 110116903625,
-        "report_digest": "3d6f56fb5f686011a85b402c632bfe5fe8d53c76c0f8d3324e426964f7c88079",
+    "AC-08": {
+        "obligation_id": "P1-ADVERSARIAL-AC-08-17b003d162aa15f0",
+        "obligation_digest": "d772b28ffe6bacfa91412e9b61dd1527291c59a0ceb1f674f8e3535d395e9318",
+        "report_digest": "ebae7c1459af81ab5894a2456a4d932d2e91e77cfb80316e3c8d867fb154a21b",
         "modes": {
-            "soak": "b70df20f7ed41953a2d1dab12366e39735bd24a97b22b05ad26d90e7ee2e2817",
-            "accelerated_time": "63f2c2d92a793d468a99c15b7d7c5ec9156204b6fc37a8781f6cfa65f6cb4295",
-            "aging_simulation": "6b191a2cb9ee3f2f2621e398826ac8078586470a629f9ef571b94db75e0bd51d",
-            "retirement_migration": "5be90488bd3a8a011907fdf4cd450ef148376ab7f4590a2e1a177b14f72fc5d1",
+            "restore_drill": "2e4b416e4a17aa6bbd285aa2a39bf349d1532759dd2dbb6cc3dda4155584791c",
+            "tombstone_propagation": "0f1e4f3afdef4aa0a6eec7c14e575d674f21307c29f68a2e5ae80e88c6ab0a0f",
+            "external_reconciliation": "506d8e744dcad6e9f8873deb906dcad7aefe3bb62906766e691f3ff70a5f4e9f",
+            "credential_revalidation": "9bc1c2b3cb7c7c1af348623245ef45ec4ac02fea886f3d93d5725f477df8e30b",
         },
     },
 }
@@ -63,15 +60,15 @@ def _obligations():
     )
 
 
-def test_ac19_ac23_bindings_pin_successful_exact_head_receipts() -> None:
+def test_ac01_ac08_bindings_pin_successful_exact_head_receipts() -> None:
+    assert VERIFIER_RUN_ID == 36784502045
+    assert VERIFIER_JOB_ID == 110122546683
+
     registry = _load(ROOT / REGISTRY)
     by_id = {row["obligation_id"]: row for row in registry["records"]}
 
     for axis_id, expected in EXPECTED.items():
-        assert expected["verifier_run_id"] > 0
-        assert expected["verifier_job_id"] > 0
         assert len(expected["report_digest"]) == 64
-
         row = by_id[expected["obligation_id"]]
         assert row["obligation_digest"] == expected["obligation_digest"]
         assert row["owner_id"] == "ACC-P1-EVID-04"
@@ -85,12 +82,12 @@ def test_ac19_ac23_bindings_pin_successful_exact_head_receipts() -> None:
             evidence = by_category[category]
             assert evidence["digest"] == digest
             assert evidence["source"] == (
-                f"p1:adversarial-ac{axis_id[-2:]}-evidence:"
-                f"{axis_id}:{category}:{expected['verifier_head']}"
+                f"p1:adversarial-wave4-evidence:{axis_id}:"
+                f"{category}:{VERIFIER_HEAD}"
             )
 
 
-def test_ac19_ac23_bindings_match_live_canonical_obligations() -> None:
+def test_ac01_ac08_bindings_match_live_canonical_obligations() -> None:
     by_axis = {
         item.source_ref: item
         for item in _obligations()
@@ -103,7 +100,7 @@ def test_ac19_ac23_bindings_match_live_canonical_obligations() -> None:
         assert set(obligation.required_evidence_modes) == set(expected["modes"])
 
 
-def test_ac19_ac23_bindings_advance_frontier_to_511_2_0() -> None:
+def test_ac01_ac08_bindings_advance_frontier_to_511_2_0() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
     assert report["binding_count"] == 511
     assert report["resolved_count"] == 511
