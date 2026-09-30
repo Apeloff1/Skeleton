@@ -120,4 +120,4 @@ def test_ac14_binding_advances_frontier_without_risk_acceptance() -> None:
     assert len(unbound) == 19
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-14", "AC-15", "AC-20"}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", "AC-20"}
