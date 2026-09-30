@@ -187,6 +187,18 @@ def test_missing_contract_marker_fails_closed(tmp_path: Path) -> None:
 
 def test_canonical_gap_drift_fails_closed(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
+    registry_path = root / REGISTRY
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["records"] = [
+        row
+        for row in registry["records"]
+        if row["evidence"][0]["category"] != "control_plane_gap_closure"
+    ]
+    registry_path.write_text(
+        json.dumps(registry, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     master_path = root / MASTER
     master = json.loads(master_path.read_text(encoding="utf-8"))
     target = next(
