@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - p1/closure-ac09-clean-main-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "scripts/build_p1_adversarial_wave3_evidence.py"
@@ -81,6 +82,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pytest -q --noconftest             skeleton/testing/test_worker_fairness_failover_shutdown.py             skeleton/testing/test_state_recovery_drill.py             skeleton/testing/test_process_resource_reliability_profiles.py             skeleton/testing/test_chaos_governor.py             tests/test_provider_capability_matrix.py             tests/test_jeeves_local_provider_policy.py             skeleton/testing/test_provider_stream_reliability_profiles.py             skeleton/testing/test_shell_ai_durable_orphan_scan.py             tests/test_duplicate_work_audit.py             skeleton/testing/test_migration_rollback_compatibility.py             skeleton/testing/test_checkpoint_migrations.py             skeleton/testing/test_swarm_exact_lease_atomicity.py             skeleton/testing/test_guarded_compaction.py             tests/test_p1_adversarial_wave3_evidence.py
+          tests/test_p1_adversarial_wave3_bindings.py
 
       - name: Run backend receipt controls
         env:
@@ -114,22 +116,22 @@ jobs:
               raise SystemExit(f"wave3 axis set drifted: {report['axis_ids']!r}")
           if report["axis_count"] != 9:
               raise SystemExit("wave3 axis count mismatch")
-          if report["already_bound_count"] != 0:
-              raise SystemExit("wave3 unexpectedly contains already-bound axes")
-          if report["candidate_binding_count"] != 9:
-              raise SystemExit("wave3 candidate count mismatch")
+          if report["already_bound_count"] != 9:
+              raise SystemExit("wave3 governed bindings not detected")
+          if report["candidate_binding_count"] != 0:
+              raise SystemExit("wave3 unexpectedly retains binding candidates")
           if not report["non_authoritative"] or report["creates_bindings"]:
               raise SystemExit("wave3 authority boundary violated")
           if report["accepts_risk"] or report["lowers_severity"] or report["promotes_maturity"]:
               raise SystemExit("wave3 governance boundary violated")
           for candidate in report["candidates"]:
-              if candidate["binding_present"]:
-                  raise SystemExit(f"{candidate['axis_id']} is already bound")
+              if candidate["binding_present"] is not True:
+                  raise SystemExit(f"{candidate['axis_id']} governed binding missing")
               if len(candidate["evidence"]) != 4:
                   raise SystemExit(f"{candidate['axis_id']} evidence cardinality mismatch")
               if any(len(item["digest"]) != 64 for item in candidate["evidence"]):
                   raise SystemExit(f"{candidate['axis_id']} invalid evidence digest")
-          print("P1 wave3 authority: OK (9 evidence-only candidates)")
+          print("P1 wave3 authority: OK (9 governed evidence bindings)")
           PY
 
       - name: Surface candidate binding payload
