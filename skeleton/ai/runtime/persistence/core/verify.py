@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from skeleton.persist.capabilities import capabilities
-from skeleton.persist.engine import PersistEngine
-from skeleton.persist.store import Persist
+from skeleton.persistence.core.capabilities import capabilities
+from skeleton.persistence.core.engine import PersistEngine
+from skeleton.persistence.core.store import Persist
 
 
 def check_local() -> None:
