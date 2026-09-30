@@ -1,0 +1,36 @@
+name: P1 AC-16 Resilient Telemetry
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/observability/resilient_telemetry.py"
+      - "skeleton/observability/__init__.py"
+      - "skeleton/ai/runtime/observability/resilient_telemetry.py"
+      - "skeleton/ai/runtime/observability/__init__.py"
+      - "skeleton/testing/test_resilient_telemetry.py"
+      - ".github/workflows/p1-ac16-resilient-telemetry.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate AC-16 telemetry outage controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<9"
+      - run: python -m pytest -q --noconftest skeleton/testing/test_resilient_telemetry.py
+      - run: python scripts/check_ai_file_tree.py
