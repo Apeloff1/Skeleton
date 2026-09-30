@@ -162,7 +162,7 @@ jobs:
       - name: Confirm governed registry remains unchanged
         run: |
           set -euo pipefail
-          python scripts/reconcile_p1_risk_evidence.py             --out .p1-bulk-volume-evidence/risk-report.json             --print-summary
+          python scripts/reconcile_p1_risk_evidence.py --evaluated-at "2026-10-01T12:00:00+00:00" --out .p1-bulk-volume-evidence/risk-report.json --print-summary
           python - <<'PY'
           import json
           from pathlib import Path
