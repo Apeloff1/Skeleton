@@ -106,8 +106,12 @@ AXIS_PROOFS: dict[str, dict[str, tuple[tuple[str, tuple[str, ...]], ...]]] = {
     "AC-04": {
         "dependency_fault": (
             (
-                "backend/tests/test_ai_provider_reliability.py",
-                ("_FailingAdapter", "ProviderInvocationError", "upstream-token=do-not-leak"),
+                "skeleton/testing/test_provider_stream_reliability_profiles.py",
+                (
+                    "TransientProviderError",
+                    "test_stream_retry_budget_is_exact_under_exhaustion",
+                    "test_provider_stream_pressure_fails_closed_at_retry_budget",
+                ),
             ),
         ),
         "fallback_matrix": (
@@ -165,8 +169,12 @@ AXIS_PROOFS: dict[str, dict[str, tuple[tuple[str, tuple[str, ...]], ...]]] = {
         ),
         "provider_fault": (
             (
-                "backend/tests/test_ai_provider_reliability.py",
-                ("_FailingAdapter", "ProviderInvocationError", "ProviderUnavailableError"),
+                "skeleton/testing/test_provider_stream_reliability_profiles.py",
+                (
+                    "TransientProviderError",
+                    "test_post_emission_failure_is_not_retried",
+                    "test_stream_retry_budget_is_exact_under_exhaustion",
+                ),
             ),
         ),
         "receipt_recovery": (
