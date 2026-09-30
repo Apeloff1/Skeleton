@@ -28,6 +28,9 @@ def test_ac14_candidate_covers_exact_required_modes() -> None:
 
     assert report["axis_id"] == AXIS_ID == "AC-14"
     assert report["candidate_count"] == 1
+    assert report["already_bound_count"] == 1
+    assert report["candidate_binding_count"] == 0
+    assert candidate["binding_present"] is True
     assert report["required_evidence_mode_count"] == 4
     assert tuple(candidate["required_evidence_modes"]) == EXPECTED_MODES
     assert {row["category"] for row in candidate["evidence"]} == set(
