@@ -131,6 +131,7 @@ def _compare(
     *,
     parity_exceptions: dict[str, dict[str, object]] | None = None,
     overlay_children: set[str] | None = None,
+    source_exclusions: set[str] | None = None,
 ) -> list[str]:
     if source.is_symlink() or destination.is_symlink():
         return [f"symlink mapping forbidden: {source} -> {destination}"]
@@ -143,12 +144,13 @@ def _compare(
 
     exceptions = parity_exceptions or {}
     overlays = overlay_children or set()
+    exclusions = source_exclusions or set()
     src = _tree_files(source)
     dst = _tree_files(destination)
     governed_src = {
         rel: path
         for rel, path in src.items()
-        if not any(rel == overlay or rel.startswith(overlay + "/") for overlay in overlays)
+        if not any(rel == excluded or rel.startswith(excluded + "/") for excluded in exclusions)
     }
     governed_dst = {
         rel: path
@@ -160,7 +162,8 @@ def _compare(
         extra = sorted(set(governed_dst) - set(governed_src))
         return [
             f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
-            f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)}"
+            f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)} "
+            f"source_exclusions={sorted(exclusions)}"
         ]
 
     errors: list[str] = []
@@ -182,7 +185,7 @@ def _compare(
                 )
             )
             continue
-        if not _content_equivalent(governed_src[rel], governed_dst[rel]):
+        if not _content_equivalent(src[rel], governed_dst[rel]):
             errors.append(f"tree semantic/content drift: {source.relative_to(ROOT)}/{rel}")
     return errors
 
@@ -224,27 +227,6 @@ def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool
     if mapping.get("kind") != "tree":
         return False
     return planned_source.startswith(source.rstrip("/") + "/")
-
-
-def _mappings_cover_planned_source(mappings: list[object], planned_source: str) -> bool:
-    """A namespace may compose separate owners only if every member is governed.
-
-    This keeps research lineage in its existing destination-only namespaces
-    without copying it into a new source parent just to satisfy tree parity.
-    """
-    if any(_mapping_covers_planned_source(mapping, planned_source) for mapping in mappings):
-        return True
-    source = ROOT / planned_source
-    if not source.is_dir():
-        return False
-    members = _tree_files(source)
-    return bool(members) and all(
-        any(
-            _mapping_covers_planned_source(mapping, f"{planned_source}/{member}")
-            for mapping in mappings
-        )
-        for member in members
-    )
 
 
 def validate() -> list[str]:
@@ -316,18 +298,12 @@ def validate() -> list[str]:
         errors.append(f"cannot parse AI master plan for file-tree coverage: {exc}")
         master_plan = {}
 
-    planned_aliases = {
-        item.get("planned_path")
-        for item in data.get("planned_path_audit", {}).get("covered_aliases", [])
-        if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
-    }
     for planned_source in sorted(_planned_implementation_sources(master_plan)):
-        governed = _mappings_cover_planned_source(mappings, planned_source)
-        if (
-            _source_exists(planned_source)
-            and not governed
-            and planned_source not in planned_aliases
-        ):
+        governed = any(
+            _mapping_covers_planned_source(mapping, planned_source)
+            for mapping in mappings
+        )
+        if _source_exists(planned_source) and not governed:
             errors.append(
                 "extant planned implementation path is not governed by AI file tree: "
                 f"{planned_source}"
@@ -338,11 +314,15 @@ def validate() -> list[str]:
         for item in mappings
         if isinstance(item, dict) and isinstance(item.get("destination"), str)
     }
-
     declared_sources = {
         item.get("source")
         for item in mappings
         if isinstance(item, dict) and isinstance(item.get("source"), str)
+    }
+    declared_retained_paths = {
+        item.get("path")
+        for item in data.get("retained_outside_ai_tree", [])
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
     }
 
     seen_ids: set[str] = set()
@@ -391,7 +371,7 @@ def validate() -> list[str]:
             item.get("parity_mode") == "compatibility_facade"
             or bool(item.get("parity_exceptions"))
         )
-        quarantine = dst == "skeleton/ai/research" or dst.startswith("skeleton/ai/research/")
+        quarantine = dst.startswith("skeleton/ai/research/")
         compat_convergence = dst.startswith("skeleton/ai/compat/")
         expected_cutover = (
             "cutover:quarantine"
@@ -488,33 +468,60 @@ def validate() -> list[str]:
                             errors.append(f"{mid}: duplicate overlay child {overlay}")
                             continue
                         full_destination = f"{dst}/{overlay}"
-                        full_source = f"{src}/{overlay}"
-                        governed_destination = full_destination in declared_destinations
-                        governed_source = any(
-                            candidate == full_source
-                            or candidate.startswith(full_source.rstrip("/") + "/")
-                            for candidate in declared_sources
-                        )
-                        if not (governed_destination or governed_source):
+                        if full_destination not in declared_destinations:
                             errors.append(
-                                f"{mid}: overlay child is not independently governed: "
-                                f"source={full_source} destination={full_destination}"
+                                f"{mid}: overlay child is not a governed mapping destination: "
+                                f"{full_destination}"
                             )
                             continue
                         overlays.add(overlay)
+                raw_source_exclusions = item.get("source_exclusions", [])
+                source_exclusions: set[str] = set()
+                if not isinstance(raw_source_exclusions, list):
+                    errors.append(f"{mid}: source_exclusions must be a list")
+                else:
+                    for excluded in raw_source_exclusions:
+                        if (
+                            not isinstance(excluded, str)
+                            or not excluded
+                            or excluded.startswith("/")
+                            or ".." in Path(excluded).parts
+                        ):
+                            errors.append(f"{mid}: invalid source exclusion")
+                            continue
+                        if excluded in source_exclusions:
+                            errors.append(f"{mid}: duplicate source exclusion {excluded}")
+                            continue
+                        full_source = f"{src.rstrip('/')}/{excluded}"
+                        independently_governed = any(
+                            other != src and (
+                                other == full_source
+                                or other.startswith(full_source.rstrip("/") + "/")
+                            )
+                            for other in declared_sources
+                        )
+                        explicitly_retained = full_source in declared_retained_paths
+                        if not independently_governed and not explicitly_retained:
+                            errors.append(
+                                f"{mid}: source exclusion is neither independently governed "
+                                f"nor explicitly retained: {full_source}"
+                            )
+                            continue
+                        source_exclusions.add(excluded)
                 errors.extend(
                     _compare(
                         source,
                         destination,
                         parity_exceptions=exceptions,
                         overlay_children=overlays,
+                        source_exclusions=source_exclusions,
                     )
                 )
             else:
                 errors.append(f"{mid}: unknown parity_mode {parity_mode!r}")
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
-        has_build |= src in {"core/shift_supervisor", "skeleton/automation/shift_supervisor"} and dst == "skeleton/ai/build/shift_supervisor"
+        has_build |= src == "skeleton/automation/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
 
     if not has_jeeves:
         errors.append("Jeeves engine mapping is mandatory")
@@ -644,12 +651,10 @@ def validate() -> list[str]:
     pending_ids: set[str] = set()
     pending_sources: set[str] = set()
     pending_destinations: set[str] = set()
-    alias_sources = {
+    covered_alias_sources = {
         item.get("planned_path")
-        for item in audit.get("covered_aliases", [])
-        if isinstance(audit, dict)
-        and isinstance(item, dict)
-        and isinstance(item.get("planned_path"), str)
+        for item in data.get("planned_path_audit", {}).get("covered_aliases", [])
+        if isinstance(item, dict) and isinstance(item.get("planned_path"), str)
     }
     required_pending_sources = {
         "skeleton/state",
@@ -668,7 +673,7 @@ def validate() -> list[str]:
         "skeleton/overseer",
         "skeleton/pr_automation",
         "skeleton/chronicle",
-    } - mapped_sources - alias_sources
+    } - mapped_sources - covered_alias_sources
     if required_pending_sources and len(assignments) < len(required_pending_sources):
         errors.append(
             "next_move_assignments must contain every still-unmapped plan-derived source"
@@ -758,7 +763,9 @@ def validate() -> list[str]:
         if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
             return None
         parts = Path(path_value).parts
-        return path_value if len(parts) == 2 else None
+        if len(parts) < 2:
+            return None
+        return "/".join(parts[:2])
 
     classified_top_level: set[str] = {"skeleton/ai"}
     for item in mappings:
@@ -772,21 +779,24 @@ def validate() -> list[str]:
             if root:
                 classified_top_level.add(root)
     if isinstance(audit, dict):
-        for item in audit.get("intentionally_external", []):
-            if isinstance(item, dict):
-                root = _first_level(item.get("path"))
-                if root:
-                    classified_top_level.add(root)
         for item in audit.get("covered_aliases", []):
             if isinstance(item, dict):
                 root = _first_level(item.get("planned_path"))
+                if root:
+                    classified_top_level.add(root)
+        for item in audit.get("intentionally_external", []):
+            if isinstance(item, dict):
+                root = _first_level(item.get("path"))
                 if root:
                     classified_top_level.add(root)
         for path_value in audit.get("non_engine_root_exclusions", []):
             root = _first_level(path_value)
             if root:
                 classified_top_level.add(root)
-    classified_top_level.update(retained_paths)
+    for path_value in retained_paths:
+        root = _first_level(path_value)
+        if root:
+            classified_top_level.add(root)
 
     try:
         tracked = subprocess.run(
@@ -804,10 +814,7 @@ def validate() -> list[str]:
         for path_value in tracked
         if path_value and len(Path(path_value).parts) >= 2
     }
-    unclassified_live = sorted(
-        root for root in tracked_top_level - classified_top_level
-        if not _mappings_cover_planned_source(mappings, root)
-    )
+    unclassified_live = sorted(tracked_top_level - classified_top_level)
     if unclassified_live:
         errors.append(
             "git-tracked top-level skeleton paths lack AI-tree move/retain classification: "

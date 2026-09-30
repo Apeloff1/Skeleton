@@ -22,6 +22,36 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def test_frontier_runtime_authority_paths_follow_canonical_namespace() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    runtime = _load(REPO_ROOT / "skeleton/app/manifest.json")
+
+    expected = {
+        "model_routing": "skeleton/frontier/runtime/model_routing.py",
+        "stream_contract": "skeleton/frontier/runtime/operation_stream.py",
+        "stream_store": "skeleton/frontier/runtime/operation_stream_store.py",
+    }
+    placements = {
+        item["plane"]: item["owner"]
+        for item in architecture["structural_blueprint"]["plane_placements"]
+    }
+
+    assert placements["model-routing"] == expected["model_routing"]
+    assert architecture["sources"]["stream_contract"] == expected["stream_contract"]
+    assert architecture["sources"]["stream_store"] == expected["stream_store"]
+    assert runtime["construction"]["model_routing_owner"] == expected["model_routing"]
+    assert runtime["construction"]["stream_contract"] == expected["stream_contract"]
+    assert runtime["construction"]["stream_store"] == expected["stream_store"]
+
+    serialized = json.dumps({"architecture": architecture, "runtime": runtime})
+    for legacy in (
+        "skeleton/frontier/model_routing.py",
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/operation_stream_store.py",
+    ):
+        assert legacy not in serialized
+
+
 def test_architecture_contract_is_valid() -> None:
     errors, summary = validate_architecture(REPO_ROOT)
 
@@ -117,8 +147,8 @@ def test_architecture_sources_link_all_contract_layers() -> None:
             "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
             "provider_contract": "skeleton/provider_contract.py",
             "operation_contract": "skeleton/contracts/operation.py",
-            "stream_contract": "skeleton/frontier/operation_stream.py",
-            "stream_store": "skeleton/frontier/operation_stream_store.py",
+            "stream_contract": "skeleton/frontier/runtime/operation_stream.py",
+            "stream_store": "skeleton/frontier/runtime/operation_stream_store.py",
             "capability_interface_registry": "machine/capability_interfaces.json",
             "capability_interface_validator": "scripts/check_capability_interfaces.py",
             "state_topology": "machine/state_topology.json",

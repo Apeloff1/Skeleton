@@ -2794,6 +2794,22 @@
       "network_transport_owner": false,
       "sdk_client_owner": false,
       "discovery_edge_classes": []
+    },
+    {
+      "id": "shift-supervisor-model-gateway",
+      "family": "automation_model",
+      "role": "shift-supervisor automation model transport; credential-safe gateway with explicit network ownership",
+      "owner": "skeleton/automation/shift_supervisor/model_gateway.py",
+      "credential_bearing": false,
+      "receipt_required": true,
+      "status": "canonical",
+      "surface_class": "automation_provider_explicitly_separate_and_receipt-gated",
+      "credential_owner": false,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "network_transport"
+      ]
     }
   ],
   "request_lifecycle": [
