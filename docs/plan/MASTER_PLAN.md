@@ -542,6 +542,16 @@ The remaining **314 volumes** stay explicitly deferred. Their existence is not h
 
 P1 may deepen existing owners and interfaces but may not add a top-level volume, reopen a canonical construction gap for convenience, promote a candidate through self-generated evidence, or substitute target-plan prose for runtime truth.
 
+## 21.8 P2 capability-expansion map
+
+After the governed P1 frontier reaches 513 resolved / 0 blocking / 0 unclassified obligations, the deferred long-range breadth becomes eligible for a new bounded execution program rather than being silently folded into P1.
+
+P2 is defined by [`docs/plan/P2_EXECUTION_MAP.md`](P2_EXECUTION_MAP.md), [`machine/ai_p2_execution_map.json`](../../machine/ai_p2_execution_map.json), and [`machine/ai_p2_task_backlog.json`](../../machine/ai_p2_task_backlog.json). Its source scope is exactly the **314 volume references** recorded in the P1 execution map's `deferred_volume_refs` set.
+
+The initial P2 tranche schedules **42 volumes** across architecture/contract convergence, requirements/schema/traceability, repository intelligence and engineering control, formal quality/final assembly, evidence-bound documentation, and profiling-gated native/JVM acceleration. The other **272 volumes remain explicitly queued**. They are not deleted, implied complete, or hidden behind an aggregate percentage.
+
+P2 inherits all P1 fail-closed authority, evidence, recovery, and exact-head rules. It may deepen existing owners but cannot weaken P1 guarantees, fabricate completion/sign-off, or treat documentation/file presence as maturity evidence. The P2 map validator enforces exact scope equality, unique scheduled ownership, complete scheduled+queued coverage, known acyclic dependencies, and unchecked foundation accountability state.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
