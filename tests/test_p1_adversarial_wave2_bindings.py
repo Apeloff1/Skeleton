@@ -139,7 +139,11 @@ def test_wave2_bindings_match_live_adversarial_obligations() -> None:
 
 def test_wave2_advances_governed_frontier_to_505_8_0() -> None:
     assert RESOLVED_AXES == frozenset(
-        {"AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-20", "AC-22"}
+        {
+            "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07",
+            "AC-09", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15",
+            "AC-18", "AC-20", "AC-22", "AC-24",
+        }
     )
     assert EXPECTED_RESIDUAL_AXIS_COUNT == 8
 
