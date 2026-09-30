@@ -141,6 +141,22 @@ jobs:
                       "bulk packet is not exact-head bound: " + row["obligation_id"]
                   )
           print("P1 bulk volume evidence:", report["report_digest"])
+          for row in report["records"]:
+              if row["binding_present"]:
+                  continue
+              seed = {
+                  "obligation_id": row["obligation_id"],
+                  "obligation_digest": row["obligation_digest"],
+                  "owner_id": row["owner_id"],
+                  "kind": row["kind"],
+                  "severity": row["recommended_severity"],
+                  "disposition": row["recommended_disposition"],
+                  "evidence": row["candidate_evidence_ref"],
+              }
+              print(
+                  "P1_BULK_BINDING_SEED "
+                  + json.dumps(seed, sort_keys=True, separators=(",", ":"))
+              )
           PY
 
       - name: Confirm governed registry remains unchanged
