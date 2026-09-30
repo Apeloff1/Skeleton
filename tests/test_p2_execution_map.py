@@ -30,6 +30,7 @@ class P2ExecutionMapTests(unittest.TestCase):
         self.addCleanup(lambda: shutil.rmtree(temp, ignore_errors=True))
         for relative in (
             "machine/ai_master_plan.json",
+            "machine/ai_master_build_sequence.json",
             "machine/ai_p1_execution_map.json",
             "machine/ai_p2_execution_map.json",
             "machine/ai_p2_task_backlog.json",
@@ -75,6 +76,34 @@ class P2ExecutionMapTests(unittest.TestCase):
         data["tasks"][0]["completion_checkbox_mark"] = "[x]"
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(MODULE.P2ValidationError, "may not assert completion"):
+            MODULE.validate(root)
+
+    def test_rejects_narrowed_masterplan_risk(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        obligation = data["tasks"][1]["masterplan_obligations"][0]
+        obligation["risks"] = obligation["risks"][:-1]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "narrows/drifts masterplan"):
+            MODULE.validate(root)
+
+    def test_rejects_breadth_freeze_override(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_execution_map.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["masterplan_alignment"]["breadth_freeze"]["required_enabled"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "must require the masterplan breadth freeze"):
+            MODULE.validate(root)
+
+    def test_rejects_master_build_sequence_drift(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_execution_map.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["masterplan_alignment"]["master_build_sequence"]["required_wave_count"] = 7
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "wave count drift"):
             MODULE.validate(root)
 
 
