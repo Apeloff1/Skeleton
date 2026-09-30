@@ -379,7 +379,211 @@
         }
       ],
       "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-077:gap:015df8ff35-8a709477a51df6cf",
+      "obligation_digest": "6fd3964219ee55567cb43d0b66318dd83666eff24ef957647b2ab03998e73fe6",
+      "owner_id": "ACC-VOL-077",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-077:gap:015df8ff35-8a709477a51df6cf:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "454e2c7be9238a0e84015810cdf9185b14c1e06e70bacbe6d13ae672538fc9a9",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-077:gap:368bfc596e-66a6c319e79875cf",
+      "obligation_digest": "1e3536efefd50498521c2f5411fb6226843d7e852ebdd7aed7b41d15a858b551",
+      "owner_id": "ACC-VOL-077",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-077:gap:368bfc596e-66a6c319e79875cf:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "ffb26d7c60f52a2cb434a686cde87b6c74584837ddf567cfb949abe33890d1e0",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-082:gap:cc6459c1d7-98f7f47f5f351d79",
+      "obligation_digest": "46b65d17123254db534f2ffe601d7656bc6ffb6fb4f1312d63a45111490772d2",
+      "owner_id": "ACC-VOL-082",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-082:gap:cc6459c1d7-98f7f47f5f351d79:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "c7a3a81c175533745791b192019d06169f120cbca76aa9014b2da9657fb9da89",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-082:gap:11a839d087-8be4462814c13eaf",
+      "obligation_digest": "cb1fa53ee78b7b86e8b7112422369eaf68215cbdf492109cbcf5965be5b07c02",
+      "owner_id": "ACC-VOL-082",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-082:gap:11a839d087-8be4462814c13eaf:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "77a890005c31ff820ee9b1e7b96ff2903a7b3cb9770fbcc7c14ab32e7d9a6b85",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-324:gap:da08ee0247-f60e51545be71336",
+      "obligation_digest": "eabb960ec3c99be031ac941be57cc6c3b36e3d926b50fa029b3b77c7f16d8490",
+      "owner_id": "ACC-VOL-324",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-324:gap:da08ee0247-f60e51545be71336:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "1e43ab7bf93546b2146befd153fe86d21cf1f64eb9b76852a96439e3bfc307f9",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-324:gap:58d10be00f-565ffac84c80229b",
+      "obligation_digest": "ed73da06cfe226044613e964fb1a8656e21b9022e5a405339d1b6362baf037c7",
+      "owner_id": "ACC-VOL-324",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-324:gap:58d10be00f-565ffac84c80229b:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "1e5ad1ce29f103c7aeebbdb78bdde5c0768b7eece520b3ada7da2f14aa4e4835",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-414:gap:360528bb94-27055c7ebf612001",
+      "obligation_digest": "50fca755e074dbb20ba87a992b0bcb6c60a28985ed7a6455ee1ed5601764a79b",
+      "owner_id": "ACC-VOL-414",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-414:gap:360528bb94-27055c7ebf612001:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "db6a38387d06c39170f33ee8c9ed63ae40004c519bd41c3e46f0a223e4fa743b",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-414:gap:2ff615d88a-ba34dcd1ac04eb85",
+      "obligation_digest": "48b1871d1cb9defa80a1aaab00467003242bccd22109718b3b45ef900374b2e8",
+      "owner_id": "ACC-VOL-414",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-414:gap:2ff615d88a-ba34dcd1ac04eb85:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "8558e985ddcea32487e0b9a81f3a91bb544e355b70d0f40160fb0d9fe91ae31b",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-415:gap:210392ecc3-e9e7bc2667a8e33a",
+      "obligation_digest": "b9b1d64ac7cdf31135e92674a54e8f9f8c02e59117efa7365f04d1540584e9b3",
+      "owner_id": "ACC-VOL-415",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-415:gap:210392ecc3-e9e7bc2667a8e33a:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "4b1572b17b4238660456b15ad9528207edd399d6fa754298eb5f1ae8dc620224",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-415:gap:99373e5bc1-ec31886904cec4e4",
+      "obligation_digest": "3cabbcc9f5c334ba51446232c5d379d1879e7b307d2d7f2be54fb30f3ba4538a",
+      "owner_id": "ACC-VOL-415",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-415:gap:99373e5bc1-ec31886904cec4e4:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "2e8a7a1529f6747f17dade4319bc0f4306c90619ccb32adcb21e318405618ed2",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-419:gap:13aee1138e-6556f2baafb11049",
+      "obligation_digest": "e5210591c9c7c3c5b80368a099944662de5e71a7ebeaa94dc9b8cb4519e0eab2",
+      "owner_id": "ACC-VOL-419",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-419:gap:13aee1138e-6556f2baafb11049:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "b1211922645e1223617628bfdd48e1b0729e49a381a25a82f3c007326b751ca3",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
+    },
+    {
+      "obligation_id": "P1-GAP-VOL-419:gap:88329581ef-fba1b83d7c94b8f9",
+      "obligation_digest": "497682d311d5823b7382ee4d0001e6e62ff1b19091939ffadcec26351ba86839",
+      "owner_id": "ACC-VOL-419",
+      "severity": "high",
+      "disposition": "evidence",
+      "bound_at": "2026-09-30T16:47:00Z",
+      "review_at": "2026-10-30T16:47:00Z",
+      "evidence": [
+        {
+          "source": "p1:learning-eval-gap-batch3:P1-GAP-VOL-419:gap:88329581ef-fba1b83d7c94b8f9:12f914521b59f26299d2e9c621649cdc95fac9dc",
+          "digest": "ec9faa29cce6f663ba3cc13d229036eb5f8bb7b0bb7f5c7d595cf82dcd30909b",
+          "category": "learning_eval_gap_closure"
+        }
+      ],
+      "accepted_risk": null
     }
   ],
-  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Batch 1 release-gap and batch 2 control-plane evidence remain independently regression-locked."
+  "note": "Bindings are added only from materialized evidence or signed, time-bounded accepted-risk dispositions. Release-gap, control-plane, and learning/evaluation evidence batches remain independently regression-locked."
 }
