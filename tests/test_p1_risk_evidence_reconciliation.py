@@ -98,13 +98,13 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
-    assert report["binding_count"] == 492
-    assert report["resolved_count"] == 492
-    assert report["unresolved_blocking_count"] == 21
+    assert report["binding_count"] == 493
+    assert report["resolved_count"] == 493
+    assert report["unresolved_blocking_count"] == 20
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 492,
-        "unbound": 21,
+        "evidence": 493,
+        "unbound": 20,
     }
     assert report["non_authoritative"] is True
     assert report["source_mutation_detected"] is False
