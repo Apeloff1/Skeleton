@@ -98,7 +98,7 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
     assert set(obligation.required_evidence_modes) == set(EXPECTED_EVIDENCE)
 
 
-def test_governed_frontier_is_493_resolved_20_adversarial() -> None:
+def test_governed_frontier_is_494_resolved_19_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
     assert report["binding_count"] == 494
@@ -114,9 +114,9 @@ def test_governed_frontier_is_493_resolved_20_adversarial() -> None:
     bound = {row["obligation_id"] for row in registry["records"]}
     unbound = [item for item in _obligations() if item.obligation_id not in bound]
 
-    assert len(unbound) == 20
+    assert len(unbound) == 19
     assert all(item.kind is RiskKind.ADVERSARIAL for item in unbound)
     assert AXIS_ID not in {item.source_ref for item in unbound}
     assert {item.source_ref for item in unbound} == {
         f"AC-{index:02d}" for index in range(1, 25)
-    } - {"AC-11", "AC-14", "AC-15", AXIS_ID}
+    } - {"AC-11", "AC-13", "AC-14", "AC-15", AXIS_ID}
