@@ -57,7 +57,7 @@ def test_bulk_candidates_preserve_governance_authority_boundaries() -> None:
     assert len(candidates) == 455
     assert all(row["recommended_severity"] == "high" for row in candidates)
     assert all(row["recommended_disposition"] == "evidence" for row in candidates)
-    assert all(row["accepted_risk"] is False for row in candidates)
+    assert all(row["accepts_risk"] is False for row in candidates)
     assert all(row["candidate_evidence_ref"]["category"] == CATEGORY for row in candidates)
     assert all(
         row["candidate_evidence_ref"]["digest"] == row["packet_digest"]
