@@ -82,7 +82,7 @@ jobs:
 
       - name: Run independent cost verifier
         env:
-          GITHUB_SHA: "${{ env.EXPECTED_SHA }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: |
           set -euo pipefail
           python scripts/verify_cost_admission_closure.py             --evidence-out .p1-ac14/cost-receipt.json
