@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from skeleton.persist.capabilities import capabilities
-from skeleton.persist.cards import persist_card
-from skeleton.persist.engine import PersistEngine
-from skeleton.persist.law import OWN_ENV, PACKET, VERSION
-from skeleton.persist.store import Persist
+from skeleton.persistence.core.capabilities import capabilities
+from skeleton.persistence.core.cards import persist_card
+from skeleton.persistence.core.engine import PersistEngine
+from skeleton.persistence.core.law import OWN_ENV, PACKET, VERSION
+from skeleton.persistence.core.store import Persist
 
 __all__ = [
     "OWN_ENV",
