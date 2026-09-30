@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "0513a269bd19d405de5a1e9f729843ea85b7373a",
+      "source_git_object_sha": "c138440e485313a33fb4d0c5487a088681c5ac99",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
@@ -149,7 +149,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "676f0f50c86a2acb550bada89840de7622d4288d",
+      "source_git_object_sha": "07d34df1e204e3e721cd62bfa076d5695cd8d90d",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -271,7 +271,7 @@
       "source": "skeleton/skills",
       "destination": "skeleton/ai/runtime/skills",
       "kind": "tree",
-      "source_git_object_sha": "09d238958b9e446054165faecc3fed72360d6719",
+      "source_git_object_sha": "781c4da70da7fd39141c7cd8e76f19d0036f1782",
       "role": "tool and skill runtime",
       "work_package_refs": [
         "WP-W13",
@@ -544,7 +544,7 @@
       "source": "skeleton/artifact_plane",
       "destination": "skeleton/ai/runtime/artifact_plane",
       "kind": "tree",
-      "source_git_object_sha": "9ae9937eb4f748ce827105abd4307fc32d62bc16",
+      "source_git_object_sha": "09c5a7433a57718501d40dfb1a6c1946e2c8c6bf",
       "role": "artifact production and governance plane",
       "work_package_refs": [
         "WP-W00",
@@ -689,7 +689,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "337e6ec148d5e141984f602e94bc75e5348c2bb1",
+      "source_git_object_sha": "968804c6506a46da7f12732fbdf98ddcc3f549b5",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -724,7 +724,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "1bd295b2761f82c28dcfcdf01dd0d067a03e9052",
+      "source_git_object_sha": "1a869638d7f6ac5598566d86621cc3f49f1efbf6",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -826,7 +826,7 @@
       "source": "skeleton/resilience",
       "destination": "skeleton/ai/runtime/resilience",
       "kind": "tree",
-      "source_git_object_sha": "22f84205b51d03628cdbb069af6977305b4912b3",
+      "source_git_object_sha": "6eba4a3b557ba18eb1085e8886248133f5f8a57e",
       "role": "failure recovery and resilience runtime",
       "work_package_refs": [
         "WP-W00",
@@ -858,7 +858,7 @@
       "source": "skeleton/cognition",
       "destination": "skeleton/ai/cognition",
       "kind": "tree",
-      "source_git_object_sha": "24f689205da1c891c3794ab43dd1d99ab20a1703",
+      "source_git_object_sha": "062d67911079893e9169ef8114ddb7ec120dd3a9",
       "role": "cognition and telemetry support",
       "work_package_refs": [
         "WP-W00",
@@ -922,7 +922,7 @@
       "source": "skeleton/repo_intelligence",
       "destination": "skeleton/ai/build/repo_intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a089e3c09730d6c67ef71b8f2ee493ce891506db",
+      "source_git_object_sha": "5efce02a638abdb6e7749781a2c9ab1b52ee080d",
       "role": "repository intelligence for build/control workflows",
       "work_package_refs": [
         "WP-W00",
@@ -1139,7 +1139,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "754faddb86a11687ff6057cc473e771b7d304cba",
+      "source_git_object_sha": "5badce616e249e811c1f6785223469da45b8f7d7",
       "role": "Incremental build graph and network audit are repository-engineering/build-control support for autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -1624,7 +1624,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "b5a5d8f2b9bfe60adac8eb157c47c4cf10c6623d",
+      "source_git_object_sha": "943a16fa9dcabf71443498edb7254d456122be4b",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -2637,7 +2637,7 @@
       "source": "skeleton/config",
       "destination": "skeleton/ai/runtime/config",
       "kind": "tree",
-      "source_git_object_sha": "8af2a5f58b6e3071472f77e85c660de1ab01bdeb",
+      "source_git_object_sha": "deb783b39705076d2559cc263b51ed46054dfdfd",
       "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
       "work_package_refs": [
         "WP-W00",
@@ -2707,7 +2707,7 @@
       "source": "skeleton/turn",
       "destination": "skeleton/ai/compat/turn",
       "kind": "tree",
-      "source_git_object_sha": "2f01eac16fb3350b7912654c19adfbec71c20306",
+      "source_git_object_sha": "a6e00d3a5ebdf8e68686b86c0432fd62a027da62",
       "role": "legacy TurnEngine facade retained for convergence into canonical conversation/execution owners",
       "work_package_refs": [
         "WP-W01",
@@ -4227,7 +4227,7 @@
       "source": "backend/gameforge/jeeves",
       "destination": "skeleton/ai/research/legacy/gameforge/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "8fe11234ae7b10b0b16c07531410770e793f1e02",
+      "source_git_object_sha": "1ca6b7410ea19a92f838d5c5f4a2cb69c4e4cbfe",
       "role": "Legacy GameForge Jeeves implementation/status lineage retained as non-authoritative evidence.",
       "work_package_refs": [
         "WP-W11",
