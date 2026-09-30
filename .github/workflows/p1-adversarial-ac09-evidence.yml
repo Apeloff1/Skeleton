@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - p1/risk-classification-evidence-batch1-20260930
+      - p1/closure-rollup-495-18-20260930
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_master_plan.json"
