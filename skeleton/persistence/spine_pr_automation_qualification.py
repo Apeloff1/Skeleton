@@ -7,6 +7,14 @@ import json
 import re
 from typing import Any, Callable
 
+from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_SOURCE_CONCLUSION,
+    TRUSTED_SOURCE_EVENT,
+    TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_NAME,
+    TRUSTED_SOURCE_WORKFLOW_PATH,
+)
+
 
 class SpinePrAutomationQualificationError(RuntimeError):
     """PR-automation operational evidence failed closed."""
@@ -14,6 +22,9 @@ class SpinePrAutomationQualificationError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 _ALLOWED_STATES = frozenset({"ready", "held", "ignored", "merged"})
 _ALLOWED_DECISIONS = frozenset({"ignore", "hold", "ready", "merge"})
 _ALLOWED_MODES = frozenset({"observe", "apply"})
@@ -92,9 +103,34 @@ class SpinePrAutomationQualification:
             raise SpinePrAutomationQualificationError(
                 "PR automation workflow identity changed"
             )
-        if receipt.get("source_workflow") != "Merge Readiness":
+        if receipt.get("source_workflow") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationError(
                 "PR automation source workflow changed"
+            )
+        if receipt.get("source_workflow_path") != TRUSTED_SOURCE_WORKFLOW_PATH:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow path changed"
+            )
+        if receipt.get("source_event") != TRUSTED_SOURCE_EVENT:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow event changed"
+            )
+        repository = receipt.get("repository")
+        if (
+            not isinstance(repository, str)
+            or _REPOSITORY_RE.fullmatch(repository) is None
+            or receipt.get("source_head_repository") != repository
+        ):
+            raise SpinePrAutomationQualificationError(
+                "PR automation source repository changed"
+            )
+        if receipt.get("source_status") != TRUSTED_SOURCE_STATUS:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow is not completed"
+            )
+        if receipt.get("source_conclusion") != TRUSTED_SOURCE_CONCLUSION:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow did not succeed"
             )
         if receipt.get("conclusion") != "success":
             raise SpinePrAutomationQualificationError(
@@ -113,6 +149,18 @@ class SpinePrAutomationQualification:
         run_attempt = _positive_int(
             receipt.get("run_attempt"),
             "PR automation run attempt",
+        )
+        source_workflow_id = _positive_int(
+            receipt.get("source_workflow_id"),
+            "PR automation source workflow id",
+        )
+        source_run_id = _positive_int(
+            receipt.get("source_run_id"),
+            "PR automation source run id",
+        )
+        source_run_attempt = _positive_int(
+            receipt.get("source_run_attempt"),
+            "PR automation source run attempt",
         )
         report_digest = _digest_text(
             receipt.get("report_digest"),
@@ -213,7 +261,16 @@ class SpinePrAutomationQualification:
         evidence = {
             "authority_domain": receipt["authority_domain"],
             "workflow_name": receipt["workflow_name"],
+            "repository": repository,
             "source_workflow": receipt["source_workflow"],
+            "source_workflow_path": receipt["source_workflow_path"],
+            "source_event": receipt["source_event"],
+            "source_workflow_id": source_workflow_id,
+            "source_run_id": source_run_id,
+            "source_run_attempt": source_run_attempt,
+            "source_head_repository": receipt["source_head_repository"],
+            "source_status": receipt["source_status"],
+            "source_conclusion": receipt["source_conclusion"],
             "conclusion": receipt["conclusion"],
             "head_sha": expected_head,
             "pr_number": expected_pr,

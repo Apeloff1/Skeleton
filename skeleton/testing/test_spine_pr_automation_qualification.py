@@ -37,7 +37,16 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "kind": "spine_pr_automation_runner_receipt",
         "authority_domain": "pr-automation-runner",
         "workflow_name": "PR Automation Index",
+        "repository": "Apeloff1/Skeleton",
         "source_workflow": "Merge Readiness",
+        "source_workflow_path": ".github/workflows/merge-readiness.yml",
+        "source_event": "pull_request",
+        "source_workflow_id": 358774735,
+        "source_run_id": 777,
+        "source_run_attempt": 1,
+        "source_head_repository": "Apeloff1/Skeleton",
+        "source_status": "completed",
+        "source_conclusion": "success",
         "head_sha": HEAD,
         "pr_number": PR,
         "run_id": 12345,
@@ -224,5 +233,38 @@ def test_verifier_rejects_merge_authority_tamper() -> None:
     with pytest.raises(
         SpinePrAutomationQualificationVerifyError,
         match="cannot grant merge authority",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
+
+
+def test_qualification_rejects_source_path_tamper() -> None:
+    receipt = _receipt()
+    receipt["source_workflow_path"] = (
+        ".github/workflows/forged-merge-readiness.yml"
+    )
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="source workflow path changed",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_verifier_rejects_source_event_tamper() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["source_event"] = "workflow_dispatch"
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="source workflow event changed",
     ):
         SpinePrAutomationQualificationVerify().verify(tampered)

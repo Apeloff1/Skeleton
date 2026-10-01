@@ -7,6 +7,14 @@ import json
 import re
 from typing import Any, Callable, Mapping
 
+from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_SOURCE_CONCLUSION,
+    TRUSTED_SOURCE_EVENT,
+    TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_NAME,
+    TRUSTED_SOURCE_WORKFLOW_PATH,
+)
+
 
 class SpinePrAutomationReceiptError(RuntimeError):
     """Runner report could not form an exact-target operational receipt."""
@@ -14,6 +22,9 @@ class SpinePrAutomationReceiptError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 _ALLOWED_STATES = frozenset({"ready", "held", "ignored", "merged"})
 _ALLOWED_DECISIONS = frozenset({"ignore", "hold", "ready", "merge"})
 _ALLOWED_MODES = frozenset({"observe", "apply"})
@@ -56,6 +67,9 @@ class SpinePrAutomationReceiptBuilder:
         self,
         *,
         report: Mapping[str, Any],
+        expected_repository: str,
+        source_run: Mapping[str, Any],
+        expected_source_run_attempt: int,
         expected_head_sha: str,
         expected_pr_number: int,
         run_id: int,
@@ -65,6 +79,21 @@ class SpinePrAutomationReceiptBuilder:
     ) -> dict[str, Any]:
         if not isinstance(report, Mapping):
             raise SpinePrAutomationReceiptError("runner report must be an object")
+        if (
+            not isinstance(expected_repository, str)
+            or _REPOSITORY_RE.fullmatch(expected_repository) is None
+        ):
+            raise SpinePrAutomationReceiptError(
+                "expected repository is invalid"
+            )
+        if not isinstance(source_run, Mapping):
+            raise SpinePrAutomationReceiptError(
+                "source workflow run must be an object"
+            )
+        source_run_attempt = _positive(
+            expected_source_run_attempt,
+            "source workflow run attempt",
+        )
         if not isinstance(expected_head_sha, str) or _SHA_RE.fullmatch(expected_head_sha) is None:
             raise SpinePrAutomationReceiptError("expected head SHA is invalid")
         expected_pr = _positive(expected_pr_number, "expected PR number")
@@ -78,10 +107,73 @@ class SpinePrAutomationReceiptBuilder:
         identity = report.get("identity")
         if not isinstance(identity, Mapping):
             raise SpinePrAutomationReceiptError("runner identity is missing")
-        if identity.get("workflow_name") != "Merge Readiness":
+        if identity.get("repository") != expected_repository:
+            raise SpinePrAutomationReceiptError(
+                "runner repository identity changed"
+            )
+        if identity.get("workflow_name") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationReceiptError("runner source workflow changed")
         if identity.get("head_sha") != expected_head_sha:
             raise SpinePrAutomationReceiptError("runner report is not exact-head")
+        if identity.get("event_name") != "workflow_run":
+            raise SpinePrAutomationReceiptError(
+                "runner was not produced by workflow_run"
+            )
+
+        source_id = _positive(
+            source_run.get("id"),
+            "source workflow run id",
+        )
+        source_attempt = _positive(
+            source_run.get("run_attempt"),
+            "source workflow run attempt",
+        )
+        source_workflow_id = _positive(
+            source_run.get("workflow_id"),
+            "source workflow id",
+        )
+        if source_attempt != source_run_attempt:
+            raise SpinePrAutomationReceiptError(
+                "source workflow run attempt changed"
+            )
+        if identity.get("workflow_run_id") != source_id:
+            raise SpinePrAutomationReceiptError(
+                "runner source run identity changed"
+            )
+        if source_run.get("name") != TRUSTED_SOURCE_WORKFLOW_NAME:
+            raise SpinePrAutomationReceiptError(
+                "source workflow name changed"
+            )
+        if source_run.get("path") != TRUSTED_SOURCE_WORKFLOW_PATH:
+            raise SpinePrAutomationReceiptError(
+                "source workflow path changed"
+            )
+        if source_run.get("event") != TRUSTED_SOURCE_EVENT:
+            raise SpinePrAutomationReceiptError(
+                "source workflow event changed"
+            )
+        if source_run.get("head_sha") != expected_head_sha:
+            raise SpinePrAutomationReceiptError(
+                "source workflow run is not exact-head"
+            )
+        head_repository = source_run.get("head_repository")
+        source_repository = (
+            head_repository.get("full_name")
+            if isinstance(head_repository, Mapping)
+            else None
+        )
+        if source_repository != expected_repository:
+            raise SpinePrAutomationReceiptError(
+                "source workflow repository changed"
+            )
+        if source_run.get("status") != TRUSTED_SOURCE_STATUS:
+            raise SpinePrAutomationReceiptError(
+                "source workflow run is not completed"
+            )
+        if source_run.get("conclusion") != TRUSTED_SOURCE_CONCLUSION:
+            raise SpinePrAutomationReceiptError(
+                "source workflow run did not succeed"
+            )
 
         targets = report.get("targets")
         if not isinstance(targets, Mapping) or targets.get("complete") is not True:
@@ -146,7 +238,16 @@ class SpinePrAutomationReceiptBuilder:
             "kind": "spine_pr_automation_runner_receipt",
             "authority_domain": "pr-automation-runner",
             "workflow_name": "PR Automation Index",
-            "source_workflow": "Merge Readiness",
+            "repository": expected_repository,
+            "source_workflow": TRUSTED_SOURCE_WORKFLOW_NAME,
+            "source_workflow_path": TRUSTED_SOURCE_WORKFLOW_PATH,
+            "source_event": TRUSTED_SOURCE_EVENT,
+            "source_workflow_id": source_workflow_id,
+            "source_run_id": source_id,
+            "source_run_attempt": source_attempt,
+            "source_head_repository": source_repository,
+            "source_status": TRUSTED_SOURCE_STATUS,
+            "source_conclusion": TRUSTED_SOURCE_CONCLUSION,
             "head_sha": expected_head_sha,
             "pr_number": expected_pr,
             "run_id": automation_run_id,

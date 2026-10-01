@@ -23,8 +23,12 @@ PR = 2333
 def _report() -> dict[str, object]:
     return {
         "identity": {
+            "repository": "Apeloff1/Skeleton",
+            "trigger": "workflow_completion",
             "workflow_name": "Merge Readiness",
+            "workflow_run_id": 777,
             "head_sha": HEAD,
+            "event_name": "workflow_run",
         },
         "targets": {
             "complete": True,
@@ -52,10 +56,27 @@ def _report() -> dict[str, object]:
     }
 
 
-def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
-    report = _report()
-    receipt = SpinePrAutomationReceiptBuilder().build(
+def _source_run() -> dict[str, object]:
+    return {
+        "id": 777,
+        "name": "Merge Readiness",
+        "path": ".github/workflows/merge-readiness.yml",
+        "event": "pull_request",
+        "workflow_id": 358774735,
+        "run_attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": HEAD,
+        "head_repository": {"full_name": "Apeloff1/Skeleton"},
+    }
+
+
+def _build(report: dict[str, object]) -> dict[str, object]:
+    return SpinePrAutomationReceiptBuilder().build(
         report=report,
+        expected_repository="Apeloff1/Skeleton",
+        source_run=_source_run(),
+        expected_source_run_attempt=1,
         expected_head_sha=HEAD,
         expected_pr_number=PR,
         run_id=123,
@@ -63,6 +84,11 @@ def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
         mode="observe",
         attest=lambda payload: "d" * 64,
     )
+
+
+def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
+    report = _report()
+    receipt = _build(report)
     card = SpinePrAutomationQualification().qualify(
         receipt=receipt,
         expected_head_sha=HEAD,
@@ -95,23 +121,35 @@ def test_runner_receipt_builder_rejects_sweep_or_multi_target_report() -> None:
         }
     )
     with pytest.raises(SpinePrAutomationReceiptError, match="exactly one target"):
-        SpinePrAutomationReceiptBuilder().build(
-            report=report,
-            expected_head_sha=HEAD,
-            expected_pr_number=PR,
-            run_id=123,
-            run_attempt=1,
-            mode="observe",
-            attest=lambda payload: "d" * 64,
-        )
+        _build(report)
 
 
 def test_runner_receipt_builder_rejects_observe_mode_mutation() -> None:
     report = _report()
     report["mutations_attempted"] = 1
     with pytest.raises(SpinePrAutomationReceiptError, match="observe"):
+        _build(report)
+
+
+def test_runner_receipt_builder_rejects_head_drift() -> None:
+    report = copy.deepcopy(_report())
+    report["identity"]["head_sha"] = "f" * 40
+    with pytest.raises(SpinePrAutomationReceiptError, match="not exact-head"):
+        _build(report)
+
+
+def test_runner_receipt_builder_rejects_source_path_impersonation() -> None:
+    source = _source_run()
+    source["path"] = ".github/workflows/forged-merge-readiness.yml"
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="source workflow path changed",
+    ):
         SpinePrAutomationReceiptBuilder().build(
-            report=report,
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=source,
+            expected_source_run_attempt=1,
             expected_head_sha=HEAD,
             expected_pr_number=PR,
             run_id=123,
@@ -121,12 +159,28 @@ def test_runner_receipt_builder_rejects_observe_mode_mutation() -> None:
         )
 
 
-def test_runner_receipt_builder_rejects_head_drift() -> None:
-    report = copy.deepcopy(_report())
-    report["identity"]["head_sha"] = "f" * 40
-    with pytest.raises(SpinePrAutomationReceiptError, match="not exact-head"):
+def test_runner_receipt_builder_rejects_source_run_identity_drift() -> None:
+    report = _report()
+    report["identity"]["workflow_run_id"] = 778
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="source run identity changed",
+    ):
+        _build(report)
+
+
+def test_runner_receipt_builder_rejects_unsuccessful_source() -> None:
+    source = _source_run()
+    source["conclusion"] = "failure"
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="did not succeed",
+    ):
         SpinePrAutomationReceiptBuilder().build(
-            report=report,
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=source,
+            expected_source_run_attempt=1,
             expected_head_sha=HEAD,
             expected_pr_number=PR,
             run_id=123,

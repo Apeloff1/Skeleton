@@ -188,11 +188,15 @@ jobs:
           run_pr_automation "${args[@]}"
 
       - name: Emit P2 PR Automation qualification evidence
-        if: github.event_name == 'workflow_run'
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success'
         shell: bash
         env:
           P2_PR_AUTOMATION_ATTESTATION_KEY: ${{ secrets.P2_PR_AUTOMATION_ATTESTATION_KEY }}
           P2_AUTOMATION_MODE: ${{ steps.mode.outputs.mode }}
+          P2_SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          P2_SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
           set -euo pipefail
           if [[ -z "${P2_PR_AUTOMATION_ATTESTATION_KEY:-}" ]]; then
@@ -211,7 +215,16 @@ jobs:
           rm -f .pr-automation/p2-pr-automation-evidence.json
           mkdir -p .p2-evidence
           evidence=".p2-evidence/pr-automation.json"
-          python scripts/qualify_spine_pr_automation_runner.py             --report "$report"             --expected-head "$P2_SOURCE_HEAD_SHA"             --run-id "$GITHUB_RUN_ID"             --run-attempt "$GITHUB_RUN_ATTEMPT"             --mode "$P2_AUTOMATION_MODE"             --evidence-out "$evidence"
+          python scripts/qualify_spine_pr_automation_runner.py \
+            --report "$report" \
+            --repository "$GITHUB_REPOSITORY" \
+            --expected-head "$P2_SOURCE_HEAD_SHA" \
+            --source-run-id "$P2_SOURCE_RUN_ID" \
+            --source-run-attempt "$P2_SOURCE_RUN_ATTEMPT" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --mode "$P2_AUTOMATION_MODE" \
+            --evidence-out "$evidence"
 
       - name: Upload P2 PR Automation qualification evidence
         if: always() && github.event_name == 'workflow_run'

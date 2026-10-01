@@ -7,6 +7,14 @@ import json
 import re
 from typing import Any
 
+from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_SOURCE_CONCLUSION,
+    TRUSTED_SOURCE_EVENT,
+    TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_NAME,
+    TRUSTED_SOURCE_WORKFLOW_PATH,
+)
+
 
 class SpinePrAutomationQualificationVerifyError(RuntimeError):
     """PR-automation qualification verification failed closed."""
@@ -14,6 +22,9 @@ class SpinePrAutomationQualificationVerifyError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 _ALLOWED_STATES = frozenset({"ready", "held", "ignored", "merged"})
 _ALLOWED_DECISIONS = frozenset({"ignore", "hold", "ready", "merge"})
 _ALLOWED_MODES = frozenset({"observe", "apply"})
@@ -55,9 +66,34 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation workflow identity changed"
             )
-        if card.get("source_workflow") != "Merge Readiness":
+        if card.get("source_workflow") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation source workflow changed"
+            )
+        if card.get("source_workflow_path") != TRUSTED_SOURCE_WORKFLOW_PATH:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow path changed"
+            )
+        if card.get("source_event") != TRUSTED_SOURCE_EVENT:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow event changed"
+            )
+        repository = card.get("repository")
+        if (
+            not isinstance(repository, str)
+            or _REPOSITORY_RE.fullmatch(repository) is None
+            or card.get("source_head_repository") != repository
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source repository changed"
+            )
+        if card.get("source_status") != TRUSTED_SOURCE_STATUS:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow is not completed"
+            )
+        if card.get("source_conclusion") != TRUSTED_SOURCE_CONCLUSION:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow did not succeed"
             )
         if card.get("conclusion") != "success":
             raise SpinePrAutomationQualificationVerifyError(
@@ -85,7 +121,13 @@ class SpinePrAutomationQualificationVerify:
                 raise SpinePrAutomationQualificationVerifyError(
                     f"{field} is invalid"
                 )
-        for field in ("run_id", "run_attempt"):
+        for field in (
+            "run_id",
+            "run_attempt",
+            "source_workflow_id",
+            "source_run_id",
+            "source_run_attempt",
+        ):
             value = card.get(field)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise SpinePrAutomationQualificationVerifyError(
@@ -158,7 +200,16 @@ class SpinePrAutomationQualificationVerify:
         evidence = {
             "authority_domain": card["authority_domain"],
             "workflow_name": card["workflow_name"],
+            "repository": repository,
             "source_workflow": card["source_workflow"],
+            "source_workflow_path": card["source_workflow_path"],
+            "source_event": card["source_event"],
+            "source_workflow_id": card["source_workflow_id"],
+            "source_run_id": card["source_run_id"],
+            "source_run_attempt": card["source_run_attempt"],
+            "source_head_repository": card["source_head_repository"],
+            "source_status": card["source_status"],
+            "source_conclusion": card["source_conclusion"],
             "conclusion": card["conclusion"],
             "head_sha": head_sha,
             "pr_number": pr_number,

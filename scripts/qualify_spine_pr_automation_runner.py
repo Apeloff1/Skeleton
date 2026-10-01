@@ -10,6 +10,8 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from skeleton.persistence.spine_pr_automation_qualification import (
     SpinePrAutomationQualification,
@@ -55,10 +57,39 @@ def _authenticate(receipt: dict[str, Any], key: bytes) -> bool:
     )
 
 
+def _fetch_source_run(repository: str, run_id: int) -> dict[str, Any]:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "GITHUB_TOKEN is required to verify the source workflow run"
+        )
+    owner_repo = quote(repository, safe="/")
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/actions/runs/{run_id}"
+    )
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "skeleton-p2-pr-automation-qualification",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    if not isinstance(payload, dict):
+        raise RuntimeError("source workflow run response is not an object")
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", required=True)
+    parser.add_argument("--repository", required=True)
     parser.add_argument("--expected-head", required=True)
+    parser.add_argument("--source-run-id", required=True, type=int)
+    parser.add_argument("--source-run-attempt", required=True, type=int)
     parser.add_argument("--pr-number", type=int)
     parser.add_argument("--run-id", required=True, type=int)
     parser.add_argument("--run-attempt", required=True, type=int)
@@ -83,9 +114,20 @@ def main() -> int:
                 "runner report must contain exactly one positive target PR when --pr-number is omitted"
             )
         pr_number = target_rows[0]["number"]
+    source_run = _fetch_source_run(
+        args.repository,
+        args.source_run_id,
+    )
+    if source_run.get("run_attempt") != args.source_run_attempt:
+        raise RuntimeError(
+            "source workflow run attempt changed before qualification"
+        )
     key = _key()
     receipt = SpinePrAutomationReceiptBuilder().build(
         report=report,
+        expected_repository=args.repository,
+        source_run=source_run,
+        expected_source_run_attempt=args.source_run_attempt,
         expected_head_sha=args.expected_head,
         expected_pr_number=pr_number,
         run_id=args.run_id,

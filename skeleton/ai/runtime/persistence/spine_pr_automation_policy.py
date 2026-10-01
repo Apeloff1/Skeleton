@@ -1,0 +1,15 @@
+"""Trusted source identity for P2 PR Automation operational evidence."""
+
+TRUSTED_SOURCE_WORKFLOW_NAME = "Merge Readiness"
+TRUSTED_SOURCE_WORKFLOW_PATH = ".github/workflows/merge-readiness.yml"
+TRUSTED_SOURCE_EVENT = "pull_request"
+TRUSTED_SOURCE_STATUS = "completed"
+TRUSTED_SOURCE_CONCLUSION = "success"
+
+__all__ = [
+    "TRUSTED_SOURCE_CONCLUSION",
+    "TRUSTED_SOURCE_EVENT",
+    "TRUSTED_SOURCE_STATUS",
+    "TRUSTED_SOURCE_WORKFLOW_NAME",
+    "TRUSTED_SOURCE_WORKFLOW_PATH",
+]
