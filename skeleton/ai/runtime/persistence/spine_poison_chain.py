@@ -28,7 +28,7 @@ class SpinePoisonChain:
             raise SpinePoisonChainError("tenant_id must be non-empty text")
         rows = self._connection.execute(
             """
-            SELECT apply_id, tenant_id, outbox_id, digest, reason,
+            SELECT apply_id, tenant_id, outbox_id, hold_id, digest, reason,
                    epoch_before, epoch_after, applied, ticket_id, applied_at
             FROM spine_poison_apply
             WHERE tenant_id = ?
@@ -44,6 +44,7 @@ class SpinePoisonChain:
                     "apply_id",
                     "tenant_id",
                     "outbox_id",
+                    "hold_id",
                     "digest",
                     "reason",
                     "epoch_before",

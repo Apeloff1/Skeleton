@@ -67,9 +67,10 @@ def _active_spine_hold(
     ).fetchone()
 
 
-def _release_spine_holds(
+def _release_spine_hold(
     connection: sqlite3.Connection,
     *,
+    hold_id: int,
     tenant_id: str,
     outbox_id: str,
     ticket_id: str,
@@ -81,9 +82,18 @@ def _release_spine_holds(
         SET released = 1,
             released_at = ?,
             release_ticket_id = ?
-        WHERE tenant_id = ? AND outbox_id = ? AND released = 0
+        WHERE hold_id = ?
+          AND tenant_id = ?
+          AND outbox_id = ?
+          AND released = 0
         """,
-        (released_at, ticket_id, tenant_id, outbox_id),
+        (
+            released_at,
+            ticket_id,
+            hold_id,
+            tenant_id,
+            outbox_id,
+        ),
     )
     connection.commit()
     return max(0, cursor.rowcount)

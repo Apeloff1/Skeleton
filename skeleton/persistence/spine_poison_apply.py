@@ -18,7 +18,7 @@ from skeleton.persistence.inbox_ledger import InboxDelivery
 from skeleton.persistence.spine_hold import (
     _active_spine_hold,
     _ensure_spine_hold_schema,
-    _release_spine_holds,
+    _release_spine_hold,
 )
 from skeleton.persistence.spine_reaccept import SpineReaccept
 from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
@@ -58,6 +58,7 @@ class SpinePoisonApply:
                 apply_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 outbox_id TEXT NOT NULL,
+                hold_id INTEGER NOT NULL DEFAULT 0,
                 digest TEXT NOT NULL,
                 reason TEXT NOT NULL,
                 epoch_before INTEGER NOT NULL,
@@ -68,6 +69,19 @@ class SpinePoisonApply:
             )
             """
         )
+        journal_columns = {
+            str(row["name"])
+            for row in self._journal.execute(
+                "PRAGMA table_info(spine_poison_apply)"
+            )
+        }
+        if "hold_id" not in journal_columns:
+            self._journal.execute(
+                """
+                ALTER TABLE spine_poison_apply
+                ADD COLUMN hold_id INTEGER NOT NULL DEFAULT 0
+                """
+            )
         self._journal.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS
@@ -127,6 +141,30 @@ class SpinePoisonApply:
                 "ticket-mismatch",
                 instant,
             )
+        ticket_hold_id = ticket["hold_id"]
+        if (
+            isinstance(ticket_hold_id, bool)
+            or not isinstance(ticket_hold_id, int)
+            or ticket_hold_id < 1
+        ):
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "ticket-hold-missing",
+                instant,
+            )
+        if int(hold["hold_id"]) != ticket_hold_id:
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "hold-drift",
+                instant,
+                hold_id=ticket_hold_id,
+            )
         if ticket["consumed"] != 0:
             return self._refuse(
                 tenant_id,
@@ -180,13 +218,14 @@ class SpinePoisonApply:
         self._journal.execute(
             """
             INSERT INTO spine_poison_apply(
-                tenant_id, outbox_id, digest, reason, epoch_before, epoch_after,
-                applied, ticket_id, applied_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+                tenant_id, outbox_id, hold_id, digest, reason,
+                epoch_before, epoch_after, applied, ticket_id, applied_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
             (
                 tenant_id,
                 outbox_id,
+                ticket_hold_id,
                 expected_digest,
                 card["reason"],
                 card["epoch_before"],
@@ -196,8 +235,9 @@ class SpinePoisonApply:
             ),
         )
         self._journal.commit()
-        released_rows = _release_spine_holds(
+        released_rows = _release_spine_hold(
             self._hold,
+            hold_id=ticket_hold_id,
             tenant_id=tenant_id,
             outbox_id=outbox_id,
             ticket_id=ticket_id,
@@ -225,6 +265,7 @@ class SpinePoisonApply:
             card["duplicate"],
             expected_digest,
             ticket_id,
+            ticket_hold_id,
             True,
             released_rows,
         )
@@ -244,15 +285,25 @@ class SpinePoisonApply:
         ticket_id: str,
         reason: str,
         instant: datetime,
+        *,
+        hold_id: int = 0,
     ) -> dict[str, Any]:
         self._journal.execute(
             """
             INSERT INTO spine_poison_apply(
-                tenant_id, outbox_id, digest, reason, epoch_before, epoch_after,
-                applied, ticket_id, applied_at
-            ) VALUES (?, ?, ?, ?, 0, 0, 0, ?, ?)
+                tenant_id, outbox_id, hold_id, digest, reason,
+                epoch_before, epoch_after, applied, ticket_id, applied_at
+            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, ?)
             """,
-            (tenant_id, outbox_id, digest, reason, ticket_id, instant.isoformat()),
+            (
+                tenant_id,
+                outbox_id,
+                hold_id,
+                digest,
+                reason,
+                ticket_id,
+                instant.isoformat(),
+            ),
         )
         self._journal.commit()
         return self._card(
@@ -265,6 +316,7 @@ class SpinePoisonApply:
             False,
             digest,
             ticket_id,
+            hold_id,
             False,
             0,
         )
@@ -280,6 +332,7 @@ class SpinePoisonApply:
         duplicate: bool,
         delivery_digest: str,
         ticket_id: str,
+        hold_id: int,
         hold_released: bool,
         released_hold_rows: int,
     ) -> dict[str, Any]:
@@ -292,6 +345,7 @@ class SpinePoisonApply:
             "outbox_id": outbox_id,
             "delivery_digest": delivery_digest,
             "ticket_id": ticket_id,
+            "hold_id": hold_id,
             "hold_released": hold_released,
             "released_hold_rows": released_hold_rows,
             "reason": reason,

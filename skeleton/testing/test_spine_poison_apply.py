@@ -114,6 +114,7 @@ def test_matching_digest_applies_without_moving_fence(tmp_path: Path) -> None:
     assert card["reason"] == "accepted"
     assert card["epoch_before"] == card["epoch_after"] == 0
     assert card["applied_fence"] is False
+    assert card["hold_id"] == issued["hold_id"]
     assert card["hold_released"] is True
     assert card["released_hold_rows"] == 1
     assert inbox.applied_count() == 1
@@ -156,6 +157,54 @@ def test_matching_digest_applies_without_moving_fence(tmp_path: Path) -> None:
     assert inbox.applied_count() == 1
     assert witness.card("tenant-poison")["applied"] == 1
     assert witness.card("tenant-other")["applied"] == 0
+
+
+def test_ticket_is_bound_to_exact_hold_row_and_newer_hold_fails_closed(
+    tmp_path: Path,
+) -> None:
+    hold, apply, witness, inbox = _stack(tmp_path)
+    delivery = _delivery()
+    first = hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison-first",
+        now=BASE,
+    )
+    ticket = SpinePoisonTicket(
+        tmp_path / "hold.sqlite",
+        tmp_path / "ticket.sqlite",
+    )
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    assert issued["hold_id"] >= 1
+
+    second = hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison-newer",
+        now=BASE,
+    )
+    assert first["hit"] is True and second["hit"] is True
+
+    refused = apply.apply(
+        delivery,
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        expected_digest=delivery.digest(),
+        ticket_id=issued["ticket_id"],
+        now=BASE,
+    )
+    assert refused["reason"] == "hold-drift"
+    assert refused["applied"] == 0
+    row = ticket.read(issued["ticket_id"])
+    assert row is not None
+    assert row["consumed"] == 0
+    assert inbox.applied_count() == 0
+    assert witness.card("tenant-poison")["applied"] == 0
 
 
 def test_ticket_consume_is_one_time_and_idempotent(tmp_path: Path) -> None:

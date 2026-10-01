@@ -41,12 +41,23 @@ class SpinePoisonTicket:
                 ticket_id TEXT PRIMARY KEY,
                 tenant_id TEXT NOT NULL,
                 outbox_id TEXT NOT NULL,
+                hold_id INTEGER NOT NULL,
                 digest TEXT NOT NULL,
                 consumed INTEGER NOT NULL,
                 issued_at TEXT NOT NULL
             )
             """
         )
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(spine_poison_ticket)"
+            )
+        }
+        if "hold_id" not in columns:
+            self._connection.execute(
+                "ALTER TABLE spine_poison_ticket ADD COLUMN hold_id INTEGER"
+            )
         self._connection.commit()
 
     def issue(
@@ -85,10 +96,20 @@ class SpinePoisonTicket:
         ticket_id = str(uuid4())
         self._connection.execute(
             """
-            INSERT INTO spine_poison_ticket(ticket_id, tenant_id, outbox_id, digest, consumed, issued_at)
-            VALUES (?, ?, ?, ?, 0, ?)
+            INSERT INTO spine_poison_ticket(
+                ticket_id, tenant_id, outbox_id, hold_id, digest,
+                consumed, issued_at
+            )
+            VALUES (?, ?, ?, ?, ?, 0, ?)
             """,
-            (ticket_id, tenant_id, outbox_id, digest, instant.isoformat()),
+            (
+                ticket_id,
+                tenant_id,
+                outbox_id,
+                int(hold["hold_id"]),
+                digest,
+                instant.isoformat(),
+            ),
         )
         self._connection.commit()
         return {
@@ -99,6 +120,7 @@ class SpinePoisonTicket:
             "ticket_id": ticket_id,
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "hold_id": int(hold["hold_id"]),
             "digest": digest,
             "issued": 1,
             "consumed": 0,
@@ -118,12 +140,17 @@ class SpinePoisonTicket:
         ticket = self.read(ticket_id)
         if ticket is None:
             return None
+        hold_id = ticket["hold_id"]
+        if isinstance(hold_id, bool) or not isinstance(hold_id, int) or hold_id < 1:
+            return None
         row = self._hold.execute(
             """
             SELECT
-                COUNT(*) AS total,
-                COALESCE(SUM(CASE WHEN released = 0 THEN 1 ELSE 0 END), 0)
-                    AS active,
+                COUNT(*) AS target_rows,
+                COALESCE(
+                    SUM(CASE WHEN released = 0 THEN 1 ELSE 0 END),
+                    0
+                ) AS target_active,
                 COALESCE(
                     SUM(
                         CASE
@@ -134,13 +161,20 @@ class SpinePoisonTicket:
                     0
                 ) AS released_by_ticket
             FROM spine_hold
-            WHERE tenant_id = ? AND outbox_id = ?
+            WHERE hold_id = ?
+              AND tenant_id = ?
+              AND outbox_id = ?
             """,
-            (ticket_id, ticket["tenant_id"], ticket["outbox_id"]),
+            (
+                ticket_id,
+                hold_id,
+                ticket["tenant_id"],
+                ticket["outbox_id"],
+            ),
         ).fetchone()
         return {
-            "total": int(row["total"]),
-            "active": int(row["active"]),
+            "target_rows": int(row["target_rows"]),
+            "target_active": int(row["target_active"]),
             "released_by_ticket": int(row["released_by_ticket"]),
         }
 

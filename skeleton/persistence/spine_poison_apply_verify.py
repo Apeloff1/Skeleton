@@ -41,6 +41,15 @@ class SpinePoisonApplyVerify:
         for field, value in (("tenant_id", tenant_id), ("outbox_id", outbox_id), ("ticket_id", ticket_id)):
             if not isinstance(value, str) or not value.strip():
                 raise SpinePoisonApplyVerifyError(f"{field} must be non-empty text")
+        hold_id = card.get("hold_id")
+        if (
+            isinstance(hold_id, bool)
+            or not isinstance(hold_id, int)
+            or hold_id < 1
+        ):
+            raise SpinePoisonApplyVerifyError(
+                "poison apply hold_id is invalid"
+            )
         delivery_digest = card.get("delivery_digest")
         if not isinstance(delivery_digest, str) or _DIGEST_RE.fullmatch(delivery_digest) is None:
             raise SpinePoisonApplyVerifyError("delivery_digest must be lowercase SHA-256 hex")
@@ -83,8 +92,8 @@ class SpinePoisonApplyVerify:
 
         rows = self._connection.execute(
             """
-            SELECT tenant_id, outbox_id, digest, reason, epoch_before,
-                   epoch_after, applied, ticket_id
+            SELECT tenant_id, outbox_id, hold_id, digest, reason,
+                   epoch_before, epoch_after, applied, ticket_id
             FROM spine_poison_apply
             WHERE ticket_id = ? AND applied = 1
             ORDER BY apply_id
@@ -99,6 +108,7 @@ class SpinePoisonApplyVerify:
         expected = {
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "hold_id": hold_id,
             "digest": delivery_digest,
             "reason": reason,
             "epoch_before": before,
@@ -116,6 +126,7 @@ class SpinePoisonApplyVerify:
         if (
             ticket["tenant_id"] != tenant_id
             or ticket["outbox_id"] != outbox_id
+            or ticket["hold_id"] != hold_id
             or ticket["digest"] != delivery_digest
         ):
             raise SpinePoisonApplyVerifyError("poison apply ticket scope mismatch")
@@ -141,9 +152,13 @@ class SpinePoisonApplyVerify:
             raise SpinePoisonApplyVerifyError(
                 "poison apply hold release evidence is missing"
             )
-        if release_state["active"] != 0:
+        if release_state["target_rows"] != 1:
             raise SpinePoisonApplyVerifyError(
-                "poison apply left an active hold"
+                "poison apply target hold evidence is missing"
+            )
+        if release_state["target_active"] != 0:
+            raise SpinePoisonApplyVerifyError(
+                "poison apply left the target hold active"
             )
         if release_state["released_by_ticket"] != released_hold_rows:
             raise SpinePoisonApplyVerifyError(
@@ -159,6 +174,7 @@ class SpinePoisonApplyVerify:
             "outbox_id": outbox_id,
             "delivery_digest": delivery_digest,
             "ticket_id": ticket_id,
+            "hold_id": hold_id,
             "reason": reason,
             "epoch_before": before,
             "epoch_after": after,
