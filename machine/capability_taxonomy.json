@@ -9934,5 +9934,13 @@
     "all_volume_rule": "Every masterplan volume appears exactly once.",
     "naming_rule": "Canonical spelling is preserved; normalized name is search metadata only.",
     "runtime_truth_rule": "Taxonomy never implies runtime availability or maturity."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-124",
+    "title": "Capability Taxonomy",
+    "required_gap_texts": [
+      "normalize capability naming",
+      "map all volumes to capability classes"
+    ]
   }
 }
