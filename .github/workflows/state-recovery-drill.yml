@@ -66,6 +66,8 @@ on:
       - "skeleton/persistence/spine_ci_qualification*.py"
       - "skeleton/ai/runtime/persistence/spine_ci_qualification*.py"
       - "skeleton/testing/test_spine_provider_live_qualification.py"
+      - "skeleton/testing/test_spine_provider_live_script.py"
+      - "scripts/qualify_spine_provider_live.py"
       - "skeleton/persistence/spine_provider_live_qualification*.py"
       - "skeleton/ai/runtime/persistence/spine_provider_live_qualification*.py"
       - "skeleton/persistence/spine_pr_automation_qualification*.py"
@@ -258,6 +260,7 @@ jobs:
           skeleton/testing/test_spine_pr_automation_qualification.py
           skeleton/testing/test_spine_ci_qualification.py
           skeleton/testing/test_spine_provider_live_qualification.py
+          skeleton/testing/test_spine_provider_live_script.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 
