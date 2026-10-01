@@ -242,6 +242,16 @@ jobs:
           skeleton/testing/test_spine_projection.py
           skeleton/testing/test_mongo_projection.py
 
+      - name: Verify P2 authenticated receipt producer contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_spine_ci_receipt.py
+          skeleton/testing/test_spine_pr_automation_receipt.py
+          skeleton/testing/test_spine_ci_qualification.py
+          skeleton/testing/test_spine_pr_automation_qualification.py
+
       - name: Verify P2 async Mongo bootstrap contracts
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
