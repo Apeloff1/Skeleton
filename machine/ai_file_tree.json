@@ -200,7 +200,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "606b5cc78039d2635b18f71e24a56d04cea430f7",
+      "source_git_object_sha": "06ca65e89d7a9ca313c46af19c5ff3f4e4aeb770",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -578,7 +578,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "9841184e84f716673cd2ff107984f67168e1be08",
+      "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
       "role": "AI runtime observability audit and telemetry plane",
       "work_package_refs": [
         "WP-W00",
@@ -954,7 +954,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c991fd564e5045721b9e72563a4f2322daad520c",
+      "source_git_object_sha": "856257ce45a03ca9682f05e6ec0bcdb91ca2900b",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1003,7 +1003,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "143dd478f3e24d32268547b69826d5d485ff9edc",
+      "source_git_object_sha": "3d91efbdb8bf1a553f5a92391050ddebe11c0107",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
