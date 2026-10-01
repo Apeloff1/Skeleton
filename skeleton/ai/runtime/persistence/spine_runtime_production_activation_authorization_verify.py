@@ -61,6 +61,7 @@ class SpineRuntimeProductionActivationAuthorizationVerify:
             "authorization_id",
             "acceptance_digest",
             "acceptance_id",
+            "health_digest",
             "execution_id",
             "authorization_nonce",
         ):
@@ -79,7 +80,8 @@ class SpineRuntimeProductionActivationAuthorizationVerify:
         expected_id = hashlib.sha256(
             (
                 f"{card['acceptance_digest']}|{card['acceptance_id']}|"
-                f"{card['execution_id']}|{card['deployment_id']}|"
+                f"{card['health_digest']}|{card['execution_id']}|"
+                f"{card['deployment_id']}|
                 f"{card['authorization_nonce']}|pymongo-async"
             ).encode("utf-8")
         ).hexdigest()
@@ -91,6 +93,7 @@ class SpineRuntimeProductionActivationAuthorizationVerify:
             "authorization_id": card["authorization_id"],
             "acceptance_digest": card["acceptance_digest"],
             "acceptance_id": card["acceptance_id"],
+            "health_digest": card["health_digest"],
             "execution_id": card["execution_id"],
             "deployment_id": card["deployment_id"],
             "authorization_nonce": card["authorization_nonce"],
@@ -118,6 +121,7 @@ class SpineRuntimeProductionActivationAuthorizationVerify:
             "authorization_id": card["authorization_id"],
             "authorization_digest": digest,
             "acceptance_id": card["acceptance_id"],
+            "health_digest": card["health_digest"],
             "execution_id": card["execution_id"],
             "verified": True,
             "production_activation_authorized": True,
