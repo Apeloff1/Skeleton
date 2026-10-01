@@ -43,6 +43,8 @@ FILES = (
     "spine_runtime_activation_commit_verify.py",
     "spine_runtime_activation_boundary.py",
     "spine_runtime_activation_boundary_verify.py",
+    "spine_runtime_activation_handoff.py",
+    "spine_runtime_activation_handoff_verify.py",
 )
 
 

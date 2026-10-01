@@ -108,6 +108,8 @@ SEAMS = (
     ("runtime-activation-commit-verify", "activation-commitment-verification-does-not-activate-runtime"),
     ("runtime-activation-boundary", "pre-activation-boundary-proves-runtime-and-fence-unchanged"),
     ("runtime-activation-boundary-verify", "boundary-verification-does-not-activate-runtime"),
+    ("runtime-activation-handoff", "deployment-handoff-does-not-activate-runtime"),
+    ("runtime-activation-handoff-verify", "handoff-verification-does-not-activate-runtime"),
 )
 
 

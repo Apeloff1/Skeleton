@@ -113,6 +113,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeActivationBoundaryWitness` joins the verified activation commitment to the actual runtime dispatcher binding and an epoch witness. It proves the dispatcher identity is stable and uncalled, `dispatcher_running=false`, the fence epoch is unchanged, the runtime object is not replaced, and `runtime_activated=false`. This is the final pre-activation evidence boundary, not activation itself.
 
+## Deployment activation handoff
+
+`SpineRuntimeActivationHandoff` binds the independently verified final pre-activation boundary to a short-lived, externally authenticated `runtime-deployment` receipt scoped to the exact boundary digest. The handoff may become `handoff_ready=true`, but the runtime object, dispatcher, fence, and activation state remain unchanged. `SpineRuntimeActivationHandoffVerify` independently reconstructs the digest and rejects authority drift.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -145,7 +149,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_activation_permit.py \
   skeleton/testing/test_spine_activation_consumption.py \
   skeleton/testing/test_spine_runtime_activation_commit.py \
-  skeleton/testing/test_spine_runtime_activation_boundary.py
+  skeleton/testing/test_spine_runtime_activation_boundary.py \
+  skeleton/testing/test_spine_runtime_activation_handoff.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
