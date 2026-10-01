@@ -469,6 +469,7 @@ jobs:
         if: steps.live_provider.outputs.enabled == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          P2_PROVIDER_LIVE_ATTESTATION_KEY: ${{ github.token }}
           P2_PROVIDER_LIVE_MODEL: ${{ vars.P2_PROVIDER_LIVE_MODEL }}
         run: >-
           python scripts/qualify_spine_provider_live.py
