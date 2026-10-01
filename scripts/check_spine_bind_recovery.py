@@ -36,7 +36,7 @@ MODULES = (
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
 
-MANIFEST_SEAM_COUNT = 132
+MINIMUM_MANIFEST_SEAM_COUNT = 133
 
 EXPECTED_SEAMS = {
     "bind-snapshot": "bind-snapshot-stays-unactivated",
@@ -95,9 +95,10 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != MANIFEST_SEAM_COUNT:
+    if len(seams) < MINIMUM_MANIFEST_SEAM_COUNT:
         raise SpineBindRecoveryControlError(
-            f"expected {MANIFEST_SEAM_COUNT} spine seams, found {len(seams)}"
+            "spine manifest seam count regressed: "
+            f"minimum {MINIMUM_MANIFEST_SEAM_COUNT}, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -114,12 +115,12 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     }
 
 
-def verify_masterplan(root: Path) -> dict[str, Any]:
+def verify_masterplan(root: Path, *, manifest_count: int) -> dict[str, Any]:
     path = root / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
     text = path.read_text(encoding="utf-8")
     required = [
         "- Bind card sealed: 100%",
-        f"Expect `count` {MANIFEST_SEAM_COUNT}",
+        f"Expect `count` {manifest_count}",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -138,7 +139,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
         )
     return {
         "bind_card_percent": 100,
-        "manifest_count": MANIFEST_SEAM_COUNT,
+        "manifest_count": manifest_count,
         "activation_claimed": False,
     }
 
@@ -147,7 +148,10 @@ def build_report(root: Path) -> dict[str, Any]:
     root = root.resolve()
     mirrors = verify_mirror_parity(root)
     manifest = verify_manifest(root)
-    masterplan = verify_masterplan(root)
+    masterplan = verify_masterplan(
+        root,
+        manifest_count=manifest["count"],
+    )
     return {
         "schema_version": 1,
         "control": "p2-bind-recovery-v1",

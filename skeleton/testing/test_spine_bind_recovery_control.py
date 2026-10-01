@@ -6,7 +6,7 @@ import pytest
 
 from scripts.check_spine_bind_recovery import (
     EXPECTED_SEAMS,
-    MANIFEST_SEAM_COUNT,
+    MINIMUM_MINIMUM_MANIFEST_SEAM_COUNT,
     MIRRORED,
     SpineBindRecoveryControlError,
     build_report,
@@ -25,7 +25,7 @@ def _write_fixture(root: Path) -> None:
         if name == "spine_manifest.py":
             base = [
                 (f"seam-{index}", f"law-{index}")
-                for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
+                for index in range(MINIMUM_MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
             ]
             base.extend(EXPECTED_SEAMS.items())
             content = "SEAMS = " + repr(tuple(base)) + "\n"
@@ -38,7 +38,7 @@ def _write_fixture(root: Path) -> None:
         "\n".join(
             [
                 "- Bind card sealed: 100%",
-                f"Expect `count` {MANIFEST_SEAM_COUNT}",
+                f"Expect `count` {MINIMUM_MANIFEST_SEAM_COUNT}",
                 "Bind snapshot",
                 "Bind recovery",
                 "Bind checkpoint",
@@ -62,7 +62,7 @@ def test_control_accepts_complete_dark_fixture(tmp_path: Path) -> None:
 
     assert report["valid"] is True
     assert report["mirror_count"] == len(MIRRORED)
-    assert report["manifest"]["count"] == MANIFEST_SEAM_COUNT
+    assert report["manifest"]["count"] == MINIMUM_MANIFEST_SEAM_COUNT
     assert report["masterplan"]["bind_card_percent"] == 100
     assert report["masterplan"]["activation_claimed"] is False
     assert report["completion_checkbox"] is False
@@ -84,6 +84,49 @@ def test_mirror_drift_fails_closed(tmp_path: Path) -> None:
         verify_mirror_parity(tmp_path)
 
 
+def test_manifest_growth_is_accepted_when_masterplan_matches(
+    tmp_path: Path,
+) -> None:
+    _write_fixture(tmp_path)
+    manifest_path = (
+        tmp_path / "skeleton" / "persistence" / "spine_manifest.py"
+    )
+    mirror_path = (
+        tmp_path
+        / "skeleton"
+        / "ai"
+        / "runtime"
+        / "persistence"
+        / "spine_manifest.py"
+    )
+    seams = list(_literal_assignment_for_test(manifest_path))
+    seams.append(("future-seam", "future-law"))
+    content = "SEAMS = " + repr(tuple(seams)) + "\n"
+    manifest_path.write_text(content, encoding="utf-8")
+    mirror_path.write_text(content, encoding="utf-8")
+
+    masterplan = tmp_path / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
+    text = masterplan.read_text(encoding="utf-8").replace(
+        f"Expect `count` {MINIMUM_MANIFEST_SEAM_COUNT}",
+        f"Expect `count` {MINIMUM_MANIFEST_SEAM_COUNT + 1}",
+    )
+    masterplan.write_text(text, encoding="utf-8")
+
+    report = build_report(tmp_path)
+    assert report["manifest"]["count"] == MINIMUM_MANIFEST_SEAM_COUNT + 1
+    assert report["masterplan"]["manifest_count"] == (
+        MINIMUM_MANIFEST_SEAM_COUNT + 1
+    )
+
+
+def _literal_assignment_for_test(path: Path) -> tuple[tuple[str, str], ...]:
+    namespace: dict[str, object] = {}
+    exec(path.read_text(encoding="utf-8"), {}, namespace)
+    value = namespace["SEAMS"]
+    assert isinstance(value, tuple)
+    return value
+
+
 def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
     _write_fixture(tmp_path)
     path = tmp_path / "skeleton" / "persistence" / "spine_manifest.py"
@@ -92,7 +135,7 @@ def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
 
     full_manifest = [
         (f"seam-{index}", f"law-{index}")
-        for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
+        for index in range(MINIMUM_MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
     ]
     full_manifest.extend(EXPECTED_SEAMS.items())
     missing_name = seams[-1]
@@ -100,7 +143,7 @@ def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
         ("replacement", "not-the-required-seam") if name == missing_name else (name, law)
         for name, law in full_manifest
     ]
-    assert len(mutated) == MANIFEST_SEAM_COUNT
+    assert len(mutated) == MINIMUM_MANIFEST_SEAM_COUNT
     path.write_text("SEAMS = " + repr(tuple(mutated)) + "\n", encoding="utf-8")
 
     with pytest.raises(
