@@ -59,5 +59,13 @@
     "provider_or_framework_specific_types": "must remain behind adapters and not become canonical interface identity",
     "cancellation": "cross-boundary cancellation/deadline semantics must be named when applicable",
     "errors": "every interface declares target_failure_contract"
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-128",
+    "title": "Interface Design Standard",
+    "required_gap_texts": [
+      "codify interface lint rules",
+      "bind public contracts to schema registry"
+    ]
   }
 }
