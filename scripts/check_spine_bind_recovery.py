@@ -36,7 +36,7 @@ MODULES = (
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
 
-MANIFEST_SEAM_COUNT = 124
+MANIFEST_SEAM_COUNT = 126
 
 EXPECTED_SEAMS = {
     "bind-snapshot": "bind-snapshot-stays-unactivated",
