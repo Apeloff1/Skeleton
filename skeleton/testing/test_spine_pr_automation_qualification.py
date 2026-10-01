@@ -70,6 +70,9 @@ def test_policy_hold_can_prove_runner_operational_without_merge_authority() -> N
     )
     verified = SpinePrAutomationQualificationVerify().verify(card)
 
+    assert card["authority_domain"] == "pr-automation-runner"
+    assert card["workflow_name"] == "PR Automation Index"
+    assert card["source_workflow"] == "Merge Readiness"
     assert card["pr_automation_operational_green"] is True
     assert card["pr_automation_green"] is True
     assert card["pr_automation_merge_eligible"] is False
@@ -159,6 +162,22 @@ def test_runner_failures_and_head_drift_fail_closed() -> None:
             expected_pr_number=PR,
             authenticate=lambda receipt: True,
         )
+
+
+def test_verifier_rejects_workflow_identity_tamper() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda receipt: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["workflow_name"] = "Other Workflow"
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="workflow identity changed",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
 
 
 def test_verifier_rejects_state_decision_tamper() -> None:

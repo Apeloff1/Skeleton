@@ -211,6 +211,10 @@ class SpinePrAutomationQualification:
             and target_state in {"ready", "merged"}
         )
         evidence = {
+            "authority_domain": receipt["authority_domain"],
+            "workflow_name": receipt["workflow_name"],
+            "source_workflow": receipt["source_workflow"],
+            "conclusion": receipt["conclusion"],
             "head_sha": expected_head,
             "pr_number": expected_pr,
             "run_id": run_id,

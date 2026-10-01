@@ -47,6 +47,22 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation qualification kind mismatch"
             )
+        if card.get("authority_domain") != "pr-automation-runner":
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation authority domain changed"
+            )
+        if card.get("workflow_name") != "PR Automation Index":
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation workflow identity changed"
+            )
+        if card.get("source_workflow") != "Merge Readiness":
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow changed"
+            )
+        if card.get("conclusion") != "success":
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation workflow did not complete successfully"
+            )
         head_sha = card.get("head_sha")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
             raise SpinePrAutomationQualificationVerifyError(
@@ -140,6 +156,10 @@ class SpinePrAutomationQualificationVerify:
             )
 
         evidence = {
+            "authority_domain": card["authority_domain"],
+            "workflow_name": card["workflow_name"],
+            "source_workflow": card["source_workflow"],
+            "conclusion": card["conclusion"],
             "head_sha": head_sha,
             "pr_number": pr_number,
             "run_id": card["run_id"],
