@@ -109,6 +109,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeActivationCommitLedger` persists one commitment only from independently verified activation-permit consumption. The commitment is replay-resistant and records activation intent while `runtime_object_replaced=false`, `dispatcher_started=false`, and `runtime_activated=false`. Its verifier independently reconstructs identity and digest.
 
+## Final pre-activation boundary witness
+
+`SpineRuntimeActivationBoundaryWitness` joins the verified activation commitment to the actual runtime dispatcher binding and an epoch witness. It proves the dispatcher identity is stable and uncalled, `dispatcher_running=false`, the fence epoch is unchanged, the runtime object is not replaced, and `runtime_activated=false`. This is the final pre-activation evidence boundary, not activation itself.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -140,7 +144,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_activation_gate.py \
   skeleton/testing/test_spine_activation_permit.py \
   skeleton/testing/test_spine_activation_consumption.py \
-  skeleton/testing/test_spine_runtime_activation_commit.py
+  skeleton/testing/test_spine_runtime_activation_commit.py \
+  skeleton/testing/test_spine_runtime_activation_boundary.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

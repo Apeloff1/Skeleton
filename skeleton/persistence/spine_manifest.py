@@ -106,6 +106,8 @@ SEAMS = (
     ("activation-consume-verify", "activation-consumption-verification-does-not-activate-runtime"),
     ("runtime-activation-commit", "consumed-activation-permit-commits-intent-not-runtime-activation"),
     ("runtime-activation-commit-verify", "activation-commitment-verification-does-not-activate-runtime"),
+    ("runtime-activation-boundary", "pre-activation-boundary-proves-runtime-and-fence-unchanged"),
+    ("runtime-activation-boundary-verify", "boundary-verification-does-not-activate-runtime"),
 )
 
 

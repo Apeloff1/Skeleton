@@ -45,6 +45,9 @@ on:
       - "skeleton/testing/test_spine_activation_consumption.py"
       - "skeleton/persistence/spine_activation_consumption_verify.py"
       - "skeleton/persistence/spine_runtime_activation_commit*.py"
+      - "skeleton/persistence/spine_runtime_activation_boundary*.py"
+      - "skeleton/ai/runtime/persistence/spine_runtime_activation_boundary*.py"
+      - "skeleton/testing/test_spine_runtime_activation_boundary.py"
       - "skeleton/ai/runtime/persistence/spine_runtime_activation_commit*.py"
       - "skeleton/testing/test_spine_runtime_activation_commit.py"
       - "skeleton/ai/runtime/persistence/spine_activation_consumption_verify.py"
@@ -186,6 +189,7 @@ jobs:
           skeleton/testing/test_spine_activation_permit.py
           skeleton/testing/test_spine_activation_consumption.py
           skeleton/testing/test_spine_runtime_activation_commit.py
+          skeleton/testing/test_spine_runtime_activation_boundary.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 

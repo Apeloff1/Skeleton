@@ -150,6 +150,8 @@ from skeleton.persistence.spine_activation_permit_verify import SpineActivationP
 from skeleton.persistence.spine_activation_consumption_verify import SpineActivationConsumptionVerify
 from skeleton.persistence.spine_runtime_activation_commit import SpineRuntimeActivationCommitLedger
 from skeleton.persistence.spine_runtime_activation_commit_verify import SpineRuntimeActivationCommitVerify
+from skeleton.persistence.spine_runtime_activation_boundary import SpineRuntimeActivationBoundaryWitness
+from skeleton.persistence.spine_runtime_activation_boundary_verify import SpineRuntimeActivationBoundaryVerify
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
@@ -319,6 +321,8 @@ __all__ = [
     "SpineActivationConsumptionVerify",
     "SpineRuntimeActivationCommitLedger",
     "SpineRuntimeActivationCommitVerify",
+    "SpineRuntimeActivationBoundaryWitness",
+    "SpineRuntimeActivationBoundaryVerify",
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",

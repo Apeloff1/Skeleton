@@ -41,6 +41,8 @@ FILES = (
     "spine_activation_consumption_verify.py",
     "spine_runtime_activation_commit.py",
     "spine_runtime_activation_commit_verify.py",
+    "spine_runtime_activation_boundary.py",
+    "spine_runtime_activation_boundary_verify.py",
 )
 
 
