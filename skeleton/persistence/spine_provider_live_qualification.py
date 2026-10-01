@@ -8,6 +8,10 @@ import json
 import re
 from typing import Any, Callable
 
+from skeleton.persistence.spine_provider_surface_qualification_verify import (
+    SpineProviderSurfaceQualificationVerify,
+)
+
 
 class SpineProviderLiveQualificationError(RuntimeError):
     """Live-provider qualification failed closed."""
@@ -86,6 +90,18 @@ class SpineProviderLiveQualification:
         ):
             raise SpineProviderLiveQualificationError(
                 "provider closure digest is invalid"
+            )
+        try:
+            current_closure_verify = (
+                SpineProviderSurfaceQualificationVerify().verify(closure)
+            )
+        except Exception as exc:
+            raise SpineProviderLiveQualificationError(
+                "current provider closure verification failed closed"
+            ) from exc
+        if current_closure_verify.get("qualification_digest") != closure_digest:
+            raise SpineProviderLiveQualificationError(
+                "current provider closure digest changed"
             )
         if (
             not isinstance(closure_verify, dict)
