@@ -175,6 +175,12 @@ This seam registers exact-head provider closure evidence. It does not substitute
 
 This distinction is critical for large P2 changes: automation can be healthy while size, review, CI, or policy still blocks merge. `SpinePrAutomationQualificationVerify` independently reconstructs the card and refuses any merge-authority promotion.
 
+## Authenticated live provider qualification
+
+`SpineProviderLiveQualification` joins the exact-head paired provider-closure card with a short-lived externally authenticated live-call receipt. The receipt must prove the canonical credential boundary and provider network transport were actually used, carry request/response/architecture digests, exact provider/model identities, and remain scoped to the closure digest and exact head. Only then may the card set `provider_surface_live_green=true` and `provider_surface_green=true`.
+
+The repository implementation alone does not claim that a production provider call happened. That claim requires a real externally authenticated receipt. `SpineProviderLiveQualificationVerify` independently reconstructs the live card and still grants no PR-automation or merge authority.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -221,7 +227,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_production_activation_authorization.py \
   skeleton/testing/test_spine_runtime_production_activation.py \
   skeleton/testing/test_spine_provider_surface_qualification.py \
-  skeleton/testing/test_spine_pr_automation_qualification.py
+  skeleton/testing/test_spine_pr_automation_qualification.py \
+  skeleton/testing/test_spine_provider_live_qualification.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
