@@ -1,10 +1,10 @@
 # P2 spine masterplan
 
-Apeloff1/Skeleton PR #2333. Branch `feat/p2-runtime-spine`. Head at last push `6b80f23`. Parent cite #80. This plan does not sign work off and does not merge.
+Apeloff1/Skeleton PR #2333. Branch `feat/p2-runtime-spine`. Parent `7648f8f`. This file is the unread-surface land. Parent cite #80. This plan does not sign work off and does not merge.
 
 ## Law
 
-No completion checkbox. No implementation signature. No verification signature. `stored_prose=0`. Percentages are reads. `hit` stays false while poison apply is unlanded.
+No completion checkbox. No implementation signature. No verification signature. `stored_prose=0`. Percentages are reads. `hit` stays false while `apply_landed` is false and both surfaces are unclaimed.
 
 ## Landed
 
@@ -45,13 +45,19 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind audit | `skeleton/persistence/spine_bind_audit.py` | running dispatcher fails closed |
 | Cut gate | `skeleton/persistence/spine_cut_gate.py` | switch refused |
 | Surface | `skeleton/persistence/spine_surface.py` | provider and PR Automation not claimed green |
+| Provider probe | `skeleton/persistence/spine_provider_probe.py` | named surface unread, claim writes claimed 0 |
+| PR probe | `skeleton/persistence/spine_pr_probe.py` | named check unread, claim writes claimed 0 |
+| Unread gap | `skeleton/persistence/spine_unread_gap.py` | foreign tenant empty, skipped seq listed |
+| Surface seal | `skeleton/persistence/spine_surface_seal.py` | forged green stripped |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Tracker
 
-- Read and project: 94%
+- Read and project: 95%
+- Provider surface claimed: 0%
+- PR Automation claimed: 0%
 - Poison apply: 55%
 - Live Motor bootstrap: 15%
 - CI green: 0%
@@ -62,11 +68,12 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 1. Poison apply is landed as its own seam. The hold row is the only input. A changed digest stays a conflict and is refused before accept. The fence epoch does not advance. `SpineApplyGate` still refuses every intent. This is not a sign-off.
 2. Motor index bootstrap stays a plan. `SpineIndexPlan.apply` calls `create_index` only when the injected collection has that method. A deployment module may pass the database. The core package still does not import Motor.
 3. The runtime dispatcher is not replaced. `SpineBind` remains the only start path for the composed worker.
-4. Provider-surface and PR Automation are not claimed green from this plan.
+4. Provider-surface and PR Automation are not claimed green. `SpineProviderProbe` and `SpinePrProbe` append unread rows only. `claim` writes `claimed=0`. `SpineUnreadGap` lists a skipped sequence for that tenant and returns empty for a foreign tenant. `SpineSurfaceSeal` strips a forged green flag. This is not a sign-off.
+5. CI green stays unread. Merge stays unread.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 28, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 32, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

@@ -37,6 +37,10 @@ SEAMS = (
     ("bind-audit", "bind-does-not-start-dispatcher"),
     ("cut-gate", "switch-refused"),
     ("surface", "surface-not-claimed"),
+    ("provider-probe", "provider-surface-unclaimed"),
+    ("pr-probe", "pr-automation-unclaimed"),
+    ("unread-gap", "tenant-sequence-gap"),
+    ("surface-seal", "green-claim-stripped"),
 )
 
 
