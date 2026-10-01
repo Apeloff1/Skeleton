@@ -113,6 +113,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Activation permit verify | `skeleton/persistence/spine_activation_permit_verify.py` | permit verification does not activate runtime |
 | Activation permit consume | `skeleton/persistence/spine_activation_permit.py` | durable activation permit is consumed exactly once |
 | Activation consumption verify | `skeleton/persistence/spine_activation_consumption_verify.py` | consumption verification does not activate runtime |
+| Runtime activation commit | `skeleton/persistence/spine_runtime_activation_commit.py` | consumed permit commits activation intent only |
+| Runtime activation commit verify | `skeleton/persistence/spine_runtime_activation_commit_verify.py` | commitment verification does not activate runtime |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -122,7 +124,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider surface claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
-- Apply/cutover readiness: 97%
+- Apply/cutover readiness: 98%
 - Async Mongo bootstrap: 90%
 - CI green: 0%
 - Merge: 0%
@@ -141,7 +143,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 95, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 97, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

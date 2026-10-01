@@ -104,6 +104,8 @@ SEAMS = (
     ("activation-permit-verify", "activation-permit-verification-does-not-activate-runtime"),
     ("activation-consume", "activation-permit-consumed-once-before-runtime-transition"),
     ("activation-consume-verify", "activation-consumption-verification-does-not-activate-runtime"),
+    ("runtime-activation-commit", "consumed-activation-permit-commits-intent-not-runtime-activation"),
+    ("runtime-activation-commit-verify", "activation-commitment-verification-does-not-activate-runtime"),
 )
 
 

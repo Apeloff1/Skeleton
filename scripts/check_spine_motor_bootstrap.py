@@ -39,6 +39,8 @@ FILES = (
     "spine_activation_permit.py",
     "spine_activation_permit_verify.py",
     "spine_activation_consumption_verify.py",
+    "spine_runtime_activation_commit.py",
+    "spine_runtime_activation_commit_verify.py",
 )
 
 
