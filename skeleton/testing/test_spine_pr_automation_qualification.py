@@ -43,9 +43,9 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "run_id": 12345,
         "run_attempt": 1,
         "conclusion": "success",
-        "report_digest": "r" * 64,
-        "policy_fingerprint": "p" * 64,
-        "snapshot_fingerprint": "s" * 64,
+        "report_digest": "a" * 64,
+        "policy_fingerprint": "b" * 64,
+        "snapshot_fingerprint": "c" * 64,
         "reason_digest": _digest(reasons),
         "reason_count": len(reasons),
         "mode": "observe",
@@ -57,7 +57,7 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "mutations_applied": 0,
         "evidence_complete": True,
         "exact_head": True,
-        "attestation_digest": "t" * 64,
+        "attestation_digest": "d" * 64,
     }
 
 
@@ -66,7 +66,7 @@ def test_policy_hold_can_prove_runner_operational_without_merge_authority() -> N
         receipt=_receipt(),
         expected_head_sha=HEAD,
         expected_pr_number=PR,
-        authenticate=lambda receipt: receipt["attestation_digest"] == "t" * 64,
+        authenticate=lambda receipt: receipt["attestation_digest"] == "d" * 64,
     )
     verified = SpinePrAutomationQualificationVerify().verify(card)
 
