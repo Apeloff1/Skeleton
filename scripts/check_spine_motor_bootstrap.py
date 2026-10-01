@@ -25,6 +25,8 @@ FILES = (
     "spine_runtime_selection_verify.py",
     "spine_cutover_rehearsal.py",
     "spine_cutover_rehearsal_verify.py",
+    "spine_cutover_authorization.py",
+    "spine_cutover_authorization_verify.py",
 )
 
 

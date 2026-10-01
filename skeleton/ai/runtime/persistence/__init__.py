@@ -139,6 +139,8 @@ from skeleton.persistence.spine_runtime_selection import SpineRuntimeSelection
 from skeleton.persistence.spine_runtime_selection_verify import SpineRuntimeSelectionVerify
 from skeleton.persistence.spine_cutover_rehearsal import SpineCutoverRehearsal
 from skeleton.persistence.spine_cutover_rehearsal_verify import SpineCutoverRehearsalVerify
+from skeleton.persistence.spine_cutover_authorization import SpineCutoverAuthorization
+from skeleton.persistence.spine_cutover_authorization_verify import SpineCutoverAuthorizationVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -292,6 +294,8 @@ __all__ = [
     "SpineRuntimeSelectionVerify",
     "SpineCutoverRehearsal",
     "SpineCutoverRehearsalVerify",
+    "SpineCutoverAuthorization",
+    "SpineCutoverAuthorizationVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

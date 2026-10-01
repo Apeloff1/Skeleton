@@ -73,6 +73,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `scripts/rehearse_spine_pymongo_cutover.py` consumes the exact live qualification receipt produced earlier in the State Recovery workflow. It verifies the actual `DurableOperationRuntime.start_dispatcher` binding without starting it, creates and independently verifies the non-selecting driver candidate, constructs green cutover reads with a closed apply gate, and requires the cut gate to refuse the switch as `switch-not-landed`. The workflow asserts the dispatcher is still stopped and all runtime authority flags remain false.
 
+## Dual-control authorization evidence
+
+`SpineCutoverAuthorization` requires exactly two distinct approval receipts from the `operations` and `reliability` authority domains. Each receipt must target the exact runtime-selection candidate and cutover-rehearsal digests, be valid for no more than 30 minutes, and pass an injected deployment-owned authenticator. The resulting envelope proves authenticated dual-control evidence exists but deliberately keeps `authorization_effective=false`, `selection_authorized=false`, `runtime_driver_selected=false`, and `runtime_activated=false`. `SpineCutoverAuthorizationVerify` independently reconstructs the envelope digest and cannot make it effective.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -95,7 +99,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_index_bind.py \
   skeleton/testing/test_spine_pymongo_async_adapter.py \
   skeleton/testing/test_spine_runtime_selection.py \
-  skeleton/testing/test_spine_cutover_rehearsal.py
+  skeleton/testing/test_spine_cutover_rehearsal.py \
+  skeleton/testing/test_spine_cutover_authorization.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

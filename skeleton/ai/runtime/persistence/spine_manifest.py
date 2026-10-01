@@ -88,6 +88,8 @@ SEAMS = (
     ("cutover-rehearsal", "green-preconditions-do-not-authorize-cutover"),
     ("cutover-rehearsal-verify", "rehearsal-verification-does-not-authorize-cutover"),
     ("pymongo-async-cutover-rehearsal", "live-qualification-does-not-authorize-runtime-cutover"),
+    ("cutover-authorization", "authenticated-dual-control-is-not-runtime-activation"),
+    ("cutover-authorization-verify", "authorization-verification-does-not-make-authorization-effective"),
 )
 
 

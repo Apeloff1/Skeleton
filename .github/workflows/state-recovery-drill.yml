@@ -32,6 +32,9 @@ on:
       - "skeleton/ai/runtime/persistence/spine_runtime_selection*.py"
       - "skeleton/testing/test_spine_runtime_selection.py"
       - "skeleton/testing/test_spine_cutover_rehearsal.py"
+      - "skeleton/testing/test_spine_cutover_authorization.py"
+      - "skeleton/persistence/spine_cutover_authorization*.py"
+      - "skeleton/ai/runtime/persistence/spine_cutover_authorization*.py"
       - "skeleton/persistence/spine_cutover_rehearsal*.py"
       - "skeleton/ai/runtime/persistence/spine_cutover_rehearsal*.py"
       - "skeleton/persistence/spine_bind_*.py"
@@ -150,6 +153,7 @@ jobs:
           skeleton/testing/test_spine_pymongo_async_adapter.py
           skeleton/testing/test_spine_runtime_selection.py
           skeleton/testing/test_spine_cutover_rehearsal.py
+          skeleton/testing/test_spine_cutover_authorization.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 
