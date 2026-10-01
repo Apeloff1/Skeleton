@@ -278,6 +278,7 @@ class SpinePrAutomationQualification:
             "source_run_id": source_run_id,
             "source_run_attempt": source_run_attempt,
             "source_head_repository": receipt["source_head_repository"],
+            "source_pr_number": expected_pr,
             "source_status": receipt["source_status"],
             "source_conclusion": receipt["source_conclusion"],
             "conclusion": receipt["conclusion"],
