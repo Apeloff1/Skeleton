@@ -83,10 +83,18 @@ def test_mirror_drift_fails_closed(tmp_path: Path) -> None:
 def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
     _write_fixture(tmp_path)
     path = tmp_path / "skeleton" / "persistence" / "spine_manifest.py"
-    seams = [(f"seam-{index}", f"law-{index}") for index in range(49)]
-    seams.extend(list(EXPECTED_SEAMS.items())[:-1])
-    seams.append(("replacement", "not-the-required-seam"))
-    path.write_text("SEAMS = " + repr(tuple(seams)) + "\n", encoding="utf-8")
+    seams = list(build_report(tmp_path)["manifest"]["recovery_seams"])
+    assert seams
+
+    full_manifest = [(f"seam-{index}", f"law-{index}") for index in range(53)]
+    full_manifest.extend(EXPECTED_SEAMS.items())
+    missing_name = seams[-1]
+    mutated = [
+        ("replacement", "not-the-required-seam") if name == missing_name else (name, law)
+        for name, law in full_manifest
+    ]
+    assert len(mutated) == 70
+    path.write_text("SEAMS = " + repr(tuple(mutated)) + "\n", encoding="utf-8")
 
     with pytest.raises(
         SpineBindRecoveryControlError,
