@@ -1,6 +1,6 @@
 # P2 Execution Map
 
-Map version: **0.1.0**
+Map version: **0.3.0**
 
 Machine authority: [`machine/ai_p2_execution_map.json`](../../machine/ai_p2_execution_map.json)
 Task backlog: [`machine/ai_p2_task_backlog.json`](../../machine/ai_p2_task_backlog.json)
@@ -52,8 +52,16 @@ P2 task dependencies supplement the eight canonical `MBW-00..07` construction wa
 6. No completion checkbox may be asserted by this foundation map.
 7. P2 may deepen P1 owners but may not weaken P1 authority, evidence, recovery, or exact-head rules.
 
-## Initial implementation order
+## Current implementation order
 
-`P2-CTRL-01` is the only task in progress in this foundation change. Its job is to freeze the 314-volume boundary and make silent scope loss/duplication mechanically impossible. Once that validator is green on the exact PR head, `P2-ARCH-01` becomes the next dependency-ready implementation lane.
+`P2-CTRL-01`, `P2-ARCH-01`, and `P2-TRACE-01` have landed implementation evidence but remain **unpromoted**: no completion checkbox, maturity promotion, or sign-off is inferred from landing.
+
+With traceability landed, the dependency-ready implementation lanes are active in parallel:
+
+- `P2-REPO-01` — repository engineering/control plane (#2318, followed by stacked #2321).
+- `P2-QUAL-01` — formal quality and final-assembly qualification (#2320).
+- `P2-DOC-01` — evidence-bound generated documentation (#2322).
+
+`P2-NATIVE-01` remains blocked on `P2-QUAL-01`; its staged implementation (#2323) may be hardened, but it cannot be promoted ahead of the quality lane.
 
 The remaining 272 volumes stay visible in the machine map. They are queued, not discarded.
