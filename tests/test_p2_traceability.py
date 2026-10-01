@@ -42,6 +42,41 @@ class P2TraceabilityProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2TraceabilityError, "volume scope drift"):
             MODULE._validate_task(master, changed)
 
+    def test_landed_task_requires_concrete_success_receipts(self) -> None:
+        master = MODULE._load(ROOT, "machine/ai_master_plan.json")
+        backlog = MODULE._load(ROOT, "machine/ai_p2_task_backlog.json")
+        changed = copy.deepcopy(backlog)
+        task = next(
+            item for item in changed["tasks"]
+            if item["task_id"] == "P2-TRACE-01"
+        )
+        task["status"] = "landed_unpromoted"
+        task["evidence_refs"] = [
+            "machine:master_traceability.json",
+            "workflow:P2 Master Traceability Spine",
+            "workflow:P2 Traceability Focused Contract",
+        ]
+        with self.assertRaisesRegex(
+            MODULE.P2TraceabilityError,
+            "landed evidence lacks successful",
+        ):
+            MODULE._validate_task(master, changed)
+
+    def test_task_rejects_pre_dependency_state_regression(self) -> None:
+        master = MODULE._load(ROOT, "machine/ai_master_plan.json")
+        backlog = MODULE._load(ROOT, "machine/ai_p2_task_backlog.json")
+        changed = copy.deepcopy(backlog)
+        task = next(
+            item for item in changed["tasks"]
+            if item["task_id"] == "P2-TRACE-01"
+        )
+        task["status"] = "ready"
+        with self.assertRaisesRegex(
+            MODULE.P2TraceabilityError,
+            "in_progress or landed_unpromoted",
+        ):
+            MODULE._validate_task(master, changed)
+
     def test_task_cannot_claim_completion_or_signoff(self) -> None:
         master = MODULE._load(ROOT, "machine/ai_master_plan.json")
         backlog = MODULE._load(ROOT, "machine/ai_p2_task_backlog.json")
