@@ -137,6 +137,8 @@ SEAMS = (
     ("provider-surface-qualification-verify", "provider-closure-verification-does-not-claim-live-health"),
     ("pr-automation-qualification", "exact-head-runner-health-is-separate-from-merge-eligibility"),
     ("pr-automation-qualification-verify", "automation-health-verification-does-not-grant-merge-authority"),
+    ("provider-live-qualification", "exact-head-closure-plus-live-call-qualifies-provider-surface"),
+    ("provider-live-qualification-verify", "live-provider-verification-does-not-grant-merge-authority"),
 )
 
 
