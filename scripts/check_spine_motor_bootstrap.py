@@ -67,6 +67,8 @@ FILES = (
     "spine_runtime_production_activation_authorization_verify.py",
     "spine_runtime_production_activation.py",
     "spine_runtime_production_activation_verify.py",
+    "spine_provider_surface_qualification.py",
+    "spine_provider_surface_qualification_verify.py",
 )
 
 
