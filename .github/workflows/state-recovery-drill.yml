@@ -23,6 +23,9 @@ on:
       - "skeleton/testing/test_spine_pymongo_async_adapter.py"
       - "skeleton/deploy/spine_pymongo_async.py"
       - "scripts/qualify_spine_pymongo_async.py"
+      - "skeleton/persistence/spine_runtime_selection*.py"
+      - "skeleton/ai/runtime/persistence/spine_runtime_selection*.py"
+      - "skeleton/testing/test_spine_runtime_selection.py"
       - "skeleton/persistence/spine_bind_*.py"
       - "skeleton/persistence/spine_motor_*.py"
       - "skeleton/ai/runtime/persistence/spine_motor_*.py"
@@ -137,6 +140,7 @@ jobs:
           skeleton/testing/test_spine_motor_witness.py
           skeleton/testing/test_spine_index_bind.py
           skeleton/testing/test_spine_pymongo_async_adapter.py
+          skeleton/testing/test_spine_runtime_selection.py
 
       - name: Verify P2 async Mongo core structural control
         run: python scripts/check_spine_motor_bootstrap.py
