@@ -1528,6 +1528,8 @@ def run_spine_bind_sqlite_drill(
     from skeleton.persistence.spine_bind_restore_tenant import SpineBindRestoreTenant
     from skeleton.persistence.spine_bind_restore_chain import SpineBindRestoreChain
     from skeleton.persistence.spine_bind_restore_continuity import SpineBindRestoreContinuity
+    from skeleton.persistence.spine_bind_restore_export import SpineBindRestoreExport
+    from skeleton.persistence.spine_bind_restore_export_verify import SpineBindRestoreExportVerify
     from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 
     root = require_scratch_directory(workdir)
@@ -1538,6 +1540,7 @@ def run_spine_bind_sqlite_drill(
     receipt_source_path = root / "spine_bind_restore_receipt.sqlite"
     receipt_backup_path = root / "spine_bind_restore_receipt.backup.sqlite"
     receipt_restored_path = root / "spine_bind_restore_receipt.restored.sqlite"
+    portable_evidence_path = root / "spine_bind_restore_evidence.json"
     for candidate in (
         source_path,
         backup_path,
@@ -1545,6 +1548,7 @@ def run_spine_bind_sqlite_drill(
         receipt_source_path,
         receipt_backup_path,
         receipt_restored_path,
+        portable_evidence_path,
     ):
         if candidate.exists():
             candidate.unlink()
@@ -1699,6 +1703,26 @@ def run_spine_bind_sqlite_drill(
                 raise RecoveryDrillError("restore receipt continuity is not durable")
             if restore_continuity.get("activated") is not False:
                 raise RecoveryDrillError("restore receipt continuity activated")
+
+            portable_export = SpineBindRestoreExport().card(
+                receipt=restore_receipt,
+                continuity=restore_continuity,
+            )
+            portable_evidence_path.write_text(
+                portable_export["export_json"],
+                encoding="utf-8",
+            )
+            roundtrip_export = {
+                **portable_export,
+                "export_json": portable_evidence_path.read_text(encoding="utf-8"),
+            }
+            portable_verified = SpineBindRestoreExportVerify().verify(
+                roundtrip_export
+            )
+            if portable_verified.get("verified") is not True:
+                raise RecoveryDrillError("portable restore evidence was not verified")
+            if portable_verified.get("activated") is not False:
+                raise RecoveryDrillError("portable restore evidence activated")
         finally:
             receipt_replay_reader.close()
             receipt_tenant_reader.close()
@@ -1748,6 +1772,13 @@ def run_spine_bind_sqlite_drill(
             "verified": restore_verified["verified"],
             "activated": restore_verified["activated"],
         },
+        "portable_evidence": {
+            "digest": portable_export["digest"],
+            "bytes": portable_export["bytes"],
+            "verified": portable_verified["verified"],
+            "roundtrip_exact": roundtrip_export["export_json"] == portable_export["export_json"],
+            "activated": portable_verified["activated"],
+        },
         "restore_journal": {
             "backup_digest": receipt_backup_snapshot["digest"],
             "restore_digest": receipt_restored_snapshot["digest"],
@@ -1783,6 +1814,7 @@ def run_spine_bind_sqlite_drill(
             receipt_source_path,
             receipt_backup_path,
             receipt_restored_path,
+            portable_evidence_path,
         ):
             if candidate.exists():
                 candidate.unlink()

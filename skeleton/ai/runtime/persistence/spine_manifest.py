@@ -73,6 +73,8 @@ SEAMS = (
     ("bind-restore-tenant", "restore-journal-tenant-isolated"),
     ("bind-restore-chain", "restore-journal-hash-chain"),
     ("bind-restore-continuity", "restore-continuity-does-not-activate"),
+    ("bind-restore-export", "portable-evidence-is-not-activation"),
+    ("bind-restore-export-verify", "portable-evidence-verification-does-not-activate"),
 )
 
 

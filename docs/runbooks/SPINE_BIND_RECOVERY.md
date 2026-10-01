@@ -114,3 +114,20 @@ per-tenant receipt linkage, failing closed on mutation or a broken predecessor.
 `SpineBindRestoreContinuity` joins the current receipt, journal row, replay,
 tenant view, and chain into one durable continuity proof. The continuity proof
 has no activation, merge, maturity, or sign-off authority.
+
+
+## Portable canonical recovery evidence
+
+The terminal dark recovery evidence surface is serialized by
+`SpineBindRestoreExport` into canonical JSON with sorted keys, compact
+separators, finite JSON values, stable SHA-256 content identity, and explicit
+false authority fields. The export binds the anchored restore receipt, durable
+continuity digest, backup/restore identity, recovery identity, restore-journal
+row digest, and restore-journal chain digest.
+
+`SpineBindRestoreExportVerify` parses the bytes independently with duplicate-key
+and non-finite-constant rejection, requires canonical byte encoding, recomputes
+the content digest, and rejects any authority-bearing flag that becomes true.
+The State Recovery Drill writes the export to disk, reads those exact bytes back,
+and verifies the reconstructed export card. This closes the bind-recovery
+evidence tracker at 100% without claiming P2 completion or runtime activation.

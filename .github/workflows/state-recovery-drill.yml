@@ -104,6 +104,7 @@ jobs:
           skeleton/testing/test_spine_bind_bundle.py
           skeleton/testing/test_spine_bind_restore_receipt.py
           skeleton/testing/test_spine_bind_restore_journal.py
+          skeleton/testing/test_spine_bind_restore_export.py
           skeleton/testing/test_spine_bind_recovery_control.py
           skeleton/testing/test_spine_manifest.py
           skeleton/testing/test_spine_masterplan.py
@@ -279,6 +280,12 @@ jobs:
           assert journal["tenant_isolated"] is True
           assert journal["replay_safe"] is True
           assert journal["activated"] is False
+          portable = report["portable_evidence"]
+          assert len(portable["digest"]) == 64
+          assert portable["bytes"] > 0
+          assert portable["verified"] is True
+          assert portable["roundtrip_exact"] is True
+          assert portable["activated"] is False
           assert report["activation_claimed"] is False
           assert report["apply_landed"] is False
           assert report["live_motor"] is False
@@ -291,6 +298,7 @@ jobs:
           print("restore receipt digest:", report["restore_receipt"]["digest"])
           print("restore journal chain:", report["restore_journal"]["chain_digest"])
           print("restore continuity:", report["restore_journal"]["continuity_digest"])
+          print("portable evidence:", report["portable_evidence"]["digest"])
           PY
 
   independent-state-authority:

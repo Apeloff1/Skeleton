@@ -30,6 +30,8 @@ MODULES = (
     "spine_bind_restore_tenant.py",
     "spine_bind_restore_chain.py",
     "spine_bind_restore_continuity.py",
+    "spine_bind_restore_export.py",
+    "spine_bind_restore_export_verify.py",
 )
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
@@ -50,6 +52,8 @@ EXPECTED_SEAMS = {
     "bind-restore-tenant": "restore-journal-tenant-isolated",
     "bind-restore-chain": "restore-journal-hash-chain",
     "bind-restore-continuity": "restore-continuity-does-not-activate",
+    "bind-restore-export": "portable-evidence-is-not-activation",
+    "bind-restore-export-verify": "portable-evidence-verification-does-not-activate",
 }
 
 
@@ -89,9 +93,9 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != 64:
+    if len(seams) != 66:
         raise SpineBindRecoveryControlError(
-            f"expected 64 spine seams, found {len(seams)}"
+            f"expected 66 spine seams, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -112,8 +116,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     path = root / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
     text = path.read_text(encoding="utf-8")
     required = [
-        "- Bind card sealed: 97%",
-        "Expect `count` 64",
+        "- Bind card sealed: 100%",
+        "Expect `count` 66",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -131,8 +135,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
             "masterplan recovery control drift: " + " | ".join(missing)
         )
     return {
-        "bind_card_percent": 97,
-        "manifest_count": 64,
+        "bind_card_percent": 100,
+        "manifest_count": 66,
         "activation_claimed": False,
     }
 

@@ -81,6 +81,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind restore tenant | `skeleton/persistence/spine_bind_restore_tenant.py` | foreign receipt history stays empty |
 | Bind restore chain | `skeleton/persistence/spine_bind_restore_chain.py` | receipt history continuity is recomputed |
 | Bind restore continuity | `skeleton/persistence/spine_bind_restore_continuity.py` | durable receipt history remains non-activating |
+| Bind restore export | `skeleton/persistence/spine_bind_restore_export.py` | canonical portable evidence stays non-activating |
+| Bind restore export verify | `skeleton/persistence/spine_bind_restore_export_verify.py` | strict parser/digest verification grants no authority |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -94,7 +96,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Live Motor bootstrap: 15%
 - CI green: 0%
 - Merge: 0%
-- Bind card sealed: 97%
+- Bind card sealed: 100%
 
 ## Next, in order
 
@@ -105,11 +107,11 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
 6. Live Motor bootstrap and the runtime dispatcher stay unwired. `SpineMotorWitness` fails closed on a motor or pymongo import. `SpineDispatchWitness` fails closed if the dispatcher is running and does not call `start_dispatcher`. This is not a sign-off.
 7. The bind card joins quiet, dark, and epoch. `SpineBindCard` refuses a lit flag and a moved epoch. `SpineBindJournal` refuses a rewrite. `SpineBindRead` fails closed on a lit row. `SpineBindChain` refuses a rewritten row. `SpineBindTenant` returns empty for a foreign tenant. `SpineBindReplay` does not insert. `SpineBindSurface` refuses a claimed probe. `SpineBindGap` does not fill a missing sequence. This is not a sign-off.
-8. The recovery checkpoint lane digest-binds the dark bind evidence, records an immutable per-tenant recovery checkpoint, proves replay does not insert, proves foreign tenants stay empty, seals the checkpoint row into a hash chain, verifies a deterministic evidence bundle, destructively backup/restores the checkpoint authority in a scratch SQLite drill, emits an anchored restore receipt, persists receipt history in an append-only tenant journal, proves replay non-insertion and tenant isolation, recomputes receipt-history continuity, and joins those proofs into a durable non-activating continuity card. `scripts/check_spine_bind_recovery.py` fails closed on AI-tree mirror drift, manifest drift, or masterplan drift and is executed by the exact-head State Recovery Drill workflow. `ready`, `activated`, `apply_landed`, `live_motor`, `dispatcher_running`, `ci_green`, and `merged` remain false. This is not a sign-off.
+8. The recovery checkpoint lane digest-binds the dark bind evidence, records an immutable per-tenant recovery checkpoint, proves replay does not insert, proves foreign tenants stay empty, seals the checkpoint row into a hash chain, verifies a deterministic evidence bundle, destructively backup/restores the checkpoint authority in a scratch SQLite drill, emits an anchored restore receipt, persists receipt history in an append-only tenant journal, proves replay non-insertion and tenant isolation, recomputes receipt-history continuity, joins those proofs into a durable non-activating continuity card, then serializes that state into canonical portable machine JSON and strictly verifies the exact bytes after a file round-trip. The bind-card evidence tracker is therefore 100%, but this is an evidence-read completion only: no runtime activation, maturity promotion, completion checkbox, implementation signature, verification signature, or merge authority is granted. `scripts/check_spine_bind_recovery.py` fails closed on AI-tree mirror drift, manifest drift, or masterplan drift and is executed by the exact-head State Recovery Drill workflow. `ready`, `activated`, `apply_landed`, `live_motor`, `dispatcher_running`, `ci_green`, and `merged` remain false. This is not a sign-off.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 64, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 66, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

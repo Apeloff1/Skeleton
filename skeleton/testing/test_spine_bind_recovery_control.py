@@ -33,8 +33,8 @@ def _write_fixture(root: Path) -> None:
     (plan / "P2_SPINE_MASTERPLAN.md").write_text(
         "\n".join(
             [
-                "- Bind card sealed: 97%",
-                "Expect `count` 64",
+                "- Bind card sealed: 100%",
+                "Expect `count` 66",
                 "Bind snapshot",
                 "Bind recovery",
                 "Bind checkpoint",
@@ -58,8 +58,8 @@ def test_control_accepts_complete_dark_fixture(tmp_path: Path) -> None:
 
     assert report["valid"] is True
     assert report["mirror_count"] == len(MIRRORED)
-    assert report["manifest"]["count"] == 64
-    assert report["masterplan"]["bind_card_percent"] == 97
+    assert report["manifest"]["count"] == 66
+    assert report["masterplan"]["bind_card_percent"] == 100
     assert report["masterplan"]["activation_claimed"] is False
     assert report["completion_checkbox"] is False
 
