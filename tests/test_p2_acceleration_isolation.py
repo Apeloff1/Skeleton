@@ -55,5 +55,23 @@ class AccelerationIsolationTests(unittest.TestCase):
             )
 
 
+    def test_rejects_streaming_output_over_bound(self) -> None:
+        command = [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.write('x' * 200000); sys.stdout.flush()",
+        ]
+        with self.assertRaisesRegex(
+            MODULE.AcceleratorIsolationError,
+            "stdout exceeds output bound",
+        ):
+            MODULE.run_json_process(
+                command,
+                {"request": "bounded"},
+                timeout_s=5,
+                max_output_bytes=1024,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
