@@ -66,6 +66,14 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind replay | `skeleton/persistence/spine_bind_replay.py` | matching digest does not insert |
 | Bind surface | `skeleton/persistence/spine_bind_surface.py` | claimed probe fails closed |
 | Bind gap | `skeleton/persistence/spine_bind_gap.py` | missing sequence stays missing |
+| Bind snapshot | `skeleton/persistence/spine_bind_snapshot.py` | dark evidence is digest-bound |
+| Bind recovery | `skeleton/persistence/spine_bind_recovery.py` | recovery plan cannot self-activate |
+| Bind checkpoint | `skeleton/persistence/spine_bind_checkpoint.py` | one immutable recovery digest per tenant |
+| Bind checkpoint replay | `skeleton/persistence/spine_bind_checkpoint_replay.py` | replay does not insert |
+| Bind checkpoint tenant | `skeleton/persistence/spine_bind_checkpoint_tenant.py` | foreign tenant empty |
+| Bind checkpoint chain | `skeleton/persistence/spine_bind_checkpoint_chain.py` | promoted or rewritten row fails closed |
+| Bind bundle | `skeleton/persistence/spine_bind_bundle.py` | checkpoint evidence is not activation |
+| Bind bundle verify | `skeleton/persistence/spine_bind_bundle_verify.py` | digest verification does not promote |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -79,7 +87,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Live Motor bootstrap: 15%
 - CI green: 0%
 - Merge: 0%
-- Bind card sealed: 55%
+- Bind card sealed: 75%
 
 ## Next, in order
 
@@ -90,10 +98,11 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
 6. Live Motor bootstrap and the runtime dispatcher stay unwired. `SpineMotorWitness` fails closed on a motor or pymongo import. `SpineDispatchWitness` fails closed if the dispatcher is running and does not call `start_dispatcher`. This is not a sign-off.
 7. The bind card joins quiet, dark, and epoch. `SpineBindCard` refuses a lit flag and a moved epoch. `SpineBindJournal` refuses a rewrite. `SpineBindRead` fails closed on a lit row. `SpineBindChain` refuses a rewritten row. `SpineBindTenant` returns empty for a foreign tenant. `SpineBindReplay` does not insert. `SpineBindSurface` refuses a claimed probe. `SpineBindGap` does not fill a missing sequence. This is not a sign-off.
+8. The recovery checkpoint lane digest-binds the dark bind evidence, records an immutable per-tenant recovery checkpoint, proves replay does not insert, proves foreign tenants stay empty, seals the checkpoint row into a hash chain, and verifies a deterministic evidence bundle. `ready`, `activated`, `apply_landed`, `live_motor`, `dispatcher_running`, `ci_green`, and `merged` remain false. This is not a sign-off.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 49, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 57, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

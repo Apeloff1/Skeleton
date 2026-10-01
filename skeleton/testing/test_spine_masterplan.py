@@ -11,5 +11,6 @@ def test_masterplan_card_is_unsigned() -> None:
     assert card["merge_percent"] == 0
     assert card["motor_bootstrap_percent"] == 15
     assert card["merge_percent"] == 0
+    assert card["bind_card_percent"] == 75
     assert card["hit"] is False
     assert card["completion_checkbox"] is False

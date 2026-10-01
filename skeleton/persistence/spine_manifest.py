@@ -58,6 +58,14 @@ SEAMS = (
     ("bind-replay", "bind-replay-does-not-insert"),
     ("bind-surface", "bind-surface-stays-unread"),
     ("bind-gap", "bind-gap-not-filled"),
+    ("bind-snapshot", "bind-snapshot-stays-unactivated"),
+    ("bind-recovery", "recovery-plan-does-not-activate"),
+    ("bind-checkpoint", "checkpoint-is-immutable-and-unactivated"),
+    ("bind-checkpoint-replay", "checkpoint-replay-does-not-insert"),
+    ("bind-checkpoint-tenant", "checkpoint-tenant-isolated"),
+    ("bind-checkpoint-chain", "checkpoint-hash-chain"),
+    ("bind-bundle", "checkpoint-bundle-is-not-activation"),
+    ("bind-bundle-verify", "bundle-verification-does-not-activate"),
 )
 
 
