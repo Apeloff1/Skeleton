@@ -31,6 +31,7 @@ FILES = (
     "spine_cutover_effectiveness_verify.py",
     "spine_selection_permit.py",
     "spine_selection_permit_verify.py",
+    "spine_selection_consumption_verify.py",
 )
 
 

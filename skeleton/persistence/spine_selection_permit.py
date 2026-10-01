@@ -175,9 +175,135 @@ class SpineSelectionPermitLedger:
             "verification_signature": False,
         }
 
+    def consume(
+        self,
+        *,
+        permit: dict[str, Any],
+        permit_verify: dict[str, Any],
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(permit, dict) or permit.get("kind") != "spine_selection_permit":
+            raise SpineSelectionPermitError("selection permit card is required")
+        if permit.get("selection_authorized") is not True:
+            raise SpineSelectionPermitError("selection permit is not authorized")
+        if permit.get("permit_consumed") is not False:
+            raise SpineSelectionPermitError("selection permit was already consumed")
+        if permit.get("runtime_driver_selected") is not False:
+            raise SpineSelectionPermitError("permit already selected a runtime driver")
+        if permit.get("runtime_activated") is not False:
+            raise SpineSelectionPermitError("permit already activated runtime")
+        if permit.get("target_driver") != "pymongo-async":
+            raise SpineSelectionPermitError("selection target driver is unsupported")
+
+        permit_id = permit.get("permit_id")
+        permit_digest = permit.get("digest")
+        if not isinstance(permit_id, str) or len(permit_id) != 64:
+            raise SpineSelectionPermitError("permit identity is invalid")
+        if not isinstance(permit_digest, str) or len(permit_digest) != 64:
+            raise SpineSelectionPermitError("permit digest is invalid")
+
+        if (
+            not isinstance(permit_verify, dict)
+            or permit_verify.get("kind") != "spine_selection_permit_verify"
+            or permit_verify.get("verified") is not True
+            or permit_verify.get("permit_id") != permit_id
+            or permit_verify.get("permit_digest") != permit_digest
+            or permit_verify.get("selection_authorized") is not True
+            or permit_verify.get("permit_consumed") is not False
+            or permit_verify.get("runtime_driver_selected") is not False
+            or permit_verify.get("runtime_activated") is not False
+        ):
+            raise SpineSelectionPermitError("independent permit verification is required")
+
+        valid_until_raw = permit.get("permit_valid_until")
+        if not isinstance(valid_until_raw, str):
+            raise SpineSelectionPermitError("permit validity boundary is missing")
+        try:
+            valid_until = datetime.fromisoformat(valid_until_raw)
+        except ValueError as exc:
+            raise SpineSelectionPermitError("permit validity boundary is invalid") from exc
+        if valid_until.tzinfo is None or valid_until.utcoffset() is None:
+            raise SpineSelectionPermitError("permit validity boundary must be timezone-aware")
+        valid_until = valid_until.astimezone(timezone.utc)
+
+        instant = now or datetime.now(timezone.utc)
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise SpineSelectionPermitError("now must be timezone-aware")
+        instant = instant.astimezone(timezone.utc)
+        if instant >= valid_until:
+            raise SpineSelectionPermitError("selection permit expired before consumption")
+
+        row = self._connection.execute(
+            """
+            SELECT effectiveness_digest, authorization_digest, one_time_nonce,
+                   target_driver, payload_digest, consumed
+            FROM spine_selection_permit
+            WHERE permit_id = ?
+            """,
+            (permit_id,),
+        ).fetchone()
+        if row is None:
+            raise SpineSelectionPermitError("selection permit is not durably recorded")
+        if row["payload_digest"] != permit_digest:
+            raise SpineSelectionPermitError("persisted selection permit digest mismatch")
+        if row["effectiveness_digest"] != permit.get("effectiveness_digest"):
+            raise SpineSelectionPermitError("persisted effectiveness scope mismatch")
+        if row["authorization_digest"] != permit.get("authorization_digest"):
+            raise SpineSelectionPermitError("persisted authorization scope mismatch")
+        if row["one_time_nonce"] != permit.get("one_time_nonce"):
+            raise SpineSelectionPermitError("persisted one-time nonce mismatch")
+        if row["target_driver"] != "pymongo-async":
+            raise SpineSelectionPermitError("persisted target driver mismatch")
+        if int(row["consumed"]) != 0:
+            raise SpineSelectionPermitError("selection permit replay refused")
+
+        cursor = self._connection.execute(
+            """
+            UPDATE spine_selection_permit
+            SET consumed = 1
+            WHERE permit_id = ? AND consumed = 0
+            """,
+            (permit_id,),
+        )
+        if cursor.rowcount != 1:
+            self._connection.rollback()
+            raise SpineSelectionPermitError("selection permit replay refused")
+        self._connection.commit()
+
+        evidence = {
+            "permit_id": permit_id,
+            "permit_digest": permit_digest,
+            "effectiveness_digest": permit.get("effectiveness_digest"),
+            "authorization_digest": permit.get("authorization_digest"),
+            "target_driver": "pymongo-async",
+            "consumed_at": instant.isoformat(),
+            "selection_authorized": True,
+            "permit_consumed": True,
+            "runtime_driver_selected": False,
+            "runtime_activated": False,
+        }
+        return {
+            "kind": "spine_selection_consumption",
+            "hit": False,
+            "law": "selection-permit-consumed-once-before-driver-selection",
+            "citation": "VOL-134",
+            **evidence,
+            "digest": _digest(evidence),
+            "stored_prose": 0,
+            "completion_checkbox": False,
+            "implementation_signature": False,
+            "verification_signature": False,
+        }
+
     def count(self) -> int:
         row = self._connection.execute(
             "SELECT COUNT(*) AS n FROM spine_selection_permit"
+        ).fetchone()
+        return int(row["n"])
+
+    def consumed_count(self) -> int:
+        row = self._connection.execute(
+            "SELECT COUNT(*) AS n FROM spine_selection_permit WHERE consumed = 1"
         ).fetchone()
         return int(row["n"])
 

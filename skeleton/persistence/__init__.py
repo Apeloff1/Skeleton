@@ -145,6 +145,7 @@ from skeleton.persistence.spine_cutover_effectiveness import SpineCutoverEffecti
 from skeleton.persistence.spine_cutover_effectiveness_verify import SpineCutoverEffectivenessVerify
 from skeleton.persistence.spine_selection_permit import SpineSelectionPermitLedger
 from skeleton.persistence.spine_selection_permit_verify import SpineSelectionPermitVerify
+from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -304,6 +305,7 @@ __all__ = [
     "SpineCutoverEffectivenessVerify",
     "SpineSelectionPermitLedger",
     "SpineSelectionPermitVerify",
+    "SpineSelectionConsumptionVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

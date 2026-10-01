@@ -94,6 +94,8 @@ SEAMS = (
     ("cutover-effectiveness-verify", "effectiveness-verification-does-not-select-runtime"),
     ("selection-permit", "effective-authorization-issues-one-non-activating-selection-permit"),
     ("selection-permit-verify", "permit-verification-does-not-select-runtime"),
+    ("selection-consume", "selection-permit-consumed-once-before-driver-selection"),
+    ("selection-consume-verify", "consumption-verification-does-not-select-runtime"),
 )
 
 
