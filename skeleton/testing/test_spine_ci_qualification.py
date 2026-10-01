@@ -15,6 +15,10 @@ from skeleton.persistence.spine_ci_qualification_verify import (
     SpineCiQualificationVerifyError,
 )
 from skeleton.persistence.spine_ci_policy import (
+    CI_PRODUCER_EVENT,
+    CI_PRODUCER_STATUS,
+    CI_PRODUCER_WORKFLOW_NAME,
+    CI_PRODUCER_WORKFLOW_PATH,
     REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
@@ -29,6 +33,17 @@ def _receipt() -> dict[str, object]:
     return {
         "kind": "spine_ci_exact_head_receipt",
         "authority_domain": "ci-exact-head",
+        "repository": "Apeloff1/Skeleton",
+        "producer_workflow_name": CI_PRODUCER_WORKFLOW_NAME,
+        "producer_workflow_path": CI_PRODUCER_WORKFLOW_PATH,
+        "producer_event": CI_PRODUCER_EVENT,
+        "producer_workflow_id": 777777,
+        "producer_run_id": 900,
+        "producer_run_attempt": 1,
+        "producer_status": CI_PRODUCER_STATUS,
+        "producer_head_repository": "Apeloff1/Skeleton",
+        "producer_head_branch": "main",
+        "producer_head_sha": "e" * 40,
         "head_sha": HEAD,
         "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
         "required_check_count": len(REQUIRED_CHECKS),
@@ -211,5 +226,36 @@ def test_ci_verifier_rejects_workflow_identity_tamper() -> None:
     with pytest.raises(
         SpineCiQualificationVerifyError,
         match="workflow identity mismatch",
+    ):
+        SpineCiQualificationVerify().verify(tampered)
+
+
+def test_ci_qualification_rejects_producer_identity_tamper() -> None:
+    receipt = _receipt()
+    receipt["producer_workflow_path"] = (
+        ".github/workflows/forged-p2-ci-qualification.yml"
+    )
+    with pytest.raises(
+        SpineCiQualificationError,
+        match="producer workflow path changed",
+    ):
+        SpineCiQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_ci_verifier_rejects_producer_identity_tamper() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["producer_run_id"] = 0
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="producer_run_id is invalid",
     ):
         SpineCiQualificationVerify().verify(tampered)

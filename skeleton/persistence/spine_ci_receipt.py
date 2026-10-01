@@ -6,6 +6,10 @@ import re
 from typing import Any, Callable, Iterable, Mapping
 
 from skeleton.persistence.spine_ci_policy import (
+    CI_PRODUCER_EVENT,
+    CI_PRODUCER_STATUS,
+    CI_PRODUCER_WORKFLOW_NAME,
+    CI_PRODUCER_WORKFLOW_PATH,
     REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
@@ -23,6 +27,9 @@ class SpineCiReceiptIncompleteError(SpineCiReceiptError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 
 
 def _positive(value: object, field: str) -> int:
@@ -38,11 +45,81 @@ class SpineCiReceiptBuilder:
         self,
         *,
         workflow_runs: Iterable[Mapping[str, Any]],
+        expected_repository: str,
+        producer_run: Mapping[str, Any],
+        expected_producer_run_id: int,
+        expected_producer_run_attempt: int,
+        expected_producer_branch: str,
         expected_head_sha: str,
         attest: Callable[[dict[str, Any]], str],
     ) -> dict[str, Any]:
+        if (
+            not isinstance(expected_repository, str)
+            or _REPOSITORY_RE.fullmatch(expected_repository) is None
+        ):
+            raise SpineCiReceiptError("expected repository is invalid")
+        if not isinstance(producer_run, Mapping):
+            raise SpineCiReceiptError("CI producer workflow run must be an object")
+        producer_run_id = _positive(
+            expected_producer_run_id,
+            "CI producer run id",
+        )
+        producer_run_attempt = _positive(
+            expected_producer_run_attempt,
+            "CI producer run attempt",
+        )
+        if (
+            not isinstance(expected_producer_branch, str)
+            or not expected_producer_branch.strip()
+        ):
+            raise SpineCiReceiptError("CI producer branch is invalid")
         if not isinstance(expected_head_sha, str) or _SHA_RE.fullmatch(expected_head_sha) is None:
             raise SpineCiReceiptError("expected head SHA is invalid")
+
+        observed_producer_run_id = _positive(
+            producer_run.get("id"),
+            "observed CI producer run id",
+        )
+        observed_producer_attempt = _positive(
+            producer_run.get("run_attempt"),
+            "observed CI producer run attempt",
+        )
+        producer_workflow_id = _positive(
+            producer_run.get("workflow_id"),
+            "CI producer workflow id",
+        )
+        if observed_producer_run_id != producer_run_id:
+            raise SpineCiReceiptError("CI producer run identity changed")
+        if observed_producer_attempt != producer_run_attempt:
+            raise SpineCiReceiptError("CI producer run attempt changed")
+        if producer_run.get("name") != CI_PRODUCER_WORKFLOW_NAME:
+            raise SpineCiReceiptError("CI producer workflow name changed")
+        if producer_run.get("path") != CI_PRODUCER_WORKFLOW_PATH:
+            raise SpineCiReceiptError("CI producer workflow path changed")
+        if producer_run.get("event") != CI_PRODUCER_EVENT:
+            raise SpineCiReceiptError("CI producer event changed")
+        if producer_run.get("status") != CI_PRODUCER_STATUS:
+            raise SpineCiReceiptError("CI producer is not running")
+        if producer_run.get("conclusion") is not None:
+            raise SpineCiReceiptError(
+                "CI producer concluded before evidence emission"
+            )
+        producer_head_sha = producer_run.get("head_sha")
+        if (
+            not isinstance(producer_head_sha, str)
+            or _SHA_RE.fullmatch(producer_head_sha) is None
+        ):
+            raise SpineCiReceiptError("CI producer head SHA is invalid")
+        if producer_run.get("head_branch") != expected_producer_branch:
+            raise SpineCiReceiptError("CI producer branch identity changed")
+        producer_head_repository = producer_run.get("head_repository")
+        producer_repository = (
+            producer_head_repository.get("full_name")
+            if isinstance(producer_head_repository, Mapping)
+            else None
+        )
+        if producer_repository != expected_repository:
+            raise SpineCiReceiptError("CI producer repository changed")
         if not callable(attest):
             raise SpineCiReceiptError("CI receipt attestor must be callable")
 
@@ -118,6 +195,17 @@ class SpineCiReceiptBuilder:
         receipt: dict[str, Any] = {
             "kind": "spine_ci_exact_head_receipt",
             "authority_domain": "ci-exact-head",
+            "repository": expected_repository,
+            "producer_workflow_name": CI_PRODUCER_WORKFLOW_NAME,
+            "producer_workflow_path": CI_PRODUCER_WORKFLOW_PATH,
+            "producer_event": CI_PRODUCER_EVENT,
+            "producer_workflow_id": producer_workflow_id,
+            "producer_run_id": producer_run_id,
+            "producer_run_attempt": producer_run_attempt,
+            "producer_status": CI_PRODUCER_STATUS,
+            "producer_head_repository": producer_repository,
+            "producer_head_branch": expected_producer_branch,
+            "producer_head_sha": producer_head_sha,
             "head_sha": expected_head_sha,
             "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
             "required_check_count": len(REQUIRED_CHECKS),

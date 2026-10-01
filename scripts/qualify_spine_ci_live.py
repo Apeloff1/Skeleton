@@ -54,6 +54,30 @@ def _authenticate(receipt: dict[str, Any], key: bytes) -> bool:
     )
 
 
+def _fetch_run(repository: str, run_id: int) -> dict[str, Any]:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN is required to verify CI producer run")
+    owner_repo = quote(repository, safe="/")
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/actions/runs/{run_id}"
+    )
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "skeleton-p2-ci-qualification",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    if not isinstance(payload, dict):
+        raise RuntimeError("CI producer workflow response is not an object")
+    return payload
+
+
 def _fetch_runs(repository: str, head_sha: str) -> list[dict[str, Any]]:
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
@@ -88,6 +112,9 @@ def _fetch_runs(repository: str, head_sha: str) -> list[dict[str, Any]]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", required=True)
+    parser.add_argument("--producer-run-id", required=True, type=int)
+    parser.add_argument("--producer-run-attempt", required=True, type=int)
+    parser.add_argument("--producer-branch", required=True)
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--evidence-out", required=True)
     parser.add_argument("--runs-json", default="")
@@ -109,10 +136,24 @@ def main() -> int:
     else:
         runs = _fetch_runs(args.repository, args.expected_head)
 
+    producer_run = _fetch_run(
+        args.repository,
+        args.producer_run_id,
+    )
+    if producer_run.get("run_attempt") != args.producer_run_attempt:
+        raise RuntimeError(
+            "CI producer run attempt changed before qualification"
+        )
+
     key = _key()
     try:
         receipt = SpineCiReceiptBuilder().build(
             workflow_runs=runs,
+            expected_repository=args.repository,
+            producer_run=producer_run,
+            expected_producer_run_id=args.producer_run_id,
+            expected_producer_run_attempt=args.producer_run_attempt,
+            expected_producer_branch=args.producer_branch,
             expected_head_sha=args.expected_head,
             attest=lambda candidate: _attest(candidate, key),
         )

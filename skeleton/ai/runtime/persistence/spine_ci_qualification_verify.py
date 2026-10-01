@@ -8,6 +8,10 @@ import re
 from typing import Any
 
 from skeleton.persistence.spine_ci_policy import (
+    CI_PRODUCER_EVENT,
+    CI_PRODUCER_STATUS,
+    CI_PRODUCER_WORKFLOW_NAME,
+    CI_PRODUCER_WORKFLOW_PATH,
     REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
@@ -21,6 +25,9 @@ class SpineCiQualificationVerifyError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 
 
 def _digest(payload: object) -> str:
@@ -48,6 +55,57 @@ class SpineCiQualificationVerify:
         if card.get("authority_domain") != "ci-exact-head":
             raise SpineCiQualificationVerifyError(
                 "CI authority domain changed"
+            )
+        repository = card.get("repository")
+        if (
+            not isinstance(repository, str)
+            or _REPOSITORY_RE.fullmatch(repository) is None
+            or card.get("producer_head_repository") != repository
+        ):
+            raise SpineCiQualificationVerifyError(
+                "CI producer repository changed"
+            )
+        if card.get("producer_workflow_name") != CI_PRODUCER_WORKFLOW_NAME:
+            raise SpineCiQualificationVerifyError(
+                "CI producer workflow name changed"
+            )
+        if card.get("producer_workflow_path") != CI_PRODUCER_WORKFLOW_PATH:
+            raise SpineCiQualificationVerifyError(
+                "CI producer workflow path changed"
+            )
+        if card.get("producer_event") != CI_PRODUCER_EVENT:
+            raise SpineCiQualificationVerifyError(
+                "CI producer event changed"
+            )
+        if card.get("producer_status") != CI_PRODUCER_STATUS:
+            raise SpineCiQualificationVerifyError(
+                "CI producer status changed"
+            )
+        for field in (
+            "producer_workflow_id",
+            "producer_run_id",
+            "producer_run_attempt",
+        ):
+            value = card.get(field)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise SpineCiQualificationVerifyError(
+                    f"{field} is invalid"
+                )
+        producer_head_branch = card.get("producer_head_branch")
+        if (
+            not isinstance(producer_head_branch, str)
+            or not producer_head_branch.strip()
+        ):
+            raise SpineCiQualificationVerifyError(
+                "CI producer branch identity is invalid"
+            )
+        producer_head_sha = card.get("producer_head_sha")
+        if (
+            not isinstance(producer_head_sha, str)
+            or _SHA_RE.fullmatch(producer_head_sha) is None
+        ):
+            raise SpineCiQualificationVerifyError(
+                "CI producer head SHA is invalid"
             )
         head_sha = card.get("head_sha")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
@@ -171,6 +229,19 @@ class SpineCiQualificationVerify:
             )
         evidence = {
             "authority_domain": card["authority_domain"],
+            "repository": repository,
+            "producer_workflow_name": card["producer_workflow_name"],
+            "producer_workflow_path": card["producer_workflow_path"],
+            "producer_event": card["producer_event"],
+            "producer_workflow_id": card["producer_workflow_id"],
+            "producer_run_id": card["producer_run_id"],
+            "producer_run_attempt": card["producer_run_attempt"],
+            "producer_status": card["producer_status"],
+            "producer_head_repository": card[
+                "producer_head_repository"
+            ],
+            "producer_head_branch": producer_head_branch,
+            "producer_head_sha": producer_head_sha,
             "head_sha": head_sha,
             "required_check_policy_digest": card[
                 "required_check_policy_digest"

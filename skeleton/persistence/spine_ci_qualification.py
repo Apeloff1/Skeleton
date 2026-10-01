@@ -8,6 +8,10 @@ import re
 from typing import Any, Callable
 
 from skeleton.persistence.spine_ci_policy import (
+    CI_PRODUCER_EVENT,
+    CI_PRODUCER_STATUS,
+    CI_PRODUCER_WORKFLOW_NAME,
+    CI_PRODUCER_WORKFLOW_PATH,
     REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
@@ -21,6 +25,9 @@ class SpineCiQualificationError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"
+)
 
 
 def _digest(payload: object) -> str:
@@ -58,6 +65,53 @@ class SpineCiQualification:
             raise SpineCiQualificationError("exact-head CI receipt is missing")
         if receipt.get("authority_domain") != "ci-exact-head":
             raise SpineCiQualificationError("CI authority domain changed")
+        repository = receipt.get("repository")
+        if (
+            not isinstance(repository, str)
+            or _REPOSITORY_RE.fullmatch(repository) is None
+            or receipt.get("producer_head_repository") != repository
+        ):
+            raise SpineCiQualificationError(
+                "CI producer repository changed"
+            )
+        if receipt.get("producer_workflow_name") != CI_PRODUCER_WORKFLOW_NAME:
+            raise SpineCiQualificationError(
+                "CI producer workflow name changed"
+            )
+        if receipt.get("producer_workflow_path") != CI_PRODUCER_WORKFLOW_PATH:
+            raise SpineCiQualificationError(
+                "CI producer workflow path changed"
+            )
+        if receipt.get("producer_event") != CI_PRODUCER_EVENT:
+            raise SpineCiQualificationError("CI producer event changed")
+        if receipt.get("producer_status") != CI_PRODUCER_STATUS:
+            raise SpineCiQualificationError("CI producer status changed")
+        producer_workflow_id = receipt.get("producer_workflow_id")
+        producer_run_id = receipt.get("producer_run_id")
+        producer_run_attempt = receipt.get("producer_run_attempt")
+        for field, value in (
+            ("CI producer workflow id", producer_workflow_id),
+            ("CI producer run id", producer_run_id),
+            ("CI producer run attempt", producer_run_attempt),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise SpineCiQualificationError(f"{field} is invalid")
+        producer_head_branch = receipt.get("producer_head_branch")
+        if (
+            not isinstance(producer_head_branch, str)
+            or not producer_head_branch.strip()
+        ):
+            raise SpineCiQualificationError(
+                "CI producer branch identity is invalid"
+            )
+        producer_head_sha = receipt.get("producer_head_sha")
+        if (
+            not isinstance(producer_head_sha, str)
+            or _SHA_RE.fullmatch(producer_head_sha) is None
+        ):
+            raise SpineCiQualificationError(
+                "CI producer head SHA is invalid"
+            )
         if receipt.get("head_sha") != expected_head_sha:
             raise SpineCiQualificationError("CI receipt is not exact-head")
         if receipt.get("catalog_complete") is not True:
@@ -178,6 +232,19 @@ class SpineCiQualification:
 
         evidence = {
             "authority_domain": receipt["authority_domain"],
+            "repository": repository,
+            "producer_workflow_name": receipt["producer_workflow_name"],
+            "producer_workflow_path": receipt["producer_workflow_path"],
+            "producer_event": receipt["producer_event"],
+            "producer_workflow_id": producer_workflow_id,
+            "producer_run_id": producer_run_id,
+            "producer_run_attempt": producer_run_attempt,
+            "producer_status": receipt["producer_status"],
+            "producer_head_repository": receipt[
+                "producer_head_repository"
+            ],
+            "producer_head_branch": producer_head_branch,
+            "producer_head_sha": producer_head_sha,
             "head_sha": expected_head_sha,
             "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
             "required_check_count": expected_count,

@@ -32,6 +32,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
       P2_CI_ATTESTATION_KEY: ${{ secrets.P2_CI_ATTESTATION_KEY }}
       SOURCE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      CI_PRODUCER_BRANCH: ${{ github.event.repository.default_branch }}
 
     steps:
       - name: Check out trusted default branch
@@ -62,7 +63,14 @@ jobs:
           mkdir -p .p2-evidence
           evidence=".p2-evidence/ci-$SOURCE_HEAD_SHA.json"
           set +e
-          python scripts/qualify_spine_ci_live.py             --repository "$GITHUB_REPOSITORY"             --expected-head "$SOURCE_HEAD_SHA"             --evidence-out "$evidence"             --allow-incomplete
+          python scripts/qualify_spine_ci_live.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --producer-run-id "$GITHUB_RUN_ID" \
+            --producer-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --producer-branch "$CI_PRODUCER_BRANCH" \
+            --expected-head "$SOURCE_HEAD_SHA" \
+            --evidence-out "$evidence" \
+            --allow-incomplete
           status=$?
           set -e
           if [[ "$status" -eq 3 ]]; then

@@ -25,6 +25,11 @@ REQUIRED_CHECK_WORKFLOWS = {
 REQUIRED_CHECKS = tuple(sorted(REQUIRED_CHECK_WORKFLOWS))
 REQUIRED_CHECK_EVENT = "pull_request"
 
+CI_PRODUCER_WORKFLOW_NAME = "P2 CI Qualification Evidence"
+CI_PRODUCER_WORKFLOW_PATH = ".github/workflows/p2-ci-qualification.yml"
+CI_PRODUCER_EVENT = "workflow_run"
+CI_PRODUCER_STATUS = "in_progress"
+
 
 def _digest(payload: object) -> str:
     encoded = json.dumps(
@@ -39,7 +44,12 @@ def _digest(payload: object) -> str:
 
 REQUIRED_CHECK_POLICY_DIGEST = _digest(
     {
-        "schema_version": 2,
+        "schema_version": 3,
+        "producer": {
+            "name": CI_PRODUCER_WORKFLOW_NAME,
+            "workflow_path": CI_PRODUCER_WORKFLOW_PATH,
+            "event": CI_PRODUCER_EVENT,
+        },
         "required_checks": [
             {
                 "name": name,
@@ -53,6 +63,10 @@ REQUIRED_CHECK_POLICY_DIGEST = _digest(
 
 
 __all__ = [
+    "CI_PRODUCER_EVENT",
+    "CI_PRODUCER_STATUS",
+    "CI_PRODUCER_WORKFLOW_NAME",
+    "CI_PRODUCER_WORKFLOW_PATH",
     "REQUIRED_CHECKS",
     "REQUIRED_CHECK_EVENT",
     "REQUIRED_CHECK_POLICY_DIGEST",
