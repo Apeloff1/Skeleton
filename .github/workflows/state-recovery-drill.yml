@@ -17,6 +17,8 @@ on:
       - "skeleton/testing/test_spine_motor_bootstrap_control.py"
       - "skeleton/testing/test_spine_motor_witness.py"
       - "skeleton/testing/test_spine_index_bind.py"
+      - "skeleton/testing/test_spine_pymongo_async_adapter.py"
+      - "skeleton/deploy/spine_pymongo_async.py"
       - "skeleton/persistence/spine_bind_*.py"
       - "skeleton/persistence/spine_motor_*.py"
       - "skeleton/ai/runtime/persistence/spine_motor_*.py"
@@ -89,7 +91,7 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
-          "pymongo>=4.10,<5"
+          "pymongo>=4.13,<5"
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
@@ -120,7 +122,7 @@ jobs:
       - name: Verify P2 bind recovery control
         run: python scripts/check_spine_bind_recovery.py
 
-      - name: Verify P2 driver-injected Motor bootstrap contracts
+      - name: Verify P2 async Mongo bootstrap contracts
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
@@ -129,8 +131,9 @@ jobs:
           skeleton/testing/test_spine_motor_bootstrap_control.py
           skeleton/testing/test_spine_motor_witness.py
           skeleton/testing/test_spine_index_bind.py
+          skeleton/testing/test_spine_pymongo_async_adapter.py
 
-      - name: Verify P2 Motor bootstrap structural control
+      - name: Verify P2 async Mongo core structural control
         run: python scripts/check_spine_motor_bootstrap.py
 
       - name: Run live Mongo backup restore and rebuild drill

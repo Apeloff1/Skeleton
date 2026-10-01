@@ -81,6 +81,7 @@ SEAMS = (
     ("motor-bootstrap-replay", "bootstrap-replay-is-equivalent"),
     ("motor-preflight", "deployment-protocol-qualified-without-activation"),
     ("motor-preflight-verify", "preflight-verification-does-not-activate"),
+    ("pymongo-async-adapter", "supported-driver-import-is-deployment-only"),
 )
 
 

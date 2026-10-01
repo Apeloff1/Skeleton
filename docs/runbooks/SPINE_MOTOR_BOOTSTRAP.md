@@ -1,4 +1,4 @@
-# P2 driver-injected Motor bootstrap
+# P2 async Mongo bootstrap (legacy Motor lane name)
 
 Machine owners:
 - `skeleton/persistence/spine_motor_plan.py`
@@ -8,13 +8,11 @@ Machine owners:
 - `skeleton/persistence/spine_motor_preflight.py`
 - `skeleton/persistence/spine_motor_preflight_verify.py`
 
-AI-tree mirrors live under `skeleton/ai/runtime/persistence`.
+AI-tree mirrors live under `skeleton/ai/runtime/persistence`. The supported deployment adapter is `skeleton/deploy/spine_pymongo_async.py`.
 
 ## Boundary
 
-This tranche makes the async Mongo bootstrap contract executable without
-importing or activating a live driver in core. `live_motor=false`,
-`driver_imported=false`, and `activated=false` remain mandatory.
+This tranche makes the async Mongo bootstrap contract executable without importing or activating a live driver in core. The supported deployment path targets PyMongo Async with pymongo>=4.13. Core `live_motor=false`, `driver_imported=false`, and `activated=false` remain mandatory.
 
 A deployment may inject collection objects exposing `create_index`. The core
 supports either synchronous results or awaitable results, which covers the
@@ -53,8 +51,11 @@ It emits canonical SHA-256 evidence while keeping `driver_imported=false`,
 
 `SpineMotorPreflightVerify` independently reconstructs the plan identity,
 collection coverage, wire-version constraints, authority flags, and digest.
-This qualifies the deployment protocol surface only; it does not authenticate
-a package identity or activate the runtime.
+This qualifies the deployment protocol surface only; it does not activate the runtime.
+
+## Supported PyMongo Async deployment adapter
+
+`SpinePyMongoAsyncAdapter` is intentionally outside the persistence package. It imports `AsyncMongoClient`, requires pymongo>=4.13, uses Stable API v1, and emits a canonical driver identity receipt. The receipt marks the deployment driver import as present while keeping the core driver import and runtime activation false. Motor is not a dependency of this supported path.
 
 ## Independent checks
 
@@ -75,7 +76,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_motor_bootstrap.py \
   skeleton/testing/test_spine_motor_bootstrap_control.py \
   skeleton/testing/test_spine_motor_witness.py \
-  skeleton/testing/test_spine_index_bind.py
+  skeleton/testing/test_spine_index_bind.py \
+  skeleton/testing/test_spine_pymongo_async_adapter.py
 python scripts/check_spine_motor_bootstrap.py
 ```
 
