@@ -54,6 +54,11 @@ FILES = (
     "spine_runtime_transition_attempt_verify.py",
     "spine_runtime_transition_rollback_witness.py",
     "spine_runtime_transition_rollback_verify.py",
+    "spine_runtime_transition_slot.py",
+    "spine_runtime_transition_execution.py",
+    "spine_runtime_transition_execution_verify.py",
+    "spine_runtime_transition_effect_rollback.py",
+    "spine_runtime_transition_effect_rollback_verify.py",
 )
 
 
