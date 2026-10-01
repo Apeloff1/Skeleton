@@ -2749,5 +2749,13 @@
     "behavior_rule": "Every behavior traces to requirement(s) and test.",
     "impact_rule": "Incident edges permit deterministic changed-authority expansion to affected requirements/volumes.",
     "no_false_completion": "Trace completeness does not imply masterplan maturity or signoff."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-112",
+    "title": "Master Traceability Matrix",
+    "required_gap_texts": [
+      "materialize canonical trace graph",
+      "bind PR impact checks to trace edges"
+    ]
   }
 }
