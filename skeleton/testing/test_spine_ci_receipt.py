@@ -8,7 +8,11 @@ from skeleton.persistence.spine_ci_qualification import SpineCiQualification
 from skeleton.persistence.spine_ci_qualification_verify import (
     SpineCiQualificationVerify,
 )
-from skeleton.persistence.spine_ci_policy import REQUIRED_CHECKS
+from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_EVENT,
+    REQUIRED_CHECKS,
+    REQUIRED_CHECK_WORKFLOWS,
+)
 from skeleton.persistence.spine_ci_receipt import (
     SpineCiReceiptBuilder,
     SpineCiReceiptError,
@@ -24,6 +28,8 @@ def _runs() -> list[dict[str, object]]:
             "id": 100 + index,
             "name": name,
             "head_sha": HEAD,
+            "path": REQUIRED_CHECK_WORKFLOWS[name],
+            "event": REQUIRED_CHECK_EVENT,
             "run_attempt": 1,
             "status": "completed",
             "conclusion": "success",
@@ -46,6 +52,12 @@ def test_ci_receipt_builder_qualifies_complete_exact_head_catalog() -> None:
     verified = SpineCiQualificationVerify().verify(card)
 
     assert [row["name"] for row in receipt["checks"]] == list(REQUIRED_CHECKS)
+    assert [row["workflow_path"] for row in receipt["checks"]] == [
+        REQUIRED_CHECK_WORKFLOWS[name] for name in REQUIRED_CHECKS
+    ]
+    assert {row["event"] for row in receipt["checks"]} == {
+        REQUIRED_CHECK_EVENT
+    }
     assert card["ci_green"] is True
     assert verified["ci_green"] is True
     assert verified["merge_authority"] is False
@@ -77,4 +89,43 @@ def test_ci_receipt_builder_rejects_missing_exact_head_check() -> None:
             workflow_runs=runs,
             expected_head_sha=HEAD,
             attest=lambda payload: "e" * 64,
+        )
+
+
+def test_ci_receipt_builder_rejects_same_name_wrong_workflow_identity() -> None:
+    runs = _runs()
+    forged = copy.deepcopy(runs[0])
+    forged["id"] = 999999
+    forged["path"] = ".github/workflows/forged-backend-quality.yml"
+    forged["event"] = REQUIRED_CHECK_EVENT
+
+    receipt = SpineCiReceiptBuilder().build(
+        workflow_runs=[forged, *runs],
+        expected_head_sha=HEAD,
+        attest=lambda payload: "f" * 64,
+    )
+    assert receipt["checks"][0]["run_id"] == runs[0]["id"]
+    assert (
+        receipt["checks"][0]["workflow_path"]
+        == REQUIRED_CHECK_WORKFLOWS[REQUIRED_CHECKS[0]]
+    )
+
+    only_forged = _runs()
+    only_forged[0]["path"] = ".github/workflows/forged-backend-quality.yml"
+    with pytest.raises(SpineCiReceiptError, match="missing="):
+        SpineCiReceiptBuilder().build(
+            workflow_runs=only_forged,
+            expected_head_sha=HEAD,
+            attest=lambda payload: "f" * 64,
+        )
+
+
+def test_ci_receipt_builder_rejects_wrong_trigger_event() -> None:
+    runs = _runs()
+    runs[0]["event"] = "workflow_dispatch"
+    with pytest.raises(SpineCiReceiptError, match="missing="):
+        SpineCiReceiptBuilder().build(
+            workflow_runs=runs,
+            expected_head_sha=HEAD,
+            attest=lambda payload: "f" * 64,
         )

@@ -6,14 +6,24 @@ import hashlib
 import json
 
 
-REQUIRED_CHECKS = (
-    "Backend Quality",
-    "P2 Repository Engineering Control",
-    "Provider Surface Closure Gate",
-    "Repository Hygiene Gate",
-    "State Recovery Drill",
-    "Workflow Input Security",
-)
+REQUIRED_CHECK_WORKFLOWS = {
+    "Backend Quality": ".github/workflows/backend-quality.yml",
+    "P2 Repository Engineering Control": (
+        ".github/workflows/p2-repository-engineering.yml"
+    ),
+    "Provider Surface Closure Gate": (
+        ".github/workflows/provider-surface-closure.yml"
+    ),
+    "Repository Hygiene Gate": (
+        ".github/workflows/repository-hygiene-gate.yml"
+    ),
+    "State Recovery Drill": ".github/workflows/state-recovery-drill.yml",
+    "Workflow Input Security": (
+        ".github/workflows/workflow-input-security.yml"
+    ),
+}
+REQUIRED_CHECKS = tuple(sorted(REQUIRED_CHECK_WORKFLOWS))
+REQUIRED_CHECK_EVENT = "pull_request"
 
 
 def _digest(payload: object) -> str:
@@ -29,10 +39,22 @@ def _digest(payload: object) -> str:
 
 REQUIRED_CHECK_POLICY_DIGEST = _digest(
     {
-        "schema_version": 1,
-        "required_checks": list(REQUIRED_CHECKS),
+        "schema_version": 2,
+        "required_checks": [
+            {
+                "name": name,
+                "workflow_path": REQUIRED_CHECK_WORKFLOWS[name],
+                "event": REQUIRED_CHECK_EVENT,
+            }
+            for name in REQUIRED_CHECKS
+        ],
     }
 )
 
 
-__all__ = ["REQUIRED_CHECKS", "REQUIRED_CHECK_POLICY_DIGEST"]
+__all__ = [
+    "REQUIRED_CHECKS",
+    "REQUIRED_CHECK_EVENT",
+    "REQUIRED_CHECK_POLICY_DIGEST",
+    "REQUIRED_CHECK_WORKFLOWS",
+]

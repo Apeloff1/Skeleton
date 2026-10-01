@@ -8,8 +8,10 @@ import re
 from typing import Any, Callable
 
 from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
+    REQUIRED_CHECK_WORKFLOWS,
 )
 
 
@@ -99,6 +101,15 @@ class SpineCiQualification:
                     "CI required-check catalog contains duplicates"
                 )
             names.add(name)
+            expected_path = REQUIRED_CHECK_WORKFLOWS.get(name)
+            if (
+                expected_path is None
+                or check.get("workflow_path") != expected_path
+                or check.get("event") != REQUIRED_CHECK_EVENT
+            ):
+                raise SpineCiQualificationError(
+                    f"CI workflow identity mismatch: {name}"
+                )
             if check.get("head_sha") != expected_head_sha:
                 raise SpineCiQualificationError(
                     f"CI check is not exact-head: {name}"
@@ -125,6 +136,8 @@ class SpineCiQualification:
                 {
                     "name": name,
                     "head_sha": expected_head_sha,
+                    "workflow_path": expected_path,
+                    "event": REQUIRED_CHECK_EVENT,
                     "run_id": run_id,
                     "run_attempt": run_attempt,
                     "conclusion": "success",

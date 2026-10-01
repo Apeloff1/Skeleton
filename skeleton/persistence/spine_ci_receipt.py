@@ -6,8 +6,10 @@ import re
 from typing import Any, Callable, Iterable, Mapping
 
 from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_EVENT,
     REQUIRED_CHECK_POLICY_DIGEST,
     REQUIRED_CHECKS,
+    REQUIRED_CHECK_WORKFLOWS,
 )
 
 
@@ -49,11 +51,17 @@ class SpineCiReceiptBuilder:
                 continue
             if raw.get("head_sha") != expected_head_sha:
                 continue
+            if raw.get("path") != REQUIRED_CHECK_WORKFLOWS[name]:
+                continue
+            if raw.get("event") != REQUIRED_CHECK_EVENT:
+                continue
             run_id = _positive(raw.get("id"), f"{name} run id")
             run_attempt = _positive(raw.get("run_attempt"), f"{name} run attempt")
             candidate = {
                 "name": name,
                 "head_sha": expected_head_sha,
+                "workflow_path": REQUIRED_CHECK_WORKFLOWS[name],
+                "event": REQUIRED_CHECK_EVENT,
                 "run_id": run_id,
                 "run_attempt": run_attempt,
                 "status": raw.get("status"),
@@ -91,6 +99,8 @@ class SpineCiReceiptBuilder:
             {
                 "name": name,
                 "head_sha": expected_head_sha,
+                "workflow_path": latest[name]["workflow_path"],
+                "event": latest[name]["event"],
                 "run_id": latest[name]["run_id"],
                 "run_attempt": latest[name]["run_attempt"],
                 "conclusion": "success",

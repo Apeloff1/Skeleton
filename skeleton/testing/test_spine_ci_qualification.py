@@ -14,51 +14,35 @@ from skeleton.persistence.spine_ci_qualification_verify import (
     SpineCiQualificationVerify,
     SpineCiQualificationVerifyError,
 )
+from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_EVENT,
+    REQUIRED_CHECK_POLICY_DIGEST,
+    REQUIRED_CHECKS,
+    REQUIRED_CHECK_WORKFLOWS,
+)
 
 
 HEAD = "a" * 40
 
 
-def _policy_digest(checks: list[str]) -> str:
-    payload = {
-        "schema_version": 1,
-        "required_checks": checks,
-    }
-    return hashlib.sha256(
-        json.dumps(
-            payload,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8")
-    ).hexdigest()
-
-
 def _receipt() -> dict[str, object]:
-    checks = [
-        "Backend Quality",
-        "P2 Repository Engineering Control",
-        "Provider Surface Closure Gate",
-        "Repository Hygiene Gate",
-        "State Recovery Drill",
-        "Workflow Input Security",
-    ]
     return {
         "kind": "spine_ci_exact_head_receipt",
         "authority_domain": "ci-exact-head",
         "head_sha": HEAD,
-        "required_check_policy_digest": _policy_digest(checks),
-        "required_check_count": len(checks),
+        "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
+        "required_check_count": len(REQUIRED_CHECKS),
         "checks": [
             {
                 "name": name,
                 "head_sha": HEAD,
+                "workflow_path": REQUIRED_CHECK_WORKFLOWS[name],
+                "event": REQUIRED_CHECK_EVENT,
                 "run_id": index + 100,
                 "run_attempt": 1,
                 "conclusion": "success",
             }
-            for index, name in enumerate(checks)
+            for index, name in enumerate(REQUIRED_CHECKS)
         ],
         "catalog_complete": True,
         "pending_count": 0,
@@ -196,5 +180,36 @@ def test_ci_verifier_rejects_merge_authority_tamper() -> None:
     with pytest.raises(
         SpineCiQualificationVerifyError,
         match="overclaimed merge authority",
+    ):
+        SpineCiQualificationVerify().verify(tampered)
+
+
+def test_ci_qualification_rejects_workflow_identity_tamper() -> None:
+    receipt = _receipt()
+    receipt["checks"][0]["workflow_path"] = (
+        ".github/workflows/forged-backend-quality.yml"
+    )
+    with pytest.raises(
+        SpineCiQualificationError,
+        match="workflow identity mismatch",
+    ):
+        SpineCiQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_ci_verifier_rejects_workflow_identity_tamper() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["checks"][0]["event"] = "workflow_dispatch"
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="workflow identity mismatch",
     ):
         SpineCiQualificationVerify().verify(tampered)
