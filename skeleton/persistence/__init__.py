@@ -82,6 +82,9 @@ from skeleton.persistence.spine_reaccept import SpineReaccept
 from skeleton.persistence.spine_gate import SpineGate
 from skeleton.persistence.spine_watch import SpineWatch
 from skeleton.persistence.spine_gap import SpineGap
+from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
+from skeleton.persistence.spine_poison_apply import SpinePoisonApply
+from skeleton.persistence.spine_poison_witness import SpinePoisonWitness
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -178,6 +181,9 @@ __all__ = [
     "SpineWindow",
     "SpineSeal",
     "SpineGap",
+    "SpinePoisonTicket",
+    "SpinePoisonApply",
+    "SpinePoisonWitness",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

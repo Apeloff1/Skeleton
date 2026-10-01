@@ -25,6 +25,12 @@ SEAMS = (
     ("export", "quarantine-json"),
     ("digest", "sha256-gap-drift"),
     ("ledger", "append-digest"),
+    ("reaccept", "digest-stable-reaccept"),
+    ("gate", "held-id-refused"),
+    ("watch", "epoch-unchanged"),
+    ("poison-ticket", "ticket-requires-hold"),
+    ("poison-apply", "hold-digest-stable-epoch-unchanged"),
+    ("poison-witness", "tenant-isolated-journal"),
 )
 
 
@@ -40,6 +46,7 @@ class SpineManifest:
             "seams": [{"name": name, "law": law} for name, law in SEAMS],
             "count": len(SEAMS),
             "apply_landed": False,
+            "poison_apply_landed": True,
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,
