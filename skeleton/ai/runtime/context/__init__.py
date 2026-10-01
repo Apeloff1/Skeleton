@@ -48,6 +48,27 @@ from skeleton.context.skills_files import (
 )
 from skeleton.context.snowball import Snowball, STAGES as SNOWBALL_STAGES
 
+def _load_lazy_module(module_name: str) -> Any:
+    """Load one explicitly allowlisted lazy context module.
+
+    Keep each import target literal so repository dynamic-import safety can prove
+    the compatibility facade cannot import attacker-controlled module names.
+    """
+    if module_name == "skeleton.context.tensor":
+        return import_module("skeleton.context.tensor")
+    if module_name == "skeleton.context.dodeca":
+        return import_module("skeleton.context.dodeca")
+    if module_name == "skeleton.context.oracle":
+        return import_module("skeleton.context.oracle")
+    if module_name == "skeleton.context.cockpit":
+        return import_module("skeleton.context.cockpit")
+    if module_name == "skeleton.context.pipeline":
+        return import_module("skeleton.context.pipeline")
+    if module_name == "skeleton.context.questionnaire":
+        return import_module("skeleton.context.questionnaire")
+    raise RuntimeError(f"unsupported lazy context module: {module_name!r}")
+
+
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "AXES": ("skeleton.context.tensor", "AXES"),
     "ContextTensor": ("skeleton.context.tensor", "ContextTensor"),
@@ -72,7 +93,7 @@ def __getattr__(name: str) -> Any:
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
-    value = getattr(import_module(module_name), attribute)
+    value = getattr(_load_lazy_module(module_name), attribute)
     globals()[name] = value
     return value
 
