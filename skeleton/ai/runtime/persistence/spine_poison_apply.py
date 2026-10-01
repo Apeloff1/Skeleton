@@ -176,6 +176,8 @@ class SpinePoisonApply:
             card["epoch_after"],
             1,
             card["duplicate"],
+            expected_digest,
+            ticket_id,
         )
 
     def applied_count(self, tenant_id: str) -> int:
@@ -204,7 +206,17 @@ class SpinePoisonApply:
             (tenant_id, outbox_id, digest, reason, ticket_id, instant.isoformat()),
         )
         self._journal.commit()
-        return self._card(tenant_id, outbox_id, reason, 0, 0, 0, False)
+        return self._card(
+            tenant_id,
+            outbox_id,
+            reason,
+            0,
+            0,
+            0,
+            False,
+            digest,
+            ticket_id,
+        )
 
     @staticmethod
     def _card(
@@ -215,6 +227,8 @@ class SpinePoisonApply:
         after: int,
         applied: int,
         duplicate: bool,
+        delivery_digest: str,
+        ticket_id: str,
     ) -> dict[str, Any]:
         return {
             "kind": "spine_poison_apply",
@@ -223,6 +237,8 @@ class SpinePoisonApply:
             "citation": "VOL-134",
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "delivery_digest": delivery_digest,
+            "ticket_id": ticket_id,
             "reason": reason,
             "epoch_before": before,
             "epoch_after": after,
