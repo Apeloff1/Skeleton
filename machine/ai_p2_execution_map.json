@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.p2.execution_map.v1",
-  "map_version": "0.2.0",
+  "map_version": "0.3.0",
   "status": "active",
   "title": "P2 Capability Expansion Execution Map",
   "purpose": "Begin P2 from the terminal P1 boundary by turning the 314 explicitly deferred masterplan volumes into a governed, dependency-aware capability expansion program without reopening or weakening P1.",
@@ -770,18 +770,19 @@
     "completion_rule": "P2 task state does not replace master build waves, AIQ dependencies, gap closure, vertical-slice evidence, masterplan maturity, or signed accountability."
   },
   "progress": {
-    "as_of_git_main": "6660bf890ab75cd175cbcf85f79c56723154ac69",
+    "as_of_git_main": "bd5171ecb04368f4ba6ff4e67d497c9559eccb85",
     "landed_unpromoted_tasks": [
+      "P2-ARCH-01",
       "P2-CTRL-01",
-      "P2-ARCH-01"
-    ],
-    "active_tasks": [
       "P2-TRACE-01"
     ],
-    "blocked_tasks": [
-      "P2-REPO-01",
-      "P2-QUAL-01",
+    "active_tasks": [
       "P2-DOC-01",
+      "P2-QUAL-01",
+      "P2-REPO-01"
+    ],
+    "ready_tasks": [],
+    "blocked_tasks": [
       "P2-NATIVE-01"
     ],
     "rule": "Landed implementation evidence does not imply masterplan maturity promotion, checkbox completion, or sign-off."
