@@ -49,6 +49,7 @@ SEAMS = (
     ("dark", "unwired-surfaces-stay-dark"),
     ("epoch-witness", "side-card-epoch-unchanged"),
     ("quiet", "dark-card-not-rewritten"),
+    ("quiet-witness", "quiet-row-stays-dark"),
 )
 
 

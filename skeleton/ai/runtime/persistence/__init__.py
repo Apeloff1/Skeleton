@@ -103,6 +103,7 @@ from skeleton.persistence.spine_dispatch_witness import SpineDispatchWitness
 from skeleton.persistence.spine_dark import SpineDark
 from skeleton.persistence.spine_epoch_witness import SpineEpochWitness
 from skeleton.persistence.spine_quiet import SpineQuiet
+from skeleton.persistence.spine_quiet_witness import SpineQuietWitness
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -220,6 +221,7 @@ __all__ = [
     "SpineDark",
     "SpineEpochWitness",
     "SpineQuiet",
+    "SpineQuietWitness",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
