@@ -23,7 +23,10 @@ def _write_fixture(root: Path) -> None:
     for name in MIRRORED:
         content = f"# {name}\n"
         if name == "spine_manifest.py":
-            base = [(f"seam-{index}", f"law-{index}") for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))]
+            base = [
+                (f"seam-{index}", f"law-{index}")
+                for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
+            ]
             base.extend(EXPECTED_SEAMS.items())
             content = "SEAMS = " + repr(tuple(base)) + "\n"
         (canonical / name).write_text(content, encoding="utf-8")
@@ -87,7 +90,10 @@ def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
     seams = list(build_report(tmp_path)["manifest"]["recovery_seams"])
     assert seams
 
-    full_manifest = [(f"seam-{index}", f"law-{index}") for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))]
+    full_manifest = [
+        (f"seam-{index}", f"law-{index}")
+        for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))
+    ]
     full_manifest.extend(EXPECTED_SEAMS.items())
     missing_name = seams[-1]
     mutated = [
