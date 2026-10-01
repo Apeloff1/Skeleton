@@ -129,6 +129,14 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeTransitionPermitLedger.consume()` rechecks the independently verified permit, durable rehearsal/transition/deployment scope, payload digest, and expiry before atomically changing the persisted permit from unconsumed to consumed. Replay is refused. The resulting receipt keeps `transition_attempted=false`, `transition_executed=false`, and `runtime_activated=false`; `SpineRuntimeTransitionConsumptionVerify` independently reconstructs that receipt.
 
+## Deployment-owned transition attempt
+
+`SpineRuntimeTransitionAttemptLedger` accepts only independently verified, already-consumed execution-permit evidence and invokes a deployment-owned attempt callback exactly once. The callback is required to return a receipt scoped to the same transition and deployment with `decision=refuse-transition`, `transition_executed=false`, and `runtime_activated=false`. The seam snapshots the actual runtime dispatcher binding before the callback and verifies it remains identical and stopped afterwards, while the epoch witness requires the fence to remain unchanged. Any replay, execution claim, dispatcher mutation, fence movement, or activation fails closed. `SpineRuntimeTransitionAttemptVerify` independently reconstructs the attempt identity, result digest, and full card digest.
+
+## Independent rollback/no-effect witness
+
+`SpineRuntimeTransitionRollbackWitness` consumes the independently verified refused attempt and rechecks the actual runtime dispatcher plus fence epoch. It records `rollback_checked=true`, `rollback_required=false`, `rollback_executed=false`, and `rollback_verified=true` only when the refused attempt left no runtime effect. `SpineRuntimeTransitionRollbackVerify` independently reconstructs this card and grants no activation authority.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -165,7 +173,9 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_activation_handoff.py \
   skeleton/testing/test_spine_runtime_transition_rehearsal.py \
   skeleton/testing/test_spine_runtime_transition_permit.py \
-  skeleton/testing/test_spine_runtime_transition_consumption.py
+  skeleton/testing/test_spine_runtime_transition_consumption.py \
+  skeleton/testing/test_spine_runtime_transition_attempt.py \
+  skeleton/testing/test_spine_runtime_transition_rollback.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
