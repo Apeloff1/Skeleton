@@ -45,6 +45,7 @@ on:
       - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification_verify.py"
       - "skeleton/testing/test_spine_provider_surface_qualification.py"
       - "skeleton/testing/test_spine_provider_live_qualification.py"
+      - "skeleton/testing/test_spine_provider_live_script.py"
       - "skeleton/persistence/spine_provider_live_qualification*.py"
       - "skeleton/ai/runtime/persistence/spine_provider_live_qualification*.py"
       - "scripts/qualify_spine_provider_live.py"
@@ -443,7 +444,8 @@ jobs:
           python -m pip install --disable-pip-version-check "pytest>=8,<9"
           && python -m pytest -q --noconftest
           skeleton/testing/test_spine_provider_surface_qualification.py \
-          skeleton/testing/test_spine_provider_live_qualification.py
+          skeleton/testing/test_spine_provider_live_qualification.py \
+          skeleton/testing/test_spine_provider_live_script.py
 
       - name: Detect live provider credential
         id: live_provider
