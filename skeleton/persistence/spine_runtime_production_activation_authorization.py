@@ -9,6 +9,10 @@ from pathlib import Path
 import sqlite3
 from typing import Any, Callable
 
+from skeleton.persistence.spine_runtime_transition_acceptance_verify import (
+    SpineRuntimeTransitionAcceptanceVerify,
+)
+
 
 class SpineRuntimeProductionActivationAuthorizationError(RuntimeError):
     """Production activation authorization failed closed."""
@@ -109,13 +113,29 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
             raise SpineRuntimeProductionActivationAuthorizationError(
                 "accepted target driver changed"
             )
+        try:
+            current_acceptance_verify = (
+                SpineRuntimeTransitionAcceptanceVerify().verify(acceptance)
+            )
+        except Exception as exc:
+            raise SpineRuntimeProductionActivationAuthorizationError(
+                "current transition acceptance verification failed closed"
+            ) from exc
+        if current_acceptance_verify.get("acceptance_digest") != acceptance_digest:
+            raise SpineRuntimeProductionActivationAuthorizationError(
+                "current acceptance digest changed"
+            )
         if (
             not isinstance(acceptance_verify, dict)
             or acceptance_verify.get("kind") != "spine_runtime_transition_acceptance_verify"
             or acceptance_verify.get("verified") is not True
             or acceptance_verify.get("acceptance_id") != acceptance_id
             or acceptance_verify.get("acceptance_digest") != acceptance_digest
+            or acceptance_verify.get("health_digest") != health_digest
             or acceptance_verify.get("execution_id") != execution_id
+            or acceptance_verify.get("deployment_id") != deployment_id
+            or acceptance_verify.get("target_driver") != "pymongo-async"
+            or acceptance_verify.get("valid_until") != acceptance.get("valid_until")
             or acceptance_verify.get("activation_accepted") is not True
             or acceptance_verify.get("production_activation_authorized") is not False
             or acceptance_verify.get("rollback_available") is not True
@@ -181,6 +201,14 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
                 "now must be timezone-aware"
             )
         instant = instant.astimezone(timezone.utc)
+        acceptance_valid_until = _instant(
+            acceptance.get("valid_until"),
+            "acceptance valid_until",
+        )
+        if instant >= acceptance_valid_until:
+            raise SpineRuntimeProductionActivationAuthorizationError(
+                "transition acceptance expired before authorization"
+            )
         issued_at = _instant(receipt.get("issued_at"), "issued_at")
         expires_at = _instant(receipt.get("expires_at"), "expires_at")
         if issued_at > instant:
@@ -194,6 +222,10 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
         if (expires_at - issued_at).total_seconds() > 120:
             raise SpineRuntimeProductionActivationAuthorizationError(
                 "activation receipt lifetime exceeds two minutes"
+            )
+        if expires_at > acceptance_valid_until:
+            raise SpineRuntimeProductionActivationAuthorizationError(
+                "activation authorization outlives accepted health"
             )
         try:
             authenticated = authenticate(dict(receipt))
