@@ -176,6 +176,56 @@ def test_effect_rollback_restores_runtime_stops_candidate_and_compensates_fence(
         execution_ledger.close()
 
 
+def test_rejected_rollback_does_not_reapply_candidate_after_external_restore(
+    tmp_path: Path,
+) -> None:
+    (
+        original,
+        candidate,
+        fence,
+        slot,
+        execution_ledger,
+        execution,
+        execution_verify,
+    ) = _execute(tmp_path)
+    rollback_ledger = SpineRuntimeTransitionEffectRollbackLedger(
+        tmp_path / "effect-rollback-stale.sqlite"
+    )
+    try:
+        candidate.stop_dispatcher(flush=False)
+        slot.restore(
+            expected_candidate=candidate,
+            original=original,
+        )
+
+        with pytest.raises(
+            SpineRuntimeTransitionEffectRollbackError,
+            match="effect rollback failed closed",
+        ):
+            rollback_ledger.rollback(
+                execution=execution,
+                execution_verify=execution_verify,
+                slot=slot,
+                original_runtime=original,
+                candidate_runtime=candidate,
+                fence=fence,
+            )
+
+        assert slot.runtime is original
+        assert candidate.dispatcher_running is False
+        assert original.dispatcher_running is False
+        assert fence.read(
+            tenant_id="tenant-a",
+            resource_id="runtime:deploy-a",
+        ).epoch == execution["fence_epoch_after"]
+    finally:
+        candidate.close()
+        original.close()
+        fence.close()
+        rollback_ledger.close()
+        execution_ledger.close()
+
+
 def test_effect_rollback_verifier_rejects_activation_tamper(
     tmp_path: Path,
 ) -> None:
