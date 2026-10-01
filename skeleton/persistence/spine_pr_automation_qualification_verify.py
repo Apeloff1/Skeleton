@@ -110,6 +110,10 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation PR number is invalid"
             )
+        if card.get("source_pr_number") != pr_number:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow targets the wrong PR"
+            )
         for field in (
             "report_digest",
             "policy_fingerprint",
@@ -213,6 +217,7 @@ class SpinePrAutomationQualificationVerify:
             "source_run_id": card["source_run_id"],
             "source_run_attempt": card["source_run_attempt"],
             "source_head_repository": card["source_head_repository"],
+            "source_pr_number": card["source_pr_number"],
             "source_status": card["source_status"],
             "source_conclusion": card["source_conclusion"],
             "conclusion": card["conclusion"],

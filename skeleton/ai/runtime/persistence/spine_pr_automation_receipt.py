@@ -171,6 +171,17 @@ class SpinePrAutomationReceiptBuilder:
             raise SpinePrAutomationReceiptError(
                 "source workflow repository changed"
             )
+        source_pull_requests = source_run.get("pull_requests")
+        if (
+            not isinstance(source_pull_requests, list)
+            or len(source_pull_requests) != 1
+            or not isinstance(source_pull_requests[0], Mapping)
+            or source_pull_requests[0].get("number") != expected_pr
+        ):
+            raise SpinePrAutomationReceiptError(
+                "source workflow run targets the wrong PR"
+            )
+        source_pr_number = expected_pr
         if source_run.get("status") != TRUSTED_SOURCE_STATUS:
             raise SpinePrAutomationReceiptError(
                 "source workflow run is not completed"
@@ -251,6 +262,7 @@ class SpinePrAutomationReceiptBuilder:
             "source_run_id": source_id,
             "source_run_attempt": source_attempt,
             "source_head_repository": source_repository,
+            "source_pr_number": source_pr_number,
             "source_status": TRUSTED_SOURCE_STATUS,
             "source_conclusion": TRUSTED_SOURCE_CONCLUSION,
             "head_sha": expected_head_sha,

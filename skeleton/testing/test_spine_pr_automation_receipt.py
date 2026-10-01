@@ -68,6 +68,7 @@ def _source_run() -> dict[str, object]:
         "conclusion": "success",
         "head_sha": HEAD,
         "head_repository": {"full_name": "Apeloff1/Skeleton"},
+        "pull_requests": [{"number": PR}],
     }
 
 
@@ -97,6 +98,7 @@ def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
     )
     verified = SpinePrAutomationQualificationVerify().verify(card)
 
+    assert receipt["source_pr_number"] == PR
     assert receipt["target_state"] == "held"
     assert receipt["decision"] == "hold"
     assert verified["pr_automation_operational_green"] is True
@@ -196,6 +198,51 @@ def test_runner_receipt_builder_rejects_source_workflow_id_drift() -> None:
     with pytest.raises(
         SpinePrAutomationReceiptError,
         match="source workflow id changed",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=source,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )
+
+
+def test_runner_receipt_builder_rejects_source_pr_identity_drift() -> None:
+    source = _source_run()
+    source["pull_requests"] = [{"number": PR + 1}]
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="targets the wrong PR",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=source,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )
+
+
+def test_runner_receipt_builder_rejects_ambiguous_source_prs() -> None:
+    source = _source_run()
+    source["pull_requests"] = [
+        {"number": PR},
+        {"number": PR + 1},
+    ]
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="targets the wrong PR",
     ):
         SpinePrAutomationReceiptBuilder().build(
             report=_report(),

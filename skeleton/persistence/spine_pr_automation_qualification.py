@@ -145,6 +145,10 @@ class SpinePrAutomationQualification:
             raise SpinePrAutomationQualificationError(
                 "PR automation receipt targets the wrong PR"
             )
+        if receipt.get("source_pr_number") != expected_pr:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow targets the wrong PR"
+            )
 
         run_id = _positive_int(receipt.get("run_id"), "PR automation run id")
         run_attempt = _positive_int(

@@ -45,6 +45,7 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "source_run_id": 777,
         "source_run_attempt": 1,
         "source_head_repository": "Apeloff1/Skeleton",
+        "source_pr_number": PR,
         "source_status": "completed",
         "source_conclusion": "success",
         "head_sha": HEAD,
@@ -297,5 +298,36 @@ def test_verifier_rejects_source_workflow_id_drift() -> None:
     with pytest.raises(
         SpinePrAutomationQualificationVerifyError,
         match="source workflow id changed",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
+
+
+def test_qualification_rejects_source_pr_identity_drift() -> None:
+    receipt = _receipt()
+    receipt["source_pr_number"] = PR + 1
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="source workflow targets the wrong PR",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_verifier_rejects_source_pr_identity_drift() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["source_pr_number"] = PR + 1
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="source workflow targets the wrong PR",
     ):
         SpinePrAutomationQualificationVerify().verify(tampered)
