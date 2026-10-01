@@ -104,6 +104,7 @@ def test_exact_authorized_health_activates_once_and_keeps_rollback_live(
         tenant_id="tenant-a",
         resource_id="runtime:deploy-a",
         writer_id="bootstrap",
+        now=NOW,
     )
     slot = SpineRuntimeSlot(original)
     execution_ledger = SpineRuntimeTransitionExecutionLedger(
