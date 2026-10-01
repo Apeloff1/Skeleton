@@ -235,6 +235,8 @@ jobs:
           skeleton/testing/test_spine_poison_chain.py
 
       - name: Verify P2 projection crash-recovery contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_spine_projection.py
