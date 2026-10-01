@@ -1,0 +1,113 @@
+{
+  "schema_version": "skeleton.architecture.runtime_supervision.v1",
+  "contract_version": "0.1.0",
+  "status": "active",
+  "purpose": "One machine-readable backend/engine supervision contract covering dependency order, readiness, shutdown, recovery, cancellation, deadlines and operation identity.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-004",
+    "title": "Kernel & Execution Foundation",
+    "required_gap_texts": [
+      "unify service supervision semantics across backend and engine",
+      "expand cancellation propagation coverage into all connectors"
+    ]
+  },
+  "sources": {
+    "runtime_manifest": "skeleton/app/manifest.json",
+    "backend_server": "backend/server.py",
+    "backend_engine_client": "backend/core/engine_client.py",
+    "engine_server": "skeleton/api/server.py",
+    "engine_runtime": "skeleton/api/engine_runtime.py",
+    "engine_service": "skeleton/api/engine_service.py",
+    "operation_runtime": "skeleton/persistence/operation_runtime.py"
+  },
+  "invariants": [
+    "backend depends on skeleton and mongo; skeleton depends on mongo",
+    "backend and skeleton both expose declared health paths before being treated as ready",
+    "shutdown cancels/drains background execution before closing durable dependencies",
+    "backend cancellation delegates to the engine cancel endpoint rather than inventing local terminal truth",
+    "engine cancellation is persisted through the execution repository and is idempotent around terminal state",
+    "engine coordinator supports restart recovery and bounded shutdown",
+    "operation deadlines are explicit and cannot be created already expired",
+    "operation identity is preserved across backend client and engine service boundaries"
+  ],
+  "services": [
+    {
+      "service": "backend",
+      "role": "application-api",
+      "expected_dependencies": [
+        "mongo",
+        "skeleton"
+      ],
+      "expected_health_path": "/api/health",
+      "expected_entrypoint": "server:app",
+      "lifecycle_bindings": [
+        {
+          "path": "backend/server.py",
+          "required_symbols": [
+            "async def lifespan(app: FastAPI):",
+            "t.cancel()",
+            "client.close()",
+            "@api_router.get(\"/health/ready\")"
+          ]
+        }
+      ],
+      "connector_bindings": [
+        {
+          "path": "backend/core/engine_client.py",
+          "required_symbols": [
+            "async def cancel(",
+            "f\"/executions/{execution}/cancel\"",
+            "execution_timeout_s",
+            "operation_id"
+          ]
+        }
+      ]
+    },
+    {
+      "service": "skeleton",
+      "role": "engine-api",
+      "expected_dependencies": [
+        "mongo"
+      ],
+      "expected_health_path": "/api/v1/health/live",
+      "expected_entrypoint": "skeleton.api.server:create_app",
+      "lifecycle_bindings": [
+        {
+          "path": "skeleton/api/server.py",
+          "required_symbols": [
+            "async def close_engine_execution_service",
+            "await coordinator.shutdown()",
+            "def close_operation_runtime"
+          ]
+        },
+        {
+          "path": "skeleton/api/engine_runtime.py",
+          "required_symbols": [
+            "async def recover(",
+            "async def shutdown(",
+            "task.cancel()"
+          ]
+        },
+        {
+          "path": "skeleton/persistence/operation_runtime.py",
+          "required_symbols": [
+            "default_deadline_s",
+            "deadline must be in the future",
+            "stop_dispatcher"
+          ]
+        }
+      ],
+      "cancellation_bindings": [
+        {
+          "path": "skeleton/api/engine_service.py",
+          "required_symbols": [
+            "def cancel(",
+            "self.repository.request_cancel(",
+            "cancellation_requested",
+            "operation_deadline"
+          ]
+        }
+      ]
+    }
+  ]
+}
