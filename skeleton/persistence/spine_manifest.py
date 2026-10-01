@@ -116,6 +116,10 @@ SEAMS = (
     ("runtime-transition-permit-verify", "transition-permit-verification-does-not-execute-runtime"),
     ("runtime-transition-consume", "transition-execution-permit-consumed-once-before-any-attempt"),
     ("runtime-transition-consume-verify", "transition-consumption-verification-does-not-attempt-runtime-transition"),
+    ("runtime-transition-attempt", "consumed-transition-permit-allows-one-fail-closed-deployment-attempt"),
+    ("runtime-transition-attempt-verify", "attempt-verification-does-not-promote-refused-transition"),
+    ("runtime-transition-rollback-witness", "refused-transition-must-prove-no-effect-or-rollback-before-promotion"),
+    ("runtime-transition-rollback-verify", "rollback-verification-does-not-authorize-runtime-promotion"),
 )
 
 
