@@ -1,13 +1,15 @@
-"""Append-only journal of a refused bind seal.
+"""Append-only durable evidence for a refused bind seal.
 
-Stores one digest per tenant and outbox id. A second write with a different
-digest fails closed. applied stays 0. The journal does not accept a delivery.
+The durable row carries enough fixed evidence to reconstruct its SHA-256 digest
+without trusting the original in-memory card. A second identity-changing write
+fails closed. The journal grants no apply or merge authority.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -17,17 +19,58 @@ class SpineBindHoldJournalError(RuntimeError):
     """Bind hold journal rejected its inputs. Not a maturity signal."""
 
 
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _bind_hold_refusal_digest(
+    *,
+    tenant_id: str,
+    outbox_id: str,
+    hold_id: int,
+    hold_reason: str,
+    bind_digest: str,
+    epoch: int,
+) -> str:
+    evidence = {
+        "tenant_id": tenant_id,
+        "outbox_id": outbox_id,
+        "hold_id": hold_id,
+        "hold_reason": hold_reason,
+        "bind_digest": bind_digest,
+        "epoch": epoch,
+        "held": True,
+        "sealed": False,
+        "moved": False,
+        "applied": 0,
+        "apply_landed": False,
+    }
+    encoded = json.dumps(
+        evidence,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 class SpineBindHoldJournal:
-    """Seal a refusal. Do not rewrite it."""
+    """Seal a refusal into reconstructable durable evidence. Do not rewrite it."""
 
     def __init__(self, journal_path: str | Path) -> None:
-        self._connection = sqlite3.connect(str(journal_path), check_same_thread=False)
+        self._connection = sqlite3.connect(
+            str(journal_path),
+            check_same_thread=False,
+        )
         self._connection.row_factory = sqlite3.Row
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS spine_bind_hold (
                 tenant_id TEXT NOT NULL,
                 outbox_id TEXT NOT NULL,
+                hold_id INTEGER NOT NULL DEFAULT 0,
+                hold_reason TEXT NOT NULL DEFAULT '',
+                bind_digest TEXT NOT NULL DEFAULT '',
                 digest TEXT NOT NULL,
                 held INTEGER NOT NULL,
                 applied INTEGER NOT NULL,
@@ -36,43 +79,151 @@ class SpineBindHoldJournal:
             )
             """
         )
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(spine_bind_hold)"
+            )
+        }
+        if "hold_id" not in columns:
+            self._connection.execute(
+                """
+                ALTER TABLE spine_bind_hold
+                ADD COLUMN hold_id INTEGER NOT NULL DEFAULT 0
+                """
+            )
+        if "hold_reason" not in columns:
+            self._connection.execute(
+                """
+                ALTER TABLE spine_bind_hold
+                ADD COLUMN hold_reason TEXT NOT NULL DEFAULT ''
+                """
+            )
+        if "bind_digest" not in columns:
+            self._connection.execute(
+                """
+                ALTER TABLE spine_bind_hold
+                ADD COLUMN bind_digest TEXT NOT NULL DEFAULT ''
+                """
+            )
         self._connection.commit()
 
     def append(self, card: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(card, dict) or card.get("kind") != "spine_bind_hold":
             raise SpineBindHoldJournalError("card must be a spine_bind_hold")
+        if (
+            card.get("law") != "held-id-refuses-bind"
+            or card.get("citation") != "VOL-134"
+        ):
+            raise SpineBindHoldJournalError("refusal authority identity changed")
         if card.get("held") is not True or card.get("sealed") is not False:
             raise SpineBindHoldJournalError("refusal is not a hold")
-        if card.get("applied") != 0 or card.get("moved") is not False:
+        if (
+            card.get("applied") != 0
+            or card.get("moved") is not False
+            or card.get("apply_landed") is not False
+        ):
             raise SpineBindHoldJournalError("refusal is not dark")
+        if card.get("stored_prose") != 0:
+            raise SpineBindHoldJournalError("refusal stored prose changed")
+        for field in (
+            "completion_checkbox",
+            "implementation_signature",
+            "verification_signature",
+        ):
+            if card.get(field) is not False:
+                raise SpineBindHoldJournalError(
+                    f"refusal overclaimed authority: {field}"
+                )
+
         tenant_id = card.get("tenant_id")
         outbox_id = card.get("outbox_id")
+        hold_reason = card.get("reason")
+        bind_digest = card.get("bind_digest")
+        hold_id = card.get("hold_id")
+        epoch = card.get("epoch_before")
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise SpineBindHoldJournalError("tenant_id must be non-empty text")
         if not isinstance(outbox_id, str) or not outbox_id.strip():
             raise SpineBindHoldJournalError("outbox_id must be non-empty text")
-        epoch = card.get("epoch_before")
-        if not isinstance(epoch, int) or epoch < 0 or epoch != card.get("epoch_after"):
+        if not isinstance(hold_reason, str) or not hold_reason.strip():
+            raise SpineBindHoldJournalError("hold reason must be non-empty text")
+        if (
+            not isinstance(bind_digest, str)
+            or _DIGEST_RE.fullmatch(bind_digest) is None
+        ):
+            raise SpineBindHoldJournalError("bind digest is invalid")
+        if (
+            isinstance(hold_id, bool)
+            or not isinstance(hold_id, int)
+            or hold_id < 1
+        ):
+            raise SpineBindHoldJournalError("hold_id is invalid")
+        if (
+            isinstance(epoch, bool)
+            or not isinstance(epoch, int)
+            or epoch < 0
+            or epoch != card.get("epoch_after")
+        ):
             raise SpineBindHoldJournalError("refusal epoch moved")
-        digest = hashlib.sha256(
-            json.dumps(card, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
+
+        digest = _bind_hold_refusal_digest(
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+            hold_id=hold_id,
+            hold_reason=hold_reason,
+            bind_digest=bind_digest,
+            epoch=epoch,
+        )
         existing = self._connection.execute(
-            "SELECT digest FROM spine_bind_hold WHERE tenant_id = ? AND outbox_id = ?",
+            """
+            SELECT hold_id, hold_reason, bind_digest, digest, held, applied, epoch
+            FROM spine_bind_hold
+            WHERE tenant_id = ? AND outbox_id = ?
+            """,
             (tenant_id, outbox_id),
         ).fetchone()
-        if existing is not None and existing["digest"] != digest:
-            raise SpineBindHoldJournalError("bind hold journal rewrite")
-        if existing is None:
+        if existing is not None:
+            durable = {
+                "hold_id": int(existing["hold_id"]),
+                "hold_reason": str(existing["hold_reason"]),
+                "bind_digest": str(existing["bind_digest"]),
+                "digest": str(existing["digest"]),
+                "held": int(existing["held"]),
+                "applied": int(existing["applied"]),
+                "epoch": int(existing["epoch"]),
+            }
+            expected = {
+                "hold_id": hold_id,
+                "hold_reason": hold_reason,
+                "bind_digest": bind_digest,
+                "digest": digest,
+                "held": 1,
+                "applied": 0,
+                "epoch": epoch,
+            }
+            if durable != expected:
+                raise SpineBindHoldJournalError("bind hold journal rewrite")
+        else:
             self._connection.execute(
                 """
                 INSERT INTO spine_bind_hold (
-                    tenant_id, outbox_id, digest, held, applied, epoch
-                ) VALUES (?, ?, ?, 1, 0, ?)
+                    tenant_id, outbox_id, hold_id, hold_reason, bind_digest,
+                    digest, held, applied, epoch
+                ) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
                 """,
-                (tenant_id, outbox_id, digest, epoch),
+                (
+                    tenant_id,
+                    outbox_id,
+                    hold_id,
+                    hold_reason,
+                    bind_digest,
+                    digest,
+                    epoch,
+                ),
             )
             self._connection.commit()
+
         return {
             "kind": "spine_bind_hold_journal",
             "hit": True,
@@ -80,6 +231,9 @@ class SpineBindHoldJournal:
             "citation": "VOL-134",
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "hold_id": hold_id,
+            "hold_reason": hold_reason,
+            "bind_digest": bind_digest,
             "digest": digest,
             "rewritten": False,
             "applied": 0,
@@ -93,3 +247,9 @@ class SpineBindHoldJournal:
 
     def close(self) -> None:
         self._connection.close()
+
+
+__all__ = [
+    "SpineBindHoldJournal",
+    "SpineBindHoldJournalError",
+]
