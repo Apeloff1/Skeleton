@@ -23,6 +23,8 @@ MODULES = (
     "spine_bind_checkpoint_chain.py",
     "spine_bind_bundle.py",
     "spine_bind_bundle_verify.py",
+    "spine_bind_restore_receipt.py",
+    "spine_bind_restore_verify.py",
 )
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
@@ -36,6 +38,8 @@ EXPECTED_SEAMS = {
     "bind-checkpoint-chain": "checkpoint-hash-chain",
     "bind-bundle": "checkpoint-bundle-is-not-activation",
     "bind-bundle-verify": "bundle-verification-does-not-activate",
+    "bind-restore-receipt": "restore-receipt-is-not-activation",
+    "bind-restore-verify": "restore-verification-does-not-activate",
 }
 
 
@@ -75,9 +79,9 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != 57:
+    if len(seams) != 59:
         raise SpineBindRecoveryControlError(
-            f"expected 57 spine seams, found {len(seams)}"
+            f"expected 59 spine seams, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -98,8 +102,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     path = root / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
     text = path.read_text(encoding="utf-8")
     required = [
-        "- Bind card sealed: 85%",
-        "Expect `count` 57",
+        "- Bind card sealed: 92%",
+        "Expect `count` 59",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -117,8 +121,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
             "masterplan recovery control drift: " + " | ".join(missing)
         )
     return {
-        "bind_card_percent": 85,
-        "manifest_count": 57,
+        "bind_card_percent": 92,
+        "manifest_count": 59,
         "activation_claimed": False,
     }
 

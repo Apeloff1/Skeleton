@@ -120,6 +120,8 @@ from skeleton.persistence.spine_bind_checkpoint_tenant import SpineBindCheckpoin
 from skeleton.persistence.spine_bind_checkpoint_chain import SpineBindCheckpointChain
 from skeleton.persistence.spine_bind_bundle import SpineBindBundle
 from skeleton.persistence.spine_bind_bundle_verify import SpineBindBundleVerify
+from skeleton.persistence.spine_bind_restore_receipt import SpineBindRestoreReceipt
+from skeleton.persistence.spine_bind_restore_verify import SpineBindRestoreVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -254,6 +256,8 @@ __all__ = [
     "SpineBindCheckpointChain",
     "SpineBindBundle",
     "SpineBindBundleVerify",
+    "SpineBindRestoreReceipt",
+    "SpineBindRestoreVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

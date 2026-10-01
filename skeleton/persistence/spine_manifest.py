@@ -66,6 +66,8 @@ SEAMS = (
     ("bind-checkpoint-chain", "checkpoint-hash-chain"),
     ("bind-bundle", "checkpoint-bundle-is-not-activation"),
     ("bind-bundle-verify", "bundle-verification-does-not-activate"),
+    ("bind-restore-receipt", "restore-receipt-is-not-activation"),
+    ("bind-restore-verify", "restore-verification-does-not-activate"),
 )
 
 

@@ -358,6 +358,11 @@ def test_spine_bind_checkpoint_restore_preserves_dark_evidence(tmp_path) -> None
     assert result["chain"]["rewritten"] is False
     assert result["bundle"]["verified"] is True
     assert result["bundle"]["activated"] is False
+    assert len(result["restore_receipt"]["digest"]) == 64
+    assert result["restore_receipt"]["backup_restore_digest"] == result["backup_digest"]
+    assert result["restore_receipt"]["recovery_digest"] == result["checkpoint"]["recovery_digest"]
+    assert result["restore_receipt"]["verified"] is True
+    assert result["restore_receipt"]["activated"] is False
     assert result["activation_claimed"] is False
     assert result["apply_landed"] is False
     assert result["live_motor"] is False

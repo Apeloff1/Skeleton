@@ -1521,6 +1521,8 @@ def run_spine_bind_sqlite_drill(
         SpineBindCheckpointTenant,
     )
     from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
+    from skeleton.persistence.spine_bind_restore_receipt import SpineBindRestoreReceipt
+    from skeleton.persistence.spine_bind_restore_verify import SpineBindRestoreVerify
     from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 
     root = require_scratch_directory(workdir)
@@ -1619,6 +1621,23 @@ def run_spine_bind_sqlite_drill(
             raise RecoveryDrillError("bind checkpoint bundle verification failed")
         if verified.get("activated") is not False:
             raise RecoveryDrillError("bind checkpoint bundle activated")
+
+        restore_receipt = SpineBindRestoreReceipt().card(
+            backup_digest=backup_snapshot["digest"],
+            restore_digest=restored_snapshot["digest"],
+            expected_recovery_digest=seeded_checkpoint["recovery_digest"],
+            checkpoint=checkpoint,
+            replay=replay,
+            tenant=own,
+            chain=chain,
+            bundle=bundle,
+            verified=verified,
+        )
+        restore_verified = SpineBindRestoreVerify().verify(restore_receipt)
+        if restore_verified.get("verified") is not True:
+            raise RecoveryDrillError("bind restore receipt verification failed")
+        if restore_verified.get("activated") is not False:
+            raise RecoveryDrillError("bind restore receipt activated")
     finally:
         restored.close()
         replay_reader.close()
@@ -1656,6 +1675,13 @@ def run_spine_bind_sqlite_drill(
             "digest": bundle["digest"],
             "verified": verified["verified"],
             "activated": verified["activated"],
+        },
+        "restore_receipt": {
+            "digest": restore_receipt["digest"],
+            "backup_restore_digest": restore_receipt["backup_restore_digest"],
+            "recovery_digest": restore_receipt["recovery_digest"],
+            "verified": restore_verified["verified"],
+            "activated": restore_verified["activated"],
         },
         "activation_claimed": False,
         "apply_landed": False,

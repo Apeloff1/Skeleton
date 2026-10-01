@@ -22,7 +22,7 @@ class SpineMasterplan:
             "pr_automation_percent": 0,
             "ci_green_percent": 0,
             "merge_percent": 0,
-            "bind_card_percent": 85,
+            "bind_card_percent": 92,
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,

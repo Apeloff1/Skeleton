@@ -85,3 +85,17 @@ Every activation-bearing flag remains false after restore. The drill rejects
 digest drift, row-count drift, replay insertion, tenant leakage, chain rewrite,
 or any accidental activation. It uses only scratch directories whose basename
 starts with skeleton_recovery_drill_.
+
+
+## Anchored restore receipt
+
+After destructive restore, the drill emits `SpineBindRestoreReceipt`. The
+receipt binds the pre-destroy SQLite backup digest and expected recovery digest
+to the restored checkpoint, replay result, tenant-scoped view, checkpoint chain,
+bundle, and bundle-verification result. `SpineBindRestoreVerify` then
+recomputes the receipt digest and fails closed if any activation-bearing field
+was promoted.
+
+This is tamper-evident recovery evidence, not a digital signature and not
+non-repudiation. External anchoring would still be required for that stronger
+claim.

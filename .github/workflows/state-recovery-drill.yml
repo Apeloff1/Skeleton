@@ -102,6 +102,7 @@ jobs:
           skeleton/testing/test_spine_bind_snapshot.py
           skeleton/testing/test_spine_bind_checkpoint.py
           skeleton/testing/test_spine_bind_bundle.py
+          skeleton/testing/test_spine_bind_restore_receipt.py
           skeleton/testing/test_spine_bind_recovery_control.py
           skeleton/testing/test_spine_manifest.py
           skeleton/testing/test_spine_masterplan.py
@@ -257,6 +258,11 @@ jobs:
           assert report["chain"]["rewritten"] is False
           assert report["bundle"]["verified"] is True
           assert report["bundle"]["activated"] is False
+          assert len(report["restore_receipt"]["digest"]) == 64
+          assert report["restore_receipt"]["backup_restore_digest"] == report["backup_digest"]
+          assert report["restore_receipt"]["recovery_digest"] == report["checkpoint"]["recovery_digest"]
+          assert report["restore_receipt"]["verified"] is True
+          assert report["restore_receipt"]["activated"] is False
           assert report["activation_claimed"] is False
           assert report["apply_landed"] is False
           assert report["live_motor"] is False
@@ -266,6 +272,7 @@ jobs:
           print("spine-bind-checkpoint-recovery: OK")
           print("backup/restore digest:", report["backup_digest"])
           print("bundle digest:", report["bundle"]["digest"])
+          print("restore receipt digest:", report["restore_receipt"]["digest"])
           PY
 
   independent-state-authority:
