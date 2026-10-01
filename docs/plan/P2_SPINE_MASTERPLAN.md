@@ -142,6 +142,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime production activation authorization verify | `skeleton/persistence/spine_runtime_production_activation_authorization_verify.py` | authorization verification cannot activate runtime |
 | Runtime production activation | `skeleton/persistence/spine_runtime_production_activation.py` | consumes exact authorization + live health once without moving the rollback fence |
 | Runtime production activation verify | `skeleton/persistence/spine_runtime_production_activation_verify.py` | independently re-reads activated runtime, durable health operation, slot, and rollback fence |
+| Provider surface qualification | `skeleton/persistence/spine_provider_surface_qualification.py` | requires canonical + independent exact-head provider ownership receipts to agree |
+| Provider surface qualification verify | `skeleton/persistence/spine_provider_surface_qualification_verify.py` | verifies closure qualification without claiming live external provider health |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -170,8 +172,13 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 124, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 126, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
 ```
+
+
+### Provider closure qualification
+
+The legacy `SpineProviderProbe` remains intentionally dark and claim-refusing. Provider ownership closure is a separate evidence path: `SpineProviderSurfaceQualification` normalizes the canonical provider inventory receipt and the independent provider-ownership receipt, requires both to target the exact same 40-character head SHA, and requires declared ownership and discovered provider-edge digests/counts to agree. A successful card may set `provider_surface_closure_green=true`, but it deliberately keeps `provider_surface_live_green=false`, `provider_surface_green=false`, and `pr_automation_green=false`. `SpineProviderSurfaceQualificationVerify` independently reconstructs the closure card and rejects any live-health overclaim.
