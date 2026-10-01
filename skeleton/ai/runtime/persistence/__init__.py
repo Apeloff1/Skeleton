@@ -148,6 +148,8 @@ from skeleton.persistence.spine_selection_permit_verify import SpineSelectionPer
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
+from skeleton.persistence.spine_runtime_activation_gate import SpineRuntimeActivationGate
+from skeleton.persistence.spine_runtime_activation_gate_verify import SpineRuntimeActivationGateVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -310,6 +312,8 @@ __all__ = [
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",
+    "SpineRuntimeActivationGate",
+    "SpineRuntimeActivationGateVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

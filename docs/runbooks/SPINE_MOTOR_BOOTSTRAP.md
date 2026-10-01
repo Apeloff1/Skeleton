@@ -93,6 +93,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineDriverSelectionLedger` consumes only independently verified one-time permit-consumption evidence and persists `pymongo-async` as the selected target. This control-plane state does not import a driver, replace a runtime object, start a dispatcher, or activate runtime. Replay and unsupported targets fail closed. `SpineDriverSelectionVerify` reconstructs the selection identity and digest independently.
 
+## Runtime activation eligibility
+
+`SpineRuntimeActivationGate` joins durable selected-driver state, independent selection verification, the live `AsyncMongoClient` qualification receipt, and an unchanged dispatcher identity proof. This can produce `activation_eligible=true`, but it neither imports nor instantiates the driver in core, replaces the runtime object, starts the dispatcher, nor activates runtime. `SpineRuntimeActivationGateVerify` independently reconstructs the eligibility digest.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -120,7 +124,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_cutover_effectiveness.py \
   skeleton/testing/test_spine_selection_permit.py \
   skeleton/testing/test_spine_selection_consumption.py \
-  skeleton/testing/test_spine_driver_selection.py
+  skeleton/testing/test_spine_driver_selection.py \
+  skeleton/testing/test_spine_runtime_activation_gate.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
