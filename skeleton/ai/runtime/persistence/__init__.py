@@ -65,6 +65,8 @@ from skeleton.persistence.spine_drift import SpineDrift
 from skeleton.persistence.spine_apply import SpineApplyGate
 from skeleton.persistence.spine_cutover import SpineCutover
 from skeleton.persistence.spine_window import SpineWindow
+from skeleton.persistence.spine_seal import SpineSeal
+from skeleton.persistence.spine_gap import SpineGap
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -144,6 +146,8 @@ __all__ = [
     "SpineApplyGate",
     "SpineCutover",
     "SpineWindow",
+    "SpineSeal",
+    "SpineGap",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
