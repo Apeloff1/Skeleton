@@ -1,13 +1,13 @@
 {
   "schema_version": "skeleton.p2.task_backlog.v1",
-  "backlog_version": "0.1.0",
-  "status": "active-foundation",
+  "backlog_version": "0.2.0",
+  "status": "active",
   "source_map": "machine/ai_p2_execution_map.json",
   "tasks": [
     {
       "task_id": "P2-CTRL-01",
       "lane_id": "P2-L0",
-      "status": "in_progress",
+      "status": "landed_unpromoted",
       "title": "Freeze P2 deferred-frontier authority",
       "depends_on": [],
       "primary_volume_refs": [],
@@ -24,13 +24,17 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "github:pr#2315",
+        "git:merge:6ccdcffaa5684ced6b22b39a573c016d0dfd052d",
+        "workflow:P2 Execution Map@a3bab8da968785971a19f7613ca64d073ea19f2b:success"
+      ],
       "masterplan_obligations": []
     },
     {
       "task_id": "P2-ARCH-01",
       "lane_id": "P2-L1",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Converge architecture and contract authority",
       "depends_on": [
         "P2-CTRL-01"
@@ -59,7 +63,11 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "github:pr#2316",
+        "git:merge:d4334086eaf1c7cbbff46890b727fc954fde1677",
+        "workflow:P2 Architecture Rule Registry@8e7686f15c77be974ed6e3632587b9f17eb4ab64:success"
+      ],
       "masterplan_obligations": [
         {
           "volume_ref": "VOL-002",
@@ -299,7 +307,7 @@
     {
       "task_id": "P2-TRACE-01",
       "lane_id": "P2-L2",
-      "status": "blocked",
+      "status": "in_progress",
       "title": "Build requirements-to-runtime traceability spine",
       "depends_on": [
         "P2-ARCH-01"
@@ -330,7 +338,12 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "branch:feat/p2-traceability-spine",
+        "machine:master_traceability.json",
+        "workflow:P2 Master Traceability Spine",
+        "workflow:P2 Traceability Focused Contract"
+      ],
       "masterplan_obligations": [
         {
           "volume_ref": "VOL-112",
@@ -1196,9 +1209,10 @@
     "task_count": 7,
     "in_progress_count": 1,
     "ready_count": 0,
-    "blocked_count": 6,
+    "blocked_count": 4,
     "scheduled_volume_count": 42,
     "queued_volume_count": 272,
-    "source_volume_count": 314
+    "source_volume_count": 314,
+    "landed_unpromoted_count": 2
   }
 }
