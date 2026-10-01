@@ -80,6 +80,7 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
             or acceptance.get("acceptance_authenticated") is not True
             or acceptance.get("activation_accepted") is not True
             or acceptance.get("production_activation_authorized") is not False
+            or acceptance.get("rollback_available") is not True
             or acceptance.get("runtime_activated") is not False
         ):
             raise SpineRuntimeProductionActivationAuthorizationError(
@@ -102,6 +103,10 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
             raise SpineRuntimeProductionActivationAuthorizationError(
                 "deployment identity is missing"
             )
+        if acceptance.get("target_driver") != "pymongo-async":
+            raise SpineRuntimeProductionActivationAuthorizationError(
+                "accepted target driver changed"
+            )
         if (
             not isinstance(acceptance_verify, dict)
             or acceptance_verify.get("kind") != "spine_runtime_transition_acceptance_verify"
@@ -109,7 +114,9 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
             or acceptance_verify.get("acceptance_id") != acceptance_id
             or acceptance_verify.get("acceptance_digest") != acceptance_digest
             or acceptance_verify.get("execution_id") != execution_id
+            or acceptance_verify.get("activation_accepted") is not True
             or acceptance_verify.get("production_activation_authorized") is not False
+            or acceptance_verify.get("rollback_available") is not True
             or acceptance_verify.get("runtime_activated") is not False
         ):
             raise SpineRuntimeProductionActivationAuthorizationError(
