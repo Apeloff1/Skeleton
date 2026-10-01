@@ -50,6 +50,10 @@ FILES = (
     "spine_runtime_transition_permit.py",
     "spine_runtime_transition_permit_verify.py",
     "spine_runtime_transition_consumption_verify.py",
+    "spine_runtime_transition_attempt.py",
+    "spine_runtime_transition_attempt_verify.py",
+    "spine_runtime_transition_rollback_witness.py",
+    "spine_runtime_transition_rollback_verify.py",
 )
 
 
