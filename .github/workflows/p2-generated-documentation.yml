@@ -1,0 +1,70 @@
+name: P2 Generated Documentation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/generated_documentation.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "machine/master_traceability.json"
+      - "machine/architecture_rule_registry.json"
+      - "machine/architecture.json"
+      - "machine/adr_index.json"
+      - "scripts/generate_p2_docs.py"
+      - "docs/generated/**"
+      - "tests/test_generated_documentation.py"
+      - ".github/workflows/p2-generated-documentation.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-generated-documentation
+    paths:
+      - "machine/generated_documentation.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "machine/master_traceability.json"
+      - "machine/architecture_rule_registry.json"
+      - "machine/architecture.json"
+      - "machine/adr_index.json"
+      - "scripts/generate_p2_docs.py"
+      - "docs/generated/**"
+      - "tests/test_generated_documentation.py"
+      - ".github/workflows/p2-generated-documentation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-generated-docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generated-documentation:
+    name: Validate generated documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Check deterministic regeneration
+        run: python scripts/generate_p2_docs.py --check --json
+
+      - name: Run generated-document regressions
+        run: python -m unittest -v tests.test_generated_documentation
