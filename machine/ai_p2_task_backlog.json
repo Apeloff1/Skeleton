@@ -1170,7 +1170,11 @@
       "evidence_refs": [
         "dependency:P2-QUAL-01:landed_unpromoted",
         "github:pr#2330",
-        "machine:acceleration_policy.json"
+        "machine:acceleration_policy.json",
+        "runtime:skeleton/native/profiling.py",
+        "runtime:skeleton/native/selection.py",
+        "runtime:skeleton/native/isolation.py",
+        "runtime:skeleton/native/protocol.py"
       ],
       "masterplan_obligations": [
         {
