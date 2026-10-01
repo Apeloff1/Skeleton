@@ -36,11 +36,11 @@ class SpineBindHoldChain:
         try:
             rows = self._connection.execute(
                 """
-                SELECT tenant_id, outbox_id, hold_id, hold_reason,
+                SELECT refusal_id, tenant_id, outbox_id, hold_id, hold_reason,
                        bind_digest, digest, held, applied, epoch
                 FROM spine_bind_hold
                 WHERE tenant_id = ?
-                ORDER BY outbox_id
+                ORDER BY refusal_id
                 """,
                 (tenant_id,),
             ).fetchall()
@@ -49,6 +49,7 @@ class SpineBindHoldChain:
 
         digest = "0" * 64
         for row in rows:
+            refusal_id = int(row["refusal_id"])
             hold_id = int(row["hold_id"])
             hold_reason = str(row["hold_reason"])
             bind_digest = str(row["bind_digest"])
@@ -57,7 +58,8 @@ class SpineBindHoldChain:
             applied = int(row["applied"])
             epoch = int(row["epoch"])
             if (
-                hold_id < 1
+                refusal_id < 1
+                or hold_id < 1
                 or not hold_reason.strip()
                 or _DIGEST_RE.fullmatch(bind_digest) is None
                 or _DIGEST_RE.fullmatch(refusal_digest) is None
@@ -80,6 +82,7 @@ class SpineBindHoldChain:
                 )
             payload = "|".join(
                 (
+                    str(refusal_id),
                     str(row["tenant_id"]),
                     str(row["outbox_id"]),
                     str(hold_id),

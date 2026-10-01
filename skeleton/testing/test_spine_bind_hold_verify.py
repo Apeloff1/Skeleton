@@ -59,6 +59,7 @@ def test_bind_hold_refusal_is_independently_verified(
     card, verifier, _path = _evidence(tmp_path)
     result = verifier.verify(card)
     assert result["verified"] is True
+    assert result["refusal_id"] >= 1
     assert result["hold_id"] == card["hold_id"]
     assert result["hold_reason"] == "poison"
     assert result["bind_digest"] == "c" * 64

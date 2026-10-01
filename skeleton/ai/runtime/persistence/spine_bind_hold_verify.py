@@ -97,12 +97,22 @@ class SpineBindHoldVerify:
         try:
             row = self._connection.execute(
                 """
-                SELECT hold_id, hold_reason, bind_digest, digest,
+                SELECT refusal_id, hold_id, hold_reason, bind_digest, digest,
                        held, applied, epoch
                 FROM spine_bind_hold
-                WHERE tenant_id = ? AND outbox_id = ?
+                WHERE tenant_id = ?
+                  AND outbox_id = ?
+                  AND hold_id = ?
+                  AND bind_digest = ?
+                  AND epoch = ?
                 """,
-                (tenant_id, outbox_id),
+                (
+                    tenant_id,
+                    outbox_id,
+                    hold_id,
+                    bind_digest,
+                    epoch_before,
+                ),
             ).fetchone()
         except sqlite3.OperationalError as exc:
             raise SpineBindHoldVerifyError(
@@ -113,6 +123,11 @@ class SpineBindHoldVerify:
                 "bind hold durable refusal is missing"
             )
 
+        refusal_id = int(row["refusal_id"])
+        if refusal_id < 1:
+            raise SpineBindHoldVerifyError(
+                "bind hold durable refusal id is invalid"
+            )
         durable = {
             "hold_id": int(row["hold_id"]),
             "hold_reason": str(row["hold_reason"]),
@@ -156,6 +171,7 @@ class SpineBindHoldVerify:
             "citation": "VOL-134",
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "refusal_id": refusal_id,
             "hold_id": hold_id,
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,

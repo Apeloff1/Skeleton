@@ -199,6 +199,7 @@ def test_journal_refuses_rewrite_and_read_reconstructs_digest(
     again = journal.append(card)
     assert sealed["rewritten"] is False
     assert again["digest"] == sealed["digest"]
+    assert again["refusal_id"] == sealed["refusal_id"]
     assert again["hold_id"] == card["hold_id"]
     assert again["bind_digest"] == card["bind_digest"]
     assert again["applied"] == 0
@@ -208,6 +209,7 @@ def test_journal_refuses_rewrite_and_read_reconstructs_digest(
     seen = reader.card("house-a", "ob-1")
     assert seen["seen"] is True
     assert seen["digest"] == sealed["digest"]
+    assert seen["refusal_id"] == sealed["refusal_id"]
     assert seen["hold_id"] == card["hold_id"]
     assert seen["hold_reason"] == "poison"
     assert seen["bind_digest"] == "c" * 64
@@ -219,6 +221,82 @@ def test_journal_refuses_rewrite_and_read_reconstructs_digest(
         SpineBindHoldJournal(journal_path).append(
             {**card, "reason": "other"}
         )
+
+
+def test_later_hold_on_same_outbox_appends_new_refusal(
+    tmp_path: Path,
+) -> None:
+    hold_path = tmp_path / "hold.sqlite"
+    journal_path = tmp_path / "refusal.sqlite"
+    hold = SpineHold(hold_path)
+    hold.hold(
+        tenant_id="house-a",
+        outbox_id="ob-1",
+        reason="first",
+        now=NOW,
+    )
+    gate = SpineBindHold(hold_path)
+    first = gate.refuse(
+        tenant_id="house-a",
+        outbox_id="ob-1",
+        bind=_bind(),
+        epoch_before=2,
+        epoch_after=2,
+    )
+    journal = SpineBindHoldJournal(journal_path)
+    first_sealed = journal.append(first)
+
+    connection = sqlite3.connect(hold_path)
+    connection.execute(
+        """
+        UPDATE spine_hold
+        SET released = 1,
+            released_at = ?,
+            release_ticket_id = ?
+        WHERE hold_id = ?
+        """,
+        (NOW.isoformat(), "ticket-first", first["hold_id"]),
+    )
+    connection.commit()
+    connection.close()
+
+    hold.hold(
+        tenant_id="house-a",
+        outbox_id="ob-1",
+        reason="second",
+        now=NOW,
+    )
+    second = gate.refuse(
+        tenant_id="house-a",
+        outbox_id="ob-1",
+        bind=_bind(),
+        epoch_before=2,
+        epoch_after=2,
+    )
+    second_sealed = journal.append(second)
+    assert second["hold_id"] != first["hold_id"]
+    assert second_sealed["refusal_id"] > first_sealed["refusal_id"]
+
+    reader = SpineBindHoldRead(journal_path)
+    latest = reader.card("house-a", "ob-1")
+    assert latest["refusal_id"] == second_sealed["refusal_id"]
+    assert latest["hold_id"] == second["hold_id"]
+    assert latest["hold_reason"] == "second"
+
+    chain = SpineBindHoldChain(journal_path)
+    sealed_chain = chain.seal("house-a")
+    assert sealed_chain["rows"] == 2
+    assert chain.verify("house-a", sealed_chain["digest"])["match"] is True
+
+    verifier = SpineBindHoldVerify(journal_path)
+    assert verifier.verify(first)["refusal_id"] == first_sealed["refusal_id"]
+    assert verifier.verify(second)["refusal_id"] == second_sealed["refusal_id"]
+    verifier.close()
+    chain.close()
+    reader.close()
+    journal.close()
+    gate.close()
+    hold.close()
 
 
 def test_read_rejects_durable_reason_tamper(tmp_path: Path) -> None:

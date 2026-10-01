@@ -63,22 +63,21 @@ class SpineBindHoldJournal:
             check_same_thread=False,
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute(
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
+        table = self._connection.execute(
             """
-            CREATE TABLE IF NOT EXISTS spine_bind_hold (
-                tenant_id TEXT NOT NULL,
-                outbox_id TEXT NOT NULL,
-                hold_id INTEGER NOT NULL DEFAULT 0,
-                hold_reason TEXT NOT NULL DEFAULT '',
-                bind_digest TEXT NOT NULL DEFAULT '',
-                digest TEXT NOT NULL,
-                held INTEGER NOT NULL,
-                applied INTEGER NOT NULL,
-                epoch INTEGER NOT NULL,
-                PRIMARY KEY (tenant_id, outbox_id)
-            )
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'spine_bind_hold'
             """
-        )
+        ).fetchone()
+        if table is None:
+            self._create_current_table()
+            self._connection.commit()
+            return
+
         columns = {
             str(row["name"])
             for row in self._connection.execute(
@@ -107,6 +106,64 @@ class SpineBindHoldJournal:
                 """
             )
         self._connection.commit()
+
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(spine_bind_hold)"
+            )
+        }
+        if "refusal_id" in columns:
+            return
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._connection.execute(
+                "ALTER TABLE spine_bind_hold RENAME TO spine_bind_hold_legacy"
+            )
+            self._create_current_table()
+            self._connection.execute(
+                """
+                INSERT INTO spine_bind_hold(
+                    tenant_id, outbox_id, hold_id, hold_reason,
+                    bind_digest, digest, held, applied, epoch
+                )
+                SELECT tenant_id, outbox_id, hold_id, hold_reason,
+                       bind_digest, digest, held, applied, epoch
+                FROM spine_bind_hold_legacy
+                ORDER BY rowid
+                """
+            )
+            self._connection.execute("DROP TABLE spine_bind_hold_legacy")
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    def _create_current_table(self) -> None:
+        self._connection.execute(
+            """
+            CREATE TABLE spine_bind_hold (
+                refusal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                outbox_id TEXT NOT NULL,
+                hold_id INTEGER NOT NULL DEFAULT 0,
+                hold_reason TEXT NOT NULL DEFAULT '',
+                bind_digest TEXT NOT NULL DEFAULT '',
+                digest TEXT NOT NULL,
+                held INTEGER NOT NULL,
+                applied INTEGER NOT NULL,
+                epoch INTEGER NOT NULL,
+                UNIQUE(
+                    tenant_id,
+                    outbox_id,
+                    hold_id,
+                    bind_digest,
+                    epoch
+                )
+            )
+            """
+        )
 
     def append(self, card: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(card, dict) or card.get("kind") != "spine_bind_hold":
@@ -175,54 +232,67 @@ class SpineBindHoldJournal:
             bind_digest=bind_digest,
             epoch=epoch,
         )
-        existing = self._connection.execute(
-            """
-            SELECT hold_id, hold_reason, bind_digest, digest, held, applied, epoch
-            FROM spine_bind_hold
-            WHERE tenant_id = ? AND outbox_id = ?
-            """,
-            (tenant_id, outbox_id),
-        ).fetchone()
-        if existing is not None:
-            durable = {
-                "hold_id": int(existing["hold_id"]),
-                "hold_reason": str(existing["hold_reason"]),
-                "bind_digest": str(existing["bind_digest"]),
-                "digest": str(existing["digest"]),
-                "held": int(existing["held"]),
-                "applied": int(existing["applied"]),
-                "epoch": int(existing["epoch"]),
-            }
-            expected = {
-                "hold_id": hold_id,
-                "hold_reason": hold_reason,
-                "bind_digest": bind_digest,
-                "digest": digest,
-                "held": 1,
-                "applied": 0,
-                "epoch": epoch,
-            }
-            if durable != expected:
-                raise SpineBindHoldJournalError("bind hold journal rewrite")
-        else:
-            self._connection.execute(
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            existing = self._connection.execute(
                 """
-                INSERT INTO spine_bind_hold (
-                    tenant_id, outbox_id, hold_id, hold_reason, bind_digest,
-                    digest, held, applied, epoch
-                ) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
+                SELECT refusal_id, hold_reason, digest, held, applied
+                FROM spine_bind_hold
+                WHERE tenant_id = ?
+                  AND outbox_id = ?
+                  AND hold_id = ?
+                  AND bind_digest = ?
+                  AND epoch = ?
                 """,
                 (
                     tenant_id,
                     outbox_id,
                     hold_id,
-                    hold_reason,
                     bind_digest,
-                    digest,
                     epoch,
                 ),
-            )
-            self._connection.commit()
+            ).fetchone()
+            if existing is not None:
+                durable = {
+                    "hold_reason": str(existing["hold_reason"]),
+                    "digest": str(existing["digest"]),
+                    "held": int(existing["held"]),
+                    "applied": int(existing["applied"]),
+                }
+                expected = {
+                    "hold_reason": hold_reason,
+                    "digest": digest,
+                    "held": 1,
+                    "applied": 0,
+                }
+                if durable != expected:
+                    raise SpineBindHoldJournalError(
+                        "bind hold journal rewrite"
+                    )
+                refusal_id = int(existing["refusal_id"])
+            else:
+                cursor = self._connection.execute(
+                    """
+                    INSERT INTO spine_bind_hold (
+                        tenant_id, outbox_id, hold_id, hold_reason,
+                        bind_digest, digest, held, applied, epoch
+                    ) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
+                    """,
+                    (
+                        tenant_id,
+                        outbox_id,
+                        hold_id,
+                        hold_reason,
+                        bind_digest,
+                        digest,
+                        epoch,
+                    ),
+                )
+                refusal_id = int(cursor.lastrowid)
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
 
         return {
             "kind": "spine_bind_hold_journal",
@@ -231,6 +301,7 @@ class SpineBindHoldJournal:
             "citation": "VOL-134",
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
+            "refusal_id": refusal_id,
             "hold_id": hold_id,
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,

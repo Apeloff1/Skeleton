@@ -41,10 +41,12 @@ class SpineBindHoldRead:
         try:
             row = self._connection.execute(
                 """
-                SELECT hold_id, hold_reason, bind_digest, digest,
+                SELECT refusal_id, hold_id, hold_reason, bind_digest, digest,
                        held, applied, epoch
                 FROM spine_bind_hold
                 WHERE tenant_id = ? AND outbox_id = ?
+                ORDER BY refusal_id DESC
+                LIMIT 1
                 """,
                 (tenant_id, outbox_id),
             ).fetchone()
@@ -60,6 +62,7 @@ class SpineBindHoldRead:
                 "tenant_id": tenant_id,
                 "outbox_id": outbox_id,
                 "seen": False,
+                "refusal_id": None,
                 "hold_id": None,
                 "hold_reason": None,
                 "bind_digest": None,
@@ -73,6 +76,7 @@ class SpineBindHoldRead:
                 "verification_signature": False,
             }
 
+        refusal_id = int(row["refusal_id"])
         hold_id = int(row["hold_id"])
         hold_reason = str(row["hold_reason"])
         bind_digest = str(row["bind_digest"])
@@ -80,6 +84,8 @@ class SpineBindHoldRead:
         held = int(row["held"])
         applied = int(row["applied"])
         epoch = int(row["epoch"])
+        if refusal_id < 1:
+            raise SpineBindHoldReadError("refusal row id is invalid")
         if hold_id < 1:
             raise SpineBindHoldReadError(
                 "refusal row is missing bound hold identity"
@@ -114,6 +120,7 @@ class SpineBindHoldRead:
             "tenant_id": tenant_id,
             "outbox_id": outbox_id,
             "seen": True,
+            "refusal_id": refusal_id,
             "hold_id": hold_id,
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,
