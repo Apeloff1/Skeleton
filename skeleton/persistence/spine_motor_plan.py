@@ -43,9 +43,14 @@ class SpineMotorPlan:
                 ):
                     raise SpineMotorPlanError("invalid index key declaration")
                 normalized_keys.append([key[0], key[1]])
+            index_name = "_".join(
+                f"{field}_{direction}"
+                for field, direction in normalized_keys
+            )
             specs.append(
                 {
                     "collection": collection,
+                    "name": index_name,
                     "keys": normalized_keys,
                     "unique": bool(unique),
                 }

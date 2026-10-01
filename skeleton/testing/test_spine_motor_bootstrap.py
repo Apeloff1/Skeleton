@@ -31,31 +31,61 @@ from skeleton.persistence.spine_motor_preflight_verify import (
 class _AsyncCollection:
     def __init__(self, name: str) -> None:
         self.name = name
-        self.calls: list[tuple[list[tuple[str, int]], bool]] = []
+        self.calls: list[tuple[list[tuple[str, int]], bool, str]] = []
 
-    async def create_index(self, keys, unique: bool = False):
+    async def create_index(
+        self,
+        keys,
+        unique: bool = False,
+        name: str | None = None,
+    ):
         normalized = list(keys)
-        self.calls.append((normalized, unique))
-        fields = "_".join(key for key, _direction in normalized)
-        return f"{self.name}:{fields}:{int(unique)}"
+        assert isinstance(name, str) and name
+        self.calls.append((normalized, unique, name))
+        return name
 
 
 class _SyncCollection(_AsyncCollection):
-    def create_index(self, keys, unique: bool = False):
+    def create_index(
+        self,
+        keys,
+        unique: bool = False,
+        name: str | None = None,
+    ):
         normalized = list(keys)
-        self.calls.append((normalized, unique))
-        fields = "_".join(key for key, _direction in normalized)
-        return f"{self.name}:{fields}:{int(unique)}"
+        assert isinstance(name, str) and name
+        self.calls.append((normalized, unique, name))
+        return name
 
 
 class _Broken:
-    async def create_index(self, keys, unique: bool = False):
+    async def create_index(
+        self,
+        keys,
+        unique: bool = False,
+        name: str | None = None,
+    ):
         raise RuntimeError("driver fault")
 
 
 class _BadResult:
-    async def create_index(self, keys, unique: bool = False):
+    async def create_index(
+        self,
+        keys,
+        unique: bool = False,
+        name: str | None = None,
+    ):
         return {"not": "an index identity"}
+
+
+class _WrongName:
+    async def create_index(
+        self,
+        keys,
+        unique: bool = False,
+        name: str | None = None,
+    ):
+        return "wrong_index_name"
 
 
 def _collections(factory=_AsyncCollection):
@@ -93,6 +123,13 @@ def test_async_bootstrap_verifies_and_replays_equivalently() -> None:
     second = asyncio.run(bootstrap.apply(second_collections))
 
     assert first["applied"] == 3
+    assert len(first["digest"]) == 64
+    assert [row["index_name"] for row in first["results"]] == [
+        "namespace_1_consumer_id_1_event_id_1",
+        "namespace_1_consumer_id_1_operation_id_1",
+        "namespace_1_tenant_id_1_resource_id_1",
+    ]
+    assert all(row["result"] == row["index_name"] for row in first["results"])
     assert first["missing"] == 0
     assert first["failures"] == 0
     assert first["bootstrap_exercised"] is True
@@ -134,7 +171,15 @@ def test_bootstrap_rejects_non_text_driver_result() -> None:
     collections = _collections()
     collections["fence"] = _BadResult()
 
-    with pytest.raises(SpineMotorBootstrapError, match="text or None"):
+    with pytest.raises(SpineMotorBootstrapError, match="identity mismatch"):
+        asyncio.run(SpineMotorBootstrap().apply(collections))
+
+
+def test_bootstrap_rejects_wrong_driver_index_name() -> None:
+    collections = _collections()
+    collections["fence"] = _WrongName()
+
+    with pytest.raises(SpineMotorBootstrapError, match="identity mismatch"):
         asyncio.run(SpineMotorBootstrap().apply(collections))
 
 
@@ -146,6 +191,30 @@ def test_bootstrap_verifier_rejects_plan_identity_drift() -> None:
     with pytest.raises(
         SpineMotorBootstrapVerifyError,
         match="plan digest mismatch",
+    ):
+        SpineMotorBootstrapVerify().verify(forged)
+
+
+def test_bootstrap_verifier_rejects_result_identity_tamper() -> None:
+    card = asyncio.run(SpineMotorBootstrap().apply(_collections()))
+    forged = copy.deepcopy(card)
+    forged["results"][0]["result"] = "wrong_index_name"
+
+    with pytest.raises(
+        SpineMotorBootstrapVerifyError,
+        match="result identity changed",
+    ):
+        SpineMotorBootstrapVerify().verify(forged)
+
+
+def test_bootstrap_verifier_rejects_digest_tamper() -> None:
+    card = asyncio.run(SpineMotorBootstrap().apply(_collections()))
+    forged = copy.deepcopy(card)
+    forged["digest"] = "0" * 64
+
+    with pytest.raises(
+        SpineMotorBootstrapVerifyError,
+        match="evidence digest mismatch",
     ):
         SpineMotorBootstrapVerify().verify(forged)
 

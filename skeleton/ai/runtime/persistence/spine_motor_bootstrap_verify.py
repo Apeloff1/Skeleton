@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from skeleton.persistence.spine_motor_plan import SpineMotorPlan
@@ -45,13 +47,50 @@ class SpineMotorBootstrapVerify:
                 raise SpineMotorBootstrapVerifyError("bootstrap result keys changed")
             if row.get("unique") is not expected[name]["unique"]:
                 raise SpineMotorBootstrapVerifyError("bootstrap uniqueness changed")
+            if row.get("index_name") != expected[name]["name"]:
+                raise SpineMotorBootstrapVerifyError("bootstrap index name changed")
             result = row.get("result")
-            if result is not None and not isinstance(result, str):
-                raise SpineMotorBootstrapVerifyError("bootstrap result identity is invalid")
+            if result != expected[name]["name"]:
+                raise SpineMotorBootstrapVerifyError(
+                    "bootstrap result identity changed"
+                )
 
         for flag in ("live_motor", "driver_imported", "activated"):
             if bootstrap.get(flag) is not False:
                 raise SpineMotorBootstrapVerifyError("bootstrap gained live authority")
+        for flag in (
+            "completion_checkbox",
+            "implementation_signature",
+            "verification_signature",
+        ):
+            if bootstrap.get(flag) is not False:
+                raise SpineMotorBootstrapVerifyError(
+                    "bootstrap overclaimed signoff authority"
+                )
+
+        evidence = {
+            "plan_digest": plan["digest"],
+            "planned": plan["count"],
+            "applied": plan["count"],
+            "results": results,
+            "missing": 0,
+            "failures": 0,
+            "bootstrap_exercised": True,
+            "live_motor": False,
+            "driver_imported": False,
+            "activated": False,
+        }
+        encoded = json.dumps(
+            evidence,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        digest = hashlib.sha256(encoded).hexdigest()
+        if bootstrap.get("digest") != digest:
+            raise SpineMotorBootstrapVerifyError(
+                "bootstrap evidence digest mismatch"
+            )
 
         return {
             "kind": "spine_motor_bootstrap_verify",
@@ -59,6 +98,7 @@ class SpineMotorBootstrapVerify:
             "law": "bootstrap-verification-does-not-activate",
             "citation": "VOL-134",
             "plan_digest": plan["digest"],
+            "bootstrap_digest": digest,
             "verified_indexes": plan["count"],
             "verified": True,
             "live_motor": False,

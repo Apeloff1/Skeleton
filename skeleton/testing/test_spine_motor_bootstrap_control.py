@@ -19,6 +19,11 @@ def test_live_repository_motor_bootstrap_control_is_dark() -> None:
     assert report["index_count"] == 3
     assert report["mirror_count"] == len(FILES)
     assert len(report["plan_digest"]) == 64
+    assert report["index_names"] == [
+        "namespace_1_consumer_id_1_event_id_1",
+        "namespace_1_consumer_id_1_operation_id_1",
+        "namespace_1_tenant_id_1_resource_id_1",
+    ]
     assert report["live_motor"] is False
     assert report["driver_imported"] is False
     assert report["activated"] is False

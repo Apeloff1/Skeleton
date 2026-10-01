@@ -34,6 +34,8 @@ class SpineMotorBootstrapReplay:
             raise SpineMotorBootstrapReplayError("bootstrap replay applied count changed")
         if first.get("results") != second.get("results"):
             raise SpineMotorBootstrapReplayError("bootstrap replay result changed")
+        if first.get("digest") != second.get("digest"):
+            raise SpineMotorBootstrapReplayError("bootstrap replay digest changed")
 
         return {
             "kind": "spine_motor_bootstrap_replay",
@@ -41,6 +43,7 @@ class SpineMotorBootstrapReplay:
             "law": "bootstrap-replay-is-equivalent",
             "citation": "VOL-134",
             "plan_digest": first.get("plan_digest"),
+            "bootstrap_digest": first.get("digest"),
             "applied": first.get("applied"),
             "equivalent": True,
             "live_motor": False,

@@ -61,6 +61,11 @@ async def qualify(*, uri: str, database_name: str) -> dict[str, Any]:
             "driver_class": session.receipt["driver_class"],
             "plan_digest": plan["digest"],
             "preflight_digest": preflight["digest"],
+            "bootstrap_digest": first["digest"],
+            "index_names": [
+                row["index_name"]
+                for row in first["results"]
+            ],
             "wire_version_min": preflight["min_wire_version"],
             "wire_version_max": preflight["max_wire_version"],
             "indexes_planned": first["planned"],

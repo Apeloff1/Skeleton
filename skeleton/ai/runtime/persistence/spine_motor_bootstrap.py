@@ -7,7 +7,9 @@ so tests can model both protocols without activating a live driver.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
+import json
 from typing import Any
 
 from skeleton.persistence.spine_motor_plan import SpineMotorPlan
@@ -42,31 +44,32 @@ class SpineMotorBootstrap:
                 )
             keys = [tuple(item) for item in spec["keys"]]
             try:
-                outcome = create(keys, unique=spec["unique"])
+                outcome = create(
+                    keys,
+                    unique=spec["unique"],
+                    name=spec["name"],
+                )
                 if inspect.isawaitable(outcome):
                     outcome = await outcome
             except Exception as exc:
                 raise SpineMotorBootstrapError(
                     f"index bootstrap failed for {name}"
                 ) from exc
-            if outcome is not None and not isinstance(outcome, str):
+            if not isinstance(outcome, str) or outcome != spec["name"]:
                 raise SpineMotorBootstrapError(
-                    f"index bootstrap result for {name} must be text or None"
+                    f"index bootstrap result identity mismatch for {name}"
                 )
             results.append(
                 {
                     "collection": name,
+                    "index_name": spec["name"],
                     "result": outcome,
                     "unique": spec["unique"],
                     "keys": spec["keys"],
                 }
             )
 
-        return {
-            "kind": "spine_motor_bootstrap",
-            "hit": len(results) == plan["count"],
-            "law": "driver-injected-index-bootstrap",
-            "citation": "VOL-134",
+        evidence = {
             "plan_digest": plan["digest"],
             "planned": plan["count"],
             "applied": len(results),
@@ -77,6 +80,20 @@ class SpineMotorBootstrap:
             "live_motor": False,
             "driver_imported": False,
             "activated": False,
+        }
+        encoded = json.dumps(
+            evidence,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        return {
+            "kind": "spine_motor_bootstrap",
+            "hit": len(results) == plan["count"],
+            "law": "driver-injected-index-bootstrap",
+            "citation": "VOL-134",
+            **evidence,
+            "digest": hashlib.sha256(encoded).hexdigest(),
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,

@@ -129,6 +129,15 @@ def build_report(root: Path) -> dict[str, object]:
     collections = [row["collection"] for row in plan["indexes"]]
     if collections != ["receipts", "watermarks", "fence"]:
         raise MotorBootstrapControlError("bootstrap collection order changed")
+    index_names = [row.get("name") for row in plan["indexes"]]
+    if index_names != [
+        "namespace_1_consumer_id_1_event_id_1",
+        "namespace_1_consumer_id_1_operation_id_1",
+        "namespace_1_tenant_id_1_resource_id_1",
+    ]:
+        raise MotorBootstrapControlError("bootstrap index identity changed")
+    if len(index_names) != len(set(index_names)):
+        raise MotorBootstrapControlError("bootstrap index names must be unique")
     return {
         "schema_version": 1,
         "control": "p2-motor-bootstrap-v1",
@@ -137,6 +146,7 @@ def build_report(root: Path) -> dict[str, object]:
         "mirror_count": len(mirrored),
         "plan_digest": plan["digest"],
         "index_count": plan["count"],
+        "index_names": index_names,
         "live_motor": False,
         "driver_imported": False,
         "activated": False,
