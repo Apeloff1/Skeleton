@@ -6,7 +6,7 @@ import pytest
 
 from scripts.check_spine_bind_recovery import (
     EXPECTED_SEAMS,
-    MINIMUM_MINIMUM_MANIFEST_SEAM_COUNT,
+    MINIMUM_MANIFEST_SEAM_COUNT,
     MIRRORED,
     SpineBindRecoveryControlError,
     build_report,
