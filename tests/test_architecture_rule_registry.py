@@ -31,17 +31,26 @@ class ArchitectureRuleRegistryTests(unittest.TestCase):
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="architecture-rules-"))
         self.addCleanup(lambda: shutil.rmtree(temp, ignore_errors=True))
-        for relative in (
+        base_files = (
             "machine/architecture_rule_registry.json",
             "machine/architecture.json",
             "machine/ai_master_plan.json",
-            "scripts/check_architecture_rule_registry.py",
-            "scripts/check_architecture_map.py",
-            "scripts/check_architecture_boundaries.py",
-            "scripts/check_ai_file_tree.py",
-            "scripts/check_architecture_doc_contradictions.py",
-            "scripts/check_ai_scope_freeze.py",
-        ):
+        )
+        for relative in base_files:
+            dst = temp / relative
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, dst)
+
+        registry = json.loads(
+            (ROOT / "machine/architecture_rule_registry.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        validator_paths = {
+            rule["validator_path"]
+            for rule in registry["rules"]
+        }
+        for relative in sorted(validator_paths):
             dst = temp / relative
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, dst)
