@@ -22,6 +22,7 @@ from skeleton.persistence.spine_bind_hold_read import (
     SpineBindHoldRead,
     SpineBindHoldReadError,
 )
+from skeleton.persistence.spine_bind_hold_verify import SpineBindHoldVerify
 from skeleton.persistence.spine_hold import SpineHold
 
 
