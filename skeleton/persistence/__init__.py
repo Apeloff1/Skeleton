@@ -73,6 +73,7 @@ from skeleton.persistence.spine_bind import SpineBind
 from skeleton.persistence.spine_tracker import SpineTracker
 from skeleton.persistence.spine_pair import SpinePair
 from skeleton.persistence.spine_replay import SpineReplay
+from skeleton.persistence.spine_sweep import SpineSweep
 from skeleton.persistence.spine_gap import SpineGap
 
 _SNAPSHOT_EXPORTS = {
@@ -158,6 +159,7 @@ __all__ = [
     "SpineTracker",
     "SpinePair",
     "SpineReplay",
+    "SpineSweep",
     "SpineCutover",
     "SpineWindow",
     "SpineSeal",
