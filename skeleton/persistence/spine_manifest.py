@@ -54,6 +54,10 @@ SEAMS = (
     ("bind-journal", "bind-card-not-rewritten"),
     ("bind-read", "bind-row-stays-dark"),
     ("bind-chain", "bind-journal-hash-chain"),
+    ("bind-tenant", "bind-tenant-isolated"),
+    ("bind-replay", "bind-replay-does-not-insert"),
+    ("bind-surface", "bind-surface-stays-unread"),
+    ("bind-gap", "bind-gap-not-filled"),
 )
 
 

@@ -108,6 +108,10 @@ from skeleton.persistence.spine_bind_card import SpineBindCard
 from skeleton.persistence.spine_bind_journal import SpineBindJournal
 from skeleton.persistence.spine_bind_read import SpineBindRead
 from skeleton.persistence.spine_bind_chain import SpineBindChain
+from skeleton.persistence.spine_bind_tenant import SpineBindTenant
+from skeleton.persistence.spine_bind_replay import SpineBindReplay
+from skeleton.persistence.spine_bind_surface import SpineBindSurface
+from skeleton.persistence.spine_bind_gap import SpineBindGap
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -230,6 +234,10 @@ __all__ = [
     "SpineBindJournal",
     "SpineBindRead",
     "SpineBindChain",
+    "SpineBindTenant",
+    "SpineBindReplay",
+    "SpineBindSurface",
+    "SpineBindGap",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
