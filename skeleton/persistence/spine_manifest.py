@@ -46,6 +46,8 @@ SEAMS = (
     ("probe-replay", "replay-does-not-insert"),
     ("motor-witness", "motor-not-imported"),
     ("dispatch-witness", "dispatcher-not-started"),
+    ("dark", "unwired-surfaces-stay-dark"),
+    ("epoch-witness", "side-card-epoch-unchanged"),
 )
 
 

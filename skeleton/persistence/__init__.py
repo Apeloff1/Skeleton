@@ -100,6 +100,8 @@ from skeleton.persistence.spine_merge_gate import SpineMergeGate
 from skeleton.persistence.spine_probe_replay import SpineProbeReplay
 from skeleton.persistence.spine_motor_witness import SpineMotorWitness
 from skeleton.persistence.spine_dispatch_witness import SpineDispatchWitness
+from skeleton.persistence.spine_dark import SpineDark
+from skeleton.persistence.spine_epoch_witness import SpineEpochWitness
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -214,6 +216,8 @@ __all__ = [
     "SpineProbeReplay",
     "SpineMotorWitness",
     "SpineDispatchWitness",
+    "SpineDark",
+    "SpineEpochWitness",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
