@@ -131,6 +131,8 @@ SEAMS = (
     ("runtime-transition-acceptance-verify", "acceptance-verification-does-not-promote-runtime-activation"),
     ("runtime-production-activation-authorization", "external-authorization-does-not-itself-activate-runtime"),
     ("runtime-production-activation-authorization-verify", "authorization-verification-does-not-activate-runtime"),
+    ("runtime-production-activation", "exact-authorized-live-health-may-activate-once"),
+    ("runtime-production-activation-verify", "activation-verification-preserves-live-rollback-boundary"),
 )
 
 
