@@ -1,11 +1,14 @@
-"""
-Skeleton Persistence Package
+"""Skeleton persistence package.
 
-Exports:
-- SnapshotStore: File-based snapshot registry
-- snapshot_genesis_state / restore_genesis_state: whole-system capture
-- Plane serializers for VectorStore, MAGStore, KnowledgeGraph, matrices
+Core durable repositories import eagerly. Snapshot compatibility helpers are
+loaded lazily because snapshot restoration reaches Jeeves/orchestration
+surfaces and therefore belongs to the higher architecture layer.
 """
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
 
 from skeleton.persistence.conversation_repository import (
     ConversationAuthorizationError,
@@ -43,19 +46,34 @@ from skeleton.persistence.operation_runtime import (
     DurableOperationRuntime,
     OutboxDispatchReport,
 )
-from skeleton.persistence.snapshots import (
-    SnapshotStore,
-    restore_genesis_state,
-    restore_graph,
-    restore_mag,
-    restore_matrices,
-    restore_vector_store,
-    serialize_graph,
-    serialize_mag,
-    serialize_matrices,
-    serialize_vector_store,
-    snapshot_genesis_state,
-)
+
+_SNAPSHOT_EXPORTS = {
+    "SnapshotStore",
+    "restore_genesis_state",
+    "restore_graph",
+    "restore_mag",
+    "restore_matrices",
+    "restore_vector_store",
+    "serialize_graph",
+    "serialize_mag",
+    "serialize_matrices",
+    "serialize_vector_store",
+    "snapshot_genesis_state",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _SNAPSHOT_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module("skeleton.persistence.snapshots")
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _SNAPSHOT_EXPORTS)
+
 
 __all__ = [
     "ExecutionOutboxEvent",
