@@ -56,6 +56,9 @@ from skeleton.persistence.spine_quarantine import SpineQuarantine
 from skeleton.persistence.spine_status import SpineStatus
 from skeleton.persistence.mongo_projection import MongoSpineProjection, MongoProjectionReport
 from skeleton.persistence.spine_repair import SpineRepairPlan
+from skeleton.persistence.spine_lag import SpineLag
+from skeleton.persistence.spine_catalog import SpineCatalog
+from skeleton.persistence.mongo_catalog import MongoCatalog
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -125,6 +128,9 @@ __all__ = [
     "MongoSpineProjection",
     "MongoProjectionReport",
     "SpineRepairPlan",
+    "SpineLag",
+    "SpineCatalog",
+    "MongoCatalog",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
