@@ -242,6 +242,7 @@ class SpineProviderLiveQualification:
             "request_digest": receipt["request_digest"],
             "response_digest": receipt["response_digest"],
             "architecture_digest": receipt["architecture_digest"],
+            "attestation_digest": receipt["attestation_digest"],
             "latency_ms": latency_ms,
             "issued_at": issued_at.isoformat(),
             "valid_until": expires_at.isoformat(),

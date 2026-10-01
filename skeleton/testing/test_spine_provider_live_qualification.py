@@ -113,6 +113,7 @@ def test_authenticated_live_call_qualifies_provider_surface() -> None:
     assert card["provider_surface_closure_green"] is True
     assert card["provider_surface_live_green"] is True
     assert card["provider_surface_green"] is True
+    assert card["attestation_digest"] == "1" * 64
     assert card["pr_automation_green"] is False
     assert card["merge_authority"] is False
     assert verified["verified"] is True
@@ -146,6 +147,24 @@ def test_live_provider_receipt_must_be_authenticated_and_fresh() -> None:
             authenticate=lambda receipt: True,
             now=NOW,
         )
+
+
+def test_live_provider_verifier_rejects_attestation_detachment() -> None:
+    card = SpineProviderLiveQualification().qualify(
+        closure=_closure(),
+        closure_verify=_closure_verify(),
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda receipt: True,
+        now=NOW,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["attestation_digest"] = "2" * 64
+    with pytest.raises(
+        SpineProviderLiveQualificationVerifyError,
+        match="digest mismatch",
+    ):
+        SpineProviderLiveQualificationVerify().verify(tampered)
 
 
 def test_live_provider_verifier_rejects_merge_authority_tamper() -> None:

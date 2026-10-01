@@ -67,6 +67,7 @@ class SpineProviderLiveQualificationVerify:
             "request_digest",
             "response_digest",
             "architecture_digest",
+            "attestation_digest",
         ):
             value = card.get(field)
             if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
@@ -143,6 +144,7 @@ class SpineProviderLiveQualificationVerify:
             "request_digest": card["request_digest"],
             "response_digest": card["response_digest"],
             "architecture_digest": card["architecture_digest"],
+            "attestation_digest": card["attestation_digest"],
             "latency_ms": latency_ms,
             "issued_at": card["issued_at"],
             "valid_until": card["valid_until"],
