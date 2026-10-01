@@ -107,19 +107,30 @@ def test_observe_mode_refuses_mutation_counts() -> None:
         )
 
 
-def test_ready_decision_with_nonready_state_is_not_merge_eligible() -> None:
-    card = SpinePrAutomationQualification().qualify(
-        receipt=_receipt(decision="ready", state="held"),
-        expected_head_sha=HEAD,
-        expected_pr_number=PR,
-        authenticate=lambda receipt: True,
-    )
-    verified = SpinePrAutomationQualificationVerify().verify(card)
+def test_inconsistent_state_and_decision_fail_closed() -> None:
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="state and decision are inconsistent",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=_receipt(decision="ready", state="held"),
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda receipt: True,
+        )
 
-    assert card["pr_automation_operational_green"] is True
-    assert card["pr_automation_merge_eligible"] is False
-    assert verified["pr_automation_merge_eligible"] is False
-    assert card["merge_authority"] is False
+    impossible = _receipt()
+    impossible["target_state"] = "evaluated"
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="target state is not operational",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=impossible,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda receipt: True,
+        )
 
 
 def test_runner_failures_and_head_drift_fail_closed() -> None:
@@ -148,6 +159,22 @@ def test_runner_failures_and_head_drift_fail_closed() -> None:
             expected_pr_number=PR,
             authenticate=lambda receipt: True,
         )
+
+
+def test_verifier_rejects_state_decision_tamper() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda receipt: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["decision"] = "ready"
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="state and decision are inconsistent",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
 
 
 def test_verifier_rejects_attestation_detachment() -> None:

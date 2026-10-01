@@ -14,9 +14,15 @@ class SpinePrAutomationQualificationError(RuntimeError):
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_ALLOWED_STATES = frozenset({"evaluated", "ready", "held", "ignored", "merged"})
+_ALLOWED_STATES = frozenset({"ready", "held", "ignored", "merged"})
 _ALLOWED_DECISIONS = frozenset({"ignore", "hold", "ready", "merge"})
 _ALLOWED_MODES = frozenset({"observe", "apply"})
+_VALID_STATE_DECISIONS = {
+    "ready": frozenset({"ready", "merge"}),
+    "held": frozenset({"hold"}),
+    "ignored": frozenset({"ignore"}),
+    "merged": frozenset({"merge"}),
+}
 
 
 def _digest(payload: object) -> str:
@@ -142,6 +148,10 @@ class SpinePrAutomationQualification:
         if decision not in _ALLOWED_DECISIONS:
             raise SpinePrAutomationQualificationError(
                 "PR automation decision is invalid"
+            )
+        if decision not in _VALID_STATE_DECISIONS[target_state]:
+            raise SpinePrAutomationQualificationError(
+                "PR automation state and decision are inconsistent"
             )
         failures = _non_negative_int(
             receipt.get("failures"),
