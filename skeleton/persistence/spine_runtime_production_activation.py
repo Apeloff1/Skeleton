@@ -126,6 +126,20 @@ class SpineRuntimeProductionActivationLedger:
             raise SpineRuntimeProductionActivationError(
                 "activation target driver changed"
             )
+        instant = now or datetime.now(timezone.utc)
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise SpineRuntimeProductionActivationError(
+                "now must be timezone-aware"
+            )
+        instant = instant.astimezone(timezone.utc)
+        valid_until = _instant(
+            authorization.get("valid_until"),
+            "authorization valid_until",
+        )
+        if instant >= valid_until:
+            raise SpineRuntimeProductionActivationError(
+                "production activation authorization expired"
+            )
         try:
             current_authorization_verify = (
                 SpineRuntimeProductionActivationAuthorizationVerify().verify(
@@ -205,21 +219,6 @@ class SpineRuntimeProductionActivationLedger:
         ):
             raise SpineRuntimeProductionActivationError(
                 "independent live health verification is required"
-            )
-
-        instant = now or datetime.now(timezone.utc)
-        if instant.tzinfo is None or instant.utcoffset() is None:
-            raise SpineRuntimeProductionActivationError(
-                "now must be timezone-aware"
-            )
-        instant = instant.astimezone(timezone.utc)
-        valid_until = _instant(
-            authorization.get("valid_until"),
-            "authorization valid_until",
-        )
-        if instant >= valid_until:
-            raise SpineRuntimeProductionActivationError(
-                "production activation authorization expired"
             )
 
         if not isinstance(slot, SpineRuntimeSlot):
