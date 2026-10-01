@@ -199,8 +199,127 @@ class SpineRuntimeTransitionPermitLedger:
             "verification_signature": False,
         }
 
+    def consume(
+        self,
+        *,
+        permit: dict[str, Any],
+        permit_verify: dict[str, Any],
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(permit, dict) or permit.get("kind") != "spine_runtime_transition_permit":
+            raise SpineRuntimeTransitionPermitError("transition permit card is required")
+        if permit.get("transition_authorized") is not True:
+            raise SpineRuntimeTransitionPermitError("transition is not authorized")
+        if permit.get("permit_consumed") is not False:
+            raise SpineRuntimeTransitionPermitError("transition permit was already consumed")
+        for field in ("transition_attempted", "transition_executed", "runtime_object_replaced", "dispatcher_started", "runtime_activated"):
+            if permit.get(field) is not False:
+                raise SpineRuntimeTransitionPermitError(f"transition permit changed invariant: {field}")
+        if permit.get("runtime_driver_selected") is not True:
+            raise SpineRuntimeTransitionPermitError("runtime driver selection disappeared")
+        if permit.get("target_driver") != "pymongo-async":
+            raise SpineRuntimeTransitionPermitError("transition target driver changed")
+
+        permit_id = permit.get("permit_id")
+        permit_digest = permit.get("digest")
+        if not isinstance(permit_id, str) or len(permit_id) != 64:
+            raise SpineRuntimeTransitionPermitError("transition permit identity is invalid")
+        if not isinstance(permit_digest, str) or len(permit_digest) != 64:
+            raise SpineRuntimeTransitionPermitError("transition permit digest is invalid")
+        if (
+            not isinstance(permit_verify, dict)
+            or permit_verify.get("kind") != "spine_runtime_transition_permit_verify"
+            or permit_verify.get("verified") is not True
+            or permit_verify.get("permit_id") != permit_id
+            or permit_verify.get("permit_digest") != permit_digest
+            or permit_verify.get("transition_authorized") is not True
+            or permit_verify.get("permit_consumed") is not False
+            or permit_verify.get("transition_attempted") is not False
+            or permit_verify.get("transition_executed") is not False
+            or permit_verify.get("runtime_activated") is not False
+        ):
+            raise SpineRuntimeTransitionPermitError("independent transition-permit verification is required")
+
+        valid_until = _instant(permit.get("valid_until"), "valid_until")
+        instant = now or datetime.now(timezone.utc)
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise SpineRuntimeTransitionPermitError("now must be timezone-aware")
+        instant = instant.astimezone(timezone.utc)
+        if instant >= valid_until:
+            raise SpineRuntimeTransitionPermitError("transition permit expired before consumption")
+
+        row = self._connection.execute(
+            """
+            SELECT rehearsal_digest,transition_id,execution_nonce,deployment_id,
+                   target_driver,payload_digest,consumed
+            FROM spine_runtime_transition_permit
+            WHERE permit_id = ?
+            """,
+            (permit_id,),
+        ).fetchone()
+        if row is None:
+            raise SpineRuntimeTransitionPermitError("transition permit is not durably recorded")
+        checks = {
+            "rehearsal_digest": permit.get("rehearsal_digest"),
+            "transition_id": permit.get("transition_id"),
+            "execution_nonce": permit.get("execution_nonce"),
+            "deployment_id": permit.get("deployment_id"),
+            "target_driver": permit.get("target_driver"),
+            "payload_digest": permit_digest,
+        }
+        for field, expected in checks.items():
+            if row[field] != expected:
+                raise SpineRuntimeTransitionPermitError(f"persisted transition permit mismatch: {field}")
+        if int(row["consumed"]) != 0:
+            raise SpineRuntimeTransitionPermitError("transition permit replay refused")
+
+        cursor = self._connection.execute(
+            "UPDATE spine_runtime_transition_permit SET consumed = 1 WHERE permit_id = ? AND consumed = 0",
+            (permit_id,),
+        )
+        if cursor.rowcount != 1:
+            self._connection.rollback()
+            raise SpineRuntimeTransitionPermitError("transition permit replay refused")
+        self._connection.commit()
+
+        evidence = {
+            "permit_id": permit_id,
+            "permit_digest": permit_digest,
+            "rehearsal_digest": permit.get("rehearsal_digest"),
+            "transition_id": permit.get("transition_id"),
+            "deployment_id": permit.get("deployment_id"),
+            "target_driver": "pymongo-async",
+            "consumed_at": instant.isoformat(),
+            "transition_authorized": True,
+            "permit_consumed": True,
+            "transition_attempted": False,
+            "transition_executed": False,
+            "runtime_driver_selected": True,
+            "runtime_object_replaced": False,
+            "dispatcher_started": False,
+            "runtime_activated": False,
+        }
+        return {
+            "kind": "spine_runtime_transition_consumption",
+            "hit": False,
+            "law": "transition-execution-permit-consumed-once-before-any-attempt",
+            "citation": "VOL-134",
+            **evidence,
+            "digest": _digest(evidence),
+            "stored_prose": 0,
+            "completion_checkbox": False,
+            "implementation_signature": False,
+            "verification_signature": False,
+        }
+
     def count(self) -> int:
         row = self._connection.execute("SELECT COUNT(*) AS n FROM spine_runtime_transition_permit").fetchone()
+        return int(row["n"])
+
+    def consumed_count(self) -> int:
+        row = self._connection.execute(
+            "SELECT COUNT(*) AS n FROM spine_runtime_transition_permit WHERE consumed = 1"
+        ).fetchone()
         return int(row["n"])
 
     def close(self) -> None:

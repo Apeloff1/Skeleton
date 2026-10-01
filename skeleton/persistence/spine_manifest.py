@@ -114,6 +114,8 @@ SEAMS = (
     ("runtime-transition-rehearsal-verify", "transition-rehearsal-verification-does-not-activate-runtime"),
     ("runtime-transition-permit", "transition-rehearsal-requires-external-short-lived-execution-permit"),
     ("runtime-transition-permit-verify", "transition-permit-verification-does-not-execute-runtime"),
+    ("runtime-transition-consume", "transition-execution-permit-consumed-once-before-any-attempt"),
+    ("runtime-transition-consume-verify", "transition-consumption-verification-does-not-attempt-runtime-transition"),
 )
 
 

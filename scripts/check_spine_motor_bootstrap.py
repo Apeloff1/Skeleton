@@ -49,6 +49,7 @@ FILES = (
     "spine_runtime_transition_rehearsal_verify.py",
     "spine_runtime_transition_permit.py",
     "spine_runtime_transition_permit_verify.py",
+    "spine_runtime_transition_consumption_verify.py",
 )
 
 
