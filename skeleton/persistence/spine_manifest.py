@@ -135,6 +135,8 @@ SEAMS = (
     ("runtime-production-activation-verify", "activation-verification-preserves-live-rollback-boundary"),
     ("provider-surface-qualification", "paired-exact-head-receipts-qualify-provider-closure"),
     ("provider-surface-qualification-verify", "provider-closure-verification-does-not-claim-live-health"),
+    ("pr-automation-qualification", "exact-head-runner-health-is-separate-from-merge-eligibility"),
+    ("pr-automation-qualification-verify", "automation-health-verification-does-not-grant-merge-authority"),
 )
 
 
