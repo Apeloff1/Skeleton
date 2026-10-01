@@ -79,6 +79,8 @@ from skeleton.persistence.spine_hold import SpineHold
 from skeleton.persistence.spine_manifest import SpineManifest
 from skeleton.persistence.spine_masterplan import SpineMasterplan
 from skeleton.persistence.spine_reaccept import SpineReaccept
+from skeleton.persistence.spine_gate import SpineGate
+from skeleton.persistence.spine_watch import SpineWatch
 from skeleton.persistence.spine_gap import SpineGap
 
 _SNAPSHOT_EXPORTS = {
@@ -170,6 +172,8 @@ __all__ = [
     "SpineManifest",
     "SpineMasterplan",
     "SpineReaccept",
+    "SpineGate",
+    "SpineWatch",
     "SpineCutover",
     "SpineWindow",
     "SpineSeal",
