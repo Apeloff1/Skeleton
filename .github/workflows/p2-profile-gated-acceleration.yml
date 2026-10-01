@@ -23,6 +23,7 @@ on:
       - "tests/test_p2_acceleration_control.py"
       - "tests/test_p2_acceleration_selection.py"
       - "tests/test_p2_acceleration_protocol.py"
+      - "tests/test_p2_acceleration_profiling.py"
       - "tests/test_p2_acceleration_isolation.py"
       - "docs/architecture/P2_PROFILE_GATED_ACCELERATION.md"
       - ".github/workflows/p2-profile-gated-acceleration.yml"
@@ -87,4 +88,5 @@ jobs:
           tests.test_p2_acceleration_control
           tests.test_p2_acceleration_selection
           tests.test_p2_acceleration_protocol
+          tests.test_p2_acceleration_profiling
           tests.test_p2_acceleration_isolation
