@@ -97,7 +97,7 @@ def test_distinct_authenticated_dual_control_is_qualified_but_not_effective() ->
     ("mutator", "match"),
     [
         (lambda rows: rows.__setitem__(1, {**rows[1], "approver_id": "operator-a"}), "distinct approvers"),
-        (lambda rows: rows.__setitem__(1, {**rows[1], "authority_domain": "operations"}), "domains"),
+        (lambda rows: rows.__setitem__(1, {**rows[1], "authority_domain": "operations"}), "operations and reliability"),
         (lambda rows: rows.__setitem__(1, {**rows[1], "candidate_digest": "c" * 64}), "candidate scope"),
         (lambda rows: rows.__setitem__(1, {**rows[1], "decision": "reject"}), "decision"),
         (lambda rows: rows.__setitem__(1, {**rows[1], "expires_at": (NOW - timedelta(seconds=1)).isoformat()}), "expired"),
