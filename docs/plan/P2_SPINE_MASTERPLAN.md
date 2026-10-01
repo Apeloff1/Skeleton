@@ -125,6 +125,10 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime transition permit verify | `skeleton/persistence/spine_runtime_transition_permit_verify.py` | permit verification does not execute transition |
 | Runtime transition permit consume | `skeleton/persistence/spine_runtime_transition_permit.py` | durable execution permit is consumed exactly once before any attempt |
 | Runtime transition consumption verify | `skeleton/persistence/spine_runtime_transition_consumption_verify.py` | consumption verification does not attempt transition |
+| Runtime transition attempt | `skeleton/persistence/spine_runtime_transition_attempt.py` | one consumed permit may drive one deployment-owned fail-closed attempt |
+| Runtime transition attempt verify | `skeleton/persistence/spine_runtime_transition_attempt_verify.py` | refused attempt verification cannot promote runtime |
+| Runtime transition rollback witness | `skeleton/persistence/spine_runtime_transition_rollback_witness.py` | independently proves the refused attempt left runtime/fence unchanged |
+| Runtime transition rollback verify | `skeleton/persistence/spine_runtime_transition_rollback_verify.py` | no-effect rollback proof grants no activation authority |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -153,7 +157,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 107, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 111, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
