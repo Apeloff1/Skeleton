@@ -82,7 +82,6 @@ class SpineBindHoldChain:
                 )
             payload = "|".join(
                 (
-                    str(refusal_id),
                     str(row["tenant_id"]),
                     str(row["outbox_id"]),
                     str(hold_id),
