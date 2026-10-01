@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 
 import pytest
 
@@ -13,36 +15,61 @@ from skeleton.persistence.spine_provider_live_qualification_verify import (
     SpineProviderLiveQualificationVerify,
     SpineProviderLiveQualificationVerifyError,
 )
+from skeleton.persistence.spine_provider_surface_qualification_verify import (
+    SpineProviderSurfaceQualificationVerify,
+)
 
 
 HEAD = "a" * 40
 NOW = datetime(2026, 10, 1, 18, 0, tzinfo=timezone.utc)
 
 
+def _digest(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 def _closure() -> dict[str, object]:
-    return {
-        "kind": "spine_provider_surface_qualification",
+    evidence = {
         "head_sha": HEAD,
+        "canonical_receipt_digest": "1" * 64,
+        "independent_receipt_digest": "2" * 64,
+        "declared_digest": "3" * 64,
+        "independent_declared_surface_digest": "4" * 64,
+        "discovered_digest": "5" * 64,
+        "declared_count": 1,
+        "discovered_count": 1,
+        "scanned_python_files": 2,
         "exact_head": True,
         "independent_agreement": True,
         "provider_surface_closure_green": True,
         "provider_surface_live_green": False,
         "provider_surface_green": False,
-        "digest": "c" * 64,
+        "pr_automation_green": False,
+    }
+    return {
+        "kind": "spine_provider_surface_qualification",
+        "hit": True,
+        "law": "paired-exact-head-receipts-qualify-provider-closure",
+        "citation": "VOL-134",
+        **evidence,
+        "digest": _digest(evidence),
+        "stored_prose": 0,
+        "completion_checkbox": False,
+        "implementation_signature": False,
+        "verification_signature": False,
     }
 
 
 def _closure_verify() -> dict[str, object]:
-    return {
-        "kind": "spine_provider_surface_qualification_verify",
-        "head_sha": HEAD,
-        "qualification_digest": "c" * 64,
-        "verified": True,
-        "provider_surface_closure_green": True,
-        "provider_surface_live_green": False,
-        "provider_surface_green": False,
-    }
-
+    return SpineProviderSurfaceQualificationVerify().verify(_closure())
 
 def _receipt() -> dict[str, object]:
     return {
@@ -134,5 +161,41 @@ def test_live_provider_verifier_rejects_merge_authority_tamper() -> None:
     with pytest.raises(
         SpineProviderLiveQualificationVerifyError,
         match="overclaimed merge authority",
+    ):
+        SpineProviderLiveQualificationVerify().verify(tampered)
+
+
+
+def test_live_provider_verifier_rejects_invalid_validity_window() -> None:
+    card = SpineProviderLiveQualification().qualify(
+        closure=_closure(),
+        closure_verify=_closure_verify(),
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda receipt: True,
+        now=NOW,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["valid_until"] = tampered["issued_at"]
+    evidence = {
+        key: value
+        for key, value in tampered.items()
+        if key
+        not in {
+            "kind",
+            "hit",
+            "law",
+            "citation",
+            "digest",
+            "stored_prose",
+            "completion_checkbox",
+            "implementation_signature",
+            "verification_signature",
+        }
+    }
+    tampered["digest"] = _digest(evidence)
+    with pytest.raises(
+        SpineProviderLiveQualificationVerifyError,
+        match="validity window is invalid",
     ):
         SpineProviderLiveQualificationVerify().verify(tampered)
