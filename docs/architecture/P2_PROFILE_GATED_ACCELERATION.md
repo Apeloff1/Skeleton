@@ -28,3 +28,10 @@ Medium/high crash-risk candidates require a bounded subprocess boundary for auto
 JVM candidates use `skeleton.acceleration.rpc@1.0` with explicit version negotiation, request identity, operation and deadline. Unknown versions reject rather than being interpreted optimistically.
 
 All current candidates remain `candidate_unpromoted`; this lane does not claim benchmark superiority, maturity promotion, or P2-NATIVE-01 completion.
+
+
+## Profiling receipts
+
+`skeleton/native/profiling.py` produces paired reference/candidate evidence rather than accepting hand-authored speed claims. Each run binds the receipt to the candidate source identity and a deterministic, non-secret environment fingerprint; interleaves reference and candidate calls to reduce temporal skew; records medians, correctness, maximum absolute error, crashes and timeouts; and refuses to mint a receipt if the candidate produces zero successful samples.
+
+The profiler itself never promotes or routes traffic. Its output is input to the separate fail-closed selection engine.
