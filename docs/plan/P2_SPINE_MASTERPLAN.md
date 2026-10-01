@@ -158,6 +158,8 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Read and project: 96%
 - Provider surface closure qualified: implemented
 - Provider live qualification implementation: landed
+- Provider live credential-bearing producer `scripts/qualify_spine_provider_live.py`: landed
+- Provider live external credential: runtime/environment dependent
 - Provider surface live claim: 0% until authenticated live receipt
 - PR Automation operational qualification: implemented
 - PR Automation merge authority: 0%
