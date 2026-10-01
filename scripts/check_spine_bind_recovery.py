@@ -36,6 +36,8 @@ MODULES = (
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
 
+MANIFEST_SEAM_COUNT = 116
+
 EXPECTED_SEAMS = {
     "bind-snapshot": "bind-snapshot-stays-unactivated",
     "bind-recovery": "recovery-plan-does-not-activate",
@@ -93,9 +95,9 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != 116:
+    if len(seams) != MANIFEST_SEAM_COUNT:
         raise SpineBindRecoveryControlError(
-            f"expected 116 spine seams, found {len(seams)}"
+            f"expected {MANIFEST_SEAM_COUNT} spine seams, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -117,7 +119,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     required = [
         "- Bind card sealed: 100%",
-        "Expect `count` 116",
+        f"Expect `count` {MANIFEST_SEAM_COUNT}",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -136,7 +138,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
         )
     return {
         "bind_card_percent": 100,
-        "manifest_count": 116,
+        "manifest_count": MANIFEST_SEAM_COUNT,
         "activation_claimed": False,
     }
 
