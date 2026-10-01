@@ -82,6 +82,14 @@ class SpineCursorRead:
                 """,
                 (self.projection.consumer_id,),
             ).fetchone()
+            completion = self.projection._connection.execute(
+                """
+                SELECT COUNT(*) AS n
+                FROM projection_applied
+                WHERE consumer_id = ?
+                """,
+                (self.projection.consumer_id,),
+            ).fetchone()
             poison = self.projection._connection.execute(
                 "SELECT COUNT(*) AS n FROM projection_poison"
             ).fetchone()
@@ -93,6 +101,11 @@ class SpineCursorRead:
                 raise SpineCursorError("applied_count must be a non-negative integer")
             applied = applied_raw
             updated = _aware(row["updated_at"])
+        completion_count = int(completion["n"])
+        if applied != completion_count:
+            raise SpineCursorError(
+                "projection cursor disagrees with completion journal"
+            )
         epoch = None
         if self.fence is not None and tenant_id is not None and resource_id is not None:
             try:

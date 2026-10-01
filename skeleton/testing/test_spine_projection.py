@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sqlite3
 
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
@@ -222,4 +223,89 @@ def test_projection_recovers_cursor_after_fence_committed_before_completion(
             tenant_id="tenant-a",
             resource_id=resource,
         ).applied_count == 1
+    runtime.close()
+
+def test_projection_rebuilds_legacy_aggregate_cursor_from_completion_evidence(
+    tmp_path: Path,
+) -> None:
+    journal_path = tmp_path / "journal.sqlite"
+    connection = sqlite3.connect(journal_path)
+    connection.execute(
+        """
+        CREATE TABLE projection_cursor (
+            consumer_id TEXT PRIMARY KEY,
+            applied_count INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO projection_cursor(
+            consumer_id, applied_count, updated_at
+        ) VALUES (?, ?, ?)
+        """,
+        ("spine-projection", 7, BASE.isoformat()),
+    )
+    connection.commit()
+    connection.close()
+
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        journal_path=journal_path,
+    ) as projection:
+        cursor = SpineCursorRead(projection, fence).read()
+        assert cursor.applied_count == 0
+
+
+def test_projection_completion_identity_is_scoped_by_consumer(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    created = operations.create(_envelope(), now=BASE)
+    runtime.dispatch_outbox(operation_id=created.envelope.operation_id)
+
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    journal_path = tmp_path / "journal.sqlite"
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        consumer_id="projection-a",
+        journal_path=journal_path,
+    ) as first:
+        first_report = first.project(now=BASE + timedelta(seconds=2))
+        assert first_report.applied == 1
+        assert SpineCursorRead(first, fence).read().applied_count == 1
+
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        consumer_id="projection-b",
+        journal_path=journal_path,
+    ) as second:
+        second_report = second.project(now=BASE + timedelta(seconds=3))
+        assert second_report.applied == 1
+        assert second_report.fence_advances == 0
+        assert SpineCursorRead(second, fence).read().applied_count == 1
+
+    connection = sqlite3.connect(journal_path)
+    rows = connection.execute(
+        """
+        SELECT consumer_id
+        FROM projection_applied
+        ORDER BY consumer_id
+        """
+    ).fetchall()
+    connection.close()
+    assert rows == [("projection-a",), ("projection-b",)]
     runtime.close()

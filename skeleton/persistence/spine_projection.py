@@ -147,15 +147,124 @@ class SpineProjection:
                     updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS projection_applied (
-                    outbox_id TEXT PRIMARY KEY,
                     consumer_id TEXT NOT NULL,
+                    outbox_id TEXT NOT NULL,
                     operation_id TEXT NOT NULL,
                     tenant_id TEXT NOT NULL,
                     fence_epoch INTEGER NOT NULL,
-                    completed_at TEXT NOT NULL
+                    completed_at TEXT NOT NULL,
+                    PRIMARY KEY(consumer_id, outbox_id)
                 );
                 """
             )
+            self._migrate_completion_schema()
+            self._rebuild_cursor_from_completions()
+
+    def _migrate_completion_schema(self) -> None:
+        columns = self._connection.execute(
+            "PRAGMA table_info(projection_applied)"
+        ).fetchall()
+        primary_key = [
+            row["name"]
+            for row in sorted(
+                (row for row in columns if int(row["pk"]) > 0),
+                key=lambda row: int(row["pk"]),
+            )
+        ]
+        if primary_key == ["consumer_id", "outbox_id"]:
+            return
+        if primary_key != ["outbox_id"]:
+            raise SpineProjectionError(
+                "projection completion primary key is unsupported"
+            )
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._connection.execute(
+                "ALTER TABLE projection_applied RENAME TO projection_applied_legacy"
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE projection_applied (
+                    consumer_id TEXT NOT NULL,
+                    outbox_id TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    fence_epoch INTEGER NOT NULL,
+                    completed_at TEXT NOT NULL,
+                    PRIMARY KEY(consumer_id, outbox_id)
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                INSERT INTO projection_applied(
+                    consumer_id, outbox_id, operation_id, tenant_id,
+                    fence_epoch, completed_at
+                )
+                SELECT consumer_id, outbox_id, operation_id, tenant_id,
+                       fence_epoch, completed_at
+                FROM projection_applied_legacy
+                """
+            )
+            self._connection.execute("DROP TABLE projection_applied_legacy")
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    def _rebuild_cursor_from_completions(self) -> None:
+        completions = self._connection.execute(
+            """
+            SELECT consumer_id, COUNT(*) AS n, MAX(completed_at) AS updated_at
+            FROM projection_applied
+            GROUP BY consumer_id
+            """
+        ).fetchall()
+        completion_by_consumer = {
+            str(row["consumer_id"]): (int(row["n"]), str(row["updated_at"]))
+            for row in completions
+        }
+        cursors = self._connection.execute(
+            """
+            SELECT consumer_id, updated_at
+            FROM projection_cursor
+            """
+        ).fetchall()
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            seen: set[str] = set()
+            for row in cursors:
+                consumer = str(row["consumer_id"])
+                seen.add(consumer)
+                count, updated_at = completion_by_consumer.get(
+                    consumer,
+                    (0, str(row["updated_at"])),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE projection_cursor
+                    SET applied_count = ?, updated_at = ?
+                    WHERE consumer_id = ?
+                    """,
+                    (count, updated_at, consumer),
+                )
+            for consumer, (count, updated_at) in completion_by_consumer.items():
+                if consumer in seen:
+                    continue
+                self._connection.execute(
+                    """
+                    INSERT INTO projection_cursor(
+                        consumer_id, applied_count, updated_at
+                    ) VALUES (?, ?, ?)
+                    """,
+                    (consumer, count, updated_at),
+                )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
 
     def project(self, *, limit: int = 1000, now: datetime | None = None) -> SpineProjectionReport:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
@@ -346,17 +455,34 @@ class SpineProjection:
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                existing = self._connection.execute(
+                insert = self._connection.execute(
                     """
-                    SELECT consumer_id, operation_id, tenant_id, fence_epoch
-                    FROM projection_applied
-                    WHERE outbox_id = ?
+                    INSERT INTO projection_applied(
+                        consumer_id, outbox_id, operation_id, tenant_id,
+                        fence_epoch, completed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(consumer_id, outbox_id) DO NOTHING
                     """,
-                    (event.outbox_id,),
-                ).fetchone()
-                if existing is not None:
+                    (
+                        self.consumer_id,
+                        event.outbox_id,
+                        event.operation_id,
+                        tenant_id,
+                        fence_epoch,
+                        instant.isoformat(),
+                    ),
+                )
+                if insert.rowcount == 0:
+                    existing = self._connection.execute(
+                        """
+                        SELECT operation_id, tenant_id, fence_epoch
+                        FROM projection_applied
+                        WHERE consumer_id = ? AND outbox_id = ?
+                        """,
+                        (self.consumer_id, event.outbox_id),
+                    ).fetchone()
                     if (
-                        existing["consumer_id"] != self.consumer_id
+                        existing is None
                         or existing["operation_id"] != event.operation_id
                         or existing["tenant_id"] != tenant_id
                         or existing["fence_epoch"] != fence_epoch
@@ -366,22 +492,7 @@ class SpineProjection:
                         )
                     self._connection.execute("COMMIT")
                     return 0
-                self._connection.execute(
-                    """
-                    INSERT INTO projection_applied(
-                        outbox_id, consumer_id, operation_id, tenant_id,
-                        fence_epoch, completed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        event.outbox_id,
-                        self.consumer_id,
-                        event.operation_id,
-                        tenant_id,
-                        fence_epoch,
-                        instant.isoformat(),
-                    ),
-                )
+
                 self._connection.execute(
                     """
                     INSERT INTO projection_cursor(
