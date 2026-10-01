@@ -155,5 +155,13 @@
     "extraction_rule": "Enum states exactly match ai_runtime_schemas.json.",
     "transition_rule": "Every entry names transition source and test authority.",
     "terminal_rule": "Terminal states are explicit and must exist in source enum."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-127",
+    "title": "State Machine Catalogue",
+    "required_gap_texts": [
+      "extract existing lifecycle machines",
+      "bind transition tests"
+    ]
   }
 }
