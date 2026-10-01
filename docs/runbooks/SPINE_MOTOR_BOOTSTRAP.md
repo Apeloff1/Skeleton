@@ -163,6 +163,12 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 The provider closure workflow now produces two independent exact-head evidence receipts: the canonical bootstrap inventory and the independent provider ownership scan. `SpineProviderSurfaceQualification` normalizes their declared ownership and discovered-edge views, requires exact head equality plus digest/count agreement, and emits only `provider_surface_closure_green=true`. It does not alter the legacy dark provider probe and does not claim live external provider health: `provider_surface_live_green=false` and `provider_surface_green=false` remain explicit. `SpineProviderSurfaceQualificationVerify` reconstructs the card and rejects forged live-green claims.
 
+## Provider surface closure qualification
+
+`SpineProviderSurfaceQualification` normalizes the canonical provider-surface inventory receipt and the independent ownership-scan receipt for the exact same head SHA. It requires matching declared/discovered digests and counts, then records `provider_surface_closure_green=true` only. `provider_surface_live_green`, `provider_surface_green`, and `pr_automation_green` remain false. `SpineProviderSurfaceQualificationVerify` independently reconstructs that card and rejects any live-green overclaim.
+
+This seam registers exact-head provider closure evidence. It does not substitute CI closure for a credential-bearing live provider request.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -207,7 +213,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_transition_health.py \
   skeleton/testing/test_spine_runtime_transition_acceptance.py \
   skeleton/testing/test_spine_runtime_production_activation_authorization.py \
-  skeleton/testing/test_spine_runtime_production_activation.py
+  skeleton/testing/test_spine_runtime_production_activation.py \
+  skeleton/testing/test_spine_provider_surface_qualification.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
