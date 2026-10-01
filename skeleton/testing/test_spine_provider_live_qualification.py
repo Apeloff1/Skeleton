@@ -71,13 +71,14 @@ def _closure() -> dict[str, object]:
 def _closure_verify() -> dict[str, object]:
     return SpineProviderSurfaceQualificationVerify().verify(_closure())
 
+
 def _receipt() -> dict[str, object]:
     return {
         "kind": "spine_provider_live_receipt",
         "authority_domain": "provider-live",
         "decision": "qualify-live-provider",
         "head_sha": HEAD,
-        "closure_digest": "c" * 64,
+        "closure_digest": _closure()["digest"],
         "provider_id": "openai",
         "provider_family": "runtime_model",
         "model": "test-model",
