@@ -1,0 +1,81 @@
+{
+  "schema_version": "skeleton.generated_documentation.v1",
+  "manifest_version": "0.1.0",
+  "status": "active",
+  "purpose": "Masterplan-bound generated-document manifest with deterministic source identity and clean-regeneration enforcement.",
+  "masterplan_bindings": [
+    {
+      "volume_ref": "VOL-089",
+      "title": "Documentation Engine",
+      "accountability_id": "ACC-VOL-089",
+      "required_gap_texts": [
+        "define generated-doc boundaries",
+        "materialize doc drift gate"
+      ],
+      "risks": [
+        "stale docs",
+        "generated overwrite",
+        "broken references"
+      ],
+      "contracts": [
+        "DocumentationSource",
+        "GeneratedSection",
+        "DocumentationCheck"
+      ]
+    },
+    {
+      "volume_ref": "VOL-090",
+      "title": "Generated Documentation",
+      "accountability_id": "ACC-VOL-090",
+      "required_gap_texts": [
+        "define generated artifact manifest",
+        "add regeneration cleanliness gate"
+      ],
+      "risks": [
+        "generated drift",
+        "review noise",
+        "manual derived edits"
+      ],
+      "contracts": [
+        "GeneratedDocument",
+        "GeneratorIdentity",
+        "SourceDigestSet"
+      ]
+    }
+  ],
+  "policy": {
+    "output_root": "docs/generated",
+    "generated_marker": "<!-- generated-document: do-not-edit -->",
+    "generator_identity": "p2-docs/0.1.0",
+    "source_identity": "git-blob-sha1",
+    "human_authored_rule": "The generator may write only declared artifacts under docs/generated; human-authored rationale elsewhere is never overwritten.",
+    "drift_rule": "Every generated artifact must exactly equal a fresh deterministic render from its declared source Git-blob identities.",
+    "reference_rule": "Every declared source path, generated task/rule/ADR identifier, and output path must resolve through canonical source data."
+  },
+  "artifacts": [
+    {
+      "artifact_id": "GEN-P2-AUTHORITY",
+      "output": "docs/generated/P2_AUTHORITY_SNAPSHOT.md",
+      "generator": "scripts/generate_p2_docs.py",
+      "generator_version": "0.1.0",
+      "sources": [
+        "machine/ai_p2_execution_map.json",
+        "machine/ai_p2_task_backlog.json",
+        "machine/master_traceability.json"
+      ],
+      "format": "markdown"
+    },
+    {
+      "artifact_id": "GEN-ARCH-CONTROLS",
+      "output": "docs/generated/ARCHITECTURE_CONTROL_INDEX.md",
+      "generator": "scripts/generate_p2_docs.py",
+      "generator_version": "0.1.0",
+      "sources": [
+        "machine/architecture_rule_registry.json",
+        "machine/architecture.json",
+        "machine/adr_index.json"
+      ],
+      "format": "markdown"
+    }
+  ]
+}
