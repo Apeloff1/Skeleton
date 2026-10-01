@@ -20,6 +20,7 @@ import threading
 from typing import Any
 
 from skeleton.persistence.consistency_fence import (
+    ConsistencyConflict,
     ConsistencyFenceError,
     SQLiteConsistencyFence,
 )
