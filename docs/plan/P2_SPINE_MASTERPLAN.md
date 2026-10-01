@@ -182,7 +182,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%
-- Bind hold refusal: 95%; active holds only, latest hold identity bound, durable refusal digest reconstructable, exact-head verification pending
+- Bind hold refusal: 100%; active holds only, latest hold identity bound, durable refusal digest reconstructable, repeated refusals append-safe, and the exact-head bind hold refusal contracts passed in State Recovery run 1920
 
 ## Next, in order
 
