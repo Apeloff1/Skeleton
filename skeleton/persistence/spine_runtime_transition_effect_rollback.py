@@ -291,17 +291,20 @@ class SpineRuntimeTransitionEffectRollbackLedger:
             }
         except Exception as exc:
             try:
-                if (
-                    moved is None
-                    and restored_by_call
-                    and slot.runtime is original_runtime
-                ):
+                if moved is None and restored_by_call and slot.runtime is original_runtime:
                     slot.replace(
                         expected=original_runtime,
                         replacement=candidate_runtime,
                     )
                     if stopped_by_call and not candidate_runtime.dispatcher_running:
                         candidate_runtime.start_dispatcher()
+                elif (
+                    moved is None
+                    and stopped_by_call
+                    and slot.runtime is candidate_runtime
+                    and not candidate_runtime.dispatcher_running
+                ):
+                    candidate_runtime.start_dispatcher()
             except Exception:
                 pass
             try:
