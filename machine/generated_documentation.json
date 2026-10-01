@@ -1,0 +1,56 @@
+{
+  "schema_version": "skeleton.p2.generated_documentation.v1",
+  "manifest_version": "0.1.0",
+  "status": "active_stacked",
+  "purpose": "Masterplan-bound deterministic documentation engine for P2 machine authority. Generated documents are derived projections only and never override machine/runtime truth.",
+  "task_ref": "P2-DOC-01",
+  "parent_lane": "P2-TRACE-01",
+  "masterplan_bindings": [
+    {
+      "volume_ref": "VOL-089",
+      "title": "Documentation Engine",
+      "accountability_id": "ACC-VOL-089",
+      "required_gap_texts": [
+        "define generated-doc boundaries",
+        "materialize doc drift gate"
+      ]
+    },
+    {
+      "volume_ref": "VOL-090",
+      "title": "Generated Documentation",
+      "accountability_id": "ACC-VOL-090",
+      "required_gap_texts": [
+        "define generated artifact manifest",
+        "add regeneration cleanliness gate"
+      ]
+    }
+  ],
+  "boundary_policy": {
+    "generated_root": "docs/generated",
+    "manual_roots": [
+      "docs/architecture",
+      "docs/plan",
+      "docs/adr",
+      "docs/operations"
+    ],
+    "rule": "Files declared generated are write-owned only by their declared generator. Human-authored documentation may reference generated output but may not become its source of truth.",
+    "derived_authority": false,
+    "clean_regeneration_required": true,
+    "deterministic_bytes_required": true,
+    "undeclared_generated_file_policy": "deny"
+  },
+  "generated_files": [
+    {
+      "id": "GEN-P2-MACHINE-AUTHORITY",
+      "output": "docs/generated/P2_MACHINE_AUTHORITY.md",
+      "generator": "scripts/generate_p2_documentation.py",
+      "renderer": "p2_machine_authority",
+      "editable": false,
+      "sources": [
+        "machine/ai_master_plan.json",
+        "machine/ai_p2_execution_map.json",
+        "machine/ai_p2_task_backlog.json"
+      ]
+    }
+  ]
+}
