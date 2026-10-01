@@ -4,6 +4,7 @@ Machine owners:
 
 - `skeleton/persistence/inbox_ledger.py`
 - `skeleton/persistence/consistency_fence.py`
+- `skeleton/persistence/spine_projection.py`
 
 AI-tree mirrors live under `skeleton/ai/runtime/persistence/` and must stay semantically identical.
 
@@ -20,6 +21,12 @@ The runtime spine already commits operation state and an outbox row in one trans
 - Later writes must present the current epoch.
 - A foreign tenant cannot observe another tenant's fence.
 
+## Projection seam
+
+`skeleton/persistence/spine_projection.py` reads already-published outbox rows, accepts them into `SQLiteInboxLedger`, and advances `SQLiteConsistencyFence` only on a new accept. Conflicts are journaled as poison and do not move the fence. No completion checkbox is set.
+
+`SQLiteOperationStore.published_outbox` is the read used by that seam. It does not publish.
+
 ## What this slice does not do
 
 No completion checkbox. No implementation signature. No verification signature. No masterplan maturity promotion. No T1 activation. `stored_prose` stays 0.
@@ -27,5 +34,5 @@ No completion checkbox. No implementation signature. No verification signature. 
 ## Local check
 
 ```bash
-python -m pytest -q skeleton/testing/test_inbox_ledger.py skeleton/testing/test_consistency_fence.py
+python -m pytest -q skeleton/testing/test_inbox_ledger.py skeleton/testing/test_consistency_fence.py skeleton/testing/test_spine_projection.py
 ```
