@@ -223,4 +223,3 @@ def test_projection_recovers_cursor_after_fence_committed_before_completion(
             resource_id=resource,
         ).applied_count == 1
     runtime.close()
-

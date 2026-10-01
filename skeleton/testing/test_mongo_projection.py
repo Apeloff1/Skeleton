@@ -97,4 +97,3 @@ def test_mongo_projection_repairs_fence_after_receipt_before_fence(
         resource_id=f"op:{OP}",
     ).epoch == 1
     runtime.close()
-
