@@ -70,5 +70,38 @@ class AccelerationProtocolTests(unittest.TestCase):
             )
 
 
+    def test_rejects_wrong_protocol_id(self) -> None:
+        deadline = (
+            datetime.now(timezone.utc) + timedelta(minutes=1)
+        ).isoformat().replace("+00:00", "Z")
+        with self.assertRaisesRegex(
+            MODULE.AcceleratorProtocolError,
+            "unsupported accelerator protocol id",
+        ):
+            MODULE.make_request_envelope(
+                protocol_id="other.protocol",
+                version=MODULE.CURRENT_PROTOCOL_VERSION,
+                operation="vector.search",
+                payload={},
+                deadline_utc=deadline,
+            )
+
+    def test_rejects_unsupported_envelope_version(self) -> None:
+        deadline = (
+            datetime.now(timezone.utc) + timedelta(minutes=1)
+        ).isoformat().replace("+00:00", "Z")
+        with self.assertRaisesRegex(
+            MODULE.AcceleratorProtocolError,
+            "unsupported accelerator protocol version",
+        ):
+            MODULE.make_request_envelope(
+                protocol_id=MODULE.ACCELERATION_PROTOCOL_ID,
+                version=MODULE.ProtocolVersion(2, 0),
+                operation="vector.search",
+                payload={},
+                deadline_utc=deadline,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
