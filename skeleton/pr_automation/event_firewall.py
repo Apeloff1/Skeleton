@@ -221,6 +221,9 @@ class EventAdmission:
 @dataclass(frozen=True, slots=True)
 class EventFirewallPolicy:
     trusted_upstream_workflows: frozenset[str] = frozenset({"Merge Readiness"})
+    trusted_upstream_identities: frozenset[tuple[str, int]] = frozenset(
+        {("Merge Readiness", 358774735)}
+    )
     mutation_source_events: frozenset[str] = _MUTATION_SOURCE_EVENTS
     require_same_repository_for_mutation: bool = True
 
@@ -232,6 +235,31 @@ class EventFirewallPolicy:
             for item in self.trusted_upstream_workflows
         )
         object.__setattr__(self, "trusted_upstream_workflows", workflows)
+        if not self.trusted_upstream_identities:
+            raise EventFirewallError(
+                "trusted upstream workflow identity set must not be empty"
+            )
+        identities: set[tuple[str, int]] = set()
+        for raw_name, raw_id in self.trusted_upstream_identities:
+            name = _text(
+                raw_name,
+                field_name="trusted workflow identity",
+                limit=_MAX_WORKFLOW,
+            )
+            workflow_id = _positive_int(
+                raw_id,
+                field_name="trusted workflow id",
+            )
+            if name not in workflows:
+                raise EventFirewallError(
+                    "trusted workflow identity name is not in trusted workflow set"
+                )
+            identities.add((name, workflow_id))
+        object.__setattr__(
+            self,
+            "trusted_upstream_identities",
+            frozenset(identities),
+        )
         events = frozenset(
             _text(item, field_name="mutation source event", limit=64).casefold()
             for item in self.mutation_source_events
@@ -356,6 +384,15 @@ def admit_workflow_run(
         return EventAdmission(
             AdmissionLevel.DROP,
             "upstream workflow is not trusted for PR automation",
+            fingerprint,
+        )
+    if (
+        event.upstream_workflow,
+        event.workflow_id,
+    ) not in selected.trusted_upstream_identities:
+        return EventAdmission(
+            AdmissionLevel.DROP,
+            "upstream workflow identity is not trusted for PR automation",
             fingerprint,
         )
 
