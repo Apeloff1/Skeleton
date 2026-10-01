@@ -106,6 +106,24 @@ def test_bind_hold_verifier_rejects_durable_digest_tamper(
     verifier.close()
 
 
+
+def test_bind_hold_verifier_rejects_refusal_id_tamper(
+    tmp_path: Path,
+) -> None:
+    card, verifier, journal_path = _evidence(tmp_path)
+    connection = sqlite3.connect(journal_path)
+    connection.execute(
+        "UPDATE spine_bind_hold SET refusal_id = 77"
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(
+        SpineBindHoldVerifyError,
+        match="identity digest mismatch",
+    ):
+        verifier.verify(card)
+    verifier.close()
+
 def test_bind_hold_verifier_rejects_signoff_tamper(
     tmp_path: Path,
 ) -> None:

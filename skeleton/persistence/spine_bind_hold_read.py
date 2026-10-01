@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.persistence.spine_bind_hold_journal import (
+    _bind_hold_identity_digest,
     _bind_hold_refusal_digest,
 )
 
@@ -42,7 +43,7 @@ class SpineBindHoldRead:
             row = self._connection.execute(
                 """
                 SELECT refusal_id, hold_id, hold_reason, bind_digest, digest,
-                       held, applied, epoch
+                       identity_digest, held, applied, epoch
                 FROM spine_bind_hold
                 WHERE tenant_id = ? AND outbox_id = ?
                 ORDER BY refusal_id DESC
@@ -67,6 +68,7 @@ class SpineBindHoldRead:
                 "hold_reason": None,
                 "bind_digest": None,
                 "digest": None,
+                "identity_digest": None,
                 "epoch": None,
                 "applied": 0,
                 "sealed": False,
@@ -81,6 +83,7 @@ class SpineBindHoldRead:
         hold_reason = str(row["hold_reason"])
         bind_digest = str(row["bind_digest"])
         digest = str(row["digest"])
+        identity_digest = str(row["identity_digest"])
         held = int(row["held"])
         applied = int(row["applied"])
         epoch = int(row["epoch"])
@@ -96,6 +99,10 @@ class SpineBindHoldRead:
             raise SpineBindHoldReadError("refusal row bind digest is invalid")
         if _DIGEST_RE.fullmatch(digest) is None:
             raise SpineBindHoldReadError("refusal row digest is invalid")
+        if _DIGEST_RE.fullmatch(identity_digest) is None:
+            raise SpineBindHoldReadError(
+                "refusal row identity digest is invalid"
+            )
         if held != 1 or applied != 0 or epoch < 0:
             raise SpineBindHoldReadError("refusal row is not dark")
 
@@ -111,6 +118,14 @@ class SpineBindHoldRead:
             raise SpineBindHoldReadError(
                 "refusal row digest does not match durable evidence"
             )
+        expected_identity = _bind_hold_identity_digest(
+            refusal_id=refusal_id,
+            refusal_digest=digest,
+        )
+        if identity_digest != expected_identity:
+            raise SpineBindHoldReadError(
+                "refusal row identity digest does not match durable evidence"
+            )
 
         return {
             "kind": "spine_bind_hold_read",
@@ -125,6 +140,7 @@ class SpineBindHoldRead:
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,
             "digest": digest,
+            "identity_digest": identity_digest,
             "epoch": epoch,
             "applied": 0,
             "sealed": False,

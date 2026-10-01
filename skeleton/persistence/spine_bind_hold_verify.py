@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.persistence.spine_bind_hold_journal import (
+    _bind_hold_identity_digest,
     _bind_hold_refusal_digest,
 )
 
@@ -98,7 +99,7 @@ class SpineBindHoldVerify:
             row = self._connection.execute(
                 """
                 SELECT refusal_id, hold_id, hold_reason, bind_digest, digest,
-                       held, applied, epoch
+                       identity_digest, held, applied, epoch
                 FROM spine_bind_hold
                 WHERE tenant_id = ?
                   AND outbox_id = ?
@@ -161,6 +162,15 @@ class SpineBindHoldVerify:
             raise SpineBindHoldVerifyError(
                 "bind hold durable refusal digest mismatch"
             )
+        identity_digest = str(row["identity_digest"])
+        expected_identity = _bind_hold_identity_digest(
+            refusal_id=refusal_id,
+            refusal_digest=refusal_digest,
+        )
+        if identity_digest != expected_identity:
+            raise SpineBindHoldVerifyError(
+                "bind hold durable refusal identity digest mismatch"
+            )
 
         return {
             "kind": "spine_bind_hold_verify",
@@ -176,6 +186,7 @@ class SpineBindHoldVerify:
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,
             "refusal_digest": refusal_digest,
+            "identity_digest": identity_digest,
             "epoch": epoch_before,
             "verified": True,
             "held": True,

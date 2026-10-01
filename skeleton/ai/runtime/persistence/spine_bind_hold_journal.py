@@ -54,6 +54,35 @@ def _bind_hold_refusal_digest(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _bind_hold_identity_digest(
+    *,
+    refusal_id: int,
+    refusal_digest: str,
+) -> str:
+    if (
+        isinstance(refusal_id, bool)
+        or not isinstance(refusal_id, int)
+        or refusal_id < 1
+    ):
+        raise SpineBindHoldJournalError("refusal_id is invalid")
+    if (
+        not isinstance(refusal_digest, str)
+        or _DIGEST_RE.fullmatch(refusal_digest) is None
+    ):
+        raise SpineBindHoldJournalError("refusal digest is invalid")
+    encoded = json.dumps(
+        {
+            "refusal_id": refusal_id,
+            "refusal_digest": refusal_digest,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 class SpineBindHoldJournal:
     """Seal a refusal into reconstructable durable evidence. Do not rewrite it."""
 
@@ -113,28 +142,79 @@ class SpineBindHoldJournal:
                 "PRAGMA table_info(spine_bind_hold)"
             )
         }
-        if "refusal_id" in columns:
-            return
+        if "refusal_id" not in columns:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._connection.execute(
+                    "ALTER TABLE spine_bind_hold RENAME TO spine_bind_hold_legacy"
+                )
+                self._create_current_table()
+                self._connection.execute(
+                    """
+                    INSERT INTO spine_bind_hold(
+                        tenant_id, outbox_id, hold_id, hold_reason,
+                        bind_digest, digest, held, applied, epoch
+                    )
+                    SELECT tenant_id, outbox_id, hold_id, hold_reason,
+                           bind_digest, digest, held, applied, epoch
+                    FROM spine_bind_hold_legacy
+                    ORDER BY rowid
+                    """
+                )
+                self._connection.execute("DROP TABLE spine_bind_hold_legacy")
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
 
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(spine_bind_hold)"
+            )
+        }
+        if "identity_digest" not in columns:
+            self._connection.execute(
+                """
+                ALTER TABLE spine_bind_hold
+                ADD COLUMN identity_digest TEXT NOT NULL DEFAULT ''
+                """
+            )
+            self._connection.commit()
+        self._backfill_identity_digests()
+
+    def _backfill_identity_digests(self) -> None:
+        rows = self._connection.execute(
+            """
+            SELECT refusal_id, digest, identity_digest
+            FROM spine_bind_hold
+            ORDER BY refusal_id
+            """
+        ).fetchall()
         self._connection.execute("BEGIN IMMEDIATE")
         try:
-            self._connection.execute(
-                "ALTER TABLE spine_bind_hold RENAME TO spine_bind_hold_legacy"
-            )
-            self._create_current_table()
-            self._connection.execute(
-                """
-                INSERT INTO spine_bind_hold(
-                    tenant_id, outbox_id, hold_id, hold_reason,
-                    bind_digest, digest, held, applied, epoch
+            for row in rows:
+                refusal_id = int(row["refusal_id"])
+                refusal_digest = str(row["digest"])
+                identity_digest = str(row["identity_digest"])
+                if (
+                    refusal_id < 1
+                    or _DIGEST_RE.fullmatch(refusal_digest) is None
+                    or identity_digest
+                ):
+                    continue
+                sealed = _bind_hold_identity_digest(
+                    refusal_id=refusal_id,
+                    refusal_digest=refusal_digest,
                 )
-                SELECT tenant_id, outbox_id, hold_id, hold_reason,
-                       bind_digest, digest, held, applied, epoch
-                FROM spine_bind_hold_legacy
-                ORDER BY rowid
-                """
-            )
-            self._connection.execute("DROP TABLE spine_bind_hold_legacy")
+                self._connection.execute(
+                    """
+                    UPDATE spine_bind_hold
+                    SET identity_digest = ?
+                    WHERE refusal_id = ? AND identity_digest = ''
+                    """,
+                    (sealed, refusal_id),
+                )
             self._connection.execute("COMMIT")
         except Exception:
             self._connection.execute("ROLLBACK")
@@ -151,6 +231,7 @@ class SpineBindHoldJournal:
                 hold_reason TEXT NOT NULL DEFAULT '',
                 bind_digest TEXT NOT NULL DEFAULT '',
                 digest TEXT NOT NULL,
+                identity_digest TEXT NOT NULL DEFAULT '',
                 held INTEGER NOT NULL,
                 applied INTEGER NOT NULL,
                 epoch INTEGER NOT NULL,
@@ -236,7 +317,8 @@ class SpineBindHoldJournal:
         try:
             existing = self._connection.execute(
                 """
-                SELECT refusal_id, hold_reason, digest, held, applied
+                SELECT refusal_id, hold_reason, digest, identity_digest,
+                       held, applied
                 FROM spine_bind_hold
                 WHERE tenant_id = ?
                   AND outbox_id = ?
@@ -253,15 +335,22 @@ class SpineBindHoldJournal:
                 ),
             ).fetchone()
             if existing is not None:
+                refusal_id = int(existing["refusal_id"])
+                identity_digest = _bind_hold_identity_digest(
+                    refusal_id=refusal_id,
+                    refusal_digest=digest,
+                )
                 durable = {
                     "hold_reason": str(existing["hold_reason"]),
                     "digest": str(existing["digest"]),
+                    "identity_digest": str(existing["identity_digest"]),
                     "held": int(existing["held"]),
                     "applied": int(existing["applied"]),
                 }
                 expected = {
                     "hold_reason": hold_reason,
                     "digest": digest,
+                    "identity_digest": identity_digest,
                     "held": 1,
                     "applied": 0,
                 }
@@ -269,7 +358,6 @@ class SpineBindHoldJournal:
                     raise SpineBindHoldJournalError(
                         "bind hold journal rewrite"
                     )
-                refusal_id = int(existing["refusal_id"])
             else:
                 cursor = self._connection.execute(
                     """
@@ -289,6 +377,18 @@ class SpineBindHoldJournal:
                     ),
                 )
                 refusal_id = int(cursor.lastrowid)
+                identity_digest = _bind_hold_identity_digest(
+                    refusal_id=refusal_id,
+                    refusal_digest=digest,
+                )
+                self._connection.execute(
+                    """
+                    UPDATE spine_bind_hold
+                    SET identity_digest = ?
+                    WHERE refusal_id = ?
+                    """,
+                    (identity_digest, refusal_id),
+                )
             self._connection.execute("COMMIT")
         except Exception:
             self._connection.execute("ROLLBACK")
@@ -306,6 +406,7 @@ class SpineBindHoldJournal:
             "hold_reason": hold_reason,
             "bind_digest": bind_digest,
             "digest": digest,
+            "identity_digest": identity_digest,
             "rewritten": False,
             "applied": 0,
             "sealed": False,

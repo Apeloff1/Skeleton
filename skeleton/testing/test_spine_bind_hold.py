@@ -200,6 +200,8 @@ def test_journal_refuses_rewrite_and_read_reconstructs_digest(
     again = journal.append(card)
     assert sealed["rewritten"] is False
     assert again["digest"] == sealed["digest"]
+    assert again["identity_digest"] == sealed["identity_digest"]
+    assert len(sealed["identity_digest"]) == 64
     assert again["refusal_id"] == sealed["refusal_id"]
     assert again["hold_id"] == card["hold_id"]
     assert again["bind_digest"] == card["bind_digest"]
@@ -210,6 +212,7 @@ def test_journal_refuses_rewrite_and_read_reconstructs_digest(
     seen = reader.card("house-a", "ob-1")
     assert seen["seen"] is True
     assert seen["digest"] == sealed["digest"]
+    assert seen["identity_digest"] == sealed["identity_digest"]
     assert seen["refusal_id"] == sealed["refusal_id"]
     assert seen["hold_id"] == card["hold_id"]
     assert seen["hold_reason"] == "poison"
@@ -323,6 +326,45 @@ def test_read_rejects_durable_reason_tamper(tmp_path: Path) -> None:
     ):
         SpineBindHoldRead(journal_path).card("house-a", "ob-1")
 
+
+
+def test_read_and_chain_reject_refusal_id_tamper(tmp_path: Path) -> None:
+    card, _hold_path = _refusal(tmp_path)
+    journal_path = tmp_path / "refusal.sqlite"
+    journal = SpineBindHoldJournal(journal_path)
+    sealed = journal.append(card)
+    journal.close()
+
+    chain = SpineBindHoldChain(journal_path)
+    expected_chain = chain.seal("house-a")["digest"]
+    chain.close()
+
+    connection = sqlite3.connect(journal_path)
+    connection.execute(
+        """
+        UPDATE spine_bind_hold
+        SET refusal_id = ?
+        WHERE refusal_id = ?
+        """,
+        (99, sealed["refusal_id"]),
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(
+        SpineBindHoldReadError,
+        match="identity digest",
+    ):
+        SpineBindHoldRead(journal_path).card("house-a", "ob-1")
+
+    with pytest.raises(
+        SpineBindHoldChainError,
+        match="identity digest",
+    ):
+        SpineBindHoldChain(journal_path).verify(
+            "house-a",
+            expected_chain,
+        )
 
 def test_legacy_unbound_refusal_row_fails_closed(tmp_path: Path) -> None:
     journal_path = tmp_path / "refusal.sqlite"

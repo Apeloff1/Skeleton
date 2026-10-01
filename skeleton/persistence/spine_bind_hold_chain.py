@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.persistence.spine_bind_hold_journal import (
+    _bind_hold_identity_digest,
     _bind_hold_refusal_digest,
 )
 
@@ -37,7 +38,8 @@ class SpineBindHoldChain:
             rows = self._connection.execute(
                 """
                 SELECT refusal_id, tenant_id, outbox_id, hold_id, hold_reason,
-                       bind_digest, digest, held, applied, epoch
+                       bind_digest, digest, identity_digest,
+                       held, applied, epoch
                 FROM spine_bind_hold
                 WHERE tenant_id = ?
                 ORDER BY refusal_id
@@ -54,6 +56,7 @@ class SpineBindHoldChain:
             hold_reason = str(row["hold_reason"])
             bind_digest = str(row["bind_digest"])
             refusal_digest = str(row["digest"])
+            identity_digest = str(row["identity_digest"])
             held = int(row["held"])
             applied = int(row["applied"])
             epoch = int(row["epoch"])
@@ -63,6 +66,7 @@ class SpineBindHoldChain:
                 or not hold_reason.strip()
                 or _DIGEST_RE.fullmatch(bind_digest) is None
                 or _DIGEST_RE.fullmatch(refusal_digest) is None
+                or _DIGEST_RE.fullmatch(identity_digest) is None
                 or held != 1
                 or applied != 0
                 or epoch < 0
@@ -80,14 +84,24 @@ class SpineBindHoldChain:
                 raise SpineBindHoldChainError(
                     "refusal row digest does not match durable evidence"
                 )
+            expected_identity = _bind_hold_identity_digest(
+                refusal_id=refusal_id,
+                refusal_digest=refusal_digest,
+            )
+            if identity_digest != expected_identity:
+                raise SpineBindHoldChainError(
+                    "refusal row identity digest does not match durable evidence"
+                )
             payload = "|".join(
                 (
+                    str(refusal_id),
                     str(row["tenant_id"]),
                     str(row["outbox_id"]),
                     str(hold_id),
                     hold_reason,
                     bind_digest,
                     refusal_digest,
+                    identity_digest,
                     str(held),
                     str(applied),
                     str(epoch),
