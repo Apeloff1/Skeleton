@@ -63,6 +63,8 @@ FILES = (
     "spine_runtime_transition_health_verify.py",
     "spine_runtime_transition_acceptance.py",
     "spine_runtime_transition_acceptance_verify.py",
+    "spine_runtime_production_activation_authorization.py",
+    "spine_runtime_production_activation_authorization_verify.py",
 )
 
 
