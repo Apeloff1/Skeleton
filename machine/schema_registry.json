@@ -1,597 +1,838 @@
 {
-  "schema_version": "skeleton.trace.schema_registry.v1",
+  "schema_version": "skeleton.schema_registry.v1",
   "registry_version": "0.1.0",
   "status": "active",
-  "purpose": "Inventory every canonical durable/wire record under stable schema identity with owner, version, producer/consumer compatibility and migration requirements.",
-  "masterplan_binding": {
-    "volume_ref": "VOL-129",
-    "title": "Schema Registry",
-    "required_gap_texts": [
-      "inventory serialized contracts",
-      "materialize compatibility checker"
-    ]
-  },
-  "sources": {
-    "runtime_schemas": "machine/ai_runtime_schemas.json",
-    "contract_conformance": "machine/contract_conformance.json",
-    "compatibility_guard": "skeleton/data/schema_evolution.py"
-  },
-  "policy": {
-    "stable_identity": true,
-    "breaking_change_requires_migration": true,
-    "unknown_field_security_review": true,
-    "compatibility_check_required_before_promotion": true
-  },
+  "purpose": "Stable identity, ownership and compatibility classification for every canonical runtime record.",
+  "source": "machine/ai_runtime_schemas.json",
+  "source_git_blob_sha": "79379d0b02c5a7f53d7e31b5c01cd608e69609ba",
   "schemas": [
     {
-      "schema_id": "SCHEMA-OperationEnvelope",
-      "record_name": "OperationEnvelope",
+      "id": "SCHEMA-OperationEnvelope",
+      "name": "OperationEnvelope",
       "version": 1,
       "owner_plane": "orchestration",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "orchestration",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "reasoning-verification"
+      "field_names": [
+        "actor_id",
+        "capability",
+        "created_at",
+        "deadline",
+        "idempotency_key",
+        "operation_id",
+        "state",
+        "tenant_id",
+        "trace_id",
+        "version"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 4,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ResourceBudget",
-      "record_name": "ResourceBudget",
+      "id": "SCHEMA-ResourceBudget",
+      "name": "ResourceBudget",
       "version": 1,
       "owner_plane": "cost-capacity",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "cost-capacity",
-      "consumer_planes": [
-        "orchestration",
-        "model-routing",
-        "tool-runtime",
-        "prompt-context"
+      "field_names": [
+        "max_artifact_bytes",
+        "max_input_tokens",
+        "max_model_turns",
+        "max_output_tokens",
+        "max_parallel_tools",
+        "max_provider_cost",
+        "max_repairs",
+        "max_retries",
+        "max_storage_bytes",
+        "max_tool_calls",
+        "max_tool_cost",
+        "max_total_tokens",
+        "max_wall_seconds"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ConversationThread",
-      "record_name": "ConversationThread",
+      "id": "SCHEMA-ConversationThread",
+      "name": "ConversationThread",
       "version": 1,
       "owner_plane": "application-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "application-api",
-      "consumer_planes": [
-        "deployment-release",
-        "operator-control",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "active_branch_id",
+        "created_at",
+        "owner_id",
+        "retention_class",
+        "status",
+        "tenant_id",
+        "thread_id",
+        "title",
+        "updated_at",
+        "version"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ConversationMessage",
-      "record_name": "ConversationMessage",
+      "id": "SCHEMA-ConversationMessage",
+      "name": "ConversationMessage",
       "version": 1,
       "owner_plane": "application-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "application-api",
-      "consumer_planes": [
-        "deployment-release",
-        "operator-control",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "artifact_refs",
+        "author_id",
+        "author_type",
+        "branch_id",
+        "citation_refs",
+        "content_digest",
+        "content_ref",
+        "created_at",
+        "data_class",
+        "execution_result_id",
+        "message_id",
+        "operation_id",
+        "role",
+        "sequence",
+        "supersedes_message_id",
+        "tenant_id",
+        "thread_id",
+        "tool_receipt_refs"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 4,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ContextSegment",
-      "record_name": "ContextSegment",
+      "id": "SCHEMA-ContextSegment",
+      "name": "ContextSegment",
       "version": 1,
       "owner_plane": "prompt-context",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "prompt-context",
-      "consumer_planes": [
-        "orchestration"
+      "field_names": [
+        "content_digest",
+        "content_ref",
+        "created_at",
+        "data_class",
+        "kind",
+        "priority",
+        "provenance",
+        "purpose",
+        "relevance",
+        "retention_class",
+        "segment_id",
+        "source_id",
+        "source_type",
+        "tenant_id",
+        "token_estimate",
+        "trust_level"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ContextEnvelope",
-      "record_name": "ContextEnvelope",
+      "id": "SCHEMA-ContextEnvelope",
+      "name": "ContextEnvelope",
       "version": 1,
       "owner_plane": "prompt-context",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "prompt-context",
-      "consumer_planes": [
-        "orchestration"
+      "field_names": [
+        "budget",
+        "compiled_at",
+        "compiler_version",
+        "context_digest",
+        "context_id",
+        "evidence_segments",
+        "execution_id",
+        "instruction_segments",
+        "omitted_segment_ids",
+        "operation_id",
+        "selected_tokens_estimate",
+        "source_snapshot",
+        "tenant_id",
+        "tool_schema_segments",
+        "turn_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-AIExecutionRequest",
-      "record_name": "AIExecutionRequest",
+      "id": "SCHEMA-AIExecutionRequest",
+      "name": "AIExecutionRequest",
       "version": 1,
       "owner_plane": "orchestration",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "orchestration",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "reasoning-verification"
+      "field_names": [
+        "checkpoint_ref",
+        "context_policy",
+        "created_at",
+        "execution_id",
+        "objective",
+        "operation_id",
+        "resource_budget",
+        "stop_policy",
+        "tool_policy"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-AgentTurn",
-      "record_name": "AgentTurn",
+      "id": "SCHEMA-AgentTurn",
+      "name": "AgentTurn",
       "version": 1,
       "owner_plane": "orchestration",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "orchestration",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "reasoning-verification"
+      "field_names": [
+        "checkpoint_ref",
+        "context_digest",
+        "execution_id",
+        "operation_id",
+        "parent_turn_id",
+        "phase",
+        "provider_request_id",
+        "provider_response_id",
+        "route_decision_id",
+        "status",
+        "tool_receipt_ids",
+        "turn_id",
+        "turn_index",
+        "usage_delta",
+        "verification_receipt_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderToolDefinition",
-      "record_name": "ProviderToolDefinition",
+      "id": "SCHEMA-ProviderToolDefinition",
+      "name": "ProviderToolDefinition",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "description",
+        "input_schema",
+        "tool_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderToolCall",
-      "record_name": "ProviderToolCall",
+      "id": "SCHEMA-ProviderToolCall",
+      "name": "ProviderToolCall",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "arguments",
+        "arguments_digest",
+        "call_id",
+        "tool_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderUsage",
-      "record_name": "ProviderUsage",
+      "id": "SCHEMA-ProviderUsage",
+      "name": "ProviderUsage",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "billed_cost",
+        "cached_input_tokens",
+        "currency",
+        "estimated_cost",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "usage_source"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderResponse",
-      "record_name": "ProviderResponse",
+      "id": "SCHEMA-ProviderResponse",
+      "name": "ProviderResponse",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "admission_decision_id",
+        "context_compiler_version",
+        "context_digest",
+        "context_id",
+        "context_source_snapshot",
+        "data_class",
+        "finish_reason",
+        "governance_decision_id",
+        "latency_ms",
+        "model",
+        "provider",
+        "request_id",
+        "response_id",
+        "structured_output",
+        "text",
+        "tool_calls",
+        "usage"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ToolExecutionRequest",
-      "record_name": "ToolExecutionRequest",
+      "id": "SCHEMA-ToolExecutionRequest",
+      "name": "ToolExecutionRequest",
       "version": 1,
       "owner_plane": "tool-runtime",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "tool-runtime",
-      "consumer_planes": [
-        "orchestration",
-        "security-safety"
+      "field_names": [
+        "arguments",
+        "arguments_digest",
+        "authority_context",
+        "call_id",
+        "deadline",
+        "execution_id",
+        "operation_id",
+        "principal",
+        "resource_budget",
+        "tenant_id",
+        "tool_id",
+        "trace_id",
+        "turn_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ToolExecutionReceipt",
-      "record_name": "ToolExecutionReceipt",
+      "id": "SCHEMA-ToolExecutionReceipt",
+      "name": "ToolExecutionReceipt",
       "version": 1,
       "owner_plane": "tool-runtime",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "tool-runtime",
-      "consumer_planes": [
-        "orchestration",
-        "security-safety"
+      "field_names": [
+        "approval_id",
+        "arguments_digest",
+        "authority_decision",
+        "call_id",
+        "compensation_ref",
+        "completed_at",
+        "error_code",
+        "execution_id",
+        "idempotency_key",
+        "manifest_version",
+        "operation_id",
+        "postcondition_ref",
+        "receipt_id",
+        "result_ref",
+        "started_at",
+        "status",
+        "tool_id",
+        "turn_id",
+        "usage"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-MemoryRecord",
-      "record_name": "MemoryRecord",
+      "id": "SCHEMA-MemoryRecord",
+      "name": "MemoryRecord",
       "version": 1,
       "owner_plane": "memory",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "memory",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "orchestration",
-        "retrieval"
+      "field_names": [
+        "authority_class",
+        "confidence_band",
+        "content_digest",
+        "content_ref",
+        "created_at",
+        "data_class",
+        "dedupe_key",
+        "expires_at",
+        "kind",
+        "memory_id",
+        "namespace",
+        "provenance",
+        "purpose",
+        "retention_class",
+        "status",
+        "tenant_id",
+        "updated_at",
+        "user_id",
+        "version"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-VerificationReceipt",
-      "record_name": "VerificationReceipt",
+      "id": "SCHEMA-VerificationReceipt",
+      "name": "VerificationReceipt",
       "version": 1,
       "owner_plane": "reasoning-verification",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "reasoning-verification",
-      "consumer_planes": [
-        "evaluation"
+      "field_names": [
+        "candidate_ref",
+        "claim_checks",
+        "completed_at",
+        "confidence_band",
+        "created_at",
+        "evidence_refs",
+        "execution_id",
+        "level",
+        "operation_id",
+        "outcome",
+        "postcondition_checks",
+        "reason_codes",
+        "repair_directive",
+        "turn_id",
+        "verification_id",
+        "verifier_route_refs"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-AIExecutionResult",
-      "record_name": "AIExecutionResult",
+      "id": "SCHEMA-AIExecutionResult",
+      "name": "AIExecutionResult",
       "version": 1,
       "owner_plane": "orchestration",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "orchestration",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "reasoning-verification"
+      "field_names": [
+        "artifact_refs",
+        "completed_at",
+        "execution_id",
+        "final_output",
+        "memory_refs",
+        "operation_id",
+        "provider_receipts",
+        "route_receipts",
+        "status",
+        "stream_terminal_event",
+        "tool_receipts",
+        "usage",
+        "verification"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-DelegatedAuthority",
-      "record_name": "DelegatedAuthority",
+      "id": "SCHEMA-DelegatedAuthority",
+      "name": "DelegatedAuthority",
       "version": 1,
       "owner_plane": "engine-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "engine-api",
-      "consumer_planes": [
-        "deployment-release",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "actor_id",
+        "authority_digest",
+        "capability",
+        "expires_at",
+        "issued_at",
+        "request_binding",
+        "scopes",
+        "service_principal",
+        "tenant_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-EngineExecutionCommand",
-      "record_name": "EngineExecutionCommand",
+      "id": "SCHEMA-EngineExecutionCommand",
+      "name": "EngineExecutionCommand",
       "version": 1,
       "owner_plane": "engine-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "engine-api",
-      "consumer_planes": [
-        "deployment-release",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "context_seed_refs",
+        "delegated_authority",
+        "execution_request",
+        "operation",
+        "resource_budget",
+        "stream_preferences"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-StreamEvent",
-      "record_name": "StreamEvent",
+      "id": "SCHEMA-StreamEvent",
+      "name": "StreamEvent",
       "version": 1,
       "owner_plane": "streaming-realtime",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "streaming-realtime",
-      "consumer_planes": [
-        "application-api",
-        "product-experience"
+      "field_names": [
+        "event_id",
+        "operation_id",
+        "payload",
+        "sequence",
+        "timestamp",
+        "type"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-AIError",
-      "record_name": "AIError",
+      "id": "SCHEMA-AIError",
+      "name": "AIError",
       "version": 1,
       "owner_plane": "application-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "application-api",
-      "consumer_planes": [
-        "deployment-release",
-        "operator-control",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "category",
+        "caused_by",
+        "detail_ref",
+        "error_code",
+        "http_status",
+        "operation_id",
+        "retry_after",
+        "retryable",
+        "trace_id",
+        "user_safe_message"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderRequest",
-      "record_name": "ProviderRequest",
+      "id": "SCHEMA-ProviderRequest",
+      "name": "ProviderRequest",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "context_compiler_version",
+        "context_digest",
+        "context_id",
+        "context_source_snapshot",
+        "data_class",
+        "deadline",
+        "execution_id",
+        "history",
+        "instructions",
+        "max_output_tokens",
+        "model",
+        "operation_id",
+        "prompt",
+        "purpose",
+        "resource_budget",
+        "specific_tool_id",
+        "structured_output",
+        "tenant_id",
+        "tool_choice",
+        "tools",
+        "turn_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 5,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-RouteDecision",
-      "record_name": "RouteDecision",
+      "id": "SCHEMA-RouteDecision",
+      "name": "RouteDecision",
       "version": 1,
       "owner_plane": "model-routing",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-routing",
-      "consumer_planes": [
-        "cost-capacity",
-        "orchestration",
-        "reasoning-verification",
-        "resilience"
+      "field_names": [
+        "budgets",
+        "candidates",
+        "decision_id",
+        "execution_id",
+        "operation_id",
+        "reason_codes",
+        "rejected",
+        "routed_at",
+        "selected_endpoint",
+        "turn_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-EvidenceReference",
-      "record_name": "EvidenceReference",
+      "id": "SCHEMA-EvidenceReference",
+      "name": "EvidenceReference",
       "version": 1,
       "owner_plane": "retrieval",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "retrieval",
-      "consumer_planes": [
-        "application-api",
-        "engine-api",
-        "prompt-context"
+      "field_names": [
+        "authority_class",
+        "citation_metadata",
+        "content_digest",
+        "data_class",
+        "evidence_id",
+        "observed_at",
+        "provenance",
+        "source_id",
+        "source_type",
+        "source_version",
+        "tenant_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ToolCallProposal",
-      "record_name": "ToolCallProposal",
+      "id": "SCHEMA-ToolCallProposal",
+      "name": "ToolCallProposal",
       "version": 1,
       "owner_plane": "tool-runtime",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "tool-runtime",
-      "consumer_planes": [
-        "orchestration",
-        "security-safety"
+      "field_names": [
+        "approval_required",
+        "arguments",
+        "arguments_digest",
+        "authority_required",
+        "call_id",
+        "execution_id",
+        "operation_id",
+        "tool_id",
+        "turn_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ArtifactRecord",
-      "record_name": "ArtifactRecord",
+      "id": "SCHEMA-ArtifactRecord",
+      "name": "ArtifactRecord",
       "version": 1,
       "owner_plane": "artifact-files",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "artifact-files",
-      "consumer_planes": [
-        "application-api"
+      "field_names": [
+        "artifact_id",
+        "content_digest",
+        "created_at",
+        "data_class",
+        "kind",
+        "lifecycle_status",
+        "media_type",
+        "owner_id",
+        "provenance",
+        "purpose",
+        "scan_status",
+        "size_bytes",
+        "source_operation_id",
+        "storage_ref",
+        "tenant_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ReleaseEvidence",
-      "record_name": "ReleaseEvidence",
+      "id": "SCHEMA-ReleaseEvidence",
+      "name": "ReleaseEvidence",
       "version": 1,
       "owner_plane": "deployment-release",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "deployment-release",
-      "consumer_planes": [
-        "operator-control"
+      "field_names": [
+        "architecture_tag",
+        "construction_version",
+        "created_at",
+        "evaluations",
+        "golden_journeys",
+        "migrations",
+        "provenance",
+        "rollback_ref",
+        "schema_catalog_version",
+        "security",
+        "source_sha",
+        "tests"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-AdmissionDecision",
-      "record_name": "AdmissionDecision",
+      "id": "SCHEMA-AdmissionDecision",
+      "name": "AdmissionDecision",
       "version": 1,
       "owner_plane": "cost-capacity",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "cost-capacity",
-      "consumer_planes": [
-        "orchestration",
-        "model-routing"
+      "field_names": [
+        "capability",
+        "decided_at",
+        "decision_id",
+        "estimate",
+        "expires_at",
+        "operation_id",
+        "reason_code",
+        "remaining",
+        "reservation",
+        "status",
+        "tenant_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderTransferDecision",
-      "record_name": "ProviderTransferDecision",
+      "id": "SCHEMA-ProviderTransferDecision",
+      "name": "ProviderTransferDecision",
       "version": 1,
       "owner_plane": "governance",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "governance",
-      "consumer_planes": [
-        "artifact-files",
-        "feedback-learning",
-        "memory",
-        "retrieval"
+      "field_names": [
+        "data_class",
+        "decided_at",
+        "decision_id",
+        "operation_id",
+        "permitted",
+        "policy_version",
+        "provider_id",
+        "purpose",
+        "reason_code",
+        "routing_privacy",
+        "tenant_bound"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-VerificationRequest",
-      "record_name": "VerificationRequest",
+      "id": "SCHEMA-VerificationRequest",
+      "name": "VerificationRequest",
       "version": 1,
       "owner_plane": "reasoning-verification",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "reasoning-verification",
-      "consumer_planes": [
-        "evaluation"
+      "field_names": [
+        "artifact_refs",
+        "budget",
+        "candidate_ref",
+        "capability",
+        "context_snapshot_id",
+        "deadline",
+        "evidence_refs",
+        "execution_id",
+        "operation_id",
+        "required_level",
+        "risk_class",
+        "tool_receipt_refs",
+        "turn_id",
+        "verification_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-EngineExecutionAck",
-      "record_name": "EngineExecutionAck",
+      "id": "SCHEMA-EngineExecutionAck",
+      "name": "EngineExecutionAck",
       "version": 1,
       "owner_plane": "engine-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "engine-api",
-      "consumer_planes": [
-        "deployment-release",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "accepted_at",
+        "events_ref",
+        "execution_id",
+        "idempotency_digest",
+        "operation_id",
+        "state",
+        "status_ref",
+        "trace_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-EngineExecutionStatus",
-      "record_name": "EngineExecutionStatus",
+      "id": "SCHEMA-EngineExecutionStatus",
+      "name": "EngineExecutionStatus",
       "version": 1,
       "owner_plane": "engine-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "engine-api",
-      "consumer_planes": [
-        "deployment-release",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "execution_id",
+        "execution_state",
+        "failure_code",
+        "latest_checkpoint_version",
+        "operation_id",
+        "operation_state",
+        "result_ref",
+        "updated_at"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-EngineCancelCommand",
-      "record_name": "EngineCancelCommand",
+      "id": "SCHEMA-EngineCancelCommand",
+      "name": "EngineCancelCommand",
       "version": 1,
       "owner_plane": "engine-api",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "engine-api",
-      "consumer_planes": [
-        "deployment-release",
-        "product-experience",
-        "streaming-realtime"
+      "field_names": [
+        "actor_id",
+        "idempotency_key",
+        "operation_id",
+        "reason",
+        "requested_at",
+        "tenant_id"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-CapabilityManifest",
-      "record_name": "CapabilityManifest",
+      "id": "SCHEMA-CapabilityManifest",
+      "name": "CapabilityManifest",
       "version": 1,
       "owner_plane": "foundation",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "foundation",
-      "consumer_planes": [
-        "configuration-secrets",
-        "data-persistence",
-        "identity",
-        "memory",
-        "model-provider",
-        "observability",
-        "orchestration",
-        "prompt-context",
-        "tool-runtime"
+      "field_names": [
+        "budget_profile",
+        "capability_id",
+        "data_class_ceiling",
+        "degraded_behavior",
+        "enabled",
+        "golden_journeys",
+        "input_modalities",
+        "instruction_policy_ref",
+        "memory_policy",
+        "output_modalities",
+        "owner_plane",
+        "readiness_requirements",
+        "required_planes",
+        "required_provider_capabilities",
+        "retrieval_policy",
+        "risk_class",
+        "tool_policy",
+        "verification_level",
+        "version"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 2,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-InstructionPolicyRef",
-      "record_name": "InstructionPolicyRef",
+      "id": "SCHEMA-InstructionPolicyRef",
+      "name": "InstructionPolicyRef",
       "version": 1,
       "owner_plane": "prompt-context",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "prompt-context",
-      "consumer_planes": [
-        "orchestration"
+      "field_names": [
+        "capability_id",
+        "content_digest",
+        "policy_id",
+        "scope",
+        "version"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 1,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     },
     {
-      "schema_id": "SCHEMA-ProviderDelta",
-      "record_name": "ProviderDelta",
+      "id": "SCHEMA-ProviderDelta",
+      "name": "ProviderDelta",
       "version": 1,
       "owner_plane": "model-provider",
-      "compatibility_mode": "backward",
-      "canonical_serialization": "machine/ai_runtime_schemas.json#conventions/canonical_json",
-      "producer_plane": "model-provider",
-      "consumer_planes": [
-        "application-api",
-        "model-routing",
-        "retrieval"
+      "field_names": [
+        "emitted_at",
+        "finish_reason",
+        "kind",
+        "response_id",
+        "sequence",
+        "structured_fragment",
+        "text",
+        "tool_call",
+        "usage"
       ],
-      "source": "machine/ai_runtime_schemas.json",
-      "migration_required_for_breaking_change": true
+      "invariant_count": 3,
+      "durability": "wire_or_durable_canonical",
+      "compatibility_policy": "strict-required-fields; explicitly-versioned optional response additions may be additive"
     }
-  ]
+  ],
+  "compatibility_rules": {
+    "compatible": [
+      "add explicitly optional response field where additive-compatible reader policy applies",
+      "widen documentation without changing encoded semantics"
+    ],
+    "incompatible": [
+      "remove or rename existing field",
+      "change field type or nullability",
+      "reinterpret existing enum value",
+      "change canonical identity/digest semantics",
+      "make unknown fields grant authority"
+    ]
+  }
 }

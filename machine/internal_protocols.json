@@ -1,0 +1,107 @@
+{
+  "schema_version": "skeleton.internal_protocols.v1",
+  "protocol_version": "0.1.0",
+  "status": "active",
+  "purpose": "Unify internal operation envelopes, correlation, deadlines, idempotency and tracing references.",
+  "schema_source": "machine/schema_registry.json",
+  "protocols": [
+    {
+      "id": "PROTO-ENGINE-EXECUTION",
+      "producer": "application-api",
+      "consumer": "engine-api",
+      "envelope_schemas": [
+        "OperationEnvelope",
+        "EngineExecutionCommand",
+        "EngineExecutionAck",
+        "EngineExecutionStatus",
+        "EngineCancelCommand",
+        "AIError"
+      ],
+      "correlation_fields": [
+        "operation_id",
+        "trace_id",
+        "execution_id"
+      ],
+      "deadline_fields": [
+        "deadline"
+      ],
+      "idempotency_fields": [
+        "idempotency_key"
+      ],
+      "tracing": "operation_id/trace_id preserved across submit/status/cancel"
+    },
+    {
+      "id": "PROTO-PROVIDER",
+      "producer": "orchestration",
+      "consumer": "model-provider",
+      "envelope_schemas": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderDelta",
+        "AIError"
+      ],
+      "correlation_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "request_id",
+        "response_id"
+      ],
+      "deadline_fields": [
+        "deadline"
+      ],
+      "idempotency_fields": [],
+      "tracing": "operation/execution/turn plus provider request/response identities"
+    },
+    {
+      "id": "PROTO-TOOL",
+      "producer": "orchestration",
+      "consumer": "tool-runtime",
+      "envelope_schemas": [
+        "ToolCallProposal",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "AIError"
+      ],
+      "correlation_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "trace_id"
+      ],
+      "deadline_fields": [
+        "deadline"
+      ],
+      "idempotency_fields": [
+        "idempotency_key"
+      ],
+      "tracing": "call_id plus operation/execution/turn lineage"
+    },
+    {
+      "id": "PROTO-STREAM",
+      "producer": "streaming-realtime",
+      "consumer": "application-api",
+      "envelope_schemas": [
+        "StreamEvent",
+        "AIError"
+      ],
+      "correlation_fields": [
+        "operation_id",
+        "event_id",
+        "sequence"
+      ],
+      "deadline_fields": [],
+      "idempotency_fields": [
+        "event_id"
+      ],
+      "tracing": "monotonic event sequence per operation"
+    }
+  ],
+  "policy": {
+    "envelope_rule": "Every protocol schema exists in schema_registry.",
+    "deadline_rule": "Deadline fields are explicit; absence is intentional.",
+    "unknown_outcome_rule": "Retryable/idempotent semantics require stable identity; ambiguous action outcome is not success.",
+    "trace_rule": "Every protocol declares correlation/tracing semantics."
+  }
+}
