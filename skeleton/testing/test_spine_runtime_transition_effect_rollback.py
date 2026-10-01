@@ -30,6 +30,11 @@ class _Reasoner:
         return {"answer": "ok"}
 
 
+class _FailRestoreSlot(SpineRuntimeSlot):
+    def restore(self, *, expected_candidate, original):
+        raise RuntimeError("synthetic restore failure")
+
+
 def _runtime(root: Path, name: str) -> DurableOperationRuntime:
     return DurableOperationRuntime(
         _Reasoner(),
@@ -169,6 +174,66 @@ def test_effect_rollback_restores_runtime_stops_candidate_and_compensates_fence(
                 fence=fence,
             )
     finally:
+        candidate.close()
+        original.close()
+        fence.close()
+        rollback_ledger.close()
+        execution_ledger.close()
+
+
+def test_failed_restore_restarts_only_dispatcher_stopped_by_rollback(
+    tmp_path: Path,
+) -> None:
+    original = _runtime(tmp_path, "restore-fail-original")
+    candidate = _runtime(tmp_path, "restore-fail-candidate")
+    fence = SQLiteConsistencyFence(tmp_path / "restore-fail-fence.sqlite")
+    token = fence.open(
+        tenant_id="tenant-a",
+        resource_id="runtime:deploy-a",
+        writer_id="bootstrap",
+    )
+    slot = _FailRestoreSlot(original)
+    execution_ledger = SpineRuntimeTransitionExecutionLedger(
+        tmp_path / "restore-fail-execution.sqlite"
+    )
+    execution = execution_ledger.execute(
+        rollback_witness=_witness(),
+        rollback_verify=_witness_verify(),
+        slot=slot,
+        candidate_runtime=candidate,
+        fence=fence,
+        tenant_id="tenant-a",
+        resource_id="runtime:deploy-a",
+        expected_epoch=token.epoch,
+    )
+    execution_verify = SpineRuntimeTransitionExecutionVerify().verify(execution)
+    rollback_ledger = SpineRuntimeTransitionEffectRollbackLedger(
+        tmp_path / "restore-fail-rollback.sqlite"
+    )
+    try:
+        with pytest.raises(
+            SpineRuntimeTransitionEffectRollbackError,
+            match="effect rollback failed closed",
+        ):
+            rollback_ledger.rollback(
+                execution=execution,
+                execution_verify=execution_verify,
+                slot=slot,
+                original_runtime=original,
+                candidate_runtime=candidate,
+                fence=fence,
+            )
+
+        assert slot.runtime is candidate
+        assert candidate.dispatcher_running is True
+        assert original.dispatcher_running is False
+        assert fence.read(
+            tenant_id="tenant-a",
+            resource_id="runtime:deploy-a",
+        ).epoch == execution["fence_epoch_after"]
+    finally:
+        if candidate.dispatcher_running:
+            candidate.stop_dispatcher(flush=False)
         candidate.close()
         original.close()
         fence.close()
