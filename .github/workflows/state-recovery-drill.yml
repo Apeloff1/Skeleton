@@ -52,6 +52,12 @@ on:
       - "skeleton/testing/test_spine_runtime_transition_rehearsal.py"
       - "skeleton/testing/test_spine_runtime_transition_permit.py"
       - "skeleton/testing/test_spine_runtime_transition_consumption.py"
+      - "skeleton/testing/test_spine_runtime_transition_attempt.py"
+      - "skeleton/testing/test_spine_runtime_transition_rollback.py"
+      - "skeleton/persistence/spine_runtime_transition_attempt*.py"
+      - "skeleton/ai/runtime/persistence/spine_runtime_transition_attempt*.py"
+      - "skeleton/persistence/spine_runtime_transition_rollback*.py"
+      - "skeleton/ai/runtime/persistence/spine_runtime_transition_rollback*.py"
       - "skeleton/persistence/spine_runtime_transition_consumption_verify.py"
       - "skeleton/ai/runtime/persistence/spine_runtime_transition_consumption_verify.py"
       - "skeleton/persistence/spine_runtime_transition_permit*.py"
@@ -206,6 +212,8 @@ jobs:
           skeleton/testing/test_spine_runtime_transition_rehearsal.py
           skeleton/testing/test_spine_runtime_transition_permit.py
           skeleton/testing/test_spine_runtime_transition_consumption.py
+          skeleton/testing/test_spine_runtime_transition_attempt.py
+          skeleton/testing/test_spine_runtime_transition_rollback.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 
