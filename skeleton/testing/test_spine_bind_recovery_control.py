@@ -6,6 +6,7 @@ import pytest
 
 from scripts.check_spine_bind_recovery import (
     EXPECTED_SEAMS,
+    MANIFEST_SEAM_COUNT,
     MIRRORED,
     SpineBindRecoveryControlError,
     build_report,
@@ -22,7 +23,7 @@ def _write_fixture(root: Path) -> None:
     for name in MIRRORED:
         content = f"# {name}\n"
         if name == "spine_manifest.py":
-            base = [(f"seam-{index}", f"law-{index}") for index in range(90)]
+            base = [(f"seam-{index}", f"law-{index}") for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))]
             base.extend(EXPECTED_SEAMS.items())
             content = "SEAMS = " + repr(tuple(base)) + "\n"
         (canonical / name).write_text(content, encoding="utf-8")
@@ -34,7 +35,7 @@ def _write_fixture(root: Path) -> None:
         "\n".join(
             [
                 "- Bind card sealed: 100%",
-                "Expect `count` 107",
+                f"Expect `count` {MANIFEST_SEAM_COUNT}",
                 "Bind snapshot",
                 "Bind recovery",
                 "Bind checkpoint",
@@ -58,7 +59,7 @@ def test_control_accepts_complete_dark_fixture(tmp_path: Path) -> None:
 
     assert report["valid"] is True
     assert report["mirror_count"] == len(MIRRORED)
-    assert report["manifest"]["count"] == 107
+    assert report["manifest"]["count"] == MANIFEST_SEAM_COUNT
     assert report["masterplan"]["bind_card_percent"] == 100
     assert report["masterplan"]["activation_claimed"] is False
     assert report["completion_checkbox"] is False
@@ -86,14 +87,14 @@ def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
     seams = list(build_report(tmp_path)["manifest"]["recovery_seams"])
     assert seams
 
-    full_manifest = [(f"seam-{index}", f"law-{index}") for index in range(90)]
+    full_manifest = [(f"seam-{index}", f"law-{index}") for index in range(MANIFEST_SEAM_COUNT - len(EXPECTED_SEAMS))]
     full_manifest.extend(EXPECTED_SEAMS.items())
     missing_name = seams[-1]
     mutated = [
         ("replacement", "not-the-required-seam") if name == missing_name else (name, law)
         for name, law in full_manifest
     ]
-    assert len(mutated) == 107
+    assert len(mutated) == MANIFEST_SEAM_COUNT
     path.write_text("SEAMS = " + repr(tuple(mutated)) + "\n", encoding="utf-8")
 
     with pytest.raises(
