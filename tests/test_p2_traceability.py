@@ -110,6 +110,20 @@ class P2TraceabilityTests(unittest.TestCase):
         data = json.loads(path.read_text(encoding="utf-8"))
         data["entries"][0]["target_failure_contract"] = ""
         path.write_text(json.dumps(data), encoding="utf-8")
+
+        # This test targets interface semantics, not the earlier source-digest
+        # invalidation gates. Refresh the dependent snapshot digests so
+        # validation reaches the interface rule itself.
+        digest = MODULE._git_blob_sha(path)
+        for relative in (
+            "machine/capability_registry.json",
+            "machine/interface_standard.json",
+        ):
+            dependent = root / relative
+            payload = json.loads(dependent.read_text(encoding="utf-8"))
+            payload["source_git_blob_sha"] = digest
+            dependent.write_text(json.dumps(payload), encoding="utf-8")
+
         with self.assertRaisesRegex(MODULE.TraceabilityError, "missing interface field"):
             MODULE.validate(root)
 
