@@ -106,6 +106,8 @@ class SpineRuntimeTransitionAcceptanceLedger:
             or health_verify.get("verified") is not True
             or health_verify.get("health_digest") != health_digest
             or health_verify.get("execution_id") != execution_id
+            or health_verify.get("deployment_id") != deployment_id
+            or health_verify.get("target_driver") != "pymongo-async"
             or health_verify.get("operation_continuity") is not True
             or health_verify.get("runtime_activated") is not False
         ):
