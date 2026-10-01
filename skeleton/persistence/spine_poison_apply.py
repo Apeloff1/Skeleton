@@ -120,39 +120,69 @@ class SpinePoisonApply:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "tenant-drift", instant)
         if delivery.event_id != outbox_id:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "identity-mismatch", instant)
+        ticket = self.ticket.read(ticket_id)
+        if ticket is not None:
+            if (
+                ticket["tenant_id"] != tenant_id
+                or ticket["outbox_id"] != outbox_id
+            ):
+                return self._refuse(
+                    tenant_id,
+                    outbox_id,
+                    expected_digest,
+                    ticket_id,
+                    "ticket-mismatch",
+                    instant,
+                )
+            ticket_hold_id = ticket["hold_id"]
+            if (
+                isinstance(ticket_hold_id, bool)
+                or not isinstance(ticket_hold_id, int)
+                or ticket_hold_id < 1
+            ):
+                return self._refuse(
+                    tenant_id,
+                    outbox_id,
+                    expected_digest,
+                    ticket_id,
+                    "ticket-hold-missing",
+                    instant,
+                )
+            if ticket["consumed"] != 0:
+                return self._refuse(
+                    tenant_id,
+                    outbox_id,
+                    expected_digest,
+                    ticket_id,
+                    "ticket-consumed",
+                    instant,
+                    hold_id=ticket_hold_id,
+                )
+        else:
+            ticket_hold_id = 0
+
         hold = _active_spine_hold(
             self._hold,
             tenant_id=tenant_id,
             outbox_id=outbox_id,
         )
         if hold is None:
-            return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "unheld", instant)
-        ticket = self.ticket.read(ticket_id)
-        if (
-            ticket is None
-            or ticket["tenant_id"] != tenant_id
-            or ticket["outbox_id"] != outbox_id
-        ):
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "unheld",
+                instant,
+                hold_id=ticket_hold_id,
+            )
+        if ticket is None:
             return self._refuse(
                 tenant_id,
                 outbox_id,
                 expected_digest,
                 ticket_id,
                 "ticket-mismatch",
-                instant,
-            )
-        ticket_hold_id = ticket["hold_id"]
-        if (
-            isinstance(ticket_hold_id, bool)
-            or not isinstance(ticket_hold_id, int)
-            or ticket_hold_id < 1
-        ):
-            return self._refuse(
-                tenant_id,
-                outbox_id,
-                expected_digest,
-                ticket_id,
-                "ticket-hold-missing",
                 instant,
             )
         if int(hold["hold_id"]) != ticket_hold_id:
@@ -164,15 +194,6 @@ class SpinePoisonApply:
                 "hold-drift",
                 instant,
                 hold_id=ticket_hold_id,
-            )
-        if ticket["consumed"] != 0:
-            return self._refuse(
-                tenant_id,
-                outbox_id,
-                expected_digest,
-                ticket_id,
-                "ticket-consumed",
-                instant,
             )
         if ticket["digest"] != expected_digest or delivery.digest() != expected_digest:
             return self._refuse(
