@@ -16,6 +16,12 @@ from .registry import (
     NativeAcceleratorRuntimeStatus,
     get_default_native_registry,
 )
+from .profile_gate import (
+    AccelerationProfile,
+    GateDecision,
+    ProfileGate,
+    ProfileGateError,
+)
 
 __all__ = [
     "AsmAcceleratorAbiError",
@@ -30,4 +36,8 @@ __all__ = [
     "NativeAcceleratorRegistryError",
     "NativeAcceleratorRuntimeStatus",
     "get_default_native_registry",
+    "AccelerationProfile",
+    "GateDecision",
+    "ProfileGate",
+    "ProfileGateError",
 ]
