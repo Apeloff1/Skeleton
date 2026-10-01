@@ -99,8 +99,11 @@ def _validate_task(master: dict[str, Any], backlog: dict[str, Any]) -> dict[str,
 
     if task.get("primary_volume_refs") != list(TRACE_REFS):
         raise P2TraceabilityError("P2-TRACE-01 volume scope drift")
-    if task.get("status") != "in_progress":
-        raise P2TraceabilityError("P2-TRACE-01 must remain in_progress")
+    task_status = task.get("status")
+    if task_status not in {"in_progress", "landed_unpromoted"}:
+        raise P2TraceabilityError(
+            "P2-TRACE-01 must be in_progress or landed_unpromoted"
+        )
     if task.get("completion_checkbox") is not False or task.get("completion_checkbox_mark") != "[ ]":
         raise P2TraceabilityError("P2-TRACE-01 may not claim completion")
     if task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
@@ -139,7 +142,12 @@ def _validate_task(master: dict[str, Any], backlog: dict[str, Any]) -> dict[str,
     }
     if not required <= evidence:
         raise P2TraceabilityError("P2-TRACE-01 must reference both independent trace workflows")
-    return {"task_status": task["status"], "trace_volume_count": len(TRACE_REFS)}
+    if task_status == "landed_unpromoted":
+        if not any(str(ref).startswith("github:pr#") for ref in evidence):
+            raise P2TraceabilityError("landed P2-TRACE-01 lacks PR evidence")
+        if not any(str(ref).startswith("git:merge:") for ref in evidence):
+            raise P2TraceabilityError("landed P2-TRACE-01 lacks merge evidence")
+    return {"task_status": task_status, "trace_volume_count": len(TRACE_REFS)}
 
 
 def _workflow_descriptor(root: Path, relative: Path) -> dict[str, str]:
