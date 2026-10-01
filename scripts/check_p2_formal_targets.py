@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
+from skeleton.contracts import ai_execution as ai_execution_contract
+from skeleton.contracts import operation as operation_contract
 import json
 from pathlib import Path
 import sys
@@ -16,6 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTROL = Path("machine/p2_quality_control.json")
 MASTER = Path("machine/ai_master_plan.json")
 CATALOGUE = Path("machine/state_machine_catalogue.json")
+
+_FORMAL_MODULES = {
+    "skeleton.contracts.operation": operation_contract,
+    "skeleton.contracts.ai_execution": ai_execution_contract,
+}
 
 
 class FormalTargetError(RuntimeError):
@@ -90,7 +96,12 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             if target.get(field) != cat.get(field):
                 raise FormalTargetError(f"{target_id} catalogue {field} drift")
 
-        module = importlib.import_module(target["module"])
+        module_name = target.get("module")
+        if module_name not in _FORMAL_MODULES:
+            raise FormalTargetError(
+                f"{target_id} module is not an approved formal target: {module_name!r}"
+            )
+        module = _FORMAL_MODULES[module_name]
         try:
             enum_cls = getattr(module, target["enum_symbol"])
             transitions = getattr(module, target["transition_symbol"])
