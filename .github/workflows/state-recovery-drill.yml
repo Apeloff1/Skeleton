@@ -231,6 +231,7 @@ jobs:
           skeleton/testing/test_spine_reaccept.py
           skeleton/testing/test_spine_gate.py
           skeleton/testing/test_spine_poison_apply.py
+          skeleton/testing/test_spine_poison_apply_verify.py
           skeleton/testing/test_spine_poison_chain.py
 
       - name: Verify P2 async Mongo bootstrap contracts

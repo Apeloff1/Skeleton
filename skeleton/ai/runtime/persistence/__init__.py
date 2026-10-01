@@ -84,6 +84,7 @@ from skeleton.persistence.spine_watch import SpineWatch
 from skeleton.persistence.spine_gap import SpineGap
 from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
 from skeleton.persistence.spine_poison_apply import SpinePoisonApply
+from skeleton.persistence.spine_poison_apply_verify import SpinePoisonApplyVerify
 from skeleton.persistence.spine_poison_witness import SpinePoisonWitness
 from skeleton.persistence.spine_poison_chain import SpinePoisonChain
 from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard
@@ -299,6 +300,7 @@ __all__ = [
     "SpineGap",
     "SpinePoisonTicket",
     "SpinePoisonApply",
+    "SpinePoisonApplyVerify",
     "SpinePoisonWitness",
     "SpinePoisonChain",
     "SpineDispatchGuard",
