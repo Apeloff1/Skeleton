@@ -125,6 +125,10 @@ SEAMS = (
     ("runtime-transition-execution-verify", "effect-verification-does-not-self-promote-runtime-activation"),
     ("runtime-transition-effect-rollback", "effectful-transition-rollback-restores-runtime-and-compensates-fence"),
     ("runtime-transition-effect-rollback-verify", "compensation-verification-does-not-promote-runtime-activation"),
+    ("runtime-transition-health", "post-transition-health-proves-live-operation-continuity"),
+    ("runtime-transition-health-verify", "live-health-verification-does-not-promote-runtime-activation"),
+    ("runtime-transition-acceptance", "external-health-acceptance-does-not-self-authorize-activation"),
+    ("runtime-transition-acceptance-verify", "acceptance-verification-does-not-promote-runtime-activation"),
 )
 
 
