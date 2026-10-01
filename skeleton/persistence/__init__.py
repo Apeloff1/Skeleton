@@ -46,6 +46,10 @@ from skeleton.persistence.operation_runtime import (
     DurableOperationRuntime,
     OutboxDispatchReport,
 )
+from skeleton.persistence.inbox_ledger import SQLiteInboxLedger
+from skeleton.persistence.consistency_fence import SQLiteConsistencyFence
+from skeleton.persistence.spine_projection import SpineProjection, SpineProjectionReport
+from skeleton.persistence.spine_land import SpineLand, SpineLandReport
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -102,6 +106,12 @@ __all__ = [
     "StoredOperation",
     "DurableOperationRuntime",
     "OutboxDispatchReport",
+    "SQLiteInboxLedger",
+    "SQLiteConsistencyFence",
+    "SpineProjection",
+    "SpineProjectionReport",
+    "SpineLand",
+    "SpineLandReport",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
