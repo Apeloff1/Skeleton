@@ -72,7 +72,21 @@ def __getattr__(name: str) -> Any:
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
-    value = getattr(import_module(module_name), attribute)
+    if module_name == "skeleton.context.tensor":
+        module = import_module("skeleton.context.tensor")
+    elif module_name == "skeleton.context.dodeca":
+        module = import_module("skeleton.context.dodeca")
+    elif module_name == "skeleton.context.oracle":
+        module = import_module("skeleton.context.oracle")
+    elif module_name == "skeleton.context.cockpit":
+        module = import_module("skeleton.context.cockpit")
+    elif module_name == "skeleton.context.pipeline":
+        module = import_module("skeleton.context.pipeline")
+    elif module_name == "skeleton.context.questionnaire":
+        module = import_module("skeleton.context.questionnaire")
+    else:
+        raise RuntimeError(f"unapproved lazy context module: {module_name!r}")
+    value = getattr(module, attribute)
     globals()[name] = value
     return value
 
