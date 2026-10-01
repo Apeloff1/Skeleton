@@ -65,7 +65,7 @@ def _build(
     expected_head_sha: str = HEAD,
     attest,
 ) -> dict[str, object]:
-    return _build(
+    return SpineCiReceiptBuilder().build(
         workflow_runs=workflow_runs,
         expected_repository="Apeloff1/Skeleton",
         producer_run=_producer_run(),
