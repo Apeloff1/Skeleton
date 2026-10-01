@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.master_traceability.v1",
-  "graph_version": "0.1.0",
+  "graph_version": "0.1.1",
   "status": "active",
   "purpose": "Typed P2-TRACE-01 graph joining masterplan volumes, canonical requirements, capabilities, behaviors, machine authorities and executable validation.",
   "sources": [
@@ -401,67 +401,67 @@
       "name": "trace graph"
     },
     {
-      "id": "CAP-0723",
+      "id": "CAP-0732",
       "type": "capability",
       "name": "orphan detection"
     },
     {
-      "id": "CAP-0180",
+      "id": "CAP-0205",
       "type": "capability",
       "name": "change impact"
     },
     {
-      "id": "CAP-0161",
+      "id": "CAP-0186",
       "type": "capability",
       "name": "capability registry"
     },
     {
-      "id": "CAP-0638",
+      "id": "CAP-0651",
       "type": "capability",
       "name": "maturity/availability projection"
     },
     {
-      "id": "CAP-0336",
+      "id": "CAP-0360",
       "type": "capability",
       "name": "dependency map"
     },
     {
-      "id": "CAP-0899",
+      "id": "CAP-0908",
       "type": "capability",
       "name": "requirement registry"
     },
     {
-      "id": "CAP-0179",
+      "id": "CAP-0204",
       "type": "capability",
       "name": "change control"
     },
     {
-      "id": "CAP-0004",
+      "id": "CAP-0032",
       "type": "capability",
       "name": "acceptance traceability"
     },
     {
-      "id": "CAP-0699",
+      "id": "CAP-0016",
       "type": "capability",
       "name": "NFR registry"
     },
     {
-      "id": "CAP-0127",
+      "id": "CAP-0152",
       "type": "capability",
       "name": "budget enforcement"
     },
     {
-      "id": "CAP-0639",
+      "id": "CAP-0652",
       "type": "capability",
       "name": "measurement policy"
     },
     {
-      "id": "CAP-0159",
+      "id": "CAP-0184",
       "type": "capability",
       "name": "capability classification"
     },
     {
-      "id": "CAP-0333",
+      "id": "CAP-0357",
       "type": "capability",
       "name": "dependency grouping"
     },
@@ -471,32 +471,32 @@
       "name": "taxonomy queries"
     },
     {
-      "id": "CAP-0637",
+      "id": "CAP-0650",
       "type": "capability",
       "name": "maturity transitions"
     },
     {
-      "id": "CAP-0789",
+      "id": "CAP-0798",
       "type": "capability",
       "name": "promotion gates"
     },
     {
-      "id": "CAP-0383",
+      "id": "CAP-0405",
       "type": "capability",
       "name": "downgrade semantics"
     },
     {
-      "id": "CAP-0102",
+      "id": "CAP-0127",
       "type": "capability",
       "name": "behavior scenarios"
     },
     {
-      "id": "CAP-0770",
+      "id": "CAP-0779",
       "type": "capability",
       "name": "pre/postcondition contracts"
     },
     {
-      "id": "CAP-0492",
+      "id": "CAP-0512",
       "type": "capability",
       "name": "forbidden-outcome rules"
     },
@@ -516,62 +516,62 @@
       "name": "terminal-state rules"
     },
     {
-      "id": "CAP-0586",
+      "id": "CAP-0603",
       "type": "capability",
       "name": "interface conventions"
     },
     {
-      "id": "CAP-0417",
+      "id": "CAP-0438",
       "type": "capability",
       "name": "error/cancellation rules"
     },
     {
-      "id": "CAP-0007",
+      "id": "CAP-0035",
       "type": "capability",
       "name": "adapter boundaries"
     },
     {
-      "id": "CAP-0997",
+      "id": "CAP-1003",
       "type": "capability",
       "name": "schema registration"
     },
     {
-      "id": "CAP-0217",
+      "id": "CAP-0241",
       "type": "capability",
       "name": "compatibility checks"
     },
     {
-      "id": "CAP-0157",
+      "id": "CAP-0182",
       "type": "capability",
       "name": "canonical serialization"
     },
     {
-      "id": "CAP-0219",
+      "id": "CAP-0243",
       "type": "capability",
       "name": "compatibility matrix"
     },
     {
-      "id": "CAP-0666",
+      "id": "CAP-0679",
       "type": "capability",
       "name": "mixed-version policy"
     },
     {
-      "id": "CAP-0347",
+      "id": "CAP-0371",
       "type": "capability",
       "name": "deprecation windows"
     },
     {
-      "id": "CAP-0588",
+      "id": "CAP-0604",
       "type": "capability",
       "name": "internal RPC"
     },
     {
-      "id": "CAP-0656",
+      "id": "CAP-0669",
       "type": "capability",
       "name": "message envelopes"
     },
     {
-      "id": "CAP-0303",
+      "id": "CAP-0327",
       "type": "capability",
       "name": "deadline propagation"
     },
@@ -717,13 +717,13 @@
     {
       "id": "TRACE-00003",
       "from": "REQ-VOL-112-R01",
-      "to": "CAP-0723",
+      "to": "CAP-0732",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00004",
       "from": "REQ-VOL-112-R01",
-      "to": "CAP-0180",
+      "to": "CAP-0205",
       "kind": "requires_capability"
     },
     {
@@ -747,13 +747,13 @@
     {
       "id": "TRACE-00008",
       "from": "REQ-VOL-112-R02",
-      "to": "CAP-0723",
+      "to": "CAP-0732",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00009",
       "from": "REQ-VOL-112-R02",
-      "to": "CAP-0180",
+      "to": "CAP-0205",
       "kind": "requires_capability"
     },
     {
@@ -777,13 +777,13 @@
     {
       "id": "TRACE-00013",
       "from": "REQ-VOL-112-R03",
-      "to": "CAP-0723",
+      "to": "CAP-0732",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00014",
       "from": "REQ-VOL-112-R03",
-      "to": "CAP-0180",
+      "to": "CAP-0205",
       "kind": "requires_capability"
     },
     {
@@ -807,13 +807,13 @@
     {
       "id": "TRACE-00018",
       "from": "REQ-VOL-112-G01",
-      "to": "CAP-0723",
+      "to": "CAP-0732",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00019",
       "from": "REQ-VOL-112-G01",
-      "to": "CAP-0180",
+      "to": "CAP-0205",
       "kind": "requires_capability"
     },
     {
@@ -837,13 +837,13 @@
     {
       "id": "TRACE-00023",
       "from": "REQ-VOL-112-G02",
-      "to": "CAP-0723",
+      "to": "CAP-0732",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00024",
       "from": "REQ-VOL-112-G02",
-      "to": "CAP-0180",
+      "to": "CAP-0205",
       "kind": "requires_capability"
     },
     {
@@ -861,19 +861,19 @@
     {
       "id": "TRACE-00027",
       "from": "REQ-VOL-113-R01",
-      "to": "CAP-0161",
+      "to": "CAP-0186",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00028",
       "from": "REQ-VOL-113-R01",
-      "to": "CAP-0638",
+      "to": "CAP-0651",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00029",
       "from": "REQ-VOL-113-R01",
-      "to": "CAP-0336",
+      "to": "CAP-0360",
       "kind": "requires_capability"
     },
     {
@@ -891,19 +891,19 @@
     {
       "id": "TRACE-00032",
       "from": "REQ-VOL-113-R02",
-      "to": "CAP-0161",
+      "to": "CAP-0186",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00033",
       "from": "REQ-VOL-113-R02",
-      "to": "CAP-0638",
+      "to": "CAP-0651",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00034",
       "from": "REQ-VOL-113-R02",
-      "to": "CAP-0336",
+      "to": "CAP-0360",
       "kind": "requires_capability"
     },
     {
@@ -921,19 +921,19 @@
     {
       "id": "TRACE-00037",
       "from": "REQ-VOL-113-R03",
-      "to": "CAP-0161",
+      "to": "CAP-0186",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00038",
       "from": "REQ-VOL-113-R03",
-      "to": "CAP-0638",
+      "to": "CAP-0651",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00039",
       "from": "REQ-VOL-113-R03",
-      "to": "CAP-0336",
+      "to": "CAP-0360",
       "kind": "requires_capability"
     },
     {
@@ -951,19 +951,19 @@
     {
       "id": "TRACE-00042",
       "from": "REQ-VOL-113-G01",
-      "to": "CAP-0161",
+      "to": "CAP-0186",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00043",
       "from": "REQ-VOL-113-G01",
-      "to": "CAP-0638",
+      "to": "CAP-0651",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00044",
       "from": "REQ-VOL-113-G01",
-      "to": "CAP-0336",
+      "to": "CAP-0360",
       "kind": "requires_capability"
     },
     {
@@ -981,19 +981,19 @@
     {
       "id": "TRACE-00047",
       "from": "REQ-VOL-113-G02",
-      "to": "CAP-0161",
+      "to": "CAP-0186",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00048",
       "from": "REQ-VOL-113-G02",
-      "to": "CAP-0638",
+      "to": "CAP-0651",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00049",
       "from": "REQ-VOL-113-G02",
-      "to": "CAP-0336",
+      "to": "CAP-0360",
       "kind": "requires_capability"
     },
     {
@@ -1011,19 +1011,19 @@
     {
       "id": "TRACE-00052",
       "from": "REQ-VOL-122-R01",
-      "to": "CAP-0899",
+      "to": "CAP-0908",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00053",
       "from": "REQ-VOL-122-R01",
-      "to": "CAP-0179",
+      "to": "CAP-0204",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00054",
       "from": "REQ-VOL-122-R01",
-      "to": "CAP-0004",
+      "to": "CAP-0032",
       "kind": "requires_capability"
     },
     {
@@ -1041,19 +1041,19 @@
     {
       "id": "TRACE-00057",
       "from": "REQ-VOL-122-R02",
-      "to": "CAP-0899",
+      "to": "CAP-0908",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00058",
       "from": "REQ-VOL-122-R02",
-      "to": "CAP-0179",
+      "to": "CAP-0204",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00059",
       "from": "REQ-VOL-122-R02",
-      "to": "CAP-0004",
+      "to": "CAP-0032",
       "kind": "requires_capability"
     },
     {
@@ -1071,19 +1071,19 @@
     {
       "id": "TRACE-00062",
       "from": "REQ-VOL-122-G01",
-      "to": "CAP-0899",
+      "to": "CAP-0908",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00063",
       "from": "REQ-VOL-122-G01",
-      "to": "CAP-0179",
+      "to": "CAP-0204",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00064",
       "from": "REQ-VOL-122-G01",
-      "to": "CAP-0004",
+      "to": "CAP-0032",
       "kind": "requires_capability"
     },
     {
@@ -1101,19 +1101,19 @@
     {
       "id": "TRACE-00067",
       "from": "REQ-VOL-122-G02",
-      "to": "CAP-0899",
+      "to": "CAP-0908",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00068",
       "from": "REQ-VOL-122-G02",
-      "to": "CAP-0179",
+      "to": "CAP-0204",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00069",
       "from": "REQ-VOL-122-G02",
-      "to": "CAP-0004",
+      "to": "CAP-0032",
       "kind": "requires_capability"
     },
     {
@@ -1131,19 +1131,19 @@
     {
       "id": "TRACE-00072",
       "from": "REQ-VOL-123-R01",
-      "to": "CAP-0699",
+      "to": "CAP-0016",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00073",
       "from": "REQ-VOL-123-R01",
-      "to": "CAP-0127",
+      "to": "CAP-0152",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00074",
       "from": "REQ-VOL-123-R01",
-      "to": "CAP-0639",
+      "to": "CAP-0652",
       "kind": "requires_capability"
     },
     {
@@ -1161,19 +1161,19 @@
     {
       "id": "TRACE-00077",
       "from": "REQ-VOL-123-R02",
-      "to": "CAP-0699",
+      "to": "CAP-0016",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00078",
       "from": "REQ-VOL-123-R02",
-      "to": "CAP-0127",
+      "to": "CAP-0152",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00079",
       "from": "REQ-VOL-123-R02",
-      "to": "CAP-0639",
+      "to": "CAP-0652",
       "kind": "requires_capability"
     },
     {
@@ -1191,19 +1191,19 @@
     {
       "id": "TRACE-00082",
       "from": "REQ-VOL-123-G01",
-      "to": "CAP-0699",
+      "to": "CAP-0016",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00083",
       "from": "REQ-VOL-123-G01",
-      "to": "CAP-0127",
+      "to": "CAP-0152",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00084",
       "from": "REQ-VOL-123-G01",
-      "to": "CAP-0639",
+      "to": "CAP-0652",
       "kind": "requires_capability"
     },
     {
@@ -1221,19 +1221,19 @@
     {
       "id": "TRACE-00087",
       "from": "REQ-VOL-123-G02",
-      "to": "CAP-0699",
+      "to": "CAP-0016",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00088",
       "from": "REQ-VOL-123-G02",
-      "to": "CAP-0127",
+      "to": "CAP-0152",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00089",
       "from": "REQ-VOL-123-G02",
-      "to": "CAP-0639",
+      "to": "CAP-0652",
       "kind": "requires_capability"
     },
     {
@@ -1251,13 +1251,13 @@
     {
       "id": "TRACE-00092",
       "from": "REQ-VOL-124-R01",
-      "to": "CAP-0159",
+      "to": "CAP-0184",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00093",
       "from": "REQ-VOL-124-R01",
-      "to": "CAP-0333",
+      "to": "CAP-0357",
       "kind": "requires_capability"
     },
     {
@@ -1281,13 +1281,13 @@
     {
       "id": "TRACE-00097",
       "from": "REQ-VOL-124-R02",
-      "to": "CAP-0159",
+      "to": "CAP-0184",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00098",
       "from": "REQ-VOL-124-R02",
-      "to": "CAP-0333",
+      "to": "CAP-0357",
       "kind": "requires_capability"
     },
     {
@@ -1311,13 +1311,13 @@
     {
       "id": "TRACE-00102",
       "from": "REQ-VOL-124-G01",
-      "to": "CAP-0159",
+      "to": "CAP-0184",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00103",
       "from": "REQ-VOL-124-G01",
-      "to": "CAP-0333",
+      "to": "CAP-0357",
       "kind": "requires_capability"
     },
     {
@@ -1341,13 +1341,13 @@
     {
       "id": "TRACE-00107",
       "from": "REQ-VOL-124-G02",
-      "to": "CAP-0159",
+      "to": "CAP-0184",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00108",
       "from": "REQ-VOL-124-G02",
-      "to": "CAP-0333",
+      "to": "CAP-0357",
       "kind": "requires_capability"
     },
     {
@@ -1371,19 +1371,19 @@
     {
       "id": "TRACE-00112",
       "from": "REQ-VOL-125-R01",
-      "to": "CAP-0637",
+      "to": "CAP-0650",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00113",
       "from": "REQ-VOL-125-R01",
-      "to": "CAP-0789",
+      "to": "CAP-0798",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00114",
       "from": "REQ-VOL-125-R01",
-      "to": "CAP-0383",
+      "to": "CAP-0405",
       "kind": "requires_capability"
     },
     {
@@ -1401,19 +1401,19 @@
     {
       "id": "TRACE-00117",
       "from": "REQ-VOL-125-R02",
-      "to": "CAP-0637",
+      "to": "CAP-0650",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00118",
       "from": "REQ-VOL-125-R02",
-      "to": "CAP-0789",
+      "to": "CAP-0798",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00119",
       "from": "REQ-VOL-125-R02",
-      "to": "CAP-0383",
+      "to": "CAP-0405",
       "kind": "requires_capability"
     },
     {
@@ -1431,19 +1431,19 @@
     {
       "id": "TRACE-00122",
       "from": "REQ-VOL-125-G01",
-      "to": "CAP-0637",
+      "to": "CAP-0650",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00123",
       "from": "REQ-VOL-125-G01",
-      "to": "CAP-0789",
+      "to": "CAP-0798",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00124",
       "from": "REQ-VOL-125-G01",
-      "to": "CAP-0383",
+      "to": "CAP-0405",
       "kind": "requires_capability"
     },
     {
@@ -1461,19 +1461,19 @@
     {
       "id": "TRACE-00127",
       "from": "REQ-VOL-125-G02",
-      "to": "CAP-0637",
+      "to": "CAP-0650",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00128",
       "from": "REQ-VOL-125-G02",
-      "to": "CAP-0789",
+      "to": "CAP-0798",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00129",
       "from": "REQ-VOL-125-G02",
-      "to": "CAP-0383",
+      "to": "CAP-0405",
       "kind": "requires_capability"
     },
     {
@@ -1491,19 +1491,19 @@
     {
       "id": "TRACE-00132",
       "from": "REQ-VOL-126-R01",
-      "to": "CAP-0102",
+      "to": "CAP-0127",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00133",
       "from": "REQ-VOL-126-R01",
-      "to": "CAP-0770",
+      "to": "CAP-0779",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00134",
       "from": "REQ-VOL-126-R01",
-      "to": "CAP-0492",
+      "to": "CAP-0512",
       "kind": "requires_capability"
     },
     {
@@ -1521,19 +1521,19 @@
     {
       "id": "TRACE-00137",
       "from": "REQ-VOL-126-R02",
-      "to": "CAP-0102",
+      "to": "CAP-0127",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00138",
       "from": "REQ-VOL-126-R02",
-      "to": "CAP-0770",
+      "to": "CAP-0779",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00139",
       "from": "REQ-VOL-126-R02",
-      "to": "CAP-0492",
+      "to": "CAP-0512",
       "kind": "requires_capability"
     },
     {
@@ -1551,19 +1551,19 @@
     {
       "id": "TRACE-00142",
       "from": "REQ-VOL-126-G01",
-      "to": "CAP-0102",
+      "to": "CAP-0127",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00143",
       "from": "REQ-VOL-126-G01",
-      "to": "CAP-0770",
+      "to": "CAP-0779",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00144",
       "from": "REQ-VOL-126-G01",
-      "to": "CAP-0492",
+      "to": "CAP-0512",
       "kind": "requires_capability"
     },
     {
@@ -1581,19 +1581,19 @@
     {
       "id": "TRACE-00147",
       "from": "REQ-VOL-126-G02",
-      "to": "CAP-0102",
+      "to": "CAP-0127",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00148",
       "from": "REQ-VOL-126-G02",
-      "to": "CAP-0770",
+      "to": "CAP-0779",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00149",
       "from": "REQ-VOL-126-G02",
-      "to": "CAP-0492",
+      "to": "CAP-0512",
       "kind": "requires_capability"
     },
     {
@@ -1731,19 +1731,19 @@
     {
       "id": "TRACE-00172",
       "from": "REQ-VOL-128-R01",
-      "to": "CAP-0586",
+      "to": "CAP-0603",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00173",
       "from": "REQ-VOL-128-R01",
-      "to": "CAP-0417",
+      "to": "CAP-0438",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00174",
       "from": "REQ-VOL-128-R01",
-      "to": "CAP-0007",
+      "to": "CAP-0035",
       "kind": "requires_capability"
     },
     {
@@ -1761,19 +1761,19 @@
     {
       "id": "TRACE-00177",
       "from": "REQ-VOL-128-R02",
-      "to": "CAP-0586",
+      "to": "CAP-0603",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00178",
       "from": "REQ-VOL-128-R02",
-      "to": "CAP-0417",
+      "to": "CAP-0438",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00179",
       "from": "REQ-VOL-128-R02",
-      "to": "CAP-0007",
+      "to": "CAP-0035",
       "kind": "requires_capability"
     },
     {
@@ -1791,19 +1791,19 @@
     {
       "id": "TRACE-00182",
       "from": "REQ-VOL-128-G01",
-      "to": "CAP-0586",
+      "to": "CAP-0603",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00183",
       "from": "REQ-VOL-128-G01",
-      "to": "CAP-0417",
+      "to": "CAP-0438",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00184",
       "from": "REQ-VOL-128-G01",
-      "to": "CAP-0007",
+      "to": "CAP-0035",
       "kind": "requires_capability"
     },
     {
@@ -1821,19 +1821,19 @@
     {
       "id": "TRACE-00187",
       "from": "REQ-VOL-128-G02",
-      "to": "CAP-0586",
+      "to": "CAP-0603",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00188",
       "from": "REQ-VOL-128-G02",
-      "to": "CAP-0417",
+      "to": "CAP-0438",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00189",
       "from": "REQ-VOL-128-G02",
-      "to": "CAP-0007",
+      "to": "CAP-0035",
       "kind": "requires_capability"
     },
     {
@@ -1851,19 +1851,19 @@
     {
       "id": "TRACE-00192",
       "from": "REQ-VOL-129-R01",
-      "to": "CAP-0997",
+      "to": "CAP-1003",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00193",
       "from": "REQ-VOL-129-R01",
-      "to": "CAP-0217",
+      "to": "CAP-0241",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00194",
       "from": "REQ-VOL-129-R01",
-      "to": "CAP-0157",
+      "to": "CAP-0182",
       "kind": "requires_capability"
     },
     {
@@ -1881,19 +1881,19 @@
     {
       "id": "TRACE-00197",
       "from": "REQ-VOL-129-R02",
-      "to": "CAP-0997",
+      "to": "CAP-1003",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00198",
       "from": "REQ-VOL-129-R02",
-      "to": "CAP-0217",
+      "to": "CAP-0241",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00199",
       "from": "REQ-VOL-129-R02",
-      "to": "CAP-0157",
+      "to": "CAP-0182",
       "kind": "requires_capability"
     },
     {
@@ -1911,19 +1911,19 @@
     {
       "id": "TRACE-00202",
       "from": "REQ-VOL-129-G01",
-      "to": "CAP-0997",
+      "to": "CAP-1003",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00203",
       "from": "REQ-VOL-129-G01",
-      "to": "CAP-0217",
+      "to": "CAP-0241",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00204",
       "from": "REQ-VOL-129-G01",
-      "to": "CAP-0157",
+      "to": "CAP-0182",
       "kind": "requires_capability"
     },
     {
@@ -1941,19 +1941,19 @@
     {
       "id": "TRACE-00207",
       "from": "REQ-VOL-129-G02",
-      "to": "CAP-0997",
+      "to": "CAP-1003",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00208",
       "from": "REQ-VOL-129-G02",
-      "to": "CAP-0217",
+      "to": "CAP-0241",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00209",
       "from": "REQ-VOL-129-G02",
-      "to": "CAP-0157",
+      "to": "CAP-0182",
       "kind": "requires_capability"
     },
     {
@@ -1971,19 +1971,19 @@
     {
       "id": "TRACE-00212",
       "from": "REQ-VOL-130-R01",
-      "to": "CAP-0219",
+      "to": "CAP-0243",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00213",
       "from": "REQ-VOL-130-R01",
-      "to": "CAP-0666",
+      "to": "CAP-0679",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00214",
       "from": "REQ-VOL-130-R01",
-      "to": "CAP-0347",
+      "to": "CAP-0371",
       "kind": "requires_capability"
     },
     {
@@ -2001,19 +2001,19 @@
     {
       "id": "TRACE-00217",
       "from": "REQ-VOL-130-R02",
-      "to": "CAP-0219",
+      "to": "CAP-0243",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00218",
       "from": "REQ-VOL-130-R02",
-      "to": "CAP-0666",
+      "to": "CAP-0679",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00219",
       "from": "REQ-VOL-130-R02",
-      "to": "CAP-0347",
+      "to": "CAP-0371",
       "kind": "requires_capability"
     },
     {
@@ -2031,19 +2031,19 @@
     {
       "id": "TRACE-00222",
       "from": "REQ-VOL-130-G01",
-      "to": "CAP-0219",
+      "to": "CAP-0243",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00223",
       "from": "REQ-VOL-130-G01",
-      "to": "CAP-0666",
+      "to": "CAP-0679",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00224",
       "from": "REQ-VOL-130-G01",
-      "to": "CAP-0347",
+      "to": "CAP-0371",
       "kind": "requires_capability"
     },
     {
@@ -2061,19 +2061,19 @@
     {
       "id": "TRACE-00227",
       "from": "REQ-VOL-130-G02",
-      "to": "CAP-0219",
+      "to": "CAP-0243",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00228",
       "from": "REQ-VOL-130-G02",
-      "to": "CAP-0666",
+      "to": "CAP-0679",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00229",
       "from": "REQ-VOL-130-G02",
-      "to": "CAP-0347",
+      "to": "CAP-0371",
       "kind": "requires_capability"
     },
     {
@@ -2091,19 +2091,19 @@
     {
       "id": "TRACE-00232",
       "from": "REQ-VOL-131-R01",
-      "to": "CAP-0588",
+      "to": "CAP-0604",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00233",
       "from": "REQ-VOL-131-R01",
-      "to": "CAP-0656",
+      "to": "CAP-0669",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00234",
       "from": "REQ-VOL-131-R01",
-      "to": "CAP-0303",
+      "to": "CAP-0327",
       "kind": "requires_capability"
     },
     {
@@ -2121,19 +2121,19 @@
     {
       "id": "TRACE-00237",
       "from": "REQ-VOL-131-R02",
-      "to": "CAP-0588",
+      "to": "CAP-0604",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00238",
       "from": "REQ-VOL-131-R02",
-      "to": "CAP-0656",
+      "to": "CAP-0669",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00239",
       "from": "REQ-VOL-131-R02",
-      "to": "CAP-0303",
+      "to": "CAP-0327",
       "kind": "requires_capability"
     },
     {
@@ -2151,19 +2151,19 @@
     {
       "id": "TRACE-00242",
       "from": "REQ-VOL-131-G01",
-      "to": "CAP-0588",
+      "to": "CAP-0604",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00243",
       "from": "REQ-VOL-131-G01",
-      "to": "CAP-0656",
+      "to": "CAP-0669",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00244",
       "from": "REQ-VOL-131-G01",
-      "to": "CAP-0303",
+      "to": "CAP-0327",
       "kind": "requires_capability"
     },
     {
@@ -2181,19 +2181,19 @@
     {
       "id": "TRACE-00247",
       "from": "REQ-VOL-131-G02",
-      "to": "CAP-0588",
+      "to": "CAP-0604",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00248",
       "from": "REQ-VOL-131-G02",
-      "to": "CAP-0656",
+      "to": "CAP-0669",
       "kind": "requires_capability"
     },
     {
       "id": "TRACE-00249",
       "from": "REQ-VOL-131-G02",
-      "to": "CAP-0303",
+      "to": "CAP-0327",
       "kind": "requires_capability"
     },
     {
@@ -2748,7 +2748,8 @@
     "requirement_rule": "Every requirement traces to its volume, one or more capabilities, and executable test evidence.",
     "behavior_rule": "Every behavior traces to requirement(s) and test.",
     "impact_rule": "Incident edges permit deterministic changed-authority expansion to affected requirements/volumes.",
-    "no_false_completion": "Trace completeness does not imply masterplan maturity or signoff."
+    "no_false_completion": "Trace completeness does not imply masterplan maturity or signoff.",
+    "capability_id_rule": "Capability node IDs use the taxonomy Unicode code-point ordering algorithm."
   },
   "masterplan_binding": {
     "volume_ref": "VOL-112",
