@@ -222,6 +222,17 @@ jobs:
       - name: Verify P2 bind recovery control
         run: python scripts/check_spine_bind_recovery.py
 
+      - name: Verify P2 poison recovery contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_spine_hold.py
+          skeleton/testing/test_spine_reaccept.py
+          skeleton/testing/test_spine_gate.py
+          skeleton/testing/test_spine_poison_apply.py
+          skeleton/testing/test_spine_poison_chain.py
+
       - name: Verify P2 async Mongo bootstrap contracts
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
