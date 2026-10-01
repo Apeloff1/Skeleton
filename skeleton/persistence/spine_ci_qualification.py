@@ -180,6 +180,7 @@ class SpineCiQualification:
             "required_check_count": expected_count,
             "checks_digest": _digest(normalized),
             "check_names": actual_names,
+            "attestation_digest": attestation,
             "catalog_complete": True,
             "pending_count": 0,
             "failing_count": 0,

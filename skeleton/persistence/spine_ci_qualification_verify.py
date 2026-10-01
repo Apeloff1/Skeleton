@@ -59,7 +59,11 @@ class SpineCiQualificationVerify:
             raise SpineCiQualificationVerifyError(
                 "CI qualification head SHA is invalid"
             )
-        for field in ("required_check_policy_digest", "checks_digest"):
+        for field in (
+            "required_check_policy_digest",
+            "checks_digest",
+            "attestation_digest",
+        ):
             value = card.get(field)
             if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
                 raise SpineCiQualificationVerifyError(f"{field} is invalid")
@@ -112,6 +116,7 @@ class SpineCiQualificationVerify:
             "required_check_count": count,
             "checks_digest": card["checks_digest"],
             "check_names": list(names),
+            "attestation_digest": card["attestation_digest"],
             "catalog_complete": card["catalog_complete"],
             "pending_count": card["pending_count"],
             "failing_count": card["failing_count"],

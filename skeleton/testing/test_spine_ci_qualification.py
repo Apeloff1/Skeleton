@@ -78,6 +78,7 @@ def test_complete_exact_head_catalog_qualifies_ci_not_merge() -> None:
 
     assert card["ci_green"] is True
     assert card["catalog_complete"] is True
+    assert card["attestation_digest"] == "c" * 64
     assert card["merge_authority"] is False
     assert verified["verified"] is True
     assert verified["merge_authority"] is False
@@ -148,6 +149,21 @@ def test_ci_verifier_rejects_policy_catalog_tamper() -> None:
     with pytest.raises(
         SpineCiQualificationVerifyError,
         match="catalog does not match policy",
+    ):
+        SpineCiQualificationVerify().verify(tampered)
+
+
+def test_ci_verifier_rejects_attestation_detachment() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda receipt: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["attestation_digest"] = "d" * 64
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="digest mismatch",
     ):
         SpineCiQualificationVerify().verify(tampered)
 
