@@ -19,6 +19,19 @@ SPEC.loader.exec_module(M)
 
 
 class RepositoryTransactionTests(unittest.TestCase):
+    def test_lease_registry_rejects_boolean_and_nonfinite_bounds(self) -> None:
+        with self.assertRaises(TypeError):
+            M.LeaseRegistry(max_leases=True)
+        with self.assertRaises(TypeError):
+            M.LeaseRegistry(max_ttl_s=float("nan"))
+
+    def test_lease_acquire_rejects_boolean_and_nonfinite_ttl(self) -> None:
+        leases = M.LeaseRegistry(clock=lambda: 100.0)
+        with self.assertRaises(TypeError):
+            leases.acquire("builder-a", ["pkg"], ttl_s=True)
+        with self.assertRaises(TypeError):
+            leases.acquire("builder-a", ["pkg"], ttl_s=float("inf"))
+
     def test_commit_is_path_scoped_and_optimistic(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
