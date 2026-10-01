@@ -56,6 +56,7 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Dispatch witness | `skeleton/persistence/spine_dispatch_witness.py` | running dispatcher fails closed |
 | Dark | `skeleton/persistence/spine_dark.py` | unwired surfaces stay dark |
 | Epoch witness | `skeleton/persistence/spine_epoch_witness.py` | side card does not move the fence |
+| Quiet | `skeleton/persistence/spine_quiet.py` | dark card rewrite fails closed |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -81,7 +82,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 39, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 40, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

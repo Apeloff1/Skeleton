@@ -48,6 +48,7 @@ SEAMS = (
     ("dispatch-witness", "dispatcher-not-started"),
     ("dark", "unwired-surfaces-stay-dark"),
     ("epoch-witness", "side-card-epoch-unchanged"),
+    ("quiet", "dark-card-not-rewritten"),
 )
 
 
