@@ -113,6 +113,18 @@ class SpineRuntimeTransitionEffectRollbackLedger:
             raise SpineRuntimeTransitionEffectRollbackError(
                 "runtime slot is required"
             )
+        if not isinstance(original_runtime, DurableOperationRuntime):
+            raise SpineRuntimeTransitionEffectRollbackError(
+                "original runtime must be durable"
+            )
+        if not isinstance(candidate_runtime, DurableOperationRuntime):
+            raise SpineRuntimeTransitionEffectRollbackError(
+                "candidate runtime must be durable"
+            )
+        if original_runtime is candidate_runtime:
+            raise SpineRuntimeTransitionEffectRollbackError(
+                "rollback runtimes must be distinct"
+            )
         if not isinstance(fence, SQLiteConsistencyFence):
             raise SpineRuntimeTransitionEffectRollbackError(
                 "consistency fence is required"
@@ -180,6 +192,8 @@ class SpineRuntimeTransitionEffectRollbackLedger:
             ) from exc
 
         moved = None
+        stopped_by_call = False
+        restored_by_call = False
         try:
             if slot.runtime is not candidate_runtime:
                 raise SpineRuntimeTransitionEffectRollbackError(
@@ -194,6 +208,7 @@ class SpineRuntimeTransitionEffectRollbackLedger:
                     "original dispatcher unexpectedly running"
                 )
             candidate_runtime.stop_dispatcher(timeout_s=2.0, flush=False)
+            stopped_by_call = True
             if candidate_runtime.dispatcher_running:
                 raise SpineRuntimeTransitionEffectRollbackError(
                     "candidate dispatcher did not stop"
@@ -202,6 +217,7 @@ class SpineRuntimeTransitionEffectRollbackLedger:
                 expected_candidate=candidate_runtime,
                 original=original_runtime,
             )
+            restored_by_call = True
             if slot.runtime is not original_runtime:
                 raise SpineRuntimeTransitionEffectRollbackError(
                     "runtime slot did not restore original"
@@ -275,12 +291,16 @@ class SpineRuntimeTransitionEffectRollbackLedger:
             }
         except Exception as exc:
             try:
-                if moved is None and slot.runtime is original_runtime:
+                if (
+                    moved is None
+                    and restored_by_call
+                    and slot.runtime is original_runtime
+                ):
                     slot.replace(
                         expected=original_runtime,
                         replacement=candidate_runtime,
                     )
-                    if not candidate_runtime.dispatcher_running:
+                    if stopped_by_call and not candidate_runtime.dispatcher_running:
                         candidate_runtime.start_dispatcher()
             except Exception:
                 pass
