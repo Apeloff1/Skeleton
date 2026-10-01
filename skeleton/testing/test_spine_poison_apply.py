@@ -195,6 +195,116 @@ def test_foreign_tenant_cannot_apply_held_id(tmp_path: Path) -> None:
     assert inbox.applied_count() == 0
 
 
+def test_reaccept_exception_is_journaled_after_ticket_claim(
+    tmp_path: Path,
+) -> None:
+    hold_path = tmp_path / "hold.sqlite"
+    ticket_path = tmp_path / "ticket.sqlite"
+    journal_path = tmp_path / "journal.sqlite"
+    hold = SpineHold(hold_path)
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    reaccept = SpineReaccept(inbox, fence)
+    ticket = SpinePoisonTicket(hold_path, ticket_path)
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    apply = SpinePoisonApply(
+        hold_path,
+        reaccept,
+        ticket,
+        journal_path,
+    )
+
+    def _boom(*args: object, **kwargs: object) -> dict[str, object]:
+        raise RuntimeError("synthetic reaccept fault")
+
+    reaccept.reaccept = _boom  # type: ignore[method-assign]
+    with pytest.raises(
+        SpinePoisonApplyError,
+        match="one-time ticket claim",
+    ):
+        apply.apply(
+            delivery,
+            tenant_id="tenant-poison",
+            outbox_id=EVENT,
+            expected_digest=delivery.digest(),
+            ticket_id=issued["ticket_id"],
+            now=BASE,
+        )
+
+    row = ticket.read(issued["ticket_id"])
+    assert row is not None
+    assert row["consumed"] == 1
+    witness = SpinePoisonWitness(journal_path).card("tenant-poison")
+    assert witness["seen"] == 1
+    assert witness["applied"] == 0
+
+
+def test_success_journal_has_unique_ticket_boundary(tmp_path: Path) -> None:
+    hold, apply, _witness, _inbox = _stack(tmp_path)
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    ticket = SpinePoisonTicket(
+        tmp_path / "hold.sqlite",
+        tmp_path / "ticket.sqlite",
+    )
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    card = apply.apply(
+        delivery,
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        expected_digest=delivery.digest(),
+        ticket_id=issued["ticket_id"],
+        now=BASE,
+    )
+    assert card["applied"] == 1
+
+    import sqlite3
+
+    connection = sqlite3.connect(tmp_path / "journal.sqlite")
+    row = connection.execute(
+        """
+        SELECT tenant_id, outbox_id, digest, reason, epoch_before,
+               epoch_after, applied, ticket_id, applied_at
+        FROM spine_poison_apply
+        WHERE ticket_id = ?
+        """,
+        (issued["ticket_id"],),
+    ).fetchone()
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            """
+            INSERT INTO spine_poison_apply(
+                tenant_id, outbox_id, digest, reason, epoch_before,
+                epoch_after, applied, ticket_id, applied_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            row,
+        )
+    connection.close()
+
+
 def test_apply_gate_still_refuses(tmp_path: Path) -> None:
     intent = RepairIntent("outbox", "tenant-poison", "poison", BASE)
     refusal = SpineApplyGate().consider(intent, now=BASE)

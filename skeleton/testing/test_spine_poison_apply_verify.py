@@ -88,6 +88,17 @@ def test_verifier_rejects_card_epoch_tamper(tmp_path: Path) -> None:
         verify.verify(tampered)
 
 
+def test_verifier_rejects_signoff_tamper(tmp_path: Path) -> None:
+    card, verify = _applied(tmp_path)
+    tampered = copy.deepcopy(card)
+    tampered["completion_checkbox"] = True
+    with pytest.raises(
+        SpinePoisonApplyVerifyError,
+        match="overclaimed authority",
+    ):
+        verify.verify(tampered)
+
+
 def test_verifier_rejects_rewritten_journal_row(tmp_path: Path) -> None:
     card, verify = _applied(tmp_path)
     connection = sqlite3.connect(tmp_path / "journal.sqlite")
@@ -98,31 +109,4 @@ def test_verifier_rejects_rewritten_journal_row(tmp_path: Path) -> None:
     connection.commit()
     connection.close()
     with pytest.raises(SpinePoisonApplyVerifyError, match="journal evidence mismatch"):
-        verify.verify(card)
-
-
-def test_verifier_rejects_duplicate_applied_rows(tmp_path: Path) -> None:
-    card, verify = _applied(tmp_path)
-    connection = sqlite3.connect(tmp_path / "journal.sqlite")
-    row = connection.execute(
-        """
-        SELECT tenant_id, outbox_id, digest, reason, epoch_before,
-               epoch_after, applied, ticket_id, applied_at
-        FROM spine_poison_apply
-        WHERE ticket_id = ?
-        """,
-        (card["ticket_id"],),
-    ).fetchone()
-    connection.execute(
-        """
-        INSERT INTO spine_poison_apply(
-            tenant_id, outbox_id, digest, reason, epoch_before,
-            epoch_after, applied, ticket_id, applied_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        row,
-    )
-    connection.commit()
-    connection.close()
-    with pytest.raises(SpinePoisonApplyVerifyError, match="exactly one applied row"):
         verify.verify(card)

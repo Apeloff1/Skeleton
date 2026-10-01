@@ -65,6 +65,21 @@ class SpinePoisonApplyVerify:
             raise SpinePoisonApplyVerifyError("poison apply moved the fence")
         if card.get("applied_fence") is not False:
             raise SpinePoisonApplyVerifyError("poison apply overclaimed fence application")
+        if card.get("law") != "hold-digest-stable-epoch-unchanged":
+            raise SpinePoisonApplyVerifyError("poison apply law changed")
+        if card.get("citation") != "VOL-134":
+            raise SpinePoisonApplyVerifyError("poison apply citation changed")
+        if card.get("stored_prose") != 0:
+            raise SpinePoisonApplyVerifyError("poison apply stored prose changed")
+        for field in (
+            "completion_checkbox",
+            "implementation_signature",
+            "verification_signature",
+        ):
+            if card.get(field) is not False:
+                raise SpinePoisonApplyVerifyError(
+                    f"poison apply overclaimed authority: {field}"
+                )
 
         rows = self._connection.execute(
             """

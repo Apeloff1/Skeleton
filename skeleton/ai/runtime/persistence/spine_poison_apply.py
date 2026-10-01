@@ -62,6 +62,14 @@ class SpinePoisonApply:
             )
             """
         )
+        self._journal.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS
+                spine_poison_apply_one_success_per_ticket
+            ON spine_poison_apply(ticket_id)
+            WHERE applied = 1
+            """
+        )
         self._journal.commit()
 
     def apply(
@@ -139,12 +147,25 @@ class SpinePoisonApply:
                 "ticket-consumed",
                 instant,
             )
-        card = self.reaccept.reaccept(
-            delivery,
-            tenant_id=tenant_id,
-            expected_digest=expected_digest,
-            now=instant,
-        )
+        try:
+            card = self.reaccept.reaccept(
+                delivery,
+                tenant_id=tenant_id,
+                expected_digest=expected_digest,
+                now=instant,
+            )
+        except Exception as exc:
+            self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "reaccept-error",
+                instant,
+            )
+            raise SpinePoisonApplyError(
+                "reaccept failed after one-time ticket claim"
+            ) from exc
         if card["epoch_before"] != card["epoch_after"]:
             raise SpinePoisonApplyError("poison apply moved the fence")
         if card["reason"] not in {"accepted", "duplicate"}:
