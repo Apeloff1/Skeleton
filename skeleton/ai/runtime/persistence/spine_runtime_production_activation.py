@@ -12,6 +12,12 @@ from typing import Any
 from skeleton.contracts.operation import OperationState
 from skeleton.persistence.consistency_fence import SQLiteConsistencyFence
 from skeleton.persistence.operation_runtime import DurableOperationRuntime
+from skeleton.persistence.spine_runtime_production_activation_authorization_verify import (
+    SpineRuntimeProductionActivationAuthorizationVerify,
+)
+from skeleton.persistence.spine_runtime_transition_health_verify import (
+    SpineRuntimeTransitionHealthVerify,
+)
 from skeleton.persistence.spine_runtime_transition_slot import SpineRuntimeSlot
 
 
@@ -120,6 +126,28 @@ class SpineRuntimeProductionActivationLedger:
             raise SpineRuntimeProductionActivationError(
                 "activation target driver changed"
             )
+        try:
+            current_authorization_verify = (
+                SpineRuntimeProductionActivationAuthorizationVerify().verify(
+                    authorization
+                )
+            )
+        except Exception as exc:
+            raise SpineRuntimeProductionActivationError(
+                "current production activation authorization verification "
+                "failed closed"
+            ) from exc
+        if (
+            current_authorization_verify.get("authorization_digest")
+            != authorization_digest
+            or current_authorization_verify.get("health_digest") != health_digest
+            or current_authorization_verify.get("execution_id") != execution_id
+            or current_authorization_verify.get("deployment_id") != deployment_id
+            or current_authorization_verify.get("target_driver") != "pymongo-async"
+        ):
+            raise SpineRuntimeProductionActivationError(
+                "current production activation authorization scope changed"
+            )
         if (
             not isinstance(authorization_verify, dict)
             or authorization_verify.get("kind")
@@ -130,6 +158,10 @@ class SpineRuntimeProductionActivationLedger:
             != authorization_digest
             or authorization_verify.get("health_digest") != health_digest
             or authorization_verify.get("execution_id") != execution_id
+            or authorization_verify.get("deployment_id") != deployment_id
+            or authorization_verify.get("target_driver") != "pymongo-async"
+            or authorization_verify.get("valid_until")
+            != authorization.get("valid_until")
             or authorization_verify.get("production_activation_authorized")
             is not True
             or authorization_verify.get("rollback_available") is not True
@@ -201,6 +233,26 @@ class SpineRuntimeProductionActivationLedger:
         if not isinstance(fence, SQLiteConsistencyFence):
             raise SpineRuntimeProductionActivationError(
                 "consistency fence is required"
+            )
+        try:
+            current_health_verify = SpineRuntimeTransitionHealthVerify().verify(
+                health,
+                slot=slot,
+                candidate_runtime=candidate_runtime,
+                fence=fence,
+            )
+        except Exception as exc:
+            raise SpineRuntimeProductionActivationError(
+                "current live health verification failed closed"
+            ) from exc
+        if (
+            current_health_verify.get("health_digest") != health_digest
+            or current_health_verify.get("execution_id") != execution_id
+            or current_health_verify.get("deployment_id") != deployment_id
+            or current_health_verify.get("target_driver") != "pymongo-async"
+        ):
+            raise SpineRuntimeProductionActivationError(
+                "current live health scope changed"
             )
         slot_generation = health.get("slot_generation")
         fence_epoch = health.get("fence_epoch")
