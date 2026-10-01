@@ -187,6 +187,12 @@ This distinction is critical for large P2 changes: automation can be healthy whi
 
 The repository implementation alone does not claim that a production provider call happened. That claim requires a real externally authenticated receipt. `SpineProviderLiveQualificationVerify` independently reconstructs the live card and still grants no PR-automation or merge authority.
 
+## Exact-head CI qualification
+
+`SpineCiQualification` consumes one externally authenticated exact-head CI receipt containing the complete required-check catalog. Every listed check must target the same head SHA and conclude successfully, with zero pending, failing, or missing checks. A valid card may set `ci_green=true`, but `merge_authority=false` remains mandatory. `SpineCiQualificationVerify` independently reconstructs the catalog digest and rejects any attempt to promote CI health into merge authority.
+
+This is distinct from the legacy dark `SpineCiWitness`: the witness remains conservative, while the qualification seam can represent authenticated live exact-head evidence.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
