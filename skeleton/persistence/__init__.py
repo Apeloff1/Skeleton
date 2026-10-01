@@ -133,6 +133,10 @@ from skeleton.persistence.spine_bind_tenant import SpineBindTenant
 from skeleton.persistence.spine_bind_replay import SpineBindReplay
 from skeleton.persistence.spine_bind_surface import SpineBindSurface
 from skeleton.persistence.spine_bind_gap import SpineBindGap
+from skeleton.persistence.spine_bind_hold import SpineBindHold
+from skeleton.persistence.spine_bind_hold_journal import SpineBindHoldJournal
+from skeleton.persistence.spine_bind_hold_read import SpineBindHoldRead
+from skeleton.persistence.spine_bind_hold_chain import SpineBindHoldChain
 from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
 from skeleton.persistence.spine_bind_checkpoint import SpineBindCheckpoint
@@ -340,6 +344,10 @@ __all__ = [
     "SpineBindReplay",
     "SpineBindSurface",
     "SpineBindGap",
+    "SpineBindHold",
+    "SpineBindHoldJournal",
+    "SpineBindHoldRead",
+    "SpineBindHoldChain",
     "SpineBindSnapshot",
     "SpineBindRecovery",
     "SpineBindCheckpoint",
