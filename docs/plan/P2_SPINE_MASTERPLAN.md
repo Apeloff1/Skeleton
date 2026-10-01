@@ -140,6 +140,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime transition acceptance verify | `skeleton/persistence/spine_runtime_transition_acceptance_verify.py` | acceptance verification does not grant production activation |
 | Runtime production activation authorization | `skeleton/persistence/spine_runtime_production_activation_authorization.py` | short-lived external authority may authorize production activation without performing it |
 | Runtime production activation authorization verify | `skeleton/persistence/spine_runtime_production_activation_authorization_verify.py` | authorization verification cannot activate runtime |
+| Runtime production activation | `skeleton/persistence/spine_runtime_production_activation.py` | consumes exact authorization + live health once without moving the rollback fence |
+| Runtime production activation verify | `skeleton/persistence/spine_runtime_production_activation_verify.py` | independently re-reads activated runtime, durable health operation, slot, and rollback fence |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -168,7 +170,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 122, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 124, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
