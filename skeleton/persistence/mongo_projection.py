@@ -88,29 +88,84 @@ class MongoSpineProjection:
                 self.poison.append(event.outbox_id)
                 poisoned += 1
                 continue
-            if result.duplicate:
-                duplicates += 1
-                continue
             resource = f"op:{event.operation_id}"
             try:
-                expected = self.fence.read(tenant_id=tenant_id, resource_id=resource).epoch
-            except ConsistencyFenceError:
-                expected = 0
-            try:
-                self.fence.compare_and_advance(
+                advanced = self._reconcile_fence(
                     tenant_id=tenant_id,
                     resource_id=resource,
-                    expected_epoch=expected,
-                    writer_id=self.consumer_id,
+                    target_epoch=result.applied_through,
                     now=event.published_at or instant,
                 )
-            except ConsistencyConflict:
+            except ConsistencyFenceError:
                 self.poison.append(event.outbox_id)
                 poisoned += 1
                 continue
-            applied += 1
-            advances += 1
+            if result.duplicate:
+                duplicates += 1
+            else:
+                applied += 1
+            advances += advanced
         return MongoProjectionReport(len(events), applied, duplicates, poisoned, advances)
+
+    def _reconcile_fence(
+        self,
+        *,
+        tenant_id: str,
+        resource_id: str,
+        target_epoch: int,
+        now: datetime,
+    ) -> int:
+        if (
+            isinstance(target_epoch, bool)
+            or not isinstance(target_epoch, int)
+            or target_epoch < 1
+        ):
+            raise ConsistencyConflict(
+                "inbox watermark must be a positive fence target"
+            )
+        try:
+            current = self.fence.read(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+            )
+        except ConsistencyFenceError as exc:
+            if str(exc) != "unknown fence":
+                raise
+            if target_epoch != 1:
+                raise ConsistencyConflict(
+                    "fence is missing behind inbox watermark"
+                ) from exc
+            expected = 0
+        else:
+            if current.epoch == target_epoch:
+                return 0
+            if current.epoch != target_epoch - 1:
+                raise ConsistencyConflict(
+                    "fence epoch does not trail inbox watermark by one"
+                )
+            expected = current.epoch
+
+        try:
+            token = self.fence.compare_and_advance(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+                expected_epoch=expected,
+                writer_id=self.consumer_id,
+                now=now,
+            )
+        except ConsistencyConflict:
+            current = self.fence.read(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+            )
+            if current.epoch == target_epoch:
+                return 0
+            raise
+        if token.epoch != target_epoch:
+            raise ConsistencyConflict(
+                "fence advance did not reach inbox watermark"
+            )
+        return 1
 
     def card(self, report: MongoProjectionReport) -> dict[str, Any]:
         return report.as_dict()

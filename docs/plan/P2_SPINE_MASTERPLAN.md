@@ -13,14 +13,14 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Inbox | `skeleton/persistence/inbox_ledger.py` | exactly-once, contiguous version, tenant bind |
 | Fence | `skeleton/persistence/consistency_fence.py` | compare-and-advance, foreign tenant unknown |
 | Published outbox | `skeleton/persistence/operation_store.py` | acknowledged rows only |
-| Projection | `skeleton/persistence/spine_projection.py` | published row to inbox and fence |
+| Projection | `skeleton/persistence/spine_projection.py` | published row to inbox and fence; duplicate retry reconciles a one-epoch fence gap |
 | Land | `skeleton/persistence/spine_land.py` | dispatch then project |
 | Hook | `skeleton/persistence/spine_dispatch.py` | publish, project, cursor |
 | Worker | `skeleton/persistence/spine_worker.py` | own thread, does not replace runtime dispatcher |
 | Bind | `skeleton/persistence/spine_bind.py` | starts worker only |
 | Mongo inbox | `skeleton/persistence/mongo_inbox.py` | same accept law, no Motor import |
 | Mongo fence | `skeleton/persistence/mongo_fence.py` | open at epoch 0 only |
-| Mongo projection | `skeleton/persistence/mongo_projection.py` | SQLite outbox into Mongo |
+| Mongo projection | `skeleton/persistence/mongo_projection.py` | SQLite outbox into Mongo; duplicate retry reconciles a one-epoch fence gap |
 | Catalogs | `spine_catalog.py`, `mongo_catalog.py` | one tenant, other tenant empty |
 | Lag | `skeleton/persistence/spine_lag.py` | pending versus published |
 | Batch | `skeleton/persistence/spine_batch.py` | cap 256, poison counts failed |
@@ -156,7 +156,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Tracker
 
-- Read and project: 96%
+- Read and project: 99%
 - Provider surface closure qualified: implemented
 - Provider live qualification implementation: landed
 - Provider live credential-bearing producer `scripts/qualify_spine_provider_live.py`: landed

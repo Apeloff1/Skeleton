@@ -189,22 +189,80 @@ class SpineProjection:
         except InboxConflict as exc:
             self._poison(event, tenant_id, _reason_code(exc), instant)
             return (0, 0, 1, 0)
-        if result.duplicate:
-            return (0, 1, 0, 0)
         resource = _resource(event.operation_id)
         try:
-            current = self.fence.read(tenant_id=tenant_id, resource_id=resource)
-            expected = current.epoch
-        except ConsistencyFenceError:
+            advanced = self._reconcile_fence(
+                tenant_id=tenant_id,
+                resource_id=resource,
+                target_epoch=result.applied_through,
+                now=event.published_at or instant,
+            )
+        except ConsistencyFenceError as exc:
+            self._poison(event, tenant_id, _reason_code(exc), instant)
+            return (0, 0, 1, 0)
+        if result.duplicate:
+            return (0, 1, 0, advanced)
+        return (1, 0, 0, advanced)
+
+    def _reconcile_fence(
+        self,
+        *,
+        tenant_id: str,
+        resource_id: str,
+        target_epoch: int,
+        now: datetime,
+    ) -> int:
+        if (
+            isinstance(target_epoch, bool)
+            or not isinstance(target_epoch, int)
+            or target_epoch < 1
+        ):
+            raise ConsistencyConflict(
+                "inbox watermark must be a positive fence target"
+            )
+        try:
+            current = self.fence.read(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+            )
+        except ConsistencyFenceError as exc:
+            if str(exc) != "unknown fence":
+                raise
+            if target_epoch != 1:
+                raise ConsistencyConflict(
+                    "fence is missing behind inbox watermark"
+                ) from exc
             expected = 0
-        self.fence.compare_and_advance(
-            tenant_id=tenant_id,
-            resource_id=resource,
-            expected_epoch=expected,
-            writer_id=self.consumer_id,
-            now=event.published_at or instant,
-        )
-        return (1, 0, 0, 1)
+        else:
+            if current.epoch == target_epoch:
+                return 0
+            if current.epoch != target_epoch - 1:
+                raise ConsistencyConflict(
+                    "fence epoch does not trail inbox watermark by one"
+                )
+            expected = current.epoch
+
+        try:
+            token = self.fence.compare_and_advance(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+                expected_epoch=expected,
+                writer_id=self.consumer_id,
+                now=now,
+            )
+        except ConsistencyConflict:
+            current = self.fence.read(
+                tenant_id=tenant_id,
+                resource_id=resource_id,
+            )
+            if current.epoch == target_epoch:
+                return 0
+            raise
+        if token.epoch != target_epoch:
+            raise ConsistencyConflict(
+                "fence advance did not reach inbox watermark"
+            )
+        return 1
 
     def _poison(
         self,

@@ -6,6 +6,7 @@ from pathlib import Path
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
 from skeleton.persistence.mongo_fence import MongoConsistencyFence
+from skeleton.persistence.inbox_ledger import delivery_from_outbox
 from skeleton.persistence.mongo_inbox import MongoInboxLedger
 from skeleton.persistence.mongo_projection import MongoSpineProjection
 from skeleton.persistence.operation_runtime import DurableOperationRuntime
@@ -50,3 +51,49 @@ def test_mongo_projection_advances_once(tmp_path: Path) -> None:
     assert token.epoch == 1
     assert projection.card(first)["completion_checkbox"] is False
     runtime.close()
+
+def test_mongo_projection_repairs_fence_after_receipt_before_fence(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    created = operations.create(
+        OperationEnvelope(
+            operation_id=OP,
+            tenant_id="tenant-bridge",
+            actor_id="actor-bridge",
+            capability="chat",
+            created_at=BASE,
+            deadline=BASE + timedelta(minutes=5),
+            idempotency_key="idem-bridge-repair",
+            trace_id="trace-bridge-repair",
+        ),
+        now=BASE,
+    )
+    runtime.dispatch_outbox(operation_id=created.envelope.operation_id)
+    event = operations.published_outbox(
+        operation_id=created.envelope.operation_id
+    )[0]
+    inbox = MongoInboxLedger(None)
+    fence = MongoConsistencyFence()
+    delivery = delivery_from_outbox(event, "tenant-bridge")
+    accepted = inbox.accept(
+        delivery,
+        consumer_id="mongo-spine",
+        now=event.published_at,
+    )
+    assert accepted.duplicate is False
+
+    projection = MongoSpineProjection(operations, inbox, fence)
+    repaired = projection.project(now=BASE + timedelta(seconds=2))
+    assert repaired.applied == 0
+    assert repaired.duplicates == 1
+    assert repaired.poisoned == 0
+    assert repaired.fence_advances == 1
+    assert fence.read(
+        tenant_id="tenant-bridge",
+        resource_id=f"op:{OP}",
+    ).epoch == 1
+    runtime.close()
+
