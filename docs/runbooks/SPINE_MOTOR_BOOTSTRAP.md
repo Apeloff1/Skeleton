@@ -97,6 +97,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeActivationGate` joins durable selected-driver state, independent selection verification, the live `AsyncMongoClient` qualification receipt, and an unchanged dispatcher identity proof. This can produce `activation_eligible=true`, but it neither imports nor instantiates the driver in core, replaces the runtime object, starts the dispatcher, nor activates runtime. `SpineRuntimeActivationGateVerify` independently reconstructs the eligibility digest.
 
+## External activation permit
+
+`SpineActivationPermitLedger` requires independently verified activation eligibility plus an externally authenticated deployment-owned `activation-control` receipt scoped to the exact activation-gate digest. The receipt is capped at five minutes and carries a unique nonce. Permit issuance remains non-activating.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -125,7 +129,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_selection_permit.py \
   skeleton/testing/test_spine_selection_consumption.py \
   skeleton/testing/test_spine_driver_selection.py \
-  skeleton/testing/test_spine_runtime_activation_gate.py
+  skeleton/testing/test_spine_runtime_activation_gate.py \
+  skeleton/testing/test_spine_activation_permit.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

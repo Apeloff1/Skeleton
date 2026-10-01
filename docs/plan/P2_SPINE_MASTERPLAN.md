@@ -109,6 +109,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Driver selection verify | `skeleton/persistence/spine_driver_selection_verify.py` | selected-driver verification does not activate runtime |
 | Runtime activation gate | `skeleton/persistence/spine_runtime_activation_gate.py` | selected live driver may become activation-eligible only |
 | Runtime activation gate verify | `skeleton/persistence/spine_runtime_activation_gate_verify.py` | eligibility verification never activates runtime |
+| Activation permit | `skeleton/persistence/spine_activation_permit.py` | external activation-control issues one short-lived permit |
+| Activation permit verify | `skeleton/persistence/spine_activation_permit_verify.py` | permit verification does not activate runtime |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -118,7 +120,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider surface claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
-- Apply/cutover readiness: 95%
+- Apply/cutover readiness: 96%
 - Async Mongo bootstrap: 90%
 - CI green: 0%
 - Merge: 0%
@@ -137,7 +139,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 91, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 93, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

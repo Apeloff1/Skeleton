@@ -36,6 +36,8 @@ FILES = (
     "spine_driver_selection_verify.py",
     "spine_runtime_activation_gate.py",
     "spine_runtime_activation_gate_verify.py",
+    "spine_activation_permit.py",
+    "spine_activation_permit_verify.py",
 )
 
 

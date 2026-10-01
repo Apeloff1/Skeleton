@@ -145,6 +145,8 @@ from skeleton.persistence.spine_cutover_effectiveness import SpineCutoverEffecti
 from skeleton.persistence.spine_cutover_effectiveness_verify import SpineCutoverEffectivenessVerify
 from skeleton.persistence.spine_selection_permit import SpineSelectionPermitLedger
 from skeleton.persistence.spine_selection_permit_verify import SpineSelectionPermitVerify
+from skeleton.persistence.spine_activation_permit import SpineActivationPermitLedger
+from skeleton.persistence.spine_activation_permit_verify import SpineActivationPermitVerify
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
@@ -309,6 +311,8 @@ __all__ = [
     "SpineCutoverEffectivenessVerify",
     "SpineSelectionPermitLedger",
     "SpineSelectionPermitVerify",
+    "SpineActivationPermitLedger",
+    "SpineActivationPermitVerify",
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",

@@ -39,6 +39,9 @@ on:
       - "skeleton/testing/test_spine_driver_selection.py"
       - "skeleton/testing/test_spine_runtime_activation_gate.py"
       - "skeleton/persistence/spine_runtime_activation_gate*.py"
+      - "skeleton/persistence/spine_activation_permit*.py"
+      - "skeleton/ai/runtime/persistence/spine_activation_permit*.py"
+      - "skeleton/testing/test_spine_activation_permit.py"
       - "skeleton/ai/runtime/persistence/spine_runtime_activation_gate*.py"
       - "skeleton/persistence/spine_driver_selection*.py"
       - "skeleton/ai/runtime/persistence/spine_driver_selection*.py"
@@ -174,6 +177,7 @@ jobs:
           skeleton/testing/test_spine_selection_consumption.py
           skeleton/testing/test_spine_driver_selection.py
           skeleton/testing/test_spine_runtime_activation_gate.py
+          skeleton/testing/test_spine_activation_permit.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 

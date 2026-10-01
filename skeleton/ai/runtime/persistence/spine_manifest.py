@@ -100,6 +100,8 @@ SEAMS = (
     ("driver-selection-verify", "selection-verification-does-not-activate-runtime"),
     ("runtime-activation-gate", "activation-eligibility-does-not-activate-runtime"),
     ("runtime-activation-gate-verify", "activation-gate-verification-does-not-activate-runtime"),
+    ("activation-permit", "activation-eligibility-requires-external-short-lived-permit"),
+    ("activation-permit-verify", "activation-permit-verification-does-not-activate-runtime"),
 )
 
 
