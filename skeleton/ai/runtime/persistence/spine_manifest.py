@@ -133,6 +133,8 @@ SEAMS = (
     ("runtime-production-activation-authorization-verify", "authorization-verification-does-not-activate-runtime"),
     ("runtime-production-activation", "exact-authorized-live-health-may-activate-once"),
     ("runtime-production-activation-verify", "activation-verification-preserves-live-rollback-boundary"),
+    ("provider-surface-qualification", "paired-exact-head-receipts-qualify-provider-closure"),
+    ("provider-surface-qualification-verify", "provider-closure-verification-does-not-claim-live-health"),
 )
 
 
