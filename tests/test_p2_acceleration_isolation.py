@@ -62,10 +62,10 @@ class AccelerationIsolationTests(unittest.TestCase):
             "import sys; sys.stdout.write('x' * 200000); sys.stdout.flush()",
         ]
         with self.assertRaisesRegex(
-            MODULE.AcceleratorIsolationError,
+            AcceleratorIsolationError,
             "stdout exceeds output bound",
         ):
-            MODULE.run_json_process(
+            run_json_process(
                 command,
                 {"request": "bounded"},
                 timeout_s=5,
