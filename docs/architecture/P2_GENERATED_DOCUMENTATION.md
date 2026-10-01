@@ -1,6 +1,6 @@
 # P2 Generated Documentation
 
-Machine authority: `machine/generated_documentation.json`  
+Machine authority: `machine/generated_documentation.json`
 Generator: `scripts/generate_p2_docs.py`
 
 This lane implements the masterplan gaps in VOL-089 and VOL-090.
