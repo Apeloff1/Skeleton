@@ -69,6 +69,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineCutoverRehearsal` requires the verified non-selecting candidate plus green cutover and chain reads, then exercises `SpineCutGate`. Even with every precondition green, the gate must return only `switch-not-landed`; it cannot advance a fence, select a driver, authorize selection, or activate runtime. `SpineCutoverRehearsalVerify` independently reconstructs the rehearsal digest and rejects authority promotion.
 
+## Live cutover rehearsal
+
+`scripts/rehearse_spine_pymongo_cutover.py` consumes the exact live qualification receipt produced earlier in the State Recovery workflow. It verifies the actual `DurableOperationRuntime.start_dispatcher` binding without starting it, creates and independently verifies the non-selecting driver candidate, constructs green cutover reads with a closed apply gate, and requires the cut gate to refuse the switch as `switch-not-landed`. The workflow asserts the dispatcher is still stopped and all runtime authority flags remain false.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and

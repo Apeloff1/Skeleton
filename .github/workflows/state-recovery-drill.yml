@@ -23,6 +23,11 @@ on:
       - "skeleton/testing/test_spine_pymongo_async_adapter.py"
       - "skeleton/deploy/spine_pymongo_async.py"
       - "scripts/qualify_spine_pymongo_async.py"
+      - "scripts/rehearse_spine_pymongo_cutover.py"
+      - "skeleton/persistence/spine_cutover.py"
+      - "skeleton/ai/runtime/persistence/spine_cutover.py"
+      - "skeleton/testing/test_spine_cutover.py"
+      - "skeleton/testing/test_spine_cut_gate.py"
       - "skeleton/persistence/spine_runtime_selection*.py"
       - "skeleton/ai/runtime/persistence/spine_runtime_selection*.py"
       - "skeleton/testing/test_spine_runtime_selection.py"
@@ -145,6 +150,8 @@ jobs:
           skeleton/testing/test_spine_pymongo_async_adapter.py
           skeleton/testing/test_spine_runtime_selection.py
           skeleton/testing/test_spine_cutover_rehearsal.py
+          skeleton/testing/test_spine_cutover.py
+          skeleton/testing/test_spine_cut_gate.py
 
       - name: Verify P2 async Mongo core structural control
         run: python scripts/check_spine_motor_bootstrap.py
@@ -187,6 +194,41 @@ jobs:
           print("wire:", report["wire_version_min"], report["wire_version_max"])
           print("evidence:", report["digest"])
           PY
+      - name: Rehearse P2 cutover from live PyMongo qualification
+        run: >-
+          python scripts/rehearse_spine_pymongo_cutover.py
+          --qualification "${RUNNER_TEMP}/p2-pymongo-async.json"
+          --output "${RUNNER_TEMP}/p2-pymongo-cutover-rehearsal.json"
+
+      - name: Verify P2 live cutover rehearsal evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "p2-pymongo-cutover-rehearsal.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          assert report["kind"] == "spine_pymongo_async_cutover_rehearsal"
+          assert report["candidate_verified"] is True
+          assert report["rehearsal_verified"] is True
+          assert report["cutover_preconditions_green"] is True
+          assert report["switch_refused"] is True
+          assert report["switch_reason"] == "switch-not-landed"
+          assert report["dispatcher_identity_stable"] is True
+          assert report["dispatcher_running"] is False
+          assert report["runtime_driver_selected"] is False
+          assert report["selection_authorized"] is False
+          assert report["runtime_activated"] is False
+          assert len(report["qualification_digest"]) == 64
+          assert len(report["candidate_digest"]) == 64
+          assert len(report["rehearsal_digest"]) == 64
+          print("p2-pymongo-async-cutover-rehearsal: OK")
+          print("driver:", report["driver_version"])
+          print("switch reason:", report["switch_reason"])
+          print("rehearsal:", report["rehearsal_digest"])
+          PY
+
       - name: Run live Mongo backup restore and rebuild drill
         run: >-
           python scripts/state_recovery_drill.py live-mongo

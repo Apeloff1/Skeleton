@@ -57,6 +57,8 @@ def test_cutover_and_window(tmp_path: Path) -> None:
     assert card["sqlite_epoch"] == 0
     assert card["mongo_epoch"] == 0
     assert card["applied"] == 0
+    assert card["apply_refused"] is True
+    assert card["apply_refusal_count"] == 0
     assert card["hit"] is True
     assert card["completion_checkbox"] is False
     runtime.close()
