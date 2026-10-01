@@ -1,7 +1,7 @@
 # P2 Traceability Spine
 
-Canonical master trace: `machine/master_traceability.json` + `machine/traceability/*.json`  
-Canonical validator: `scripts/check_traceability_spine.py`  
+Canonical master trace: `machine/master_traceability.json` + `machine/traceability/*.json`
+Canonical validator: `scripts/check_traceability_spine.py`
 Focused projection validator: `scripts/check_p2_traceability.py`
 
 P2-TRACE-01 remains subordinate to `machine/ai_master_plan.json`. It covers exactly VOL-112, VOL-113, and VOL-122 through VOL-131 and does not promote any of those volumes.
