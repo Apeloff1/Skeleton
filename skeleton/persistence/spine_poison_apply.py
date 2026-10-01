@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.persistence.inbox_ledger import InboxDelivery
+from skeleton.persistence.spine_hold import (
+    _active_spine_hold,
+    _ensure_spine_hold_schema,
+    _release_spine_holds,
+)
 from skeleton.persistence.spine_reaccept import SpineReaccept
 from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
 
@@ -44,6 +49,7 @@ class SpinePoisonApply:
         self.ticket = ticket
         self._hold = sqlite3.connect(str(hold_path), check_same_thread=False)
         self._hold.row_factory = sqlite3.Row
+        _ensure_spine_hold_schema(self._hold)
         self._journal = sqlite3.connect(str(journal_path), check_same_thread=False)
         self._journal.row_factory = sqlite3.Row
         self._journal.execute(
@@ -100,10 +106,11 @@ class SpinePoisonApply:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "tenant-drift", instant)
         if delivery.event_id != outbox_id:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "identity-mismatch", instant)
-        hold = self._hold.execute(
-            "SELECT reason FROM spine_hold WHERE tenant_id = ? AND outbox_id = ?",
-            (tenant_id, outbox_id),
-        ).fetchone()
+        hold = _active_spine_hold(
+            self._hold,
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+        )
         if hold is None:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "unheld", instant)
         ticket = self.ticket.read(ticket_id)
@@ -189,6 +196,25 @@ class SpinePoisonApply:
             ),
         )
         self._journal.commit()
+        released_rows = _release_spine_holds(
+            self._hold,
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+            ticket_id=ticket_id,
+            released_at=instant.isoformat(),
+        )
+        if released_rows < 1:
+            self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "hold-release-error",
+                instant,
+            )
+            raise SpinePoisonApplyError(
+                "poison apply could not release active hold"
+            )
         return self._card(
             tenant_id,
             outbox_id,
@@ -199,6 +225,8 @@ class SpinePoisonApply:
             card["duplicate"],
             expected_digest,
             ticket_id,
+            True,
+            released_rows,
         )
 
     def applied_count(self, tenant_id: str) -> int:
@@ -237,6 +265,8 @@ class SpinePoisonApply:
             False,
             digest,
             ticket_id,
+            False,
+            0,
         )
 
     @staticmethod
@@ -250,6 +280,8 @@ class SpinePoisonApply:
         duplicate: bool,
         delivery_digest: str,
         ticket_id: str,
+        hold_released: bool,
+        released_hold_rows: int,
     ) -> dict[str, Any]:
         return {
             "kind": "spine_poison_apply",
@@ -260,6 +292,8 @@ class SpinePoisonApply:
             "outbox_id": outbox_id,
             "delivery_digest": delivery_digest,
             "ticket_id": ticket_id,
+            "hold_released": hold_released,
+            "released_hold_rows": released_hold_rows,
             "reason": reason,
             "epoch_before": before,
             "epoch_after": after,

@@ -8,6 +8,7 @@ import pytest
 from skeleton.persistence.consistency_fence import SQLiteConsistencyFence
 from skeleton.persistence.inbox_ledger import InboxDelivery, SQLiteInboxLedger
 from skeleton.persistence.spine_apply import SpineApplyGate
+from skeleton.persistence.spine_gate import SpineGate
 from skeleton.persistence.spine_hold import SpineHold
 from skeleton.persistence.spine_poison_apply import (
     SpinePoisonApply,
@@ -113,7 +114,34 @@ def test_matching_digest_applies_without_moving_fence(tmp_path: Path) -> None:
     assert card["reason"] == "accepted"
     assert card["epoch_before"] == card["epoch_after"] == 0
     assert card["applied_fence"] is False
+    assert card["hold_released"] is True
+    assert card["released_hold_rows"] == 1
     assert inbox.applied_count() == 1
+
+    post_ticket = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    assert post_ticket["hit"] is False
+    assert post_ticket["reason"] == "unheld"
+
+    gate = SpineGate(
+        tmp_path / "hold.sqlite",
+        SpineReaccept(
+            inbox,
+            SQLiteConsistencyFence(tmp_path / "fence.sqlite"),
+        ),
+    )
+    post_gate = gate.allow(
+        delivery,
+        tenant_id="tenant-poison",
+        expected_digest=delivery.digest(),
+        outbox_id=EVENT,
+        now=BASE,
+    )
+    assert post_gate["reason"] == "duplicate"
     again = apply.apply(
         delivery,
         tenant_id="tenant-poison",

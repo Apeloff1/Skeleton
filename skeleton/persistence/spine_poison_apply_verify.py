@@ -123,6 +123,32 @@ class SpinePoisonApplyVerify:
             raise SpinePoisonApplyVerifyError(
                 "poison apply ticket is not consumed exactly once"
             )
+        if card.get("hold_released") is not True:
+            raise SpinePoisonApplyVerifyError(
+                "poison apply did not prove hold release"
+            )
+        released_hold_rows = card.get("released_hold_rows")
+        if (
+            isinstance(released_hold_rows, bool)
+            or not isinstance(released_hold_rows, int)
+            or released_hold_rows < 1
+        ):
+            raise SpinePoisonApplyVerifyError(
+                "poison apply released hold count is invalid"
+            )
+        release_state = self.ticket.hold_release_state(ticket_id)
+        if release_state is None:
+            raise SpinePoisonApplyVerifyError(
+                "poison apply hold release evidence is missing"
+            )
+        if release_state["active"] != 0:
+            raise SpinePoisonApplyVerifyError(
+                "poison apply left an active hold"
+            )
+        if release_state["released_by_ticket"] != released_hold_rows:
+            raise SpinePoisonApplyVerifyError(
+                "poison apply hold release scope mismatch"
+            )
 
         return {
             "kind": "spine_poison_apply_verify",
@@ -138,6 +164,8 @@ class SpinePoisonApplyVerify:
             "epoch_after": after,
             "journal_rows": 1,
             "ticket_consumed": True,
+            "hold_released": True,
+            "released_hold_rows": released_hold_rows,
             "verified": True,
             "applied_fence": False,
             "apply_authority": False,

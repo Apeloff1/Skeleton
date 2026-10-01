@@ -13,6 +13,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from skeleton.persistence.spine_hold import (
+    _active_spine_hold,
+    _ensure_spine_hold_schema,
+)
+
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -27,6 +32,7 @@ class SpinePoisonTicket:
     def __init__(self, hold_path: str | Path, path: str | Path) -> None:
         self._hold = sqlite3.connect(str(hold_path), check_same_thread=False)
         self._hold.row_factory = sqlite3.Row
+        _ensure_spine_hold_schema(self._hold)
         self._connection = sqlite3.connect(str(path), check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute(
@@ -58,10 +64,11 @@ class SpinePoisonTicket:
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise SpinePoisonTicketError("now must be timezone-aware")
-        hold = self._hold.execute(
-            "SELECT 1 FROM spine_hold WHERE tenant_id = ? AND outbox_id = ?",
-            (tenant_id, outbox_id),
-        ).fetchone()
+        hold = _active_spine_hold(
+            self._hold,
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+        )
         if hold is None:
             return {
                 "kind": "spine_poison_ticket",
@@ -106,6 +113,36 @@ class SpinePoisonTicket:
             "SELECT * FROM spine_poison_ticket WHERE ticket_id = ?",
             (ticket_id,),
         ).fetchone()
+
+    def hold_release_state(self, ticket_id: str) -> dict[str, int] | None:
+        ticket = self.read(ticket_id)
+        if ticket is None:
+            return None
+        row = self._hold.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN released = 0 THEN 1 ELSE 0 END), 0)
+                    AS active,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN released = 1 AND release_ticket_id = ?
+                            THEN 1 ELSE 0
+                        END
+                    ),
+                    0
+                ) AS released_by_ticket
+            FROM spine_hold
+            WHERE tenant_id = ? AND outbox_id = ?
+            """,
+            (ticket_id, ticket["tenant_id"], ticket["outbox_id"]),
+        ).fetchone()
+        return {
+            "total": int(row["total"]),
+            "active": int(row["active"]),
+            "released_by_ticket": int(row["released_by_ticket"]),
+        }
 
     def consume(self, ticket_id: str, *, now: datetime | None = None) -> bool:
         if not isinstance(ticket_id, str) or not ticket_id.strip():

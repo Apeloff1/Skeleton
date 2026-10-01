@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.persistence.inbox_ledger import InboxDelivery
+from skeleton.persistence.spine_hold import (
+    _active_spine_hold,
+    _ensure_spine_hold_schema,
+)
 from skeleton.persistence.spine_reaccept import SpineReaccept
 
 
@@ -28,6 +32,7 @@ class SpineGate:
         self.reaccept = reaccept
         self._connection = sqlite3.connect(str(hold_path), check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
+        _ensure_spine_hold_schema(self._connection)
 
     def allow(
         self,
@@ -38,10 +43,11 @@ class SpineGate:
         outbox_id: str,
         now: datetime | None = None,
     ) -> dict[str, Any]:
-        row = self._connection.execute(
-            "SELECT 1 FROM spine_hold WHERE tenant_id = ? AND outbox_id = ?",
-            (tenant_id, outbox_id),
-        ).fetchone()
+        row = _active_spine_hold(
+            self._connection,
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+        )
         if row is not None:
             return {
                 "kind": "spine_gate",

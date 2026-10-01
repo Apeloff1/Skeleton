@@ -76,6 +76,8 @@ def test_successful_poison_apply_reconciles_durable_evidence(tmp_path: Path) -> 
     assert result["verified"] is True
     assert result["journal_rows"] == 1
     assert result["ticket_consumed"] is True
+    assert result["hold_released"] is True
+    assert result["released_hold_rows"] == 1
     assert result["epoch_before"] == result["epoch_after"] == 0
     assert result["apply_authority"] is False
 
@@ -85,6 +87,17 @@ def test_verifier_rejects_card_epoch_tamper(tmp_path: Path) -> None:
     tampered = copy.deepcopy(card)
     tampered["epoch_after"] = 1
     with pytest.raises(SpinePoisonApplyVerifyError, match="moved the fence"):
+        verify.verify(tampered)
+
+
+def test_verifier_rejects_hold_release_tamper(tmp_path: Path) -> None:
+    card, verify = _applied(tmp_path)
+    tampered = copy.deepcopy(card)
+    tampered["hold_released"] = False
+    with pytest.raises(
+        SpinePoisonApplyVerifyError,
+        match="did not prove hold release",
+    ):
         verify.verify(tampered)
 
 
