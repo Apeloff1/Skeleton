@@ -834,5 +834,13 @@
       "change canonical identity/digest semantics",
       "make unknown fields grant authority"
     ]
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-129",
+    "title": "Schema Registry",
+    "required_gap_texts": [
+      "inventory serialized contracts",
+      "materialize compatibility checker"
+    ]
   }
 }
