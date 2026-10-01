@@ -84,6 +84,13 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation mutation counts are inconsistent"
             )
+        if card.get("mode") == "observe" and (
+            card["mutations_attempted"] != 0
+            or card["mutations_applied"] != 0
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation observe mode cannot mutate"
+            )
         if card.get("mode") not in _ALLOWED_MODES:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation mode is invalid"
@@ -112,7 +119,10 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation qualification cannot grant merge authority"
             )
-        expected_eligible = decision in {"ready", "merge"}
+        expected_eligible = (
+            decision in {"ready", "merge"}
+            and card.get("target_state") in {"ready", "merged"}
+        )
         if card.get("pr_automation_merge_eligible") is not expected_eligible:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation merge eligibility does not match decision"

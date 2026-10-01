@@ -171,6 +171,12 @@ class SpinePrAutomationQualification:
             raise SpinePrAutomationQualificationError(
                 "PR automation mutation counts are inconsistent"
             )
+        if mode == "observe" and (
+            mutations_attempted != 0 or mutations_applied != 0
+        ):
+            raise SpinePrAutomationQualificationError(
+                "PR automation observe mode cannot mutate"
+            )
         if receipt.get("evidence_complete") is not True:
             raise SpinePrAutomationQualificationError(
                 "PR automation evidence is incomplete"
@@ -190,7 +196,10 @@ class SpinePrAutomationQualification:
                 "PR automation receipt was not externally authenticated"
             )
 
-        merge_eligible = decision in {"ready", "merge"}
+        merge_eligible = (
+            decision in {"ready", "merge"}
+            and target_state in {"ready", "merged"}
+        )
         evidence = {
             "head_sha": expected_head,
             "pr_number": expected_pr,

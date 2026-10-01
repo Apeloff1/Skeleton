@@ -91,6 +91,36 @@ def test_ready_decision_is_eligible_but_still_not_merge_authority() -> None:
     assert verified["pr_automation_merge_eligible"] is True
 
 
+def test_observe_mode_refuses_mutation_counts() -> None:
+    mutated = _receipt()
+    mutated["mutations_attempted"] = 1
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="observe mode cannot mutate",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=mutated,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda receipt: True,
+        )
+
+
+def test_ready_decision_with_nonready_state_is_not_merge_eligible() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(decision="ready", state="held"),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda receipt: True,
+    )
+    verified = SpinePrAutomationQualificationVerify().verify(card)
+
+    assert card["pr_automation_operational_green"] is True
+    assert card["pr_automation_merge_eligible"] is False
+    assert verified["pr_automation_merge_eligible"] is False
+    assert card["merge_authority"] is False
+
+
 def test_runner_failures_and_head_drift_fail_closed() -> None:
     failed = _receipt()
     failed["failures"] = 1
