@@ -150,7 +150,8 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 ## Tracker
 
 - Read and project: 96%
-- Provider surface claimed: 0%
+- Provider surface closure qualified: implemented
+- Provider surface live claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
 - Apply/cutover readiness: 99%
