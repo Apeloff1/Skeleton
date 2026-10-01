@@ -1,0 +1,1718 @@
+{
+  "schema_version": "skeleton.backlog_registry.v1",
+  "registry_version": "0.1.0",
+  "status": "active",
+  "purpose": "Canonical deduplicated backlog IDs preserving P2 task, edge-case and masterplan-gap provenance.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-093",
+    "title": "Backlog Control",
+    "required_gap_texts": [
+      "establish canonical backlog IDs",
+      "bind backlog to gap/risk closure"
+    ]
+  },
+  "sources": [
+    "machine/ai_p2_task_backlog.json",
+    "machine/ai_edge_case_priority_queue.json",
+    "machine/ai_master_plan.json"
+  ],
+  "policy": {
+    "stable_id": "IDs are deterministic from source type and source identity.",
+    "provenance": "Deduplication may merge equivalent work only by preserving all source refs/provenance; it may not erase source obligations.",
+    "lifecycle": "Upstream dependency/evidence changes force revalidation rather than silent retirement.",
+    "closure": "Every item has explicit closure_rule; source maturity or risk authority is never inferred from backlog status."
+  },
+  "items": [
+    {
+      "id": "BL-P2-P2-CTRL-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-CTRL-01",
+      "rationale": "Freeze P2 deferred-frontier authority",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-CTRL-01",
+      "dependency_refs": [],
+      "status": "landed_unpromoted",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-CTRL-01"
+    },
+    {
+      "id": "BL-P2-P2-ARCH-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-ARCH-01",
+      "rationale": "Converge architecture and contract authority",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-ARCH-01",
+      "dependency_refs": [
+        "BL-P2-P2-CTRL-01"
+      ],
+      "status": "landed_unpromoted",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-ARCH-01"
+    },
+    {
+      "id": "BL-P2-P2-TRACE-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-TRACE-01",
+      "rationale": "Build requirements-to-runtime traceability spine",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-TRACE-01",
+      "dependency_refs": [
+        "BL-P2-P2-ARCH-01"
+      ],
+      "status": "landed_unpromoted",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-TRACE-01"
+    },
+    {
+      "id": "BL-P2-P2-REPO-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-REPO-01",
+      "rationale": "Operationalize autonomous repository engineering",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-REPO-01",
+      "dependency_refs": [
+        "BL-P2-P2-ARCH-01",
+        "BL-P2-P2-TRACE-01"
+      ],
+      "status": "ready",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-REPO-01"
+    },
+    {
+      "id": "BL-P2-P2-QUAL-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-QUAL-01",
+      "rationale": "Strengthen formal quality and final assembly qualification",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-QUAL-01",
+      "dependency_refs": [
+        "BL-P2-P2-TRACE-01"
+      ],
+      "status": "ready",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-QUAL-01"
+    },
+    {
+      "id": "BL-P2-P2-DOC-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-DOC-01",
+      "rationale": "Make generated documentation evidence-bound",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-DOC-01",
+      "dependency_refs": [
+        "BL-P2-P2-TRACE-01"
+      ],
+      "status": "ready",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-DOC-01"
+    },
+    {
+      "id": "BL-P2-P2-NATIVE-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-NATIVE-01",
+      "rationale": "Profile-gate native and JVM acceleration",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-NATIVE-01",
+      "dependency_refs": [
+        "BL-P2-P2-QUAL-01"
+      ],
+      "status": "blocked",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-NATIVE-01"
+    },
+    {
+      "id": "BL-EDGE-HIST-SYS-019",
+      "source_type": "edge_case",
+      "source_ref": "HIST-SYS-019",
+      "rationale": "Capability security",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W01,WP-W13,WP-W14,WP-W15,WP-W20,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W01",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W15",
+        "work_package:WP-W20",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-SYS-019"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-018",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-018",
+      "rationale": "Compression changes trust geometry",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W07,WP-W08,WP-W10,WP-W14,WP-W17,WP-W20,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W07",
+        "work_package:WP-W08",
+        "work_package:WP-W10",
+        "work_package:WP-W14",
+        "work_package:WP-W17",
+        "work_package:WP-W20",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-018"
+    },
+    {
+      "id": "BL-EDGE-EDGE-CONTRACT-010",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-CONTRACT-010",
+      "rationale": "Zero-width and confusable characters",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W14,WP-W20,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W01",
+        "work_package:WP-W10",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-CONTRACT-010"
+    },
+    {
+      "id": "BL-EDGE-EDGE-CONTRACT-009",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-CONTRACT-009",
+      "rationale": "Bidirectional control characters",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W18,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W01",
+        "work_package:WP-W10",
+        "work_package:WP-W18",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-CONTRACT-009"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-010",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-010",
+      "rationale": "Backup retains deleted sensitive data",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W07,WP-W14,WP-W19,WP-W20,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W07",
+        "work_package:WP-W14",
+        "work_package:WP-W19",
+        "work_package:WP-W20",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-010"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-008",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-008",
+      "rationale": "Windows reserved device names",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20,WP-W23,WP-W24,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20",
+        "work_package:WP-W23",
+        "work_package:WP-W24",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-008"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-009",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-009",
+      "rationale": "Alternate data streams",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20,WP-W22,WP-W24,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20",
+        "work_package:WP-W22",
+        "work_package:WP-W24",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-009"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-001",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-001",
+      "rationale": "Indirect prompt injection in retrieved document",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W10,WP-W14,WP-W17,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W10",
+        "work_package:WP-W14",
+        "work_package:WP-W17",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-001"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-002",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-002",
+      "rationale": "Instruction laundering through tool output",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W10,WP-W13,WP-W14,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W10",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-002"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-013",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-013",
+      "rationale": "Policy trimmed from long context",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W10,WP-W14,WP-W20,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W10",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-013"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-030",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-030",
+      "rationale": "Hallucinated authorization",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W11,WP-W14,WP-W20,WP-W26",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W11",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W26"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-030"
+    },
+    {
+      "id": "BL-EDGE-EDGE-CONTRACT-001",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-CONTRACT-001",
+      "rationale": "Duplicate JSON object keys",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W01,WP-W18,WP-W20,WP-W22",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W01",
+        "work_package:WP-W18",
+        "work_package:WP-W20",
+        "work_package:WP-W22"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-CONTRACT-001"
+    },
+    {
+      "id": "BL-EDGE-EDGE-CONTRACT-020",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-CONTRACT-020",
+      "rationale": "Canonicalization before signing",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W01,WP-W20,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W01",
+        "work_package:WP-W20",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-CONTRACT-020"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-005",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-005",
+      "rationale": "Zip Slip",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-005"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-006",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-006",
+      "rationale": "Tarbomb / decompression bomb",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-006"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-007",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-007",
+      "rationale": "Archive symlink chain",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-007"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-024",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-024",
+      "rationale": "Tool description is attacker-controlled context unless curated",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W10,WP-W13,WP-W14,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W10",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-024"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-021",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-021",
+      "rationale": "Fallback changes privacy boundary",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W06,WP-W20,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W06",
+        "work_package:WP-W20",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-021"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-009",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-009",
+      "rationale": "Data retention applies to source but not derived embedding",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W07,WP-W08,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W07",
+        "work_package:WP-W08",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-009"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-001",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-001",
+      "rationale": "TOCTOU authorization race",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W14,WP-W20,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W14",
+        "work_package:WP-W20",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-001"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-011",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-011",
+      "rationale": "DNS rebinding",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W14,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-011"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-015",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-015",
+      "rationale": "Secret in exception/log payload",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W02,WP-W20,WP-W21",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W02",
+        "work_package:WP-W20",
+        "work_package:WP-W21"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-015"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-016",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-016",
+      "rationale": "Environment-variable inheritance",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W02,WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W02",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-016"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-018",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-018",
+      "rationale": "Shell quoting divergence",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20,WP-W24",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20",
+        "work_package:WP-W24"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-018"
+    },
+    {
+      "id": "BL-EDGE-HIST-SYS-020",
+      "source_type": "edge_case",
+      "source_ref": "HIST-SYS-020",
+      "rationale": "Saltzer–Schroeder principles",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W14,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W14",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-SYS-020"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-025",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-025",
+      "rationale": "Capability discovery can become privilege discovery",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W10,WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W10",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-025"
+    },
+    {
+      "id": "BL-EDGE-EDGE-AI-003",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-AI-003",
+      "rationale": "Memory poisoning",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W07,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W07",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-AI-003"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-002",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-002",
+      "rationale": "Symlink escape",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-002"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-003",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-003",
+      "rationale": "Hardlink aliasing",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-003"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-004",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-004",
+      "rationale": "Path traversal after decoding",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-004"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-012",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-012",
+      "rationale": "Redirect crosses egress boundary",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-012"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-013",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-013",
+      "rationale": "Metadata-service SSRF",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-013"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-014",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-014",
+      "rationale": "IPv4-mapped IPv6 bypass",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-014"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-017",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-017",
+      "rationale": "Temporary-file race",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-017"
+    },
+    {
+      "id": "BL-EDGE-EDGE-SEC-019",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-SEC-019",
+      "rationale": "Executable shadowing via PATH",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W13,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W13",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-SEC-019"
+    },
+    {
+      "id": "BL-EDGE-HIST-SYS-021",
+      "source_type": "edge_case",
+      "source_ref": "HIST-SYS-021",
+      "rationale": "Bell-LaPadula / Biba",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W14,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P0",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W14",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-SYS-021"
+    },
+    {
+      "id": "BL-EDGE-HIST-AI-002",
+      "source_type": "edge_case",
+      "source_ref": "HIST-AI-002",
+      "rationale": "STRIPS planning",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W01,WP-W11,WP-W12,WP-W13,WP-W17,WP-W25,WP-W26,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W01",
+        "work_package:WP-W11",
+        "work_package:WP-W12",
+        "work_package:WP-W13",
+        "work_package:WP-W17",
+        "work_package:WP-W25",
+        "work_package:WP-W26",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-AI-002"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-020",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-020",
+      "rationale": "Livelock",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W11,WP-W12,WP-W15,WP-W16,WP-W19,WP-W28,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W11",
+        "work_package:WP-W12",
+        "work_package:WP-W15",
+        "work_package:WP-W16",
+        "work_package:WP-W19",
+        "work_package:WP-W28",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-020"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-021",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-021",
+      "rationale": "Deadlock",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W11,WP-W12,WP-W13,WP-W16,WP-W18,WP-W19,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W11",
+        "work_package:WP-W12",
+        "work_package:WP-W13",
+        "work_package:WP-W16",
+        "work_package:WP-W18",
+        "work_package:WP-W19",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-021"
+    },
+    {
+      "id": "BL-EDGE-HIST-SYS-003",
+      "source_type": "edge_case",
+      "source_ref": "HIST-SYS-003",
+      "rationale": "Petri nets",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W01,WP-W11,WP-W12,WP-W18,WP-W19,WP-W26",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W01",
+        "work_package:WP-W11",
+        "work_package:WP-W12",
+        "work_package:WP-W18",
+        "work_package:WP-W19",
+        "work_package:WP-W26"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-SYS-003"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-002",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-002",
+      "rationale": "Orphaned blob after metadata rollback",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W20,WP-W25,WP-W27,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W20",
+        "work_package:WP-W25",
+        "work_package:WP-W27",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-002"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-007",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-007",
+      "rationale": "Rollback code cannot read new data shape",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W16,WP-W25,WP-W29,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W16",
+        "work_package:WP-W25",
+        "work_package:WP-W29",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-007"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-010",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-010",
+      "rationale": "Split brain",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W14,WP-W18,WP-W19,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W14",
+        "work_package:WP-W18",
+        "work_package:WP-W19",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-010"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-027",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-027",
+      "rationale": "Consumer commits side effect before inbox marker",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W04,WP-W13,WP-W19,WP-W22,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W04",
+        "work_package:WP-W13",
+        "work_package:WP-W19",
+        "work_package:WP-W22",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-027"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-005",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-005",
+      "rationale": "Timeout means unknown, not failed",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W05,WP-W11,WP-W13,WP-W19,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W05",
+        "work_package:WP-W11",
+        "work_package:WP-W13",
+        "work_package:WP-W19",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-005"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-010",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-010",
+      "rationale": "Read repair can resurrect stale data",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W08,WP-W20,WP-W25,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W08",
+        "work_package:WP-W20",
+        "work_package:WP-W25",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-010"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-029",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-029",
+      "rationale": "Hash-based CAS still needs metadata migrations",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W03,WP-W25,WP-W27,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W03",
+        "work_package:WP-W25",
+        "work_package:WP-W27",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-029"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-005",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-005",
+      "rationale": "Corrupt backup discovered only during restore",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W17,WP-W19,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W17",
+        "work_package:WP-W19",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-005"
+    },
+    {
+      "id": "BL-EDGE-HIST-SYS-025",
+      "source_type": "edge_case",
+      "source_ref": "HIST-SYS-025",
+      "rationale": "Smalltalk image persistence",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W00,WP-W18,WP-W25,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W00",
+        "work_package:WP-W18",
+        "work_package:WP-W25",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:HIST-SYS-025"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-014",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-014",
+      "rationale": "Backups are write-only until restoration is proven",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W17,WP-W19,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W17",
+        "work_package:WP-W19",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-014"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-021",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-021",
+      "rationale": "Unknown usage must stay unknown",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W05,WP-W06,WP-W21,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W05",
+        "work_package:WP-W06",
+        "work_package:WP-W21",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-021"
+    },
+    {
+      "id": "BL-EDGE-EDGE-CONTRACT-013",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-CONTRACT-013",
+      "rationale": "Locale-sensitive casing",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W01,WP-W23,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W01",
+        "work_package:WP-W23",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-CONTRACT-013"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-001",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-001",
+      "rationale": "Tombstone resurrection",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W07,WP-W20",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W07",
+        "work_package:WP-W20"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-001"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DATA-006",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DATA-006",
+      "rationale": "Migration partially applied",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W25,WP-W30",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W25",
+        "work_package:WP-W30"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DATA-006"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-007",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-007",
+      "rationale": "Stale lease holder resumes",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W16,WP-W22,WP-W29",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W16",
+        "work_package:WP-W22",
+        "work_package:WP-W29"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-007"
+    },
+    {
+      "id": "BL-EDGE-EDGE-DIST-024",
+      "source_type": "edge_case",
+      "source_ref": "EDGE-DIST-024",
+      "rationale": "Write skew under snapshot isolation",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W03,WP-W18",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W03",
+        "work_package:WP-W18"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:EDGE-DIST-024"
+    },
+    {
+      "id": "BL-EDGE-OBSCURE-007",
+      "source_type": "edge_case",
+      "source_ref": "OBSCURE-007",
+      "rationale": "Garbage collection is part of data architecture",
+      "owner": "repository-machine",
+      "owner_ref": "WP-W07,WP-W27",
+      "dependency_refs": [],
+      "status": "planned",
+      "priority_class": "P1",
+      "provenance": [
+        "machine/ai_edge_case_priority_queue.json",
+        "work_package:WP-W07",
+        "work_package:WP-W27"
+      ],
+      "closure_rule": "status must be passing, accepted_risk or closed; passing requires evidence and accepted_risk requires explicit risk disposition",
+      "dedupe_key": "edge_case:OBSCURE-007"
+    },
+    {
+      "id": "BL-GAP-VOL-021-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-021#gap-1",
+      "rationale": "complete cross-language graph extraction",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-021",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-021",
+        "accountability:ACC-VOL-021"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-021#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-021-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-021#gap-2",
+      "rationale": "connect ownership/test mapping to change planner",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-021",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-021",
+        "accountability:ACC-VOL-021"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-021#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-022-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-022#gap-1",
+      "rationale": "transactional workspace layer incomplete",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-022",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-022",
+        "accountability:ACC-VOL-022"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-022#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-022-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-022#gap-2",
+      "rationale": "independent reviewer/verifier routing needs full integration",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-022",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-022",
+        "accountability:ACC-VOL-022"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-022#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-092-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-092#gap-1",
+      "rationale": "define maintenance ownership registry",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-092",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-092",
+        "accountability:ACC-VOL-092"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-092#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-092-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-092#gap-2",
+      "rationale": "bind deletion to reachability/retention checks",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-092",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-092",
+        "accountability:ACC-VOL-092"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-092#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-093-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-093#gap-1",
+      "rationale": "establish canonical backlog IDs",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-093",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-093",
+        "accountability:ACC-VOL-093"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-093#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-093-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-093#gap-2",
+      "rationale": "bind backlog to gap/risk closure",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-093",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-093",
+        "accountability:ACC-VOL-093"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-093#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-094-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-094#gap-1",
+      "rationale": "define priority factor schema",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-094",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-094",
+        "accountability:ACC-VOL-094"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-094#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-094-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-094#gap-2",
+      "rationale": "add anti-starvation constraints",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-094",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-094",
+        "accountability:ACC-VOL-094"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-094#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-095-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-095#gap-1",
+      "rationale": "bind all packages to exact requirements",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-095",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-095",
+        "accountability:ACC-VOL-095"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-095#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-095-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-095#gap-2",
+      "rationale": "materialize package evidence rollup",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-095",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-095",
+        "accountability:ACC-VOL-095"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-095#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-108-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-108#gap-1",
+      "rationale": "seed registry from historical failures",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-108",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-108",
+        "accountability:ACC-VOL-108"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-108#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-108-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-108#gap-2",
+      "rationale": "bind detectable patterns to CI",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-108",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-108",
+        "accountability:ACC-VOL-108"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-108#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-109-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-109#gap-1",
+      "rationale": "bind every AIQ task into construction DAG",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-109",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-109",
+        "accountability:ACC-VOL-109"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-109#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-109-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-109#gap-2",
+      "rationale": "materialize cycle/blocked-state reporting",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-109",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-109",
+        "accountability:ACC-VOL-109"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-109#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-110-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-110#gap-1",
+      "rationale": "unify maturity and DoD rules",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-110",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-110",
+        "accountability:ACC-VOL-110"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-110#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-110-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-110#gap-2",
+      "rationale": "bind change-impact triggers to DoD",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-110",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-110",
+        "accountability:ACC-VOL-110"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-110#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-115-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-115#gap-1",
+      "rationale": "establish debt IDs and ownership",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-115",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-115",
+        "accountability:ACC-VOL-115"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-115#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-115-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-115#gap-2",
+      "rationale": "bind debt to risk/backlog/ADR",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-115",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-115",
+        "accountability:ACC-VOL-115"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-115#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-118-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-118#gap-1",
+      "rationale": "bind roadmap to build DAG",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-118",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-118",
+        "accountability:ACC-VOL-118"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-118#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-118-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-118#gap-2",
+      "rationale": "materialize revision lineage",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-118",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-118",
+        "accountability:ACC-VOL-118"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-118#gap-2"
+    },
+    {
+      "id": "BL-GAP-VOL-119-G01",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-119#gap-1",
+      "rationale": "implement canonical rollup function",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-119",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-119",
+        "accountability:ACC-VOL-119"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-119#gap-1"
+    },
+    {
+      "id": "BL-GAP-VOL-119-G02",
+      "source_type": "masterplan_gap",
+      "source_ref": "VOL-119#gap-2",
+      "rationale": "bind UI progress to derived completion only",
+      "owner": "repository-machine",
+      "owner_ref": "ACC-VOL-119",
+      "dependency_refs": [],
+      "status": "open",
+      "priority_class": "P2",
+      "provenance": [
+        "machine/ai_master_plan.json",
+        "volume:VOL-119",
+        "accountability:ACC-VOL-119"
+      ],
+      "closure_rule": "gap remains open until bound machine control and executable validation land; volume maturity/signoff remains independent",
+      "dedupe_key": "masterplan_gap:VOL-119#gap-2"
+    }
+  ]
+}

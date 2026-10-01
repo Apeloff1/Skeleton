@@ -1,0 +1,383 @@
+{
+  "schema_version": "skeleton.roadmap_control.v1",
+  "roadmap_version": "0.1.0",
+  "status": "active",
+  "purpose": "Bind roadmap state to canonical construction/P2 dependency DAGs while preserving explicit revision lineage and breadth freeze.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-118",
+    "title": "Roadmap Control",
+    "required_gap_texts": [
+      "bind roadmap to build DAG",
+      "materialize revision lineage"
+    ]
+  },
+  "sources": [
+    "machine/ai_master_build_sequence.json",
+    "machine/ai_p2_task_backlog.json",
+    "machine/ai_master_plan.json"
+  ],
+  "breadth_freeze": {
+    "last_top_level_volume": 420,
+    "new_top_level_scope_requires_adr": true
+  },
+  "items": [
+    {
+      "id": "ROAD-MBW-00",
+      "kind": "construction_wave",
+      "source_ref": "MBW-00",
+      "depends_on": [],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "canonical contracts have explicit version/compatibility semantics",
+        "security-sensitive encodings fail closed",
+        "W00/W01 evidence is linked from the signed ledger"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-01",
+      "kind": "construction_wave",
+      "source_ref": "MBW-01",
+      "depends_on": [
+        "ROAD-MBW-00"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W19"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "boot/shutdown/restart are deterministic",
+        "authoritative restore and projection rebuild are proven",
+        "event replay is idempotent and side-effect safe"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-02",
+      "kind": "construction_wave",
+      "source_ref": "MBW-02",
+      "depends_on": [
+        "ROAD-MBW-00",
+        "ROAD-MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "provider routing preserves policy/privacy constraints",
+        "memory and retrieval writes are governed",
+        "context compilation preserves trust under pressure"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-03",
+      "kind": "construction_wave",
+      "source_ref": "MBW-03",
+      "depends_on": [
+        "ROAD-MBW-00",
+        "ROAD-MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "privileged actions require deterministic authorization",
+        "postconditions and receipts bind effects to operations",
+        "critical filesystem/network/process cases have executable evidence"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-04",
+      "kind": "construction_wave",
+      "source_ref": "MBW-04",
+      "depends_on": [
+        "ROAD-MBW-02",
+        "ROAD-MBW-03"
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "cognitive loops are bounded and recoverable",
+        "plan DAGs enforce pre/postconditions",
+        "agent delegation, leases and conflicts are mechanically constrained"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-05",
+      "kind": "construction_wave",
+      "source_ref": "MBW-05",
+      "depends_on": [
+        "ROAD-MBW-01",
+        "ROAD-MBW-03",
+        "ROAD-MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "reconnect/replay/resync is deterministic",
+        "UI is projection-only",
+        "operator-visible progress, cost, evidence and cancellation match durable state"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-06",
+      "kind": "construction_wave",
+      "source_ref": "MBW-06",
+      "depends_on": [
+        "ROAD-MBW-02",
+        "ROAD-MBW-03",
+        "ROAD-MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "benchmarks are versioned and contamination-aware",
+        "research claims preserve replication/negative-result lineage",
+        "candidate promotion requires champion/challenger, canary and rollback evidence"
+      ]
+    },
+    {
+      "id": "ROAD-MBW-07",
+      "kind": "construction_wave",
+      "source_ref": "MBW-07",
+      "depends_on": [
+        "ROAD-MBW-05",
+        "ROAD-MBW-06"
+      ],
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "volume_refs": [],
+      "status": "derived",
+      "acceptance_gates": [
+        "clean-machine install/update/rollback is proven",
+        "distributed execution survives failover/congestion/resource pressure",
+        "release evidence, provenance, SLO/capacity and recovery artifacts are complete"
+      ]
+    },
+    {
+      "id": "ROAD-P2-CTRL-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-CTRL-01",
+      "depends_on": [],
+      "work_package_refs": [],
+      "volume_refs": [],
+      "status": "landed_unpromoted",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-ARCH-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-ARCH-01",
+      "depends_on": [
+        "ROAD-P2-CTRL-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-002",
+        "VOL-003",
+        "VOL-004",
+        "VOL-051",
+        "VOL-052",
+        "VOL-053",
+        "VOL-054",
+        "VOL-055",
+        "VOL-058",
+        "VOL-116"
+      ],
+      "status": "landed_unpromoted",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-TRACE-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-TRACE-01",
+      "depends_on": [
+        "ROAD-P2-ARCH-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-112",
+        "VOL-113",
+        "VOL-122",
+        "VOL-123",
+        "VOL-124",
+        "VOL-125",
+        "VOL-126",
+        "VOL-127",
+        "VOL-128",
+        "VOL-129",
+        "VOL-130",
+        "VOL-131"
+      ],
+      "status": "landed_unpromoted",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-REPO-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-REPO-01",
+      "depends_on": [
+        "ROAD-P2-ARCH-01",
+        "ROAD-P2-TRACE-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-021",
+        "VOL-022",
+        "VOL-092",
+        "VOL-093",
+        "VOL-094",
+        "VOL-095",
+        "VOL-108",
+        "VOL-109",
+        "VOL-110",
+        "VOL-115",
+        "VOL-118",
+        "VOL-119"
+      ],
+      "status": "ready",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-QUAL-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-QUAL-01",
+      "depends_on": [
+        "ROAD-P2-TRACE-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-070",
+        "VOL-081",
+        "VOL-117",
+        "VOL-120"
+      ],
+      "status": "ready",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-DOC-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-DOC-01",
+      "depends_on": [
+        "ROAD-P2-TRACE-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-089",
+        "VOL-090"
+      ],
+      "status": "ready",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-NATIVE-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-NATIVE-01",
+      "depends_on": [
+        "ROAD-P2-QUAL-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-032",
+        "VOL-033"
+      ],
+      "status": "blocked",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    }
+  ],
+  "revisions": [
+    {
+      "id": "ROAD-REV-0001",
+      "event": "p2_foundation_merged",
+      "pr": 2315,
+      "git_sha": "6ccdcffaa5684ced6b22b39a573c016d0dfd052d",
+      "at_utc": "2026-09-30T23:56:24Z",
+      "reason": "establish governed P2 source scope"
+    },
+    {
+      "id": "ROAD-REV-0002",
+      "event": "p2_architecture_merged",
+      "pr": 2316,
+      "git_sha": "d4334086eaf1c7cbbff46890b727fc954fde1677",
+      "at_utc": "2026-10-01T00:30:42Z",
+      "reason": "land architecture-control tranche"
+    },
+    {
+      "id": "ROAD-REV-0003",
+      "event": "p2_traceability_open",
+      "pr": 2319,
+      "git_sha": "6e17df8493cdf0c97484f867e32252caed708a4e",
+      "at_utc": "2026-10-01T01:22:00Z",
+      "reason": "open traceability implementation lane"
+    },
+    {
+      "id": "ROAD-REV-0004",
+      "event": "repository_control_sync",
+      "p2_map_version": "0.2.0",
+      "p2_backlog_version": "0.2.0",
+      "build_sequence_version": "1.1.0",
+      "reason": "bind repository roadmap to current governed P2 and build-sequence source versions",
+      "preserves_history": true
+    }
+  ],
+  "policy": {
+    "dependency_rule": "Roadmap dependencies are copied from canonical DAG sources.",
+    "revision_rule": "Replanning appends revision lineage; prior events are immutable.",
+    "scope_rule": "No roadmap item can add top-level masterplan volume beyond VOL-420 without ADR."
+  }
+}
