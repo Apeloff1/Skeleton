@@ -47,22 +47,6 @@ class SpineRuntimeSelection:
         ):
             raise SpineRuntimeSelectionError("live qualification is missing or invalid")
 
-        try:
-            qualification_verified = (
-                SpinePyMongoAsyncQualificationVerify().verify(qualification)
-            )
-        except Exception as exc:
-            raise SpineRuntimeSelectionError(
-                "live qualification independent verification failed"
-            ) from exc
-        if (
-            qualification_verified.get("qualification_digest")
-            != qualification.get("digest")
-        ):
-            raise SpineRuntimeSelectionError(
-                "live qualification digest verification changed"
-            )
-
         if qualification.get("supported_async_driver") is not True:
             raise SpineRuntimeSelectionError("unsupported async driver")
         if qualification.get("deployment_driver_imported") is not True:
@@ -94,6 +78,22 @@ class SpineRuntimeSelection:
             value = qualification.get(name)
             if not isinstance(value, str) or len(value) != 64:
                 raise SpineRuntimeSelectionError(f"invalid qualification digest: {name}")
+
+        try:
+            qualification_verified = (
+                SpinePyMongoAsyncQualificationVerify().verify(qualification)
+            )
+        except Exception as exc:
+            raise SpineRuntimeSelectionError(
+                "live qualification independent verification failed"
+            ) from exc
+        if (
+            qualification_verified.get("qualification_digest")
+            != qualification.get("digest")
+        ):
+            raise SpineRuntimeSelectionError(
+                "live qualification digest verification changed"
+            )
 
         if (
             not isinstance(dispatch_guard, dict)
