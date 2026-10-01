@@ -71,6 +71,8 @@ FILES = (
     "spine_provider_surface_qualification_verify.py",
     "spine_pr_automation_qualification.py",
     "spine_pr_automation_qualification_verify.py",
+    "spine_provider_live_qualification.py",
+    "spine_provider_live_qualification_verify.py",
 )
 
 
