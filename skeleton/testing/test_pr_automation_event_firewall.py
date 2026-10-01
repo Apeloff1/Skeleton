@@ -509,3 +509,17 @@ def test_workflow_does_not_interpolate_authority_metadata_directly_into_shell() 
         dollar + "{{ github.event.workflow_run.head_repository.full_name }}"
         not in text
     )
+
+def test_workflow_exports_protected_base_control_as_active_env() -> None:
+    from pathlib import Path
+
+    text = Path(".github/workflows/pr-automation-index.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "\\n      PR_RUNNER_REQUIRE_PROTECTED_BASE" not in text
+    assert any(
+        line.strip().startswith("PR_RUNNER_REQUIRE_PROTECTED_BASE:")
+        and not line.lstrip().startswith("#")
+        for line in text.splitlines()
+    )
+
