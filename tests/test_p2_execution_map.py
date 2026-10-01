@@ -106,6 +106,42 @@ class P2ExecutionMapTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2ValidationError, "wave count drift"):
             MODULE.validate(root)
 
+    def test_rejects_ready_task_with_unlanded_dependency(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        by_id = {task["task_id"]: task for task in data["tasks"]}
+        by_id["P2-TRACE-01"]["status"] = "in_progress"
+        by_id["P2-REPO-01"]["status"] = "ready"
+        data["summary"]["in_progress_count"] = 1
+        data["summary"]["ready_count"] = 3
+        data["summary"]["landed_unpromoted_count"] = 2
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "unresolved dependencies"):
+            MODULE.validate(root)
+
+    def test_rejects_blocked_task_when_dependencies_are_landed(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        by_id = {task["task_id"]: task for task in data["tasks"]}
+        by_id["P2-REPO-01"]["status"] = "blocked"
+        data["summary"]["ready_count"] = 2
+        data["summary"]["blocked_count"] = 2
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "all dependencies are landed"):
+            MODULE.validate(root)
+
+    def test_rejects_landed_task_without_evidence(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        by_id = {task["task_id"]: task for task in data["tasks"]}
+        by_id["P2-TRACE-01"]["evidence_refs"] = []
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "requires at least three evidence refs"):
+            MODULE.validate(root)
+
 
 if __name__ == "__main__":
     unittest.main()
