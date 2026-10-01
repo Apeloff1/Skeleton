@@ -61,6 +61,8 @@ from skeleton.persistence.spine_catalog import SpineCatalog
 from skeleton.persistence.mongo_catalog import MongoCatalog
 from skeleton.persistence.spine_batch import SpineBatch, SpineBatchReport
 from skeleton.persistence.spine_witness import SpineWitness
+from skeleton.persistence.spine_drift import SpineDrift
+from skeleton.persistence.spine_apply import SpineApplyGate
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -136,6 +138,8 @@ __all__ = [
     "SpineBatch",
     "SpineBatchReport",
     "SpineWitness",
+    "SpineDrift",
+    "SpineApplyGate",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
