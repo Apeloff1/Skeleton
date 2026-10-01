@@ -339,6 +339,10 @@
       "implementation_signed": false,
       "verification_signed": false,
       "evidence_refs": [
+        "branch:feat/p2-traceability-spine",
+        "machine:master_traceability.json",
+        "workflow:P2 Master Traceability Spine",
+        "workflow:P2 Traceability Focused Contract",
         "github:pr#2319",
         "git:merge:bd5171ecb04368f4ba6ff4e67d497c9559eccb85",
         "workflow:P2 Master Traceability Spine@a4fdffe92cf2dec5b310e23f65d9de0e5f833aae:success",
