@@ -88,11 +88,13 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
             )
         acceptance_digest = acceptance.get("digest")
         acceptance_id = acceptance.get("acceptance_id")
+        health_digest = acceptance.get("health_digest")
         execution_id = acceptance.get("execution_id")
         deployment_id = acceptance.get("deployment_id")
         for field, value in (
             ("acceptance digest", acceptance_digest),
             ("acceptance identity", acceptance_id),
+            ("health digest", health_digest),
             ("execution identity", execution_id),
         ):
             if not isinstance(value, str) or len(value) != 64:
@@ -206,14 +208,15 @@ class SpineRuntimeProductionActivationAuthorizationLedger:
 
         authorization_id = hashlib.sha256(
             (
-                f"{acceptance_digest}|{acceptance_id}|{execution_id}|"
-                f"{deployment_id}|{nonce}|pymongo-async"
+                f"{acceptance_digest}|{acceptance_id}|{health_digest}|"
+                f"{execution_id}|{deployment_id}|{nonce}|pymongo-async"
             ).encode("utf-8")
         ).hexdigest()
         evidence = {
             "authorization_id": authorization_id,
             "acceptance_digest": acceptance_digest,
             "acceptance_id": acceptance_id,
+            "health_digest": health_digest,
             "execution_id": execution_id,
             "deployment_id": deployment_id,
             "authorization_nonce": nonce,
