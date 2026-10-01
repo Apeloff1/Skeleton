@@ -101,6 +101,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineActivationPermitLedger` requires independently verified activation eligibility plus an externally authenticated deployment-owned `activation-control` receipt scoped to the exact activation-gate digest. The receipt is capped at five minutes and carries a unique nonce. Permit issuance remains non-activating.
 
+## One-time activation permit consumption
+
+`SpineActivationPermitLedger.consume()` rechecks the durable permit row, exact scope and digest, refuses expired permits, atomically flips `consumed` from 0 to 1, and rejects replay. The consumption receipt remains non-activating and is independently verified.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -130,7 +134,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_selection_consumption.py \
   skeleton/testing/test_spine_driver_selection.py \
   skeleton/testing/test_spine_runtime_activation_gate.py \
-  skeleton/testing/test_spine_activation_permit.py
+  skeleton/testing/test_spine_activation_permit.py \
+  skeleton/testing/test_spine_activation_consumption.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

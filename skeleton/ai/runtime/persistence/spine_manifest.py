@@ -102,6 +102,8 @@ SEAMS = (
     ("runtime-activation-gate-verify", "activation-gate-verification-does-not-activate-runtime"),
     ("activation-permit", "activation-eligibility-requires-external-short-lived-permit"),
     ("activation-permit-verify", "activation-permit-verification-does-not-activate-runtime"),
+    ("activation-consume", "activation-permit-consumed-once-before-runtime-transition"),
+    ("activation-consume-verify", "activation-consumption-verification-does-not-activate-runtime"),
 )
 
 

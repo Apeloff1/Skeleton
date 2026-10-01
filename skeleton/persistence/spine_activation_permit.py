@@ -162,8 +162,107 @@ class SpineActivationPermitLedger:
             "verification_signature": False,
         }
 
+    def consume(
+        self,
+        *,
+        permit: dict[str, Any],
+        permit_verify: dict[str, Any],
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(permit, dict) or permit.get("kind") != "spine_activation_permit":
+            raise SpineActivationPermitError("activation permit card is required")
+        if permit.get("activation_authorized") is not True or permit.get("permit_consumed") is not False:
+            raise SpineActivationPermitError("activation permit is not consumable")
+        if permit.get("runtime_driver_selected") is not True or permit.get("runtime_activated") is not False:
+            raise SpineActivationPermitError("activation permit runtime state is invalid")
+        if permit.get("runtime_object_replaced") is not False or permit.get("dispatcher_started") is not False:
+            raise SpineActivationPermitError("activation permit already changed runtime")
+        permit_id, permit_digest = permit.get("permit_id"), permit.get("digest")
+        if not isinstance(permit_id, str) or len(permit_id) != 64:
+            raise SpineActivationPermitError("activation permit identity is invalid")
+        if not isinstance(permit_digest, str) or len(permit_digest) != 64:
+            raise SpineActivationPermitError("activation permit digest is invalid")
+        if (
+            not isinstance(permit_verify, dict)
+            or permit_verify.get("kind") != "spine_activation_permit_verify"
+            or permit_verify.get("verified") is not True
+            or permit_verify.get("permit_id") != permit_id
+            or permit_verify.get("permit_digest") != permit_digest
+            or permit_verify.get("activation_authorized") is not True
+            or permit_verify.get("permit_consumed") is not False
+            or permit_verify.get("runtime_activated") is not False
+        ):
+            raise SpineActivationPermitError("independent activation permit verification is required")
+
+        valid_until = _instant(permit.get("valid_until"), "valid_until")
+        instant = now or datetime.now(timezone.utc)
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise SpineActivationPermitError("now must be timezone-aware")
+        instant = instant.astimezone(timezone.utc)
+        if instant >= valid_until:
+            raise SpineActivationPermitError("activation permit expired before consumption")
+
+        row = self._connection.execute(
+            """SELECT activation_gate_digest, activation_nonce, target_driver,
+                      payload_digest, consumed
+               FROM spine_activation_permit WHERE permit_id = ?""",
+            (permit_id,),
+        ).fetchone()
+        if row is None:
+            raise SpineActivationPermitError("activation permit is not durably recorded")
+        if row["payload_digest"] != permit_digest:
+            raise SpineActivationPermitError("persisted activation permit digest mismatch")
+        if row["activation_gate_digest"] != permit.get("activation_gate_digest"):
+            raise SpineActivationPermitError("persisted activation gate scope mismatch")
+        if row["activation_nonce"] != permit.get("activation_nonce"):
+            raise SpineActivationPermitError("persisted activation nonce mismatch")
+        if row["target_driver"] != "pymongo-async":
+            raise SpineActivationPermitError("persisted activation target changed")
+        if int(row["consumed"]) != 0:
+            raise SpineActivationPermitError("activation permit replay refused")
+
+        cursor = self._connection.execute(
+            "UPDATE spine_activation_permit SET consumed = 1 WHERE permit_id = ? AND consumed = 0",
+            (permit_id,),
+        )
+        if cursor.rowcount != 1:
+            self._connection.rollback()
+            raise SpineActivationPermitError("activation permit replay refused")
+        self._connection.commit()
+
+        evidence = {
+            "permit_id": permit_id,
+            "permit_digest": permit_digest,
+            "activation_gate_digest": permit.get("activation_gate_digest"),
+            "target_driver": "pymongo-async",
+            "consumed_at": instant.isoformat(),
+            "activation_authorized": True,
+            "permit_consumed": True,
+            "runtime_driver_selected": True,
+            "runtime_object_replaced": False,
+            "dispatcher_started": False,
+            "runtime_activated": False,
+        }
+        return {
+            "kind": "spine_activation_consumption",
+            "hit": False,
+            "law": "activation-permit-consumed-once-before-runtime-transition",
+            "citation": "VOL-134",
+            **evidence,
+            "digest": _digest(evidence),
+            "stored_prose": 0,
+            "completion_checkbox": False,
+            "implementation_signature": False,
+            "verification_signature": False,
+        }
+
     def count(self) -> int:
         return int(self._connection.execute("SELECT COUNT(*) FROM spine_activation_permit").fetchone()[0])
+
+    def consumed_count(self) -> int:
+        return int(self._connection.execute(
+            "SELECT COUNT(*) FROM spine_activation_permit WHERE consumed = 1"
+        ).fetchone()[0])
 
     def close(self) -> None:
         self._connection.close()
