@@ -72,11 +72,27 @@ def _source_run() -> dict[str, object]:
     }
 
 
+def _automation_run() -> dict[str, object]:
+    return {
+        "id": 123,
+        "name": "PR Automation Index",
+        "path": ".github/workflows/pr-automation-index.yml",
+        "event": "workflow_run",
+        "workflow_id": 359670100,
+        "run_attempt": 1,
+        "status": "in_progress",
+        "conclusion": None,
+        "head_sha": "e" * 40,
+        "head_repository": {"full_name": "Apeloff1/Skeleton"},
+    }
+
+
 def _build(report: dict[str, object]) -> dict[str, object]:
     return SpinePrAutomationReceiptBuilder().build(
         report=report,
         expected_repository="Apeloff1/Skeleton",
         source_run=_source_run(),
+        automation_run=_automation_run(),
         expected_source_run_attempt=1,
         expected_head_sha=HEAD,
         expected_pr_number=PR,
@@ -99,6 +115,13 @@ def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
     verified = SpinePrAutomationQualificationVerify().verify(card)
 
     assert receipt["source_pr_number"] == PR
+    assert receipt["automation_workflow_id"] == 359670100
+    assert (
+        receipt["automation_workflow_path"]
+        == ".github/workflows/pr-automation-index.yml"
+    )
+    assert receipt["automation_event"] == "workflow_run"
+    assert receipt["automation_status"] == "in_progress"
     assert receipt["target_state"] == "held"
     assert receipt["decision"] == "hold"
     assert verified["pr_automation_operational_green"] is True
@@ -248,6 +271,50 @@ def test_runner_receipt_builder_rejects_ambiguous_source_prs() -> None:
             report=_report(),
             expected_repository="Apeloff1/Skeleton",
             source_run=source,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )
+
+
+def test_runner_receipt_builder_rejects_producer_workflow_id_drift() -> None:
+    automation = _automation_run()
+    automation["workflow_id"] = 999999999
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="producer workflow id changed",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=_source_run(),
+            automation_run=automation,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )
+
+
+def test_runner_receipt_builder_rejects_producer_run_identity_drift() -> None:
+    automation = _automation_run()
+    automation["id"] = 124
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="producer run identity changed",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=_source_run(),
+            automation_run=automation,
             expected_source_run_attempt=1,
             expected_head_sha=HEAD,
             expected_pr_number=PR,

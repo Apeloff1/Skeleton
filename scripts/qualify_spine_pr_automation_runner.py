@@ -57,7 +57,7 @@ def _authenticate(receipt: dict[str, Any], key: bytes) -> bool:
     )
 
 
-def _fetch_source_run(repository: str, run_id: int) -> dict[str, Any]:
+def _fetch_workflow_run(repository: str, run_id: int) -> dict[str, Any]:
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
         raise RuntimeError(
@@ -114,19 +114,28 @@ def main() -> int:
                 "runner report must contain exactly one positive target PR when --pr-number is omitted"
             )
         pr_number = target_rows[0]["number"]
-    source_run = _fetch_source_run(
+    source_run = _fetch_workflow_run(
         args.repository,
         args.source_run_id,
+    )
+    automation_run = _fetch_workflow_run(
+        args.repository,
+        args.run_id,
     )
     if source_run.get("run_attempt") != args.source_run_attempt:
         raise RuntimeError(
             "source workflow run attempt changed before qualification"
+        )
+    if automation_run.get("run_attempt") != args.run_attempt:
+        raise RuntimeError(
+            "PR Automation producer run attempt changed before qualification"
         )
     key = _key()
     receipt = SpinePrAutomationReceiptBuilder().build(
         report=report,
         expected_repository=args.repository,
         source_run=source_run,
+        automation_run=automation_run,
         expected_source_run_attempt=args.source_run_attempt,
         expected_head_sha=args.expected_head,
         expected_pr_number=pr_number,

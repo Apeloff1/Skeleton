@@ -1,4 +1,10 @@
-"""Trusted source identity for P2 PR Automation operational evidence."""
+"""Trusted workflow identities for P2 PR Automation operational evidence."""
+
+TRUSTED_AUTOMATION_WORKFLOW_NAME = "PR Automation Index"
+TRUSTED_AUTOMATION_WORKFLOW_ID = 359670100
+TRUSTED_AUTOMATION_WORKFLOW_PATH = ".github/workflows/pr-automation-index.yml"
+TRUSTED_AUTOMATION_EVENT = "workflow_run"
+TRUSTED_AUTOMATION_STATUS = "in_progress"
 
 TRUSTED_SOURCE_WORKFLOW_NAME = "Merge Readiness"
 TRUSTED_SOURCE_WORKFLOW_ID = 358774735
@@ -8,6 +14,11 @@ TRUSTED_SOURCE_STATUS = "completed"
 TRUSTED_SOURCE_CONCLUSION = "success"
 
 __all__ = [
+    "TRUSTED_AUTOMATION_EVENT",
+    "TRUSTED_AUTOMATION_STATUS",
+    "TRUSTED_AUTOMATION_WORKFLOW_ID",
+    "TRUSTED_AUTOMATION_WORKFLOW_NAME",
+    "TRUSTED_AUTOMATION_WORKFLOW_PATH",
     "TRUSTED_SOURCE_CONCLUSION",
     "TRUSTED_SOURCE_EVENT",
     "TRUSTED_SOURCE_STATUS",

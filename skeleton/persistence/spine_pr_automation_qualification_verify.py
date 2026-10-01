@@ -8,6 +8,11 @@ import re
 from typing import Any
 
 from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_AUTOMATION_EVENT,
+    TRUSTED_AUTOMATION_STATUS,
+    TRUSTED_AUTOMATION_WORKFLOW_ID,
+    TRUSTED_AUTOMATION_WORKFLOW_NAME,
+    TRUSTED_AUTOMATION_WORKFLOW_PATH,
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
@@ -63,9 +68,43 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation authority domain changed"
             )
-        if card.get("workflow_name") != "PR Automation Index":
+        if card.get("workflow_name") != TRUSTED_AUTOMATION_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation workflow identity changed"
+            )
+        automation_workflow_id = card.get(
+            "automation_workflow_id"
+        )
+        if (
+            isinstance(automation_workflow_id, bool)
+            or not isinstance(automation_workflow_id, int)
+            or automation_workflow_id != TRUSTED_AUTOMATION_WORKFLOW_ID
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation producer workflow id changed"
+            )
+        if (
+            card.get("automation_workflow_path")
+            != TRUSTED_AUTOMATION_WORKFLOW_PATH
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation producer workflow path changed"
+            )
+        if card.get("automation_event") != TRUSTED_AUTOMATION_EVENT:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation producer event changed"
+            )
+        if card.get("automation_status") != TRUSTED_AUTOMATION_STATUS:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation producer status changed"
+            )
+        automation_head_sha = card.get("automation_head_sha")
+        if (
+            not isinstance(automation_head_sha, str)
+            or _SHA_RE.fullmatch(automation_head_sha) is None
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation producer head SHA is invalid"
             )
         if card.get("source_workflow") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationVerifyError(
@@ -84,9 +123,10 @@ class SpinePrAutomationQualificationVerify:
             not isinstance(repository, str)
             or _REPOSITORY_RE.fullmatch(repository) is None
             or card.get("source_head_repository") != repository
+            or card.get("automation_head_repository") != repository
         ):
             raise SpinePrAutomationQualificationVerifyError(
-                "PR automation source repository changed"
+                "PR automation source or producer repository changed"
             )
         if card.get("source_status") != TRUSTED_SOURCE_STATUS:
             raise SpinePrAutomationQualificationVerifyError(
@@ -98,7 +138,7 @@ class SpinePrAutomationQualificationVerify:
             )
         if card.get("conclusion") != "success":
             raise SpinePrAutomationQualificationVerifyError(
-                "PR automation workflow did not complete successfully"
+                "PR automation runner evaluation did not complete successfully"
             )
         head_sha = card.get("head_sha")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
@@ -209,6 +249,14 @@ class SpinePrAutomationQualificationVerify:
         evidence = {
             "authority_domain": card["authority_domain"],
             "workflow_name": card["workflow_name"],
+            "automation_workflow_id": card["automation_workflow_id"],
+            "automation_workflow_path": card["automation_workflow_path"],
+            "automation_event": card["automation_event"],
+            "automation_status": card["automation_status"],
+            "automation_head_repository": card[
+                "automation_head_repository"
+            ],
+            "automation_head_sha": automation_head_sha,
             "repository": repository,
             "source_workflow": card["source_workflow"],
             "source_workflow_path": card["source_workflow_path"],

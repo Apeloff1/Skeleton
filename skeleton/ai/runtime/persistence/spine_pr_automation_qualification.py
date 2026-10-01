@@ -8,6 +8,11 @@ import re
 from typing import Any, Callable
 
 from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_AUTOMATION_EVENT,
+    TRUSTED_AUTOMATION_STATUS,
+    TRUSTED_AUTOMATION_WORKFLOW_ID,
+    TRUSTED_AUTOMATION_WORKFLOW_NAME,
+    TRUSTED_AUTOMATION_WORKFLOW_PATH,
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
@@ -100,10 +105,37 @@ class SpinePrAutomationQualification:
             raise SpinePrAutomationQualificationError(
                 "PR automation authority domain changed"
             )
-        if receipt.get("workflow_name") != "PR Automation Index":
+        if receipt.get("workflow_name") != TRUSTED_AUTOMATION_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationError(
                 "PR automation workflow identity changed"
             )
+        automation_workflow_id = _positive_int(
+            receipt.get("automation_workflow_id"),
+            "PR automation producer workflow id",
+        )
+        if automation_workflow_id != TRUSTED_AUTOMATION_WORKFLOW_ID:
+            raise SpinePrAutomationQualificationError(
+                "PR automation producer workflow id changed"
+            )
+        if (
+            receipt.get("automation_workflow_path")
+            != TRUSTED_AUTOMATION_WORKFLOW_PATH
+        ):
+            raise SpinePrAutomationQualificationError(
+                "PR automation producer workflow path changed"
+            )
+        if receipt.get("automation_event") != TRUSTED_AUTOMATION_EVENT:
+            raise SpinePrAutomationQualificationError(
+                "PR automation producer event changed"
+            )
+        if receipt.get("automation_status") != TRUSTED_AUTOMATION_STATUS:
+            raise SpinePrAutomationQualificationError(
+                "PR automation producer status changed"
+            )
+        automation_head_sha = _sha(
+            receipt.get("automation_head_sha"),
+            "PR automation producer head SHA",
+        )
         if receipt.get("source_workflow") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationQualificationError(
                 "PR automation source workflow changed"
@@ -121,9 +153,10 @@ class SpinePrAutomationQualification:
             not isinstance(repository, str)
             or _REPOSITORY_RE.fullmatch(repository) is None
             or receipt.get("source_head_repository") != repository
+            or receipt.get("automation_head_repository") != repository
         ):
             raise SpinePrAutomationQualificationError(
-                "PR automation source repository changed"
+                "PR automation source or producer repository changed"
             )
         if receipt.get("source_status") != TRUSTED_SOURCE_STATUS:
             raise SpinePrAutomationQualificationError(
@@ -135,7 +168,7 @@ class SpinePrAutomationQualification:
             )
         if receipt.get("conclusion") != "success":
             raise SpinePrAutomationQualificationError(
-                "PR automation workflow did not complete successfully"
+                "PR automation runner evaluation did not complete successfully"
             )
         if receipt.get("head_sha") != expected_head:
             raise SpinePrAutomationQualificationError(
@@ -270,6 +303,14 @@ class SpinePrAutomationQualification:
         evidence = {
             "authority_domain": receipt["authority_domain"],
             "workflow_name": receipt["workflow_name"],
+            "automation_workflow_id": automation_workflow_id,
+            "automation_workflow_path": receipt["automation_workflow_path"],
+            "automation_event": receipt["automation_event"],
+            "automation_status": receipt["automation_status"],
+            "automation_head_repository": receipt[
+                "automation_head_repository"
+            ],
+            "automation_head_sha": automation_head_sha,
             "repository": repository,
             "source_workflow": receipt["source_workflow"],
             "source_workflow_path": receipt["source_workflow_path"],

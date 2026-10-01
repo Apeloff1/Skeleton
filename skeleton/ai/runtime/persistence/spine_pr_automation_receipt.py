@@ -8,6 +8,11 @@ import re
 from typing import Any, Callable, Mapping
 
 from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_AUTOMATION_EVENT,
+    TRUSTED_AUTOMATION_STATUS,
+    TRUSTED_AUTOMATION_WORKFLOW_ID,
+    TRUSTED_AUTOMATION_WORKFLOW_NAME,
+    TRUSTED_AUTOMATION_WORKFLOW_PATH,
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
@@ -70,6 +75,7 @@ class SpinePrAutomationReceiptBuilder:
         report: Mapping[str, Any],
         expected_repository: str,
         source_run: Mapping[str, Any],
+        automation_run: Mapping[str, Any],
         expected_source_run_attempt: int,
         expected_head_sha: str,
         expected_pr_number: int,
@@ -91,6 +97,10 @@ class SpinePrAutomationReceiptBuilder:
             raise SpinePrAutomationReceiptError(
                 "source workflow run must be an object"
             )
+        if not isinstance(automation_run, Mapping):
+            raise SpinePrAutomationReceiptError(
+                "automation workflow run must be an object"
+            )
         source_run_attempt = _positive(
             expected_source_run_attempt,
             "source workflow run attempt",
@@ -100,6 +110,68 @@ class SpinePrAutomationReceiptBuilder:
         expected_pr = _positive(expected_pr_number, "expected PR number")
         automation_run_id = _positive(run_id, "PR Automation run id")
         automation_attempt = _positive(run_attempt, "PR Automation run attempt")
+        observed_automation_run_id = _positive(
+            automation_run.get("id"),
+            "observed PR Automation run id",
+        )
+        observed_automation_attempt = _positive(
+            automation_run.get("run_attempt"),
+            "observed PR Automation run attempt",
+        )
+        automation_workflow_id = _positive(
+            automation_run.get("workflow_id"),
+            "PR Automation workflow id",
+        )
+        if observed_automation_run_id != automation_run_id:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer run identity changed"
+            )
+        if observed_automation_attempt != automation_attempt:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer run attempt changed"
+            )
+        if automation_run.get("name") != TRUSTED_AUTOMATION_WORKFLOW_NAME:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer workflow name changed"
+            )
+        if automation_workflow_id != TRUSTED_AUTOMATION_WORKFLOW_ID:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer workflow id changed"
+            )
+        if automation_run.get("path") != TRUSTED_AUTOMATION_WORKFLOW_PATH:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer workflow path changed"
+            )
+        if automation_run.get("event") != TRUSTED_AUTOMATION_EVENT:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer event changed"
+            )
+        if automation_run.get("status") != TRUSTED_AUTOMATION_STATUS:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer is not running"
+            )
+        if automation_run.get("conclusion") is not None:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer concluded before evidence emission"
+            )
+        automation_head_sha = automation_run.get("head_sha")
+        if (
+            not isinstance(automation_head_sha, str)
+            or _SHA_RE.fullmatch(automation_head_sha) is None
+        ):
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer head SHA is invalid"
+            )
+        automation_head_repository = automation_run.get("head_repository")
+        automation_repository = (
+            automation_head_repository.get("full_name")
+            if isinstance(automation_head_repository, Mapping)
+            else None
+        )
+        if automation_repository != expected_repository:
+            raise SpinePrAutomationReceiptError(
+                "PR Automation producer repository changed"
+            )
         if mode not in _ALLOWED_MODES:
             raise SpinePrAutomationReceiptError("PR Automation mode is invalid")
         if not callable(attest):
@@ -253,7 +325,13 @@ class SpinePrAutomationReceiptBuilder:
         receipt: dict[str, Any] = {
             "kind": "spine_pr_automation_runner_receipt",
             "authority_domain": "pr-automation-runner",
-            "workflow_name": "PR Automation Index",
+            "workflow_name": TRUSTED_AUTOMATION_WORKFLOW_NAME,
+            "automation_workflow_id": automation_workflow_id,
+            "automation_workflow_path": TRUSTED_AUTOMATION_WORKFLOW_PATH,
+            "automation_event": TRUSTED_AUTOMATION_EVENT,
+            "automation_status": TRUSTED_AUTOMATION_STATUS,
+            "automation_head_repository": automation_repository,
+            "automation_head_sha": automation_head_sha,
             "repository": expected_repository,
             "source_workflow": TRUSTED_SOURCE_WORKFLOW_NAME,
             "source_workflow_path": TRUSTED_SOURCE_WORKFLOW_PATH,

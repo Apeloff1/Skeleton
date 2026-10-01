@@ -37,6 +37,12 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "kind": "spine_pr_automation_runner_receipt",
         "authority_domain": "pr-automation-runner",
         "workflow_name": "PR Automation Index",
+        "automation_workflow_id": 359670100,
+        "automation_workflow_path": ".github/workflows/pr-automation-index.yml",
+        "automation_event": "workflow_run",
+        "automation_status": "in_progress",
+        "automation_head_repository": "Apeloff1/Skeleton",
+        "automation_head_sha": "e" * 40,
         "repository": "Apeloff1/Skeleton",
         "source_workflow": "Merge Readiness",
         "source_workflow_path": ".github/workflows/merge-readiness.yml",
@@ -329,5 +335,38 @@ def test_verifier_rejects_source_pr_identity_drift() -> None:
     with pytest.raises(
         SpinePrAutomationQualificationVerifyError,
         match="source workflow targets the wrong PR",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
+
+
+def test_qualification_rejects_producer_workflow_identity_drift() -> None:
+    receipt = _receipt()
+    receipt["automation_workflow_id"] = 999999999
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="producer workflow id changed",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_verifier_rejects_producer_workflow_identity_drift() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["automation_workflow_path"] = (
+        ".github/workflows/forged-pr-automation-index.yml"
+    )
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="producer workflow path changed",
     ):
         SpinePrAutomationQualificationVerify().verify(tampered)
