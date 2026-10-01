@@ -98,7 +98,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     path = root / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
     text = path.read_text(encoding="utf-8")
     required = [
-        "- Bind card sealed: 75%",
+        "- Bind card sealed: 85%",
         "Expect `count` 57",
         "Bind snapshot",
         "Bind recovery",
@@ -117,7 +117,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
             "masterplan recovery control drift: " + " | ".join(missing)
         )
     return {
-        "bind_card_percent": 75,
+        "bind_card_percent": 85,
         "manifest_count": 57,
         "activation_claimed": False,
     }

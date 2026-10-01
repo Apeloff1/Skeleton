@@ -66,3 +66,22 @@ evidence state and no-activation boundary.
 The control report is evidence about repository consistency only. valid=true is
 not runtime activation, provider/PR surface promotion, CI completion authority,
 merge authority, or a P2 sign-off.
+
+
+## Destructive-scratch restore drill
+
+The recovery workflow also executes:
+
+python scripts/state_recovery_drill.py live-spine-bind-sqlite \
+  --workdir <scratch>/skeleton_recovery_drill_spine_bind
+
+The drill creates a real SpineBindCheckpoint SQLite database, captures a
+transactionally consistent backup through SQLite's backup API, deletes the
+source authority, restores into a fresh database, verifies schema/data digests,
+replays the checkpoint without insertion, proves a foreign tenant is empty,
+recomputes the checkpoint hash chain, and verifies the final evidence bundle.
+
+Every activation-bearing flag remains false after restore. The drill rejects
+digest drift, row-count drift, replay insertion, tenant leakage, chain rewrite,
+or any accidental activation. It uses only scratch directories whose basename
+starts with skeleton_recovery_drill_.

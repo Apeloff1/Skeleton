@@ -333,3 +333,34 @@ def test_derived_rebuild_includes_only_active_canonical_memory() -> None:
             ),
         }
     ]
+
+
+def test_spine_bind_checkpoint_restore_preserves_dark_evidence(tmp_path) -> None:
+    result = drill.run_spine_bind_sqlite_drill(
+        tmp_path / "skeleton_recovery_drill_spine_bind",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["policy"] == "spine-bind-checkpoint-dark-restore"
+    assert result["backup_digest"] == result["restore_digest"]
+    assert result["checkpoint"]["rows"] == 1
+    assert len(result["checkpoint"]["recovery_digest"]) == 64
+    assert result["replay"] == {
+        "rows_before": 1,
+        "rows_after": 1,
+        "inserted": False,
+        "rewritten": False,
+    }
+    assert result["tenant"]["own_count"] == 1
+    assert result["tenant"]["foreign_count"] == 0
+    assert result["chain"]["rows"] == 1
+    assert result["chain"]["rewritten"] is False
+    assert result["bundle"]["verified"] is True
+    assert result["bundle"]["activated"] is False
+    assert result["activation_claimed"] is False
+    assert result["apply_landed"] is False
+    assert result["live_motor"] is False
+    assert result["dispatcher_running"] is False
+    assert result["ci_green"] is False
+    assert result["merged"] is False
