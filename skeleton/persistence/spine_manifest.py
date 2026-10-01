@@ -129,6 +129,8 @@ SEAMS = (
     ("runtime-transition-health-verify", "live-health-verification-does-not-promote-runtime-activation"),
     ("runtime-transition-acceptance", "external-health-acceptance-does-not-self-authorize-activation"),
     ("runtime-transition-acceptance-verify", "acceptance-verification-does-not-promote-runtime-activation"),
+    ("runtime-production-activation-authorization", "external-authorization-does-not-itself-activate-runtime"),
+    ("runtime-production-activation-authorization-verify", "authorization-verification-does-not-activate-runtime"),
 )
 
 
