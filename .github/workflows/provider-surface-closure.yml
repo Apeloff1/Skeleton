@@ -39,6 +39,11 @@ on:
       - "skeleton/testing/test_engine_cross_service_boundary.py"
       - "tests/test_provider_capability_matrix.py"
       - "tests/test_provider_surface_independent_verifier.py"
+      - "skeleton/persistence/spine_provider_surface_qualification.py"
+      - "skeleton/persistence/spine_provider_surface_qualification_verify.py"
+      - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification.py"
+      - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification_verify.py"
+      - "skeleton/testing/test_spine_provider_surface_qualification.py"
       - "machine/provider_capability_matrix.json"
       - "machine/ai_app_construction.json"
       - "machine/ai_closure_evidence.json"
@@ -58,6 +63,13 @@ jobs:
     name: Provider surface contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    outputs:
+      head_sha: ${{ steps.closure_summary.outputs.head_sha }}
+      declared_digest: ${{ steps.closure_summary.outputs.declared_digest }}
+      discovered_digest: ${{ steps.closure_summary.outputs.discovered_digest }}
+      declared_count: ${{ steps.closure_summary.outputs.declared_count }}
+      discovered_count: ${{ steps.closure_summary.outputs.discovered_count }}
+      receipt_digest: ${{ steps.closure_summary.outputs.receipt_digest }}
     env:
       PYTHONPATH: ".:backend"
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -171,10 +183,49 @@ jobs:
           )
           PY
 
+      - name: Emit canonical provider closure summary
+        id: closure_summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.persistence.spine_provider_surface_qualification import (
+              SpineProviderSurfaceQualification,
+          )
+
+          receipt = json.loads(
+              Path(".provider-surface-evidence.json").read_text(encoding="utf-8")
+          )
+          summary = SpineProviderSurfaceQualification.canonical_summary(receipt)
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              for key in (
+                  "head_sha",
+                  "declared_digest",
+                  "discovered_digest",
+                  "declared_count",
+                  "discovered_count",
+                  "receipt_digest",
+              ):
+                  handle.write(f"{key}={summary[key]}\n")
+          PY
+
   provider-surface-independent:
     name: Independent provider verifier
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      head_sha: ${{ steps.closure_summary.outputs.head_sha }}
+      declared_digest: ${{ steps.closure_summary.outputs.declared_digest }}
+      discovered_digest: ${{ steps.closure_summary.outputs.discovered_digest }}
+      declared_count: ${{ steps.closure_summary.outputs.declared_count }}
+      discovered_count: ${{ steps.closure_summary.outputs.discovered_count }}
+      scanned_python_files: ${{ steps.closure_summary.outputs.scanned_python_files }}
+      declared_surface_digest: ${{ steps.closure_summary.outputs.declared_surface_digest }}
+      receipt_digest: ${{ steps.closure_summary.outputs.receipt_digest }}
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -245,3 +296,146 @@ jobs:
               len(receipt["discovered_provider_edges"]),
           )
           PY
+
+      - name: Emit independent provider closure summary
+        id: closure_summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.persistence.spine_provider_surface_qualification import (
+              SpineProviderSurfaceQualification,
+          )
+
+          receipt = json.loads(
+              Path(".provider-surface-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          summary = SpineProviderSurfaceQualification.independent_summary(receipt)
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              for key in (
+                  "head_sha",
+                  "declared_digest",
+                  "discovered_digest",
+                  "declared_count",
+                  "discovered_count",
+                  "scanned_python_files",
+                  "declared_surface_digest",
+                  "receipt_digest",
+              ):
+                  handle.write(f"{key}={summary[key]}\n")
+          PY
+
+  provider-surface-qualified:
+    name: Paired exact-head provider closure
+    needs:
+      - provider-surface-contracts
+      - provider-surface-independent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      CANONICAL_HEAD_SHA: "${{ needs.provider-surface-contracts.outputs.head_sha }}"
+      CANONICAL_DECLARED_DIGEST: "${{ needs.provider-surface-contracts.outputs.declared_digest }}"
+      CANONICAL_DISCOVERED_DIGEST: "${{ needs.provider-surface-contracts.outputs.discovered_digest }}"
+      CANONICAL_DECLARED_COUNT: "${{ needs.provider-surface-contracts.outputs.declared_count }}"
+      CANONICAL_DISCOVERED_COUNT: "${{ needs.provider-surface-contracts.outputs.discovered_count }}"
+      CANONICAL_RECEIPT_DIGEST: "${{ needs.provider-surface-contracts.outputs.receipt_digest }}"
+      INDEPENDENT_HEAD_SHA: "${{ needs.provider-surface-independent.outputs.head_sha }}"
+      INDEPENDENT_DECLARED_DIGEST: "${{ needs.provider-surface-independent.outputs.declared_digest }}"
+      INDEPENDENT_DISCOVERED_DIGEST: "${{ needs.provider-surface-independent.outputs.discovered_digest }}"
+      INDEPENDENT_DECLARED_COUNT: "${{ needs.provider-surface-independent.outputs.declared_count }}"
+      INDEPENDENT_DISCOVERED_COUNT: "${{ needs.provider-surface-independent.outputs.discovered_count }}"
+      INDEPENDENT_SCANNED_PYTHON_FILES: "${{ needs.provider-surface-independent.outputs.scanned_python_files }}"
+      INDEPENDENT_DECLARED_SURFACE_DIGEST: "${{ needs.provider-surface-independent.outputs.declared_surface_digest }}"
+      INDEPENDENT_RECEIPT_DIGEST: "${{ needs.provider-surface-independent.outputs.receipt_digest }}"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Qualify paired exact-head provider closure
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from skeleton.persistence.spine_provider_surface_qualification import (
+              SpineProviderSurfaceQualification,
+          )
+          from skeleton.persistence.spine_provider_surface_qualification_verify import (
+              SpineProviderSurfaceQualificationVerify,
+          )
+
+          canonical = {
+              "kind": "spine_provider_surface_canonical_summary",
+              "head_sha": os.environ["CANONICAL_HEAD_SHA"],
+              "declared_digest": os.environ["CANONICAL_DECLARED_DIGEST"],
+              "discovered_digest": os.environ["CANONICAL_DISCOVERED_DIGEST"],
+              "declared_count": int(os.environ["CANONICAL_DECLARED_COUNT"]),
+              "discovered_count": int(os.environ["CANONICAL_DISCOVERED_COUNT"]),
+              "receipt_digest": os.environ["CANONICAL_RECEIPT_DIGEST"],
+          }
+          independent = {
+              "kind": "spine_provider_surface_independent_summary",
+              "head_sha": os.environ["INDEPENDENT_HEAD_SHA"],
+              "declared_digest": os.environ["INDEPENDENT_DECLARED_DIGEST"],
+              "discovered_digest": os.environ["INDEPENDENT_DISCOVERED_DIGEST"],
+              "declared_count": int(os.environ["INDEPENDENT_DECLARED_COUNT"]),
+              "discovered_count": int(os.environ["INDEPENDENT_DISCOVERED_COUNT"]),
+              "scanned_python_files": int(
+                  os.environ["INDEPENDENT_SCANNED_PYTHON_FILES"]
+              ),
+              "declared_surface_digest": os.environ[
+                  "INDEPENDENT_DECLARED_SURFACE_DIGEST"
+              ],
+              "receipt_digest": os.environ["INDEPENDENT_RECEIPT_DIGEST"],
+          }
+          card = SpineProviderSurfaceQualification().qualify(
+              canonical=canonical,
+              independent=independent,
+              expected_head_sha=os.environ["EXPECTED_SHA"],
+          )
+          verified = SpineProviderSurfaceQualificationVerify().verify(card)
+          if verified.get("provider_surface_closure_green") is not True:
+              raise SystemExit("provider closure qualification is not green")
+          if verified.get("provider_surface_live_green") is not False:
+              raise SystemExit("provider closure overclaimed live provider health")
+          if verified.get("provider_surface_green") is not False:
+              raise SystemExit("provider closure overclaimed provider surface green")
+          Path(".provider-surface-qualified.json").write_text(
+              json.dumps(card, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(
+              "provider closure qualified:",
+              card["head_sha"],
+              "declared=",
+              card["declared_count"],
+              "discovered=",
+              card["discovered_count"],
+          )
+          PY
+
+      - name: Run provider closure qualification regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pip install --disable-pip-version-check "pytest>=8,<9"
+          && python -m pytest -q --noconftest
+          skeleton/testing/test_spine_provider_surface_qualification.py
