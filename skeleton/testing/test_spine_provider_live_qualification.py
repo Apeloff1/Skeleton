@@ -110,6 +110,10 @@ def test_authenticated_live_call_qualifies_provider_surface() -> None:
     )
     verified = SpineProviderLiveQualificationVerify().verify(card)
 
+    assert card["authority_domain"] == "provider-live"
+    assert card["decision"] == "qualify-live-provider"
+    assert card["network_transport_used"] is True
+    assert card["credential_boundary_used"] is True
     assert card["provider_surface_closure_green"] is True
     assert card["provider_surface_live_green"] is True
     assert card["provider_surface_green"] is True
@@ -147,6 +151,24 @@ def test_live_provider_receipt_must_be_authenticated_and_fresh() -> None:
             authenticate=lambda receipt: True,
             now=NOW,
         )
+
+
+def test_live_provider_verifier_rejects_source_authority_tamper() -> None:
+    card = SpineProviderLiveQualification().qualify(
+        closure=_closure(),
+        closure_verify=_closure_verify(),
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda receipt: True,
+        now=NOW,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["network_transport_used"] = False
+    with pytest.raises(
+        SpineProviderLiveQualificationVerifyError,
+        match="source invariant missing",
+    ):
+        SpineProviderLiveQualificationVerify().verify(tampered)
 
 
 def test_live_provider_verifier_rejects_attestation_detachment() -> None:

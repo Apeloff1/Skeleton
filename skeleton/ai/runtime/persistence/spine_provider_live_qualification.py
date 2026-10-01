@@ -231,6 +231,14 @@ class SpineProviderLiveQualification:
             )
 
         evidence = {
+            "authority_domain": receipt["authority_domain"],
+            "decision": receipt["decision"],
+            "success": receipt["success"],
+            "network_transport_used": receipt["network_transport_used"],
+            "credential_boundary_used": receipt["credential_boundary_used"],
+            "architecture_acknowledged": receipt[
+                "architecture_acknowledged"
+            ],
             "head_sha": expected_head_sha,
             "closure_digest": closure_digest,
             "provider_id": receipt["provider_id"],

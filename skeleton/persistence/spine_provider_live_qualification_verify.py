@@ -57,6 +57,24 @@ class SpineProviderLiveQualificationVerify:
             raise SpineProviderLiveQualificationVerifyError(
                 "provider live qualification kind mismatch"
             )
+        if card.get("authority_domain") != "provider-live":
+            raise SpineProviderLiveQualificationVerifyError(
+                "provider live authority domain changed"
+            )
+        if card.get("decision") != "qualify-live-provider":
+            raise SpineProviderLiveQualificationVerifyError(
+                "provider live decision changed"
+            )
+        for field in (
+            "success",
+            "network_transport_used",
+            "credential_boundary_used",
+            "architecture_acknowledged",
+        ):
+            if card.get(field) is not True:
+                raise SpineProviderLiveQualificationVerifyError(
+                    f"provider live source invariant missing: {field}"
+                )
         head_sha = card.get("head_sha")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
             raise SpineProviderLiveQualificationVerifyError(
@@ -133,6 +151,14 @@ class SpineProviderLiveQualificationVerify:
             )
 
         evidence = {
+            "authority_domain": card["authority_domain"],
+            "decision": card["decision"],
+            "success": card["success"],
+            "network_transport_used": card["network_transport_used"],
+            "credential_boundary_used": card["credential_boundary_used"],
+            "architecture_acknowledged": card[
+                "architecture_acknowledged"
+            ],
             "head_sha": head_sha,
             "closure_digest": card["closure_digest"],
             "provider_id": card["provider_id"],
