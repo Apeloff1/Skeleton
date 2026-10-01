@@ -125,6 +125,6 @@ def test_rehearsal_verifier_rejects_authority_and_digest_tamper() -> None:
         SpineCutoverRehearsalVerify().verify(activated)
 
     tampered = copy.deepcopy(card)
-    tampered["published"] = 99
+    tampered["cutover_published"] = 99
     with pytest.raises(SpineCutoverRehearsalVerifyError, match="digest mismatch"):
         SpineCutoverRehearsalVerify().verify(tampered)
