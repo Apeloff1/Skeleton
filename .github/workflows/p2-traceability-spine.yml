@@ -1,4 +1,4 @@
-name: P2 Traceability Spine
+name: P2 Master Traceability Spine
 
 on:
   pull_request:
@@ -71,7 +71,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p2-traceability-${{ github.event.pull_request.number || github.ref }}
+  group: p2-master-traceability-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
