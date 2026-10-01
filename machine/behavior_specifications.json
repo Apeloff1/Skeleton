@@ -275,5 +275,13 @@
     "linkage_rule": "Every scenario links to canonical requirement IDs.",
     "negative_rule": "Each traceability volume has at least one explicit failure/degraded scenario.",
     "implementation_independence": "Scenarios state observable outcomes."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-126",
+    "title": "Behavior Specifications",
+    "required_gap_texts": [
+      "define scenario schema",
+      "bind behaviors to requirement IDs"
+    ]
   }
 }
