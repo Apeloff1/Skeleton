@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.p2.repository_engineering_control.v1",
-  "control_version": "0.2.0",
+  "control_version": "0.3.0",
   "status": "active",
   "purpose": "Canonical P2 repository-engineering control plane derived from existing masterplan, trace, build, architecture and accountability authorities.",
   "masterplan_bindings": [
@@ -37093,7 +37093,7 @@
         "roadmap_id": "ROADMAP-P2-REPO-01",
         "task_id": "P2-REPO-01",
         "lane_id": "P2-L3",
-        "status": "ready",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-ARCH-01",
           "P2-TRACE-01"
@@ -37118,7 +37118,7 @@
         "roadmap_id": "ROADMAP-P2-QUAL-01",
         "task_id": "P2-QUAL-01",
         "lane_id": "P2-L4",
-        "status": "ready",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-TRACE-01"
         ],
@@ -37134,7 +37134,7 @@
         "roadmap_id": "ROADMAP-P2-DOC-01",
         "task_id": "P2-DOC-01",
         "lane_id": "P2-L5",
-        "status": "ready",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-TRACE-01"
         ],
@@ -37148,7 +37148,7 @@
         "roadmap_id": "ROADMAP-P2-NATIVE-01",
         "task_id": "P2-NATIVE-01",
         "lane_id": "P2-L6",
-        "status": "blocked",
+        "status": "ready",
         "depends_on": [
           "P2-QUAL-01"
         ],
@@ -37224,35 +37224,35 @@
       },
       {
         "task_id": "P2-REPO-01",
-        "declared_status": "ready",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "not_started"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-QUAL-01",
-        "declared_status": "ready",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "not_started"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-DOC-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-NATIVE-01",
         "declared_status": "ready",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
         "derived_state": "not_started"
-      },
-      {
-        "task_id": "P2-NATIVE-01",
-        "declared_status": "blocked",
-        "implementation_signed": false,
-        "verification_signed": false,
-        "completion_checkbox": false,
-        "derived_state": "blocked"
       }
     ],
     "derivation_engine": "skeleton/repo_machine/completion.py",
