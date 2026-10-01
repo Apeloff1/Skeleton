@@ -143,6 +143,12 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeTransitionEffectRollbackLedger` consumes independently verified execution evidence, stops the candidate dispatcher, restores the original runtime slot, and advances the same fence once more as a compensation epoch. `SpineRuntimeTransitionExecutionVerify` and `SpineRuntimeTransitionEffectRollbackVerify` independently reconstruct identities, digests, generation changes, and fence movement. These seams prove effect/rollback mechanics, not production activation.
 
+## Live post-transition health and acceptance
+
+`SpineRuntimeTransitionHealth` runs a real durable operation through the transitioned candidate runtime. It requires the operation to reach `completed`, the transactional outbox to drain, the candidate dispatcher to remain running, the runtime slot generation to remain unchanged, and the transition fence to remain on the execution epoch. `SpineRuntimeTransitionHealthVerify` independently re-reads those live surfaces rather than trusting the first card.
+
+`SpineRuntimeTransitionAcceptanceLedger` accepts only that independently verified live health plus a short-lived externally authenticated `runtime-transition-acceptance` receipt scoped to the exact health digest, execution identity, and deployment. The acceptance receipt is durable and replay-resistant. It records `activation_accepted=true` while keeping `production_activation_authorized=false` and `runtime_activated=false`. `SpineRuntimeTransitionAcceptanceVerify` independently reconstructs that boundary.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -183,7 +189,9 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_transition_attempt.py \
   skeleton/testing/test_spine_runtime_transition_rollback.py \
   skeleton/testing/test_spine_runtime_transition_execution.py \
-  skeleton/testing/test_spine_runtime_transition_effect_rollback.py
+  skeleton/testing/test_spine_runtime_transition_effect_rollback.py \
+  skeleton/testing/test_spine_runtime_transition_health.py \
+  skeleton/testing/test_spine_runtime_transition_acceptance.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
