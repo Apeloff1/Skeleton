@@ -169,6 +169,12 @@ The provider closure workflow now produces two independent exact-head evidence r
 
 This seam registers exact-head provider closure evidence. It does not substitute CI closure for a credential-bearing live provider request.
 
+## Provider live qualification
+
+`SpineProviderLiveQualification` accepts only exact-head provider-closure evidence plus a short-lived externally authenticated receipt proving one credential-bound network call through the canonical runtime-model provider boundary. The receipt must carry request/response/architecture digests and explicit transport, credential-boundary, and architecture-acknowledgement evidence. A valid card may set `provider_surface_live_green=true` and `provider_surface_green=true`, while `pr_automation_green=false` and `merge_authority=false`.
+
+`SpineProviderLiveQualificationVerify` independently reconstructs the card and rejects PR-automation or merge-authority promotion.
+
 ## PR automation operational qualification
 
 `SpinePrAutomationQualification` consumes an externally authenticated exact-head receipt from the trusted `PR Automation Index` runner-v2 control plane. A successful runner with complete evidence and zero runner/transport failures may set `pr_automation_operational_green=true` and `pr_automation_green=true`. The runner decision remains explicit: policy `hold` is healthy fail-closed behavior and yields `pr_automation_merge_eligible=false`; `ready` or `merge` may yield eligibility. None of these cards grant `merge_authority`.
