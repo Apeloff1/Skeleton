@@ -50,6 +50,10 @@ from skeleton.persistence.inbox_ledger import SQLiteInboxLedger
 from skeleton.persistence.consistency_fence import SQLiteConsistencyFence
 from skeleton.persistence.spine_projection import SpineProjection, SpineProjectionReport
 from skeleton.persistence.spine_land import SpineLand, SpineLandReport
+from skeleton.persistence.mongo_inbox import MongoInboxLedger
+from skeleton.persistence.mongo_fence import MongoConsistencyFence
+from skeleton.persistence.spine_quarantine import SpineQuarantine
+from skeleton.persistence.spine_status import SpineStatus
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -112,6 +116,10 @@ __all__ = [
     "SpineProjectionReport",
     "SpineLand",
     "SpineLandReport",
+    "MongoInboxLedger",
+    "MongoConsistencyFence",
+    "SpineQuarantine",
+    "SpineStatus",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
