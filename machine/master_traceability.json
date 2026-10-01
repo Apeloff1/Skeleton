@@ -1,111 +1,2753 @@
 {
-  "schema_version": "skeleton.traceability.master.v1",
+  "schema_version": "skeleton.master_traceability.v1",
   "graph_version": "0.1.0",
   "status": "active",
-  "source": {
-    "master_plan": "machine/ai_master_plan.json",
-    "plan_version": "1.6.0",
-    "volume_count": 421
-  },
-  "masterplan_binding": {
-    "volume_ref": "VOL-112",
-    "title": "Master Traceability Matrix",
-    "required_gap_texts": [
-      "materialize canonical trace graph",
-      "bind PR impact checks to trace edges"
-    ]
-  },
-  "policy": {
-    "stable_id_rule": "Node IDs are deterministic from masterplan volume key, field class, and one-based zero-padded source position.",
-    "sharding_rule": "Each volume belongs to exactly one shard keyed by its canonical depth_pass; shards collectively form one trace graph.",
-    "edge_rule": "Edges are typed and must reference nodes in the same volume shard.",
-    "completeness_rule": "Missing test/evidence links are reported as traceability debt and never silently promoted to complete.",
-    "impact_rule": "Changed repository paths resolve through implementation_path nodes using exact/prefix/glob matching."
-  },
-  "summary": {
-    "node_count": 9115,
-    "edge_count": 25119,
-    "requirement_count": 963,
-    "requirements_without_evidence": 688,
-    "shard_count": 11
-  },
-  "shards": [
+  "purpose": "Typed P2-TRACE-01 graph joining masterplan volumes, canonical requirements, capabilities, behaviors, machine authorities and executable validation.",
+  "sources": [
+    "machine/ai_master_plan.json",
+    "machine/requirement_registry.json",
+    "machine/capability_taxonomy.json",
+    "machine/capability_registry.json",
+    "machine/capability_maturity.json",
+    "machine/behavior_specifications.json",
+    "machine/state_machine_catalogue.json",
+    "machine/interface_standard.json",
+    "machine/schema_registry.json",
+    "machine/compatibility_model.json",
+    "machine/internal_protocols.json",
+    "machine/nfr_registry.json"
+  ],
+  "node_types": [
+    "volume",
+    "requirement",
+    "capability",
+    "behavior",
+    "authority",
+    "test",
+    "validator"
+  ],
+  "edge_types": [
+    "defines",
+    "requires_capability",
+    "specified_by",
+    "verified_by",
+    "implemented_by",
+    "governed_by"
+  ],
+  "nodes": [
     {
-      "depth_pass": "DP-000-040",
-      "path": "machine/traceability/DP-000-040.json",
-      "volume_count": 41,
-      "node_count": 1295,
-      "edge_count": 4937
+      "id": "VOL-112",
+      "type": "volume",
+      "title": "Master Traceability Matrix"
     },
     {
-      "depth_pass": "DP-041-080",
-      "path": "machine/traceability/DP-041-080.json",
-      "volume_count": 40,
-      "node_count": 1149,
-      "edge_count": 3790
+      "id": "VOL-113",
+      "type": "volume",
+      "title": "Capability Map"
     },
     {
-      "depth_pass": "DP-081-120",
-      "path": "machine/traceability/DP-081-120.json",
-      "volume_count": 40,
-      "node_count": 906,
-      "edge_count": 2195
+      "id": "VOL-122",
+      "type": "volume",
+      "title": "Requirements Engineering"
     },
     {
-      "depth_pass": "DP-121-160",
-      "path": "machine/traceability/DP-121-160.json",
-      "volume_count": 40,
-      "node_count": 680,
-      "edge_count": 1400
+      "id": "VOL-123",
+      "type": "volume",
+      "title": "Non-Functional Requirements"
     },
     {
-      "depth_pass": "DP-161-200",
-      "path": "machine/traceability/DP-161-200.json",
-      "volume_count": 40,
-      "node_count": 742,
-      "edge_count": 1796
+      "id": "VOL-124",
+      "type": "volume",
+      "title": "Capability Taxonomy"
     },
     {
-      "depth_pass": "DP-201-240",
-      "path": "machine/traceability/DP-201-240.json",
-      "volume_count": 40,
-      "node_count": 756,
-      "edge_count": 1866
+      "id": "VOL-125",
+      "type": "volume",
+      "title": "Capability Maturity Model"
     },
     {
-      "depth_pass": "DP-241-280",
-      "path": "machine/traceability/DP-241-280.json",
-      "volume_count": 40,
-      "node_count": 815,
-      "edge_count": 2079
+      "id": "VOL-126",
+      "type": "volume",
+      "title": "Behavior Specifications"
     },
     {
-      "depth_pass": "DP-281-320",
-      "path": "machine/traceability/DP-281-320.json",
-      "volume_count": 40,
-      "node_count": 702,
-      "edge_count": 1506
+      "id": "VOL-127",
+      "type": "volume",
+      "title": "State Machine Catalogue"
     },
     {
-      "depth_pass": "DP-321-360",
-      "path": "machine/traceability/DP-321-360.json",
-      "volume_count": 40,
-      "node_count": 761,
-      "edge_count": 1887
+      "id": "VOL-128",
+      "type": "volume",
+      "title": "Interface Design Standard"
     },
     {
-      "depth_pass": "DP-361-400",
-      "path": "machine/traceability/DP-361-400.json",
-      "volume_count": 40,
-      "node_count": 893,
-      "edge_count": 2624
+      "id": "VOL-129",
+      "type": "volume",
+      "title": "Schema Registry"
     },
     {
-      "depth_pass": "DP-401-420",
-      "path": "machine/traceability/DP-401-420.json",
-      "volume_count": 20,
-      "node_count": 416,
-      "edge_count": 1039
+      "id": "VOL-130",
+      "type": "volume",
+      "title": "Compatibility Model"
+    },
+    {
+      "id": "VOL-131",
+      "type": "volume",
+      "title": "Internal Protocols"
+    },
+    {
+      "id": "REQ-VOL-112-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-112",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-112-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-112",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-112-R03",
+      "type": "requirement",
+      "volume_ref": "VOL-112",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-112-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-112",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-112-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-112",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-113-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-113",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-113-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-113",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-113-R03",
+      "type": "requirement",
+      "volume_ref": "VOL-113",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-113-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-113",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-113-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-113",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-122-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-122",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-122-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-122",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-122-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-122",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-122-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-122",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-123-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-123",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-123-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-123",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-123-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-123",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-123-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-123",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-124-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-124",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-124-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-124",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-124-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-124",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-124-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-124",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-125-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-125",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-125-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-125",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-125-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-125",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-125-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-125",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-126-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-126",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-126-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-126",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-126-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-126",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-126-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-126",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-127-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-127",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-127-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-127",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-127-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-127",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-127-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-127",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-128-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-128",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-128-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-128",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-128-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-128",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-128-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-128",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-129-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-129",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-129-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-129",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-129-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-129",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-129-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-129",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-130-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-130",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-130-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-130",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-130-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-130",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-130-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-130",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-131-R01",
+      "type": "requirement",
+      "volume_ref": "VOL-131",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-131-R02",
+      "type": "requirement",
+      "volume_ref": "VOL-131",
+      "status": "normative"
+    },
+    {
+      "id": "REQ-VOL-131-G01",
+      "type": "requirement",
+      "volume_ref": "VOL-131",
+      "status": "open"
+    },
+    {
+      "id": "REQ-VOL-131-G02",
+      "type": "requirement",
+      "volume_ref": "VOL-131",
+      "status": "open"
+    },
+    {
+      "id": "CAP-1142",
+      "type": "capability",
+      "name": "trace graph"
+    },
+    {
+      "id": "CAP-0723",
+      "type": "capability",
+      "name": "orphan detection"
+    },
+    {
+      "id": "CAP-0180",
+      "type": "capability",
+      "name": "change impact"
+    },
+    {
+      "id": "CAP-0161",
+      "type": "capability",
+      "name": "capability registry"
+    },
+    {
+      "id": "CAP-0638",
+      "type": "capability",
+      "name": "maturity/availability projection"
+    },
+    {
+      "id": "CAP-0336",
+      "type": "capability",
+      "name": "dependency map"
+    },
+    {
+      "id": "CAP-0899",
+      "type": "capability",
+      "name": "requirement registry"
+    },
+    {
+      "id": "CAP-0179",
+      "type": "capability",
+      "name": "change control"
+    },
+    {
+      "id": "CAP-0004",
+      "type": "capability",
+      "name": "acceptance traceability"
+    },
+    {
+      "id": "CAP-0699",
+      "type": "capability",
+      "name": "NFR registry"
+    },
+    {
+      "id": "CAP-0127",
+      "type": "capability",
+      "name": "budget enforcement"
+    },
+    {
+      "id": "CAP-0639",
+      "type": "capability",
+      "name": "measurement policy"
+    },
+    {
+      "id": "CAP-0159",
+      "type": "capability",
+      "name": "capability classification"
+    },
+    {
+      "id": "CAP-0333",
+      "type": "capability",
+      "name": "dependency grouping"
+    },
+    {
+      "id": "CAP-1104",
+      "type": "capability",
+      "name": "taxonomy queries"
+    },
+    {
+      "id": "CAP-0637",
+      "type": "capability",
+      "name": "maturity transitions"
+    },
+    {
+      "id": "CAP-0789",
+      "type": "capability",
+      "name": "promotion gates"
+    },
+    {
+      "id": "CAP-0383",
+      "type": "capability",
+      "name": "downgrade semantics"
+    },
+    {
+      "id": "CAP-0102",
+      "type": "capability",
+      "name": "behavior scenarios"
+    },
+    {
+      "id": "CAP-0770",
+      "type": "capability",
+      "name": "pre/postcondition contracts"
+    },
+    {
+      "id": "CAP-0492",
+      "type": "capability",
+      "name": "forbidden-outcome rules"
+    },
+    {
+      "id": "CAP-1067",
+      "type": "capability",
+      "name": "state-machine registry"
+    },
+    {
+      "id": "CAP-1155",
+      "type": "capability",
+      "name": "transition validation"
+    },
+    {
+      "id": "CAP-1118",
+      "type": "capability",
+      "name": "terminal-state rules"
+    },
+    {
+      "id": "CAP-0586",
+      "type": "capability",
+      "name": "interface conventions"
+    },
+    {
+      "id": "CAP-0417",
+      "type": "capability",
+      "name": "error/cancellation rules"
+    },
+    {
+      "id": "CAP-0007",
+      "type": "capability",
+      "name": "adapter boundaries"
+    },
+    {
+      "id": "CAP-0997",
+      "type": "capability",
+      "name": "schema registration"
+    },
+    {
+      "id": "CAP-0217",
+      "type": "capability",
+      "name": "compatibility checks"
+    },
+    {
+      "id": "CAP-0157",
+      "type": "capability",
+      "name": "canonical serialization"
+    },
+    {
+      "id": "CAP-0219",
+      "type": "capability",
+      "name": "compatibility matrix"
+    },
+    {
+      "id": "CAP-0666",
+      "type": "capability",
+      "name": "mixed-version policy"
+    },
+    {
+      "id": "CAP-0347",
+      "type": "capability",
+      "name": "deprecation windows"
+    },
+    {
+      "id": "CAP-0588",
+      "type": "capability",
+      "name": "internal RPC"
+    },
+    {
+      "id": "CAP-0656",
+      "type": "capability",
+      "name": "message envelopes"
+    },
+    {
+      "id": "CAP-0303",
+      "type": "capability",
+      "name": "deadline propagation"
+    },
+    {
+      "id": "BEH-TRACE-ORPHAN",
+      "type": "behavior",
+      "volume_ref": "VOL-112"
+    },
+    {
+      "id": "BEH-CAP-AVAILABILITY",
+      "type": "behavior",
+      "volume_ref": "VOL-113"
+    },
+    {
+      "id": "BEH-REQ-IDENTITY",
+      "type": "behavior",
+      "volume_ref": "VOL-122"
+    },
+    {
+      "id": "BEH-NFR-HARD-GATE",
+      "type": "behavior",
+      "volume_ref": "VOL-123"
+    },
+    {
+      "id": "BEH-TAXONOMY-COVERAGE",
+      "type": "behavior",
+      "volume_ref": "VOL-124"
+    },
+    {
+      "id": "BEH-MATURITY-INVALIDATION",
+      "type": "behavior",
+      "volume_ref": "VOL-125"
+    },
+    {
+      "id": "BEH-SCENARIO-LINKAGE",
+      "type": "behavior",
+      "volume_ref": "VOL-126"
+    },
+    {
+      "id": "BEH-STATE-TERMINAL",
+      "type": "behavior",
+      "volume_ref": "VOL-127"
+    },
+    {
+      "id": "BEH-INTERFACE-ERROR",
+      "type": "behavior",
+      "volume_ref": "VOL-128"
+    },
+    {
+      "id": "BEH-SCHEMA-COMPAT",
+      "type": "behavior",
+      "volume_ref": "VOL-129"
+    },
+    {
+      "id": "BEH-COMPAT-ROLLBACK",
+      "type": "behavior",
+      "volume_ref": "VOL-130"
+    },
+    {
+      "id": "BEH-PROTOCOL-DEADLINE",
+      "type": "behavior",
+      "volume_ref": "VOL-131"
+    },
+    {
+      "id": "AUTH-REQ",
+      "type": "authority",
+      "path": "machine/requirement_registry.json"
+    },
+    {
+      "id": "AUTH-TAXONOMY",
+      "type": "authority",
+      "path": "machine/capability_taxonomy.json"
+    },
+    {
+      "id": "AUTH-RUNTIME-CAP",
+      "type": "authority",
+      "path": "machine/capability_registry.json"
+    },
+    {
+      "id": "AUTH-MATURITY",
+      "type": "authority",
+      "path": "machine/capability_maturity.json"
+    },
+    {
+      "id": "AUTH-BEHAVIOR",
+      "type": "authority",
+      "path": "machine/behavior_specifications.json"
+    },
+    {
+      "id": "AUTH-STATE",
+      "type": "authority",
+      "path": "machine/state_machine_catalogue.json"
+    },
+    {
+      "id": "AUTH-INTERFACE",
+      "type": "authority",
+      "path": "machine/interface_standard.json"
+    },
+    {
+      "id": "AUTH-SCHEMA",
+      "type": "authority",
+      "path": "machine/schema_registry.json"
+    },
+    {
+      "id": "AUTH-COMPAT",
+      "type": "authority",
+      "path": "machine/compatibility_model.json"
+    },
+    {
+      "id": "AUTH-PROTOCOL",
+      "type": "authority",
+      "path": "machine/internal_protocols.json"
+    },
+    {
+      "id": "AUTH-NFR",
+      "type": "authority",
+      "path": "machine/nfr_registry.json"
+    },
+    {
+      "id": "TEST-P2-TRACE",
+      "type": "test",
+      "path": "tests/test_p2_traceability.py"
+    },
+    {
+      "id": "CHECK-P2-TRACE",
+      "type": "validator",
+      "path": "scripts/check_p2_traceability.py"
     }
-  ]
+  ],
+  "edges": [
+    {
+      "id": "TRACE-00001",
+      "from": "VOL-112",
+      "to": "REQ-VOL-112-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00002",
+      "from": "REQ-VOL-112-R01",
+      "to": "CAP-1142",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00003",
+      "from": "REQ-VOL-112-R01",
+      "to": "CAP-0723",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00004",
+      "from": "REQ-VOL-112-R01",
+      "to": "CAP-0180",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00005",
+      "from": "REQ-VOL-112-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00006",
+      "from": "VOL-112",
+      "to": "REQ-VOL-112-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00007",
+      "from": "REQ-VOL-112-R02",
+      "to": "CAP-1142",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00008",
+      "from": "REQ-VOL-112-R02",
+      "to": "CAP-0723",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00009",
+      "from": "REQ-VOL-112-R02",
+      "to": "CAP-0180",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00010",
+      "from": "REQ-VOL-112-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00011",
+      "from": "VOL-112",
+      "to": "REQ-VOL-112-R03",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00012",
+      "from": "REQ-VOL-112-R03",
+      "to": "CAP-1142",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00013",
+      "from": "REQ-VOL-112-R03",
+      "to": "CAP-0723",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00014",
+      "from": "REQ-VOL-112-R03",
+      "to": "CAP-0180",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00015",
+      "from": "REQ-VOL-112-R03",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00016",
+      "from": "VOL-112",
+      "to": "REQ-VOL-112-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00017",
+      "from": "REQ-VOL-112-G01",
+      "to": "CAP-1142",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00018",
+      "from": "REQ-VOL-112-G01",
+      "to": "CAP-0723",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00019",
+      "from": "REQ-VOL-112-G01",
+      "to": "CAP-0180",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00020",
+      "from": "REQ-VOL-112-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00021",
+      "from": "VOL-112",
+      "to": "REQ-VOL-112-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00022",
+      "from": "REQ-VOL-112-G02",
+      "to": "CAP-1142",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00023",
+      "from": "REQ-VOL-112-G02",
+      "to": "CAP-0723",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00024",
+      "from": "REQ-VOL-112-G02",
+      "to": "CAP-0180",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00025",
+      "from": "REQ-VOL-112-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00026",
+      "from": "VOL-113",
+      "to": "REQ-VOL-113-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00027",
+      "from": "REQ-VOL-113-R01",
+      "to": "CAP-0161",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00028",
+      "from": "REQ-VOL-113-R01",
+      "to": "CAP-0638",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00029",
+      "from": "REQ-VOL-113-R01",
+      "to": "CAP-0336",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00030",
+      "from": "REQ-VOL-113-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00031",
+      "from": "VOL-113",
+      "to": "REQ-VOL-113-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00032",
+      "from": "REQ-VOL-113-R02",
+      "to": "CAP-0161",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00033",
+      "from": "REQ-VOL-113-R02",
+      "to": "CAP-0638",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00034",
+      "from": "REQ-VOL-113-R02",
+      "to": "CAP-0336",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00035",
+      "from": "REQ-VOL-113-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00036",
+      "from": "VOL-113",
+      "to": "REQ-VOL-113-R03",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00037",
+      "from": "REQ-VOL-113-R03",
+      "to": "CAP-0161",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00038",
+      "from": "REQ-VOL-113-R03",
+      "to": "CAP-0638",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00039",
+      "from": "REQ-VOL-113-R03",
+      "to": "CAP-0336",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00040",
+      "from": "REQ-VOL-113-R03",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00041",
+      "from": "VOL-113",
+      "to": "REQ-VOL-113-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00042",
+      "from": "REQ-VOL-113-G01",
+      "to": "CAP-0161",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00043",
+      "from": "REQ-VOL-113-G01",
+      "to": "CAP-0638",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00044",
+      "from": "REQ-VOL-113-G01",
+      "to": "CAP-0336",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00045",
+      "from": "REQ-VOL-113-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00046",
+      "from": "VOL-113",
+      "to": "REQ-VOL-113-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00047",
+      "from": "REQ-VOL-113-G02",
+      "to": "CAP-0161",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00048",
+      "from": "REQ-VOL-113-G02",
+      "to": "CAP-0638",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00049",
+      "from": "REQ-VOL-113-G02",
+      "to": "CAP-0336",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00050",
+      "from": "REQ-VOL-113-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00051",
+      "from": "VOL-122",
+      "to": "REQ-VOL-122-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00052",
+      "from": "REQ-VOL-122-R01",
+      "to": "CAP-0899",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00053",
+      "from": "REQ-VOL-122-R01",
+      "to": "CAP-0179",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00054",
+      "from": "REQ-VOL-122-R01",
+      "to": "CAP-0004",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00055",
+      "from": "REQ-VOL-122-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00056",
+      "from": "VOL-122",
+      "to": "REQ-VOL-122-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00057",
+      "from": "REQ-VOL-122-R02",
+      "to": "CAP-0899",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00058",
+      "from": "REQ-VOL-122-R02",
+      "to": "CAP-0179",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00059",
+      "from": "REQ-VOL-122-R02",
+      "to": "CAP-0004",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00060",
+      "from": "REQ-VOL-122-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00061",
+      "from": "VOL-122",
+      "to": "REQ-VOL-122-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00062",
+      "from": "REQ-VOL-122-G01",
+      "to": "CAP-0899",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00063",
+      "from": "REQ-VOL-122-G01",
+      "to": "CAP-0179",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00064",
+      "from": "REQ-VOL-122-G01",
+      "to": "CAP-0004",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00065",
+      "from": "REQ-VOL-122-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00066",
+      "from": "VOL-122",
+      "to": "REQ-VOL-122-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00067",
+      "from": "REQ-VOL-122-G02",
+      "to": "CAP-0899",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00068",
+      "from": "REQ-VOL-122-G02",
+      "to": "CAP-0179",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00069",
+      "from": "REQ-VOL-122-G02",
+      "to": "CAP-0004",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00070",
+      "from": "REQ-VOL-122-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00071",
+      "from": "VOL-123",
+      "to": "REQ-VOL-123-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00072",
+      "from": "REQ-VOL-123-R01",
+      "to": "CAP-0699",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00073",
+      "from": "REQ-VOL-123-R01",
+      "to": "CAP-0127",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00074",
+      "from": "REQ-VOL-123-R01",
+      "to": "CAP-0639",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00075",
+      "from": "REQ-VOL-123-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00076",
+      "from": "VOL-123",
+      "to": "REQ-VOL-123-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00077",
+      "from": "REQ-VOL-123-R02",
+      "to": "CAP-0699",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00078",
+      "from": "REQ-VOL-123-R02",
+      "to": "CAP-0127",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00079",
+      "from": "REQ-VOL-123-R02",
+      "to": "CAP-0639",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00080",
+      "from": "REQ-VOL-123-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00081",
+      "from": "VOL-123",
+      "to": "REQ-VOL-123-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00082",
+      "from": "REQ-VOL-123-G01",
+      "to": "CAP-0699",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00083",
+      "from": "REQ-VOL-123-G01",
+      "to": "CAP-0127",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00084",
+      "from": "REQ-VOL-123-G01",
+      "to": "CAP-0639",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00085",
+      "from": "REQ-VOL-123-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00086",
+      "from": "VOL-123",
+      "to": "REQ-VOL-123-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00087",
+      "from": "REQ-VOL-123-G02",
+      "to": "CAP-0699",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00088",
+      "from": "REQ-VOL-123-G02",
+      "to": "CAP-0127",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00089",
+      "from": "REQ-VOL-123-G02",
+      "to": "CAP-0639",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00090",
+      "from": "REQ-VOL-123-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00091",
+      "from": "VOL-124",
+      "to": "REQ-VOL-124-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00092",
+      "from": "REQ-VOL-124-R01",
+      "to": "CAP-0159",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00093",
+      "from": "REQ-VOL-124-R01",
+      "to": "CAP-0333",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00094",
+      "from": "REQ-VOL-124-R01",
+      "to": "CAP-1104",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00095",
+      "from": "REQ-VOL-124-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00096",
+      "from": "VOL-124",
+      "to": "REQ-VOL-124-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00097",
+      "from": "REQ-VOL-124-R02",
+      "to": "CAP-0159",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00098",
+      "from": "REQ-VOL-124-R02",
+      "to": "CAP-0333",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00099",
+      "from": "REQ-VOL-124-R02",
+      "to": "CAP-1104",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00100",
+      "from": "REQ-VOL-124-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00101",
+      "from": "VOL-124",
+      "to": "REQ-VOL-124-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00102",
+      "from": "REQ-VOL-124-G01",
+      "to": "CAP-0159",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00103",
+      "from": "REQ-VOL-124-G01",
+      "to": "CAP-0333",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00104",
+      "from": "REQ-VOL-124-G01",
+      "to": "CAP-1104",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00105",
+      "from": "REQ-VOL-124-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00106",
+      "from": "VOL-124",
+      "to": "REQ-VOL-124-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00107",
+      "from": "REQ-VOL-124-G02",
+      "to": "CAP-0159",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00108",
+      "from": "REQ-VOL-124-G02",
+      "to": "CAP-0333",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00109",
+      "from": "REQ-VOL-124-G02",
+      "to": "CAP-1104",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00110",
+      "from": "REQ-VOL-124-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00111",
+      "from": "VOL-125",
+      "to": "REQ-VOL-125-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00112",
+      "from": "REQ-VOL-125-R01",
+      "to": "CAP-0637",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00113",
+      "from": "REQ-VOL-125-R01",
+      "to": "CAP-0789",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00114",
+      "from": "REQ-VOL-125-R01",
+      "to": "CAP-0383",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00115",
+      "from": "REQ-VOL-125-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00116",
+      "from": "VOL-125",
+      "to": "REQ-VOL-125-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00117",
+      "from": "REQ-VOL-125-R02",
+      "to": "CAP-0637",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00118",
+      "from": "REQ-VOL-125-R02",
+      "to": "CAP-0789",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00119",
+      "from": "REQ-VOL-125-R02",
+      "to": "CAP-0383",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00120",
+      "from": "REQ-VOL-125-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00121",
+      "from": "VOL-125",
+      "to": "REQ-VOL-125-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00122",
+      "from": "REQ-VOL-125-G01",
+      "to": "CAP-0637",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00123",
+      "from": "REQ-VOL-125-G01",
+      "to": "CAP-0789",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00124",
+      "from": "REQ-VOL-125-G01",
+      "to": "CAP-0383",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00125",
+      "from": "REQ-VOL-125-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00126",
+      "from": "VOL-125",
+      "to": "REQ-VOL-125-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00127",
+      "from": "REQ-VOL-125-G02",
+      "to": "CAP-0637",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00128",
+      "from": "REQ-VOL-125-G02",
+      "to": "CAP-0789",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00129",
+      "from": "REQ-VOL-125-G02",
+      "to": "CAP-0383",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00130",
+      "from": "REQ-VOL-125-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00131",
+      "from": "VOL-126",
+      "to": "REQ-VOL-126-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00132",
+      "from": "REQ-VOL-126-R01",
+      "to": "CAP-0102",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00133",
+      "from": "REQ-VOL-126-R01",
+      "to": "CAP-0770",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00134",
+      "from": "REQ-VOL-126-R01",
+      "to": "CAP-0492",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00135",
+      "from": "REQ-VOL-126-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00136",
+      "from": "VOL-126",
+      "to": "REQ-VOL-126-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00137",
+      "from": "REQ-VOL-126-R02",
+      "to": "CAP-0102",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00138",
+      "from": "REQ-VOL-126-R02",
+      "to": "CAP-0770",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00139",
+      "from": "REQ-VOL-126-R02",
+      "to": "CAP-0492",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00140",
+      "from": "REQ-VOL-126-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00141",
+      "from": "VOL-126",
+      "to": "REQ-VOL-126-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00142",
+      "from": "REQ-VOL-126-G01",
+      "to": "CAP-0102",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00143",
+      "from": "REQ-VOL-126-G01",
+      "to": "CAP-0770",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00144",
+      "from": "REQ-VOL-126-G01",
+      "to": "CAP-0492",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00145",
+      "from": "REQ-VOL-126-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00146",
+      "from": "VOL-126",
+      "to": "REQ-VOL-126-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00147",
+      "from": "REQ-VOL-126-G02",
+      "to": "CAP-0102",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00148",
+      "from": "REQ-VOL-126-G02",
+      "to": "CAP-0770",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00149",
+      "from": "REQ-VOL-126-G02",
+      "to": "CAP-0492",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00150",
+      "from": "REQ-VOL-126-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00151",
+      "from": "VOL-127",
+      "to": "REQ-VOL-127-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00152",
+      "from": "REQ-VOL-127-R01",
+      "to": "CAP-1067",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00153",
+      "from": "REQ-VOL-127-R01",
+      "to": "CAP-1155",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00154",
+      "from": "REQ-VOL-127-R01",
+      "to": "CAP-1118",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00155",
+      "from": "REQ-VOL-127-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00156",
+      "from": "VOL-127",
+      "to": "REQ-VOL-127-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00157",
+      "from": "REQ-VOL-127-R02",
+      "to": "CAP-1067",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00158",
+      "from": "REQ-VOL-127-R02",
+      "to": "CAP-1155",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00159",
+      "from": "REQ-VOL-127-R02",
+      "to": "CAP-1118",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00160",
+      "from": "REQ-VOL-127-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00161",
+      "from": "VOL-127",
+      "to": "REQ-VOL-127-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00162",
+      "from": "REQ-VOL-127-G01",
+      "to": "CAP-1067",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00163",
+      "from": "REQ-VOL-127-G01",
+      "to": "CAP-1155",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00164",
+      "from": "REQ-VOL-127-G01",
+      "to": "CAP-1118",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00165",
+      "from": "REQ-VOL-127-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00166",
+      "from": "VOL-127",
+      "to": "REQ-VOL-127-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00167",
+      "from": "REQ-VOL-127-G02",
+      "to": "CAP-1067",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00168",
+      "from": "REQ-VOL-127-G02",
+      "to": "CAP-1155",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00169",
+      "from": "REQ-VOL-127-G02",
+      "to": "CAP-1118",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00170",
+      "from": "REQ-VOL-127-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00171",
+      "from": "VOL-128",
+      "to": "REQ-VOL-128-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00172",
+      "from": "REQ-VOL-128-R01",
+      "to": "CAP-0586",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00173",
+      "from": "REQ-VOL-128-R01",
+      "to": "CAP-0417",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00174",
+      "from": "REQ-VOL-128-R01",
+      "to": "CAP-0007",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00175",
+      "from": "REQ-VOL-128-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00176",
+      "from": "VOL-128",
+      "to": "REQ-VOL-128-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00177",
+      "from": "REQ-VOL-128-R02",
+      "to": "CAP-0586",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00178",
+      "from": "REQ-VOL-128-R02",
+      "to": "CAP-0417",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00179",
+      "from": "REQ-VOL-128-R02",
+      "to": "CAP-0007",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00180",
+      "from": "REQ-VOL-128-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00181",
+      "from": "VOL-128",
+      "to": "REQ-VOL-128-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00182",
+      "from": "REQ-VOL-128-G01",
+      "to": "CAP-0586",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00183",
+      "from": "REQ-VOL-128-G01",
+      "to": "CAP-0417",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00184",
+      "from": "REQ-VOL-128-G01",
+      "to": "CAP-0007",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00185",
+      "from": "REQ-VOL-128-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00186",
+      "from": "VOL-128",
+      "to": "REQ-VOL-128-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00187",
+      "from": "REQ-VOL-128-G02",
+      "to": "CAP-0586",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00188",
+      "from": "REQ-VOL-128-G02",
+      "to": "CAP-0417",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00189",
+      "from": "REQ-VOL-128-G02",
+      "to": "CAP-0007",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00190",
+      "from": "REQ-VOL-128-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00191",
+      "from": "VOL-129",
+      "to": "REQ-VOL-129-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00192",
+      "from": "REQ-VOL-129-R01",
+      "to": "CAP-0997",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00193",
+      "from": "REQ-VOL-129-R01",
+      "to": "CAP-0217",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00194",
+      "from": "REQ-VOL-129-R01",
+      "to": "CAP-0157",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00195",
+      "from": "REQ-VOL-129-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00196",
+      "from": "VOL-129",
+      "to": "REQ-VOL-129-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00197",
+      "from": "REQ-VOL-129-R02",
+      "to": "CAP-0997",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00198",
+      "from": "REQ-VOL-129-R02",
+      "to": "CAP-0217",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00199",
+      "from": "REQ-VOL-129-R02",
+      "to": "CAP-0157",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00200",
+      "from": "REQ-VOL-129-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00201",
+      "from": "VOL-129",
+      "to": "REQ-VOL-129-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00202",
+      "from": "REQ-VOL-129-G01",
+      "to": "CAP-0997",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00203",
+      "from": "REQ-VOL-129-G01",
+      "to": "CAP-0217",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00204",
+      "from": "REQ-VOL-129-G01",
+      "to": "CAP-0157",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00205",
+      "from": "REQ-VOL-129-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00206",
+      "from": "VOL-129",
+      "to": "REQ-VOL-129-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00207",
+      "from": "REQ-VOL-129-G02",
+      "to": "CAP-0997",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00208",
+      "from": "REQ-VOL-129-G02",
+      "to": "CAP-0217",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00209",
+      "from": "REQ-VOL-129-G02",
+      "to": "CAP-0157",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00210",
+      "from": "REQ-VOL-129-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00211",
+      "from": "VOL-130",
+      "to": "REQ-VOL-130-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00212",
+      "from": "REQ-VOL-130-R01",
+      "to": "CAP-0219",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00213",
+      "from": "REQ-VOL-130-R01",
+      "to": "CAP-0666",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00214",
+      "from": "REQ-VOL-130-R01",
+      "to": "CAP-0347",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00215",
+      "from": "REQ-VOL-130-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00216",
+      "from": "VOL-130",
+      "to": "REQ-VOL-130-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00217",
+      "from": "REQ-VOL-130-R02",
+      "to": "CAP-0219",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00218",
+      "from": "REQ-VOL-130-R02",
+      "to": "CAP-0666",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00219",
+      "from": "REQ-VOL-130-R02",
+      "to": "CAP-0347",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00220",
+      "from": "REQ-VOL-130-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00221",
+      "from": "VOL-130",
+      "to": "REQ-VOL-130-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00222",
+      "from": "REQ-VOL-130-G01",
+      "to": "CAP-0219",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00223",
+      "from": "REQ-VOL-130-G01",
+      "to": "CAP-0666",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00224",
+      "from": "REQ-VOL-130-G01",
+      "to": "CAP-0347",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00225",
+      "from": "REQ-VOL-130-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00226",
+      "from": "VOL-130",
+      "to": "REQ-VOL-130-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00227",
+      "from": "REQ-VOL-130-G02",
+      "to": "CAP-0219",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00228",
+      "from": "REQ-VOL-130-G02",
+      "to": "CAP-0666",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00229",
+      "from": "REQ-VOL-130-G02",
+      "to": "CAP-0347",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00230",
+      "from": "REQ-VOL-130-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00231",
+      "from": "VOL-131",
+      "to": "REQ-VOL-131-R01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00232",
+      "from": "REQ-VOL-131-R01",
+      "to": "CAP-0588",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00233",
+      "from": "REQ-VOL-131-R01",
+      "to": "CAP-0656",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00234",
+      "from": "REQ-VOL-131-R01",
+      "to": "CAP-0303",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00235",
+      "from": "REQ-VOL-131-R01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00236",
+      "from": "VOL-131",
+      "to": "REQ-VOL-131-R02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00237",
+      "from": "REQ-VOL-131-R02",
+      "to": "CAP-0588",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00238",
+      "from": "REQ-VOL-131-R02",
+      "to": "CAP-0656",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00239",
+      "from": "REQ-VOL-131-R02",
+      "to": "CAP-0303",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00240",
+      "from": "REQ-VOL-131-R02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00241",
+      "from": "VOL-131",
+      "to": "REQ-VOL-131-G01",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00242",
+      "from": "REQ-VOL-131-G01",
+      "to": "CAP-0588",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00243",
+      "from": "REQ-VOL-131-G01",
+      "to": "CAP-0656",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00244",
+      "from": "REQ-VOL-131-G01",
+      "to": "CAP-0303",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00245",
+      "from": "REQ-VOL-131-G01",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00246",
+      "from": "VOL-131",
+      "to": "REQ-VOL-131-G02",
+      "kind": "defines"
+    },
+    {
+      "id": "TRACE-00247",
+      "from": "REQ-VOL-131-G02",
+      "to": "CAP-0588",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00248",
+      "from": "REQ-VOL-131-G02",
+      "to": "CAP-0656",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00249",
+      "from": "REQ-VOL-131-G02",
+      "to": "CAP-0303",
+      "kind": "requires_capability"
+    },
+    {
+      "id": "TRACE-00250",
+      "from": "REQ-VOL-131-G02",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00251",
+      "from": "REQ-VOL-112-R01",
+      "to": "BEH-TRACE-ORPHAN",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00252",
+      "from": "REQ-VOL-112-R02",
+      "to": "BEH-TRACE-ORPHAN",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00253",
+      "from": "REQ-VOL-112-R03",
+      "to": "BEH-TRACE-ORPHAN",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00254",
+      "from": "REQ-VOL-112-G01",
+      "to": "BEH-TRACE-ORPHAN",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00255",
+      "from": "REQ-VOL-112-G02",
+      "to": "BEH-TRACE-ORPHAN",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00256",
+      "from": "BEH-TRACE-ORPHAN",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00257",
+      "from": "REQ-VOL-113-R01",
+      "to": "BEH-CAP-AVAILABILITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00258",
+      "from": "REQ-VOL-113-R02",
+      "to": "BEH-CAP-AVAILABILITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00259",
+      "from": "REQ-VOL-113-R03",
+      "to": "BEH-CAP-AVAILABILITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00260",
+      "from": "REQ-VOL-113-G01",
+      "to": "BEH-CAP-AVAILABILITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00261",
+      "from": "REQ-VOL-113-G02",
+      "to": "BEH-CAP-AVAILABILITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00262",
+      "from": "BEH-CAP-AVAILABILITY",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00263",
+      "from": "REQ-VOL-122-R01",
+      "to": "BEH-REQ-IDENTITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00264",
+      "from": "REQ-VOL-122-R02",
+      "to": "BEH-REQ-IDENTITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00265",
+      "from": "REQ-VOL-122-G01",
+      "to": "BEH-REQ-IDENTITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00266",
+      "from": "REQ-VOL-122-G02",
+      "to": "BEH-REQ-IDENTITY",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00267",
+      "from": "BEH-REQ-IDENTITY",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00268",
+      "from": "REQ-VOL-123-R01",
+      "to": "BEH-NFR-HARD-GATE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00269",
+      "from": "REQ-VOL-123-R02",
+      "to": "BEH-NFR-HARD-GATE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00270",
+      "from": "REQ-VOL-123-G01",
+      "to": "BEH-NFR-HARD-GATE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00271",
+      "from": "REQ-VOL-123-G02",
+      "to": "BEH-NFR-HARD-GATE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00272",
+      "from": "BEH-NFR-HARD-GATE",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00273",
+      "from": "REQ-VOL-124-R01",
+      "to": "BEH-TAXONOMY-COVERAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00274",
+      "from": "REQ-VOL-124-R02",
+      "to": "BEH-TAXONOMY-COVERAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00275",
+      "from": "REQ-VOL-124-G01",
+      "to": "BEH-TAXONOMY-COVERAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00276",
+      "from": "REQ-VOL-124-G02",
+      "to": "BEH-TAXONOMY-COVERAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00277",
+      "from": "BEH-TAXONOMY-COVERAGE",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00278",
+      "from": "REQ-VOL-125-R01",
+      "to": "BEH-MATURITY-INVALIDATION",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00279",
+      "from": "REQ-VOL-125-R02",
+      "to": "BEH-MATURITY-INVALIDATION",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00280",
+      "from": "REQ-VOL-125-G01",
+      "to": "BEH-MATURITY-INVALIDATION",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00281",
+      "from": "REQ-VOL-125-G02",
+      "to": "BEH-MATURITY-INVALIDATION",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00282",
+      "from": "BEH-MATURITY-INVALIDATION",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00283",
+      "from": "REQ-VOL-126-R01",
+      "to": "BEH-SCENARIO-LINKAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00284",
+      "from": "REQ-VOL-126-R02",
+      "to": "BEH-SCENARIO-LINKAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00285",
+      "from": "REQ-VOL-126-G01",
+      "to": "BEH-SCENARIO-LINKAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00286",
+      "from": "REQ-VOL-126-G02",
+      "to": "BEH-SCENARIO-LINKAGE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00287",
+      "from": "BEH-SCENARIO-LINKAGE",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00288",
+      "from": "REQ-VOL-127-R01",
+      "to": "BEH-STATE-TERMINAL",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00289",
+      "from": "REQ-VOL-127-R02",
+      "to": "BEH-STATE-TERMINAL",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00290",
+      "from": "REQ-VOL-127-G01",
+      "to": "BEH-STATE-TERMINAL",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00291",
+      "from": "REQ-VOL-127-G02",
+      "to": "BEH-STATE-TERMINAL",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00292",
+      "from": "BEH-STATE-TERMINAL",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00293",
+      "from": "REQ-VOL-128-R01",
+      "to": "BEH-INTERFACE-ERROR",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00294",
+      "from": "REQ-VOL-128-R02",
+      "to": "BEH-INTERFACE-ERROR",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00295",
+      "from": "REQ-VOL-128-G01",
+      "to": "BEH-INTERFACE-ERROR",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00296",
+      "from": "REQ-VOL-128-G02",
+      "to": "BEH-INTERFACE-ERROR",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00297",
+      "from": "BEH-INTERFACE-ERROR",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00298",
+      "from": "REQ-VOL-129-R01",
+      "to": "BEH-SCHEMA-COMPAT",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00299",
+      "from": "REQ-VOL-129-R02",
+      "to": "BEH-SCHEMA-COMPAT",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00300",
+      "from": "REQ-VOL-129-G01",
+      "to": "BEH-SCHEMA-COMPAT",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00301",
+      "from": "REQ-VOL-129-G02",
+      "to": "BEH-SCHEMA-COMPAT",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00302",
+      "from": "BEH-SCHEMA-COMPAT",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00303",
+      "from": "REQ-VOL-130-R01",
+      "to": "BEH-COMPAT-ROLLBACK",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00304",
+      "from": "REQ-VOL-130-R02",
+      "to": "BEH-COMPAT-ROLLBACK",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00305",
+      "from": "REQ-VOL-130-G01",
+      "to": "BEH-COMPAT-ROLLBACK",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00306",
+      "from": "REQ-VOL-130-G02",
+      "to": "BEH-COMPAT-ROLLBACK",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00307",
+      "from": "BEH-COMPAT-ROLLBACK",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00308",
+      "from": "REQ-VOL-131-R01",
+      "to": "BEH-PROTOCOL-DEADLINE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00309",
+      "from": "REQ-VOL-131-R02",
+      "to": "BEH-PROTOCOL-DEADLINE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00310",
+      "from": "REQ-VOL-131-G01",
+      "to": "BEH-PROTOCOL-DEADLINE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00311",
+      "from": "REQ-VOL-131-G02",
+      "to": "BEH-PROTOCOL-DEADLINE",
+      "kind": "specified_by"
+    },
+    {
+      "id": "TRACE-00312",
+      "from": "BEH-PROTOCOL-DEADLINE",
+      "to": "TEST-P2-TRACE",
+      "kind": "verified_by"
+    },
+    {
+      "id": "TRACE-00313",
+      "from": "VOL-112",
+      "to": "AUTH-REQ",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00314",
+      "from": "VOL-112",
+      "to": "AUTH-TAXONOMY",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00315",
+      "from": "VOL-112",
+      "to": "AUTH-BEHAVIOR",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00316",
+      "from": "VOL-113",
+      "to": "AUTH-RUNTIME-CAP",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00317",
+      "from": "VOL-113",
+      "to": "AUTH-TAXONOMY",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00318",
+      "from": "VOL-122",
+      "to": "AUTH-REQ",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00319",
+      "from": "VOL-123",
+      "to": "AUTH-NFR",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00320",
+      "from": "VOL-123",
+      "to": "AUTH-REQ",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00321",
+      "from": "VOL-124",
+      "to": "AUTH-TAXONOMY",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00322",
+      "from": "VOL-125",
+      "to": "AUTH-MATURITY",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00323",
+      "from": "VOL-126",
+      "to": "AUTH-BEHAVIOR",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00324",
+      "from": "VOL-127",
+      "to": "AUTH-STATE",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00325",
+      "from": "VOL-128",
+      "to": "AUTH-INTERFACE",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00326",
+      "from": "VOL-129",
+      "to": "AUTH-SCHEMA",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00327",
+      "from": "VOL-130",
+      "to": "AUTH-COMPAT",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00328",
+      "from": "VOL-131",
+      "to": "AUTH-PROTOCOL",
+      "kind": "implemented_by"
+    },
+    {
+      "id": "TRACE-00329",
+      "from": "VOL-112",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00330",
+      "from": "VOL-113",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00331",
+      "from": "VOL-122",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00332",
+      "from": "VOL-123",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00333",
+      "from": "VOL-124",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00334",
+      "from": "VOL-125",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00335",
+      "from": "VOL-126",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00336",
+      "from": "VOL-127",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00337",
+      "from": "VOL-128",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00338",
+      "from": "VOL-129",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00339",
+      "from": "VOL-130",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    },
+    {
+      "id": "TRACE-00340",
+      "from": "VOL-131",
+      "to": "CHECK-P2-TRACE",
+      "kind": "governed_by"
+    }
+  ],
+  "policy": {
+    "dangling_rule": "Every edge endpoint exists exactly once.",
+    "requirement_rule": "Every requirement traces to its volume, one or more capabilities, and executable test evidence.",
+    "behavior_rule": "Every behavior traces to requirement(s) and test.",
+    "impact_rule": "Incident edges permit deterministic changed-authority expansion to affected requirements/volumes.",
+    "no_false_completion": "Trace completeness does not imply masterplan maturity or signoff."
+  }
 }
