@@ -1,0 +1,2028 @@
+{
+  "schema_version": "skeleton.trace.nfr_registry.v1",
+  "registry_version": "0.1.0",
+  "status": "active",
+  "purpose": "Stable NFR identities and measurement contracts derived from engineering work-package budget classes without inventing universal numeric thresholds.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-123",
+    "title": "Non-Functional Requirements",
+    "required_gap_texts": [
+      "bind all production claims to NFR IDs",
+      "materialize measurement harnesses"
+    ]
+  },
+  "sources": {
+    "engineering_pass": "machine/ai_engineering_pass.json"
+  },
+  "policy": {
+    "no_invented_thresholds": true,
+    "binding_rule": "Do not invent universal numeric thresholds in the plan. Before implementation can be promoted beyond scaffolded/experimental, each applicable budget class must bind a threshold with unit, percentile/window where relevant, workload, environment, measurement method, owner and exception policy.",
+    "production_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence.",
+    "hard_failure_rule": "A bound NFR threshold is non-compensable: aggregate success cannot mask its failure."
+  },
+  "nfrs": [
+    {
+      "nfr_id": "NFR-ACCESSIBILITY",
+      "budget_class": "accessibility",
+      "work_package_refs": [
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-AUTHORIZATION-LATENCY",
+      "budget_class": "authorization_latency",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-AVAILABILITY",
+      "budget_class": "availability",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19",
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-CAPACITY",
+      "budget_class": "capacity",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-CHANGE-FAILURE-RATE",
+      "budget_class": "change_failure_rate",
+      "work_package_refs": [
+        "WP-W00"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-COMPATIBILITY-WINDOW",
+      "budget_class": "compatibility_window",
+      "work_package_refs": [
+        "WP-W01"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-CONTEXT-OR-MEMORY-BUDGET",
+      "budget_class": "context_or_memory_budget",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W08",
+        "WP-W10"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-COST",
+      "budget_class": "cost",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W08",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16",
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-DATASET-OR-ARTIFACT-GROWTH",
+      "budget_class": "dataset_or_artifact_growth",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-DURABILITY",
+      "budget_class": "durability",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W07"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-EVIDENCE-FRESHNESS",
+      "budget_class": "evidence_freshness",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W17",
+        "WP-W18",
+        "WP-W21"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-EXPERIMENT-COST",
+      "budget_class": "experiment_cost",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-FALSE-ACCEPT-RATE",
+      "budget_class": "false_accept_rate",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W17",
+        "WP-W18",
+        "WP-W21"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-FANOUT",
+      "budget_class": "fanout",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-LATENCY",
+      "budget_class": "latency",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W08",
+        "WP-W10",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-MEMORY-CEILING",
+      "budget_class": "memory_ceiling",
+      "work_package_refs": [
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-PLAN-DRIFT",
+      "budget_class": "plan_drift",
+      "work_package_refs": [
+        "WP-W00"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-PROMOTION-LATENCY",
+      "budget_class": "promotion_latency",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-QUALITY",
+      "budget_class": "quality",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W08",
+        "WP-W10"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-RECONNECT-BUDGET",
+      "budget_class": "reconnect_budget",
+      "work_package_refs": [
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-RECOVERY-POINT",
+      "budget_class": "recovery_point",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W07",
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-RECOVERY-TIME",
+      "budget_class": "recovery_time",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W07",
+        "WP-W11",
+        "WP-W12",
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W19",
+        "WP-W20",
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-REPRODUCIBILITY",
+      "budget_class": "reproducibility",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-RESOURCE-CEILING",
+      "budget_class": "resource_ceiling",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-ROLLBACK-TIME",
+      "budget_class": "rollback_time",
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-SANDBOX-RESOURCE",
+      "budget_class": "sandbox_resource",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-SCHEMA-ERROR-RATE",
+      "budget_class": "schema_error_rate",
+      "work_package_refs": [
+        "WP-W01"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-SERIALIZATION-COST",
+      "budget_class": "serialization_cost",
+      "work_package_refs": [
+        "WP-W01"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-SIDE-EFFECT-RATE",
+      "budget_class": "side_effect_rate",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-STARTUP-SHUTDOWN-LATENCY",
+      "budget_class": "startup_shutdown_latency",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-STEP-BUDGET",
+      "budget_class": "step_budget",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-STORAGE-GROWTH",
+      "budget_class": "storage_growth",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W07",
+        "WP-W09",
+        "WP-W17",
+        "WP-W18",
+        "WP-W21"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-THROUGHPUT",
+      "budget_class": "throughput",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W08",
+        "WP-W10"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-TRANSACTION-LATENCY",
+      "budget_class": "transaction_latency",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W07"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-VALIDATION-LATENCY",
+      "budget_class": "validation_latency",
+      "work_package_refs": [
+        "WP-W00"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-VERIFICATION-LATENCY",
+      "budget_class": "verification_latency",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W17",
+        "WP-W18",
+        "WP-W21"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    },
+    {
+      "nfr_id": "NFR-WALL-CLOCK",
+      "budget_class": "wall_clock",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "threshold_binding": {
+        "status": "required_before_promotion",
+        "required_fields": [
+          "metric",
+          "threshold",
+          "unit",
+          "measurement_window_or_percentile",
+          "workload",
+          "environment",
+          "measurement_method",
+          "owner",
+          "exception_or_waiver_ref"
+        ],
+        "values": null
+      },
+      "measurement_contract": {
+        "harness": "scripts/check_nfr_registry.py",
+        "evidence_required": true,
+        "proof_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+      }
+    }
+  ],
+  "work_package_bindings": [
+    {
+      "work_package_ref": "WP-W00",
+      "primary_wave": "MBW-00",
+      "engineering_class": "control",
+      "nfr_ids": [
+        "NFR-CHANGE-FAILURE-RATE",
+        "NFR-PLAN-DRIFT",
+        "NFR-VALIDATION-LATENCY"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "architecture fitness"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W01",
+      "primary_wave": "MBW-00",
+      "engineering_class": "contract",
+      "nfr_ids": [
+        "NFR-COMPATIBILITY-WINDOW",
+        "NFR-SCHEMA-ERROR-RATE",
+        "NFR-SERIALIZATION-COST"
+      ],
+      "evidence_modes": [
+        "schema",
+        "property",
+        "compatibility",
+        "fuzz"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "versioned decoder fallback",
+        "migration/rollback fixture"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W02",
+      "primary_wave": "MBW-01",
+      "engineering_class": "runtime",
+      "nfr_ids": [
+        "NFR-AVAILABILITY",
+        "NFR-RECOVERY-TIME",
+        "NFR-RESOURCE-CEILING",
+        "NFR-STARTUP-SHUTDOWN-LATENCY"
+      ],
+      "evidence_modes": [
+        "state-machine",
+        "integration",
+        "fault injection"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W03",
+      "primary_wave": "MBW-01",
+      "engineering_class": "state",
+      "nfr_ids": [
+        "NFR-DURABILITY",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STORAGE-GROWTH",
+        "NFR-TRANSACTION-LATENCY"
+      ],
+      "evidence_modes": [
+        "transaction",
+        "crash recovery",
+        "migration",
+        "property"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W04",
+      "primary_wave": "MBW-01",
+      "engineering_class": "state",
+      "nfr_ids": [
+        "NFR-DURABILITY",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STORAGE-GROWTH",
+        "NFR-TRANSACTION-LATENCY"
+      ],
+      "evidence_modes": [
+        "property",
+        "replay",
+        "fault injection",
+        "integration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W05",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "nfr_ids": [
+        "NFR-CONTEXT-OR-MEMORY-BUDGET",
+        "NFR-COST",
+        "NFR-LATENCY",
+        "NFR-QUALITY",
+        "NFR-THROUGHPUT"
+      ],
+      "evidence_modes": [
+        "contract",
+        "integration",
+        "cancellation",
+        "fault injection"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W06",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "nfr_ids": [
+        "NFR-CONTEXT-OR-MEMORY-BUDGET",
+        "NFR-COST",
+        "NFR-LATENCY",
+        "NFR-QUALITY",
+        "NFR-THROUGHPUT"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "policy",
+        "load",
+        "regression"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W07",
+      "primary_wave": "MBW-02",
+      "engineering_class": "state",
+      "nfr_ids": [
+        "NFR-DURABILITY",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STORAGE-GROWTH",
+        "NFR-TRANSACTION-LATENCY"
+      ],
+      "evidence_modes": [
+        "policy",
+        "lifecycle",
+        "adversarial",
+        "migration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W08",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "nfr_ids": [
+        "NFR-CONTEXT-OR-MEMORY-BUDGET",
+        "NFR-COST",
+        "NFR-LATENCY",
+        "NFR-QUALITY",
+        "NFR-THROUGHPUT"
+      ],
+      "evidence_modes": [
+        "retrieval eval",
+        "access-control",
+        "migration",
+        "fault"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W09",
+      "primary_wave": "MBW-02",
+      "engineering_class": "evidence",
+      "nfr_ids": [
+        "NFR-EVIDENCE-FRESHNESS",
+        "NFR-FALSE-ACCEPT-RATE",
+        "NFR-STORAGE-GROWTH",
+        "NFR-VERIFICATION-LATENCY"
+      ],
+      "evidence_modes": [
+        "graph property",
+        "provenance",
+        "temporal eval"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W10",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "nfr_ids": [
+        "NFR-CONTEXT-OR-MEMORY-BUDGET",
+        "NFR-COST",
+        "NFR-LATENCY",
+        "NFR-QUALITY",
+        "NFR-THROUGHPUT"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "token-budget",
+        "regression"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W11",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "nfr_ids": [
+        "NFR-COST",
+        "NFR-FANOUT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STEP-BUDGET",
+        "NFR-WALL-CLOCK"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "long-horizon",
+        "budget",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W12",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "nfr_ids": [
+        "NFR-COST",
+        "NFR-FANOUT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STEP-BUDGET",
+        "NFR-WALL-CLOCK"
+      ],
+      "evidence_modes": [
+        "static analysis",
+        "property",
+        "simulation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "replan from durable checkpoint",
+        "dependency invalidation"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W13",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "nfr_ids": [
+        "NFR-AUTHORIZATION-LATENCY",
+        "NFR-RECOVERY-TIME",
+        "NFR-SANDBOX-RESOURCE",
+        "NFR-SIDE-EFFECT-RATE"
+      ],
+      "evidence_modes": [
+        "sandbox",
+        "contract",
+        "fault",
+        "side-effect replay"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W14",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "nfr_ids": [
+        "NFR-AUTHORIZATION-LATENCY",
+        "NFR-RECOVERY-TIME",
+        "NFR-SANDBOX-RESOURCE",
+        "NFR-SIDE-EFFECT-RATE"
+      ],
+      "evidence_modes": [
+        "policy mutation",
+        "adversarial",
+        "authorization matrix"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W15",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "nfr_ids": [
+        "NFR-COST",
+        "NFR-FANOUT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STEP-BUDGET",
+        "NFR-WALL-CLOCK"
+      ],
+      "evidence_modes": [
+        "property",
+        "lease fault",
+        "integration",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "lease fencing",
+        "checkpoint resume",
+        "revoke delegation"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W16",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "nfr_ids": [
+        "NFR-COST",
+        "NFR-FANOUT",
+        "NFR-RECOVERY-TIME",
+        "NFR-STEP-BUDGET",
+        "NFR-WALL-CLOCK"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "concurrency",
+        "chaos",
+        "long-horizon"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "re-elect/reassign",
+        "conflict abort",
+        "bounded decomposition"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W17",
+      "primary_wave": "MBW-03",
+      "engineering_class": "evidence",
+      "nfr_ids": [
+        "NFR-EVIDENCE-FRESHNESS",
+        "NFR-FALSE-ACCEPT-RATE",
+        "NFR-STORAGE-GROWTH",
+        "NFR-VERIFICATION-LATENCY"
+      ],
+      "evidence_modes": [
+        "independent verifier",
+        "deterministic checks",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W18",
+      "primary_wave": "MBW-06",
+      "engineering_class": "evidence",
+      "nfr_ids": [
+        "NFR-EVIDENCE-FRESHNESS",
+        "NFR-FALSE-ACCEPT-RATE",
+        "NFR-STORAGE-GROWTH",
+        "NFR-VERIFICATION-LATENCY"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "statistical",
+        "contamination",
+        "reproducibility"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "freeze/revert benchmark",
+        "invalidate contaminated runs"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W19",
+      "primary_wave": "MBW-01",
+      "engineering_class": "runtime",
+      "nfr_ids": [
+        "NFR-AVAILABILITY",
+        "NFR-RECOVERY-TIME",
+        "NFR-RESOURCE-CEILING",
+        "NFR-STARTUP-SHUTDOWN-LATENCY"
+      ],
+      "evidence_modes": [
+        "chaos",
+        "soak",
+        "fault injection",
+        "recovery drill"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "trip breaker",
+        "shed load",
+        "restore checkpoint"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W20",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "nfr_ids": [
+        "NFR-AUTHORIZATION-LATENCY",
+        "NFR-RECOVERY-TIME",
+        "NFR-SANDBOX-RESOURCE",
+        "NFR-SIDE-EFFECT-RATE"
+      ],
+      "evidence_modes": [
+        "threat-model tests",
+        "fuzz",
+        "sandbox",
+        "penetration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "revoke credential",
+        "isolate workspace",
+        "incident rollback"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W21",
+      "primary_wave": "MBW-05",
+      "engineering_class": "evidence",
+      "nfr_ids": [
+        "NFR-EVIDENCE-FRESHNESS",
+        "NFR-FALSE-ACCEPT-RATE",
+        "NFR-STORAGE-GROWTH",
+        "NFR-VERIFICATION-LATENCY"
+      ],
+      "evidence_modes": [
+        "telemetry contract",
+        "load",
+        "redaction",
+        "replay reconstruction"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "degraded telemetry mode",
+        "sampling control",
+        "retention repair"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W22",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "nfr_ids": [
+        "NFR-ACCESSIBILITY",
+        "NFR-LATENCY",
+        "NFR-MEMORY-CEILING",
+        "NFR-RECONNECT-BUDGET"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "reconnect",
+        "load",
+        "race"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "idempotent submit",
+        "client backoff"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W23",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "nfr_ids": [
+        "NFR-ACCESSIBILITY",
+        "NFR-LATENCY",
+        "NFR-MEMORY-CEILING",
+        "NFR-RECONNECT-BUDGET"
+      ],
+      "evidence_modes": [
+        "e2e",
+        "accessibility",
+        "concurrency",
+        "offline/reconnect"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "reconcile from durable state",
+        "disable unsafe action"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W24",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "nfr_ids": [
+        "NFR-ACCESSIBILITY",
+        "NFR-LATENCY",
+        "NFR-MEMORY-CEILING",
+        "NFR-RECONNECT-BUDGET"
+      ],
+      "evidence_modes": [
+        "platform matrix",
+        "lifecycle",
+        "upgrade",
+        "security"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "repair/doctor",
+        "restart",
+        "settings rollback"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W25",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "nfr_ids": [
+        "NFR-AVAILABILITY",
+        "NFR-CAPACITY",
+        "NFR-COST",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-ROLLBACK-TIME"
+      ],
+      "evidence_modes": [
+        "clean-machine",
+        "upgrade",
+        "rollback",
+        "supply-chain"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "transaction rollback",
+        "repair mode",
+        "previous-version restore"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W26",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "nfr_ids": [
+        "NFR-DATASET-OR-ARTIFACT-GROWTH",
+        "NFR-EXPERIMENT-COST",
+        "NFR-PROMOTION-LATENCY",
+        "NFR-REPRODUCIBILITY"
+      ],
+      "evidence_modes": [
+        "replication",
+        "provenance",
+        "methodology review"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "invalidate candidate",
+        "preserve negative result",
+        "source correction"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W27",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "nfr_ids": [
+        "NFR-DATASET-OR-ARTIFACT-GROWTH",
+        "NFR-EXPERIMENT-COST",
+        "NFR-PROMOTION-LATENCY",
+        "NFR-REPRODUCIBILITY"
+      ],
+      "evidence_modes": [
+        "sandbox",
+        "comparison",
+        "adversarial",
+        "reproducibility"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "discard candidate",
+        "restore champion",
+        "quarantine artifacts"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W28",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "nfr_ids": [
+        "NFR-DATASET-OR-ARTIFACT-GROWTH",
+        "NFR-EXPERIMENT-COST",
+        "NFR-PROMOTION-LATENCY",
+        "NFR-REPRODUCIBILITY"
+      ],
+      "evidence_modes": [
+        "offline eval",
+        "shadow/canary",
+        "drift",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback candidate",
+        "disable signal source",
+        "retrain from frozen data"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W29",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "nfr_ids": [
+        "NFR-AVAILABILITY",
+        "NFR-CAPACITY",
+        "NFR-COST",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-ROLLBACK-TIME"
+      ],
+      "evidence_modes": [
+        "distributed fault",
+        "partition",
+        "load",
+        "soak"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fence/reassign",
+        "drain worker",
+        "checkpoint restore"
+      ]
+    },
+    {
+      "work_package_ref": "WP-W30",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "nfr_ids": [
+        "NFR-AVAILABILITY",
+        "NFR-CAPACITY",
+        "NFR-COST",
+        "NFR-RECOVERY-POINT",
+        "NFR-RECOVERY-TIME",
+        "NFR-ROLLBACK-TIME"
+      ],
+      "evidence_modes": [
+        "release rehearsal",
+        "DR drill",
+        "soak",
+        "security review"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback/redeploy",
+        "incident mode",
+        "restore from verified backup"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "schema_version": "skeleton.trace.state_machine_catalogue.v1",
+  "catalogue_version": "0.1.0",
+  "status": "active",
+  "purpose": "Canonical catalogue for lifecycle state machines with source symbols, terminal semantics, recovery states and test bindings.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-127",
+    "title": "State Machine Catalogue",
+    "required_gap_texts": [
+      "extract existing lifecycle machines",
+      "bind transition tests"
+    ]
+  },
+  "sources": {
+    "runtime_schema": "machine/ai_runtime_schemas.json",
+    "state_topology": "machine/state_topology.json"
+  },
+  "policy": {
+    "one_owner": true,
+    "terminals_have_no_outgoing_transitions": true,
+    "source_enum_must_equal_schema_enum": true,
+    "recovery_states_must_be_declared": true
+  },
+  "state_machines": [
+    {
+      "machine_id": "STATE-OPERATION",
+      "owner": "orchestration",
+      "version": 1,
+      "source": "skeleton/contracts/operation.py",
+      "enum_symbol": "OperationState",
+      "transition_symbol": "_ALLOWED_TRANSITIONS",
+      "terminal_symbol": "TERMINAL_OPERATION_STATES",
+      "schema_enum": "OperationState",
+      "test_refs": [
+        "skeleton/testing/test_operation_runtime.py",
+        "planned:skeleton/testing/test_state_machine_catalogue.py"
+      ],
+      "recovery_states": [
+        "retrying",
+        "degraded",
+        "waiting_for_tool",
+        "waiting_for_user"
+      ]
+    },
+    {
+      "machine_id": "STATE-AI-EXECUTION",
+      "owner": "orchestration",
+      "version": 1,
+      "source": "skeleton/contracts/ai_execution.py",
+      "enum_symbol": "ExecutionState",
+      "transition_symbol": "_ALLOWED_EXECUTION_TRANSITIONS",
+      "terminal_symbol": "TERMINAL_EXECUTION_STATES",
+      "schema_enum": "ExecutionState",
+      "test_refs": [
+        "skeleton/testing/test_engine_execution_service.py",
+        "skeleton/testing/test_engine_execution_coordinator.py",
+        "planned:skeleton/testing/test_state_machine_catalogue.py"
+      ],
+      "recovery_states": [
+        "repairing",
+        "degraded",
+        "checkpointing",
+        "waiting_for_tool_authority",
+        "waiting_for_user"
+      ]
+    }
+  ],
+  "state_domain_refs": [
+    {
+      "domain_id": "backend-core-app-state",
+      "owner_plane": "data-persistence",
+      "authority": "authoritative",
+      "status": "present"
+    },
+    {
+      "domain_id": "backend-seeded-content",
+      "owner_plane": "data-persistence",
+      "authority": "derived",
+      "status": "present"
+    },
+    {
+      "domain_id": "backend-swarm-scratch",
+      "owner_plane": "jobs-durability",
+      "authority": "scratch",
+      "status": "present"
+    },
+    {
+      "domain_id": "engine-mongo-state",
+      "owner_plane": "data-persistence",
+      "authority": "authoritative",
+      "status": "declared-partial"
+    },
+    {
+      "domain_id": "backend-rag-local-chroma",
+      "owner_plane": "retrieval",
+      "authority": "derived",
+      "status": "present"
+    },
+    {
+      "domain_id": "optional-vector-index",
+      "owner_plane": "retrieval",
+      "authority": "derived",
+      "status": "present-optional"
+    },
+    {
+      "domain_id": "canonical-operation-state",
+      "owner_plane": "orchestration",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "operation-event-stream",
+      "owner_plane": "streaming-realtime",
+      "authority": "durable-projection",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "in-process-retrieval-memory",
+      "owner_plane": "retrieval",
+      "authority": "derived",
+      "status": "present"
+    },
+    {
+      "domain_id": "manual-memory-snapshots",
+      "owner_plane": "data-persistence",
+      "authority": "recovery-aid",
+      "status": "present-optional"
+    },
+    {
+      "domain_id": "cognitive-execution-ledger",
+      "owner_plane": "orchestration",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "tool-idempotency-ledger",
+      "owner_plane": "tool-runtime",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "human-approval-ledger",
+      "owner_plane": "tool-runtime",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "execution-usage-ledger",
+      "owner_plane": "cost-capacity",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "final-ai-result-ledger",
+      "owner_plane": "orchestration",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "conversation-thread-state",
+      "owner_plane": "application-api",
+      "authority": "authoritative",
+      "status": "authoritative-mongo-binding-added"
+    },
+    {
+      "domain_id": "conversation-message-state",
+      "owner_plane": "application-api",
+      "authority": "authoritative",
+      "status": "authoritative-mongo-binding-added"
+    },
+    {
+      "domain_id": "verification-receipt-ledger",
+      "owner_plane": "reasoning-verification",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "governance-lifecycle-registry",
+      "owner_plane": "governance",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "canonical-ai-memory-records",
+      "owner_plane": "memory",
+      "authority": "authoritative",
+      "status": "production-bound"
+    },
+    {
+      "domain_id": "local-reference-provenance",
+      "owner_plane": "observability",
+      "authority": "conditional-authoritative",
+      "status": "local-observations-only"
+    }
+  ]
+}
