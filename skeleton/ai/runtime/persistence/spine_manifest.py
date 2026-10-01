@@ -63,6 +63,10 @@ SEAMS = (
     ("bind-hold-journal", "bind-hold-not-rewritten"),
     ("bind-hold-read", "bind-hold-stays-unapplied"),
     ("bind-hold-chain", "bind-hold-hash-chain"),
+    (
+        "bind-hold-verify",
+        "bind-hold-verification-does-not-grant-apply-authority",
+    ),
     ("bind-snapshot", "bind-snapshot-stays-unactivated"),
     ("bind-recovery", "recovery-plan-does-not-activate"),
     ("bind-checkpoint", "checkpoint-is-immutable-and-unactivated"),

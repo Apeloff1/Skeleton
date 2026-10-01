@@ -219,6 +219,14 @@ jobs:
           skeleton/testing/test_spine_masterplan.py
           skeleton/testing/test_spine_dispatch_guard.py
 
+      - name: Verify P2 bind hold refusal contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_spine_bind_hold.py
+          skeleton/testing/test_spine_bind_hold_verify.py
+
       - name: Verify P2 bind recovery control
         run: python scripts/check_spine_bind_recovery.py
 

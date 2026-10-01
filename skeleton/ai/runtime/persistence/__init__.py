@@ -137,6 +137,7 @@ from skeleton.persistence.spine_bind_hold import SpineBindHold
 from skeleton.persistence.spine_bind_hold_journal import SpineBindHoldJournal
 from skeleton.persistence.spine_bind_hold_read import SpineBindHoldRead
 from skeleton.persistence.spine_bind_hold_chain import SpineBindHoldChain
+from skeleton.persistence.spine_bind_hold_verify import SpineBindHoldVerify
 from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
 from skeleton.persistence.spine_bind_checkpoint import SpineBindCheckpoint
@@ -348,6 +349,7 @@ __all__ = [
     "SpineBindHoldJournal",
     "SpineBindHoldRead",
     "SpineBindHoldChain",
+    "SpineBindHoldVerify",
     "SpineBindSnapshot",
     "SpineBindRecovery",
     "SpineBindCheckpoint",

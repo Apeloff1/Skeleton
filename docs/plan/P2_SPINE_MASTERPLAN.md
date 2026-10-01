@@ -71,6 +71,7 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind hold journal | `skeleton/persistence/spine_bind_hold_journal.py` | refusal rewrite fails closed |
 | Bind hold read | `skeleton/persistence/spine_bind_hold_read.py` | applied row fails closed |
 | Bind hold chain | `skeleton/persistence/spine_bind_hold_chain.py` | rewritten refusal fails closed |
+| Bind hold verify | `skeleton/persistence/spine_bind_hold_verify.py` | durable refusal identity/digest verification grants no apply authority |
 | Bind snapshot | `skeleton/persistence/spine_bind_snapshot.py` | dark evidence is digest-bound |
 | Bind recovery | `skeleton/persistence/spine_bind_recovery.py` | recovery plan cannot self-activate |
 | Bind checkpoint | `skeleton/persistence/spine_bind_checkpoint.py` | one immutable recovery digest per tenant |
@@ -181,7 +182,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%
-- Bind hold refusal: 70%
+- Bind hold refusal: 95%; active holds only, latest hold identity bound, durable refusal digest reconstructable, exact-head verification pending
 
 ## Next, in order
 
@@ -196,7 +197,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 138, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 139, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
