@@ -144,6 +144,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime production activation verify | `skeleton/persistence/spine_runtime_production_activation_verify.py` | independently re-reads activated runtime, durable health operation, slot, and rollback fence |
 | Provider surface qualification | `skeleton/persistence/spine_provider_surface_qualification.py` | requires canonical + independent exact-head provider ownership receipts to agree |
 | Provider surface qualification verify | `skeleton/persistence/spine_provider_surface_qualification_verify.py` | verifies closure qualification without claiming live external provider health |
+| PR automation qualification | `skeleton/persistence/spine_pr_automation_qualification.py` | authenticates one exact-head runner receipt and separates operational health from merge eligibility |
+| PR automation qualification verify | `skeleton/persistence/spine_pr_automation_qualification_verify.py` | verifies runner health while merge authority remains false |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
