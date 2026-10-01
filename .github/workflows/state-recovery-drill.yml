@@ -60,6 +60,9 @@ on:
       - "skeleton/testing/test_spine_runtime_transition_acceptance.py"
       - "skeleton/testing/test_spine_runtime_production_activation_authorization.py"
       - "skeleton/testing/test_spine_runtime_production_activation.py"
+      - "skeleton/testing/test_spine_provider_surface_qualification.py"
+      - "skeleton/persistence/spine_provider_surface_qualification*.py"
+      - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification*.py"
       - "skeleton/persistence/spine_runtime_production_activation.py"
       - "skeleton/ai/runtime/persistence/spine_runtime_production_activation.py"
       - "skeleton/persistence/spine_runtime_production_activation_verify.py"
@@ -242,6 +245,7 @@ jobs:
           skeleton/testing/test_spine_runtime_transition_acceptance.py
           skeleton/testing/test_spine_runtime_production_activation_authorization.py
           skeleton/testing/test_spine_runtime_production_activation.py
+          skeleton/testing/test_spine_provider_surface_qualification.py
           skeleton/testing/test_spine_cutover.py
           skeleton/testing/test_spine_cut_gate.py
 
