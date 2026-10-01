@@ -82,5 +82,13 @@
     "no_flag_day": "Incompatible cross-boundary changes may not assume simultaneous deployment.",
     "rollback_rule": "Every incompatible change needs explicit rollback before landing.",
     "unknown_rule": "Unclassified changes are incompatible by default."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-130",
+    "title": "Compatibility Model",
+    "required_gap_texts": [
+      "bind schema/API versions to matrix",
+      "define support window policy"
+    ]
   }
 }
