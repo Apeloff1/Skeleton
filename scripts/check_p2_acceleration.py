@@ -88,6 +88,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         raise AccelerationControlError("runtime_authority must be an object")
     required_runtime = {
         "selection_engine",
+        "profiling_engine",
         "isolation_engine",
         "protocol_engine",
         "native_registry",
@@ -280,7 +281,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             )
 
     # AI-tree mirrors for new native controls must remain byte-identical.
-    for name in ("selection.py", "isolation.py", "protocol.py"):
+    for name in ("selection.py", "profiling.py", "isolation.py", "protocol.py"):
         canonical = root / "skeleton/native" / name
         mirror = root / "skeleton/ai/runtime/native" / name
         if not mirror.is_file() or canonical.read_bytes() != mirror.read_bytes():
