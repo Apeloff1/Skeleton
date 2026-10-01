@@ -69,6 +69,58 @@ def test_chain_changes_when_journal_row_is_rewritten(tmp_path: Path) -> None:
     assert chain.verify("tenant-chain", sealed["chain"])["match"] is False
 
 
+def test_chain_covers_applied_timestamp(tmp_path: Path) -> None:
+    hold = SpineHold(tmp_path / "hold.sqlite")
+    hold.hold(
+        tenant_id="tenant-chain",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    ticket = SpinePoisonTicket(
+        tmp_path / "hold.sqlite",
+        tmp_path / "ticket.sqlite",
+    )
+    delivery = _delivery()
+    issued = ticket.issue(
+        tenant_id="tenant-chain",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    apply = SpinePoisonApply(
+        tmp_path / "hold.sqlite",
+        SpineReaccept(inbox, fence),
+        ticket,
+        tmp_path / "journal.sqlite",
+    )
+    assert apply.apply(
+        delivery,
+        tenant_id="tenant-chain",
+        outbox_id=EVENT,
+        expected_digest=delivery.digest(),
+        ticket_id=issued["ticket_id"],
+        now=BASE,
+    )["applied"] == 1
+
+    chain = SpinePoisonChain(tmp_path / "journal.sqlite")
+    sealed = chain.seal("tenant-chain")
+
+    import sqlite3
+
+    connection = sqlite3.connect(tmp_path / "journal.sqlite")
+    connection.execute(
+        "UPDATE spine_poison_apply SET applied_at = ? WHERE tenant_id = ?",
+        ("2099-01-01T00:00:00+00:00", "tenant-chain"),
+    )
+    connection.commit()
+    connection.close()
+
+    assert chain.verify("tenant-chain", sealed["chain"])["match"] is False
+
+
 class _Runtime:
     def start_dispatcher(self) -> None:
         raise AssertionError("guard must not call start_dispatcher")

@@ -29,7 +29,7 @@ class SpinePoisonChain:
         rows = self._connection.execute(
             """
             SELECT apply_id, tenant_id, outbox_id, digest, reason,
-                   epoch_before, epoch_after, applied, ticket_id
+                   epoch_before, epoch_after, applied, ticket_id, applied_at
             FROM spine_poison_apply
             WHERE tenant_id = ?
             ORDER BY apply_id
@@ -50,6 +50,7 @@ class SpinePoisonChain:
                     "epoch_after",
                     "applied",
                     "ticket_id",
+                    "applied_at",
                 )
             )
             digest = hashlib.sha256(f"{digest}|{payload}".encode("utf-8")).hexdigest()
