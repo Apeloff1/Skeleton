@@ -91,6 +91,7 @@ def test_mongo_projection_repairs_fence_after_receipt_before_fence(
     assert repaired.duplicates == 1
     assert repaired.poisoned == 0
     assert repaired.fence_advances == 1
+    assert repaired.reconciled == 1
     assert fence.read(
         tenant_id="tenant-bridge",
         resource_id=f"op:{OP}",

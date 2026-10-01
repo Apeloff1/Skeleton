@@ -43,6 +43,7 @@ class SpineLandReport:
             "duplicates": self.projection.duplicates,
             "poisoned": self.projection.poisoned,
             "fence_advances": self.projection.fence_advances,
+            "reconciled": self.projection.reconciled,
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,

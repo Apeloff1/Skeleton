@@ -12,6 +12,7 @@ from skeleton.persistence.inbox_ledger import (
 )
 from skeleton.persistence.operation_runtime import DurableOperationRuntime
 from skeleton.persistence.operation_store import SQLiteOperationStore
+from skeleton.persistence.spine_cursor import SpineCursorRead
 from skeleton.persistence.spine_projection import SpineProjection
 
 
@@ -104,6 +105,13 @@ def test_projection_repairs_fence_after_receipt_committed_before_fence(
         assert repaired.duplicates == 1
         assert repaired.poisoned == 0
         assert repaired.fence_advances == 1
+        assert repaired.reconciled == 1
+        cursor = SpineCursorRead(projection, fence).read(
+            tenant_id="tenant-a",
+            resource_id=f"op:{created.envelope.operation_id}",
+        )
+        assert cursor.applied_count == 1
+        assert cursor.fence_epoch == 1
         assert fence.read(
             tenant_id="tenant-a",
             resource_id=f"op:{created.envelope.operation_id}",
@@ -158,5 +166,61 @@ def test_projection_fails_closed_when_fence_is_ahead_of_inbox(
         assert report.poisoned == 1
         assert report.fence_advances == 0
         assert projection.poison_count() == 1
+    runtime.close()
+
+def test_projection_recovers_cursor_after_fence_committed_before_completion(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    created = operations.create(_envelope(), now=BASE)
+    runtime.dispatch_outbox(operation_id=created.envelope.operation_id)
+    event = operations.published_outbox(
+        operation_id=created.envelope.operation_id
+    )[0]
+
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    delivery = delivery_from_outbox(event, "tenant-a")
+    accepted = inbox.accept(
+        delivery,
+        consumer_id="spine-projection",
+        now=event.published_at,
+    )
+    assert accepted.duplicate is False
+    resource = f"op:{created.envelope.operation_id}"
+    fence.open(
+        tenant_id="tenant-a",
+        resource_id=resource,
+        writer_id="spine-projection",
+        now=event.published_at,
+    )
+
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        journal_path=tmp_path / "journal.sqlite",
+    ) as projection:
+        repaired = projection.project(now=BASE + timedelta(seconds=5))
+        assert repaired.applied == 0
+        assert repaired.duplicates == 1
+        assert repaired.fence_advances == 0
+        assert repaired.reconciled == 1
+        cursor = SpineCursorRead(projection, fence).read(
+            tenant_id="tenant-a",
+            resource_id=resource,
+        )
+        assert cursor.applied_count == 1
+        assert cursor.fence_epoch == 1
+
+        replay = projection.project(now=BASE + timedelta(seconds=6))
+        assert replay.duplicates == 1
+        assert replay.reconciled == 0
+        assert SpineCursorRead(projection, fence).read(
+            tenant_id="tenant-a",
+            resource_id=resource,
+        ).applied_count == 1
     runtime.close()
 

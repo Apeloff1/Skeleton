@@ -66,6 +66,7 @@ class SpineProjectionReport:
     duplicates: int
     poisoned: int
     fence_advances: int
+    reconciled: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -78,6 +79,7 @@ class SpineProjectionReport:
             "duplicates": self.duplicates,
             "poisoned": self.poisoned,
             "fence_advances": self.fence_advances,
+            "reconciled": self.reconciled,
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,
@@ -144,6 +146,14 @@ class SpineProjection:
                     applied_count INTEGER NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS projection_applied (
+                    outbox_id TEXT PRIMARY KEY,
+                    consumer_id TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    fence_epoch INTEGER NOT NULL,
+                    completed_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -158,26 +168,28 @@ class SpineProjection:
         duplicates = 0
         poisoned = 0
         advances = 0
+        reconciled = 0
         for event in events:
             outcome = self._project_one(event, instant)
             applied += outcome[0]
             duplicates += outcome[1]
             poisoned += outcome[2]
             advances += outcome[3]
-        self._touch_cursor(applied, instant)
+            reconciled += outcome[4]
         return SpineProjectionReport(
             scanned=len(events),
             applied=applied,
             duplicates=duplicates,
             poisoned=poisoned,
             fence_advances=advances,
+            reconciled=reconciled,
         )
 
     def _project_one(
         self,
         event: OperationOutboxEvent,
         instant: datetime,
-    ) -> tuple[int, int, int, int]:
+    ) -> tuple[int, int, int, int, int]:
         stored = self.operations.get(event.operation_id)
         tenant_id = stored.envelope.tenant_id
         try:
@@ -189,7 +201,7 @@ class SpineProjection:
             )
         except InboxConflict as exc:
             self._poison(event, tenant_id, _reason_code(exc), instant)
-            return (0, 0, 1, 0)
+            return (0, 0, 1, 0, 0)
         resource = _resource(event.operation_id)
         try:
             advanced = self._reconcile_fence(
@@ -200,10 +212,28 @@ class SpineProjection:
             )
         except ConsistencyFenceError as exc:
             self._poison(event, tenant_id, _reason_code(exc), instant)
-            return (0, 0, 1, 0)
+            return (0, 0, 1, 0, 0)
+        try:
+            completed = self._record_completion(
+                event=event,
+                tenant_id=tenant_id,
+                fence_epoch=result.applied_through,
+                instant=instant,
+            )
+        except SpineProjectionError as exc:
+            self._poison(event, tenant_id, _reason_code(exc), instant)
+            return (0, 0, 1, advanced, 0)
         if result.duplicate:
-            return (0, 1, 0, advanced)
-        return (1, 0, 0, advanced)
+            return (0, 1, 0, advanced, completed)
+        if completed != 1:
+            self._poison(
+                event,
+                tenant_id,
+                "CompletionAlreadyExists",
+                instant,
+            )
+            return (0, 0, 1, advanced, 0)
+        return (1, 0, 0, advanced, 0)
 
     def _reconcile_fence(
         self,
@@ -297,18 +327,78 @@ class SpineProjection:
                 ),
             )
 
-    def _touch_cursor(self, applied: int, instant: datetime) -> None:
-        with self._lock:
-            self._connection.execute(
-                """
-                INSERT INTO projection_cursor(consumer_id, applied_count, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(consumer_id) DO UPDATE SET
-                    applied_count = projection_cursor.applied_count + excluded.applied_count,
-                    updated_at = excluded.updated_at
-                """,
-                (self.consumer_id, applied, instant.isoformat()),
+    def _record_completion(
+        self,
+        *,
+        event: OperationOutboxEvent,
+        tenant_id: str,
+        fence_epoch: int,
+        instant: datetime,
+    ) -> int:
+        if (
+            isinstance(fence_epoch, bool)
+            or not isinstance(fence_epoch, int)
+            or fence_epoch < 1
+        ):
+            raise SpineProjectionError(
+                "fence_epoch must be a positive integer"
             )
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._connection.execute(
+                    """
+                    SELECT consumer_id, operation_id, tenant_id, fence_epoch
+                    FROM projection_applied
+                    WHERE outbox_id = ?
+                    """,
+                    (event.outbox_id,),
+                ).fetchone()
+                if existing is not None:
+                    if (
+                        existing["consumer_id"] != self.consumer_id
+                        or existing["operation_id"] != event.operation_id
+                        or existing["tenant_id"] != tenant_id
+                        or existing["fence_epoch"] != fence_epoch
+                    ):
+                        raise SpineProjectionError(
+                            "projection completion identity changed"
+                        )
+                    self._connection.execute("COMMIT")
+                    return 0
+                self._connection.execute(
+                    """
+                    INSERT INTO projection_applied(
+                        outbox_id, consumer_id, operation_id, tenant_id,
+                        fence_epoch, completed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event.outbox_id,
+                        self.consumer_id,
+                        event.operation_id,
+                        tenant_id,
+                        fence_epoch,
+                        instant.isoformat(),
+                    ),
+                )
+                self._connection.execute(
+                    """
+                    INSERT INTO projection_cursor(
+                        consumer_id, applied_count, updated_at
+                    )
+                    VALUES (?, 1, ?)
+                    ON CONFLICT(consumer_id) DO UPDATE SET
+                        applied_count = projection_cursor.applied_count + 1,
+                        updated_at = excluded.updated_at
+                    """,
+                    (self.consumer_id, instant.isoformat()),
+                )
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+        return 1
 
     def poison_count(self) -> int:
         with self._lock:

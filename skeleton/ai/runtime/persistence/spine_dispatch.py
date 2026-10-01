@@ -42,6 +42,7 @@ class SpineDispatchReport:
             "duplicates": self.projection.duplicates,
             "poisoned": self.projection.poisoned,
             "fence_advances": self.projection.fence_advances,
+            "reconciled": self.projection.reconciled,
             "applied_count": self.cursor.applied_count,
             "poison_count": self.cursor.poison_count,
             "fence_epoch": self.cursor.fence_epoch,

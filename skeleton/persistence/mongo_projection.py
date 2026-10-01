@@ -28,6 +28,7 @@ class MongoProjectionReport:
     duplicates: int
     poisoned: int
     fence_advances: int
+    reconciled: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +41,7 @@ class MongoProjectionReport:
             "duplicates": self.duplicates,
             "poisoned": self.poisoned,
             "fence_advances": self.fence_advances,
+            "reconciled": self.reconciled,
             "stored_prose": 0,
             "completion_checkbox": False,
             "implementation_signature": False,
@@ -77,7 +79,7 @@ class MongoSpineProjection:
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise MongoProjectionError("now must be timezone-aware")
         events = self.operations.published_outbox(limit=limit)
-        applied = duplicates = poisoned = advances = 0
+        applied = duplicates = poisoned = advances = reconciled = 0
         for event in events:
             stored = self.operations.get(event.operation_id)
             tenant_id = stored.envelope.tenant_id
@@ -102,10 +104,19 @@ class MongoSpineProjection:
                 continue
             if result.duplicate:
                 duplicates += 1
+                if advanced:
+                    reconciled += 1
             else:
                 applied += 1
             advances += advanced
-        return MongoProjectionReport(len(events), applied, duplicates, poisoned, advances)
+        return MongoProjectionReport(
+            len(events),
+            applied,
+            duplicates,
+            poisoned,
+            advances,
+            reconciled,
+        )
 
     def _reconcile_fence(
         self,

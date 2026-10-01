@@ -69,6 +69,7 @@ def test_dispatch_hook_projects_and_reads_cursor(tmp_path: Path) -> None:
         assert second.dispatch.published == 0
         assert second.projection.duplicates == 1
         assert second.projection.fence_advances == 0
+        assert second.projection.reconciled == 0
         assert second.cursor.fence_epoch == 1
         card = hook.card(second)
         assert card["stored_prose"] == 0
