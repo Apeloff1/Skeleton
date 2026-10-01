@@ -81,7 +81,7 @@ class SpineRuntimeProductionActivationAuthorizationVerify:
             (
                 f"{card['acceptance_digest']}|{card['acceptance_id']}|"
                 f"{card['health_digest']}|{card['execution_id']}|"
-                f"{card['deployment_id']}|
+                f"{card['deployment_id']}|"
                 f"{card['authorization_nonce']}|pymongo-async"
             ).encode("utf-8")
         ).hexdigest()
