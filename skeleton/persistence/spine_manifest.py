@@ -79,6 +79,8 @@ SEAMS = (
     ("motor-bootstrap", "driver-injected-index-bootstrap"),
     ("motor-bootstrap-verify", "bootstrap-verification-does-not-activate"),
     ("motor-bootstrap-replay", "bootstrap-replay-is-equivalent"),
+    ("motor-preflight", "deployment-protocol-qualified-without-activation"),
+    ("motor-preflight-verify", "preflight-verification-does-not-activate"),
 )
 
 

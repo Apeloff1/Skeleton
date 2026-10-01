@@ -19,6 +19,8 @@ FILES = (
     "spine_motor_bootstrap.py",
     "spine_motor_bootstrap_verify.py",
     "spine_motor_bootstrap_replay.py",
+    "spine_motor_preflight.py",
+    "spine_motor_preflight_verify.py",
 )
 
 
@@ -44,8 +46,25 @@ def verify_no_driver_imports(root: Path) -> list[str]:
     return scanned
 
 
+def verify_mirror_parity(root: Path) -> list[str]:
+    canonical = root / "skeleton" / "persistence"
+    mirror = root / "skeleton" / "ai" / "runtime" / "persistence"
+    verified: list[str] = []
+    for name in FILES:
+        left = canonical / name
+        right = mirror / name
+        if not left.is_file() or not right.is_file():
+            raise MotorBootstrapControlError(f"missing mirrored bootstrap module: {name}")
+        if left.read_bytes() != right.read_bytes():
+            raise MotorBootstrapControlError(f"Motor bootstrap mirror drift: {name}")
+        verified.append(name)
+    return verified
+
+
 def build_report(root: Path) -> dict[str, object]:
-    scanned = verify_no_driver_imports(root.resolve())
+    root = root.resolve()
+    scanned = verify_no_driver_imports(root)
+    mirrored = verify_mirror_parity(root)
     plan = SpineMotorPlan().card()
     if plan["count"] != 3:
         raise MotorBootstrapControlError("canonical bootstrap plan must contain three indexes")
@@ -61,6 +80,7 @@ def build_report(root: Path) -> dict[str, object]:
         "control": "p2-motor-bootstrap-v1",
         "valid": True,
         "modules": scanned,
+        "mirror_count": len(mirrored),
         "plan_digest": plan["digest"],
         "index_count": plan["count"],
         "live_motor": False,

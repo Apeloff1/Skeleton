@@ -5,6 +5,8 @@ Machine owners:
 - `skeleton/persistence/spine_motor_bootstrap.py`
 - `skeleton/persistence/spine_motor_bootstrap_verify.py`
 - `skeleton/persistence/spine_motor_bootstrap_replay.py`
+- `skeleton/persistence/spine_motor_preflight.py`
+- `skeleton/persistence/spine_motor_preflight_verify.py`
 
 AI-tree mirrors live under `skeleton/ai/runtime/persistence`.
 
@@ -40,6 +42,19 @@ The normalized plan is canonical-JSON encoded and SHA-256 addressed.
 
 A successful injected run must apply every planned index. It does not prove a
 live Motor deployment exists.
+
+## Non-activating deployment preflight
+
+`SpineMotorPreflight` accepts an injected database-like object and exercises
+only `ping`, `hello`, and canonical collection lookup. It verifies the
+wire-version range and that every canonical collection exposes `create_index`.
+It emits canonical SHA-256 evidence while keeping `driver_imported=false`,
+`live_motor=false`, and `activated=false`.
+
+`SpineMotorPreflightVerify` independently reconstructs the plan identity,
+collection coverage, wire-version constraints, authority flags, and digest.
+This qualifies the deployment protocol surface only; it does not authenticate
+a package identity or activate the runtime.
 
 ## Independent checks
 

@@ -133,6 +133,8 @@ from skeleton.persistence.spine_motor_plan import SpineMotorPlan
 from skeleton.persistence.spine_motor_bootstrap import SpineMotorBootstrap
 from skeleton.persistence.spine_motor_bootstrap_verify import SpineMotorBootstrapVerify
 from skeleton.persistence.spine_motor_bootstrap_replay import SpineMotorBootstrapReplay
+from skeleton.persistence.spine_motor_preflight import SpineMotorPreflight
+from skeleton.persistence.spine_motor_preflight_verify import SpineMotorPreflightVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -280,6 +282,8 @@ __all__ = [
     "SpineMotorBootstrap",
     "SpineMotorBootstrapVerify",
     "SpineMotorBootstrapReplay",
+    "SpineMotorPreflight",
+    "SpineMotorPreflightVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

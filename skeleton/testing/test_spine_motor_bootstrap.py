@@ -18,6 +18,14 @@ from skeleton.persistence.spine_motor_bootstrap_verify import (
     SpineMotorBootstrapVerifyError,
 )
 from skeleton.persistence.spine_motor_plan import SpineMotorPlan
+from skeleton.persistence.spine_motor_preflight import (
+    SpineMotorPreflight,
+    SpineMotorPreflightError,
+)
+from skeleton.persistence.spine_motor_preflight_verify import (
+    SpineMotorPreflightVerify,
+    SpineMotorPreflightVerifyError,
+)
 
 
 class _AsyncCollection:
@@ -152,3 +160,88 @@ def test_bootstrap_replay_rejects_result_drift() -> None:
         match="bootstrap replay result changed",
     ):
         SpineMotorBootstrapReplay().card(first=first, second=second)
+
+
+class _PreflightDatabase:
+    def __init__(
+        self,
+        *,
+        ping_ok: int = 1,
+        hello_ok: int = 1,
+        min_wire: int = 0,
+        max_wire: int = 21,
+        broken_collection: str | None = None,
+    ) -> None:
+        self.ping_ok = ping_ok
+        self.hello_ok = hello_ok
+        self.min_wire = min_wire
+        self.max_wire = max_wire
+        self.broken_collection = broken_collection
+        self.commands: list[str] = []
+
+    async def command(self, name: str):
+        self.commands.append(name)
+        if name == "ping":
+            return {"ok": self.ping_ok}
+        if name == "hello":
+            return {
+                "ok": self.hello_ok,
+                "minWireVersion": self.min_wire,
+                "maxWireVersion": self.max_wire,
+            }
+        raise RuntimeError("unexpected command")
+
+    def get_collection(self, name: str):
+        if name == self.broken_collection:
+            return object()
+        return _AsyncCollection(name)
+
+
+def test_motor_preflight_qualifies_protocol_without_activation() -> None:
+    database = _PreflightDatabase()
+    card = asyncio.run(SpineMotorPreflight().probe(database))
+    verified = SpineMotorPreflightVerify().verify(card)
+
+    assert database.commands == ["ping", "hello"]
+    assert card["protocol_qualified"] is True
+    assert card["collections"] == ["receipts", "watermarks", "fence"]
+    assert card["min_wire_version"] == 0
+    assert card["max_wire_version"] == 21
+    assert len(card["digest"]) == 64
+    assert card["driver_imported"] is False
+    assert card["live_motor"] is False
+    assert card["activated"] is False
+    assert verified["verified"] is True
+    assert verified["live_motor"] is False
+
+
+@pytest.mark.parametrize(
+    ("database", "match"),
+    [
+        (_PreflightDatabase(ping_ok=0), "ping did not return ok=1"),
+        (_PreflightDatabase(hello_ok=0), "hello did not return ok=1"),
+        (_PreflightDatabase(min_wire=9, max_wire=8), "wire-version range is invalid"),
+        (_PreflightDatabase(broken_collection="fence"), "does not expose create_index"),
+    ],
+)
+def test_motor_preflight_fails_closed(database, match: str) -> None:
+    with pytest.raises(SpineMotorPreflightError, match=match):
+        asyncio.run(SpineMotorPreflight().probe(database))
+
+
+def test_motor_preflight_verifier_rejects_tampered_digest() -> None:
+    card = asyncio.run(SpineMotorPreflight().probe(_PreflightDatabase()))
+    forged = copy.deepcopy(card)
+    forged["digest"] = "0" * 64
+
+    with pytest.raises(SpineMotorPreflightVerifyError, match="digest mismatch"):
+        SpineMotorPreflightVerify().verify(forged)
+
+
+def test_motor_preflight_verifier_rejects_activation_claim() -> None:
+    card = asyncio.run(SpineMotorPreflight().probe(_PreflightDatabase()))
+    forged = copy.deepcopy(card)
+    forged["live_motor"] = True
+
+    with pytest.raises(SpineMotorPreflightVerifyError, match="gained live authority"):
+        SpineMotorPreflightVerify().verify(forged)
