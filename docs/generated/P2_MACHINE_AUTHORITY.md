@@ -12,7 +12,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | --- | --- |
 | `machine/ai_master_plan.json` | `2fdd74be113360ba79072a1c1268adb7612b8efb` |
 | `machine/ai_p2_execution_map.json` | `dc8b92e87cf405324e52b831603a912c3d58357d` |
-| `machine/ai_p2_task_backlog.json` | `9ed0d9f708a7b6f25d5c6dee7cfeae350c3f743c` |
+| `machine/ai_p2_task_backlog.json` | `33a860536b75f70e7af3cadcd0e5c5c99db600a2` |
 
 ## P2 execution boundary
 
@@ -28,7 +28,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | `P2-ARCH-01` | `P2-L1` | `landed_unpromoted` | `P2-CTRL-01` |
 | `P2-CTRL-01` | `P2-L0` | `landed_unpromoted` | — |
 | `P2-DOC-01` | `P2-L5` | `landed_unpromoted` | `P2-TRACE-01` |
-| `P2-NATIVE-01` | `P2-L6` | `ready` | `P2-QUAL-01` |
+| `P2-NATIVE-01` | `P2-L6` | `in_progress` | `P2-QUAL-01` |
 | `P2-QUAL-01` | `P2-L4` | `landed_unpromoted` | `P2-TRACE-01` |
 | `P2-REPO-01` | `P2-L3` | `landed_unpromoted` | `P2-ARCH-01`, `P2-TRACE-01` |
 | `P2-TRACE-01` | `P2-L2` | `landed_unpromoted` | `P2-ARCH-01` |

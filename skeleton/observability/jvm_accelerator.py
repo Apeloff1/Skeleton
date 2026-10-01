@@ -22,8 +22,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from skeleton.native.protocol import (
+    AcceleratorProtocolError as SharedAcceleratorProtocolError,
+    CURRENT_PROTOCOL_VERSION,
+    negotiate_wire_major,
+)
+
 _MAGIC = 0x534B4F42
-_VERSION = 1
+_VERSION = CURRENT_PROTOCOL_VERSION.major
 _OP_PING = 1
 _OP_SUMMARY = 2
 _OP_MANY_SUMMARIES = 3
@@ -50,6 +56,19 @@ class JvmAcceleratorUnavailable(JvmAcceleratorError):
 
 class JvmAcceleratorProtocolError(JvmAcceleratorError):
     """Raised when the JVM returns a malformed or rejected frame."""
+
+
+def _validate_protocol_version(version: int) -> None:
+    try:
+        selected = negotiate_wire_major(version)
+    except SharedAcceleratorProtocolError as exc:
+        raise JvmAcceleratorProtocolError(
+            f"unsupported accelerator protocol version: {version}"
+        ) from exc
+    if selected.major != _VERSION:
+        raise JvmAcceleratorProtocolError(
+            f"negotiated accelerator protocol drift: {selected}"
+        )
 
 
 class JvmAcceleratorTimeout(JvmAcceleratorError):
@@ -425,8 +444,9 @@ class JvmObservabilityAccelerator:
             while True:
                 header = self._read_exact(process.stdout, _HEADER_RESPONSE.size)
                 magic, version, op, status, request_id = _HEADER_RESPONSE.unpack(header)
-                if magic != _MAGIC or version != _VERSION:
-                    raise JvmAcceleratorProtocolError("invalid response header")
+                if magic != _MAGIC:
+                    raise JvmAcceleratorProtocolError("invalid response magic")
+                _validate_protocol_version(version)
                 if status != _STATUS_OK:
                     length = _INT.unpack(self._read_exact(process.stdout, _INT.size))[0]
                     if not 0 <= length <= 8192:
