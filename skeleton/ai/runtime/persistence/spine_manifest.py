@@ -110,6 +110,8 @@ SEAMS = (
     ("runtime-activation-boundary-verify", "boundary-verification-does-not-activate-runtime"),
     ("runtime-activation-handoff", "deployment-handoff-does-not-activate-runtime"),
     ("runtime-activation-handoff-verify", "handoff-verification-does-not-activate-runtime"),
+    ("runtime-transition-rehearsal", "deployment-transition-rehearsal-does-not-execute-activation"),
+    ("runtime-transition-rehearsal-verify", "transition-rehearsal-verification-does-not-activate-runtime"),
 )
 
 
