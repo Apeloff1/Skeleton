@@ -26,6 +26,7 @@ import sqlite3
 from typing import Any, Iterable, Mapping
 
 SCRATCH_PREFIX = "skeleton_recovery_drill_"
+SQLITE_SCRATCH_PREFIX = "skeleton_recovery_drill_"
 
 
 class RecoveryDrillError(RuntimeError):
@@ -37,14 +38,33 @@ def utc_now() -> str:
 
 
 def require_scratch_database(name: str) -> str:
-    value = str(name).strip()
-    if not value.startswith(SCRATCH_PREFIX):
+    if not isinstance(name, str) or not name.strip():
+        raise RecoveryDrillError("scratch database name must be non-empty text")
+    if name != name.strip():
+        raise RecoveryDrillError("scratch database name must be canonical text")
+    if not name.startswith(SCRATCH_PREFIX):
         raise RecoveryDrillError(
             f"refusing destructive recovery drill outside {SCRATCH_PREFIX}* database"
         )
-    if len(value) > 120:
+    if len(name) > 120:
         raise RecoveryDrillError("scratch database name is too long")
-    return value
+    return name
+
+
+def require_scratch_directory(path: str | Path) -> Path:
+    if isinstance(path, bool) or not isinstance(path, (str, Path)):
+        raise RecoveryDrillError("scratch workdir must be a path")
+    raw = Path(path)
+    if raw.name in {"", ".", ".."} or not raw.name.startswith(SQLITE_SCRATCH_PREFIX):
+        raise RecoveryDrillError(
+            "refusing destructive SQLite recovery drill outside "
+            f"{SQLITE_SCRATCH_PREFIX}* workdir"
+        )
+    parent = raw.parent.resolve()
+    target = parent / raw.name
+    if target.exists() and target.is_symlink():
+        raise RecoveryDrillError("scratch workdir must not be a symlink")
+    return target
 
 
 def canonical_json(value: Any) -> str:
@@ -856,7 +876,7 @@ def run_operation_sqlite_drill(
     from skeleton.persistence.operation_runtime import DurableOperationRuntime
     from skeleton.persistence.operation_store import SQLiteOperationStore
 
-    root = Path(workdir)
+    root = require_scratch_directory(workdir)
     root.mkdir(parents=True, exist_ok=True)
     source_path = root / "operation_state.sqlite"
     backup_path = root / "operation_state.backup.sqlite"
@@ -1157,7 +1177,7 @@ def run_engine_sqlite_bundle_drill(
     )
     from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
-    root = Path(workdir)
+    root = require_scratch_directory(workdir)
     source_root = root / "source"
     backup_root = root / "backup"
     restored_root = root / "restored"

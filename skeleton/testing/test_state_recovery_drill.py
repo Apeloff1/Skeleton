@@ -16,6 +16,20 @@ def test_recovery_drill_refuses_non_scratch_database_names() -> None:
     )
 
 
+def test_sqlite_recovery_drill_requires_scratch_workdir(tmp_path) -> None:
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_operation_sqlite_drill(tmp_path / "unsafe", cleanup=False)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_engine_sqlite_bundle_drill(tmp_path / "unsafe-engine", cleanup=False)
+
+
 def test_recovery_journal_forbids_derived_rebuild_before_authority_verify() -> None:
     journal = drill.RecoveryJournal()
 
@@ -191,7 +205,7 @@ def test_operation_sqlite_restore_preserves_authority_and_outbox_order(
     tmp_path,
 ) -> None:
     result = drill.run_operation_sqlite_drill(
-        tmp_path / "sqlite-recovery",
+        tmp_path / "skeleton_recovery_drill_sqlite",
         cleanup=False,
     )
 
@@ -255,7 +269,7 @@ def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
     tmp_path,
 ) -> None:
     result = drill.run_engine_sqlite_bundle_drill(
-        tmp_path / "engine-bundle",
+        tmp_path / "skeleton_recovery_drill_engine_bundle",
         cleanup=False,
     )
 

@@ -3,9 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import time
+
+import pytest
 from uuid import uuid4
 
-from skeleton.contracts.operation import OperationEnvelope, OperationState
+from skeleton.contracts.operation import (
+    OperationContractError,
+    OperationEnvelope,
+    OperationState,
+)
 from skeleton.frontier.operation_stream import ReplayCursor
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
 from skeleton.persistence.operation_runtime import DurableOperationRuntime
@@ -38,6 +44,39 @@ def _runtime(tmp_path: Path, reasoner: _Reasoner | None = None):
         outbox_batch_size=32,
         default_deadline_s=60.0,
     )
+
+
+def test_runtime_rejects_nonfinite_timing_configuration(tmp_path: Path) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    with pytest.raises(ValueError, match="finite and positive"):
+        DurableOperationRuntime(
+            _Reasoner(),
+            operations,
+            stream,
+            default_deadline_s=float("nan"),
+        )
+    operations.close()
+    stream.close()
+
+
+def test_reason_rejects_coerced_or_empty_operation_identity_inputs(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(tmp_path)
+
+    with pytest.raises(TypeError, match="tenant_id"):
+        runtime.reason("hello", tenant_id=123)
+    with pytest.raises(OperationContractError, match="tenant_id"):
+        runtime.reason("hello", tenant_id="")
+    with pytest.raises(OperationContractError, match="idempotency_key"):
+        runtime.reason("hello", idempotency_key="")
+    with pytest.raises(TypeError, match="trace_id"):
+        runtime.reason("hello", trace_id=True)
+    with pytest.raises(TypeError, match="finite numeric epoch"):
+        runtime.reason("hello", deadline=float("nan"))
+
+    runtime.close()
 
 
 def test_reasoning_operation_is_durable_and_streamed_to_terminal(tmp_path: Path) -> None:
@@ -77,8 +116,6 @@ def test_reasoning_error_result_commits_failed_terminal_state(tmp_path: Path) ->
 
 
 def test_reasoning_exception_commits_failed_state_before_reraising(tmp_path: Path) -> None:
-    import pytest
-
     runtime = _runtime(tmp_path, _Reasoner(raise_error=True))
 
     with pytest.raises(RuntimeError, match="boom"):
@@ -194,6 +231,42 @@ def test_restart_drains_pending_transactional_outbox(tmp_path: Path) -> None:
     ]
 
 
+def test_dispatch_report_counts_full_backlog_beyond_batch(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    runtime = DurableOperationRuntime(
+        _Reasoner(),
+        operations,
+        stream,
+        outbox_batch_size=2,
+    )
+    now = datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
+    for index in range(5):
+        operations.create(
+            OperationEnvelope(
+                operation_id=str(uuid4()),
+                tenant_id="tenant-a",
+                actor_id="actor-a",
+                capability="intelligence.reason",
+                created_at=now,
+                deadline=now + timedelta(minutes=5),
+                idempotency_key=f"batch-{index}",
+                trace_id=f"batch-trace-{index}",
+            ),
+            now=now + timedelta(seconds=index),
+        )
+
+    report = runtime.dispatch_outbox(limit=2)
+
+    assert report.attempted == 2
+    assert report.published == 2
+    assert report.remaining == 3
+    assert runtime.stats()["durable_operation_runtime"]["pending_outbox"] == 3
+    runtime.close()
+
+
 def test_stats_surface_pending_outbox_and_dispatch_health(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
     result = runtime.reason("hello")
@@ -279,6 +352,13 @@ def test_background_dispatcher_retries_pending_outbox_after_transient_failure(
 
     runtime.close()
     assert runtime.dispatcher_running is False
+
+
+def test_stop_dispatcher_rejects_nonfinite_timeout(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="finite and positive"):
+        runtime.stop_dispatcher(timeout_s=float("inf"))
+    runtime.close()
 
 
 def test_stop_dispatcher_is_idempotent_and_flushes_pending_rows(

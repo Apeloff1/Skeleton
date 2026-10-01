@@ -20,7 +20,7 @@ from pathlib import Path
 import sqlite3
 import threading
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from skeleton.contracts.operation import (
     OperationContractError,
@@ -42,6 +42,34 @@ class OperationStoreCorruptionError(OperationStoreError):
     """Persisted operation state cannot be interpreted safely."""
 
 
+def _normalized_text(value: object, field: str, *, max_length: int = 256) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise OperationStoreError(f"{field} must be non-empty text")
+    if value != value.strip():
+        raise OperationStoreError(f"{field} must be canonical text")
+    if len(value) > max_length:
+        raise OperationStoreError(f"{field} exceeds maximum length")
+    return value
+
+
+def _canonical_uuid(value: object, field: str) -> str:
+    text = _normalized_text(value, field, max_length=64)
+    try:
+        parsed = UUID(text)
+    except (ValueError, AttributeError) as exc:
+        raise OperationStoreError(f"{field} must be a canonical UUID") from exc
+    if str(parsed) != text:
+        raise OperationStoreError(f"{field} must be a canonical UUID")
+    return text
+
+
+def _identity_digest(value: object) -> str:
+    text = _normalized_text(value, "identity_digest", max_length=64)
+    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise OperationStoreError("identity_digest must be lowercase SHA-256 hex")
+    return text
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -52,6 +80,19 @@ def _aware(value: datetime, field: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise OperationStoreError(f"{field} must be timezone-aware")
     return value.astimezone(timezone.utc)
+
+
+def _persisted_int(
+    value: object,
+    field: str,
+    *,
+    minimum: int = 0,
+) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise OperationStoreCorruptionError(
+            f"{field} must be persisted as an integer >= {minimum}"
+        )
+    return value
 
 
 def _parse_time(value: object, field: str) -> datetime:
@@ -175,9 +216,10 @@ class SQLiteOperationStore:
         *,
         namespace: str = "operation_state",
     ) -> None:
-        namespace = str(namespace).strip()
-        if not namespace:
-            raise ValueError("namespace must not be empty")
+        if not isinstance(namespace, str) or not namespace.strip():
+            raise ValueError("namespace must be non-empty text")
+        if namespace != namespace.strip():
+            raise ValueError("namespace must be canonical text")
         self.namespace = namespace
         self._connection = sqlite3.connect(
             str(path),
@@ -248,9 +290,7 @@ class SQLiteOperationStore:
                 trace_id=row["trace_id"],
                 state=OperationState(row["state"]),
             )
-            version = int(row["version"])
-            if version < 1:
-                raise ValueError("version must be positive")
+            version = _persisted_int(row["version"], "version", minimum=1)
             updated_at = _parse_time(row["updated_at"], "updated_at")
         except (
             KeyError,
@@ -277,9 +317,11 @@ class SQLiteOperationStore:
     @staticmethod
     def _outbox_from_row(row: sqlite3.Row) -> OperationOutboxEvent:
         try:
-            version = int(row["operation_version"])
-            if version < 1:
-                raise ValueError("operation_version must be positive")
+            version = _persisted_int(
+                row["operation_version"],
+                "operation_version",
+                minimum=1,
+            )
             published_at = (
                 None
                 if row["published_at"] is None
@@ -439,16 +481,15 @@ class SQLiteOperationStore:
                 raise
 
     def get(self, operation_id: str) -> StoredOperation:
+        operation = _canonical_uuid(operation_id, "operation_id")
         with self._lock:
-            row = self._select_operation(operation_id=operation_id)
+            row = self._select_operation(operation_id=operation)
             if row is None:
                 raise OperationStoreError("unknown operation")
             return self._stored_from_row(row)
 
     def get_by_identity_digest(self, identity_digest: str) -> StoredOperation:
-        digest = str(identity_digest).strip()
-        if not digest:
-            raise OperationStoreError("identity_digest is required")
+        digest = _identity_digest(identity_digest)
         with self._lock:
             row = self._select_operation(identity_digest=digest)
             if row is None:
@@ -463,6 +504,7 @@ class SQLiteOperationStore:
         expected_version: int | None = None,
         now: datetime | None = None,
     ) -> StoredOperation:
+        operation = _canonical_uuid(operation_id, "operation_id")
         if expected_version is not None and (
             isinstance(expected_version, bool)
             or not isinstance(expected_version, int)
@@ -474,7 +516,7 @@ class SQLiteOperationStore:
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                row = self._select_operation(operation_id=operation_id)
+                row = self._select_operation(operation_id=operation)
                 if row is None:
                     raise OperationStoreError("unknown operation")
                 current = self._stored_from_row(row)
@@ -499,7 +541,7 @@ class SQLiteOperationStore:
                         next_version,
                         instant.isoformat(),
                         self.namespace,
-                        operation_id,
+                        operation,
                         current.version,
                     ),
                 )
@@ -537,9 +579,7 @@ class SQLiteOperationStore:
             raise ValueError("limit must be a positive integer")
         operation = None
         if operation_id is not None:
-            operation = str(operation_id).strip()
-            if not operation:
-                raise OperationStoreError("operation_id is required")
+            operation = _canonical_uuid(operation_id, "operation_id")
 
         with self._lock:
             if operation is None:
@@ -566,15 +606,51 @@ class SQLiteOperationStore:
                 ).fetchall()
         return tuple(self._outbox_from_row(row) for row in rows)
 
+    def pending_outbox_count(
+        self,
+        *,
+        operation_id: str | None = None,
+    ) -> int:
+        operation = None
+        if operation_id is not None:
+            operation = _canonical_uuid(operation_id, "operation_id")
+        with self._lock:
+            if operation is None:
+                row = self._connection.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM operation_outbox
+                    WHERE namespace = ? AND published_at IS NULL
+                    """,
+                    (self.namespace,),
+                ).fetchone()
+            else:
+                row = self._connection.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM operation_outbox
+                    WHERE namespace = ? AND operation_id = ? AND published_at IS NULL
+                    """,
+                    (self.namespace, operation),
+                ).fetchone()
+        if row is None:
+            raise OperationStoreCorruptionError(
+                "pending outbox count query returned no row"
+            )
+        value = row[0]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise OperationStoreCorruptionError(
+                "pending outbox count is invalid"
+            )
+        return value
+
     def acknowledge_outbox(
         self,
         outbox_id: str,
         *,
         published_at: datetime | None = None,
     ) -> OperationOutboxEvent:
-        event_id = str(outbox_id).strip()
-        if not event_id:
-            raise OperationStoreError("outbox_id is required")
+        event_id = _canonical_uuid(outbox_id, "outbox_id")
         instant = _aware(published_at or _utc_now(), "published_at")
 
         with self._lock:
@@ -594,6 +670,10 @@ class SQLiteOperationStore:
                 if current.published_at is not None:
                     self._connection.execute("COMMIT")
                     return current
+                if instant < current.created_at:
+                    raise OperationStoreConflict(
+                        "published_at cannot precede outbox creation"
+                    )
 
                 self._connection.execute(
                     """
