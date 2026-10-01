@@ -6,8 +6,8 @@ import hashlib
 import json
 from typing import Any
 
-from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard
-from skeleton.persistence.spine_epoch_witness import SpineEpochWitness
+from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard, SpineDispatchGuardError
+from skeleton.persistence.spine_epoch_witness import SpineEpochWitness, SpineEpochWitnessError
 
 
 class SpineRuntimeTransitionRollbackWitnessError(RuntimeError):
@@ -75,18 +75,24 @@ class SpineRuntimeTransitionRollbackWitness:
             raise SpineRuntimeTransitionRollbackWitnessError("independent transition-attempt verification is required")
 
         guard = SpineDispatchGuard()
-        before = guard.snapshot(runtime)
-        dispatch = guard.compare(before, runtime)
+        try:
+            before = guard.snapshot(runtime)
+            dispatch = guard.compare(before, runtime)
+        except SpineDispatchGuardError as exc:
+            raise SpineRuntimeTransitionRollbackWitnessError("dispatcher identity changed during rollback witness") from exc
         if dispatch.get("same") is not True or dispatch.get("called") is not False:
             raise SpineRuntimeTransitionRollbackWitnessError("dispatcher identity changed during rollback witness")
         if getattr(runtime, "dispatcher_running", False) is not False:
             raise SpineRuntimeTransitionRollbackWitnessError("dispatcher is running after refused transition attempt")
 
-        epoch = SpineEpochWitness().card(
-            epoch_before=epoch_before,
-            epoch_after=epoch_after,
-            side=attempt,
-        )
+        try:
+            epoch = SpineEpochWitness().card(
+                epoch_before=epoch_before,
+                epoch_after=epoch_after,
+                side=attempt,
+            )
+        except SpineEpochWitnessError as exc:
+            raise SpineRuntimeTransitionRollbackWitnessError("side card moved the fence") from exc
         if epoch.get("moved") is not False:
             raise SpineRuntimeTransitionRollbackWitnessError("fence moved after refused transition attempt")
 
