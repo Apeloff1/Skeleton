@@ -166,6 +166,44 @@ def validate(root: Path) -> dict:
             raise P2ValidationError(f"task {task_id} cannot depend on itself")
     _assert_acyclic(task_nodes, task_edges, "task")
 
+    allowed_statuses = {"blocked", "ready", "in_progress", "landed_unpromoted"}
+    terminal_dependency_statuses = {"landed_unpromoted"}
+    task_by_id = {t["task_id"]: t for t in tasks}
+    for task in tasks:
+        task_id = task["task_id"]
+        status = task.get("status")
+        if status not in allowed_statuses:
+            raise P2ValidationError(f"task {task_id} has unsupported status {status!r}")
+        deps = task_edges[task_id]
+        landed_deps = {
+            dep
+            for dep in deps
+            if task_by_id[dep].get("status") in terminal_dependency_statuses
+        }
+        unresolved = sorted(set(deps) - landed_deps)
+        if status in {"ready", "in_progress"} and unresolved:
+            raise P2ValidationError(
+                f"task {task_id} is {status} with unresolved dependencies {unresolved}"
+            )
+        if status == "blocked" and deps and not unresolved:
+            raise P2ValidationError(
+                f"task {task_id} is blocked even though all dependencies are landed"
+            )
+        if status == "landed_unpromoted":
+            evidence = task.get("evidence_refs")
+            if not isinstance(evidence, list) or len(evidence) < 3:
+                raise P2ValidationError(
+                    f"task {task_id} landed_unpromoted requires at least three evidence refs"
+                )
+            if task.get("completion_checkbox") is not False:
+                raise P2ValidationError(
+                    f"task {task_id} landed_unpromoted may not assert completion"
+                )
+            if task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
+                raise P2ValidationError(
+                    f"task {task_id} landed_unpromoted may not fabricate sign-off"
+                )
+
     owned_refs = [ref for t in tasks for ref in t.get("primary_volume_refs", [])]
     if _duplicates(owned_refs):
         raise P2ValidationError(f"scheduled primary volume has multiple owners: {_duplicates(owned_refs)}")
@@ -253,6 +291,7 @@ def validate(root: Path) -> dict:
         "in_progress_count": sum(t.get("status") == "in_progress" for t in tasks),
         "ready_count": sum(t.get("status") == "ready" for t in tasks),
         "blocked_count": sum(t.get("status") == "blocked" for t in tasks),
+        "landed_unpromoted_count": sum(t.get("status") == "landed_unpromoted" for t in tasks),
         "scheduled_volume_count": len(scheduled),
         "queued_volume_count": len(queued),
         "source_volume_count": len(p2_source),
