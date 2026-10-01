@@ -58,19 +58,24 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Epoch witness | `skeleton/persistence/spine_epoch_witness.py` | side card does not move the fence |
 | Quiet | `skeleton/persistence/spine_quiet.py` | dark card rewrite fails closed |
 | Quiet witness | `skeleton/persistence/spine_quiet_witness.py` | lit row fails closed |
+| Bind card | `skeleton/persistence/spine_bind_card.py` | joins quiet, dark, epoch; green fails closed |
+| Bind journal | `skeleton/persistence/spine_bind_journal.py` | rewrite fails closed |
+| Bind read | `skeleton/persistence/spine_bind_read.py` | lit bind row fails closed |
+| Bind chain | `skeleton/persistence/spine_bind_chain.py` | rewritten bind row fails closed |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Tracker
 
-- Read and project: 95%
+- Read and project: 96%
 - Provider surface claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
 - Live Motor bootstrap: 15%
 - CI green: 0%
 - Merge: 0%
+- Bind card sealed: 40%
 
 ## Next, in order
 
@@ -80,10 +85,11 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 4. Provider-surface and PR Automation are not claimed green. `SpineProviderProbe` and `SpinePrProbe` append unread rows only. `claim` writes `claimed=0`. `SpineUnreadGap` lists a skipped sequence for that tenant and returns empty for a foreign tenant. `SpineSurfaceSeal` strips a forged green flag. This is not a sign-off.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
 6. Live Motor bootstrap and the runtime dispatcher stay unwired. `SpineMotorWitness` fails closed on a motor or pymongo import. `SpineDispatchWitness` fails closed if the dispatcher is running and does not call `start_dispatcher`. This is not a sign-off.
+7. The bind card joins quiet, dark, and epoch. `SpineBindCard` refuses a lit flag and a moved epoch. `SpineBindJournal` refuses a rewrite. `SpineBindRead` fails closed on a lit row. `SpineBindChain` refuses a rewritten row. This is not a sign-off.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 41, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 45, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

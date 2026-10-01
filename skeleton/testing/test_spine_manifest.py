@@ -5,7 +5,7 @@ from skeleton.persistence.spine_manifest import SpineManifest
 
 def test_manifest_lists_seams_without_signoff() -> None:
     card = SpineManifest().card()
-    assert card["count"] == 41
+    assert card["count"] == 45
     assert card["apply_landed"] is False
     assert card["poison_apply_landed"] is True
     assert card["hit"] is False
@@ -30,3 +30,7 @@ def test_manifest_lists_seams_without_signoff() -> None:
     assert "epoch-witness" in names
     assert "quiet" in names
     assert "quiet-witness" in names
+    assert "bind-card" in names
+    assert "bind-journal" in names
+    assert "bind-read" in names
+    assert "bind-chain" in names

@@ -50,6 +50,10 @@ SEAMS = (
     ("epoch-witness", "side-card-epoch-unchanged"),
     ("quiet", "dark-card-not-rewritten"),
     ("quiet-witness", "quiet-row-stays-dark"),
+    ("bind-card", "bind-card-stays-dark"),
+    ("bind-journal", "bind-card-not-rewritten"),
+    ("bind-read", "bind-row-stays-dark"),
+    ("bind-chain", "bind-journal-hash-chain"),
 )
 
 
