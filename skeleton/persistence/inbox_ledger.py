@@ -490,7 +490,7 @@ class SQLiteInboxLedger:
         return InboxReceipt(
             consumer_id=_consumer_id(row["consumer_id"]),
             event_id=_canonical_uuid(row["event_id"], "event_id"),
-            operation_id=_canonical_uuid(row["operation_id"], "operation_id"]),
+            operation_id=_canonical_uuid(row["operation_id"], "operation_id"),
             operation_version=_persisted_int(
                 row["operation_version"], "operation_version", minimum=1
             ),
@@ -498,7 +498,7 @@ class SQLiteInboxLedger:
             event_type=_canonical_text(row["event_type"], "event_type"),
             payload_digest=digest,
             created_at=_parse_time(row["created_at"], "created_at"),
-            accepted_at=_parse_time(row["accepted_at"], "accepted_at"]),
+            accepted_at=_parse_time(row["accepted_at"], "accepted_at"),
         )
 
     def close(self) -> None:

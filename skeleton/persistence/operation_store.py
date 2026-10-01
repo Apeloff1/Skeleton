@@ -644,6 +644,44 @@ class SQLiteOperationStore:
             )
         return value
 
+    def published_outbox(
+        self,
+        *,
+        operation_id: str | None = None,
+        limit: int = 1000,
+    ) -> tuple[OperationOutboxEvent, ...]:
+        """Return acknowledged outbox rows. Does not grant sign-off."""
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        operation = None
+        if operation_id is not None:
+            operation = _canonical_uuid(operation_id, "operation_id")
+        with self._lock:
+            if operation is None:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM operation_outbox
+                    WHERE namespace = ? AND published_at IS NOT NULL
+                    ORDER BY published_at ASC, operation_version ASC, outbox_id ASC
+                    LIMIT ?
+                    """,
+                    (self.namespace, limit),
+                ).fetchall()
+            else:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM operation_outbox
+                    WHERE namespace = ? AND operation_id = ? AND published_at IS NOT NULL
+                    ORDER BY operation_version ASC, outbox_id ASC
+                    LIMIT ?
+                    """,
+                    (self.namespace, operation, limit),
+                ).fetchall()
+        return tuple(self._outbox_from_row(row) for row in rows)
+
     def acknowledge_outbox(
         self,
         outbox_id: str,

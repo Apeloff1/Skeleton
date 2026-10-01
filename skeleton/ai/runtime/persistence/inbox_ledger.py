@@ -137,6 +137,8 @@ def payload_digest(payload: Mapping[str, Any]) -> str:
 
 @dataclass(frozen=True, slots=True)
 class InboxDelivery:
+    """Published outbox identity presented to one consumer."""
+
     event_id: str
     operation_id: str
     operation_version: int
@@ -197,6 +199,8 @@ class InboxAcceptResult:
 
 
 def delivery_from_outbox(event: Any, tenant_id: str) -> InboxDelivery:
+    """Adapt a published OperationOutboxEvent without taking ownership of it."""
+
     published = getattr(event, "published_at", None)
     if published is None:
         raise InboxConflict("inbox refuses unpublished outbox events")
@@ -204,7 +208,9 @@ def delivery_from_outbox(event: Any, tenant_id: str) -> InboxDelivery:
     return InboxDelivery(
         event_id=_canonical_uuid(getattr(event, "outbox_id", None), "event_id"),
         operation_id=_canonical_uuid(getattr(event, "operation_id", None), "operation_id"),
-        operation_version=_positive_int(getattr(event, "operation_version", None), "operation_version"),
+        operation_version=_positive_int(
+            getattr(event, "operation_version", None), "operation_version"
+        ),
         event_type=_canonical_text(getattr(event, "event_type", None), "event_type"),
         payload=payload,
         created_at=_aware(getattr(event, "created_at", None), "created_at"),
@@ -214,9 +220,21 @@ def delivery_from_outbox(event: Any, tenant_id: str) -> InboxDelivery:
 
 
 class SQLiteInboxLedger:
-    def __init__(self, path: str | Path = ":memory:", *, namespace: str = "operation_inbox") -> None:
+    """SQLite exactly-once inbox over published outbox identities."""
+
+    def __init__(
+        self,
+        path: str | Path = ":memory:",
+        *,
+        namespace: str = "operation_inbox",
+    ) -> None:
         self.namespace = _canonical_text(namespace, "namespace")
-        self._connection = sqlite3.connect(str(path), check_same_thread=False, timeout=5.0, isolation_level=None)
+        self._connection = sqlite3.connect(
+            str(path),
+            check_same_thread=False,
+            timeout=5.0,
+            isolation_level=None,
+        )
         self._connection.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         with self._lock:
@@ -226,6 +244,7 @@ class SQLiteInboxLedger:
                 PRAGMA journal_mode = WAL;
                 PRAGMA synchronous = FULL;
                 PRAGMA busy_timeout = 5000;
+
                 CREATE TABLE IF NOT EXISTS inbox_receipt (
                     namespace TEXT NOT NULL,
                     consumer_id TEXT NOT NULL,
@@ -239,6 +258,7 @@ class SQLiteInboxLedger:
                     accepted_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, consumer_id, event_id)
                 );
+
                 CREATE TABLE IF NOT EXISTS inbox_watermark (
                     namespace TEXT NOT NULL,
                     consumer_id TEXT NOT NULL,
@@ -248,12 +268,19 @@ class SQLiteInboxLedger:
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, consumer_id, operation_id)
                 );
+
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_inbox_receipt_version
                 ON inbox_receipt(namespace, consumer_id, operation_id, operation_version);
                 """
             )
 
-    def accept(self, delivery: InboxDelivery, *, consumer_id: str, now: datetime | None = None) -> InboxAcceptResult:
+    def accept(
+        self,
+        delivery: InboxDelivery,
+        *,
+        consumer_id: str,
+        now: datetime | None = None,
+    ) -> InboxAcceptResult:
         if not isinstance(delivery, InboxDelivery):
             raise TypeError("delivery must be an InboxDelivery")
         consumer = _consumer_id(consumer_id)
@@ -270,11 +297,16 @@ class SQLiteInboxLedger:
         instant = _aware(now or datetime.now(timezone.utc), "now")
         if instant < published_at:
             raise InboxConflict("inbox accept cannot predate publication")
+
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 existing = self._connection.execute(
-                    "SELECT * FROM inbox_receipt WHERE namespace = ? AND consumer_id = ? AND event_id = ?",
+                    """
+                    SELECT *
+                    FROM inbox_receipt
+                    WHERE namespace = ? AND consumer_id = ? AND event_id = ?
+                    """,
                     (self.namespace, consumer, event_id),
                 ).fetchone()
                 if existing is not None:
@@ -286,38 +318,101 @@ class SQLiteInboxLedger:
                         or receipt.operation_version != version
                         or receipt.event_type != event_type
                     ):
-                        raise InboxConflict("event identity already accepted with different content")
+                        raise InboxConflict(
+                            "event identity already accepted with different content"
+                        )
                     watermark = self._watermark(consumer, operation_id)
                     self._connection.execute("COMMIT")
-                    return InboxAcceptResult(receipt=receipt, applied_through=watermark, duplicate=True)
+                    return InboxAcceptResult(
+                        receipt=receipt,
+                        applied_through=watermark,
+                        duplicate=True,
+                    )
+
                 watermark_row = self._connection.execute(
-                    "SELECT tenant_id, applied_through FROM inbox_watermark WHERE namespace = ? AND consumer_id = ? AND operation_id = ?",
+                    """
+                    SELECT tenant_id, applied_through
+                    FROM inbox_watermark
+                    WHERE namespace = ? AND consumer_id = ? AND operation_id = ?
+                    """,
                     (self.namespace, consumer, operation_id),
                 ).fetchone()
                 if watermark_row is None:
                     if version != 1:
-                        raise InboxConflict("first inbox accept must be operation version 1")
+                        raise InboxConflict(
+                            "first inbox accept must be operation version 1"
+                        )
                 else:
                     bound_tenant = watermark_row["tenant_id"]
                     if not isinstance(bound_tenant, str) or bound_tenant != tenant_id:
                         raise InboxConflict("operation watermark is bound to another tenant")
-                    applied = _persisted_int(watermark_row["applied_through"], "applied_through", minimum=1)
+                    applied = _persisted_int(
+                        watermark_row["applied_through"],
+                        "applied_through",
+                        minimum=1,
+                    )
                     if version != applied + 1:
-                        raise InboxConflict("inbox version must be contiguous with the consumer watermark")
+                        raise InboxConflict(
+                            "inbox version must be contiguous with the consumer watermark"
+                        )
+
                 self._connection.execute(
-                    "INSERT INTO inbox_receipt(namespace, consumer_id, event_id, operation_id, operation_version, tenant_id, event_type, payload_digest, created_at, accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (self.namespace, consumer, event_id, operation_id, version, tenant_id, event_type, digest, created_at.isoformat(), instant.isoformat()),
+                    """
+                    INSERT INTO inbox_receipt(
+                        namespace, consumer_id, event_id, operation_id,
+                        operation_version, tenant_id, event_type,
+                        payload_digest, created_at, accepted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        consumer,
+                        event_id,
+                        operation_id,
+                        version,
+                        tenant_id,
+                        event_type,
+                        digest,
+                        created_at.isoformat(),
+                        instant.isoformat(),
+                    ),
                 )
                 self._connection.execute(
-                    "INSERT INTO inbox_watermark(namespace, consumer_id, operation_id, tenant_id, applied_through, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(namespace, consumer_id, operation_id) DO UPDATE SET applied_through = excluded.applied_through, updated_at = excluded.updated_at",
-                    (self.namespace, consumer, operation_id, tenant_id, version, instant.isoformat()),
+                    """
+                    INSERT INTO inbox_watermark(
+                        namespace, consumer_id, operation_id, tenant_id,
+                        applied_through, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(namespace, consumer_id, operation_id) DO UPDATE SET
+                        applied_through = excluded.applied_through,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        self.namespace,
+                        consumer,
+                        operation_id,
+                        tenant_id,
+                        version,
+                        instant.isoformat(),
+                    ),
                 )
                 self._connection.execute("COMMIT")
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
         return InboxAcceptResult(
-            receipt=InboxReceipt(consumer, event_id, operation_id, version, tenant_id, event_type, digest, created_at, instant),
+            receipt=InboxReceipt(
+                consumer_id=consumer,
+                event_id=event_id,
+                operation_id=operation_id,
+                operation_version=version,
+                tenant_id=tenant_id,
+                event_type=event_type,
+                payload_digest=digest,
+                created_at=created_at,
+                accepted_at=instant,
+            ),
             applied_through=version,
             duplicate=False,
         )
@@ -327,7 +422,11 @@ class SQLiteInboxLedger:
         event = _canonical_uuid(event_id, "event_id")
         with self._lock:
             row = self._connection.execute(
-                "SELECT * FROM inbox_receipt WHERE namespace = ? AND consumer_id = ? AND event_id = ?",
+                """
+                SELECT *
+                FROM inbox_receipt
+                WHERE namespace = ? AND consumer_id = ? AND event_id = ?
+                """,
                 (self.namespace, consumer, event),
             ).fetchone()
         if row is None:
@@ -340,10 +439,17 @@ class SQLiteInboxLedger:
     def applied_count(self, consumer_id: str | None = None) -> int:
         with self._lock:
             if consumer_id is None:
-                row = self._connection.execute("SELECT COUNT(*) AS n FROM inbox_receipt WHERE namespace = ?", (self.namespace,)).fetchone()
+                row = self._connection.execute(
+                    "SELECT COUNT(*) AS n FROM inbox_receipt WHERE namespace = ?",
+                    (self.namespace,),
+                ).fetchone()
             else:
                 row = self._connection.execute(
-                    "SELECT COUNT(*) AS n FROM inbox_receipt WHERE namespace = ? AND consumer_id = ?",
+                    """
+                    SELECT COUNT(*) AS n
+                    FROM inbox_receipt
+                    WHERE namespace = ? AND consumer_id = ?
+                    """,
                     (self.namespace, _consumer_id(consumer_id)),
                 ).fetchone()
         return int(row["n"])
@@ -363,7 +469,11 @@ class SQLiteInboxLedger:
 
     def _watermark(self, consumer_id: str, operation_id: str) -> int:
         row = self._connection.execute(
-            "SELECT applied_through FROM inbox_watermark WHERE namespace = ? AND consumer_id = ? AND operation_id = ?",
+            """
+            SELECT applied_through
+            FROM inbox_watermark
+            WHERE namespace = ? AND consumer_id = ? AND operation_id = ?
+            """,
             (self.namespace, consumer_id, operation_id),
         ).fetchone()
         if row is None:
@@ -373,18 +483,22 @@ class SQLiteInboxLedger:
     @staticmethod
     def _receipt_from_row(row: sqlite3.Row) -> InboxReceipt:
         digest = row["payload_digest"]
-        if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise InboxCorruptionError("payload_digest must be persisted SHA-256 hex")
+        if any(ch not in "0123456789abcdef" for ch in digest):
             raise InboxCorruptionError("payload_digest must be lowercase SHA-256 hex")
         return InboxReceipt(
             consumer_id=_consumer_id(row["consumer_id"]),
             event_id=_canonical_uuid(row["event_id"], "event_id"),
-            operation_id=_canonical_uuid(row["operation_id"], "operation_id"]),
-            operation_version=_persisted_int(row["operation_version"], "operation_version", minimum=1),
+            operation_id=_canonical_uuid(row["operation_id"], "operation_id"),
+            operation_version=_persisted_int(
+                row["operation_version"], "operation_version", minimum=1
+            ),
             tenant_id=_canonical_text(row["tenant_id"], "tenant_id"),
             event_type=_canonical_text(row["event_type"], "event_type"),
             payload_digest=digest,
             created_at=_parse_time(row["created_at"], "created_at"),
-            accepted_at=_parse_time(row["accepted_at"], "accepted_at"]),
+            accepted_at=_parse_time(row["accepted_at"], "accepted_at"),
         )
 
     def close(self) -> None:
