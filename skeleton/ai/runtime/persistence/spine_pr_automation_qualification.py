@@ -124,6 +124,10 @@ class SpinePrAutomationQualification:
             receipt.get("reason_digest"),
             "PR automation reason digest",
         )
+        _digest_text(
+            receipt.get("attestation_digest"),
+            "PR automation attestation digest",
+        )
         mode = receipt.get("mode")
         if mode not in _ALLOWED_MODES:
             raise SpinePrAutomationQualificationError(
