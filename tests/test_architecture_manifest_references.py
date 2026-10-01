@@ -30,7 +30,7 @@ class ArchitectureManifestReferenceTests(unittest.TestCase):
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["masterplan_binding"], "VOL-054")
         self.assertGreaterEqual(result["checked_reference_count"], 1)
-        self.assertEqual(result["doc_binding_count"], 4)
+        self.assertEqual(result["doc_binding_count"], 7)
 
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="manifest-refs-"))
