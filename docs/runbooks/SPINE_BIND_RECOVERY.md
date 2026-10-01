@@ -53,3 +53,16 @@ sign-off.
 ## Focused tests
 
 python -m pytest -q skeleton/testing/test_spine_bind_snapshot.py skeleton/testing/test_spine_bind_checkpoint.py skeleton/testing/test_spine_bind_bundle.py skeleton/testing/test_spine_manifest.py skeleton/testing/test_spine_masterplan.py
+
+## Exact-head control
+
+The State Recovery Drill workflow runs the focused bind recovery regressions and
+scripts/check_spine_bind_recovery.py on the exact pull-request head. The control
+fails closed when a canonical persistence file differs from its AI-tree mirror,
+when the manifest is not exactly 57 unique seams, when any recovery seam law is
+missing or changed, or when the masterplan no longer records the 75% bind-card
+evidence state and no-activation boundary.
+
+The control report is evidence about repository consistency only. valid=true is
+not runtime activation, provider/PR surface promotion, CI completion authority,
+merge authority, or a P2 sign-off.

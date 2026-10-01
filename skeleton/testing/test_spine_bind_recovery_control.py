@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from scripts.check_spine_bind_recovery import (
+    EXPECTED_SEAMS,
+    MIRRORED,
+    SpineBindRecoveryControlError,
+    build_report,
+    verify_manifest,
+    verify_mirror_parity,
+)
+
+
+def _write_fixture(root: Path) -> None:
+    canonical = root / "skeleton" / "persistence"
+    mirror = root / "skeleton" / "ai" / "runtime" / "persistence"
+    canonical.mkdir(parents=True)
+    mirror.mkdir(parents=True)
+    for name in MIRRORED:
+        content = f"# {name}\n"
+        if name == "spine_manifest.py":
+            base = [(f"seam-{index}", f"law-{index}") for index in range(49)]
+            base.extend(EXPECTED_SEAMS.items())
+            content = "SEAMS = " + repr(tuple(base)) + "\n"
+        (canonical / name).write_text(content, encoding="utf-8")
+        (mirror / name).write_text(content, encoding="utf-8")
+
+    plan = root / "docs" / "plan"
+    plan.mkdir(parents=True)
+    (plan / "P2_SPINE_MASTERPLAN.md").write_text(
+        "\n".join(
+            [
+                "- Bind card sealed: 75%",
+                "Expect `count` 57",
+                "Bind snapshot",
+                "Bind recovery",
+                "Bind checkpoint",
+                "Bind checkpoint replay",
+                "Bind checkpoint tenant",
+                "Bind checkpoint chain",
+                "Bind bundle",
+                "Bind bundle verify",
+                "`ready`, `activated`, `apply_landed`, `live_motor`, "
+                "`dispatcher_running`, `ci_green`, and `merged` remain false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_control_accepts_complete_dark_fixture(tmp_path: Path) -> None:
+    _write_fixture(tmp_path)
+
+    report = build_report(tmp_path)
+
+    assert report["valid"] is True
+    assert report["mirror_count"] == len(MIRRORED)
+    assert report["manifest"]["count"] == 57
+    assert report["masterplan"]["bind_card_percent"] == 75
+    assert report["masterplan"]["activation_claimed"] is False
+    assert report["completion_checkbox"] is False
+
+
+def test_mirror_drift_fails_closed(tmp_path: Path) -> None:
+    _write_fixture(tmp_path)
+    mirror = (
+        tmp_path
+        / "skeleton"
+        / "ai"
+        / "runtime"
+        / "persistence"
+        / "spine_bind_bundle.py"
+    )
+    mirror.write_text("# drift\n", encoding="utf-8")
+
+    with pytest.raises(SpineBindRecoveryControlError, match="mirror drift"):
+        verify_mirror_parity(tmp_path)
+
+
+def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:
+    _write_fixture(tmp_path)
+    path = tmp_path / "skeleton" / "persistence" / "spine_manifest.py"
+    seams = [(f"seam-{index}", f"law-{index}") for index in range(49)]
+    seams.extend(list(EXPECTED_SEAMS.items())[:-1])
+    seams.append(("replacement", "not-the-required-seam"))
+    path.write_text("SEAMS = " + repr(tuple(seams)) + "\n", encoding="utf-8")
+
+    with pytest.raises(
+        SpineBindRecoveryControlError,
+        match="missing or changed recovery seam",
+    ):
+        verify_manifest(tmp_path)
