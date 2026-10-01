@@ -37148,7 +37148,7 @@
         "roadmap_id": "ROADMAP-P2-NATIVE-01",
         "task_id": "P2-NATIVE-01",
         "lane_id": "P2-L6",
-        "status": "ready",
+        "status": "in_progress",
         "depends_on": [
           "P2-QUAL-01"
         ],
@@ -37248,11 +37248,11 @@
       },
       {
         "task_id": "P2-NATIVE-01",
-        "declared_status": "ready",
+        "declared_status": "in_progress",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "not_started"
+        "derived_state": "in_progress"
       }
     ],
     "derivation_engine": "skeleton/repo_machine/completion.py",

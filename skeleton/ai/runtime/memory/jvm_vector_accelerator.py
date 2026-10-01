@@ -21,8 +21,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from skeleton.native.protocol import (
+    AcceleratorProtocolError as SharedAcceleratorProtocolError,
+    CURRENT_PROTOCOL_VERSION,
+    negotiate_wire_major,
+)
+
 _MAGIC = 0x534B5653
-_VERSION = 1
+_VERSION = CURRENT_PROTOCOL_VERSION.major
 _OP_PING = 1
 _OP_TOP_K = 2
 _OP_SHUTDOWN = 3
@@ -56,6 +62,19 @@ class JvmVectorUnavailable(JvmVectorError):
 
 class JvmVectorProtocolError(JvmVectorError):
     """Raised for rejected or malformed accelerator frames."""
+
+
+def _validate_protocol_version(version: int) -> None:
+    try:
+        selected = negotiate_wire_major(version)
+    except SharedAcceleratorProtocolError as exc:
+        raise JvmVectorProtocolError(
+            f"unsupported accelerator protocol version: {version}"
+        ) from exc
+    if selected.major != _VERSION:
+        raise JvmVectorProtocolError(
+            f"negotiated accelerator protocol drift: {selected}"
+        )
 
 
 class JvmVectorTimeout(JvmVectorError):
@@ -574,8 +593,9 @@ class JvmVectorAccelerator:
             while True:
                 header = self._read_exact(process.stdout, _HEADER_RESPONSE.size)
                 magic, version, op, status, request_id = _HEADER_RESPONSE.unpack(header)
-                if magic != _MAGIC or version != _VERSION:
-                    raise JvmVectorProtocolError("invalid vector response header")
+                if magic != _MAGIC:
+                    raise JvmVectorProtocolError("invalid vector response magic")
+                _validate_protocol_version(version)
 
                 if status != _STATUS_OK:
                     length = _INT.unpack(self._read_exact(process.stdout, _INT.size))[0]

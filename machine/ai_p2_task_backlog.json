@@ -1146,7 +1146,7 @@
     {
       "task_id": "P2-NATIVE-01",
       "lane_id": "P2-L6",
-      "status": "ready",
+      "status": "in_progress",
       "title": "Profile-gate native and JVM acceleration",
       "depends_on": [
         "P2-QUAL-01"
@@ -1168,7 +1168,13 @@
       "implementation_signed": false,
       "verification_signed": false,
       "evidence_refs": [
-        "dependency:P2-QUAL-01:landed_unpromoted"
+        "dependency:P2-QUAL-01:landed_unpromoted",
+        "github:pr#2330",
+        "machine:acceleration_policy.json",
+        "runtime:skeleton/native/profiling.py",
+        "runtime:skeleton/native/selection.py",
+        "runtime:skeleton/native/isolation.py",
+        "runtime:skeleton/native/protocol.py"
       ],
       "masterplan_obligations": [
         {
@@ -1225,8 +1231,8 @@
   ],
   "summary": {
     "task_count": 7,
-    "in_progress_count": 0,
-    "ready_count": 1,
+    "in_progress_count": 1,
+    "ready_count": 0,
     "blocked_count": 0,
     "scheduled_volume_count": 42,
     "queued_volume_count": 272,
