@@ -684,5 +684,13 @@
         "tests/test_p2_traceability.py"
       ]
     }
-  ]
+  ],
+  "masterplan_binding": {
+    "volume_ref": "VOL-122",
+    "title": "Requirements Engineering",
+    "required_gap_texts": [
+      "materialize canonical requirement IDs",
+      "bind requirements to tests/evidence"
+    ]
+  }
 }
