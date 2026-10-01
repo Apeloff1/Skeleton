@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
+import math
 import os
 from pathlib import Path, PurePosixPath
 import secrets
@@ -85,10 +86,18 @@ class LeaseRegistry:
         max_leases: int = 256,
         max_ttl_s: float = 1800.0,
     ) -> None:
-        if max_leases <= 0 or max_ttl_s <= 0:
+        if isinstance(max_leases, bool) or not isinstance(max_leases, int):
+            raise TypeError("max_leases must be an integer")
+        if (
+            isinstance(max_ttl_s, bool)
+            or not isinstance(max_ttl_s, (int, float))
+            or not math.isfinite(float(max_ttl_s))
+        ):
+            raise TypeError("max_ttl_s must be finite numeric")
+        if max_leases <= 0 or float(max_ttl_s) <= 0:
             raise ValueError("lease bounds must be positive")
         self._clock = clock
-        self._max_leases = int(max_leases)
+        self._max_leases = max_leases
         self._max_ttl_s = float(max_ttl_s)
         self._leases: dict[str, EditLease] = {}
         self._lock = threading.RLock()
@@ -102,6 +111,12 @@ class LeaseRegistry:
         owner = str(owner_id).strip()
         if not owner or len(owner) > 192:
             raise ValueError("owner_id must be non-empty bounded text")
+        if (
+            isinstance(ttl_s, bool)
+            or not isinstance(ttl_s, (int, float))
+            or not math.isfinite(float(ttl_s))
+        ):
+            raise TypeError("lease ttl must be finite numeric")
         ttl = float(ttl_s)
         if ttl <= 0 or ttl > self._max_ttl_s:
             raise ValueError("lease ttl exceeds policy")
