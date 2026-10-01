@@ -1,0 +1,275 @@
+{
+  "schema_version": "skeleton.capability_maturity.v1",
+  "model_version": "0.1.0",
+  "status": "active",
+  "purpose": "Bind P2 trace-volume maturity observations to exact masterplan/accountability source identities without promoting them.",
+  "sources": {
+    "master_plan": {
+      "path": "machine/ai_master_plan.json",
+      "git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb"
+    },
+    "accountability": {
+      "path": "machine/ai_build_accountability.json",
+      "git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa"
+    }
+  },
+  "states": [
+    "unverified",
+    "partial",
+    "implemented",
+    "verified"
+  ],
+  "transitions": [
+    {
+      "from": "unverified",
+      "to": "partial",
+      "requires": [
+        "implementation evidence"
+      ]
+    },
+    {
+      "from": "partial",
+      "to": "implemented",
+      "requires": [
+        "implementation signoff",
+        "exact-head evidence"
+      ]
+    },
+    {
+      "from": "implemented",
+      "to": "verified",
+      "requires": [
+        "independent verification signoff",
+        "exact-head evidence"
+      ]
+    },
+    {
+      "from": "verified",
+      "to": "unverified",
+      "trigger": "bound evidence/source digest invalidated"
+    }
+  ],
+  "volumes": [
+    {
+      "volume_ref": "VOL-112",
+      "accountability_id": "ACC-VOL-112",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-113",
+      "accountability_id": "ACC-VOL-113",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-122",
+      "accountability_id": "ACC-VOL-122",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-123",
+      "accountability_id": "ACC-VOL-123",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-124",
+      "accountability_id": "ACC-VOL-124",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-125",
+      "accountability_id": "ACC-VOL-125",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-126",
+      "accountability_id": "ACC-VOL-126",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-127",
+      "accountability_id": "ACC-VOL-127",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-128",
+      "accountability_id": "ACC-VOL-128",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-129",
+      "accountability_id": "ACC-VOL-129",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-130",
+      "accountability_id": "ACC-VOL-130",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    },
+    {
+      "volume_ref": "VOL-131",
+      "accountability_id": "ACC-VOL-131",
+      "masterplan_status": "unverified",
+      "accountability_status": "unverified",
+      "checkbox": false,
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_ref_count": 0,
+      "bound_masterplan_git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb",
+      "bound_accountability_git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa",
+      "invalidation_triggers": [
+        "masterplan Git blob identity changes",
+        "accountability Git blob identity changes",
+        "named evidence disappears or changes identity",
+        "required gate/evaluation no longer passes"
+      ]
+    }
+  ],
+  "policy": {
+    "anti_inflation": "Observes canonical maturity/accountability; never promotes or signs.",
+    "digest_rule": "Stored source Git blob identities must equal files at validation time.",
+    "downgrade_rule": "Digest drift or lost evidence fails closed and requires revalidation."
+  }
+}

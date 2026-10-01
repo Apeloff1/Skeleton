@@ -1,619 +1,279 @@
 {
-  "schema_version": "skeleton.trace.behavior_specifications.v1",
-  "registry_version": "0.2.0",
+  "schema_version": "skeleton.behavior_specifications.v1",
+  "spec_version": "0.1.0",
   "status": "active",
-  "purpose": "Executable-oriented normal/degraded capability behavior scenarios derived from the runtime capability registry and bound to canonical requirement IDs.",
-  "masterplan_binding": {
-    "volume_ref": "VOL-126",
-    "title": "Behavior Specifications",
-    "required_gap_texts": [
-      "define scenario schema",
-      "bind behaviors to requirement IDs"
-    ]
-  },
-  "sources": {
-    "capabilities": "machine/ai_capabilities.json",
-    "requirements": "machine/requirement_registry.json"
-  },
-  "policy": {
-    "implementation_independent": true,
-    "negative_behavior_required": true,
-    "requirement_binding_required": true
-  },
-  "behavior_specs": [
+  "purpose": "Implementation-independent negative/degraded behavior scenarios for every P2 traceability volume.",
+  "scenarios": [
     {
-      "behavior_id": "BEHAV-ASSISTANT-TEXT-NORMAL",
-      "capability_id": "assistant.text",
-      "mode": "normal",
+      "id": "BEH-TRACE-ORPHAN",
+      "volume_ref": "VOL-112",
+      "title": "dangling trace edge",
+      "requirement_refs": [
+        "REQ-VOL-112-R01",
+        "REQ-VOL-112-R02",
+        "REQ-VOL-112-R03",
+        "REQ-VOL-112-G01",
+        "REQ-VOL-112-G02"
+      ],
       "preconditions": [
-        "canonical conversation ingress or explicitly stateless request",
-        "engine execution boundary ready",
-        "context compiler ready",
-        "text provider route ready",
-        "structural finalization ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "dangling trace edge",
+      "expected_postcondition": "reject dangling trace endpoint",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-TEXT-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "assistant.text",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-CAP-AVAILABILITY",
+      "volume_ref": "VOL-113",
+      "title": "false capability advertising",
+      "requirement_refs": [
+        "REQ-VOL-113-R01",
+        "REQ-VOL-113-R02",
+        "REQ-VOL-113-R03",
+        "REQ-VOL-113-G01",
+        "REQ-VOL-113-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TEXT-DEG-MEMORY-UNAVAILABLE",
-      "capability_id": "assistant.text",
-      "mode": "degraded",
-      "trigger": "memory_unavailable",
-      "required_behavior": "continue_without_long_term_memory",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TEXT-DEG-RETRIEVAL-UNAVAILABLE",
-      "capability_id": "assistant.text",
-      "mode": "degraded",
-      "trigger": "retrieval_unavailable",
-      "required_behavior": "continue_without_retrieval_when_request_does_not_require_grounding",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-RETRIEVAL-GROUNDED-NORMAL",
-      "capability_id": "assistant.retrieval_grounded",
-      "mode": "normal",
       "preconditions": [
-        "authorized retrieval source available",
-        "context compiler preserves EvidenceReference provenance",
-        "claim/citation verification ready",
-        "text provider route ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "false capability advertising",
+      "expected_postcondition": "reject descriptor absent from canonical interface graph",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-RETRIEVAL-GROUNDED-DEG-RETRIEVAL-UNAVAILABLE",
-      "capability_id": "assistant.retrieval_grounded",
-      "mode": "degraded",
-      "trigger": "retrieval_unavailable",
-      "required_behavior": "abstain_or_offer_non_grounded_mode_only_as_distinct_capability",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-REQ-IDENTITY",
+      "volume_ref": "VOL-122",
+      "title": "requirement text drift",
+      "requirement_refs": [
+        "REQ-VOL-122-R01",
+        "REQ-VOL-122-R02",
+        "REQ-VOL-122-G01",
+        "REQ-VOL-122-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-RETRIEVAL-GROUNDED-DEG-INSUFFICIENT-EVIDENCE",
-      "capability_id": "assistant.retrieval_grounded",
-      "mode": "degraded",
-      "trigger": "insufficient_evidence",
-      "required_behavior": "qualified_or_abstain",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-RETRIEVAL-GROUNDED-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "assistant.retrieval_grounded",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-READ-NORMAL",
-      "capability_id": "assistant.tool_read",
-      "mode": "normal",
       "preconditions": [
-        "provider interaction protocol supports tool calls",
-        "canonical tool runtime ready",
-        "at least one authorized read tool admitted",
-        "tool receipt/postcondition verification ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "requirement text drift",
+      "expected_postcondition": "reject text drift from masterplan",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-READ-DEG-TOOL-RUNTIME-UNAVAILABLE",
-      "capability_id": "assistant.tool_read",
-      "mode": "degraded",
-      "trigger": "tool_runtime_unavailable",
-      "required_behavior": "return_tool_unavailable_without_claiming_action",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-NFR-HARD-GATE",
+      "volume_ref": "VOL-123",
+      "title": "aggregate NFR masking",
+      "requirement_refs": [
+        "REQ-VOL-123-R01",
+        "REQ-VOL-123-R02",
+        "REQ-VOL-123-G01",
+        "REQ-VOL-123-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-READ-DEG-NO-AUTHORIZED-TOOLS",
-      "capability_id": "assistant.tool_read",
-      "mode": "degraded",
-      "trigger": "no_authorized_tools",
-      "required_behavior": "continue_as_text_only_only_if_request_semantics_allow",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-READ-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "assistant.tool_read",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-WRITE-NORMAL",
-      "capability_id": "assistant.tool_write",
-      "mode": "normal",
       "preconditions": [
-        "canonical tool runtime ready",
-        "write authority/approval ledger ready",
-        "idempotency reservation ready",
-        "waiting_for_user resume ready",
-        "postcondition verification ready",
-        "realtime approval/cancel UX ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "aggregate NFR masking",
+      "expected_postcondition": "preserve hard NFR violation as blocking",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-WRITE-DEG-APPROVAL-TRANSPORT-UNAVAILABLE",
-      "capability_id": "assistant.tool_write",
-      "mode": "degraded",
-      "trigger": "approval_transport_unavailable",
-      "required_behavior": "unavailable_for_new_write_action",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-TAXONOMY-COVERAGE",
+      "volume_ref": "VOL-124",
+      "title": "unmapped volume",
+      "requirement_refs": [
+        "REQ-VOL-124-R01",
+        "REQ-VOL-124-R02",
+        "REQ-VOL-124-G01",
+        "REQ-VOL-124-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-WRITE-DEG-TOOL-RUNTIME-UNAVAILABLE",
-      "capability_id": "assistant.tool_write",
-      "mode": "degraded",
-      "trigger": "tool_runtime_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-TOOL-WRITE-DEG-AMBIGUOUS-SIDE-EFFECT",
-      "capability_id": "assistant.tool_write",
-      "mode": "degraded",
-      "trigger": "ambiguous_side_effect",
-      "required_behavior": "report_ambiguous_and_reconcile_never_claim_success",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-ARTIFACT-QA-NORMAL",
-      "capability_id": "assistant.artifact_qa",
-      "mode": "normal",
       "preconditions": [
-        "artifact ingestion/scan ready",
-        "bounded extraction ready",
-        "context artifact projection ready",
-        "evidence verification ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "unmapped volume",
+      "expected_postcondition": "reject missing masterplan volume mapping",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-ARTIFACT-QA-DEG-ARTIFACT-QUARANTINED",
-      "capability_id": "assistant.artifact_qa",
-      "mode": "degraded",
-      "trigger": "artifact_quarantined",
-      "required_behavior": "deny_use",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-MATURITY-INVALIDATION",
+      "volume_ref": "VOL-125",
+      "title": "stale evidence digest",
+      "requirement_refs": [
+        "REQ-VOL-125-R01",
+        "REQ-VOL-125-R02",
+        "REQ-VOL-125-G01",
+        "REQ-VOL-125-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-ARTIFACT-QA-DEG-EXTRACTOR-UNAVAILABLE",
-      "capability_id": "assistant.artifact_qa",
-      "mode": "degraded",
-      "trigger": "extractor_unavailable",
-      "required_behavior": "unavailable_for_unsupported_artifact",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-ARTIFACT-QA-DEG-VECTOR-UNAVAILABLE",
-      "capability_id": "assistant.artifact_qa",
-      "mode": "degraded",
-      "trigger": "vector_unavailable",
-      "required_behavior": "use_authorized_bounded_extraction_when_possible",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-GENERATE-NORMAL",
-      "capability_id": "media.image_generate",
-      "mode": "normal",
       "preconditions": [
-        "image provider route ready",
-        "media governance/admission ready",
-        "generated artifact lifecycle ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "stale evidence digest",
+      "expected_postcondition": "invalidate maturity snapshot on source digest drift",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-GENERATE-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "media.image_generate",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-SCENARIO-LINKAGE",
+      "volume_ref": "VOL-126",
+      "title": "behavior without requirement",
+      "requirement_refs": [
+        "REQ-VOL-126-R01",
+        "REQ-VOL-126-R02",
+        "REQ-VOL-126-G01",
+        "REQ-VOL-126-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-GENERATE-DEG-ARTIFACT-STORE-UNAVAILABLE",
-      "capability_id": "media.image_generate",
-      "mode": "degraded",
-      "trigger": "artifact_store_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-EDIT-NORMAL",
-      "capability_id": "media.image_edit",
-      "mode": "normal",
       "preconditions": [
-        "source artifact authorized and ready",
-        "image-edit provider route ready",
-        "generated artifact lifecycle ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "behavior without requirement",
+      "expected_postcondition": "reject scenario without requirement linkage",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-EDIT-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "media.image_edit",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-STATE-TERMINAL",
+      "volume_ref": "VOL-127",
+      "title": "terminal resurrection",
+      "requirement_refs": [
+        "REQ-VOL-127-R01",
+        "REQ-VOL-127-R02",
+        "REQ-VOL-127-G01",
+        "REQ-VOL-127-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-IMAGE-EDIT-DEG-SOURCE-ARTIFACT-UNAVAILABLE",
-      "capability_id": "media.image_edit",
-      "mode": "degraded",
-      "trigger": "source_artifact_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-SPEECH-SYNTHESIS-NORMAL",
-      "capability_id": "media.speech_synthesis",
-      "mode": "normal",
       "preconditions": [
-        "speech provider route ready",
-        "media governance/admission ready",
-        "audio artifact lifecycle ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "terminal resurrection",
+      "expected_postcondition": "reject undeclared terminal resurrection",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-MEDIA-SPEECH-SYNTHESIS-DEG-PROVIDER-UNAVAILABLE",
-      "capability_id": "media.speech_synthesis",
-      "mode": "degraded",
-      "trigger": "provider_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-INTERFACE-ERROR",
+      "volume_ref": "VOL-128",
+      "title": "missing failure semantics",
+      "requirement_refs": [
+        "REQ-VOL-128-R01",
+        "REQ-VOL-128-R02",
+        "REQ-VOL-128-G01",
+        "REQ-VOL-128-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-MEDIA-SPEECH-SYNTHESIS-DEG-ARTIFACT-STORE-UNAVAILABLE",
-      "capability_id": "media.speech_synthesis",
-      "mode": "degraded",
-      "trigger": "artifact_store_unavailable",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
-      ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
-    },
-    {
-      "behavior_id": "BEHAV-ASSISTANT-BACKGROUND-AGENT-NORMAL",
-      "capability_id": "assistant.background_agent",
-      "mode": "normal",
       "preconditions": [
-        "cognitive execution loop ready",
-        "child execution/fanout bounds ready",
-        "durable jobs/checkpoints ready",
-        "governed tool runtime ready",
-        "realtime status/reconnect ready"
+        "canonical machine authorities load successfully"
       ],
-      "postconditions": [
-        "requested capability semantics are preserved",
-        "result status does not overstate unavailable/degraded dependencies"
-      ],
+      "action": "missing failure semantics",
+      "expected_postcondition": "reject interface without explicit failure contract",
       "forbidden_outcomes": [
-        "silent fallback to weaker capability guarantees",
-        "enabled=true treated as ready without readiness proof"
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:001",
-        "REQ:VOL-113:002",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-BACKGROUND-AGENT-DEG-MISSING-REQUIRED-DEPENDENCY",
-      "capability_id": "assistant.background_agent",
-      "mode": "degraded",
-      "trigger": "missing_required_dependency",
-      "required_behavior": "unavailable",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-SCHEMA-COMPAT",
+      "volume_ref": "VOL-129",
+      "title": "incompatible schema evolution",
+      "requirement_refs": [
+        "REQ-VOL-129-R01",
+        "REQ-VOL-129-R02",
+        "REQ-VOL-129-G01",
+        "REQ-VOL-129-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "preconditions": [
+        "canonical machine authorities load successfully"
+      ],
+      "action": "incompatible schema evolution",
+      "expected_postcondition": "classify required-field removal/type change incompatible",
+      "forbidden_outcomes": [
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
+      ],
+      "test_ref": "tests/test_p2_traceability.py"
     },
     {
-      "behavior_id": "BEHAV-ASSISTANT-BACKGROUND-AGENT-DEG-PROVIDER-OUTAGE",
-      "capability_id": "assistant.background_agent",
-      "mode": "degraded",
-      "trigger": "provider_outage",
-      "required_behavior": "pause_or_fail_per_job_policy",
-      "forbidden_outcomes": [
-        "claiming unavailable dependency succeeded",
-        "silent reroute into broader authority or weaker verification"
+      "id": "BEH-COMPAT-ROLLBACK",
+      "volume_ref": "VOL-130",
+      "title": "rollback-incompatible upgrade",
+      "requirement_refs": [
+        "REQ-VOL-130-R01",
+        "REQ-VOL-130-R02",
+        "REQ-VOL-130-G01",
+        "REQ-VOL-130-G02"
       ],
-      "requirement_ids": [
-        "REQ:VOL-113:003",
-        "REQ:VOL-126:001",
-        "REQ:VOL-126:002"
-      ]
+      "preconditions": [
+        "canonical machine authorities load successfully"
+      ],
+      "action": "rollback-incompatible upgrade",
+      "expected_postcondition": "reject incompatible change without migration/rollback",
+      "forbidden_outcomes": [
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
+      ],
+      "test_ref": "tests/test_p2_traceability.py"
+    },
+    {
+      "id": "BEH-PROTOCOL-DEADLINE",
+      "volume_ref": "VOL-131",
+      "title": "deadline loss",
+      "requirement_refs": [
+        "REQ-VOL-131-R01",
+        "REQ-VOL-131-R02",
+        "REQ-VOL-131-G01",
+        "REQ-VOL-131-G02"
+      ],
+      "preconditions": [
+        "canonical machine authorities load successfully"
+      ],
+      "action": "deadline loss",
+      "expected_postcondition": "require explicit deadline/correlation semantics",
+      "forbidden_outcomes": [
+        "silent acceptance",
+        "implicit authority widening",
+        "maturity promotion"
+      ],
+      "test_ref": "tests/test_p2_traceability.py"
     }
-  ]
+  ],
+  "policy": {
+    "linkage_rule": "Every scenario links to canonical requirement IDs.",
+    "negative_rule": "Each traceability volume has at least one explicit failure/degraded scenario.",
+    "implementation_independence": "Scenarios state observable outcomes."
+  }
 }
