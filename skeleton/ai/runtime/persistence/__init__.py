@@ -98,6 +98,18 @@ from skeleton.persistence.spine_provider_surface_qualification import (
 from skeleton.persistence.spine_provider_surface_qualification_verify import (
     SpineProviderSurfaceQualificationVerify,
 )
+from skeleton.persistence.spine_provider_live_qualification import (
+    SpineProviderLiveQualification,
+)
+from skeleton.persistence.spine_provider_live_qualification_verify import (
+    SpineProviderLiveQualificationVerify,
+)
+from skeleton.persistence.spine_pr_automation_qualification import (
+    SpinePrAutomationQualification,
+)
+from skeleton.persistence.spine_pr_automation_qualification_verify import (
+    SpinePrAutomationQualificationVerify,
+)
 from skeleton.persistence.spine_pr_probe import SpinePrProbe
 from skeleton.persistence.spine_unread_gap import SpineUnreadGap
 from skeleton.persistence.spine_surface_seal import SpineSurfaceSeal
@@ -295,6 +307,10 @@ __all__ = [
     "SpineProviderProbe",
     "SpineProviderSurfaceQualification",
     "SpineProviderSurfaceQualificationVerify",
+    "SpineProviderLiveQualification",
+    "SpineProviderLiveQualificationVerify",
+    "SpinePrAutomationQualification",
+    "SpinePrAutomationQualificationVerify",
     "SpinePrProbe",
     "SpineUnreadGap",
     "SpineSurfaceSeal",
