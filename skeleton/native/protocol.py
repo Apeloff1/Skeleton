@@ -87,6 +87,14 @@ def make_request_envelope(
     ):
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{name} must be non-empty")
+    if protocol_id != ACCELERATION_PROTOCOL_ID:
+        raise AcceleratorProtocolError(
+            f"unsupported accelerator protocol id: {protocol_id!r}"
+        )
+    if version not in SUPPORTED_PROTOCOL_VERSIONS:
+        raise AcceleratorProtocolError(
+            f"unsupported accelerator protocol version: {version}"
+        )
     try:
         parsed = datetime.fromisoformat(deadline_utc.replace("Z", "+00:00"))
     except ValueError as exc:
