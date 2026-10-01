@@ -27,6 +27,22 @@ def _digest(payload: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+_REQUIRED_CHECKS = (
+    "Backend Quality",
+    "P2 Repository Engineering Control",
+    "Provider Surface Closure Gate",
+    "Repository Hygiene Gate",
+    "State Recovery Drill",
+    "Workflow Input Security",
+)
+_REQUIRED_CHECK_POLICY_DIGEST = _digest(
+    {
+        "schema_version": 1,
+        "required_checks": list(_REQUIRED_CHECKS),
+    }
+)
+
+
 class SpineCiQualification:
     """Qualify one complete exact-head required-check catalog."""
 
@@ -126,16 +142,26 @@ class SpineCiQualification:
                 }
             )
         normalized.sort(key=lambda item: item["name"])
+        required_names = list(_REQUIRED_CHECKS)
+        actual_names = [row["name"] for row in normalized]
+        if actual_names != required_names:
+            raise SpineCiQualificationError(
+                "CI required-check catalog does not match policy"
+            )
 
         expected_count = receipt.get("required_check_count")
         if (
             isinstance(expected_count, bool)
             or not isinstance(expected_count, int)
-            or expected_count < 1
+            or expected_count != len(_REQUIRED_CHECKS)
             or expected_count != len(normalized)
         ):
             raise SpineCiQualificationError(
                 "CI required-check count mismatch"
+            )
+        if policy_digest != _REQUIRED_CHECK_POLICY_DIGEST:
+            raise SpineCiQualificationError(
+                "CI required-check policy digest mismatch"
             )
         try:
             authenticated = authenticate(dict(receipt))
@@ -150,10 +176,10 @@ class SpineCiQualification:
 
         evidence = {
             "head_sha": expected_head_sha,
-            "required_check_policy_digest": policy_digest,
+            "required_check_policy_digest": _REQUIRED_CHECK_POLICY_DIGEST,
             "required_check_count": expected_count,
             "checks_digest": _digest(normalized),
-            "check_names": [row["name"] for row in normalized],
+            "check_names": actual_names,
             "catalog_complete": True,
             "pending_count": 0,
             "failing_count": 0,

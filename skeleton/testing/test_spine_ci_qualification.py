@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 
 import pytest
 
@@ -17,6 +19,22 @@ from skeleton.persistence.spine_ci_qualification_verify import (
 HEAD = "a" * 40
 
 
+def _policy_digest(checks: list[str]) -> str:
+    payload = {
+        "schema_version": 1,
+        "required_checks": checks,
+    }
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 def _receipt() -> dict[str, object]:
     checks = [
         "Backend Quality",
@@ -30,7 +48,7 @@ def _receipt() -> dict[str, object]:
         "kind": "spine_ci_exact_head_receipt",
         "authority_domain": "ci-exact-head",
         "head_sha": HEAD,
-        "required_check_policy_digest": "b" * 64,
+        "required_check_policy_digest": _policy_digest(checks),
         "required_check_count": len(checks),
         "checks": [
             {
@@ -89,6 +107,49 @@ def test_pending_or_non_exact_check_fails_closed() -> None:
             expected_head_sha=HEAD,
             authenticate=lambda receipt: True,
         )
+
+
+def test_catalog_and_policy_digest_must_match_repository_policy() -> None:
+    reduced = _receipt()
+    reduced["checks"] = reduced["checks"][:1]
+    reduced["required_check_count"] = 1
+    with pytest.raises(
+        SpineCiQualificationError,
+        match="catalog does not match policy",
+    ):
+        SpineCiQualification().qualify(
+            receipt=reduced,
+            expected_head_sha=HEAD,
+            authenticate=lambda receipt: True,
+        )
+
+    forged = _receipt()
+    forged["required_check_policy_digest"] = "f" * 64
+    with pytest.raises(
+        SpineCiQualificationError,
+        match="policy digest mismatch",
+    ):
+        SpineCiQualification().qualify(
+            receipt=forged,
+            expected_head_sha=HEAD,
+            authenticate=lambda receipt: True,
+        )
+
+
+def test_ci_verifier_rejects_policy_catalog_tamper() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda receipt: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["check_names"] = tampered["check_names"][:-1]
+    tampered["required_check_count"] -= 1
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="catalog does not match policy",
+    ):
+        SpineCiQualificationVerify().verify(tampered)
 
 
 def test_ci_verifier_rejects_merge_authority_tamper() -> None:

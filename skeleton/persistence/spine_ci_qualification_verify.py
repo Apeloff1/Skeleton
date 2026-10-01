@@ -27,6 +27,22 @@ def _digest(payload: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+_REQUIRED_CHECKS = (
+    "Backend Quality",
+    "P2 Repository Engineering Control",
+    "Provider Surface Closure Gate",
+    "Repository Hygiene Gate",
+    "State Recovery Drill",
+    "Workflow Input Security",
+)
+_REQUIRED_CHECK_POLICY_DIGEST = _digest(
+    {
+        "schema_version": 1,
+        "required_checks": list(_REQUIRED_CHECKS),
+    }
+)
+
+
 class SpineCiQualificationVerify:
     """Verify CI-green evidence without granting merge authority."""
 
@@ -62,6 +78,17 @@ class SpineCiQualificationVerify:
         ):
             raise SpineCiQualificationVerifyError(
                 "CI check-name catalog is invalid"
+            )
+        if count != len(_REQUIRED_CHECKS) or names != list(_REQUIRED_CHECKS):
+            raise SpineCiQualificationVerifyError(
+                "CI required-check catalog does not match policy"
+            )
+        if (
+            card.get("required_check_policy_digest")
+            != _REQUIRED_CHECK_POLICY_DIGEST
+        ):
+            raise SpineCiQualificationVerifyError(
+                "CI required-check policy digest mismatch"
             )
         for field in ("catalog_complete", "receipt_authenticated", "ci_green"):
             if card.get(field) is not True:
