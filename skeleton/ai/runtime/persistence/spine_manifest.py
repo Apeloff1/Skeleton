@@ -90,6 +90,10 @@ SEAMS = (
     ("pymongo-async-cutover-rehearsal", "live-qualification-does-not-authorize-runtime-cutover"),
     ("cutover-authorization", "authenticated-dual-control-is-not-runtime-activation"),
     ("cutover-authorization-verify", "authorization-verification-does-not-make-authorization-effective"),
+    ("cutover-effectiveness", "external-change-control-makes-authorization-effective-not-runtime-active"),
+    ("cutover-effectiveness-verify", "effectiveness-verification-does-not-select-runtime"),
+    ("selection-permit", "effective-authorization-issues-one-non-activating-selection-permit"),
+    ("selection-permit-verify", "permit-verification-does-not-select-runtime"),
 )
 
 

@@ -77,6 +77,14 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineCutoverAuthorization` requires exactly two distinct approval receipts from the `operations` and `reliability` authority domains. Each receipt must target the exact runtime-selection candidate and cutover-rehearsal digests, be valid for no more than 30 minutes, and pass an injected deployment-owned authenticator. The resulting envelope proves authenticated dual-control evidence exists but deliberately keeps `authorization_effective=false`, `selection_authorized=false`, `runtime_driver_selected=false`, and `runtime_activated=false`. `SpineCutoverAuthorizationVerify` independently reconstructs the envelope digest and cannot make it effective.
 
+## Authorization effectiveness boundary
+
+`SpineCutoverEffectiveness` consumes the independently verified dual-control envelope plus a separate deployment-owned `change-control` receipt. The receipt must authenticate externally, target the exact authorization digest, remain inside a ten-minute window, and carry a 64-character one-time nonce. This seam may make authorization effective, but it cannot authorize driver selection or activate runtime. `SpineCutoverEffectivenessVerify` independently reconstructs the digest and preserves that separation.
+
+## Durable single-use selection permit
+
+`SpineSelectionPermitLedger` consumes independently verified effective authorization and persists one permit keyed by the effectiveness digest and one-time nonce. Both are unique in SQLite, so replay and nonce reuse fail closed. Permit issuance can set `selection_authorized=true`, but the permit remains unconsumed and neither a runtime driver nor runtime activation is changed. `SpineSelectionPermitVerify` independently verifies the permit identity and digest without consuming it.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -100,7 +108,9 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_pymongo_async_adapter.py \
   skeleton/testing/test_spine_runtime_selection.py \
   skeleton/testing/test_spine_cutover_rehearsal.py \
-  skeleton/testing/test_spine_cutover_authorization.py
+  skeleton/testing/test_spine_cutover_authorization.py \
+  skeleton/testing/test_spine_cutover_effectiveness.py \
+  skeleton/testing/test_spine_selection_permit.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

@@ -5,7 +5,7 @@ from skeleton.persistence.spine_manifest import SpineManifest
 
 def test_manifest_lists_seams_without_signoff() -> None:
     card = SpineManifest().card()
-    assert card["count"] == 81
+    assert card["count"] == 85
     assert card["apply_landed"] is False
     assert card["poison_apply_landed"] is True
     assert card["hit"] is False
@@ -70,3 +70,7 @@ def test_manifest_lists_seams_without_signoff() -> None:
     assert "pymongo-async-cutover-rehearsal" in names
     assert "cutover-authorization" in names
     assert "cutover-authorization-verify" in names
+    assert "cutover-effectiveness" in names
+    assert "cutover-effectiveness-verify" in names
+    assert "selection-permit" in names
+    assert "selection-permit-verify" in names

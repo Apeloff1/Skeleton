@@ -27,6 +27,10 @@ FILES = (
     "spine_cutover_rehearsal_verify.py",
     "spine_cutover_authorization.py",
     "spine_cutover_authorization_verify.py",
+    "spine_cutover_effectiveness.py",
+    "spine_cutover_effectiveness_verify.py",
+    "spine_selection_permit.py",
+    "spine_selection_permit_verify.py",
 )
 
 

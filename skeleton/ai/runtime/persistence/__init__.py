@@ -141,6 +141,10 @@ from skeleton.persistence.spine_cutover_rehearsal import SpineCutoverRehearsal
 from skeleton.persistence.spine_cutover_rehearsal_verify import SpineCutoverRehearsalVerify
 from skeleton.persistence.spine_cutover_authorization import SpineCutoverAuthorization
 from skeleton.persistence.spine_cutover_authorization_verify import SpineCutoverAuthorizationVerify
+from skeleton.persistence.spine_cutover_effectiveness import SpineCutoverEffectiveness
+from skeleton.persistence.spine_cutover_effectiveness_verify import SpineCutoverEffectivenessVerify
+from skeleton.persistence.spine_selection_permit import SpineSelectionPermitLedger
+from skeleton.persistence.spine_selection_permit_verify import SpineSelectionPermitVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -296,6 +300,10 @@ __all__ = [
     "SpineCutoverRehearsalVerify",
     "SpineCutoverAuthorization",
     "SpineCutoverAuthorizationVerify",
+    "SpineCutoverEffectiveness",
+    "SpineCutoverEffectivenessVerify",
+    "SpineSelectionPermitLedger",
+    "SpineSelectionPermitVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
