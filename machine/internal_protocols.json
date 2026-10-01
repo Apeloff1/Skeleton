@@ -103,5 +103,13 @@
     "deadline_rule": "Deadline fields are explicit; absence is intentional.",
     "unknown_outcome_rule": "Retryable/idempotent semantics require stable identity; ambiguous action outcome is not success.",
     "trace_rule": "Every protocol declares correlation/tracing semantics."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-131",
+    "title": "Internal Protocols",
+    "required_gap_texts": [
+      "unify protocol envelopes",
+      "bind protocols to tracing"
+    ]
   }
 }
