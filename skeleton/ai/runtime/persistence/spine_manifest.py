@@ -120,6 +120,11 @@ SEAMS = (
     ("runtime-transition-attempt-verify", "attempt-verification-does-not-promote-refused-transition"),
     ("runtime-transition-rollback-witness", "refused-transition-must-prove-no-effect-or-rollback-before-promotion"),
     ("runtime-transition-rollback-verify", "rollback-verification-does-not-authorize-runtime-promotion"),
+    ("runtime-transition-slot", "runtime-slot-replacement-is-explicit-and-generation-checked"),
+    ("runtime-transition-execution", "verified-boundary-executes-one-compensable-runtime-transition"),
+    ("runtime-transition-execution-verify", "effect-verification-does-not-self-promote-runtime-activation"),
+    ("runtime-transition-effect-rollback", "effectful-transition-rollback-restores-runtime-and-compensates-fence"),
+    ("runtime-transition-effect-rollback-verify", "compensation-verification-does-not-promote-runtime-activation"),
 )
 
 
