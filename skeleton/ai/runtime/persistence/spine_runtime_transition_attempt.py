@@ -9,8 +9,8 @@ from pathlib import Path
 import sqlite3
 from typing import Any, Callable
 
-from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard
-from skeleton.persistence.spine_epoch_witness import SpineEpochWitness
+from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard, SpineDispatchGuardError
+from skeleton.persistence.spine_epoch_witness import SpineEpochWitness, SpineEpochWitnessError
 
 
 class SpineRuntimeTransitionAttemptError(RuntimeError):
@@ -119,7 +119,10 @@ class SpineRuntimeTransitionAttemptLedger:
         instant = instant.astimezone(timezone.utc)
 
         guard = SpineDispatchGuard()
-        before = guard.snapshot(runtime)
+        try:
+            before = guard.snapshot(runtime)
+        except SpineDispatchGuardError as exc:
+            raise SpineRuntimeTransitionAttemptError("dispatcher snapshot failed closed") from exc
         if getattr(runtime, "dispatcher_running", False) is not False:
             raise SpineRuntimeTransitionAttemptError("dispatcher is already running before transition attempt")
 
@@ -139,17 +142,23 @@ class SpineRuntimeTransitionAttemptLedger:
         except Exception as exc:
             raise SpineRuntimeTransitionAttemptError("deployment transition attempt failed closed") from exc
 
-        dispatch = guard.compare(before, runtime)
+        try:
+            dispatch = guard.compare(before, runtime)
+        except SpineDispatchGuardError as exc:
+            raise SpineRuntimeTransitionAttemptError("dispatcher identity changed during transition attempt") from exc
         if dispatch.get("same") is not True or dispatch.get("called") is not False:
             raise SpineRuntimeTransitionAttemptError("dispatcher identity changed during transition attempt")
         if getattr(runtime, "dispatcher_running", False) is not False:
             raise SpineRuntimeTransitionAttemptError("dispatcher started during refused transition attempt")
 
-        epoch = SpineEpochWitness().card(
-            epoch_before=epoch_before,
-            epoch_after=epoch_after,
-            side=consumption,
-        )
+        try:
+            epoch = SpineEpochWitness().card(
+                epoch_before=epoch_before,
+                epoch_after=epoch_after,
+                side=consumption,
+            )
+        except SpineEpochWitnessError as exc:
+            raise SpineRuntimeTransitionAttemptError("transition attempt moved fence") from exc
         if epoch.get("moved") is not False:
             raise SpineRuntimeTransitionAttemptError("transition attempt moved fence")
 
