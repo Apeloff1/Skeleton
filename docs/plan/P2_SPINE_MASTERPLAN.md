@@ -52,6 +52,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | CI witness | `skeleton/persistence/spine_ci_witness.py` | complete catalog, ci_green false |
 | Merge gate | `skeleton/persistence/spine_merge_gate.py` | merge refused |
 | Probe replay | `skeleton/persistence/spine_probe_replay.py` | matching digest does not insert |
+| Motor witness | `skeleton/persistence/spine_motor_witness.py` | motor and pymongo imports fail closed |
+| Dispatch witness | `skeleton/persistence/spine_dispatch_witness.py` | running dispatcher fails closed |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -73,11 +75,11 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 3. The runtime dispatcher is not replaced. `SpineBind` remains the only start path for the composed worker.
 4. Provider-surface and PR Automation are not claimed green. `SpineProviderProbe` and `SpinePrProbe` append unread rows only. `claim` writes `claimed=0`. `SpineUnreadGap` lists a skipped sequence for that tenant and returns empty for a foreign tenant. `SpineSurfaceSeal` strips a forged green flag. This is not a sign-off.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
-6. Live Motor bootstrap and the runtime dispatcher stay unwired.
+6. Live Motor bootstrap and the runtime dispatcher stay unwired. `SpineMotorWitness` fails closed on a motor or pymongo import. `SpineDispatchWitness` fails closed if the dispatcher is running and does not call `start_dispatcher`. This is not a sign-off.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 35, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 37, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

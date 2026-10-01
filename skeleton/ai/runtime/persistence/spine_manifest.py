@@ -44,6 +44,8 @@ SEAMS = (
     ("ci-witness", "ci-green-unread"),
     ("merge-gate", "merge-refused"),
     ("probe-replay", "replay-does-not-insert"),
+    ("motor-witness", "motor-not-imported"),
+    ("dispatch-witness", "dispatcher-not-started"),
 )
 
 
