@@ -1,6 +1,6 @@
 # P2 spine masterplan
 
-Apeloff1/Skeleton PR #2333. Branch `feat/p2-runtime-spine`. Head at last push `1c5ae46`. Parent cite #80. This plan does not sign work off and does not merge.
+Apeloff1/Skeleton PR #2333. Branch `feat/p2-runtime-spine`. Head at last push `4222a8a`. Parent cite #80. This plan does not sign work off and does not merge.
 
 ## Law
 
@@ -41,6 +41,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Poison witness | `skeleton/persistence/spine_poison_witness.py` | foreign tenant journal is empty |
 | Poison chain | `skeleton/persistence/spine_poison_chain.py` | rewritten journal row fails closed |
 | Dispatch guard | `skeleton/persistence/spine_dispatch_guard.py` | start_dispatcher identity unchanged, not called |
+| Index bind | `skeleton/persistence/spine_index_bind.py` | create_index only when present, live_motor false |
+| Bind audit | `skeleton/persistence/spine_bind_audit.py` | running dispatcher fails closed |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -49,7 +51,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 - Read and project: 94%
 - Poison apply: 55%
-- Live Motor bootstrap: 0%
+- Live Motor bootstrap: 15%
 - CI green: 0%
 - Merge: 0%
 
@@ -62,7 +64,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 24, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 26, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

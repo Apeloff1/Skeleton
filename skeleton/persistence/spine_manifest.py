@@ -33,6 +33,8 @@ SEAMS = (
     ("poison-witness", "tenant-isolated-journal"),
     ("poison-chain", "journal-hash-chain"),
     ("dispatch-guard", "dispatcher-identity-unchanged"),
+    ("index-bind", "create-index-only-when-present"),
+    ("bind-audit", "bind-does-not-start-dispatcher"),
 )
 
 
