@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 import unittest
 
 from skeleton.native.protocol import (
+    ACCELERATION_PROTOCOL_ID,
+    CURRENT_PROTOCOL_VERSION,
     AcceleratorProtocolError,
     ProtocolVersion,
     make_request_envelope,
@@ -75,12 +77,12 @@ class AccelerationProtocolTests(unittest.TestCase):
             datetime.now(timezone.utc) + timedelta(minutes=1)
         ).isoformat().replace("+00:00", "Z")
         with self.assertRaisesRegex(
-            MODULE.AcceleratorProtocolError,
+            AcceleratorProtocolError,
             "unsupported accelerator protocol id",
         ):
-            MODULE.make_request_envelope(
+            make_request_envelope(
                 protocol_id="other.protocol",
-                version=MODULE.CURRENT_PROTOCOL_VERSION,
+                version=CURRENT_PROTOCOL_VERSION,
                 operation="vector.search",
                 payload={},
                 deadline_utc=deadline,
@@ -91,12 +93,12 @@ class AccelerationProtocolTests(unittest.TestCase):
             datetime.now(timezone.utc) + timedelta(minutes=1)
         ).isoformat().replace("+00:00", "Z")
         with self.assertRaisesRegex(
-            MODULE.AcceleratorProtocolError,
+            AcceleratorProtocolError,
             "unsupported accelerator protocol version",
         ):
-            MODULE.make_request_envelope(
-                protocol_id=MODULE.ACCELERATION_PROTOCOL_ID,
-                version=MODULE.ProtocolVersion(2, 0),
+            make_request_envelope(
+                protocol_id=ACCELERATION_PROTOCOL_ID,
+                version=ProtocolVersion(2, 0),
                 operation="vector.search",
                 payload={},
                 deadline_utc=deadline,
