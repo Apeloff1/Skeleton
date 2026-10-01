@@ -21,6 +21,7 @@ FILES = (
     "spine_motor_bootstrap_replay.py",
     "spine_motor_preflight.py",
     "spine_motor_preflight_verify.py",
+    "spine_pymongo_async_qualification_verify.py",
     "spine_runtime_selection.py",
     "spine_runtime_selection_verify.py",
     "spine_cutover_rehearsal.py",

@@ -240,6 +240,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_spine_motor_bootstrap.py
+          skeleton/testing/test_spine_pymongo_async_qualification_verify.py
           skeleton/testing/test_spine_motor_bootstrap_control.py
           skeleton/testing/test_spine_motor_witness.py
           skeleton/testing/test_spine_index_bind.py
@@ -311,6 +312,19 @@ jobs:
           assert report["live_motor"] is False
           assert len(report["driver_receipt_digest"]) == 64
           assert len(report["preflight_digest"]) == 64
+          assert len(report["bootstrap_digest"]) == 64
+          assert report["index_names"] == [
+              "namespace_1_consumer_id_1_event_id_1",
+              "namespace_1_consumer_id_1_operation_id_1",
+              "namespace_1_tenant_id_1_resource_id_1",
+          ]
+          from skeleton.persistence.spine_pymongo_async_qualification_verify import (
+              SpinePyMongoAsyncQualificationVerify,
+          )
+          verified = SpinePyMongoAsyncQualificationVerify().verify(report)
+          assert verified["verified"] is True
+          assert verified["qualification_digest"] == report["digest"]
+          assert verified["bootstrap_digest"] == report["bootstrap_digest"]
           assert len(report["digest"]) == 64
           print("p2-pymongo-async-live-qualification: OK")
           print("driver:", report["driver_version"])

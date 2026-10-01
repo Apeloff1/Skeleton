@@ -12,6 +12,9 @@ import json
 from typing import Any
 
 from skeleton.persistence.spine_motor_plan import SpineMotorPlan
+from skeleton.persistence.spine_pymongo_async_qualification_verify import (
+    SpinePyMongoAsyncQualificationVerify,
+)
 
 
 class SpineRuntimeSelectionError(RuntimeError):
@@ -44,6 +47,22 @@ class SpineRuntimeSelection:
         ):
             raise SpineRuntimeSelectionError("live qualification is missing or invalid")
 
+        try:
+            qualification_verified = (
+                SpinePyMongoAsyncQualificationVerify().verify(qualification)
+            )
+        except Exception as exc:
+            raise SpineRuntimeSelectionError(
+                "live qualification independent verification failed"
+            ) from exc
+        if (
+            qualification_verified.get("qualification_digest")
+            != qualification.get("digest")
+        ):
+            raise SpineRuntimeSelectionError(
+                "live qualification digest verification changed"
+            )
+
         if qualification.get("supported_async_driver") is not True:
             raise SpineRuntimeSelectionError("unsupported async driver")
         if qualification.get("deployment_driver_imported") is not True:
@@ -66,7 +85,12 @@ class SpineRuntimeSelection:
         plan = SpineMotorPlan().card()
         if qualification.get("plan_digest") != plan["digest"]:
             raise SpineRuntimeSelectionError("runtime selection plan digest mismatch")
-        for name in ("digest", "driver_receipt_digest", "preflight_digest"):
+        for name in (
+            "digest",
+            "driver_receipt_digest",
+            "preflight_digest",
+            "bootstrap_digest",
+        ):
             value = qualification.get(name)
             if not isinstance(value, str) or len(value) != 64:
                 raise SpineRuntimeSelectionError(f"invalid qualification digest: {name}")
@@ -86,7 +110,9 @@ class SpineRuntimeSelection:
             "qualification_digest": qualification["digest"],
             "driver_receipt_digest": qualification["driver_receipt_digest"],
             "preflight_digest": qualification["preflight_digest"],
+            "bootstrap_digest": qualification["bootstrap_digest"],
             "plan_digest": qualification["plan_digest"],
+            "index_names": list(qualification["index_names"]),
             "driver_distribution": qualification.get("driver_distribution"),
             "driver_version": qualification.get("driver_version"),
             "driver_class": qualification.get("driver_class"),

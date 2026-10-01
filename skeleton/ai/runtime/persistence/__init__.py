@@ -156,6 +156,9 @@ from skeleton.persistence.spine_motor_bootstrap_verify import SpineMotorBootstra
 from skeleton.persistence.spine_motor_bootstrap_replay import SpineMotorBootstrapReplay
 from skeleton.persistence.spine_motor_preflight import SpineMotorPreflight
 from skeleton.persistence.spine_motor_preflight_verify import SpineMotorPreflightVerify
+from skeleton.persistence.spine_pymongo_async_qualification_verify import (
+    SpinePyMongoAsyncQualificationVerify,
+)
 from skeleton.persistence.spine_runtime_selection import SpineRuntimeSelection
 from skeleton.persistence.spine_runtime_selection_verify import SpineRuntimeSelectionVerify
 from skeleton.persistence.spine_cutover_rehearsal import SpineCutoverRehearsal
@@ -360,6 +363,7 @@ __all__ = [
     "SpineMotorBootstrapReplay",
     "SpineMotorPreflight",
     "SpineMotorPreflightVerify",
+    "SpinePyMongoAsyncQualificationVerify",
     "SpineRuntimeSelection",
     "SpineRuntimeSelectionVerify",
     "SpineCutoverRehearsal",
