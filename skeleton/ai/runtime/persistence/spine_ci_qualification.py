@@ -7,6 +7,11 @@ import json
 import re
 from typing import Any, Callable
 
+from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_POLICY_DIGEST,
+    REQUIRED_CHECKS,
+)
+
 
 class SpineCiQualificationError(RuntimeError):
     """Exact-head CI qualification failed closed."""
@@ -25,22 +30,6 @@ def _digest(payload: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
-
-
-_REQUIRED_CHECKS = (
-    "Backend Quality",
-    "P2 Repository Engineering Control",
-    "Provider Surface Closure Gate",
-    "Repository Hygiene Gate",
-    "State Recovery Drill",
-    "Workflow Input Security",
-)
-_REQUIRED_CHECK_POLICY_DIGEST = _digest(
-    {
-        "schema_version": 1,
-        "required_checks": list(_REQUIRED_CHECKS),
-    }
-)
 
 
 class SpineCiQualification:
@@ -142,7 +131,7 @@ class SpineCiQualification:
                 }
             )
         normalized.sort(key=lambda item: item["name"])
-        required_names = list(_REQUIRED_CHECKS)
+        required_names = list(REQUIRED_CHECKS)
         actual_names = [row["name"] for row in normalized]
         if actual_names != required_names:
             raise SpineCiQualificationError(
@@ -153,13 +142,13 @@ class SpineCiQualification:
         if (
             isinstance(expected_count, bool)
             or not isinstance(expected_count, int)
-            or expected_count != len(_REQUIRED_CHECKS)
+            or expected_count != len(REQUIRED_CHECKS)
             or expected_count != len(normalized)
         ):
             raise SpineCiQualificationError(
                 "CI required-check count mismatch"
             )
-        if policy_digest != _REQUIRED_CHECK_POLICY_DIGEST:
+        if policy_digest != REQUIRED_CHECK_POLICY_DIGEST:
             raise SpineCiQualificationError(
                 "CI required-check policy digest mismatch"
             )
@@ -177,7 +166,7 @@ class SpineCiQualification:
         evidence = {
             "authority_domain": receipt["authority_domain"],
             "head_sha": expected_head_sha,
-            "required_check_policy_digest": _REQUIRED_CHECK_POLICY_DIGEST,
+            "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
             "required_check_count": expected_count,
             "checks": normalized,
             "checks_digest": _digest(normalized),

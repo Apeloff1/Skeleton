@@ -151,6 +151,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | PR automation qualification verify | `skeleton/persistence/spine_pr_automation_qualification_verify.py` | verifies runner health while merge authority remains false |
 | CI qualification | `skeleton/persistence/spine_ci_qualification.py` | authenticates a complete exact-head successful required-check catalog without granting merge authority |
 | CI qualification verify | `skeleton/persistence/spine_ci_qualification_verify.py` | independently verifies CI-green evidence while merge authority remains false |
+| CI exact-head receipt producer | `skeleton/persistence/spine_ci_receipt.py`, `scripts/qualify_spine_ci_live.py` | reduces the latest six repository-owned workflow runs into HMAC-attested exact-head evidence without merge authority |
+| PR Automation receipt producer | `skeleton/persistence/spine_pr_automation_receipt.py`, `scripts/qualify_spine_pr_automation_runner.py` | reduces one exact-target trusted runner report into HMAC-attested operational evidence without merge authority |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -163,11 +165,13 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider live external credential: runtime/environment dependent
 - Provider surface live claim: 0% until authenticated live receipt
 - PR Automation operational qualification: implemented
+- PR Automation authenticated receipt producer: landed
 - PR Automation merge authority: 0%
 - Poison apply: 100%
 - Apply/cutover readiness: 99%
 - Async Mongo bootstrap: 100%
 - CI qualification implementation: landed
+- CI authenticated exact-head receipt producer: landed
 - CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%

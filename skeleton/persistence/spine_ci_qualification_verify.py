@@ -7,6 +7,11 @@ import json
 import re
 from typing import Any
 
+from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECK_POLICY_DIGEST,
+    REQUIRED_CHECKS,
+)
+
 
 class SpineCiQualificationVerifyError(RuntimeError):
     """Exact-head CI qualification verification failed closed."""
@@ -25,22 +30,6 @@ def _digest(payload: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
-
-
-_REQUIRED_CHECKS = (
-    "Backend Quality",
-    "P2 Repository Engineering Control",
-    "Provider Surface Closure Gate",
-    "Repository Hygiene Gate",
-    "State Recovery Drill",
-    "Workflow Input Security",
-)
-_REQUIRED_CHECK_POLICY_DIGEST = _digest(
-    {
-        "schema_version": 1,
-        "required_checks": list(_REQUIRED_CHECKS),
-    }
-)
 
 
 class SpineCiQualificationVerify:
@@ -88,7 +77,7 @@ class SpineCiQualificationVerify:
             raise SpineCiQualificationVerifyError(
                 "CI check-name catalog is invalid"
             )
-        if count != len(_REQUIRED_CHECKS) or names != list(_REQUIRED_CHECKS):
+        if count != len(REQUIRED_CHECKS) or names != list(REQUIRED_CHECKS):
             raise SpineCiQualificationVerifyError(
                 "CI required-check catalog does not match policy"
             )
@@ -148,7 +137,7 @@ class SpineCiQualificationVerify:
             )
         if (
             card.get("required_check_policy_digest")
-            != _REQUIRED_CHECK_POLICY_DIGEST
+            != REQUIRED_CHECK_POLICY_DIGEST
         ):
             raise SpineCiQualificationVerifyError(
                 "CI required-check policy digest mismatch"
