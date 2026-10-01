@@ -167,6 +167,8 @@ class SpineRuntimeTransitionExecutionLedger:
         original_runtime = slot.runtime
         replacement = None
         moved = None
+        replaced_by_call = False
+        started_by_call = False
         compensation_errors: list[str] = []
         try:
             if candidate_runtime is original_runtime:
@@ -185,7 +187,9 @@ class SpineRuntimeTransitionExecutionLedger:
                 expected=original_runtime,
                 replacement=candidate_runtime,
             )
+            replaced_by_call = True
             started = candidate_runtime.start_dispatcher()
+            started_by_call = started is True
             if started is not True or candidate_runtime.dispatcher_running is not True:
                 raise SpineRuntimeTransitionExecutionError(
                     "candidate dispatcher did not start"
@@ -264,12 +268,12 @@ class SpineRuntimeTransitionExecutionLedger:
             }
         except Exception as exc:
             try:
-                if candidate_runtime.dispatcher_running:
+                if started_by_call and candidate_runtime.dispatcher_running:
                     candidate_runtime.stop_dispatcher(timeout_s=2.0, flush=False)
             except Exception as stop_exc:
                 compensation_errors.append(type(stop_exc).__name__)
             try:
-                if slot.runtime is candidate_runtime:
+                if replaced_by_call and slot.runtime is candidate_runtime:
                     slot.restore(
                         expected_candidate=candidate_runtime,
                         original=original_runtime,
@@ -286,7 +290,12 @@ class SpineRuntimeTransitionExecutionLedger:
                     )
                 except Exception as fence_exc:
                     compensation_errors.append(type(fence_exc).__name__)
-            status = "compensated" if not compensation_errors else "failed"
+            effect_started = replaced_by_call or started_by_call or moved is not None
+            status = (
+                "compensated"
+                if effect_started and not compensation_errors
+                else "failed"
+            )
             try:
                 self._connection.execute(
                     """
