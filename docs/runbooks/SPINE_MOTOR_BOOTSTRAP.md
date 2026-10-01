@@ -149,6 +149,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeTransitionAcceptanceLedger` accepts only that independently verified live health plus a short-lived externally authenticated `runtime-transition-acceptance` receipt scoped to the exact health digest, execution identity, and deployment. The acceptance receipt is durable and replay-resistant. It records `activation_accepted=true` while keeping `production_activation_authorized=false` and `runtime_activated=false`. `SpineRuntimeTransitionAcceptanceVerify` independently reconstructs that boundary.
 
+## External production activation authorization
+
+`SpineRuntimeProductionActivationAuthorizationLedger` accepts only independently verified transition acceptance plus a separate short-lived externally authenticated `runtime-production-activation` receipt scoped to the exact acceptance digest, acceptance identity, execution identity, and deployment. It is durable and replay-resistant. The resulting card may set `production_activation_authorized=true`, but it keeps `runtime_activated=false` and `rollback_available=true`. `SpineRuntimeProductionActivationAuthorizationVerify` independently reconstructs that authority boundary without performing activation.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -191,7 +195,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_transition_execution.py \
   skeleton/testing/test_spine_runtime_transition_effect_rollback.py \
   skeleton/testing/test_spine_runtime_transition_health.py \
-  skeleton/testing/test_spine_runtime_transition_acceptance.py
+  skeleton/testing/test_spine_runtime_transition_acceptance.py \
+  skeleton/testing/test_spine_runtime_production_activation_authorization.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
