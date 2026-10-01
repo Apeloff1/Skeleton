@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "035c3ee14ebdaa992726e4ed15f37eee0760bc04",
+      "source_git_object_sha": "0fdd0d2b81da0387b1178dc12b4f4ef20847e3cd",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
