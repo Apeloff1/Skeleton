@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.p2.acceleration_policy.v1",
-  "policy_version": "0.1.0",
+  "policy_version": "0.2.0",
   "status": "active_stacked",
   "purpose": "Profile-gated native/JVM acceleration authority. Accelerators remain optional candidates until reproducible correctness/performance evidence satisfies non-compensable selection gates.",
   "task_ref": "P2-NATIVE-01",
@@ -30,7 +30,8 @@
     "isolation_engine": "skeleton/native/isolation.py",
     "protocol_engine": "skeleton/native/protocol.py",
     "native_registry": "skeleton/native/registry.py",
-    "jvm_registry": "skeleton/native/jvm_registry.py"
+    "jvm_registry": "skeleton/native/jvm_registry.py",
+    "profiling_engine": "skeleton/native/profiling.py"
   },
   "selection_policy": {
     "default_route": "reference",
@@ -53,7 +54,10 @@
       "fallback availability",
       "isolation requirement",
       "protocol compatibility"
-    ]
+    ],
+    "receipt_generation": "paired_reference_candidate_profile",
+    "environment_identity": "deterministic_non_secret_runtime_fingerprint",
+    "zero_success_behavior": "reject_without_receipt"
   },
   "isolation_policy": {
     "low_risk": "in_process_allowed",
