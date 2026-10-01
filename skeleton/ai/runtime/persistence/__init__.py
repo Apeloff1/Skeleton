@@ -89,6 +89,8 @@ from skeleton.persistence.spine_poison_chain import SpinePoisonChain
 from skeleton.persistence.spine_dispatch_guard import SpineDispatchGuard
 from skeleton.persistence.spine_index_bind import SpineIndexBind
 from skeleton.persistence.spine_bind_audit import SpineBindAudit
+from skeleton.persistence.spine_cut_gate import SpineCutGate
+from skeleton.persistence.spine_surface import SpineSurface
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -192,6 +194,8 @@ __all__ = [
     "SpineDispatchGuard",
     "SpineIndexBind",
     "SpineBindAudit",
+    "SpineCutGate",
+    "SpineSurface",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

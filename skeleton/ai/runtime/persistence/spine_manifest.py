@@ -35,6 +35,8 @@ SEAMS = (
     ("dispatch-guard", "dispatcher-identity-unchanged"),
     ("index-bind", "create-index-only-when-present"),
     ("bind-audit", "bind-does-not-start-dispatcher"),
+    ("cut-gate", "switch-refused"),
+    ("surface", "surface-not-claimed"),
 )
 
 
