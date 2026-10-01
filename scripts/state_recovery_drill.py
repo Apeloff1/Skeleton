@@ -39,7 +39,7 @@ def utc_now() -> str:
 
 def require_scratch_database(name: str) -> str:
     if not isinstance(name, str) or not name.strip():
-        raise RecoveryDrillError("scratch database name must be non-empty text")
+        raise RecoveryDrillError("refusing destructive recovery drill: scratch database name must be non-empty text")
     if name != name.strip():
         raise RecoveryDrillError("scratch database name must be canonical text")
     if not name.startswith(SCRATCH_PREFIX):
