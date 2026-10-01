@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "c138440e485313a33fb4d0c5487a088681c5ac99",
+      "source_git_object_sha": "93c5d0388426c665f0ee6753ebefa7967a40ef66",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "f06c712bd0bee4774f59db3c6b53c59b5b02fab3",
+      "source_git_object_sha": "3787dbb799cef44d74338c74efca7a09e7b60c41",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -149,7 +149,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "07d34df1e204e3e721cd62bfa076d5695cd8d90d",
+      "source_git_object_sha": "1669fd5239399ce2e52a74a16c464862b49bb4ea",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -247,7 +247,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "b590feb178905bc8dc12c44af77658258f223dfb",
+      "source_git_object_sha": "9204317afe2fa6bb82d87ce232bcb89dc9fc0cbd",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -1003,7 +1003,7 @@
       "source": "skeleton/native",
       "destination": "skeleton/ai/runtime/native",
       "kind": "tree",
-      "source_git_object_sha": "9349ca7b04d66e6bc92fd7f598ff8944128f43a6",
+      "source_git_object_sha": "8ae0e4662c86187ab326d264f918dfbac99ea74d",
       "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
       "volume_refs": [
         "VOL-032"
@@ -1624,7 +1624,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "943a16fa9dcabf71443498edb7254d456122be4b",
+      "source_git_object_sha": "f9e7817958be10279150dbed6cfa628555f89ee1",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",
@@ -1658,7 +1658,7 @@
       "source": "skeleton/quality",
       "destination": "skeleton/ai/evaluation/quality",
       "kind": "tree",
-      "source_git_object_sha": "84b7a57648c6ae138d489fe5c920ce731310f110",
+      "source_git_object_sha": "1eca5b97a981f8faf56935d3f22290768480e718",
       "role": "Replay evidence and property coverage are evaluation/qualification evidence, not an independent runtime owner.",
       "work_package_refs": [
         "WP-W18",
@@ -1691,7 +1691,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "24b485dc223140a29833c3f4b93fb4ab63c43643",
+      "source_git_object_sha": "e9e5708b9c452594ccab5abe5574fe29817d4b21",
       "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
       "work_package_refs": [
         "WP-W11",
@@ -5096,9 +5096,9 @@
   },
   "provenance_refresh": {
     "status": "current",
-    "refreshed_from_head": "b747f5818bf1fc4c49299359fd7004819af84cc8",
-    "refreshed_mapping_count": 10,
-    "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline.",
+    "refreshed_from_head": "fccc7ddf24a9761adbbe41a4dd4c96ed37e641d8",
+    "refreshed_mapping_count": 8,
+    "note": "Eight stale source object identities refreshed against the exact P2 head after persistence, contracts, context, frontier, native, PR automation, quality, and repo-machine evolution; baseline_git_sha remains the original migration baseline.",
     "whitespace_normalization": {
       "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
       "source_destination_pairs": 5,
