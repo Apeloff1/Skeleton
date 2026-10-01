@@ -13,6 +13,9 @@ on:
       - "scripts/check_spine_bind_recovery.py"
       - "scripts/check_spine_motor_bootstrap.py"
       - "skeleton/testing/test_spine_bind_*.py"
+      - "skeleton/testing/test_spine_dispatch_guard.py"
+      - "skeleton/persistence/spine_dispatch_guard.py"
+      - "skeleton/ai/runtime/persistence/spine_dispatch_guard.py"
       - "skeleton/testing/test_spine_motor_bootstrap.py"
       - "skeleton/testing/test_spine_motor_bootstrap_control.py"
       - "skeleton/testing/test_spine_motor_witness.py"
@@ -119,6 +122,7 @@ jobs:
           skeleton/testing/test_spine_bind_recovery_control.py
           skeleton/testing/test_spine_manifest.py
           skeleton/testing/test_spine_masterplan.py
+          skeleton/testing/test_spine_dispatch_guard.py
 
       - name: Verify P2 bind recovery control
         run: python scripts/check_spine_bind_recovery.py
