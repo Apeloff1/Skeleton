@@ -87,8 +87,9 @@ def _render_p2(root: Path) -> str:
     for task in sorted(tasks, key=lambda item: item["task_id"]):
         lines.append(
             f"| {task['task_id']} | {task['lane_id']} | {task['status']} | "
-            f"{task['completion_checkbox_mark']} | {task['implementation_signed']} | "
-            f"{task['verification_signed']} |"
+            f"{task['completion_checkbox_mark']} | "
+            f"{str(task['implementation_signed']).lower()} | "
+            f"{str(task['verification_signed']).lower()} |"
         )
     summary = trace.get("summary")
     if not isinstance(summary, dict):
@@ -160,7 +161,7 @@ def _render_architecture(root: Path) -> str:
             )
         lines.append(
             f"| {rule['id']} | `{validator}` | {rule['severity']} | "
-            f"{rule['waiver_policy']['allowed']} |"
+            f"{str(rule['waiver_policy']['allowed']).lower()} |"
         )
     lines.extend(["", "## Architecture decisions", ""])
     if records:
