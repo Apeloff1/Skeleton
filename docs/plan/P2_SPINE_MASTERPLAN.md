@@ -153,7 +153,8 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 - Read and project: 96%
 - Provider surface closure qualified: implemented
-- Provider surface live claimed: 0%
+- Provider live qualification implementation: landed
+- Provider surface live claim: 0% until authenticated live receipt
 - PR Automation operational qualification: implemented
 - PR Automation merge authority: 0%
 - Poison apply: 55%
@@ -176,7 +177,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 128, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 130, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
