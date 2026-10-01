@@ -91,7 +91,12 @@ class SpineCursorRead:
                 (self.projection.consumer_id,),
             ).fetchone()
             poison = self.projection._connection.execute(
-                "SELECT COUNT(*) AS n FROM projection_poison"
+                """
+                SELECT COUNT(*) AS n
+                FROM projection_poison
+                WHERE consumer_id = ?
+                """,
+                (self.projection.consumer_id,),
             ).fetchone()
         applied = 0
         updated = None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
@@ -15,6 +16,7 @@ from skeleton.persistence.operation_runtime import DurableOperationRuntime
 from skeleton.persistence.operation_store import SQLiteOperationStore
 from skeleton.persistence.spine_cursor import SpineCursorRead
 from skeleton.persistence.spine_projection import SpineProjection
+from skeleton.persistence.spine_quarantine import SpineQuarantine
 
 
 BASE = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
@@ -308,4 +310,105 @@ def test_projection_completion_identity_is_scoped_by_consumer(
     ).fetchall()
     connection.close()
     assert rows == [("projection-a",), ("projection-b",)]
+    runtime.close()
+
+def test_projection_migrates_legacy_poison_rows_to_current_consumer(
+    tmp_path: Path,
+) -> None:
+    journal_path = tmp_path / "journal.sqlite"
+    connection = sqlite3.connect(journal_path)
+    connection.execute(
+        """
+        CREATE TABLE projection_poison (
+            outbox_id TEXT PRIMARY KEY,
+            operation_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            digest TEXT NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO projection_poison(
+            outbox_id, operation_id, tenant_id, reason, digest, recorded_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "legacy-outbox",
+            "legacy-operation",
+            "tenant-a",
+            "LegacyConflict",
+            "d" * 64,
+            BASE.isoformat(),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        consumer_id="legacy-consumer",
+        journal_path=journal_path,
+    ) as projection:
+        assert projection.poison_count() == 1
+        marks = SpineQuarantine(projection).list(tenant_id="tenant-a")
+        assert len(marks) == 1
+        assert marks[0].outbox_id == "legacy-outbox"
+
+
+def test_projection_poison_quarantine_is_scoped_by_consumer(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    created = operations.create(_envelope(), now=BASE)
+    runtime.dispatch_outbox(operation_id=created.envelope.operation_id)
+    event = operations.published_outbox(
+        operation_id=created.envelope.operation_id
+    )[0]
+    delivery = delivery_from_outbox(event, "tenant-a")
+
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    inbox.accept(
+        replace(delivery, payload={"tampered": True}),
+        consumer_id="projection-a",
+        now=event.published_at,
+    )
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    journal_path = tmp_path / "journal.sqlite"
+
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        consumer_id="projection-a",
+        journal_path=journal_path,
+    ) as first:
+        failed = first.project(now=BASE + timedelta(seconds=2))
+        assert failed.poisoned == 1
+        assert first.poison_count() == 1
+        assert SpineCursorRead(first, fence).read().poison_count == 1
+        assert SpineQuarantine(first).card("tenant-a")["count"] == 1
+
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        consumer_id="projection-b",
+        journal_path=journal_path,
+    ) as second:
+        accepted = second.project(now=BASE + timedelta(seconds=3))
+        assert accepted.applied == 1
+        assert accepted.poisoned == 0
+        assert second.poison_count() == 0
+        assert SpineCursorRead(second, fence).read().poison_count == 0
+        assert SpineQuarantine(second).card("tenant-a")["count"] == 0
     runtime.close()

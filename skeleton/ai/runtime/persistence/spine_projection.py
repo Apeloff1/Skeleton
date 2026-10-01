@@ -134,12 +134,14 @@ class SpineProjection:
                 PRAGMA journal_mode = WAL;
                 PRAGMA synchronous = FULL;
                 CREATE TABLE IF NOT EXISTS projection_poison (
-                    outbox_id TEXT PRIMARY KEY,
+                    consumer_id TEXT NOT NULL,
+                    outbox_id TEXT NOT NULL,
                     operation_id TEXT NOT NULL,
                     tenant_id TEXT NOT NULL,
                     reason TEXT NOT NULL,
                     digest TEXT NOT NULL,
-                    recorded_at TEXT NOT NULL
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(consumer_id, outbox_id)
                 );
                 CREATE TABLE IF NOT EXISTS projection_cursor (
                     consumer_id TEXT PRIMARY KEY,
@@ -157,8 +159,68 @@ class SpineProjection:
                 );
                 """
             )
+            self._migrate_poison_schema()
             self._migrate_completion_schema()
             self._rebuild_cursor_from_completions()
+
+    def _migrate_poison_schema(self) -> None:
+        columns = self._connection.execute(
+            "PRAGMA table_info(projection_poison)"
+        ).fetchall()
+        names = {str(row["name"]) for row in columns}
+        primary_key = [
+            row["name"]
+            for row in sorted(
+                (row for row in columns if int(row["pk"]) > 0),
+                key=lambda row: int(row["pk"]),
+            )
+        ]
+        if (
+            "consumer_id" in names
+            and primary_key == ["consumer_id", "outbox_id"]
+        ):
+            return
+        if "consumer_id" in names or primary_key != ["outbox_id"]:
+            raise SpineProjectionError(
+                "projection poison primary key is unsupported"
+            )
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._connection.execute(
+                "ALTER TABLE projection_poison RENAME TO projection_poison_legacy"
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE projection_poison (
+                    consumer_id TEXT NOT NULL,
+                    outbox_id TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    digest TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(consumer_id, outbox_id)
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                INSERT INTO projection_poison(
+                    consumer_id, outbox_id, operation_id, tenant_id,
+                    reason, digest, recorded_at
+                )
+                SELECT ?, outbox_id, operation_id, tenant_id,
+                       reason, digest, recorded_at
+                FROM projection_poison_legacy
+                """,
+                (self.consumer_id,),
+            )
+            self._connection.execute("DROP TABLE projection_poison_legacy")
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
 
     def _migrate_completion_schema(self) -> None:
         columns = self._connection.execute(
@@ -422,11 +484,13 @@ class SpineProjection:
             self._connection.execute(
                 """
                 INSERT INTO projection_poison(
-                    outbox_id, operation_id, tenant_id, reason, digest, recorded_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(outbox_id) DO NOTHING
+                    consumer_id, outbox_id, operation_id, tenant_id,
+                    reason, digest, recorded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(consumer_id, outbox_id) DO NOTHING
                 """,
                 (
+                    self.consumer_id,
                     event.outbox_id,
                     event.operation_id,
                     tenant_id,
@@ -514,7 +578,12 @@ class SpineProjection:
     def poison_count(self) -> int:
         with self._lock:
             row = self._connection.execute(
-                "SELECT COUNT(*) AS n FROM projection_poison"
+                """
+                SELECT COUNT(*) AS n
+                FROM projection_poison
+                WHERE consumer_id = ?
+                """,
+                (self.consumer_id,),
             ).fetchone()
         return int(row["n"])
 

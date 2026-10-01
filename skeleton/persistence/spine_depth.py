@@ -17,8 +17,10 @@ def _poisons(self: SpineProjection) -> tuple[PoisonMark, ...]:
             """
             SELECT outbox_id, operation_id, tenant_id, reason, recorded_at
             FROM projection_poison
+            WHERE consumer_id = ?
             ORDER BY recorded_at ASC, outbox_id ASC
-            """
+            """,
+            (self.consumer_id,),
         ).fetchall()
     marks = []
     for row in rows:
