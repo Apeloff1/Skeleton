@@ -23,6 +23,8 @@ FILES = (
     "spine_motor_preflight_verify.py",
     "spine_runtime_selection.py",
     "spine_runtime_selection_verify.py",
+    "spine_cutover_rehearsal.py",
+    "spine_cutover_rehearsal_verify.py",
 )
 
 

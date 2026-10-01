@@ -65,6 +65,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeSelection` consumes the live PyMongo Async qualification plus a stable dispatcher-identity proof and emits only a non-authorized candidate. It binds driver, plan, preflight, qualification, index, and dispatcher evidence into one digest while keeping `runtime_driver_selected=false`, `selection_authorized=false`, and `runtime_activated=false`. `SpineRuntimeSelectionVerify` independently reconstructs that digest and rejects any authority promotion.
 
+## Cutover rehearsal boundary
+
+`SpineCutoverRehearsal` requires the verified non-selecting candidate plus green cutover and chain reads, then exercises `SpineCutGate`. Even with every precondition green, the gate must return only `switch-not-landed`; it cannot advance a fence, select a driver, authorize selection, or activate runtime. `SpineCutoverRehearsalVerify` independently reconstructs the rehearsal digest and rejects authority promotion.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -86,7 +90,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_motor_witness.py \
   skeleton/testing/test_spine_index_bind.py \
   skeleton/testing/test_spine_pymongo_async_adapter.py \
-  skeleton/testing/test_spine_runtime_selection.py
+  skeleton/testing/test_spine_runtime_selection.py \
+  skeleton/testing/test_spine_cutover_rehearsal.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```

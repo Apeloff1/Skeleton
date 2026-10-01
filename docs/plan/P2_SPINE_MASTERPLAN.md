@@ -94,6 +94,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | PyMongo Async live qualification | `scripts/qualify_spine_pymongo_async.py` | real async driver/service proof is non-activating |
 | Runtime selection candidate | `skeleton/persistence/spine_runtime_selection.py` | qualified driver does not self-select |
 | Runtime selection verify | `skeleton/persistence/spine_runtime_selection_verify.py` | verification grants no selection authority |
+| Cutover rehearsal | `skeleton/persistence/spine_cutover_rehearsal.py` | green preconditions do not authorize cutover |
+| Cutover rehearsal verify | `skeleton/persistence/spine_cutover_rehearsal_verify.py` | rehearsal verification grants no cutover authority |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -103,7 +105,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider surface claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
-- Apply/cutover readiness: 60%
+- Apply/cutover readiness: 65%
 - Async Mongo bootstrap: 85%
 - CI green: 0%
 - Merge: 0%
@@ -112,7 +114,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 ## Next, in order
 
 1. Poison apply is landed as its own seam. The hold row is the only input. A changed digest stays a conflict and is refused before accept. The fence epoch does not advance. `SpineApplyGate` still refuses every intent. This is not a sign-off.
-2. Motor bootstrap now has a deterministic content-addressed plan plus an executable driver-injected async bootstrap contract. `SpineMotorBootstrap` accepts only injected collections, supports sync or awaitable `create_index`, fails closed on missing collections, driver faults, or invalid result identities, and is independently verified and replay-compared. `SpineMotorWitness` plus `scripts/check_spine_motor_bootstrap.py` still forbid `motor` or `pymongo` imports in the core seam. `SpineMotorPreflight` now probes an injected database through ping/hello plus canonical collection protocol checks, and `SpineMotorPreflightVerify` independently digest-verifies that evidence. `SpinePyMongoAsyncAdapter` now binds that protocol to the supported PyMongo Async API (pymongo>=4.13) in the deployment layer and emits a package/API identity receipt. Core persistence still imports neither PyMongo nor Motor. The exact-head recovery workflow now exercises the real AsyncMongoClient against its Mongo service, runs preflight, applies all three canonical indexes twice, verifies replay equivalence, and emits a digest-bound qualification receipt. This proves deployment-driver connectivity and bootstrap compatibility only. Runtime selection is now modeled as a digest-bound candidate that requires the live qualification plus an unchanged dispatcher identity proof. Independent verification rejects any selected/authorized/activated flag. Runtime driver selection, runtime activation, merge authority, and maturity remain false.
+2. Motor bootstrap now has a deterministic content-addressed plan plus an executable driver-injected async bootstrap contract. `SpineMotorBootstrap` accepts only injected collections, supports sync or awaitable `create_index`, fails closed on missing collections, driver faults, or invalid result identities, and is independently verified and replay-compared. `SpineMotorWitness` plus `scripts/check_spine_motor_bootstrap.py` still forbid `motor` or `pymongo` imports in the core seam. `SpineMotorPreflight` now probes an injected database through ping/hello plus canonical collection protocol checks, and `SpineMotorPreflightVerify` independently digest-verifies that evidence. `SpinePyMongoAsyncAdapter` now binds that protocol to the supported PyMongo Async API (pymongo>=4.13) in the deployment layer and emits a package/API identity receipt. Core persistence still imports neither PyMongo nor Motor. The exact-head recovery workflow now exercises the real AsyncMongoClient against its Mongo service, runs preflight, applies all three canonical indexes twice, verifies replay equivalence, and emits a digest-bound qualification receipt. This proves deployment-driver connectivity and bootstrap compatibility only. Runtime selection is now modeled as a digest-bound candidate that requires the live qualification plus an unchanged dispatcher identity proof. Independent verification rejects any selected/authorized/activated flag. `SpineCutoverRehearsal` now requires the candidate, independent selection verification, green cutover reads, chain match, and a closed apply gate, then exercises the existing cut gate and requires the sole refusal reason `switch-not-landed`. Its independent verifier rejects digest drift or any selected/authorized/activated flag. Runtime driver selection, runtime activation, merge authority, and maturity remain false.
 3. The runtime dispatcher is not replaced. `SpineBind` remains the only start path for the composed worker.
 4. Provider-surface and PR Automation are not claimed green. `SpineProviderProbe` and `SpinePrProbe` append unread rows only. `claim` writes `claimed=0`. `SpineUnreadGap` lists a skipped sequence for that tenant and returns empty for a foreign tenant. `SpineSurfaceSeal` strips a forged green flag. This is not a sign-off.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
@@ -122,7 +124,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 76, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 78, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

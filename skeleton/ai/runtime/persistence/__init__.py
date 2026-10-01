@@ -137,6 +137,8 @@ from skeleton.persistence.spine_motor_preflight import SpineMotorPreflight
 from skeleton.persistence.spine_motor_preflight_verify import SpineMotorPreflightVerify
 from skeleton.persistence.spine_runtime_selection import SpineRuntimeSelection
 from skeleton.persistence.spine_runtime_selection_verify import SpineRuntimeSelectionVerify
+from skeleton.persistence.spine_cutover_rehearsal import SpineCutoverRehearsal
+from skeleton.persistence.spine_cutover_rehearsal_verify import SpineCutoverRehearsalVerify
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -288,6 +290,8 @@ __all__ = [
     "SpineMotorPreflightVerify",
     "SpineRuntimeSelection",
     "SpineRuntimeSelectionVerify",
+    "SpineCutoverRehearsal",
+    "SpineCutoverRehearsalVerify",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

@@ -85,6 +85,8 @@ SEAMS = (
     ("pymongo-async-live-qualification", "live-driver-qualification-is-not-runtime-activation"),
     ("runtime-selection-candidate", "qualified-driver-does-not-self-select"),
     ("runtime-selection-verify", "selection-verification-does-not-authorize"),
+    ("cutover-rehearsal", "green-preconditions-do-not-authorize-cutover"),
+    ("cutover-rehearsal-verify", "rehearsal-verification-does-not-authorize-cutover"),
 )
 
 
