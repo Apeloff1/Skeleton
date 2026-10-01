@@ -307,7 +307,7 @@
     {
       "task_id": "P2-TRACE-01",
       "lane_id": "P2-L2",
-      "status": "in_progress",
+      "status": "landed_unpromoted",
       "title": "Build requirements-to-runtime traceability spine",
       "depends_on": [
         "P2-ARCH-01"
@@ -339,10 +339,11 @@
       "implementation_signed": false,
       "verification_signed": false,
       "evidence_refs": [
-        "branch:feat/p2-traceability-spine",
-        "machine:master_traceability.json",
-        "workflow:P2 Master Traceability Spine",
-        "workflow:P2 Traceability Focused Contract"
+        "github:pr#2319",
+        "git:merge:bd5171ecb04368f4ba6ff4e67d497c9559eccb85",
+        "workflow:P2 Master Traceability Spine@a4fdffe92cf2dec5b310e23f65d9de0e5f833aae:success",
+        "workflow:P2 Traceability Focused Contract@a4fdffe92cf2dec5b310e23f65d9de0e5f833aae:success",
+        "machine:master_traceability.json"
       ],
       "masterplan_obligations": [
         {
@@ -616,7 +617,7 @@
     {
       "task_id": "P2-REPO-01",
       "lane_id": "P2-L3",
-      "status": "blocked",
+      "status": "ready",
       "title": "Operationalize autonomous repository engineering",
       "depends_on": [
         "P2-ARCH-01",
@@ -648,7 +649,9 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "dependency:P2-TRACE-01:landed_unpromoted"
+      ],
       "masterplan_obligations": [
         {
           "volume_ref": "VOL-021",
@@ -934,7 +937,7 @@
     {
       "task_id": "P2-QUAL-01",
       "lane_id": "P2-L4",
-      "status": "blocked",
+      "status": "ready",
       "title": "Strengthen formal quality and final assembly qualification",
       "depends_on": [
         "P2-TRACE-01"
@@ -957,7 +960,9 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "dependency:P2-TRACE-01:landed_unpromoted"
+      ],
       "masterplan_obligations": [
         {
           "volume_ref": "VOL-070",
@@ -1056,7 +1061,7 @@
     {
       "task_id": "P2-DOC-01",
       "lane_id": "P2-L5",
-      "status": "blocked",
+      "status": "ready",
       "title": "Make generated documentation evidence-bound",
       "depends_on": [
         "P2-TRACE-01"
@@ -1077,7 +1082,9 @@
       "completion_checkbox_mark": "[ ]",
       "implementation_signed": false,
       "verification_signed": false,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "dependency:P2-TRACE-01:landed_unpromoted"
+      ],
       "masterplan_obligations": [
         {
           "volume_ref": "VOL-089",
@@ -1207,12 +1214,12 @@
   ],
   "summary": {
     "task_count": 7,
-    "in_progress_count": 1,
-    "ready_count": 0,
-    "blocked_count": 4,
+    "in_progress_count": 0,
+    "ready_count": 3,
+    "blocked_count": 1,
     "scheduled_volume_count": 42,
     "queued_volume_count": 272,
     "source_volume_count": 314,
-    "landed_unpromoted_count": 2
+    "landed_unpromoted_count": 3
   }
 }
