@@ -64,5 +64,13 @@
     "non_compensable": "Every NFR is hard-gated independently; averages cannot offset a failed NFR.",
     "reproducibility": "Metric, threshold, workload, environment and measurement implementation are explicit.",
     "claim_binding": "Production claims in this registry are identified by NFR ID."
+  },
+  "masterplan_binding": {
+    "volume_ref": "VOL-123",
+    "title": "Non-Functional Requirements",
+    "required_gap_texts": [
+      "bind all production claims to NFR IDs",
+      "materialize measurement harnesses"
+    ]
   }
 }
