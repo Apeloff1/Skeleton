@@ -70,6 +70,8 @@ from skeleton.persistence.spine_digest import SpineDigest
 from skeleton.persistence.spine_ledger import SpineLedger
 from skeleton.persistence.spine_index import SpineIndexPlan
 from skeleton.persistence.spine_bind import SpineBind
+from skeleton.persistence.spine_tracker import SpineTracker
+from skeleton.persistence.spine_pair import SpinePair
 from skeleton.persistence.spine_gap import SpineGap
 
 _SNAPSHOT_EXPORTS = {
@@ -152,6 +154,8 @@ __all__ = [
     "SpineLedger",
     "SpineIndexPlan",
     "SpineBind",
+    "SpineTracker",
+    "SpinePair",
     "SpineCutover",
     "SpineWindow",
     "SpineSeal",
