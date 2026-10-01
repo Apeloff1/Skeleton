@@ -687,6 +687,10 @@ class SQLiteOperationEventStore:
                         "consumer must register before acknowledging"
                     )
                 current_checkpoint = self._consumer_from_row(row)
+                if current_checkpoint.lease_expires_at <= instant:
+                    raise StreamContractError(
+                        "consumer lease expired; register before acknowledging"
+                    )
                 current = current_checkpoint.acknowledged_through
                 acknowledged = max(current, sequence)
                 self._connection.execute(
