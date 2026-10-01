@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p2-ci-qualification-${{ github.event.workflow_run.head_sha }}
+  group: p2-ci-qualification-${{ github.event_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
