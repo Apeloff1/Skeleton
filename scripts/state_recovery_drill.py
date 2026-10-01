@@ -1523,6 +1523,11 @@ def run_spine_bind_sqlite_drill(
     from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
     from skeleton.persistence.spine_bind_restore_receipt import SpineBindRestoreReceipt
     from skeleton.persistence.spine_bind_restore_verify import SpineBindRestoreVerify
+    from skeleton.persistence.spine_bind_restore_journal import SpineBindRestoreJournal
+    from skeleton.persistence.spine_bind_restore_replay import SpineBindRestoreReplay
+    from skeleton.persistence.spine_bind_restore_tenant import SpineBindRestoreTenant
+    from skeleton.persistence.spine_bind_restore_chain import SpineBindRestoreChain
+    from skeleton.persistence.spine_bind_restore_continuity import SpineBindRestoreContinuity
     from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 
     root = require_scratch_directory(workdir)
@@ -1530,7 +1535,17 @@ def run_spine_bind_sqlite_drill(
     source_path = root / "spine_bind_checkpoint.sqlite"
     backup_path = root / "spine_bind_checkpoint.backup.sqlite"
     restored_path = root / "spine_bind_checkpoint.restored.sqlite"
-    for candidate in (source_path, backup_path, restored_path):
+    receipt_source_path = root / "spine_bind_restore_receipt.sqlite"
+    receipt_backup_path = root / "spine_bind_restore_receipt.backup.sqlite"
+    receipt_restored_path = root / "spine_bind_restore_receipt.restored.sqlite"
+    for candidate in (
+        source_path,
+        backup_path,
+        restored_path,
+        receipt_source_path,
+        receipt_backup_path,
+        receipt_restored_path,
+    ):
         if candidate.exists():
             candidate.unlink()
 
@@ -1638,6 +1653,56 @@ def run_spine_bind_sqlite_drill(
             raise RecoveryDrillError("bind restore receipt verification failed")
         if restore_verified.get("activated") is not False:
             raise RecoveryDrillError("bind restore receipt activated")
+
+        restore_journal_store = SpineBindRestoreJournal(receipt_source_path)
+        try:
+            restore_journal = restore_journal_store.append(
+                restore_receipt,
+                now=datetime(2026, 10, 1, 13, 0, tzinfo=timezone.utc),
+            )
+            if restore_journal_store.count(tenant_id) != 1:
+                raise RecoveryDrillError("restore receipt journal row count changed")
+        finally:
+            restore_journal_store.close()
+
+        receipt_source_snapshot = capture_sqlite_database(receipt_source_path)
+        online_backup_sqlite(receipt_source_path, receipt_backup_path)
+        receipt_backup_snapshot = capture_sqlite_database(receipt_backup_path)
+        verify_sqlite_snapshot(receipt_source_snapshot, receipt_backup_snapshot)
+
+        receipt_source_path.unlink()
+        online_backup_sqlite(receipt_backup_path, receipt_restored_path)
+        receipt_restored_snapshot = capture_sqlite_database(receipt_restored_path)
+        receipt_sqlite_verification = verify_sqlite_snapshot(
+            receipt_backup_snapshot,
+            receipt_restored_snapshot,
+        )
+
+        receipt_replay_reader = SpineBindRestoreReplay(receipt_restored_path)
+        receipt_tenant_reader = SpineBindRestoreTenant(receipt_restored_path)
+        receipt_chain_reader = SpineBindRestoreChain(receipt_restored_path)
+        try:
+            receipt_replay = receipt_replay_reader.replay(restore_journal)
+            receipt_own = receipt_tenant_reader.card(tenant_id)
+            receipt_foreign = receipt_tenant_reader.card("tenant-spine-bind-restore-foreign")
+            receipt_chain = receipt_chain_reader.seal(tenant_id)
+            if receipt_own.get("count") != 1 or receipt_foreign.get("count") != 0:
+                raise RecoveryDrillError("restore receipt tenant isolation changed")
+            restore_continuity = SpineBindRestoreContinuity().card(
+                receipt=restore_receipt,
+                journal=restore_journal,
+                replay=receipt_replay,
+                tenant=receipt_own,
+                chain=receipt_chain,
+            )
+            if restore_continuity.get("durable") is not True:
+                raise RecoveryDrillError("restore receipt continuity is not durable")
+            if restore_continuity.get("activated") is not False:
+                raise RecoveryDrillError("restore receipt continuity activated")
+        finally:
+            receipt_replay_reader.close()
+            receipt_tenant_reader.close()
+            receipt_chain_reader.close()
     finally:
         restored.close()
         replay_reader.close()
@@ -1683,6 +1748,25 @@ def run_spine_bind_sqlite_drill(
             "verified": restore_verified["verified"],
             "activated": restore_verified["activated"],
         },
+        "restore_journal": {
+            "backup_digest": receipt_backup_snapshot["digest"],
+            "restore_digest": receipt_restored_snapshot["digest"],
+            "sqlite": receipt_sqlite_verification,
+            "receipt_digest": restore_journal["receipt_digest"],
+            "row_digest": restore_journal["row_digest"],
+            "rows": receipt_own["count"],
+            "foreign_rows": receipt_foreign["count"],
+            "replay_rows_before": receipt_replay["rows_before"],
+            "replay_rows_after": receipt_replay["rows_after"],
+            "replay_inserted": receipt_replay["inserted"],
+            "chain_digest": receipt_chain["digest"],
+            "chain_rows": receipt_chain["rows"],
+            "continuity_digest": restore_continuity["digest"],
+            "durable": restore_continuity["durable"],
+            "tenant_isolated": restore_continuity["tenant_isolated"],
+            "replay_safe": restore_continuity["replay_safe"],
+            "activated": restore_continuity["activated"],
+        },
         "activation_claimed": False,
         "apply_landed": False,
         "live_motor": False,
@@ -1692,7 +1776,14 @@ def run_spine_bind_sqlite_drill(
     }
 
     if cleanup:
-        for candidate in (source_path, backup_path, restored_path):
+        for candidate in (
+            source_path,
+            backup_path,
+            restored_path,
+            receipt_source_path,
+            receipt_backup_path,
+            receipt_restored_path,
+        ):
             if candidate.exists():
                 candidate.unlink()
         if root.exists() and not any(root.iterdir()):

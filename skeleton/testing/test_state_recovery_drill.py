@@ -363,6 +363,20 @@ def test_spine_bind_checkpoint_restore_preserves_dark_evidence(tmp_path) -> None
     assert result["restore_receipt"]["recovery_digest"] == result["checkpoint"]["recovery_digest"]
     assert result["restore_receipt"]["verified"] is True
     assert result["restore_receipt"]["activated"] is False
+    assert result["restore_journal"]["backup_digest"] == result["restore_journal"]["restore_digest"]
+    assert result["restore_journal"]["receipt_digest"] == result["restore_receipt"]["digest"]
+    assert result["restore_journal"]["rows"] == 1
+    assert result["restore_journal"]["foreign_rows"] == 0
+    assert result["restore_journal"]["replay_rows_before"] == 1
+    assert result["restore_journal"]["replay_rows_after"] == 1
+    assert result["restore_journal"]["replay_inserted"] is False
+    assert result["restore_journal"]["chain_rows"] == 1
+    assert len(result["restore_journal"]["chain_digest"]) == 64
+    assert len(result["restore_journal"]["continuity_digest"]) == 64
+    assert result["restore_journal"]["durable"] is True
+    assert result["restore_journal"]["tenant_isolated"] is True
+    assert result["restore_journal"]["replay_safe"] is True
+    assert result["restore_journal"]["activated"] is False
     assert result["activation_claimed"] is False
     assert result["apply_landed"] is False
     assert result["live_motor"] is False

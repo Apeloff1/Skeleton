@@ -25,6 +25,11 @@ MODULES = (
     "spine_bind_bundle_verify.py",
     "spine_bind_restore_receipt.py",
     "spine_bind_restore_verify.py",
+    "spine_bind_restore_journal.py",
+    "spine_bind_restore_replay.py",
+    "spine_bind_restore_tenant.py",
+    "spine_bind_restore_chain.py",
+    "spine_bind_restore_continuity.py",
 )
 
 MIRRORED = ("__init__.py", "spine_manifest.py", "spine_masterplan.py", *MODULES)
@@ -40,6 +45,11 @@ EXPECTED_SEAMS = {
     "bind-bundle-verify": "bundle-verification-does-not-activate",
     "bind-restore-receipt": "restore-receipt-is-not-activation",
     "bind-restore-verify": "restore-verification-does-not-activate",
+    "bind-restore-journal": "restore-journal-is-append-only",
+    "bind-restore-replay": "restore-replay-does-not-insert",
+    "bind-restore-tenant": "restore-journal-tenant-isolated",
+    "bind-restore-chain": "restore-journal-hash-chain",
+    "bind-restore-continuity": "restore-continuity-does-not-activate",
 }
 
 
@@ -79,9 +89,9 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != 59:
+    if len(seams) != 64:
         raise SpineBindRecoveryControlError(
-            f"expected 59 spine seams, found {len(seams)}"
+            f"expected 64 spine seams, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -102,8 +112,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     path = root / "docs" / "plan" / "P2_SPINE_MASTERPLAN.md"
     text = path.read_text(encoding="utf-8")
     required = [
-        "- Bind card sealed: 92%",
-        "Expect `count` 59",
+        "- Bind card sealed: 97%",
+        "Expect `count` 64",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -121,8 +131,8 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
             "masterplan recovery control drift: " + " | ".join(missing)
         )
     return {
-        "bind_card_percent": 92,
-        "manifest_count": 59,
+        "bind_card_percent": 97,
+        "manifest_count": 64,
         "activation_claimed": False,
     }
 

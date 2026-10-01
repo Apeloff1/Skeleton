@@ -68,6 +68,11 @@ SEAMS = (
     ("bind-bundle-verify", "bundle-verification-does-not-activate"),
     ("bind-restore-receipt", "restore-receipt-is-not-activation"),
     ("bind-restore-verify", "restore-verification-does-not-activate"),
+    ("bind-restore-journal", "restore-journal-is-append-only"),
+    ("bind-restore-replay", "restore-replay-does-not-insert"),
+    ("bind-restore-tenant", "restore-journal-tenant-isolated"),
+    ("bind-restore-chain", "restore-journal-hash-chain"),
+    ("bind-restore-continuity", "restore-continuity-does-not-activate"),
 )
 
 

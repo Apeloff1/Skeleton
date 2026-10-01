@@ -99,3 +99,18 @@ was promoted.
 This is tamper-evident recovery evidence, not a digital signature and not
 non-repudiation. External anchoring would still be required for that stronger
 claim.
+
+
+## Durable restore-receipt history
+
+`SpineBindRestoreJournal` persists each verified restore receipt in a separate
+append-only SQLite evidence journal. Rows are linked per tenant by the previous
+receipt digest and carry their own deterministic row digest. Replaying an
+existing receipt is idempotent and does not insert a second row.
+
+`SpineBindRestoreTenant` exposes only the requested tenant's receipt history.
+`SpineBindRestoreChain` independently recomputes every row digest and the
+per-tenant receipt linkage, failing closed on mutation or a broken predecessor.
+`SpineBindRestoreContinuity` joins the current receipt, journal row, replay,
+tenant view, and chain into one durable continuity proof. The continuity proof
+has no activation, merge, maturity, or sign-off authority.

@@ -103,6 +103,7 @@ jobs:
           skeleton/testing/test_spine_bind_checkpoint.py
           skeleton/testing/test_spine_bind_bundle.py
           skeleton/testing/test_spine_bind_restore_receipt.py
+          skeleton/testing/test_spine_bind_restore_journal.py
           skeleton/testing/test_spine_bind_recovery_control.py
           skeleton/testing/test_spine_manifest.py
           skeleton/testing/test_spine_masterplan.py
@@ -263,6 +264,21 @@ jobs:
           assert report["restore_receipt"]["recovery_digest"] == report["checkpoint"]["recovery_digest"]
           assert report["restore_receipt"]["verified"] is True
           assert report["restore_receipt"]["activated"] is False
+          journal = report["restore_journal"]
+          assert journal["backup_digest"] == journal["restore_digest"]
+          assert journal["receipt_digest"] == report["restore_receipt"]["digest"]
+          assert journal["rows"] == 1
+          assert journal["foreign_rows"] == 0
+          assert journal["replay_rows_before"] == 1
+          assert journal["replay_rows_after"] == 1
+          assert journal["replay_inserted"] is False
+          assert journal["chain_rows"] == 1
+          assert len(journal["chain_digest"]) == 64
+          assert len(journal["continuity_digest"]) == 64
+          assert journal["durable"] is True
+          assert journal["tenant_isolated"] is True
+          assert journal["replay_safe"] is True
+          assert journal["activated"] is False
           assert report["activation_claimed"] is False
           assert report["apply_landed"] is False
           assert report["live_motor"] is False
@@ -273,6 +289,8 @@ jobs:
           print("backup/restore digest:", report["backup_digest"])
           print("bundle digest:", report["bundle"]["digest"])
           print("restore receipt digest:", report["restore_receipt"]["digest"])
+          print("restore journal chain:", report["restore_journal"]["chain_digest"])
+          print("restore continuity:", report["restore_journal"]["continuity_digest"])
           PY
 
   independent-state-authority:
