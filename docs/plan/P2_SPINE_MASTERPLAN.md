@@ -129,6 +129,11 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime transition attempt verify | `skeleton/persistence/spine_runtime_transition_attempt_verify.py` | refused attempt verification cannot promote runtime |
 | Runtime transition rollback witness | `skeleton/persistence/spine_runtime_transition_rollback_witness.py` | independently proves the refused attempt left runtime/fence unchanged |
 | Runtime transition rollback verify | `skeleton/persistence/spine_runtime_transition_rollback_verify.py` | no-effect rollback proof grants no activation authority |
+| Runtime transition slot | `skeleton/persistence/spine_runtime_transition_slot.py` | explicit generation-checked runtime replacement boundary |
+| Runtime transition execution | `skeleton/persistence/spine_runtime_transition_execution.py` | swaps runtime, starts candidate dispatcher, and advances deployment fence exactly once |
+| Runtime transition execution verify | `skeleton/persistence/spine_runtime_transition_execution_verify.py` | independently verifies direct runtime/dispatcher/fence effects without activation |
+| Runtime transition effect rollback | `skeleton/persistence/spine_runtime_transition_effect_rollback.py` | stops candidate, restores original runtime, and advances compensation fence |
+| Runtime transition effect rollback verify | `skeleton/persistence/spine_runtime_transition_effect_rollback_verify.py` | independently verifies compensation without activation promotion |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -157,7 +162,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 111, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 116, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
