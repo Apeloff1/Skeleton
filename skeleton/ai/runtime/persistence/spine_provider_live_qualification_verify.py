@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 import json
 import re
@@ -25,6 +26,24 @@ def _digest(payload: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _instant(value: object, field: str) -> datetime:
+    if not isinstance(value, str):
+        raise SpineProviderLiveQualificationVerifyError(
+            f"{field} must be ISO-8601 text"
+        )
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise SpineProviderLiveQualificationVerifyError(
+            f"{field} is not valid ISO-8601"
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise SpineProviderLiveQualificationVerifyError(
+            f"{field} must be timezone-aware"
+        )
+    return parsed.astimezone(timezone.utc)
 
 
 class SpineProviderLiveQualificationVerify:
@@ -72,6 +91,16 @@ class SpineProviderLiveQualificationVerify:
         if card.get("provider_family") != "runtime_model":
             raise SpineProviderLiveQualificationVerifyError(
                 "provider family changed"
+            )
+        issued_at = _instant(card.get("issued_at"), "issued_at")
+        valid_until = _instant(card.get("valid_until"), "valid_until")
+        if valid_until <= issued_at:
+            raise SpineProviderLiveQualificationVerifyError(
+                "provider live validity window is invalid"
+            )
+        if (valid_until - issued_at).total_seconds() > 300:
+            raise SpineProviderLiveQualificationVerifyError(
+                "provider live validity window exceeds five minutes"
             )
         latency_ms = card.get("latency_ms")
         if (
