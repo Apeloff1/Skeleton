@@ -63,6 +63,8 @@ from skeleton.persistence.spine_batch import SpineBatch, SpineBatchReport
 from skeleton.persistence.spine_witness import SpineWitness
 from skeleton.persistence.spine_drift import SpineDrift
 from skeleton.persistence.spine_apply import SpineApplyGate
+from skeleton.persistence.spine_cutover import SpineCutover
+from skeleton.persistence.spine_window import SpineWindow
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -140,6 +142,8 @@ __all__ = [
     "SpineWitness",
     "SpineDrift",
     "SpineApplyGate",
+    "SpineCutover",
+    "SpineWindow",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
