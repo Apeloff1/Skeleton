@@ -44,6 +44,10 @@ on:
       - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification.py"
       - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification_verify.py"
       - "skeleton/testing/test_spine_provider_surface_qualification.py"
+      - "skeleton/testing/test_spine_provider_live_qualification.py"
+      - "skeleton/persistence/spine_provider_live_qualification*.py"
+      - "skeleton/ai/runtime/persistence/spine_provider_live_qualification*.py"
+      - "scripts/qualify_spine_provider_live.py"
       - "machine/provider_capability_matrix.json"
       - "machine/ai_app_construction.json"
       - "machine/ai_closure_evidence.json"
@@ -438,4 +442,59 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check "pytest>=8,<9"
           && python -m pytest -q --noconftest
-          skeleton/testing/test_spine_provider_surface_qualification.py
+          skeleton/testing/test_spine_provider_surface_qualification.py \
+          skeleton/testing/test_spine_provider_live_qualification.py
+
+      - name: Detect live provider credential
+        id: live_provider
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "live provider credential is available"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "live provider credential is unavailable; live-green remains false"
+          fi
+
+      - name: Install canonical live provider runtime
+        if: steps.live_provider.outputs.enabled == 'true'
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+
+      - name: Qualify credential-bearing live provider
+        if: steps.live_provider.outputs.enabled == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          P2_PROVIDER_LIVE_MODEL: ${{ vars.P2_PROVIDER_LIVE_MODEL }}
+        run: >-
+          python scripts/qualify_spine_provider_live.py
+          --closure .provider-surface-qualified.json
+          --expected-head "$EXPECTED_SHA"
+          --evidence-out .provider-live-qualified.json
+
+      - name: Record provider live qualification status
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.live_provider.outputs.enabled }}" == "true" ]]; then
+            if [[ ! -s .provider-live-qualified.json ]]; then
+              echo "credential existed but live provider evidence was not produced" >&2
+              exit 1
+            fi
+            echo "provider live qualification evidence produced"
+          else
+            echo "provider live qualification not attempted: OPENAI_API_KEY unavailable"
+          fi
+
+      - name: Upload provider live qualification evidence
+        if: steps.live_provider.outputs.enabled == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-live-qualified-${{ github.run_id }}
+          path: .provider-live-qualified.json
+          if-no-files-found: error
+          retention-days: 30
