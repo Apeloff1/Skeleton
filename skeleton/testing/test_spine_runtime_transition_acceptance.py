@@ -39,6 +39,8 @@ def _health_verify() -> dict[str, object]:
         "kind": "spine_runtime_transition_health_verify",
         "health_digest": "h" * 64,
         "execution_id": "e" * 64,
+        "deployment_id": "deploy-a",
+        "target_driver": "pymongo-async",
         "verified": True,
         "health_qualified": True,
         "operation_continuity": True,
