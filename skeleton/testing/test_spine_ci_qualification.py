@@ -53,6 +53,7 @@ def _receipt() -> dict[str, object]:
                 "head_sha": HEAD,
                 "workflow_path": REQUIRED_CHECK_WORKFLOWS[name],
                 "event": REQUIRED_CHECK_EVENT,
+                "workflow_digest": "a" * 64,
                 "run_id": index + 100,
                 "run_attempt": 1,
                 "conclusion": "success",
@@ -257,5 +258,34 @@ def test_ci_verifier_rejects_producer_identity_tamper() -> None:
     with pytest.raises(
         SpineCiQualificationVerifyError,
         match="producer_run_id is invalid",
+    ):
+        SpineCiQualificationVerify().verify(tampered)
+
+
+def test_ci_qualification_rejects_workflow_definition_digest_tamper() -> None:
+    receipt = _receipt()
+    receipt["checks"][0]["workflow_digest"] = "invalid"
+    with pytest.raises(
+        SpineCiQualificationError,
+        match="workflow definition digest is invalid",
+    ):
+        SpineCiQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_ci_verifier_rejects_workflow_definition_digest_tamper() -> None:
+    card = SpineCiQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["checks"][0]["workflow_digest"] = "0" * 64
+    with pytest.raises(
+        SpineCiQualificationVerifyError,
+        match="checks digest does not match",
     ):
         SpineCiQualificationVerify().verify(tampered)

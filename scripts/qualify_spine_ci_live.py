@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import hmac
 import json
@@ -20,6 +21,10 @@ from skeleton.persistence.spine_ci_qualification_verify import (
 from skeleton.persistence.spine_ci_receipt import (
     SpineCiReceiptBuilder,
     SpineCiReceiptIncompleteError,
+)
+from skeleton.persistence.spine_ci_policy import (
+    REQUIRED_CHECKS,
+    REQUIRED_CHECK_WORKFLOWS,
 )
 
 
@@ -76,6 +81,48 @@ def _fetch_run(repository: str, run_id: int) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise RuntimeError("CI producer workflow response is not an object")
     return payload
+
+
+def _fetch_workflow_definition_digest(
+    repository: str,
+    *,
+    path: str,
+    ref: str,
+) -> str:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "GITHUB_TOKEN is required to verify workflow definitions"
+        )
+    owner_repo = quote(repository, safe="/")
+    encoded_path = quote(path, safe="/")
+    encoded_ref = quote(ref, safe="")
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/contents/"
+        f"{encoded_path}?ref={encoded_ref}"
+    )
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "skeleton-p2-ci-qualification",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("encoding") != "base64"
+        or not isinstance(payload.get("content"), str)
+    ):
+        raise RuntimeError("workflow definition response is not base64 content")
+    try:
+        content = base64.b64decode(payload["content"])
+    except Exception as exc:
+        raise RuntimeError("workflow definition base64 is invalid") from exc
+    return hashlib.sha256(content).hexdigest()
 
 
 def _fetch_runs(repository: str, head_sha: str) -> list[dict[str, Any]]:
@@ -144,11 +191,30 @@ def main() -> int:
         raise RuntimeError(
             "CI producer run attempt changed before qualification"
         )
+    trusted_head = producer_run.get("head_sha")
+    if not isinstance(trusted_head, str) or len(trusted_head) != 40:
+        raise RuntimeError("CI producer head SHA is invalid")
+    workflow_definitions: dict[str, dict[str, str]] = {}
+    for name in REQUIRED_CHECKS:
+        path = REQUIRED_CHECK_WORKFLOWS[name]
+        workflow_definitions[name] = {
+            "head_digest": _fetch_workflow_definition_digest(
+                args.repository,
+                path=path,
+                ref=args.expected_head,
+            ),
+            "trusted_digest": _fetch_workflow_definition_digest(
+                args.repository,
+                path=path,
+                ref=trusted_head,
+            ),
+        }
 
     key = _key()
     try:
         receipt = SpineCiReceiptBuilder().build(
             workflow_runs=runs,
+            workflow_definitions=workflow_definitions,
             expected_repository=args.repository,
             producer_run=producer_run,
             expected_producer_run_id=args.producer_run_id,

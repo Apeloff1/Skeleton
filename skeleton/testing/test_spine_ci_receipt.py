@@ -43,6 +43,16 @@ def _runs() -> list[dict[str, object]]:
     ]
 
 
+def _definitions() -> dict[str, dict[str, str]]:
+    return {
+        name: {
+            "head_digest": "a" * 64,
+            "trusted_digest": "a" * 64,
+        }
+        for name in REQUIRED_CHECKS
+    }
+
+
 def _producer_run() -> dict[str, object]:
     return {
         "id": 900,
@@ -67,6 +77,7 @@ def _build(
 ) -> dict[str, object]:
     return SpineCiReceiptBuilder().build(
         workflow_runs=workflow_runs,
+        workflow_definitions=_definitions(),
         expected_repository="Apeloff1/Skeleton",
         producer_run=_producer_run(),
         expected_producer_run_id=900,
@@ -96,6 +107,9 @@ def test_ci_receipt_builder_qualifies_complete_exact_head_catalog() -> None:
     ]
     assert {row["event"] for row in receipt["checks"]} == {
         REQUIRED_CHECK_EVENT
+    }
+    assert {row["workflow_digest"] for row in receipt["checks"]} == {
+        "a" * 64
     }
     assert receipt["producer_workflow_name"] == CI_PRODUCER_WORKFLOW_NAME
     assert receipt["producer_workflow_path"] == CI_PRODUCER_WORKFLOW_PATH
@@ -198,6 +212,7 @@ def test_ci_receipt_builder_rejects_producer_identity_drift() -> None:
     ):
         SpineCiReceiptBuilder().build(
             workflow_runs=_runs(),
+            workflow_definitions=_definitions(),
             expected_repository="Apeloff1/Skeleton",
             producer_run=producer,
             expected_producer_run_id=900,
@@ -217,8 +232,30 @@ def test_ci_receipt_builder_rejects_producer_run_drift() -> None:
     ):
         SpineCiReceiptBuilder().build(
             workflow_runs=_runs(),
+            workflow_definitions=_definitions(),
             expected_repository="Apeloff1/Skeleton",
             producer_run=producer,
+            expected_producer_run_id=900,
+            expected_producer_run_attempt=1,
+            expected_producer_branch="main",
+            expected_head_sha=HEAD,
+            attest=lambda payload: "f" * 64,
+        )
+
+
+def test_ci_receipt_builder_rejects_modified_workflow_definition() -> None:
+    definitions = _definitions()
+    definitions[REQUIRED_CHECKS[0]]["head_digest"] = "1" * 64
+    definitions[REQUIRED_CHECKS[0]]["trusted_digest"] = "2" * 64
+    with pytest.raises(
+        SpineCiReceiptError,
+        match="differs from trusted default branch",
+    ):
+        SpineCiReceiptBuilder().build(
+            workflow_runs=_runs(),
+            workflow_definitions=definitions,
+            expected_repository="Apeloff1/Skeleton",
+            producer_run=_producer_run(),
             expected_producer_run_id=900,
             expected_producer_run_attempt=1,
             expected_producer_branch="main",

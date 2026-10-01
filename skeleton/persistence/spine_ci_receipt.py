@@ -38,6 +38,12 @@ def _positive(value: object, field: str) -> int:
     return value
 
 
+def _digest_text(value: object, field: str) -> str:
+    if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
+        raise SpineCiReceiptError(f"{field} is invalid")
+    return value
+
+
 class SpineCiReceiptBuilder:
     """Normalize the latest exact-head required workflow run for every policy check."""
 
@@ -45,6 +51,7 @@ class SpineCiReceiptBuilder:
         self,
         *,
         workflow_runs: Iterable[Mapping[str, Any]],
+        workflow_definitions: Mapping[str, Mapping[str, str]],
         expected_repository: str,
         producer_run: Mapping[str, Any],
         expected_producer_run_id: int,
@@ -58,6 +65,10 @@ class SpineCiReceiptBuilder:
             or _REPOSITORY_RE.fullmatch(expected_repository) is None
         ):
             raise SpineCiReceiptError("expected repository is invalid")
+        if not isinstance(workflow_definitions, Mapping):
+            raise SpineCiReceiptError(
+                "CI workflow definitions must be an object"
+            )
         if not isinstance(producer_run, Mapping):
             raise SpineCiReceiptError("CI producer workflow run must be an object")
         producer_run_id = _positive(
@@ -140,6 +151,23 @@ class SpineCiReceiptBuilder:
                 raise SpineCiReceiptError(
                     f"CI workflow event mismatch: {name}"
                 )
+            definition = workflow_definitions.get(name)
+            if not isinstance(definition, Mapping):
+                raise SpineCiReceiptError(
+                    f"CI workflow definition evidence missing: {name}"
+                )
+            head_definition_digest = _digest_text(
+                definition.get("head_digest"),
+                f"{name} head workflow definition digest",
+            )
+            trusted_definition_digest = _digest_text(
+                definition.get("trusted_digest"),
+                f"{name} trusted workflow definition digest",
+            )
+            if head_definition_digest != trusted_definition_digest:
+                raise SpineCiReceiptError(
+                    f"CI workflow definition differs from trusted default branch: {name}"
+                )
             run_id = _positive(raw.get("id"), f"{name} run id")
             run_attempt = _positive(raw.get("run_attempt"), f"{name} run attempt")
             candidate = {
@@ -147,6 +175,7 @@ class SpineCiReceiptBuilder:
                 "head_sha": expected_head_sha,
                 "workflow_path": REQUIRED_CHECK_WORKFLOWS[name],
                 "event": REQUIRED_CHECK_EVENT,
+                "workflow_digest": head_definition_digest,
                 "run_id": run_id,
                 "run_attempt": run_attempt,
                 "status": raw.get("status"),
@@ -186,6 +215,7 @@ class SpineCiReceiptBuilder:
                 "head_sha": expected_head_sha,
                 "workflow_path": latest[name]["workflow_path"],
                 "event": latest[name]["event"],
+                "workflow_digest": latest[name]["workflow_digest"],
                 "run_id": latest[name]["run_id"],
                 "run_attempt": latest[name]["run_attempt"],
                 "conclusion": "success",

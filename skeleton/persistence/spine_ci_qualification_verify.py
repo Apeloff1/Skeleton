@@ -165,6 +165,14 @@ class SpineCiQualificationVerify:
                 raise SpineCiQualificationVerifyError(
                     f"CI workflow identity mismatch: {name}"
                 )
+            workflow_digest = check.get("workflow_digest")
+            if (
+                not isinstance(workflow_digest, str)
+                or _DIGEST_RE.fullmatch(workflow_digest) is None
+            ):
+                raise SpineCiQualificationVerifyError(
+                    f"CI workflow definition digest is invalid: {name}"
+                )
             if check.get("head_sha") != head_sha:
                 raise SpineCiQualificationVerifyError(
                     f"CI check is not exact-head: {name}"
@@ -197,6 +205,7 @@ class SpineCiQualificationVerify:
                     "head_sha": head_sha,
                     "workflow_path": expected_path,
                     "event": REQUIRED_CHECK_EVENT,
+                    "workflow_digest": workflow_digest,
                     "run_id": run_id,
                     "run_attempt": run_attempt,
                     "conclusion": "success",
