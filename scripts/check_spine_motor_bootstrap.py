@@ -32,6 +32,8 @@ FILES = (
     "spine_selection_permit.py",
     "spine_selection_permit_verify.py",
     "spine_selection_consumption_verify.py",
+    "spine_driver_selection.py",
+    "spine_driver_selection_verify.py",
 )
 
 

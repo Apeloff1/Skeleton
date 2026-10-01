@@ -16,7 +16,7 @@ class SpineMasterplan:
             "citation": "VOL-134",
             "doc": "docs/plan/P2_SPINE_MASTERPLAN.md",
             "read_project_percent": 95,
-            "apply_percent": 88,
+            "apply_percent": 92,
             "motor_bootstrap_percent": 90,
             "provider_surface_percent": 0,
             "pr_automation_percent": 0,

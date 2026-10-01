@@ -96,6 +96,8 @@ SEAMS = (
     ("selection-permit-verify", "permit-verification-does-not-select-runtime"),
     ("selection-consume", "selection-permit-consumed-once-before-driver-selection"),
     ("selection-consume-verify", "consumption-verification-does-not-select-runtime"),
+    ("driver-selection", "consumed-permit-selects-driver-state-not-runtime-activation"),
+    ("driver-selection-verify", "selection-verification-does-not-activate-runtime"),
 )
 
 
