@@ -62,6 +62,9 @@ def validate(root: Path) -> dict:
     p2 = _load(root, "machine/ai_p2_execution_map.json")
     backlog = _load(root, "machine/ai_p2_task_backlog.json")
 
+    if p2.get("map_version") != backlog.get("backlog_version"):
+        raise P2ValidationError("P2 map/backlog version drift")
+
     master_volumes = {v["key"]: v for v in master.get("volumes", [])}
     master_refs = set(master_volumes)
     alignment = p2.get("masterplan_alignment", {})
@@ -166,6 +169,34 @@ def validate(root: Path) -> dict:
             raise P2ValidationError(f"task {task_id} cannot depend on itself")
     _assert_acyclic(task_nodes, task_edges, "task")
 
+    allowed_task_statuses = {"blocked", "ready", "in_progress", "landed_unpromoted"}
+    status_by_task = {task["task_id"]: task.get("status") for task in tasks}
+    for task in tasks:
+        task_id = task["task_id"]
+        status = task.get("status")
+        if status not in allowed_task_statuses:
+            raise P2ValidationError(f"task {task_id} has unknown status {status!r}")
+        if status in {"ready", "in_progress", "landed_unpromoted"}:
+            unlanded = [
+                dep
+                for dep in task.get("depends_on", [])
+                if status_by_task.get(dep) != "landed_unpromoted"
+            ]
+            if unlanded:
+                raise P2ValidationError(
+                    f"task {task_id} is {status} before dependencies land: {unlanded}"
+                )
+        evidence_refs = task.get("evidence_refs", [])
+        if status == "landed_unpromoted":
+            if (
+                not isinstance(evidence_refs, list)
+                or not any(str(ref).startswith("github:pr#") for ref in evidence_refs)
+                or not any(str(ref).startswith("git:merge:") for ref in evidence_refs)
+            ):
+                raise P2ValidationError(
+                    f"task {task_id} landed state lacks PR/merge evidence"
+                )
+
     owned_refs = [ref for t in tasks for ref in t.get("primary_volume_refs", [])]
     if _duplicates(owned_refs):
         raise P2ValidationError(f"scheduled primary volume has multiple owners: {_duplicates(owned_refs)}")
@@ -253,6 +284,9 @@ def validate(root: Path) -> dict:
         "in_progress_count": sum(t.get("status") == "in_progress" for t in tasks),
         "ready_count": sum(t.get("status") == "ready" for t in tasks),
         "blocked_count": sum(t.get("status") == "blocked" for t in tasks),
+        "landed_unpromoted_count": sum(
+            t.get("status") == "landed_unpromoted" for t in tasks
+        ),
         "scheduled_volume_count": len(scheduled),
         "queued_volume_count": len(queued),
         "source_volume_count": len(p2_source),
@@ -260,6 +294,35 @@ def validate(root: Path) -> dict:
     for key, value in expected_counts.items():
         if summary.get(key) != value:
             raise P2ValidationError(f"backlog summary {key}={summary.get(key)!r}, expected {value!r}")
+
+    progress = p2.get("progress", {})
+    expected_progress = {
+        "landed_unpromoted_tasks": sorted(
+            t["task_id"] for t in tasks if t.get("status") == "landed_unpromoted"
+        ),
+        "active_tasks": sorted(
+            t["task_id"] for t in tasks if t.get("status") == "in_progress"
+        ),
+        "ready_tasks": sorted(
+            t["task_id"] for t in tasks if t.get("status") == "ready"
+        ),
+        "blocked_tasks": sorted(
+            t["task_id"] for t in tasks if t.get("status") == "blocked"
+        ),
+    }
+    for field, expected in expected_progress.items():
+        actual = progress.get(field)
+        if not isinstance(actual, list) or sorted(actual) != expected:
+            raise P2ValidationError(
+                f"P2 progress {field} drift: {actual!r}, expected {expected!r}"
+            )
+    as_of = progress.get("as_of_git_main")
+    if (
+        not isinstance(as_of, str)
+        or len(as_of) not in {40, 64}
+        or any(ch not in "0123456789abcdef" for ch in as_of)
+    ):
+        raise P2ValidationError("P2 progress as_of_git_main must be a full lowercase Git object ID")
 
     baseline = p2.get("baseline", {}).get("p1_governed_frontier", {})
     if baseline != {"total": 513, "resolved": 513, "blocking_unresolved": 0, "unclassified": 0}:
