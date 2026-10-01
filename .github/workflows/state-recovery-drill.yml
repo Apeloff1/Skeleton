@@ -11,8 +11,16 @@ on:
       - "tests/test_state_authority_independent_verifier.py"
       - "skeleton/testing/test_state_recovery_drill.py"
       - "scripts/check_spine_bind_recovery.py"
+      - "scripts/check_spine_motor_bootstrap.py"
       - "skeleton/testing/test_spine_bind_*.py"
+      - "skeleton/testing/test_spine_motor_bootstrap.py"
+      - "skeleton/testing/test_spine_motor_bootstrap_control.py"
+      - "skeleton/testing/test_spine_motor_witness.py"
+      - "skeleton/testing/test_spine_index_bind.py"
       - "skeleton/persistence/spine_bind_*.py"
+      - "skeleton/persistence/spine_motor_*.py"
+      - "skeleton/ai/runtime/persistence/spine_motor_*.py"
+      - "docs/runbooks/SPINE_MOTOR_BOOTSTRAP.md"
       - "skeleton/ai/runtime/persistence/spine_bind_*.py"
       - "skeleton/persistence/spine_manifest.py"
       - "skeleton/ai/runtime/persistence/spine_manifest.py"
@@ -111,6 +119,19 @@ jobs:
 
       - name: Verify P2 bind recovery control
         run: python scripts/check_spine_bind_recovery.py
+
+      - name: Verify P2 driver-injected Motor bootstrap contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_spine_motor_bootstrap.py
+          skeleton/testing/test_spine_motor_bootstrap_control.py
+          skeleton/testing/test_spine_motor_witness.py
+          skeleton/testing/test_spine_index_bind.py
+
+      - name: Verify P2 Motor bootstrap structural control
+        run: python scripts/check_spine_motor_bootstrap.py
 
       - name: Run live Mongo backup restore and rebuild drill
         run: >-

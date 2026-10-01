@@ -129,6 +129,10 @@ from skeleton.persistence.spine_bind_restore_chain import SpineBindRestoreChain
 from skeleton.persistence.spine_bind_restore_continuity import SpineBindRestoreContinuity
 from skeleton.persistence.spine_bind_restore_export import SpineBindRestoreExport
 from skeleton.persistence.spine_bind_restore_export_verify import SpineBindRestoreExportVerify
+from skeleton.persistence.spine_motor_plan import SpineMotorPlan
+from skeleton.persistence.spine_motor_bootstrap import SpineMotorBootstrap
+from skeleton.persistence.spine_motor_bootstrap_verify import SpineMotorBootstrapVerify
+from skeleton.persistence.spine_motor_bootstrap_replay import SpineMotorBootstrapReplay
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -272,6 +276,10 @@ __all__ = [
     "SpineBindRestoreContinuity",
     "SpineBindRestoreExport",
     "SpineBindRestoreExportVerify",
+    "SpineMotorPlan",
+    "SpineMotorBootstrap",
+    "SpineMotorBootstrapVerify",
+    "SpineMotorBootstrapReplay",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

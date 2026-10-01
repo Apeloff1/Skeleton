@@ -93,9 +93,9 @@ def verify_manifest(root: Path) -> dict[str, Any]:
     seams = _literal_assignment(path, "SEAMS")
     if not isinstance(seams, tuple):
         raise SpineBindRecoveryControlError("SEAMS must remain a tuple")
-    if len(seams) != 66:
+    if len(seams) != 70:
         raise SpineBindRecoveryControlError(
-            f"expected 66 spine seams, found {len(seams)}"
+            f"expected 70 spine seams, found {len(seams)}"
         )
     names = [row[0] for row in seams]
     if len(names) != len(set(names)):
@@ -117,7 +117,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     required = [
         "- Bind card sealed: 100%",
-        "Expect `count` 66",
+        "Expect `count` 70",
         "Bind snapshot",
         "Bind recovery",
         "Bind checkpoint",
@@ -136,7 +136,7 @@ def verify_masterplan(root: Path) -> dict[str, Any]:
         )
     return {
         "bind_card_percent": 100,
-        "manifest_count": 66,
+        "manifest_count": 70,
         "activation_claimed": False,
     }
 

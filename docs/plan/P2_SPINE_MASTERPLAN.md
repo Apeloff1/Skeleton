@@ -83,6 +83,10 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind restore continuity | `skeleton/persistence/spine_bind_restore_continuity.py` | durable receipt history remains non-activating |
 | Bind restore export | `skeleton/persistence/spine_bind_restore_export.py` | canonical portable evidence stays non-activating |
 | Bind restore export verify | `skeleton/persistence/spine_bind_restore_export_verify.py` | strict parser/digest verification grants no authority |
+| Motor plan | `skeleton/persistence/spine_motor_plan.py` | deterministic driver-injected index plan |
+| Motor bootstrap | `skeleton/persistence/spine_motor_bootstrap.py` | injected async/sync create_index only |
+| Motor bootstrap verify | `skeleton/persistence/spine_motor_bootstrap_verify.py` | plan/cardinality/result verification |
+| Motor bootstrap replay | `skeleton/persistence/spine_motor_bootstrap_replay.py` | repeated injected bootstrap must be equivalent |
 
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
@@ -93,7 +97,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider surface claimed: 0%
 - PR Automation claimed: 0%
 - Poison apply: 55%
-- Live Motor bootstrap: 15%
+- Live Motor bootstrap: 45%
 - CI green: 0%
 - Merge: 0%
 - Bind card sealed: 100%
@@ -101,7 +105,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 ## Next, in order
 
 1. Poison apply is landed as its own seam. The hold row is the only input. A changed digest stays a conflict and is refused before accept. The fence epoch does not advance. `SpineApplyGate` still refuses every intent. This is not a sign-off.
-2. Motor index bootstrap stays a plan. `SpineIndexPlan.apply` calls `create_index` only when the injected collection has that method. A deployment module may pass the database. The core package still does not import Motor.
+2. Motor bootstrap now has a deterministic content-addressed plan plus an executable driver-injected async bootstrap contract. `SpineMotorBootstrap` accepts only injected collections, supports sync or awaitable `create_index`, fails closed on missing collections, driver faults, or invalid result identities, and is independently verified and replay-compared. `SpineMotorWitness` plus `scripts/check_spine_motor_bootstrap.py` still forbid `motor` or `pymongo` imports in the core seam. `live_motor` remains false until a deployment adapter explicitly supplies and qualifies a real driver.
 3. The runtime dispatcher is not replaced. `SpineBind` remains the only start path for the composed worker.
 4. Provider-surface and PR Automation are not claimed green. `SpineProviderProbe` and `SpinePrProbe` append unread rows only. `claim` writes `claimed=0`. `SpineUnreadGap` lists a skipped sequence for that tenant and returns empty for a foreign tenant. `SpineSurfaceSeal` strips a forged green flag. This is not a sign-off.
 5. CI green stays unread. `SpineCiWitness` reports a complete catalog with `ci_green` false. `SpineMergeGate` refuses the merge. `SpineProbeReplay` does not insert. This is not a sign-off.
@@ -111,7 +115,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 66, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 70, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

@@ -17,7 +17,7 @@ class SpineMasterplan:
             "doc": "docs/plan/P2_SPINE_MASTERPLAN.md",
             "read_project_percent": 95,
             "apply_percent": 55,
-            "motor_bootstrap_percent": 15,
+            "motor_bootstrap_percent": 45,
             "provider_surface_percent": 0,
             "pr_automation_percent": 0,
             "ci_green_percent": 0,

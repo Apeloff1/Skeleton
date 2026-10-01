@@ -22,7 +22,7 @@ def _write_fixture(root: Path) -> None:
     for name in MIRRORED:
         content = f"# {name}\n"
         if name == "spine_manifest.py":
-            base = [(f"seam-{index}", f"law-{index}") for index in range(49)]
+            base = [(f"seam-{index}", f"law-{index}") for index in range(53)]
             base.extend(EXPECTED_SEAMS.items())
             content = "SEAMS = " + repr(tuple(base)) + "\n"
         (canonical / name).write_text(content, encoding="utf-8")
@@ -34,7 +34,7 @@ def _write_fixture(root: Path) -> None:
         "\n".join(
             [
                 "- Bind card sealed: 100%",
-                "Expect `count` 66",
+                "Expect `count` 70",
                 "Bind snapshot",
                 "Bind recovery",
                 "Bind checkpoint",
@@ -58,7 +58,7 @@ def test_control_accepts_complete_dark_fixture(tmp_path: Path) -> None:
 
     assert report["valid"] is True
     assert report["mirror_count"] == len(MIRRORED)
-    assert report["manifest"]["count"] == 66
+    assert report["manifest"]["count"] == 70
     assert report["masterplan"]["bind_card_percent"] == 100
     assert report["masterplan"]["activation_claimed"] is False
     assert report["completion_checkbox"] is False

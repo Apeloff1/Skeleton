@@ -75,6 +75,10 @@ SEAMS = (
     ("bind-restore-continuity", "restore-continuity-does-not-activate"),
     ("bind-restore-export", "portable-evidence-is-not-activation"),
     ("bind-restore-export-verify", "portable-evidence-verification-does-not-activate"),
+    ("motor-plan", "driver-injected-bootstrap-plan"),
+    ("motor-bootstrap", "driver-injected-index-bootstrap"),
+    ("motor-bootstrap-verify", "bootstrap-verification-does-not-activate"),
+    ("motor-bootstrap-replay", "bootstrap-replay-is-equivalent"),
 )
 
 

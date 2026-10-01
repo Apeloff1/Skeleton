@@ -7,7 +7,7 @@ def test_masterplan_card_is_unsigned() -> None:
     card = SpineMasterplan().card()
     assert card["doc"] == "docs/plan/P2_SPINE_MASTERPLAN.md"
     assert card["apply_percent"] == 55
-    assert card["motor_bootstrap_percent"] == 15
+    assert card["motor_bootstrap_percent"] == 45
     assert card["merge_percent"] == 0
     assert card["motor_bootstrap_percent"] == 15
     assert card["merge_percent"] == 0
