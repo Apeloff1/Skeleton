@@ -166,12 +166,14 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider surface live claim: 0% until authenticated live receipt
 - PR Automation operational qualification: implemented
 - PR Automation authenticated receipt producer: landed
+- PR Automation trusted evidence emission: wired; live claim remains contingent on configured attestation secret + exact-target runner receipt
 - PR Automation merge authority: 0%
 - Poison apply: 100%
 - Apply/cutover readiness: 99%
 - Async Mongo bootstrap: 100%
 - CI qualification implementation: landed
 - CI authenticated exact-head receipt producer: landed
+- CI trusted evidence emission: wired; live claim remains contingent on configured attestation secret + complete six-check exact-head catalog
 - CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%

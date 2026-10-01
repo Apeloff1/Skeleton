@@ -59,7 +59,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", required=True)
     parser.add_argument("--expected-head", required=True)
-    parser.add_argument("--pr-number", required=True, type=int)
+    parser.add_argument("--pr-number", type=int)
     parser.add_argument("--run-id", required=True, type=int)
     parser.add_argument("--run-attempt", required=True, type=int)
     parser.add_argument("--mode", required=True, choices=("observe", "apply"))
@@ -67,11 +67,27 @@ def main() -> int:
     args = parser.parse_args()
 
     report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+    pr_number = args.pr_number
+    if pr_number is None:
+        targets = report.get("targets") if isinstance(report, dict) else None
+        target_rows = targets.get("targets") if isinstance(targets, dict) else None
+        if (
+            not isinstance(target_rows, list)
+            or len(target_rows) != 1
+            or not isinstance(target_rows[0], dict)
+            or isinstance(target_rows[0].get("number"), bool)
+            or not isinstance(target_rows[0].get("number"), int)
+            or target_rows[0]["number"] < 1
+        ):
+            raise RuntimeError(
+                "runner report must contain exactly one positive target PR when --pr-number is omitted"
+            )
+        pr_number = target_rows[0]["number"]
     key = _key()
     receipt = SpinePrAutomationReceiptBuilder().build(
         report=report,
         expected_head_sha=args.expected_head,
-        expected_pr_number=args.pr_number,
+        expected_pr_number=pr_number,
         run_id=args.run_id,
         run_attempt=args.run_attempt,
         mode=args.mode,
@@ -80,7 +96,7 @@ def main() -> int:
     qualification = SpinePrAutomationQualification().qualify(
         receipt=receipt,
         expected_head_sha=args.expected_head,
-        expected_pr_number=args.pr_number,
+        expected_pr_number=pr_number,
         authenticate=lambda candidate: _authenticate(candidate, key),
     )
     verification = SpinePrAutomationQualificationVerify().verify(qualification)
@@ -102,7 +118,7 @@ def main() -> int:
         "p2-pr-automation qualified:",
         args.expected_head,
         "pr=",
-        args.pr_number,
+        pr_number,
     )
     return 0
 

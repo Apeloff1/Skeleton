@@ -17,7 +17,10 @@ from skeleton.persistence.spine_ci_qualification import SpineCiQualification
 from skeleton.persistence.spine_ci_qualification_verify import (
     SpineCiQualificationVerify,
 )
-from skeleton.persistence.spine_ci_receipt import SpineCiReceiptBuilder
+from skeleton.persistence.spine_ci_receipt import (
+    SpineCiReceiptBuilder,
+    SpineCiReceiptError,
+)
 
 
 def _canonical(value: object) -> bytes:
@@ -88,6 +91,11 @@ def main() -> int:
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--evidence-out", required=True)
     parser.add_argument("--runs-json", default="")
+    parser.add_argument(
+        "--allow-incomplete",
+        action="store_true",
+        help="return exit code 3 instead of failing while the exact-head catalog is incomplete",
+    )
     args = parser.parse_args()
 
     if args.runs_json:
@@ -102,11 +110,17 @@ def main() -> int:
         runs = _fetch_runs(args.repository, args.expected_head)
 
     key = _key()
-    receipt = SpineCiReceiptBuilder().build(
-        workflow_runs=runs,
-        expected_head_sha=args.expected_head,
-        attest=lambda candidate: _attest(candidate, key),
-    )
+    try:
+        receipt = SpineCiReceiptBuilder().build(
+            workflow_runs=runs,
+            expected_head_sha=args.expected_head,
+            attest=lambda candidate: _attest(candidate, key),
+        )
+    except SpineCiReceiptError as exc:
+        if args.allow_incomplete:
+            print(f"p2-ci evidence not emitted: {exc}")
+            return 3
+        raise
     qualification = SpineCiQualification().qualify(
         receipt=receipt,
         expected_head_sha=args.expected_head,
