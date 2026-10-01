@@ -59,6 +59,47 @@ class P2ExecutionMapTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2ValidationError, "multiple owners"):
             MODULE.validate(root)
 
+    def test_rejects_active_task_before_dependency_lands(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        trace = next(t for t in data["tasks"] if t["task_id"] == "P2-TRACE-01")
+        trace["status"] = "in_progress"
+        repo = next(t for t in data["tasks"] if t["task_id"] == "P2-REPO-01")
+        repo["status"] = "in_progress"
+        data["summary"]["landed_unpromoted_count"] = 2
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.P2ValidationError,
+            "before dependencies land",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_progress_projection_drift(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_execution_map.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["progress"]["active_tasks"] = ["P2-NATIVE-01"]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.P2ValidationError,
+            "progress active_tasks drift",
+        ):
+            MODULE.validate(root)
+
+    def test_landed_task_requires_merge_evidence(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_task_backlog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        trace = next(t for t in data["tasks"] if t["task_id"] == "P2-TRACE-01")
+        trace["evidence_refs"] = ["github:pr#2319"]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.P2ValidationError,
+            "lacks PR/merge evidence",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_task_dependency_cycle(self) -> None:
         root = self._fixture()
         path = root / "machine/ai_p2_task_backlog.json"
