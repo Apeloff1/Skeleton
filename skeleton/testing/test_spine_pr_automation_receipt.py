@@ -93,6 +93,8 @@ def _build(report: dict[str, object]) -> dict[str, object]:
         expected_repository="Apeloff1/Skeleton",
         source_run=_source_run(),
         automation_run=_automation_run(),
+        source_workflow_head_digest="f" * 64,
+        source_workflow_trusted_digest="f" * 64,
         expected_source_run_attempt=1,
         expected_head_sha=HEAD,
         expected_pr_number=PR,
@@ -115,6 +117,7 @@ def test_runner_receipt_builder_qualifies_single_exact_target() -> None:
     verified = SpinePrAutomationQualificationVerify().verify(card)
 
     assert receipt["source_pr_number"] == PR
+    assert receipt["source_workflow_digest"] == "f" * 64
     assert receipt["automation_workflow_id"] == 359670100
     assert (
         receipt["automation_workflow_path"]
@@ -298,6 +301,8 @@ def test_runner_receipt_builder_rejects_producer_workflow_id_drift() -> None:
             expected_repository="Apeloff1/Skeleton",
             source_run=_source_run(),
             automation_run=automation,
+            source_workflow_head_digest="f" * 64,
+            source_workflow_trusted_digest="f" * 64,
             expected_source_run_attempt=1,
             expected_head_sha=HEAD,
             expected_pr_number=PR,
@@ -320,6 +325,30 @@ def test_runner_receipt_builder_rejects_producer_run_identity_drift() -> None:
             expected_repository="Apeloff1/Skeleton",
             source_run=_source_run(),
             automation_run=automation,
+            source_workflow_head_digest="f" * 64,
+            source_workflow_trusted_digest="f" * 64,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )
+
+
+def test_runner_receipt_builder_rejects_modified_source_workflow_definition() -> None:
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="differs from trusted default branch",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=_source_run(),
+            automation_run=_automation_run(),
+            source_workflow_head_digest="1" * 64,
+            source_workflow_trusted_digest="2" * 64,
             expected_source_run_attempt=1,
             expected_head_sha=HEAD,
             expected_pr_number=PR,

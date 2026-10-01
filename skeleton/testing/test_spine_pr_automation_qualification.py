@@ -47,6 +47,7 @@ def _receipt(*, decision: str = "hold", state: str = "held") -> dict[str, object
         "source_workflow": "Merge Readiness",
         "source_workflow_path": ".github/workflows/merge-readiness.yml",
         "source_event": "pull_request",
+        "source_workflow_digest": "f" * 64,
         "source_workflow_id": 358774735,
         "source_run_id": 777,
         "source_run_attempt": 1,
@@ -368,5 +369,36 @@ def test_verifier_rejects_producer_workflow_identity_drift() -> None:
     with pytest.raises(
         SpinePrAutomationQualificationVerifyError,
         match="producer workflow path changed",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
+
+
+def test_qualification_rejects_source_workflow_digest_tamper() -> None:
+    receipt = _receipt()
+    receipt["source_workflow_digest"] = "not-a-digest"
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="source workflow digest",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_verifier_rejects_source_workflow_digest_tamper() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["source_workflow_digest"] = "0" * 64
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="qualification digest mismatch",
     ):
         SpinePrAutomationQualificationVerify().verify(tampered)

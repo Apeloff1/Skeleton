@@ -76,6 +76,8 @@ class SpinePrAutomationReceiptBuilder:
         expected_repository: str,
         source_run: Mapping[str, Any],
         automation_run: Mapping[str, Any],
+        source_workflow_head_digest: str,
+        source_workflow_trusted_digest: str,
         expected_source_run_attempt: int,
         expected_head_sha: str,
         expected_pr_number: int,
@@ -229,6 +231,18 @@ class SpinePrAutomationReceiptBuilder:
             raise SpinePrAutomationReceiptError(
                 "source workflow event changed"
             )
+        source_definition_digest = _digest_text(
+            source_workflow_head_digest,
+            "source workflow head definition digest",
+        )
+        trusted_definition_digest = _digest_text(
+            source_workflow_trusted_digest,
+            "source workflow trusted definition digest",
+        )
+        if source_definition_digest != trusted_definition_digest:
+            raise SpinePrAutomationReceiptError(
+                "source workflow definition differs from trusted default branch"
+            )
         if source_run.get("head_sha") != expected_head_sha:
             raise SpinePrAutomationReceiptError(
                 "source workflow run is not exact-head"
@@ -336,6 +350,7 @@ class SpinePrAutomationReceiptBuilder:
             "source_workflow": TRUSTED_SOURCE_WORKFLOW_NAME,
             "source_workflow_path": TRUSTED_SOURCE_WORKFLOW_PATH,
             "source_event": TRUSTED_SOURCE_EVENT,
+            "source_workflow_digest": source_definition_digest,
             "source_workflow_id": source_workflow_id,
             "source_run_id": source_id,
             "source_run_attempt": source_attempt,

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import hmac
 import json
@@ -21,6 +22,9 @@ from skeleton.persistence.spine_pr_automation_qualification_verify import (
 )
 from skeleton.persistence.spine_pr_automation_receipt import (
     SpinePrAutomationReceiptBuilder,
+)
+from skeleton.persistence.spine_pr_automation_policy import (
+    TRUSTED_SOURCE_WORKFLOW_PATH,
 )
 
 
@@ -83,6 +87,48 @@ def _fetch_workflow_run(repository: str, run_id: int) -> dict[str, Any]:
     return payload
 
 
+def _fetch_workflow_definition_digest(
+    repository: str,
+    *,
+    path: str,
+    ref: str,
+) -> str:
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "GITHUB_TOKEN is required to verify workflow definitions"
+        )
+    owner_repo = quote(repository, safe="/")
+    encoded_path = quote(path, safe="/")
+    encoded_ref = quote(ref, safe="")
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/contents/"
+        f"{encoded_path}?ref={encoded_ref}"
+    )
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "skeleton-p2-pr-automation-qualification",
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("encoding") != "base64"
+        or not isinstance(payload.get("content"), str)
+    ):
+        raise RuntimeError("workflow definition response is not base64 content")
+    try:
+        content = base64.b64decode(payload["content"])
+    except Exception as exc:
+        raise RuntimeError("workflow definition base64 is invalid") from exc
+    return hashlib.sha256(content).hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", required=True)
@@ -130,12 +176,27 @@ def main() -> int:
         raise RuntimeError(
             "PR Automation producer run attempt changed before qualification"
         )
+    trusted_head = automation_run.get("head_sha")
+    if not isinstance(trusted_head, str) or len(trusted_head) != 40:
+        raise RuntimeError("PR Automation producer head SHA is invalid")
+    source_workflow_head_digest = _fetch_workflow_definition_digest(
+        args.repository,
+        path=TRUSTED_SOURCE_WORKFLOW_PATH,
+        ref=args.expected_head,
+    )
+    source_workflow_trusted_digest = _fetch_workflow_definition_digest(
+        args.repository,
+        path=TRUSTED_SOURCE_WORKFLOW_PATH,
+        ref=trusted_head,
+    )
     key = _key()
     receipt = SpinePrAutomationReceiptBuilder().build(
         report=report,
         expected_repository=args.repository,
         source_run=source_run,
         automation_run=automation_run,
+        source_workflow_head_digest=source_workflow_head_digest,
+        source_workflow_trusted_digest=source_workflow_trusted_digest,
         expected_source_run_attempt=args.source_run_attempt,
         expected_head_sha=args.expected_head,
         expected_pr_number=pr_number,

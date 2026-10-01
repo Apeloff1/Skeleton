@@ -148,6 +148,10 @@ class SpinePrAutomationQualification:
             raise SpinePrAutomationQualificationError(
                 "PR automation source workflow event changed"
             )
+        source_workflow_digest = _digest_text(
+            receipt.get("source_workflow_digest"),
+            "PR automation source workflow digest",
+        )
         repository = receipt.get("repository")
         if (
             not isinstance(repository, str)
@@ -315,6 +319,7 @@ class SpinePrAutomationQualification:
             "source_workflow": receipt["source_workflow"],
             "source_workflow_path": receipt["source_workflow_path"],
             "source_event": receipt["source_event"],
+            "source_workflow_digest": source_workflow_digest,
             "source_workflow_id": source_workflow_id,
             "source_run_id": source_run_id,
             "source_run_attempt": source_run_attempt,

@@ -118,6 +118,14 @@ class SpinePrAutomationQualificationVerify:
             raise SpinePrAutomationQualificationVerifyError(
                 "PR automation source workflow event changed"
             )
+        source_workflow_digest = card.get("source_workflow_digest")
+        if (
+            not isinstance(source_workflow_digest, str)
+            or _DIGEST_RE.fullmatch(source_workflow_digest) is None
+        ):
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow digest is invalid"
+            )
         repository = card.get("repository")
         if (
             not isinstance(repository, str)
@@ -261,6 +269,7 @@ class SpinePrAutomationQualificationVerify:
             "source_workflow": card["source_workflow"],
             "source_workflow_path": card["source_workflow_path"],
             "source_event": card["source_event"],
+            "source_workflow_digest": source_workflow_digest,
             "source_workflow_id": card["source_workflow_id"],
             "source_run_id": card["source_run_id"],
             "source_run_attempt": card["source_run_attempt"],
