@@ -101,6 +101,26 @@ def test_external_authorization_is_durable_without_activation() -> None:
         ledger.close()
 
 
+def test_authorization_rejects_lost_rollback_boundary() -> None:
+    acceptance = _acceptance()
+    acceptance["rollback_available"] = False
+    ledger = SpineRuntimeProductionActivationAuthorizationLedger()
+    try:
+        with pytest.raises(
+            SpineRuntimeProductionActivationAuthorizationError,
+            match="verified transition acceptance is required",
+        ):
+            ledger.authorize(
+                acceptance=acceptance,
+                acceptance_verify=_acceptance_verify(),
+                receipt=_receipt(),
+                authenticate=lambda receipt: True,
+                now=NOW,
+            )
+    finally:
+        ledger.close()
+
+
 def test_authorization_rejects_auth_failure_and_activation_tamper() -> None:
     ledger = SpineRuntimeProductionActivationAuthorizationLedger()
     try:
