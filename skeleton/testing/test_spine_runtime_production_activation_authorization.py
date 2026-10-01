@@ -23,6 +23,7 @@ def _acceptance() -> dict[str, object]:
         "kind": "spine_runtime_transition_acceptance",
         "digest": "d" * 64,
         "acceptance_id": "a" * 64,
+        "health_digest": "h" * 64,
         "execution_id": "e" * 64,
         "deployment_id": "deploy-a",
         "target_driver": "pymongo-async",
