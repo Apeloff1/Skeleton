@@ -54,6 +54,8 @@ from skeleton.persistence.mongo_inbox import MongoInboxLedger
 from skeleton.persistence.mongo_fence import MongoConsistencyFence
 from skeleton.persistence.spine_quarantine import SpineQuarantine
 from skeleton.persistence.spine_status import SpineStatus
+from skeleton.persistence.mongo_projection import MongoSpineProjection, MongoProjectionReport
+from skeleton.persistence.spine_repair import SpineRepairPlan
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -120,6 +122,9 @@ __all__ = [
     "MongoConsistencyFence",
     "SpineQuarantine",
     "SpineStatus",
+    "MongoSpineProjection",
+    "MongoProjectionReport",
+    "SpineRepairPlan",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
