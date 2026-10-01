@@ -42,6 +42,22 @@ class P2TraceabilityProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2TraceabilityError, "volume scope drift"):
             MODULE._validate_task(master, changed)
 
+    def test_landed_trace_requires_merge_evidence(self) -> None:
+        master = MODULE._load(ROOT, "machine/ai_master_plan.json")
+        backlog = MODULE._load(ROOT, "machine/ai_p2_task_backlog.json")
+        changed = copy.deepcopy(backlog)
+        task = next(item for item in changed["tasks"] if item["task_id"] == "P2-TRACE-01")
+        task["status"] = "landed_unpromoted"
+        task["evidence_refs"] = [
+            ref for ref in task["evidence_refs"]
+            if not str(ref).startswith("git:merge:")
+        ]
+        with self.assertRaisesRegex(
+            MODULE.P2TraceabilityError,
+            "lacks merge evidence",
+        ):
+            MODULE._validate_task(master, changed)
+
     def test_task_cannot_claim_completion_or_signoff(self) -> None:
         master = MODULE._load(ROOT, "machine/ai_master_plan.json")
         backlog = MODULE._load(ROOT, "machine/ai_p2_task_backlog.json")
