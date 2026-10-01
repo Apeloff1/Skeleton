@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -205,6 +206,116 @@ def test_ticket_is_bound_to_exact_hold_row_and_newer_hold_fails_closed(
     assert row["consumed"] == 0
     assert inbox.applied_count() == 0
     assert witness.card("tenant-poison")["applied"] == 0
+
+
+def test_consumed_ticket_resumes_same_authorized_hold_after_crash(
+    tmp_path: Path,
+) -> None:
+    hold, apply, witness, inbox = _stack(tmp_path)
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    ticket = apply.ticket
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    assert ticket.consume(issued["ticket_id"], now=BASE) is True
+
+    recovered = apply.apply(
+        delivery,
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        expected_digest=delivery.digest(),
+        ticket_id=issued["ticket_id"],
+        now=BASE,
+    )
+    assert recovered["applied"] == 1
+    assert recovered["hold_id"] == issued["hold_id"]
+    assert recovered["hold_released"] is True
+    assert inbox.applied_count() == 1
+    assert witness.card("tenant-poison")["applied"] == 1
+
+
+def test_consumed_ticket_finishes_release_after_success_journal_crash(
+    tmp_path: Path,
+) -> None:
+    hold_path = tmp_path / "hold.sqlite"
+    ticket_path = tmp_path / "ticket.sqlite"
+    journal_path = tmp_path / "journal.sqlite"
+    hold = SpineHold(hold_path)
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    ticket = SpinePoisonTicket(hold_path, ticket_path)
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    apply = SpinePoisonApply(
+        hold_path,
+        SpineReaccept(inbox, fence),
+        ticket,
+        journal_path,
+    )
+    assert ticket.consume(issued["ticket_id"], now=BASE) is True
+    reaccepted = apply.reaccept.reaccept(
+        delivery,
+        tenant_id="tenant-poison",
+        expected_digest=delivery.digest(),
+        now=BASE,
+    )
+    assert reaccepted["reason"] == "accepted"
+
+    connection = sqlite3.connect(journal_path)
+    connection.execute(
+        """
+        INSERT INTO spine_poison_apply(
+            tenant_id, outbox_id, hold_id, digest, reason,
+            epoch_before, epoch_after, applied, ticket_id, applied_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        """,
+        (
+            "tenant-poison",
+            EVENT,
+            issued["hold_id"],
+            delivery.digest(),
+            reaccepted["reason"],
+            reaccepted["epoch_before"],
+            reaccepted["epoch_after"],
+            issued["ticket_id"],
+            BASE.isoformat(),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    recovered = apply.apply(
+        delivery,
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        expected_digest=delivery.digest(),
+        ticket_id=issued["ticket_id"],
+        now=BASE,
+    )
+    assert recovered["applied"] == 1
+    assert recovered["hold_released"] is True
+    assert recovered["reason"] == "accepted"
+    assert inbox.applied_count() == 1
 
 
 def test_ticket_consume_is_one_time_and_idempotent(tmp_path: Path) -> None:

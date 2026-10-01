@@ -148,16 +148,6 @@ class SpinePoisonApply:
                     "ticket-hold-missing",
                     instant,
                 )
-            if ticket["consumed"] != 0:
-                return self._refuse(
-                    tenant_id,
-                    outbox_id,
-                    expected_digest,
-                    ticket_id,
-                    "ticket-consumed",
-                    instant,
-                    hold_id=ticket_hold_id,
-                )
         else:
             ticket_hold_id = 0
 
@@ -167,12 +157,17 @@ class SpinePoisonApply:
             outbox_id=outbox_id,
         )
         if hold is None:
+            reason = (
+                "ticket-consumed"
+                if ticket is not None and ticket["consumed"] != 0
+                else "unheld"
+            )
             return self._refuse(
                 tenant_id,
                 outbox_id,
                 expected_digest,
                 ticket_id,
-                "unheld",
+                reason,
                 instant,
                 hold_id=ticket_hold_id,
             )
@@ -203,6 +198,17 @@ class SpinePoisonApply:
                 ticket_id,
                 "digest-mismatch",
                 instant,
+                hold_id=ticket_hold_id,
+            )
+        if ticket["consumed"] != 0:
+            return self._resume_consumed(
+                delivery,
+                tenant_id=tenant_id,
+                outbox_id=outbox_id,
+                expected_digest=expected_digest,
+                ticket_id=ticket_id,
+                hold_id=ticket_hold_id,
+                instant=instant,
             )
         if not self.ticket.consume(ticket_id, now=instant):
             return self._refuse(
@@ -287,6 +293,166 @@ class SpinePoisonApply:
             expected_digest,
             ticket_id,
             ticket_hold_id,
+            True,
+            released_rows,
+        )
+
+    def _resume_consumed(
+        self,
+        delivery: InboxDelivery,
+        *,
+        tenant_id: str,
+        outbox_id: str,
+        expected_digest: str,
+        ticket_id: str,
+        hold_id: int,
+        instant: datetime,
+    ) -> dict[str, Any]:
+        rows = self._journal.execute(
+            """
+            SELECT tenant_id, outbox_id, hold_id, digest, reason,
+                   epoch_before, epoch_after
+            FROM spine_poison_apply
+            WHERE ticket_id = ? AND applied = 1
+            ORDER BY apply_id
+            """,
+            (ticket_id,),
+        ).fetchall()
+        if len(rows) > 1:
+            raise SpinePoisonApplyError(
+                "consumed poison ticket has duplicate success evidence"
+            )
+        if rows:
+            row = rows[0]
+            if (
+                row["tenant_id"] != tenant_id
+                or row["outbox_id"] != outbox_id
+                or row["hold_id"] != hold_id
+                or row["digest"] != expected_digest
+                or row["reason"] not in {"accepted", "duplicate"}
+                or row["epoch_before"] != row["epoch_after"]
+            ):
+                raise SpinePoisonApplyError(
+                    "consumed poison ticket success evidence changed"
+                )
+            released_rows = _release_spine_hold(
+                self._hold,
+                hold_id=hold_id,
+                tenant_id=tenant_id,
+                outbox_id=outbox_id,
+                ticket_id=ticket_id,
+                released_at=instant.isoformat(),
+            )
+            if released_rows != 1:
+                raise SpinePoisonApplyError(
+                    "consumed poison ticket could not finish hold release"
+                )
+            return self._card(
+                tenant_id,
+                outbox_id,
+                row["reason"],
+                int(row["epoch_before"]),
+                int(row["epoch_after"]),
+                1,
+                row["reason"] == "duplicate",
+                expected_digest,
+                ticket_id,
+                hold_id,
+                True,
+                released_rows,
+            )
+
+        try:
+            card = self.reaccept.reaccept(
+                delivery,
+                tenant_id=tenant_id,
+                expected_digest=expected_digest,
+                now=instant,
+            )
+        except Exception as exc:
+            self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "reaccept-error-resume",
+                instant,
+                hold_id=hold_id,
+            )
+            raise SpinePoisonApplyError(
+                "consumed poison ticket resume reaccept failed"
+            ) from exc
+        if card["epoch_before"] != card["epoch_after"]:
+            raise SpinePoisonApplyError(
+                "consumed poison ticket resume moved the fence"
+            )
+        if card["reason"] not in {"accepted", "duplicate"}:
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                card["reason"],
+                instant,
+                hold_id=hold_id,
+            )
+
+        try:
+            self._journal.execute(
+                """
+                INSERT INTO spine_poison_apply(
+                    tenant_id, outbox_id, hold_id, digest, reason,
+                    epoch_before, epoch_after, applied, ticket_id, applied_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    tenant_id,
+                    outbox_id,
+                    hold_id,
+                    expected_digest,
+                    card["reason"],
+                    card["epoch_before"],
+                    card["epoch_after"],
+                    ticket_id,
+                    instant.isoformat(),
+                ),
+            )
+            self._journal.commit()
+        except sqlite3.IntegrityError:
+            self._journal.rollback()
+            return self._resume_consumed(
+                delivery,
+                tenant_id=tenant_id,
+                outbox_id=outbox_id,
+                expected_digest=expected_digest,
+                ticket_id=ticket_id,
+                hold_id=hold_id,
+                instant=instant,
+            )
+
+        released_rows = _release_spine_hold(
+            self._hold,
+            hold_id=hold_id,
+            tenant_id=tenant_id,
+            outbox_id=outbox_id,
+            ticket_id=ticket_id,
+            released_at=instant.isoformat(),
+        )
+        if released_rows != 1:
+            raise SpinePoisonApplyError(
+                "consumed poison ticket resume could not release hold"
+            )
+        return self._card(
+            tenant_id,
+            outbox_id,
+            card["reason"],
+            card["epoch_before"],
+            card["epoch_after"],
+            1,
+            card["duplicate"],
+            expected_digest,
+            ticket_id,
+            hold_id,
             True,
             released_rows,
         )
