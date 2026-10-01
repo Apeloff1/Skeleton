@@ -175,6 +175,9 @@ This seam registers exact-head provider closure evidence. It does not substitute
 
 `SpineProviderLiveQualificationVerify` independently reconstructs the card and rejects PR-automation or merge-authority promotion.
 
+
+`scripts/qualify_spine_provider_live.py` is the deployment producer for this seam. It sends only a tiny public synthetic verification request through `OpenAIProviderAdapter`, binds the receipt to the exact closure/head, HMAC-attests the non-secret receipt with GitHub's ephemeral job token, and never persists the API key, attestation key, or raw model text. The provider closure workflow runs this producer only when `OPENAI_API_KEY` is available; otherwise closure remains valid while live-provider green stays unclaimed.
+
 ## PR automation operational qualification
 
 `SpinePrAutomationQualification` consumes an externally authenticated exact-head receipt from the trusted `PR Automation Index` runner-v2 control plane. A successful runner with complete evidence and zero runner/transport failures may set `pr_automation_operational_green=true` and `pr_automation_green=true`. The runner decision remains explicit: policy `hold` is healthy fail-closed behavior and yields `pr_automation_merge_eligible=false`; `ready` or `merge` may yield eligibility. None of these cards grant `merge_authority`.
