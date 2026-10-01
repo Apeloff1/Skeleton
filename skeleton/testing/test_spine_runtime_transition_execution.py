@@ -181,6 +181,51 @@ def test_effectful_transition_compensates_when_fence_cas_fails(
         ledger.close()
 
 
+def test_rejected_execution_does_not_stop_preexisting_candidate_dispatcher(
+    tmp_path: Path,
+) -> None:
+    original = _runtime(tmp_path, "original-running")
+    candidate = _runtime(tmp_path, "candidate-running")
+    fence = SQLiteConsistencyFence(tmp_path / "fence-running.sqlite")
+    token = fence.open(
+        tenant_id="tenant-a",
+        resource_id="runtime:deploy-a",
+        writer_id="bootstrap",
+    )
+    slot = SpineRuntimeSlot(original)
+    ledger = SpineRuntimeTransitionExecutionLedger(tmp_path / "execution-running.sqlite")
+    try:
+        assert candidate.start_dispatcher() is True
+        with pytest.raises(
+            SpineRuntimeTransitionExecutionError,
+            match="effectful transition failed closed",
+        ):
+            ledger.execute(
+                rollback_witness=_rollback_witness(),
+                rollback_verify=_rollback_verify(),
+                slot=slot,
+                candidate_runtime=candidate,
+                fence=fence,
+                tenant_id="tenant-a",
+                resource_id="runtime:deploy-a",
+                expected_epoch=token.epoch,
+            )
+
+        assert slot.runtime is original
+        assert candidate.dispatcher_running is True
+        assert fence.read(
+            tenant_id="tenant-a",
+            resource_id="runtime:deploy-a",
+        ).epoch == token.epoch
+    finally:
+        if candidate.dispatcher_running:
+            candidate.stop_dispatcher(flush=False)
+        candidate.close()
+        original.close()
+        fence.close()
+        ledger.close()
+
+
 def test_execution_verifier_rejects_activation_tamper(tmp_path: Path) -> None:
     original = _runtime(tmp_path, "original-verify")
     candidate = _runtime(tmp_path, "candidate-verify")
