@@ -5,7 +5,7 @@ from skeleton.persistence.spine_manifest import SpineManifest
 
 def test_manifest_lists_seams_without_signoff() -> None:
     card = SpineManifest().card()
-    assert card["count"] == 116
+    assert card["count"] == 120
     assert card["apply_landed"] is False
     assert card["poison_apply_landed"] is True
     assert card["hit"] is False
@@ -105,3 +105,7 @@ def test_manifest_lists_seams_without_signoff() -> None:
     assert "runtime-transition-execution-verify" in names
     assert "runtime-transition-effect-rollback" in names
     assert "runtime-transition-effect-rollback-verify" in names
+    assert "runtime-transition-health" in names
+    assert "runtime-transition-health-verify" in names
+    assert "runtime-transition-acceptance" in names
+    assert "runtime-transition-acceptance-verify" in names
