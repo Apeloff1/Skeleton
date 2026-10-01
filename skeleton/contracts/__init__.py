@@ -106,6 +106,17 @@ from .operation import (
     OperationTransitionError,
     TERMINAL_OPERATION_STATES,
 )
+from .protocol import (
+    MAX_PROTOCOL_PAYLOAD_BYTES,
+    MAX_PROTOCOL_PAYLOAD_FIELDS,
+    MAX_PROTOCOL_TRACKED_MESSAGES,
+    PROTOCOL_ENVELOPE_VERSION,
+    ProtocolContractError,
+    ProtocolEnvelope,
+    ProtocolReplayGuard,
+    RetryClass,
+    UnknownOutcomePolicy,
+)
 
 __all__ = [
     "AI_EXECUTION_SCHEMA_VERSION",
@@ -192,4 +203,13 @@ __all__ = [
     "OperationState",
     "OperationTransitionError",
     "TERMINAL_OPERATION_STATES",
+    "MAX_PROTOCOL_PAYLOAD_BYTES",
+    "MAX_PROTOCOL_PAYLOAD_FIELDS",
+    "MAX_PROTOCOL_TRACKED_MESSAGES",
+    "PROTOCOL_ENVELOPE_VERSION",
+    "ProtocolContractError",
+    "ProtocolEnvelope",
+    "ProtocolReplayGuard",
+    "RetryClass",
+    "UnknownOutcomePolicy",
 ]
