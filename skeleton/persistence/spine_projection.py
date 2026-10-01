@@ -148,6 +148,13 @@ class SpineProjection:
                     applied_count INTEGER NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS projection_scan_cursor (
+                    consumer_id TEXT PRIMARY KEY,
+                    published_at TEXT NOT NULL,
+                    operation_version INTEGER NOT NULL,
+                    outbox_id TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS projection_applied (
                     consumer_id TEXT NOT NULL,
                     outbox_id TEXT NOT NULL,
@@ -334,7 +341,21 @@ class SpineProjection:
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None:
             raise SpineProjectionError("now must be timezone-aware")
-        events = self.operations.published_outbox(limit=limit)
+        scan_after = self._read_scan_cursor()
+        events = self.operations.published_outbox(
+            limit=limit,
+            after=scan_after,
+        )
+        if not events and scan_after is not None:
+            self._clear_scan_cursor()
+            return SpineProjectionReport(
+                scanned=0,
+                applied=0,
+                duplicates=0,
+                poisoned=0,
+                fence_advances=0,
+                reconciled=0,
+            )
         applied = 0
         duplicates = 0
         poisoned = 0
@@ -347,6 +368,8 @@ class SpineProjection:
             poisoned += outcome[2]
             advances += outcome[3]
             reconciled += outcome[4]
+        if len(events) < limit:
+            self._clear_scan_cursor()
         return SpineProjectionReport(
             scanned=len(events),
             applied=applied,
@@ -355,6 +378,82 @@ class SpineProjection:
             fence_advances=advances,
             reconciled=reconciled,
         )
+
+    def _read_scan_cursor(
+        self,
+    ) -> tuple[datetime, int, str] | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT published_at, operation_version, outbox_id
+                FROM projection_scan_cursor
+                WHERE consumer_id = ?
+                """,
+                (self.consumer_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        published_at = datetime.fromisoformat(row["published_at"])
+        if published_at.tzinfo is None or published_at.utcoffset() is None:
+            raise SpineProjectionError(
+                "projection scan cursor timestamp is not timezone-aware"
+            )
+        version = row["operation_version"]
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise SpineProjectionError(
+                "projection scan cursor version is invalid"
+            )
+        outbox_id = row["outbox_id"]
+        if not isinstance(outbox_id, str) or not outbox_id:
+            raise SpineProjectionError(
+                "projection scan cursor outbox id is invalid"
+            )
+        return (
+            published_at.astimezone(timezone.utc),
+            version,
+            outbox_id,
+        )
+
+    def _write_scan_cursor(
+        self,
+        event: OperationOutboxEvent,
+        *,
+        instant: datetime,
+    ) -> None:
+        if event.published_at is None:
+            raise SpineProjectionError(
+                "projection scan cursor requires published outbox evidence"
+            )
+        self._connection.execute(
+            """
+            INSERT INTO projection_scan_cursor(
+                consumer_id, published_at, operation_version,
+                outbox_id, updated_at
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(consumer_id) DO UPDATE SET
+                published_at = excluded.published_at,
+                operation_version = excluded.operation_version,
+                outbox_id = excluded.outbox_id,
+                updated_at = excluded.updated_at
+            """,
+            (
+                self.consumer_id,
+                event.published_at.astimezone(timezone.utc).isoformat(),
+                event.operation_version,
+                event.outbox_id,
+                instant.isoformat(),
+            ),
+        )
+
+    def _clear_scan_cursor(self) -> None:
+        with self._lock:
+            self._connection.execute(
+                """
+                DELETE FROM projection_scan_cursor
+                WHERE consumer_id = ?
+                """,
+                (self.consumer_id,),
+            )
 
     def _project_one(
         self,
@@ -481,24 +580,31 @@ class SpineProjection:
             ).encode("utf-8")
         ).hexdigest()
         with self._lock:
-            self._connection.execute(
-                """
-                INSERT INTO projection_poison(
-                    consumer_id, outbox_id, operation_id, tenant_id,
-                    reason, digest, recorded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(consumer_id, outbox_id) DO NOTHING
-                """,
-                (
-                    self.consumer_id,
-                    event.outbox_id,
-                    event.operation_id,
-                    tenant_id,
-                    reason,
-                    digest,
-                    instant.isoformat(),
-                ),
-            )
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._connection.execute(
+                    """
+                    INSERT INTO projection_poison(
+                        consumer_id, outbox_id, operation_id, tenant_id,
+                        reason, digest, recorded_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(consumer_id, outbox_id) DO NOTHING
+                    """,
+                    (
+                        self.consumer_id,
+                        event.outbox_id,
+                        event.operation_id,
+                        tenant_id,
+                        reason,
+                        digest,
+                        instant.isoformat(),
+                    ),
+                )
+                self._write_scan_cursor(event, instant=instant)
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def _record_completion(
         self,
@@ -554,6 +660,7 @@ class SpineProjection:
                         raise SpineProjectionError(
                             "projection completion identity changed"
                         )
+                    self._write_scan_cursor(event, instant=instant)
                     self._connection.execute("COMMIT")
                     return 0
 
@@ -569,6 +676,7 @@ class SpineProjection:
                     """,
                     (self.consumer_id, instant.isoformat()),
                 )
+                self._write_scan_cursor(event, instant=instant)
                 self._connection.execute("COMMIT")
             except Exception:
                 self._connection.execute("ROLLBACK")

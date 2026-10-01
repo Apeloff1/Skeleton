@@ -97,3 +97,38 @@ def test_mongo_projection_repairs_fence_after_receipt_before_fence(
         resource_id=f"op:{OP}",
     ).epoch == 1
     runtime.close()
+
+def test_mongo_projection_keyset_scan_reaches_rows_beyond_batch_limit(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    for index in range(3):
+        operation_id = f"13131313-1313-4313-8313-{index + 10:012d}"
+        operations.create(
+            OperationEnvelope(
+                operation_id=operation_id,
+                tenant_id="tenant-mongo-scan",
+                actor_id="actor-mongo-scan",
+                capability="chat",
+                created_at=BASE + timedelta(seconds=index),
+                deadline=BASE + timedelta(minutes=5),
+                idempotency_key=f"idem-mongo-scan-{index}",
+                trace_id=f"trace-mongo-scan-{index}",
+            ),
+            now=BASE + timedelta(seconds=index),
+        )
+        runtime.dispatch_outbox(operation_id=operation_id)
+
+    projection = MongoSpineProjection(
+        operations,
+        MongoInboxLedger(None),
+        MongoConsistencyFence(),
+    )
+    first = projection.project(limit=2)
+    second = projection.project(limit=2)
+    assert first.applied == 2
+    assert second.applied == 1
+    assert second.duplicates == 0
+    runtime.close()

@@ -412,3 +412,49 @@ def test_projection_poison_quarantine_is_scoped_by_consumer(
         assert SpineCursorRead(second, fence).read().poison_count == 0
         assert SpineQuarantine(second).card("tenant-a")["count"] == 0
     runtime.close()
+
+def test_projection_keyset_scan_reaches_rows_beyond_batch_limit(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "ops.sqlite")
+    stream = SQLiteOperationEventStore(tmp_path / "stream.sqlite")
+    runtime = DurableOperationRuntime(_Reasoner(), operations, stream)
+    operation_ids = []
+    for index in range(3):
+        operation_id = f"11111111-1111-4111-8111-{index + 10:012d}"
+        operation_ids.append(operation_id)
+        operations.create(
+            OperationEnvelope(
+                operation_id=operation_id,
+                tenant_id="tenant-scan",
+                actor_id="actor-scan",
+                capability="chat",
+                created_at=BASE + timedelta(seconds=index),
+                deadline=BASE + timedelta(minutes=5),
+                idempotency_key=f"idem-scan-{index}",
+                trace_id=f"trace-scan-{index}",
+            ),
+            now=BASE + timedelta(seconds=index),
+        )
+        runtime.dispatch_outbox(operation_id=operation_id)
+
+    inbox = SQLiteInboxLedger(tmp_path / "inbox.sqlite")
+    fence = SQLiteConsistencyFence(tmp_path / "fence.sqlite")
+    with SpineProjection(
+        operations,
+        inbox,
+        fence,
+        journal_path=tmp_path / "journal.sqlite",
+    ) as projection:
+        first = projection.project(limit=2)
+        second = projection.project(limit=2)
+        assert first.applied == 2
+        assert second.applied == 1
+        assert second.duplicates == 0
+        assert SpineCursorRead(projection, fence).read().applied_count == 3
+
+        third = projection.project(limit=2)
+        assert third.duplicates == 2
+        assert third.applied == 0
+        assert SpineCursorRead(projection, fence).read().applied_count == 3
+    runtime.close()

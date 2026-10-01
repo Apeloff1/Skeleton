@@ -649,6 +649,7 @@ class SQLiteOperationStore:
         *,
         operation_id: str | None = None,
         limit: int = 1000,
+        after: tuple[datetime, int, str] | None = None,
     ) -> tuple[OperationOutboxEvent, ...]:
         """Return acknowledged outbox rows. Does not grant sign-off."""
 
@@ -657,29 +658,114 @@ class SQLiteOperationStore:
         operation = None
         if operation_id is not None:
             operation = _canonical_uuid(operation_id, "operation_id")
+        cursor: tuple[datetime, int, str] | None = None
+        if after is not None:
+            if not isinstance(after, tuple) or len(after) != 3:
+                raise ValueError(
+                    "after must be a (published_at, operation_version, outbox_id) tuple"
+                )
+            published = _aware(after[0], "after published_at")
+            version = after[1]
+            if (
+                isinstance(version, bool)
+                or not isinstance(version, int)
+                or version < 1
+            ):
+                raise ValueError(
+                    "after operation_version must be a positive integer"
+                )
+            outbox = _canonical_uuid(after[2], "after outbox_id")
+            cursor = (published, version, outbox)
         with self._lock:
             if operation is None:
-                rows = self._connection.execute(
-                    """
-                    SELECT *
-                    FROM operation_outbox
-                    WHERE namespace = ? AND published_at IS NOT NULL
-                    ORDER BY published_at ASC, operation_version ASC, outbox_id ASC
-                    LIMIT ?
-                    """,
-                    (self.namespace, limit),
-                ).fetchall()
+                if cursor is None:
+                    rows = self._connection.execute(
+                        """
+                        SELECT *
+                        FROM operation_outbox
+                        WHERE namespace = ? AND published_at IS NOT NULL
+                        ORDER BY published_at ASC, operation_version ASC, outbox_id ASC
+                        LIMIT ?
+                        """,
+                        (self.namespace, limit),
+                    ).fetchall()
+                else:
+                    published, version, outbox = cursor
+                    stamp = published.isoformat()
+                    rows = self._connection.execute(
+                        """
+                        SELECT *
+                        FROM operation_outbox
+                        WHERE namespace = ?
+                          AND published_at IS NOT NULL
+                          AND (
+                              published_at > ?
+                              OR (
+                                  published_at = ?
+                                  AND operation_version > ?
+                              )
+                              OR (
+                                  published_at = ?
+                                  AND operation_version = ?
+                                  AND outbox_id > ?
+                              )
+                          )
+                        ORDER BY published_at ASC, operation_version ASC, outbox_id ASC
+                        LIMIT ?
+                        """,
+                        (
+                            self.namespace,
+                            stamp,
+                            stamp,
+                            version,
+                            stamp,
+                            version,
+                            outbox,
+                            limit,
+                        ),
+                    ).fetchall()
             else:
-                rows = self._connection.execute(
-                    """
-                    SELECT *
-                    FROM operation_outbox
-                    WHERE namespace = ? AND operation_id = ? AND published_at IS NOT NULL
-                    ORDER BY operation_version ASC, outbox_id ASC
-                    LIMIT ?
-                    """,
-                    (self.namespace, operation, limit),
-                ).fetchall()
+                if cursor is None:
+                    rows = self._connection.execute(
+                        """
+                        SELECT *
+                        FROM operation_outbox
+                        WHERE namespace = ?
+                          AND operation_id = ?
+                          AND published_at IS NOT NULL
+                        ORDER BY operation_version ASC, outbox_id ASC
+                        LIMIT ?
+                        """,
+                        (self.namespace, operation, limit),
+                    ).fetchall()
+                else:
+                    _published, version, outbox = cursor
+                    rows = self._connection.execute(
+                        """
+                        SELECT *
+                        FROM operation_outbox
+                        WHERE namespace = ?
+                          AND operation_id = ?
+                          AND published_at IS NOT NULL
+                          AND (
+                              operation_version > ?
+                              OR (
+                                  operation_version = ?
+                                  AND outbox_id > ?
+                              )
+                          )
+                        ORDER BY operation_version ASC, outbox_id ASC
+                        LIMIT ?
+                        """,
+                        (
+                            self.namespace,
+                            operation,
+                            version,
+                            version,
+                            outbox,
+                            limit,
+                        ),
+                    ).fetchall()
         return tuple(self._outbox_from_row(row) for row in rows)
 
     def acknowledge_outbox(

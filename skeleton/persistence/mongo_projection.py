@@ -71,6 +71,7 @@ class MongoSpineProjection:
         self.fence = fence
         self.consumer_id = consumer_id
         self.poison: list[str] = []
+        self._scan_after: tuple[datetime, int, str] | None = None
 
     def project(self, *, limit: int = 100, now: datetime | None = None) -> MongoProjectionReport:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
@@ -78,7 +79,13 @@ class MongoSpineProjection:
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise MongoProjectionError("now must be timezone-aware")
-        events = self.operations.published_outbox(limit=limit)
+        events = self.operations.published_outbox(
+            limit=limit,
+            after=self._scan_after,
+        )
+        if not events and self._scan_after is not None:
+            self._scan_after = None
+            return MongoProjectionReport(0, 0, 0, 0, 0, 0)
         applied = duplicates = poisoned = advances = reconciled = 0
         for event in events:
             stored = self.operations.get(event.operation_id)
@@ -89,6 +96,11 @@ class MongoSpineProjection:
             except InboxConflict:
                 self.poison.append(event.outbox_id)
                 poisoned += 1
+                self._scan_after = (
+                    event.published_at or instant,
+                    event.operation_version,
+                    event.outbox_id,
+                )
                 continue
             resource = f"op:{event.operation_id}"
             try:
@@ -101,6 +113,11 @@ class MongoSpineProjection:
             except ConsistencyFenceError:
                 self.poison.append(event.outbox_id)
                 poisoned += 1
+                self._scan_after = (
+                    event.published_at or instant,
+                    event.operation_version,
+                    event.outbox_id,
+                )
                 continue
             if result.duplicate:
                 duplicates += 1
@@ -109,6 +126,13 @@ class MongoSpineProjection:
             else:
                 applied += 1
             advances += advanced
+            self._scan_after = (
+                event.published_at or instant,
+                event.operation_version,
+                event.outbox_id,
+            )
+        if len(events) < limit:
+            self._scan_after = None
         return MongoProjectionReport(
             len(events),
             applied,
