@@ -234,6 +234,12 @@ jobs:
           skeleton/testing/test_spine_poison_apply_verify.py
           skeleton/testing/test_spine_poison_chain.py
 
+      - name: Verify P2 projection crash-recovery contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_spine_projection.py
+          skeleton/testing/test_mongo_projection.py
+
       - name: Verify P2 async Mongo bootstrap contracts
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
