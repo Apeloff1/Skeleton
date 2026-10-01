@@ -169,6 +169,12 @@ The provider closure workflow now produces two independent exact-head evidence r
 
 This seam registers exact-head provider closure evidence. It does not substitute CI closure for a credential-bearing live provider request.
 
+## PR automation operational qualification
+
+`SpinePrAutomationQualification` consumes an externally authenticated exact-head receipt from the trusted `PR Automation Index` runner-v2 control plane. A successful runner with complete evidence and zero runner/transport failures may set `pr_automation_operational_green=true` and `pr_automation_green=true`. The runner decision remains explicit: policy `hold` is healthy fail-closed behavior and yields `pr_automation_merge_eligible=false`; `ready` or `merge` may yield eligibility. None of these cards grant `merge_authority`.
+
+This distinction is critical for large P2 changes: automation can be healthy while size, review, CI, or policy still blocks merge. `SpinePrAutomationQualificationVerify` independently reconstructs the card and refuses any merge-authority promotion.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -214,7 +220,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_transition_acceptance.py \
   skeleton/testing/test_spine_runtime_production_activation_authorization.py \
   skeleton/testing/test_spine_runtime_production_activation.py \
-  skeleton/testing/test_spine_provider_surface_qualification.py
+  skeleton/testing/test_spine_provider_surface_qualification.py \
+  skeleton/testing/test_spine_pr_automation_qualification.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
