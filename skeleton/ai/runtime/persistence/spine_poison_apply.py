@@ -8,6 +8,7 @@ replace it and does not sign work off.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,9 @@ from typing import Any
 from skeleton.persistence.inbox_ledger import InboxDelivery
 from skeleton.persistence.spine_reaccept import SpineReaccept
 from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
+
+
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class SpinePoisonApplyError(RuntimeError):
@@ -74,8 +78,13 @@ class SpinePoisonApply:
             raise SpinePoisonApplyError("delivery must be an InboxDelivery")
         if not all(isinstance(value, str) and value.strip() for value in (tenant_id, outbox_id, ticket_id)):
             raise SpinePoisonApplyError("tenant_id, outbox_id, and ticket_id must be non-empty text")
-        if not isinstance(expected_digest, str) or len(expected_digest) != 64:
-            raise SpinePoisonApplyError("expected_digest must be SHA-256 hex")
+        if (
+            not isinstance(expected_digest, str)
+            or _DIGEST_RE.fullmatch(expected_digest) is None
+        ):
+            raise SpinePoisonApplyError(
+                "expected_digest must be lowercase SHA-256 hex"
+            )
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise SpinePoisonApplyError("now must be timezone-aware")
@@ -90,10 +99,46 @@ class SpinePoisonApply:
         if hold is None:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "unheld", instant)
         ticket = self.ticket.read(ticket_id)
-        if ticket is None or ticket["tenant_id"] != tenant_id or ticket["outbox_id"] != outbox_id:
-            return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "ticket-mismatch", instant)
+        if (
+            ticket is None
+            or ticket["tenant_id"] != tenant_id
+            or ticket["outbox_id"] != outbox_id
+        ):
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "ticket-mismatch",
+                instant,
+            )
+        if ticket["consumed"] != 0:
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "ticket-consumed",
+                instant,
+            )
         if ticket["digest"] != expected_digest or delivery.digest() != expected_digest:
-            return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, "digest-mismatch", instant)
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "digest-mismatch",
+                instant,
+            )
+        if not self.ticket.consume(ticket_id, now=instant):
+            return self._refuse(
+                tenant_id,
+                outbox_id,
+                expected_digest,
+                ticket_id,
+                "ticket-consumed",
+                instant,
+            )
         card = self.reaccept.reaccept(
             delivery,
             tenant_id=tenant_id,
@@ -104,7 +149,6 @@ class SpinePoisonApply:
             raise SpinePoisonApplyError("poison apply moved the fence")
         if card["reason"] not in {"accepted", "duplicate"}:
             return self._refuse(tenant_id, outbox_id, expected_digest, ticket_id, card["reason"], instant)
-        self.ticket.consume(ticket_id, now=instant)
         self._journal.execute(
             """
             INSERT INTO spine_poison_apply(

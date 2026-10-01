@@ -3,11 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from skeleton.persistence.consistency_fence import SQLiteConsistencyFence
 from skeleton.persistence.inbox_ledger import InboxDelivery, SQLiteInboxLedger
 from skeleton.persistence.spine_apply import SpineApplyGate
 from skeleton.persistence.spine_hold import SpineHold
-from skeleton.persistence.spine_poison_apply import SpinePoisonApply
+from skeleton.persistence.spine_poison_apply import (
+    SpinePoisonApply,
+    SpinePoisonApplyError,
+)
 from skeleton.persistence.spine_poison_ticket import SpinePoisonTicket
 from skeleton.persistence.spine_poison_witness import SpinePoisonWitness
 from skeleton.persistence.spine_reaccept import SpineReaccept
@@ -117,11 +122,61 @@ def test_matching_digest_applies_without_moving_fence(tmp_path: Path) -> None:
         ticket_id=issued["ticket_id"],
         now=BASE,
     )
-    assert again["reason"] == "duplicate"
+    assert again["reason"] == "ticket-consumed"
+    assert again["applied"] == 0
     assert again["epoch_before"] == again["epoch_after"] == 0
     assert inbox.applied_count() == 1
-    assert witness.card("tenant-poison")["applied"] == 2
+    assert witness.card("tenant-poison")["applied"] == 1
     assert witness.card("tenant-other")["applied"] == 0
+
+
+def test_ticket_consume_is_one_time_and_idempotent(tmp_path: Path) -> None:
+    hold = SpineHold(tmp_path / "hold.sqlite")
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    ticket = SpinePoisonTicket(
+        tmp_path / "hold.sqlite",
+        tmp_path / "ticket.sqlite",
+    )
+    issued = ticket.issue(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        digest=delivery.digest(),
+        now=BASE,
+    )
+    assert ticket.consume(issued["ticket_id"], now=BASE) is True
+    assert ticket.consume(issued["ticket_id"], now=BASE) is False
+    row = ticket.read(issued["ticket_id"])
+    assert row is not None
+    assert row["consumed"] == 1
+
+
+def test_poison_digest_must_be_lowercase_sha256_hex(tmp_path: Path) -> None:
+    hold, apply, _witness, _inbox = _stack(tmp_path)
+    delivery = _delivery()
+    hold.hold(
+        tenant_id="tenant-poison",
+        outbox_id=EVENT,
+        reason="poison",
+        now=BASE,
+    )
+    with pytest.raises(
+        SpinePoisonApplyError,
+        match="lowercase SHA-256 hex",
+    ):
+        apply.apply(
+            delivery,
+            tenant_id="tenant-poison",
+            outbox_id=EVENT,
+            expected_digest="g" * 64,
+            ticket_id="invalid",
+            now=BASE,
+        )
 
 
 def test_foreign_tenant_cannot_apply_held_id(tmp_path: Path) -> None:

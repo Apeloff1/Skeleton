@@ -6,11 +6,15 @@ a delivery and it does not advance a fence. Consume is idempotent.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class SpinePoisonTicketError(RuntimeError):
@@ -49,8 +53,8 @@ class SpinePoisonTicket:
     ) -> dict[str, Any]:
         if not all(isinstance(value, str) and value.strip() for value in (tenant_id, outbox_id)):
             raise SpinePoisonTicketError("tenant_id and outbox_id must be non-empty text")
-        if not isinstance(digest, str) or len(digest) != 64:
-            raise SpinePoisonTicketError("digest must be SHA-256 hex")
+        if not isinstance(digest, str) or _DIGEST_RE.fullmatch(digest) is None:
+            raise SpinePoisonTicketError("digest must be lowercase SHA-256 hex")
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise SpinePoisonTicketError("now must be timezone-aware")
@@ -103,15 +107,29 @@ class SpinePoisonTicket:
             (ticket_id,),
         ).fetchone()
 
-    def consume(self, ticket_id: str, *, now: datetime | None = None) -> None:
+    def consume(self, ticket_id: str, *, now: datetime | None = None) -> bool:
+        if not isinstance(ticket_id, str) or not ticket_id.strip():
+            raise SpinePoisonTicketError("ticket_id must be non-empty text")
         instant = now or datetime.now(timezone.utc)
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise SpinePoisonTicketError("now must be timezone-aware")
-        self._connection.execute(
-            "UPDATE spine_poison_ticket SET consumed = consumed + 1 WHERE ticket_id = ?",
-            (ticket_id,),
-        )
-        self._connection.commit()
+        connection = self._connection
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                UPDATE spine_poison_ticket
+                SET consumed = 1
+                WHERE ticket_id = ? AND consumed = 0
+                """,
+                (ticket_id,),
+            )
+            claimed = cursor.rowcount == 1
+            connection.commit()
+            return claimed
+        except Exception:
+            connection.rollback()
+            raise
 
     def close(self) -> None:
         self._hold.close()
