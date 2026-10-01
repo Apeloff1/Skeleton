@@ -522,4 +522,3 @@ def test_workflow_exports_protected_base_control_as_active_env() -> None:
         and not line.lstrip().startswith("#")
         for line in text.splitlines()
     )
-
