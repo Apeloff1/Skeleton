@@ -57,6 +57,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpinePyMongoAsyncAdapter` is intentionally outside the persistence package. It imports `AsyncMongoClient`, requires pymongo>=4.13, uses Stable API v1, and emits a canonical driver identity receipt. The receipt marks the deployment driver import as present while keeping the core driver import and runtime activation false. Motor is not a dependency of this supported path.
 
+## Live CI qualification
+
+`scripts/qualify_spine_pymongo_async.py` opens the supported `AsyncMongoClient` against the workflow Mongo service, performs the core ping/hello preflight, applies all three canonical indexes, verifies the bootstrap card, repeats the bootstrap, and proves replay equivalence. Its receipt explicitly distinguishes deployment-driver connectivity from runtime-driver selection and runtime activation. The scratch database is dropped before client close.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -79,6 +83,7 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_index_bind.py \
   skeleton/testing/test_spine_pymongo_async_adapter.py
 python scripts/check_spine_motor_bootstrap.py
+python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
 
 This advances bootstrap readiness only. It does not start a driver, replace the

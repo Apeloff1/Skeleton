@@ -25,7 +25,7 @@ class SpinePyMongoAsyncAdapterError(RuntimeError):
 
 
 def _version_tuple(raw: str) -> tuple[int, ...]:
-    parts = re.findall(r"\\d+", raw)
+    parts = re.findall(r"\d+", raw)
     if not parts:
         raise SpinePyMongoAsyncAdapterError("PyMongo version is not numeric")
     return tuple(int(part) for part in parts[:3])

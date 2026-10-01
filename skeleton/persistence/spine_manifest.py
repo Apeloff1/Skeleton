@@ -82,6 +82,7 @@ SEAMS = (
     ("motor-preflight", "deployment-protocol-qualified-without-activation"),
     ("motor-preflight-verify", "preflight-verification-does-not-activate"),
     ("pymongo-async-adapter", "supported-driver-import-is-deployment-only"),
+    ("pymongo-async-live-qualification", "live-driver-qualification-is-not-runtime-activation"),
 )
 
 

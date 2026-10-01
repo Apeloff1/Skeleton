@@ -30,16 +30,19 @@ def test_supported_async_driver_receipt_is_content_addressed_and_dark() -> None:
 
 
 def test_adapter_constructs_async_database_without_network_activation() -> None:
-    session = SpinePyMongoAsyncAdapter().open(
-        uri="mongodb://127.0.0.1:27017",
-        database_name="skeleton_p2_adapter_test",
-    )
-    try:
-        assert session.database.name == "skeleton_p2_adapter_test"
-        assert session.receipt["runtime_activated"] is False
-        assert session.receipt["supported_async_driver"] is True
-    finally:
-        asyncio.run(session.close())
+    async def scenario() -> None:
+        session = SpinePyMongoAsyncAdapter().open(
+            uri="mongodb://127.0.0.1:27017",
+            database_name="skeleton_p2_adapter_test",
+        )
+        try:
+            assert session.database.name == "skeleton_p2_adapter_test"
+            assert session.receipt["runtime_activated"] is False
+            assert session.receipt["supported_async_driver"] is True
+        finally:
+            await session.close()
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,7 @@ on:
       - "skeleton/testing/test_spine_index_bind.py"
       - "skeleton/testing/test_spine_pymongo_async_adapter.py"
       - "skeleton/deploy/spine_pymongo_async.py"
+      - "scripts/qualify_spine_pymongo_async.py"
       - "skeleton/persistence/spine_bind_*.py"
       - "skeleton/persistence/spine_motor_*.py"
       - "skeleton/ai/runtime/persistence/spine_motor_*.py"
@@ -136,6 +137,44 @@ jobs:
       - name: Verify P2 async Mongo core structural control
         run: python scripts/check_spine_motor_bootstrap.py
 
+      - name: Run P2 live PyMongo Async qualification
+        run: >-
+          python scripts/qualify_spine_pymongo_async.py
+          --uri "mongodb://127.0.0.1:27017"
+          --database "skeleton_p2_pymongo_async_qualification"
+          --output "${RUNNER_TEMP}/p2-pymongo-async.json"
+
+      - name: Verify P2 live PyMongo Async evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "p2-pymongo-async.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          assert report["kind"] == "spine_pymongo_async_live_qualification"
+          assert report["qualified"] is True
+          assert report["driver_distribution"] == "pymongo"
+          assert report["driver_class"] == "AsyncMongoClient"
+          assert report["supported_async_driver"] is True
+          assert report["deployment_driver_imported"] is True
+          assert report["deployment_driver_connected"] is True
+          assert report["core_driver_imported"] is False
+          assert report["indexes_planned"] == 3
+          assert report["indexes_applied"] == 3
+          assert report["bootstrap_replay_equivalent"] is True
+          assert report["runtime_driver_selected"] is False
+          assert report["runtime_activated"] is False
+          assert report["live_motor"] is False
+          assert len(report["driver_receipt_digest"]) == 64
+          assert len(report["preflight_digest"]) == 64
+          assert len(report["digest"]) == 64
+          print("p2-pymongo-async-live-qualification: OK")
+          print("driver:", report["driver_version"])
+          print("wire:", report["wire_version_min"], report["wire_version_max"])
+          print("evidence:", report["digest"])
+          PY
       - name: Run live Mongo backup restore and rebuild drill
         run: >-
           python scripts/state_recovery_drill.py live-mongo
