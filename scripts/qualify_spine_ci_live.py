@@ -19,7 +19,7 @@ from skeleton.persistence.spine_ci_qualification_verify import (
 )
 from skeleton.persistence.spine_ci_receipt import (
     SpineCiReceiptBuilder,
-    SpineCiReceiptError,
+    SpineCiReceiptIncompleteError,
 )
 
 
@@ -116,7 +116,7 @@ def main() -> int:
             expected_head_sha=args.expected_head,
             attest=lambda candidate: _attest(candidate, key),
         )
-    except SpineCiReceiptError as exc:
+    except SpineCiReceiptIncompleteError as exc:
         if args.allow_incomplete:
             print(f"p2-ci evidence not emitted: {exc}")
             return 3

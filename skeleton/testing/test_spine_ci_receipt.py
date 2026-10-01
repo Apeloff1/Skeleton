@@ -16,6 +16,7 @@ from skeleton.persistence.spine_ci_policy import (
 from skeleton.persistence.spine_ci_receipt import (
     SpineCiReceiptBuilder,
     SpineCiReceiptError,
+    SpineCiReceiptIncompleteError,
 )
 
 
@@ -73,7 +74,7 @@ def test_ci_receipt_builder_prefers_latest_exact_head_run() -> None:
     runs[0]["status"] = "in_progress"
     runs[0]["conclusion"] = None
 
-    with pytest.raises(SpineCiReceiptError, match="pending="):
+    with pytest.raises(SpineCiReceiptIncompleteError, match="pending="):
         SpineCiReceiptBuilder().build(
             workflow_runs=[stale, *runs],
             expected_head_sha=HEAD,
@@ -84,7 +85,7 @@ def test_ci_receipt_builder_prefers_latest_exact_head_run() -> None:
 def test_ci_receipt_builder_rejects_missing_exact_head_check() -> None:
     runs = _runs()
     runs[-1]["head_sha"] = "b" * 40
-    with pytest.raises(SpineCiReceiptError, match="missing="):
+    with pytest.raises(SpineCiReceiptIncompleteError, match="missing="):
         SpineCiReceiptBuilder().build(
             workflow_runs=runs,
             expected_head_sha=HEAD,
@@ -99,22 +100,12 @@ def test_ci_receipt_builder_rejects_same_name_wrong_workflow_identity() -> None:
     forged["path"] = ".github/workflows/forged-backend-quality.yml"
     forged["event"] = REQUIRED_CHECK_EVENT
 
-    receipt = SpineCiReceiptBuilder().build(
-        workflow_runs=[forged, *runs],
-        expected_head_sha=HEAD,
-        attest=lambda payload: "f" * 64,
-    )
-    assert receipt["checks"][0]["run_id"] == runs[0]["id"]
-    assert (
-        receipt["checks"][0]["workflow_path"]
-        == REQUIRED_CHECK_WORKFLOWS[REQUIRED_CHECKS[0]]
-    )
-
-    only_forged = _runs()
-    only_forged[0]["path"] = ".github/workflows/forged-backend-quality.yml"
-    with pytest.raises(SpineCiReceiptError, match="missing="):
+    with pytest.raises(
+        SpineCiReceiptError,
+        match="workflow identity mismatch",
+    ):
         SpineCiReceiptBuilder().build(
-            workflow_runs=only_forged,
+            workflow_runs=[forged, *runs],
             expected_head_sha=HEAD,
             attest=lambda payload: "f" * 64,
         )
@@ -123,9 +114,33 @@ def test_ci_receipt_builder_rejects_same_name_wrong_workflow_identity() -> None:
 def test_ci_receipt_builder_rejects_wrong_trigger_event() -> None:
     runs = _runs()
     runs[0]["event"] = "workflow_dispatch"
-    with pytest.raises(SpineCiReceiptError, match="missing="):
+    with pytest.raises(
+        SpineCiReceiptError,
+        match="workflow event mismatch",
+    ):
         SpineCiReceiptBuilder().build(
             workflow_runs=runs,
             expected_head_sha=HEAD,
             attest=lambda payload: "f" * 64,
         )
+
+
+def test_incomplete_catalog_error_is_distinct_from_integrity_error() -> None:
+    runs = _runs()
+    runs.pop()
+    with pytest.raises(SpineCiReceiptIncompleteError):
+        SpineCiReceiptBuilder().build(
+            workflow_runs=runs,
+            expected_head_sha=HEAD,
+            attest=lambda payload: "f" * 64,
+        )
+
+    forged = _runs()
+    forged[0]["path"] = ".github/workflows/forged.yml"
+    with pytest.raises(SpineCiReceiptError) as error:
+        SpineCiReceiptBuilder().build(
+            workflow_runs=forged,
+            expected_head_sha=HEAD,
+            attest=lambda payload: "f" * 64,
+        )
+    assert not isinstance(error.value, SpineCiReceiptIncompleteError)

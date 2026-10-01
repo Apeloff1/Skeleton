@@ -17,6 +17,10 @@ class SpineCiReceiptError(RuntimeError):
     """Required-check workflow evidence could not form a trusted receipt."""
 
 
+class SpineCiReceiptIncompleteError(SpineCiReceiptError):
+    """Required-check catalog is not complete and green yet."""
+
+
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -52,9 +56,13 @@ class SpineCiReceiptBuilder:
             if raw.get("head_sha") != expected_head_sha:
                 continue
             if raw.get("path") != REQUIRED_CHECK_WORKFLOWS[name]:
-                continue
+                raise SpineCiReceiptError(
+                    f"CI workflow identity mismatch: {name}"
+                )
             if raw.get("event") != REQUIRED_CHECK_EVENT:
-                continue
+                raise SpineCiReceiptError(
+                    f"CI workflow event mismatch: {name}"
+                )
             run_id = _positive(raw.get("id"), f"{name} run id")
             run_attempt = _positive(raw.get("run_attempt"), f"{name} run attempt")
             candidate = {
@@ -88,7 +96,7 @@ class SpineCiReceiptBuilder:
             and latest[name]["conclusion"] != "success"
         ]
         if missing or pending or failing:
-            raise SpineCiReceiptError(
+            raise SpineCiReceiptIncompleteError(
                 "CI required-check catalog is not green: "
                 f"missing={','.join(missing) or '-'}; "
                 f"pending={','.join(pending) or '-'}; "
@@ -129,4 +137,8 @@ class SpineCiReceiptBuilder:
         return receipt
 
 
-__all__ = ["SpineCiReceiptBuilder", "SpineCiReceiptError"]
+__all__ = [
+    "SpineCiReceiptBuilder",
+    "SpineCiReceiptError",
+    "SpineCiReceiptIncompleteError",
+]
