@@ -159,6 +159,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeProductionActivationVerify` independently reconstructs the activation identity and digest, then re-reads the candidate runtime, durable operation, runtime slot, dispatcher, and unchanged rollback fence. The end-to-end regression activates and then executes the existing rollback path, proving that activation does not destroy rollback authority.
 
+## Exact-head provider surface closure
+
+The provider closure workflow now produces two independent exact-head evidence receipts: the canonical bootstrap inventory and the independent provider ownership scan. `SpineProviderSurfaceQualification` normalizes their declared ownership and discovered-edge views, requires exact head equality plus digest/count agreement, and emits only `provider_surface_closure_green=true`. It does not alter the legacy dark provider probe and does not claim live external provider health: `provider_surface_live_green=false` and `provider_surface_green=false` remain explicit. `SpineProviderSurfaceQualificationVerify` reconstructs the card and rejects forged live-green claims.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
