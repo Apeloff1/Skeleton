@@ -68,6 +68,8 @@ from skeleton.persistence.spine_window import SpineWindow
 from skeleton.persistence.spine_seal import SpineSeal
 from skeleton.persistence.spine_digest import SpineDigest
 from skeleton.persistence.spine_ledger import SpineLedger
+from skeleton.persistence.spine_index import SpineIndexPlan
+from skeleton.persistence.spine_bind import SpineBind
 from skeleton.persistence.spine_gap import SpineGap
 
 _SNAPSHOT_EXPORTS = {
@@ -148,6 +150,8 @@ __all__ = [
     "SpineApplyGate",
     "SpineDigest",
     "SpineLedger",
+    "SpineIndexPlan",
+    "SpineBind",
     "SpineCutover",
     "SpineWindow",
     "SpineSeal",
