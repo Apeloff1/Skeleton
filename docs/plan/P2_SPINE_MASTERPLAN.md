@@ -134,6 +134,10 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime transition execution verify | `skeleton/persistence/spine_runtime_transition_execution_verify.py` | independently verifies direct runtime/dispatcher/fence effects without activation |
 | Runtime transition effect rollback | `skeleton/persistence/spine_runtime_transition_effect_rollback.py` | stops candidate, restores original runtime, and advances compensation fence |
 | Runtime transition effect rollback verify | `skeleton/persistence/spine_runtime_transition_effect_rollback_verify.py` | independently verifies compensation without activation promotion |
+| Runtime transition health | `skeleton/persistence/spine_runtime_transition_health.py` | proves the transitioned runtime can complete and durably publish a live operation |
+| Runtime transition health verify | `skeleton/persistence/spine_runtime_transition_health_verify.py` | independently re-reads runtime, operation, slot, and fence health |
+| Runtime transition acceptance | `skeleton/persistence/spine_runtime_transition_acceptance.py` | externally authenticated health acceptance remains non-authorizing |
+| Runtime transition acceptance verify | `skeleton/persistence/spine_runtime_transition_acceptance_verify.py` | acceptance verification does not grant production activation |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -162,7 +166,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 116, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 120, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
