@@ -11,6 +11,7 @@ from skeleton.persistence.spine_pr_automation_policy import (
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_ID,
     TRUSTED_SOURCE_WORKFLOW_NAME,
     TRUSTED_SOURCE_WORKFLOW_PATH,
 )
@@ -133,6 +134,10 @@ class SpinePrAutomationQualificationVerify:
                 raise SpinePrAutomationQualificationVerifyError(
                     f"{field} is invalid"
                 )
+        if card["source_workflow_id"] != TRUSTED_SOURCE_WORKFLOW_ID:
+            raise SpinePrAutomationQualificationVerifyError(
+                "PR automation source workflow id changed"
+            )
         for field in (
             "reason_count",
             "failures",

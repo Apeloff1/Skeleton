@@ -188,3 +188,24 @@ def test_runner_receipt_builder_rejects_unsuccessful_source() -> None:
             mode="observe",
             attest=lambda payload: "d" * 64,
         )
+
+
+def test_runner_receipt_builder_rejects_source_workflow_id_drift() -> None:
+    source = _source_run()
+    source["workflow_id"] = 999999999
+    with pytest.raises(
+        SpinePrAutomationReceiptError,
+        match="source workflow id changed",
+    ):
+        SpinePrAutomationReceiptBuilder().build(
+            report=_report(),
+            expected_repository="Apeloff1/Skeleton",
+            source_run=source,
+            expected_source_run_attempt=1,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            run_id=123,
+            run_attempt=1,
+            mode="observe",
+            attest=lambda payload: "d" * 64,
+        )

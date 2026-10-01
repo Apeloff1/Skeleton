@@ -11,6 +11,7 @@ from skeleton.persistence.spine_pr_automation_policy import (
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_ID,
     TRUSTED_SOURCE_WORKFLOW_NAME,
     TRUSTED_SOURCE_WORKFLOW_PATH,
 )
@@ -143,6 +144,10 @@ class SpinePrAutomationReceiptBuilder:
         if source_run.get("name") != TRUSTED_SOURCE_WORKFLOW_NAME:
             raise SpinePrAutomationReceiptError(
                 "source workflow name changed"
+            )
+        if source_workflow_id != TRUSTED_SOURCE_WORKFLOW_ID:
+            raise SpinePrAutomationReceiptError(
+                "source workflow id changed"
             )
         if source_run.get("path") != TRUSTED_SOURCE_WORKFLOW_PATH:
             raise SpinePrAutomationReceiptError(

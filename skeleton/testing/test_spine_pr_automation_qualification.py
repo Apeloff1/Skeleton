@@ -268,3 +268,34 @@ def test_verifier_rejects_source_event_tamper() -> None:
         match="source workflow event changed",
     ):
         SpinePrAutomationQualificationVerify().verify(tampered)
+
+
+def test_qualification_rejects_source_workflow_id_drift() -> None:
+    receipt = _receipt()
+    receipt["source_workflow_id"] = 999999999
+    with pytest.raises(
+        SpinePrAutomationQualificationError,
+        match="source workflow id changed",
+    ):
+        SpinePrAutomationQualification().qualify(
+            receipt=receipt,
+            expected_head_sha=HEAD,
+            expected_pr_number=PR,
+            authenticate=lambda candidate: True,
+        )
+
+
+def test_verifier_rejects_source_workflow_id_drift() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda candidate: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["source_workflow_id"] = 999999999
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="source workflow id changed",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)

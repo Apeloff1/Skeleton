@@ -11,6 +11,7 @@ from skeleton.persistence.spine_pr_automation_policy import (
     TRUSTED_SOURCE_CONCLUSION,
     TRUSTED_SOURCE_EVENT,
     TRUSTED_SOURCE_STATUS,
+    TRUSTED_SOURCE_WORKFLOW_ID,
     TRUSTED_SOURCE_WORKFLOW_NAME,
     TRUSTED_SOURCE_WORKFLOW_PATH,
 )
@@ -154,6 +155,10 @@ class SpinePrAutomationQualification:
             receipt.get("source_workflow_id"),
             "PR automation source workflow id",
         )
+        if source_workflow_id != TRUSTED_SOURCE_WORKFLOW_ID:
+            raise SpinePrAutomationQualificationError(
+                "PR automation source workflow id changed"
+            )
         source_run_id = _positive_int(
             receipt.get("source_run_id"),
             "PR automation source run id",
