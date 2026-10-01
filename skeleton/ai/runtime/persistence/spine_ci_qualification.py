@@ -175,9 +175,11 @@ class SpineCiQualification:
             )
 
         evidence = {
+            "authority_domain": receipt["authority_domain"],
             "head_sha": expected_head_sha,
             "required_check_policy_digest": _REQUIRED_CHECK_POLICY_DIGEST,
             "required_check_count": expected_count,
+            "checks": normalized,
             "checks_digest": _digest(normalized),
             "check_names": actual_names,
             "attestation_digest": attestation,

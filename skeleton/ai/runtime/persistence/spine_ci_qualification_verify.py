@@ -54,6 +54,10 @@ class SpineCiQualificationVerify:
             raise SpineCiQualificationVerifyError(
                 "CI qualification kind mismatch"
             )
+        if card.get("authority_domain") != "ci-exact-head":
+            raise SpineCiQualificationVerifyError(
+                "CI authority domain changed"
+            )
         head_sha = card.get("head_sha")
         if not isinstance(head_sha, str) or _SHA_RE.fullmatch(head_sha) is None:
             raise SpineCiQualificationVerifyError(
@@ -69,6 +73,7 @@ class SpineCiQualificationVerify:
                 raise SpineCiQualificationVerifyError(f"{field} is invalid")
         count = card.get("required_check_count")
         names = card.get("check_names")
+        checks = card.get("checks")
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise SpineCiQualificationVerifyError(
                 "CI required-check count is invalid"
@@ -86,6 +91,60 @@ class SpineCiQualificationVerify:
         if count != len(_REQUIRED_CHECKS) or names != list(_REQUIRED_CHECKS):
             raise SpineCiQualificationVerifyError(
                 "CI required-check catalog does not match policy"
+            )
+        if not isinstance(checks, list) or len(checks) != count:
+            raise SpineCiQualificationVerifyError(
+                "CI check evidence catalog is invalid"
+            )
+        normalized_checks: list[dict[str, Any]] = []
+        for index, check in enumerate(checks):
+            if not isinstance(check, dict):
+                raise SpineCiQualificationVerifyError(
+                    "CI check evidence must be an object"
+                )
+            name = check.get("name")
+            if name != names[index]:
+                raise SpineCiQualificationVerifyError(
+                    "CI check evidence order or identity changed"
+                )
+            if check.get("head_sha") != head_sha:
+                raise SpineCiQualificationVerifyError(
+                    f"CI check is not exact-head: {name}"
+                )
+            if check.get("conclusion") != "success":
+                raise SpineCiQualificationVerifyError(
+                    f"CI check is not successful: {name}"
+                )
+            run_id = check.get("run_id")
+            run_attempt = check.get("run_attempt")
+            if (
+                isinstance(run_id, bool)
+                or not isinstance(run_id, int)
+                or run_id < 1
+            ):
+                raise SpineCiQualificationVerifyError(
+                    f"CI run id is invalid: {name}"
+                )
+            if (
+                isinstance(run_attempt, bool)
+                or not isinstance(run_attempt, int)
+                or run_attempt < 1
+            ):
+                raise SpineCiQualificationVerifyError(
+                    f"CI run attempt is invalid: {name}"
+                )
+            normalized_checks.append(
+                {
+                    "name": name,
+                    "head_sha": head_sha,
+                    "run_id": run_id,
+                    "run_attempt": run_attempt,
+                    "conclusion": "success",
+                }
+            )
+        if _digest(normalized_checks) != card["checks_digest"]:
+            raise SpineCiQualificationVerifyError(
+                "CI checks digest does not match check evidence"
             )
         if (
             card.get("required_check_policy_digest")
@@ -109,11 +168,13 @@ class SpineCiQualificationVerify:
                 "CI qualification overclaimed merge authority"
             )
         evidence = {
+            "authority_domain": card["authority_domain"],
             "head_sha": head_sha,
             "required_check_policy_digest": card[
                 "required_check_policy_digest"
             ],
             "required_check_count": count,
+            "checks": normalized_checks,
             "checks_digest": card["checks_digest"],
             "check_names": list(names),
             "attestation_digest": card["attestation_digest"],
