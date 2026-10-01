@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "3787dbb799cef44d74338c74efca7a09e7b60c41",
+      "source_git_object_sha": "035c3ee14ebdaa992726e4ed15f37eee0760bc04",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -5096,9 +5096,9 @@
   },
   "provenance_refresh": {
     "status": "current",
-    "refreshed_from_head": "fccc7ddf24a9761adbbe41a4dd4c96ed37e641d8",
-    "refreshed_mapping_count": 8,
-    "note": "Eight stale source object identities refreshed against the exact P2 head after persistence, contracts, context, frontier, native, PR automation, quality, and repo-machine evolution; baseline_git_sha remains the original migration baseline.",
+    "refreshed_from_head": "4d585e7b498cb031d57c8e715171456595c05c60",
+    "refreshed_mapping_count": 1,
+    "note": "AIFT-PERSISTENCE source identity refreshed after the Bind Hold refusal and verifier tranche; baseline_git_sha remains the original migration baseline.",
     "whitespace_normalization": {
       "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
       "source_destination_pairs": 5,
