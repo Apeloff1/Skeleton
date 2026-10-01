@@ -163,6 +163,11 @@ from skeleton.persistence.spine_runtime_transition_attempt import SpineRuntimeTr
 from skeleton.persistence.spine_runtime_transition_attempt_verify import SpineRuntimeTransitionAttemptVerify
 from skeleton.persistence.spine_runtime_transition_rollback_witness import SpineRuntimeTransitionRollbackWitness
 from skeleton.persistence.spine_runtime_transition_rollback_verify import SpineRuntimeTransitionRollbackVerify
+from skeleton.persistence.spine_runtime_transition_slot import SpineRuntimeSlot
+from skeleton.persistence.spine_runtime_transition_execution import SpineRuntimeTransitionExecutionLedger
+from skeleton.persistence.spine_runtime_transition_execution_verify import SpineRuntimeTransitionExecutionVerify
+from skeleton.persistence.spine_runtime_transition_effect_rollback import SpineRuntimeTransitionEffectRollbackLedger
+from skeleton.persistence.spine_runtime_transition_effect_rollback_verify import SpineRuntimeTransitionEffectRollbackVerify
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
@@ -345,6 +350,11 @@ __all__ = [
     "SpineRuntimeTransitionAttemptVerify",
     "SpineRuntimeTransitionRollbackWitness",
     "SpineRuntimeTransitionRollbackVerify",
+    "SpineRuntimeSlot",
+    "SpineRuntimeTransitionExecutionLedger",
+    "SpineRuntimeTransitionExecutionVerify",
+    "SpineRuntimeTransitionEffectRollbackLedger",
+    "SpineRuntimeTransitionEffectRollbackVerify",
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",
