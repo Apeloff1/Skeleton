@@ -9,6 +9,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import sys
+import unicodedata
 from typing import Any, Iterable
 
 
@@ -127,7 +128,7 @@ def _repo_path(value: object) -> str:
 
 
 def _slug(value: str) -> str:
-    value = value.lower()
+    value = unicodedata.normalize("NFKD", value).lower()
     value = re.sub(r"[^a-z0-9]+", "-", value)
     return value.strip("-")[:80]
 
