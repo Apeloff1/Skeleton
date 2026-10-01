@@ -172,6 +172,8 @@ from skeleton.persistence.spine_runtime_transition_health import SpineRuntimeTra
 from skeleton.persistence.spine_runtime_transition_health_verify import SpineRuntimeTransitionHealthVerify
 from skeleton.persistence.spine_runtime_transition_acceptance import SpineRuntimeTransitionAcceptanceLedger
 from skeleton.persistence.spine_runtime_transition_acceptance_verify import SpineRuntimeTransitionAcceptanceVerify
+from skeleton.persistence.spine_runtime_production_activation_authorization import SpineRuntimeProductionActivationAuthorizationLedger
+from skeleton.persistence.spine_runtime_production_activation_authorization_verify import SpineRuntimeProductionActivationAuthorizationVerify
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
@@ -363,6 +365,8 @@ __all__ = [
     "SpineRuntimeTransitionHealthVerify",
     "SpineRuntimeTransitionAcceptanceLedger",
     "SpineRuntimeTransitionAcceptanceVerify",
+    "SpineRuntimeProductionActivationAuthorizationLedger",
+    "SpineRuntimeProductionActivationAuthorizationVerify",
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",
