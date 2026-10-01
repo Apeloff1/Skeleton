@@ -57,7 +57,7 @@ def rehearse(qualification: dict[str, Any]) -> dict[str, Any]:
             SpineApplyGate(),
         ).card(
             tenant_id="p2-cutover-rehearsal",
-            operation_id="p2-cutover-rehearsal",
+            operation_id="8c56ac1d-03f2-5f55-84c4-98c5cc7e09d6",
         )
 
         rehearsal = SpineCutoverRehearsal().rehearse(

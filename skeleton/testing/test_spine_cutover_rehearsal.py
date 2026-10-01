@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import copy
 
 import pytest
@@ -128,3 +130,8 @@ def test_rehearsal_verifier_rejects_authority_and_digest_tamper() -> None:
     tampered["cutover_published"] = 99
     with pytest.raises(SpineCutoverRehearsalVerifyError, match="digest mismatch"):
         SpineCutoverRehearsalVerify().verify(tampered)
+
+
+def test_live_rehearsal_fixture_operation_id_is_canonical_uuid() -> None:
+    operation_id = "8c56ac1d-03f2-5f55-84c4-98c5cc7e09d6"
+    assert str(UUID(operation_id)) == operation_id
