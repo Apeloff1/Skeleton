@@ -46,9 +46,14 @@ def _sha(value: object) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
-def _attestation_key(api_key: str) -> bytes:
+def _attestation_key() -> bytes:
+    raw = os.environ.get("P2_PROVIDER_LIVE_ATTESTATION_KEY", "").strip()
+    if not raw:
+        raise RuntimeError(
+            "P2_PROVIDER_LIVE_ATTESTATION_KEY is required for live attestation"
+        )
     return hashlib.sha256(
-        b"p2-provider-live-attestation\0" + api_key.encode("utf-8")
+        b"p2-provider-live-attestation\0" + raw.encode("utf-8")
     ).digest()
 
 
@@ -178,7 +183,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "credential_boundary_used": True,
         "architecture_acknowledged": True,
     }
-    key = _attestation_key(api_key)
+    key = _attestation_key()
     receipt["attestation_digest"] = _attest(receipt, key)
 
     card = SpineProviderLiveQualification().qualify(
