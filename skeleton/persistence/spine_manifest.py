@@ -31,6 +31,8 @@ SEAMS = (
     ("poison-ticket", "ticket-requires-hold"),
     ("poison-apply", "hold-digest-stable-epoch-unchanged"),
     ("poison-witness", "tenant-isolated-journal"),
+    ("poison-chain", "journal-hash-chain"),
+    ("dispatch-guard", "dispatcher-identity-unchanged"),
 )
 
 
