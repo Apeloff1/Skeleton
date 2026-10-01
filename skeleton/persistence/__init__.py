@@ -92,6 +92,12 @@ from skeleton.persistence.spine_bind_audit import SpineBindAudit
 from skeleton.persistence.spine_cut_gate import SpineCutGate
 from skeleton.persistence.spine_surface import SpineSurface
 from skeleton.persistence.spine_provider_probe import SpineProviderProbe
+from skeleton.persistence.spine_provider_surface_qualification import (
+    SpineProviderSurfaceQualification,
+)
+from skeleton.persistence.spine_provider_surface_qualification_verify import (
+    SpineProviderSurfaceQualificationVerify,
+)
 from skeleton.persistence.spine_pr_probe import SpinePrProbe
 from skeleton.persistence.spine_unread_gap import SpineUnreadGap
 from skeleton.persistence.spine_surface_seal import SpineSurfaceSeal
@@ -287,6 +293,8 @@ __all__ = [
     "SpineCutGate",
     "SpineSurface",
     "SpineProviderProbe",
+    "SpineProviderSurfaceQualification",
+    "SpineProviderSurfaceQualificationVerify",
     "SpinePrProbe",
     "SpineUnreadGap",
     "SpineSurfaceSeal",
