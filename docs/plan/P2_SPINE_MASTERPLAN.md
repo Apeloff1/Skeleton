@@ -121,6 +121,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Runtime activation handoff verify | `skeleton/persistence/spine_runtime_activation_handoff_verify.py` | handoff verification grants no activation |
 | Runtime transition rehearsal | `skeleton/persistence/spine_runtime_transition_rehearsal.py` | deployment handoff is dry-run against unchanged runtime/fence |
 | Runtime transition rehearsal verify | `skeleton/persistence/spine_runtime_transition_rehearsal_verify.py` | dry-run verification proves no transition executed |
+| Runtime transition permit | `skeleton/persistence/spine_runtime_transition_permit.py` | external execution authority issues one short-lived non-executing permit |
+| Runtime transition permit verify | `skeleton/persistence/spine_runtime_transition_permit_verify.py` | permit verification does not execute transition |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -149,7 +151,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 103, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 105, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py

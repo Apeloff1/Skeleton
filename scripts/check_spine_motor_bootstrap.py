@@ -47,6 +47,8 @@ FILES = (
     "spine_runtime_activation_handoff_verify.py",
     "spine_runtime_transition_rehearsal.py",
     "spine_runtime_transition_rehearsal_verify.py",
+    "spine_runtime_transition_permit.py",
+    "spine_runtime_transition_permit_verify.py",
 )
 
 

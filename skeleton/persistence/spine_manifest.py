@@ -112,6 +112,8 @@ SEAMS = (
     ("runtime-activation-handoff-verify", "handoff-verification-does-not-activate-runtime"),
     ("runtime-transition-rehearsal", "deployment-transition-rehearsal-does-not-execute-activation"),
     ("runtime-transition-rehearsal-verify", "transition-rehearsal-verification-does-not-activate-runtime"),
+    ("runtime-transition-permit", "transition-rehearsal-requires-external-short-lived-execution-permit"),
+    ("runtime-transition-permit-verify", "transition-permit-verification-does-not-execute-runtime"),
 )
 
 

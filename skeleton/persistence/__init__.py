@@ -156,6 +156,8 @@ from skeleton.persistence.spine_runtime_activation_handoff import SpineRuntimeAc
 from skeleton.persistence.spine_runtime_activation_handoff_verify import SpineRuntimeActivationHandoffVerify
 from skeleton.persistence.spine_runtime_transition_rehearsal import SpineRuntimeTransitionRehearsal
 from skeleton.persistence.spine_runtime_transition_rehearsal_verify import SpineRuntimeTransitionRehearsalVerify
+from skeleton.persistence.spine_runtime_transition_permit import SpineRuntimeTransitionPermitLedger
+from skeleton.persistence.spine_runtime_transition_permit_verify import SpineRuntimeTransitionPermitVerify
 from skeleton.persistence.spine_selection_consumption_verify import SpineSelectionConsumptionVerify
 from skeleton.persistence.spine_driver_selection import SpineDriverSelectionLedger
 from skeleton.persistence.spine_driver_selection_verify import SpineDriverSelectionVerify
@@ -331,6 +333,8 @@ __all__ = [
     "SpineRuntimeActivationHandoffVerify",
     "SpineRuntimeTransitionRehearsal",
     "SpineRuntimeTransitionRehearsalVerify",
+    "SpineRuntimeTransitionPermitLedger",
+    "SpineRuntimeTransitionPermitVerify",
     "SpineSelectionConsumptionVerify",
     "SpineDriverSelectionLedger",
     "SpineDriverSelectionVerify",

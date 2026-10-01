@@ -121,6 +121,10 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeTransitionRehearsal` consumes the exact verified deployment handoff before it expires, snapshots the live dispatcher binding, rechecks that the dispatcher remains stopped, and requires the fence epoch to remain unchanged. It emits a deterministic transition identity while explicitly keeping `transition_attempted=false`, `transition_executed=false`, and `runtime_activated=false`. `SpineRuntimeTransitionRehearsalVerify` independently reconstructs that evidence.
 
+## Runtime transition execution permit
+
+`SpineRuntimeTransitionPermitLedger` requires the independently verified dry-run rehearsal plus a separate externally authenticated `runtime-transition-execution` receipt scoped to the exact rehearsal, transition, and deployment identities. The receipt is capped at two minutes and carries a unique execution nonce. Permit issuance remains non-executing: `transition_attempted=false`, `transition_executed=false`, and `runtime_activated=false`. `SpineRuntimeTransitionPermitVerify` independently reconstructs the permit identity and digest.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -155,7 +159,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_activation_commit.py \
   skeleton/testing/test_spine_runtime_activation_boundary.py \
   skeleton/testing/test_spine_runtime_activation_handoff.py \
-  skeleton/testing/test_spine_runtime_transition_rehearsal.py
+  skeleton/testing/test_spine_runtime_transition_rehearsal.py \
+  skeleton/testing/test_spine_runtime_transition_permit.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
