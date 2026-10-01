@@ -153,6 +153,12 @@ This qualifies the deployment protocol surface only; it does not activate the ru
 
 `SpineRuntimeProductionActivationAuthorizationLedger` accepts only independently verified transition acceptance plus a separate short-lived externally authenticated `runtime-production-activation` receipt scoped to the exact acceptance digest, acceptance identity, execution identity, and deployment. It is durable and replay-resistant. The resulting card may set `production_activation_authorized=true`, but it keeps `runtime_activated=false` and `rollback_available=true`. `SpineRuntimeProductionActivationAuthorizationVerify` independently reconstructs that authority boundary without performing activation.
 
+## Final production activation
+
+`SpineRuntimeProductionActivationLedger` consumes one exact, independently verified production-activation authorization together with the exact accepted live-health proof. Before recording activation it re-reads the candidate runtime, durable health operation, runtime slot generation, dispatcher state, and deployment fence. The activation record sets `runtime_activated=true` exactly once but deliberately leaves the deployment fence unchanged. This keeps the existing compensating rollback executable after activation.
+
+`SpineRuntimeProductionActivationVerify` independently reconstructs the activation identity and digest, then re-reads the candidate runtime, durable operation, runtime slot, dispatcher, and unchanged rollback fence. The end-to-end regression activates and then executes the existing rollback path, proving that activation does not destroy rollback authority.
+
 ## Independent checks
 
 `SpineMotorBootstrapVerify` independently reconstructs the canonical plan and
@@ -196,7 +202,8 @@ python -m pytest -q --noconftest \
   skeleton/testing/test_spine_runtime_transition_effect_rollback.py \
   skeleton/testing/test_spine_runtime_transition_health.py \
   skeleton/testing/test_spine_runtime_transition_acceptance.py \
-  skeleton/testing/test_spine_runtime_production_activation_authorization.py
+  skeleton/testing/test_spine_runtime_production_activation_authorization.py \
+  skeleton/testing/test_spine_runtime_production_activation.py
 python scripts/check_spine_motor_bootstrap.py
 python scripts/qualify_spine_pymongo_async.py --uri mongodb://127.0.0.1:27017 --database skeleton_p2_pymongo_async_qualification --output /tmp/p2-pymongo-async.json
 ```
