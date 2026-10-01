@@ -95,6 +95,9 @@ from skeleton.persistence.spine_provider_probe import SpineProviderProbe
 from skeleton.persistence.spine_pr_probe import SpinePrProbe
 from skeleton.persistence.spine_unread_gap import SpineUnreadGap
 from skeleton.persistence.spine_surface_seal import SpineSurfaceSeal
+from skeleton.persistence.spine_ci_witness import SpineCiWitness
+from skeleton.persistence.spine_merge_gate import SpineMergeGate
+from skeleton.persistence.spine_probe_replay import SpineProbeReplay
 
 _SNAPSHOT_EXPORTS = {
     "SnapshotStore",
@@ -204,6 +207,9 @@ __all__ = [
     "SpinePrProbe",
     "SpineUnreadGap",
     "SpineSurfaceSeal",
+    "SpineCiWitness",
+    "SpineMergeGate",
+    "SpineProbeReplay",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

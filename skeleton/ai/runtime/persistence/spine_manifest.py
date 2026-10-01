@@ -41,6 +41,9 @@ SEAMS = (
     ("pr-probe", "pr-automation-unclaimed"),
     ("unread-gap", "tenant-sequence-gap"),
     ("surface-seal", "green-claim-stripped"),
+    ("ci-witness", "ci-green-unread"),
+    ("merge-gate", "merge-refused"),
+    ("probe-replay", "replay-does-not-insert"),
 )
 
 
