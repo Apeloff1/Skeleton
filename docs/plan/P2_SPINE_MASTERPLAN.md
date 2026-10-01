@@ -148,6 +148,8 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Provider live qualification verify | `skeleton/persistence/spine_provider_live_qualification_verify.py` | verifies live provider evidence while PR automation and merge authority remain separate |
 | PR automation qualification | `skeleton/persistence/spine_pr_automation_qualification.py` | authenticates one exact-head runner receipt and separates operational health from merge eligibility |
 | PR automation qualification verify | `skeleton/persistence/spine_pr_automation_qualification_verify.py` | verifies runner health while merge authority remains false |
+| CI qualification | `skeleton/persistence/spine_ci_qualification.py` | authenticates a complete exact-head successful required-check catalog without granting merge authority |
+| CI qualification verify | `skeleton/persistence/spine_ci_qualification_verify.py` | independently verifies CI-green evidence while merge authority remains false |
 
 AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
@@ -162,7 +164,8 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Poison apply: 55%
 - Apply/cutover readiness: 99%
 - Async Mongo bootstrap: 90%
-- CI green: 0%
+- CI qualification implementation: landed
+- CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%
 
@@ -179,7 +182,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 130, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 132, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
