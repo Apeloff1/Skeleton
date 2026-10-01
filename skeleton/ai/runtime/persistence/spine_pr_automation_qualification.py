@@ -124,7 +124,7 @@ class SpinePrAutomationQualification:
             receipt.get("reason_digest"),
             "PR automation reason digest",
         )
-        _digest_text(
+        attestation_digest = _digest_text(
             receipt.get("attestation_digest"),
             "PR automation attestation digest",
         )
@@ -209,6 +209,7 @@ class SpinePrAutomationQualification:
             "policy_fingerprint": policy_fingerprint,
             "snapshot_fingerprint": snapshot_fingerprint,
             "reason_digest": reason_digest,
+            "attestation_digest": attestation_digest,
             "reason_count": reason_count,
             "mode": mode,
             "target_state": target_state,

@@ -73,6 +73,7 @@ def test_policy_hold_can_prove_runner_operational_without_merge_authority() -> N
     assert card["pr_automation_operational_green"] is True
     assert card["pr_automation_green"] is True
     assert card["pr_automation_merge_eligible"] is False
+    assert card["attestation_digest"] == "d" * 64
     assert card["merge_authority"] is False
     assert verified["verified"] is True
 
@@ -147,6 +148,22 @@ def test_runner_failures_and_head_drift_fail_closed() -> None:
             expected_pr_number=PR,
             authenticate=lambda receipt: True,
         )
+
+
+def test_verifier_rejects_attestation_detachment() -> None:
+    card = SpinePrAutomationQualification().qualify(
+        receipt=_receipt(),
+        expected_head_sha=HEAD,
+        expected_pr_number=PR,
+        authenticate=lambda receipt: True,
+    )
+    tampered = copy.deepcopy(card)
+    tampered["attestation_digest"] = "e" * 64
+    with pytest.raises(
+        SpinePrAutomationQualificationVerifyError,
+        match="digest mismatch",
+    ):
+        SpinePrAutomationQualificationVerify().verify(tampered)
 
 
 def test_verifier_rejects_merge_authority_tamper() -> None:

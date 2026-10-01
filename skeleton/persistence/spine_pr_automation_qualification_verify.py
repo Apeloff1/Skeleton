@@ -56,6 +56,7 @@ class SpinePrAutomationQualificationVerify:
             "policy_fingerprint",
             "snapshot_fingerprint",
             "reason_digest",
+            "attestation_digest",
         ):
             value = card.get(field)
             if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
@@ -137,6 +138,7 @@ class SpinePrAutomationQualificationVerify:
             "policy_fingerprint": card["policy_fingerprint"],
             "snapshot_fingerprint": card["snapshot_fingerprint"],
             "reason_digest": card["reason_digest"],
+            "attestation_digest": card["attestation_digest"],
             "reason_count": card["reason_count"],
             "mode": card["mode"],
             "target_state": card["target_state"],
