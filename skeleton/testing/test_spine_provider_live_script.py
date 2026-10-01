@@ -148,3 +148,94 @@ def test_live_provider_script_requires_separate_attestation_key(
     monkeypatch.delenv("P2_PROVIDER_LIVE_ATTESTATION_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ATTESTATION_KEY is required"):
         module._attestation_key()
+
+
+def test_live_provider_script_can_classify_external_provider_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script()
+    monkeypatch.setenv("OPENAI_API_KEY", "SECRET_API_KEY_VALUE")
+    monkeypatch.setenv(
+        "P2_PROVIDER_LIVE_ATTESTATION_KEY",
+        "SECRET_ATTESTATION_VALUE",
+    )
+
+    class _UnavailableAdapter:
+        def __init__(self, **kwargs):
+            self.model = kwargs.get("model") or "test-model"
+            self.available = True
+
+        async def generate(self, request):
+            raise module.ProviderInvocationError(
+                "synthetic external provider unavailability"
+            )
+
+    monkeypatch.setattr(module, "OpenAIProviderAdapter", _UnavailableAdapter)
+    monkeypatch.setattr(
+        module,
+        "load_provider_architecture",
+        lambda provider_id: SimpleNamespace(contract_digest="f" * 64),
+    )
+    closure_path = tmp_path / "closure.json"
+    evidence_path = tmp_path / "live.json"
+    closure_path.write_text(
+        json.dumps(_closure(), sort_keys=True),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        closure=str(closure_path),
+        expected_head=HEAD,
+        evidence_out=str(evidence_path),
+        model="test-model",
+        timeout_seconds=5.0,
+        allow_provider_unavailable=True,
+    )
+
+    assert module._execute(args) == 3
+    assert not evidence_path.exists()
+
+
+def test_live_provider_script_keeps_provider_failure_hard_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script()
+    monkeypatch.setenv("OPENAI_API_KEY", "SECRET_API_KEY_VALUE")
+    monkeypatch.setenv(
+        "P2_PROVIDER_LIVE_ATTESTATION_KEY",
+        "SECRET_ATTESTATION_VALUE",
+    )
+
+    class _UnavailableAdapter:
+        def __init__(self, **kwargs):
+            self.model = kwargs.get("model") or "test-model"
+            self.available = True
+
+        async def generate(self, request):
+            raise module.ProviderInvocationError(
+                "synthetic external provider unavailability"
+            )
+
+    monkeypatch.setattr(module, "OpenAIProviderAdapter", _UnavailableAdapter)
+    monkeypatch.setattr(
+        module,
+        "load_provider_architecture",
+        lambda provider_id: SimpleNamespace(contract_digest="f" * 64),
+    )
+    closure_path = tmp_path / "closure.json"
+    closure_path.write_text(
+        json.dumps(_closure(), sort_keys=True),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        closure=str(closure_path),
+        expected_head=HEAD,
+        evidence_out=str(tmp_path / "live.json"),
+        model="test-model",
+        timeout_seconds=5.0,
+        allow_provider_unavailable=False,
+    )
+
+    with pytest.raises(module.ProviderInvocationError):
+        module._execute(args)

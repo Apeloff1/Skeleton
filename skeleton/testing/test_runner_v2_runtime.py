@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 import pytest
 
 from skeleton.pr_automation.core import Decision, Mode
+from skeleton.pr_automation.event_firewall import EventFirewallPolicy
 from skeleton.pr_automation.runner_contracts import (
     AdmissionState,
     PriorityBand,
@@ -68,6 +69,13 @@ from skeleton.testing.runner_v2_test_support import (
     runner_policy,
     snapshot,
     target,
+)
+
+
+TRUSTED_MERGE_READINESS_WORKFLOW_ID = next(
+    workflow_id
+    for workflow_name, workflow_id in EventFirewallPolicy().trusted_upstream_identities
+    if workflow_name == "Merge Readiness"
 )
 
 
@@ -202,7 +210,7 @@ def _workflow_completion_env(*, conclusion: str) -> dict[str, str]:
         "WORKFLOW_RUN_NAME": "Merge Readiness",
         "WORKFLOW_RUN_ID": "999",
         "WORKFLOW_RUN_ATTEMPT": "1",
-        "WORKFLOW_RUN_WORKFLOW_ID": "123",
+        "WORKFLOW_RUN_WORKFLOW_ID": str(TRUSTED_MERGE_READINESS_WORKFLOW_ID),
         "WORKFLOW_RUN_STATUS": "completed",
         "WORKFLOW_RUN_CONCLUSION": conclusion,
         "WORKFLOW_RUN_EVENT": "pull_request",

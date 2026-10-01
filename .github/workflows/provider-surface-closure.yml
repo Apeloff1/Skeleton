@@ -474,33 +474,60 @@ jobs:
           "openai==2.54.0"
 
       - name: Qualify credential-bearing live provider
+        id: live_qualification
         if: steps.live_provider.outputs.enabled == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           P2_PROVIDER_LIVE_ATTESTATION_KEY: ${{ github.token }}
           P2_PROVIDER_LIVE_MODEL: ${{ vars.P2_PROVIDER_LIVE_MODEL }}
-        run: >-
-          python scripts/qualify_spine_provider_live.py
-          --closure .provider-surface-qualified.json
-          --expected-head "$EXPECTED_SHA"
-          --evidence-out .provider-live-qualified.json
+        shell: bash
+        run: |
+          set -u -o pipefail
+          rm -f .provider-live-qualified.json
+          set +e
+          python scripts/qualify_spine_provider_live.py \
+            --closure .provider-surface-qualified.json \
+            --expected-head "$EXPECTED_SHA" \
+            --evidence-out .provider-live-qualified.json \
+            --allow-provider-unavailable
+          status=$?
+          set -e
+          case "$status" in
+            0)
+              [[ -s .provider-live-qualified.json ]] || {
+                echo "live qualifier returned success without evidence" >&2
+                exit 2
+              }
+              echo "produced=true" >> "$GITHUB_OUTPUT"
+              echo "unavailable=false" >> "$GITHUB_OUTPUT"
+              ;;
+            3)
+              rm -f .provider-live-qualified.json
+              echo "produced=false" >> "$GITHUB_OUTPUT"
+              echo "unavailable=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              exit "$status"
+              ;;
+          esac
 
       - name: Record provider live qualification status
         if: always()
         shell: bash
         run: |
-          if [[ "${{ steps.live_provider.outputs.enabled }}" == "true" ]]; then
-            if [[ ! -s .provider-live-qualified.json ]]; then
-              echo "credential existed but live provider evidence was not produced" >&2
-              exit 1
-            fi
-            echo "provider live qualification evidence produced"
-          else
+          if [[ "${{ steps.live_provider.outputs.enabled }}" != "true" ]]; then
             echo "provider live qualification not attempted: OPENAI_API_KEY unavailable"
+          elif [[ "${{ steps.live_qualification.outputs.produced }}" == "true" ]]; then
+            echo "provider live qualification evidence produced"
+          elif [[ "${{ steps.live_qualification.outputs.unavailable }}" == "true" ]]; then
+            echo "external provider unavailable; provider live-green remains false"
+          else
+            echo "live provider qualification ended without a classified result" >&2
+            exit 1
           fi
 
       - name: Upload provider live qualification evidence
-        if: steps.live_provider.outputs.enabled == 'true'
+        if: steps.live_qualification.outputs.produced == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: provider-live-qualified-${{ github.run_id }}

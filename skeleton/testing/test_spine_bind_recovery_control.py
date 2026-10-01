@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -120,11 +121,25 @@ def test_manifest_growth_is_accepted_when_masterplan_matches(
 
 
 def _literal_assignment_for_test(path: Path) -> tuple[tuple[str, str], ...]:
-    namespace: dict[str, object] = {}
-    exec(path.read_text(encoding="utf-8"), {}, namespace)
-    value = namespace["SEAMS"]
-    assert isinstance(value, tuple)
-    return value
+    module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for statement in module.body:
+        if not isinstance(statement, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == "SEAMS"
+            for target in statement.targets
+        ):
+            continue
+        value = ast.literal_eval(statement.value)
+        assert isinstance(value, tuple)
+        assert all(
+            isinstance(item, tuple)
+            and len(item) == 2
+            and all(isinstance(part, str) for part in item)
+            for item in value
+        )
+        return value
+    raise AssertionError("SEAMS literal assignment is missing")
 
 
 def test_manifest_missing_recovery_seam_fails_closed(tmp_path: Path) -> None:

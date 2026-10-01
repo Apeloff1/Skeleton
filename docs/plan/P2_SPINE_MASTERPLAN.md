@@ -167,7 +167,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - Provider live qualification implementation: landed
 - Provider live credential-bearing producer `scripts/qualify_spine_provider_live.py`: landed
 - Provider live external credential: runtime/environment dependent
-- Provider surface live claim: 0% until authenticated live receipt
+- Provider surface live claim: 0% until authenticated live receipt; configured credentials that are externally unavailable do not invalidate structural provider closure
 - PR Automation operational qualification: implemented
 - PR Automation authenticated receipt producer: landed
 - PR Automation trusted evidence emission: wired; live claim remains contingent on configured attestation secret + exact-target runner receipt

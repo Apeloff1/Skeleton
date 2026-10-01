@@ -28,7 +28,11 @@ from skeleton.persistence.spine_provider_live_qualification_verify import (
 from skeleton.persistence.spine_provider_surface_qualification_verify import (
     SpineProviderSurfaceQualificationVerify,
 )
-from skeleton.provider_runtime import OpenAIProviderAdapter, ProviderRequest
+from skeleton.provider_runtime import (
+    OpenAIProviderAdapter,
+    ProviderInvocationError,
+    ProviderRequest,
+)
 from skeleton.providers.contract import load_provider_architecture
 
 
@@ -230,13 +234,33 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--evidence-out", required=True)
     parser.add_argument("--model", default="")
     parser.add_argument("--timeout-seconds", type=float, default=30.0)
+    parser.add_argument(
+        "--allow-provider-unavailable",
+        action="store_true",
+        help=(
+            "return exit code 3 when the external provider invocation is "
+            "unavailable; local qualification/integrity failures still fail"
+        ),
+    )
     return parser
 
 
-def main() -> int:
-    args = _parser().parse_args()
-    asyncio.run(_run(args))
+def _execute(args: argparse.Namespace) -> int:
+    try:
+        asyncio.run(_run(args))
+    except ProviderInvocationError:
+        if not getattr(args, "allow_provider_unavailable", False):
+            raise
+        print(
+            "provider-live unavailable: external provider invocation "
+            "did not produce qualifying evidence"
+        )
+        return 3
     return 0
+
+
+def main() -> int:
+    return _execute(_parser().parse_args())
 
 
 if __name__ == "__main__":
