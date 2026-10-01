@@ -172,6 +172,11 @@ jobs:
               echo "workflow_run completion is missing head SHA or branch" >&2
               exit 2
             fi
+            [[ "$WORKFLOW_RUN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "workflow_run head SHA must be a canonical 40-hex commit OID" >&2
+              exit 2
+            }
+            printf 'P2_SOURCE_HEAD_SHA=%s\n' "$WORKFLOW_RUN_HEAD_SHA" >> "$GITHUB_ENV"
             args+=(--head-sha="$WORKFLOW_RUN_HEAD_SHA" --head-ref="$WORKFLOW_RUN_HEAD_REF")
             if [[ -n "${DEFAULT_BRANCH}" ]]; then
               args+=(--default-branch="$DEFAULT_BRANCH")
@@ -187,7 +192,6 @@ jobs:
         shell: bash
         env:
           P2_PR_AUTOMATION_ATTESTATION_KEY: ${{ secrets.P2_PR_AUTOMATION_ATTESTATION_KEY }}
-          P2_SOURCE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           P2_AUTOMATION_MODE: ${{ steps.mode.outputs.mode }}
         run: |
           set -euo pipefail
