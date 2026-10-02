@@ -260,15 +260,21 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_authority_separation_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 9,
@@ -289,15 +295,21 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_authority_separation_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 10,
@@ -347,15 +359,21 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_authority_separation_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-030",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 12,
