@@ -412,11 +412,16 @@ def _semantic_pass(
     if requirement == "persistence.terminal_evidence_integrity":
         return bool(
             _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "state_tamper_rejected")
             and _boolean(details, "turn_tamper_rejected")
             and _boolean(details, "checkpoint_tamper_rejected")
             and _boolean(details, "result_tamper_rejected")
             and _boolean(details, "outbox_tamper_rejected")
             and _boolean(details, "migration_backfill_verified")
+            and _boolean(
+                details,
+                "state_digest_backfill_verified",
+            )
             and _boolean(
                 details,
                 "replay_digest_backfill_verified",
