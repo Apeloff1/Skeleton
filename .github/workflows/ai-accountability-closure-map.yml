@@ -85,6 +85,7 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_ai_accountability_closure_map.py
           tests/test_ai_accountability_verifier_runner.py
+          tests/test_ai_p0_accountability_terminal_verifier.py
           tests/test_engine_application_boundary_independent_verifier.py
           tests/test_memory_authority_independent_verifier.py
           tests/test_provider_protocol_independent_verifier.py
@@ -212,5 +213,54 @@ jobs:
               "AI accountability closure bridge exact-head receipt:",
               expected,
               counts,
+          )
+          PY
+
+      - name: Verify terminal 42-of-42 P0 accountability on exact head
+        env:
+          ACCOUNTABILITY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_p0_accountability_terminal.py
+          --head-sha "$ACCOUNTABILITY_HEAD_SHA"
+          --verifier-receipt .ai-accountability-verifier-runner.json
+          --closure-map-receipt .ai-accountability-closure-map.json
+          --evidence-out .ai-p0-accountability-terminal.json
+          --print-evidence
+
+      - name: Assert terminal P0 receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-p0-accountability-terminal.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("terminal P0 receipt is not exact-head")
+          if receipt.get("verifier") != "ai-p0-accountability-terminal-v1":
+              raise SystemExit("unexpected terminal P0 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("terminal P0 accountability verification failed")
+          if receipt.get("task_count") != 42:
+              raise SystemExit("terminal P0 queue must contain exactly 42 tasks")
+          if receipt.get("terminal_task_count") != 42:
+              raise SystemExit("terminal P0 closure requires 42/42 done")
+          if receipt.get("group_count") != 14:
+              raise SystemExit("terminal P0 closure requires all 14 verifier groups")
+          if receipt.get("fresh_verifier_pass_count") != 14:
+              raise SystemExit("terminal P0 closure requires 14/14 fresh verifiers")
+          if not all(receipt.get("digests", {}).values()):
+              raise SystemExit("terminal P0 evidence digests are incomplete")
+          print(
+              "AI P0 terminal accountability exact-head receipt:",
+              expected,
+              f"{receipt['terminal_task_count']}/{receipt['task_count']}",
           )
           PY
