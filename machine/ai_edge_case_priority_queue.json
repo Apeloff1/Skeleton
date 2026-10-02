@@ -170,9 +170,13 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_historical_backup_purge_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/reliability/backup_restore.py",
+        "test:skeleton/testing/test_backup_retention_security.py",
+        "workflow:P0 Backup Sensitive Deletion"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-010",
       "completion_checkbox": false,
