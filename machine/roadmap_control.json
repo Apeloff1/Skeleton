@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.roadmap_control.v1",
-  "roadmap_version": "0.2.0",
+  "roadmap_version": "0.3.0",
   "status": "active",
   "purpose": "Bind roadmap state to canonical construction/P2 dependency DAGs while preserving explicit revision lineage and breadth freeze.",
   "masterplan_binding": {
@@ -353,7 +353,7 @@
         "VOL-132",
         "VOL-134"
       ],
-      "status": "ready",
+      "status": "landed_unpromoted",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -374,7 +374,7 @@
         "VOL-172",
         "VOL-175"
       ],
-      "status": "ready",
+      "status": "landed_unpromoted",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -390,7 +390,7 @@
       "volume_refs": [
         "VOL-007"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -408,7 +408,7 @@
         "VOL-091",
         "VOL-096"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -428,7 +428,7 @@
         "VOL-097",
         "VOL-104"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -475,6 +475,17 @@
       "p2_backlog_version": "0.2.0",
       "build_sequence_version": "1.1.0",
       "reason": "synchronize roadmap to activated P2-T1 runtime-trust and Functional-AI ownership",
+      "preserves_history": true
+    },
+    {
+      "id": "ROAD-REV-0006",
+      "event": "p2_functional_ai_frontier_closed",
+      "p2_map_version": "0.2.0",
+      "p2_backlog_version": "0.2.0",
+      "build_sequence_version": "1.1.0",
+      "evidence_head": "c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+      "evidence_run": 36960967807,
+      "reason": "bind P2-T1 landed-unpromoted state to provider-independent Functional-AI exact-head evidence",
       "preserves_history": true
     }
   ],
