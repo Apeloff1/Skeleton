@@ -2847,12 +2847,16 @@
       "status": "catalogued",
       "requirements": [
         "Authority-bearing identifiers reject Unicode bidirectional controls and format controls before authorization lookup.",
-        "Bidi-bearing untrusted text is stripped by the sandbox sanitizer before model or display reuse."
+        "Bidi-bearing untrusted text is stripped by the sandbox sanitizer before model or display reuse.",
+        "Security-sensitive routing and authority identifiers reject Unicode bidirectional controls before comparison or dispatch.",
+        "Protocol and approval identities cannot contain invisible Unicode formatting characters."
       ],
       "tests": [
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity",
-        "skeleton/testing/test_sandbox_sanitize_inject.py::test_sanitize_text_strips_controls_bidi_invisibles_and_ansi"
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_sanitize_text_strips_controls_bidi_invisibles_and_ansi",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_request_rejects_unicode_spoofing_in_routing_identity",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_rejects_ambiguous_unicode_authority_identity"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -2863,7 +2867,11 @@
         "mirror:skeleton/ai/shell/mcp_authz.py",
         "test:skeleton/testing/test_shell_ai_mcp_2026.py",
         "test:skeleton/testing/test_sandbox_sanitize_inject.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
@@ -2900,13 +2908,17 @@
       "requirements": [
         "Authority-bearing identifiers reject zero-width/invisible characters and NFKC compatibility aliases.",
         "Mixed Latin, Greek, and Cyrillic authority identifiers fail closed to prevent common homoglyph confusion.",
-        "Canonical single-script Unicode identities remain usable."
+        "Canonical single-script Unicode identities remain usable.",
+        "Authority-bearing identifiers use ASCII identity to eliminate Unicode lookalike/confusable collisions.",
+        "Security labels reject non-NFKC and invisible/control character spellings before registration or approval."
       ],
       "tests": [
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_tool_names",
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_allows_canonical_single_script_identity",
-        "skeleton/testing/test_sandbox_sanitize_inject.py::test_hidden_character_audit_and_tag_decoding"
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_hidden_character_audit_and_tag_decoding",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_principal_rejects_confusable_unicode_identity",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_rejects_ambiguous_unicode_authority_identity"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -2917,7 +2929,11 @@
         "mirror:skeleton/ai/shell/mcp_authz.py",
         "test:skeleton/testing/test_shell_ai_mcp_2026.py",
         "test:skeleton/testing/test_sandbox_sanitize_inject.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
