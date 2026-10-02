@@ -21,6 +21,41 @@ class CanonicalContractError(ValueError):
     """Raised when a canonical envelope violates its contract."""
 
 
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    """Encode strict JSON deterministically for digests/signing inputs."""
+    def check(item: Any) -> None:
+        if item is None or isinstance(item, (str, bool, int)):
+            return
+        if isinstance(item, float):
+            if item != item or item in {float("inf"), float("-inf")}:
+                raise CanonicalContractError("non-finite numbers are not canonical JSON")
+            return
+        if isinstance(item, list):
+            for child in item:
+                check(child)
+            return
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if not isinstance(key, str):
+                    raise CanonicalContractError("canonical JSON object keys must be strings")
+                check(child)
+            return
+        raise CanonicalContractError("canonical contract values must be strict JSON")
+
+    check(value)
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise CanonicalContractError("value cannot be canonicalized as JSON") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class Identity:
     repository: str
@@ -45,17 +80,13 @@ def evidence_ref_identity(evidence: EvidenceRef) -> str:
     """Hash canonical evidence-ref metadata without inventing a second ID field."""
     if not isinstance(evidence, EvidenceRef):
         raise CanonicalContractError("evidence must be EvidenceRef")
-    raw = json.dumps(
+    raw = _canonical_json_bytes(
         {
             "source": evidence.source,
             "digest": evidence.digest,
             "category": evidence.category,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
+        }
+    )
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -73,11 +104,7 @@ class CanonicalEnvelope:
             raise CanonicalContractError("unsupported schema version")
         if not self.kind:
             raise CanonicalContractError("missing envelope kind")
-        raw = json.dumps(
-            self.payload,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        raw = _canonical_json_bytes(self.payload)
         if len(raw) > MAX_PAYLOAD_BYTES:
             raise CanonicalContractError("payload exceeds byte budget")
         return {
@@ -91,9 +118,5 @@ class CanonicalEnvelope:
 
     @property
     def digest(self) -> str:
-        raw = json.dumps(
-            self.canonical_payload(),
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        raw = _canonical_json_bytes(self.canonical_payload())
         return hashlib.sha256(raw).hexdigest()
