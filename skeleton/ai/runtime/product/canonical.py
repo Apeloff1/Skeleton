@@ -14,6 +14,7 @@ Authority remains split intentionally:
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -221,6 +222,36 @@ class CanonicalAITurnRequest:
                 raise ValueError(f"{name} must be in [1, {maximum}]")
         object.__setattr__(self, "created_at", _aware(self.created_at))
 
+    @property
+    def identity_digest(self) -> str:
+        return _json_digest(
+            {
+                "schema_version": "skeleton.product.canonical-turn.v1",
+                "message": self.message,
+                "idempotency_key": self.idempotency_key,
+                "external_context_segments": [
+                    {
+                        "segment_id": segment.segment_id,
+                        "content_digest": segment.content_digest,
+                        "kind": segment.kind.value,
+                        "trust_level": segment.trust_level.value,
+                        "tenant_id": segment.tenant_id,
+                        "purpose": segment.purpose,
+                    }
+                    for segment in self.external_context_segments
+                ],
+                "attachment_refs": list(self.attachment_refs),
+                "allowed_tool_ids": list(self.allowed_tool_ids),
+                "max_model_turns": self.max_model_turns,
+                "max_tool_calls": self.max_tool_calls,
+                "max_repeat_tool_batches": self.max_repeat_tool_batches,
+            }
+        )
+
+    @property
+    def identity_ref(self) -> str:
+        return "product-turn-sha256:" + self.identity_digest
+
 
 @dataclass(frozen=True, slots=True)
 class CanonicalAIResponseEnvelope:
@@ -344,6 +375,8 @@ class CanonicalConversationAIRuntime:
         self.instruction_policy = instruction_policy
         self.context_budget = context_budget
         self.context_compiler = context_compiler or CanonicalContextCompiler()
+        self._active_tasks: dict[str, asyncio.Task[ExecutionRunResult]] = {}
+        self._active_tasks_lock = asyncio.Lock()
 
     def create_thread(
         self,
@@ -448,7 +481,10 @@ class CanonicalConversationAIRuntime:
             idempotency_key=request.idempotency_key,
             content=request.message,
             parent_message_id=parent,
-            attachment_refs=request.attachment_refs,
+            attachment_refs=(
+                *request.attachment_refs,
+                request.identity_ref,
+            ),
             data_class=thread.data_class,
         )
         return self.conversations.append_message(
@@ -457,6 +493,62 @@ class CanonicalConversationAIRuntime:
             owner_id=owner_id,
             expected_thread_version=thread.version,
         )
+
+    @staticmethod
+    def _assert_request_binding(
+        user_message: ConversationMessage,
+        request: CanonicalAITurnRequest,
+    ) -> None:
+        identity_refs = tuple(
+            ref
+            for ref in user_message.attachment_refs
+            if ref.startswith("product-turn-sha256:")
+        )
+        if len(identity_refs) != 1:
+            raise ConversationRepositoryCorruption(
+                "canonical user turn is missing unique product request identity"
+            )
+        if identity_refs[0] != request.identity_ref:
+            raise ConversationConflict(
+                "idempotency_key was reused with different turn semantics"
+            )
+
+    async def _run_or_join_execution(
+        self,
+        *,
+        execution_id: str,
+        request,
+        instructions: str,
+        prompt: str,
+        context_digest: str,
+        history: tuple[AIMessage, ...],
+        approval_refs: dict[str, str],
+        now: datetime,
+    ) -> ExecutionRunResult:
+        async with self._active_tasks_lock:
+            task = self._active_tasks.get(execution_id)
+            if task is None or task.done():
+                task = asyncio.create_task(
+                    self.functional_runtime.runtime.start(
+                        request,
+                        instructions=instructions,
+                        prompt=prompt,
+                        context_digest=context_digest,
+                        history=history,
+                        approval_refs=approval_refs,
+                        now=now,
+                    )
+                )
+                self._active_tasks[execution_id] = task
+        try:
+            # Product/client cancellation must not accidentally cancel a durable
+            # execution. Explicit cancel_turn() owns that authority.
+            return await asyncio.shield(task)
+        finally:
+            if task.done():
+                async with self._active_tasks_lock:
+                    if self._active_tasks.get(execution_id) is task:
+                        self._active_tasks.pop(execution_id, None)
 
     def _compile_context(
         self,
@@ -662,6 +754,8 @@ class CanonicalConversationAIRuntime:
             raise ConversationConflict(
                 "idempotency_key was reused with different user content"
             )
+        if user_message is not None:
+            self._assert_request_binding(user_message, request)
 
         if user_message is None:
             thread, user_message = self._append_user(
@@ -778,8 +872,9 @@ class CanonicalConversationAIRuntime:
                 "functional request identity derivation drifted"
             )
 
-        run = await self.functional_runtime.runtime.start(
-            lower_request.to_execution_request(),
+        run = await self._run_or_join_execution(
+            execution_id=execution_id,
+            request=lower_request.to_execution_request(),
             instructions=projection.instructions,
             prompt=projection.prompt,
             context_digest=context.context_digest,
@@ -838,6 +933,85 @@ class CanonicalConversationAIRuntime:
             terminal=terminal,
             replayed=False,
         )
+
+
+    async def cancel_turn(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        idempotency_key: str,
+        now: datetime | None = None,
+    ) -> ExecutionRunResult:
+        """Durably cancel one canonical turn and interrupt local inference.
+
+        The durable cancellation bit is written before the process-local task is
+        interrupted.  A subsequent runtime resume then materializes the terminal
+        cancelled result, so restart/retry observes one authoritative outcome.
+        """
+
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty")
+        thread = self.conversations.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        user_message, _assistant = self._find_messages(
+            thread,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            idempotency_key=idempotency_key,
+        )
+        if user_message is None:
+            raise CanonicalProductRuntimeError(
+                "cannot cancel unknown canonical turn"
+            )
+        request_id = _functional_request_id(
+            thread.thread_id,
+            user_message.message_id,
+        )
+        execution_id = _functional_execution_id(request_id)
+        try:
+            current = self.functional_runtime.repository.get(execution_id)
+        except Exception as exc:
+            raise CanonicalProductRuntimeError(
+                "canonical turn has no durable functional execution"
+            ) from exc
+
+        if current.terminal:
+            return ExecutionRunResult(
+                execution_id=execution_id,
+                state=current.state,
+                result=self.functional_runtime.repository.result(execution_id),
+            )
+
+        instant = _aware(now or datetime.now(timezone.utc))
+        self.functional_runtime.repository.request_cancel(
+            execution_id,
+            expected_version=current.version,
+            now=instant,
+        )
+
+        async with self._active_tasks_lock:
+            task = self._active_tasks.get(execution_id)
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        result = await self.functional_runtime.runtime.resume(
+            execution_id,
+            now=instant,
+        )
+        if result.result is None or result.result.status != "cancelled":
+            raise CanonicalProductRuntimeError(
+                "cancellation did not materialize a terminal cancelled result"
+            )
+        return result
 
 
 __all__ = [
