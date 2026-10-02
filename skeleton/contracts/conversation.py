@@ -240,6 +240,7 @@ class ConversationMessage:
     context_compiler_version: str | None = None
     attachment_refs: tuple[str, ...] = ()
     tool_receipt_refs: tuple[str, ...] = ()
+    provider_receipt_refs: tuple[str, ...] = ()
     memory_refs: tuple[str, ...] = ()
     citation_refs: tuple[str, ...] = ()
     artifact_refs: tuple[str, ...] = ()
@@ -334,6 +335,11 @@ class ConversationMessage:
         )
         object.__setattr__(
             self,
+            "provider_receipt_refs",
+            _refs(self.provider_receipt_refs, "provider_receipt_refs"),
+        )
+        object.__setattr__(
+            self,
             "memory_refs",
             _refs(self.memory_refs, "memory_refs"),
         )
@@ -363,6 +369,13 @@ class ConversationMessage:
         if author is ConversationAuthorType.TOOL and not self.tool_receipt_refs:
             raise ConversationContractError(
                 "tool message requires at least one tool receipt reference"
+            )
+        if (
+            author is not ConversationAuthorType.ASSISTANT
+            and self.provider_receipt_refs
+        ):
+            raise ConversationContractError(
+                "only assistant messages can bind provider receipt references"
             )
         if author is ConversationAuthorType.USER and self.ai_result_id is not None:
             raise ConversationContractError(
@@ -398,6 +411,7 @@ class ConversationMessage:
             "context_compiler_version": self.context_compiler_version,
             "attachment_refs": list(self.attachment_refs),
             "tool_receipt_refs": list(self.tool_receipt_refs),
+            "provider_receipt_refs": list(self.provider_receipt_refs),
             "memory_refs": list(self.memory_refs),
             "citation_refs": list(self.citation_refs),
             "artifact_refs": list(self.artifact_refs),
