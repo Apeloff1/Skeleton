@@ -10,6 +10,7 @@
     "execution.stop_semantics",
     "execution.tool_authority",
     "execution.durable_recovery",
+    "execution.staged_finalization_recovery",
     "execution.replay_lineage",
     "execution.reproducibility",
     "execution.governed_effects",
@@ -35,7 +36,9 @@
     "evidence_source_execution_binding": true,
     "learning_result_binding_required": true,
     "qualification_receipt_rehash_required": true,
-    "strict_json_receipt_verification": true
+    "strict_json_receipt_verification": true,
+    "staged_finalization_crash_recovery_required": true,
+    "negative_learning_gate_qualification_required": true
   },
   "runtime_binding": "skeleton/ai/runtime/system_completion.py",
   "acceptance_bindings": [
@@ -67,7 +70,7 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff all 17 requirements pass for one subject and exact git revision, each applicable source object belongs to that execution, verification binds the exact candidate/context, memory binds its owner, learning binds the qualified result digest, and the emitted qualification receipt independently rehashes from strict duplicate-free JSON",
+  "completion_rule": "valid iff all 18 requirements pass for one subject and exact git revision; source evidence must belong to that execution; staged finalization must survive close/reopen and clear after recovery; verification binds exact candidate/context; memory binds owner; learning binds the qualified result and proves rejection of invalid promotion/rollback paths; emitted JSON independently rehashes under strict duplicate-key rejection",
   "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
   "qualification_cli": "scripts/run_ai_system_completion_qualification.py",
   "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py"
