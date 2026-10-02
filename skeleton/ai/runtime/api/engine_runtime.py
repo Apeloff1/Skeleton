@@ -134,6 +134,55 @@ class EngineExecutionCoordinator:
             )
         await self.ensure_started(stored.command)
 
+    async def interrupt_cancelled_execution(
+        self,
+        execution_id: str,
+    ) -> None:
+        """Interrupt active inference and reconcile one durable cancellation.
+
+        EngineExecutionService owns the cancellation flag. This coordinator
+        only interrupts the process-local driver and then restarts the durable
+        state machine so cancellation becomes a terminal result. The resumed
+        runtime observes cancellation_requested before any further provider or
+        tool execution.
+        """
+
+        execution_id = str(execution_id).strip()
+        if not execution_id:
+            raise EngineExecutionCoordinatorError(
+                "execution_id is required for cancellation reconciliation"
+            )
+        if self._closed:
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator is closed"
+            )
+        current = self.service.repository.get(execution_id)
+        if current.terminal or self.service.repository.result(execution_id) is not None:
+            return
+        if not current.cancellation_requested:
+            raise EngineExecutionCoordinatorError(
+                "durable cancellation must be requested before interruption"
+            )
+
+        task: asyncio.Task[None] | None = None
+        async with self._lock:
+            candidate = self._tasks.get(execution_id)
+            if candidate is not None and not candidate.done():
+                task = candidate
+                task.cancel()
+
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+            async with self._lock:
+                if self._tasks.get(execution_id) is task:
+                    self._tasks.pop(execution_id, None)
+
+        # The durable submission remains authoritative across interruption.
+        # Starting a new driver is reconciliation, not a second execution: the
+        # cognitive runtime reads cancellation_requested first and finalizes
+        # cancelled without another provider invocation.
+        await self.ensure_execution(execution_id)
+
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
