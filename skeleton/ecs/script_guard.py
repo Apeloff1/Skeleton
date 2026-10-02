@@ -30,6 +30,7 @@ DEFAULT_MAX_MEMORY = 8 * 1024 * 1024  # modelled bytes
 DEFAULT_MAX_SECONDS = 0.25
 MAX_INT_BITS = 4_096
 MAX_SEQUENCE = 1_000_000
+MAX_RANGE = 10_000_000
 
 
 class Budget:
@@ -212,7 +213,6 @@ class MathNamespace:
     """Read-only math namespace exposed to scripts as ``math``."""
 
     __slots__ = ()
-    _members: Mapping[str, Any] = {}
 
     def __repr__(self) -> str:
         return "<sandbox math>"
@@ -248,14 +248,6 @@ def _math_pow(a: float, b: float) -> float:
 
 MATH_MEMBERS["pow"] = _math_pow
 MATH = MathNamespace()
-
-
-class ScriptRecord:
-    """Opaque read-only record handed to scripts (e.g. entity views).
-
-    Scripts reach fields only via ``rec.get(name)`` / ``rec.keys()`` etc.;
-    it is just a dict subclass registered in the method table.
-    """
 
 
 class Guards:
@@ -365,7 +357,10 @@ def _safe_range(budget: Budget) -> Callable[..., range]:
         for a in args:
             if isinstance(a, bool) or not isinstance(a, int):
                 raise ScriptRuntimeError("range() arguments must be integers")
-        return range(*args)
+        r = range(*args)
+        if len(r) > MAX_RANGE:
+            raise ScriptMemoryLimitError("range too large", context={"length": len(r), "maximum": MAX_RANGE})
+        return r
 
     return srange
 
@@ -373,7 +368,7 @@ def _safe_range(budget: Budget) -> Callable[..., range]:
 def _metered(budget: Budget, fn: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         for a in args:
-            ln = _length(a)
+            ln = len(a) if isinstance(a, range) else _length(a)
             if ln is not None:
                 budget.step(max(1, ln // 16))
         result = fn(*args, **kwargs)
