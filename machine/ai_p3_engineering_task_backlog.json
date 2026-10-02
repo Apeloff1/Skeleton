@@ -10,7 +10,7 @@
     {
       "task_id": "P3-WORKFLOW-01",
       "lane_id": "P3E-L0",
-      "status": "ready",
+      "status": "landed_unpromoted",
       "title": "Compile deterministic workflow and task graph",
       "depends_on": [],
       "primary_volume_refs": [
@@ -43,7 +43,13 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 Workflow Compiler@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864731"
       ],
       "masterplan_obligations": [
         {
@@ -403,7 +409,7 @@
     {
       "task_id": "P3-AUTONOMY-01",
       "lane_id": "P3E-L1",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Bound autonomy control and escalation",
       "depends_on": [
         "P3-WORKFLOW-01"
@@ -429,7 +435,15 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 Autonomy Control@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864817",
+        "workflow:P3 Autonomous Worker Control@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864727"
       ],
       "masterplan_obligations": [
         {
@@ -501,7 +515,7 @@
     {
       "task_id": "P3-CHANGE-01",
       "lane_id": "P3E-L2",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Build workspace-aware safe-change planner",
       "depends_on": [
         "P3-WORKFLOW-01"
@@ -534,7 +548,13 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 Safe Change Planner@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864746"
       ],
       "masterplan_obligations": [
         {
@@ -830,7 +850,7 @@
     {
       "task_id": "P3-TOOLS-01",
       "lane_id": "P3E-L3",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Compose trusted tools and system changes",
       "depends_on": [
         "P3-AUTONOMY-01",
@@ -864,7 +884,15 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 Tool Trust and Composition@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864799",
+        "workflow:P3 Multi-Agent Coordination@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864768"
       ],
       "masterplan_obligations": [
         {
@@ -1160,7 +1188,7 @@
     {
       "task_id": "P3-EFFECTS-01",
       "lane_id": "P3E-L4",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Ledger and compensate side effects",
       "depends_on": [
         "P3-TOOLS-01"
@@ -1187,7 +1215,13 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 Side Effect Ledger@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864754"
       ],
       "masterplan_obligations": [
         {
@@ -1291,7 +1325,7 @@
     {
       "task_id": "P3-AGENT-01",
       "lane_id": "P3E-L5",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Qualify autonomous engineering worker",
       "depends_on": [
         "P3-WORKFLOW-01",
@@ -1322,7 +1356,17 @@
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
         "source:machine/ai_master_plan.json",
-        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f",
+        "github:pr#2348",
+        "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+        "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864712",
+        "workflow:P3 VS-002 Engineering Agent@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864761",
+        "workflow:P3 Controlled Self Improvement@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864720",
+        "workflow:P3 Autonomous Engineering Acceptance@b6613f809710954f729605cf99f80497e0973bd9:success",
+        "github-actions-run:36967864688"
       ],
       "masterplan_obligations": [
         {
@@ -1427,9 +1471,9 @@
   "summary": {
     "task_count": 6,
     "in_progress_count": 0,
-    "ready_count": 1,
-    "blocked_count": 5,
-    "landed_unpromoted_count": 0,
+    "ready_count": 0,
+    "blocked_count": 0,
+    "landed_unpromoted_count": 6,
     "scheduled_volume_count": 37,
     "queued_volume_count": 197,
     "source_volume_count": 234
