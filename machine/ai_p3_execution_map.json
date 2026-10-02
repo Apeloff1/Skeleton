@@ -742,8 +742,8 @@
     "queued_volume_count": 234,
     "task_count": 6,
     "landed_unpromoted_count": 0,
-    "in_progress_count": 0,
-    "ready_count": 1,
+    "in_progress_count": 1,
+    "ready_count": 0,
     "blocked_count": 5
   }
 }

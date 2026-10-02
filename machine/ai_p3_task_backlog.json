@@ -8,8 +8,8 @@
   "completion_authority": "Task state is implementation scheduling/evidence state only. Masterplan maturity and independent sign-off remain separate authorities.",
   "summary": {
     "task_count": 6,
-    "in_progress_count": 0,
-    "ready_count": 1,
+    "in_progress_count": 1,
+    "ready_count": 0,
     "blocked_count": 5,
     "landed_unpromoted_count": 0,
     "scheduled_volume_count": 23,
@@ -20,7 +20,7 @@
     {
       "task_id": "P3-MODEL-FOUNDATION-01",
       "lane_id": "P3-L0",
-      "status": "ready",
+      "status": "in_progress",
       "title": "Model, research and multimodal foundation",
       "depends_on": [],
       "primary_volume_refs": [
@@ -45,7 +45,11 @@
       "evidence_refs": [
         "source:machine/ai_p2_functional_ai_closure.json",
         "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/ai/learning/model_program.py",
+        "implementation:skeleton/ai/research/source_lineage.py",
+        "implementation:skeleton/ai/simulation/environment.py",
+        "implementation:skeleton/ai/runtime/multimodal/intake.py"
       ],
       "masterplan_obligations": [
         {
