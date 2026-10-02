@@ -184,6 +184,7 @@ def verify(head_sha: str) -> dict[str, object]:
         "provider_privacy_fallback_qualification_required": True,
         "memory_poisoning_resistance_required": True,
         "outbound_network_boundary_qualification_required": True,
+        "qualification_semantic_reverification_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -260,6 +261,8 @@ def verify(head_sha: str) -> dict[str, object]:
             "system-completion report digest mismatch",
             "qualification receipt digest mismatch",
             "canonical requirement order",
+            "proof semantic pass mismatch",
+            "_semantic_pass",
         )
         absent = _contains_all(
             QUALIFICATION_RECEIPT_VERIFIER_PATH,
