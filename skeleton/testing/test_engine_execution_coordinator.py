@@ -559,6 +559,82 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
 
 
 @pytest.mark.asyncio
+async def test_coordinator_interrupts_active_provider_and_reconciles_cancel(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    _, command = _bundle(execution_id="exec-active-interrupt")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    gate = asyncio.Event()
+    provider = FakeProvider(
+        text="must never become a published answer",
+        gate=gate,
+    )
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
+    )
+
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
+    else:
+        raise AssertionError("provider request did not start")
+
+    cancelled = service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert cancelled.cancellation_requested is True
+
+    await coordinator.interrupt_cancelled_execution(
+        command.execution_request.execution_id
+    )
+    result = await _wait_result(
+        service,
+        command.execution_request.execution_id,
+    )
+
+    assert result.status == "cancelled"
+    assert result.final_output is None
+    assert result.usage["error_code"] == "cancellation_requested"
+    assert len(provider.requests) == 1
+
+    current = service.repository.get(
+        command.execution_request.execution_id
+    )
+    assert current.state.value == "cancelled"
+    assert current.cancellation_requested is True
+
+    # Releasing the old provider gate after terminal cancellation cannot turn
+    # the detached/cancelled invocation into a second durable outcome.
+    gate.set()
+    await asyncio.sleep(0)
+    stored = service.repository.result(
+        command.execution_request.execution_id
+    )
+    assert stored is not None
+    assert stored.status == "cancelled"
+    assert len(provider.requests) == 1
+
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_coordinator_restart_recovery_uses_durable_submission(tmp_path) -> None:
     service = _service(tmp_path)
     _, command = _bundle()
