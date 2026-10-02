@@ -160,8 +160,13 @@ class BackupManager:
                 raise ValueError("backup index contains invalid backup_id")
             path = self.backup_dir / f"{backup_id}.json"
             if not path.exists():
-                continue
-            blob = json.loads(path.read_text(encoding="utf-8"))
+                raise RuntimeError(f"indexed backup is missing: {backup_id}")
+            try:
+                blob = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    f"indexed backup is unreadable: {backup_id}"
+                ) from exc
             files = blob.get("files")
             checksums = blob.get("checksums")
             if not isinstance(files, dict) or not isinstance(checksums, dict):
@@ -199,6 +204,21 @@ class BackupManager:
         ]
         self._save_index()
         return len(staged)
+
+    def delete_state(self, state_file: str) -> Dict[str, Any]:
+        """Purge retained copies before deleting one managed live state file."""
+        if state_file not in STATE_FILES:
+            raise ValueError("state_file is not a governed backup state file")
+        purged = self.purge_file_history(state_file)
+        live = self.root / state_file
+        live_deleted = live.exists()
+        if live_deleted:
+            live.unlink()
+        return {
+            "state_file": state_file,
+            "live_deleted": live_deleted,
+            "purged_backups": purged,
+        }
 
     def verify(self, backup_id: str) -> Dict[str, Any]:
         backup_id = self._safe_backup_id(backup_id)
