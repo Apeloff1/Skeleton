@@ -230,6 +230,82 @@ def test_atomic_finalization_commits_result_before_terminal_outbox() -> None:
     assert pending[0].payload["verification"] == "verification:ver-1"
 
 
+def test_turn_digest_rejects_contract_valid_payload_tampering() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    turn = AgentTurn(
+        operation_id="op-1",
+        execution_id="exec-1",
+        turn_id="turn-integrity",
+        parent_turn_id=None,
+        turn_index=0,
+        phase=ExecutionState.PROVIDER_COMPLETED,
+        context_digest="a" * 64,
+        checkpoint_ref="execution-checkpoint:exec-1:1",
+        status="provider_completed",
+    )
+    repo.append_turn(
+        turn,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_turn
+        SET turn_json = replace(
+            turn_json,
+            '"status":"provider_completed"',
+            '"status":"forged_completed"'
+        )
+        WHERE namespace = ? AND execution_id = ? AND turn_id = ?
+        """,
+        (repo.namespace, "exec-1", turn.turn_id),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="turn digest mismatch",
+    ):
+        repo.turns("exec-1")
+
+
+def test_checkpoint_digest_rejects_contract_valid_metadata_tampering() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    checkpoint = repo.checkpoint(
+        "exec-1",
+        {"phase": "created"},
+        expected_execution_version=current.version,
+        expected_checkpoint_version=0,
+        now=_now(),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_checkpoint
+        SET checkpoint_json = replace(
+            checkpoint_json,
+            '"state":"created"',
+            '"state":"loading"'
+        )
+        WHERE namespace = ? AND execution_id = ?
+          AND checkpoint_version = ?
+        """,
+        (
+            repo.namespace,
+            "exec-1",
+            checkpoint.checkpoint_version,
+        ),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="checkpoint digest mismatch",
+    ):
+        repo.latest_checkpoint("exec-1")
+
+
 def test_terminal_result_digest_rejects_contract_valid_payload_tampering() -> None:
     repo = SQLiteExecutionRepository()
     repo.create(_request(), now=_now())
