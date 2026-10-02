@@ -4300,12 +4300,27 @@
         168
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Untrusted retrieved context is denied by default before model exposure.",
+        "When explicitly admitted, retrieved repository/tool/user data remains provenance-labeled data with instruction_authority=false.",
+        "External context cannot rewrite the canonical AIIntent goal; it is supplied only as prior observation data."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_context_planner.py::test_context_planner_rejects_untrusted_retrieved_instructions_by_default",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_explicitly_allowed_untrusted_context_remains_data_not_intent",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_repository_context_never_inherits_instruction_authority"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "mirror:skeleton/ai/shell/context_provenance.py",
+        "mirror:skeleton/ai/shell/context_policy.py",
+        "test:skeleton/testing/test_shell_ai_context_planner.py",
+        "workflow:P0 Context Instruction Authority"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4323,7 +4338,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-AI-002",
