@@ -68,6 +68,7 @@ SECURITY_BINDING_PATHS = tuple(
         "skeleton/persistence/memory_repository.py",
         "skeleton/testing/test_admission_runtime.py",
         "skeleton/testing/test_execution_repository.py",
+        "skeleton/persistence/execution_repository.py",
     )
 )
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -196,6 +197,10 @@ def verify(head_sha: str) -> dict[str, object]:
         "shared_pressure_qualification_required": True,
         "idempotent_retry_qualification_required": True,
         "tenant_isolation_qualification_required": True,
+        "unknown_usage_terminal_fence_required": True,
+        "verification_receipt_identity_required": True,
+        "terminal_outbox_delivery_required": True,
+        "persisted_terminal_evidence_integrity_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -263,6 +268,11 @@ def verify(head_sha: str) -> dict[str, object]:
             "prove_shared_pressure",
             "prove_idempotent_retry",
             "prove_tenant_isolation",
+            "_persistence_reliability_cycle",
+            "prove_unknown_usage_fence",
+            "prove_verification_receipt_identity",
+            "prove_terminal_outbox_delivery",
+            "prove_persisted_evidence_integrity",
         )
         absent = _contains_all(QUALIFICATION_PATH, qualification_required)
         if absent:
