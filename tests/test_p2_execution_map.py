@@ -22,8 +22,8 @@ class P2ExecutionMapTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["source_volume_count"], 314)
-        self.assertEqual(result["scheduled_volume_count"], 42)
-        self.assertEqual(result["queued_volume_count"], 272)
+        self.assertEqual(result["scheduled_volume_count"], 57)
+        self.assertEqual(result["queued_volume_count"], 257)
 
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="p2-map-"))
