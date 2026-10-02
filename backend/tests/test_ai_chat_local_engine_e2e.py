@@ -134,6 +134,7 @@ class SQLiteAsyncConversationAuthority:
         branch_id: str | None = None,
         supersedes_message_id: str | None = None,
         tool_receipt_refs: tuple[str, ...] = (),
+        provider_receipt_refs: tuple[str, ...] = (),
         memory_refs: tuple[str, ...] = (),
         citation_refs: tuple[str, ...] = (),
         artifact_refs: tuple[str, ...] = (),
@@ -163,6 +164,7 @@ class SQLiteAsyncConversationAuthority:
             context_source_snapshot=context_source_snapshot,
             context_compiler_version=context_compiler_version,
             tool_receipt_refs=tool_receipt_refs,
+            provider_receipt_refs=provider_receipt_refs,
             memory_refs=memory_refs,
             citation_refs=citation_refs,
             artifact_refs=artifact_refs,
@@ -352,6 +354,12 @@ async def test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_
     assert first["model"] == "engine-routed"
     assert first["response"] == "Assembled local engine answer."
     assert first["replayed"] is False
+    assert first["engine_runtime_provider"] == "local"
+    assert first["engine_provider_receipts"]
+    assert all(
+        receipt.startswith("provider:local:")
+        for receipt in first["engine_provider_receipts"]
+    )
     assert len(local_calls) == 1
 
     execution_id = first["engine_execution_id"]
@@ -381,6 +389,7 @@ async def test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_
     assert assistant.operation_id == first["operation_id"]
     assert assistant.ai_result_id == first["ai_result_id"]
     assert assistant.context_digest == first["context"]["context_digest"]
+    assert assistant.provider_receipt_refs == durable.provider_receipts
     assert assistant.citation_refs == ("evidence:backend-chat-local-e2e",)
 
     replay = await route.ai_chat(
@@ -399,6 +408,8 @@ async def test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_
     assert replay["response"] == first["response"]
     assert replay["operation_id"] == first["operation_id"]
     assert replay["ai_result_id"] == first["ai_result_id"]
+    assert replay["engine_runtime_provider"] == "local"
+    assert replay["engine_provider_receipts"] == first["engine_provider_receipts"]
     assert len(local_calls) == 1
 
     await coordinator.shutdown()
