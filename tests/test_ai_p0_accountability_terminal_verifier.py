@@ -32,6 +32,7 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 "task_prefix": prefix,
                 "gap_id": gap_id,
                 "verifier_script": verifier_script,
+                "expected_receipt_verifier": "fixture-verifier-v1",
             }
         )
         results.append(
@@ -39,6 +40,7 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 "key": key,
                 "gap_id": gap_id,
                 "passed": True,
+                "receipt_verifier": "fixture-verifier-v1",
                 "receipt_head_sha": HEAD,
                 "receipt_digest": f"{group_index + 1:064x}",
             }
@@ -227,5 +229,27 @@ def test_terminal_verifier_rejects_bridge_signoff_without_mapped_verifier(
     assert receipt["valid"] is False
     assert any(
         "bridge signoff does not bind mapped verifier" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_terminal_verifier_rejects_fresh_verifier_identity_drift(
+    tmp_path: Path,
+) -> None:
+    runner, bridge = _fixture(tmp_path)
+    payload = json.loads(runner.read_text(encoding="utf-8"))
+    payload["results"][0]["receipt_verifier"] = "wrong-verifier-v1"
+    runner.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_terminal(
+        tmp_path,
+        head_sha=HEAD,
+        verifier_receipt=runner,
+        closure_map_receipt=bridge,
+    )
+
+    assert receipt["valid"] is False
+    assert any(
+        "fresh verifier receipt identity mismatch" in error
         for error in receipt["errors"]
     )
