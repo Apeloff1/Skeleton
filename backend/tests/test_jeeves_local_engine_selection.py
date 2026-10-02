@@ -36,6 +36,16 @@ async def test_active_local_engine_uses_local_model_instead_of_extractive_result
             calls.append(("max_tokens", value))
             return self
 
+        def add_history_message(self, role, content):
+            calls.append(("history", (role, content)))
+            return self
+
+        def add_evidence(self, source_id, content, *, kind="retrieval_evidence"):
+            calls.append(
+                ("evidence", (source_id, content, kind))
+            )
+            return self
+
         async def send_message(self, message):
             calls.append(("send", message.text))
             return SimpleNamespace(
@@ -76,7 +86,13 @@ async def test_active_local_engine_uses_local_model_instead_of_extractive_result
     assert result["engine_provider_receipts"] == [
         "provider:local:jeeves"
     ]
-    assert any(kind == "send" for kind, _value in calls)
+    assert ("send", "short") in calls
+    evidence_calls = [
+        value for kind, value in calls if kind == "evidence"
+    ]
+    assert len(evidence_calls) == 1
+    assert evidence_calls[0][2] == "retrieval_evidence"
+    assert "extractive material" in evidence_calls[0][1]
 
 
 @pytest.mark.asyncio
