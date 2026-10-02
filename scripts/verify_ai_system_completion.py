@@ -26,6 +26,13 @@ RUNTIME_TEST_PATH = (
     ROOT / "skeleton" / "testing" / "test_ai_system_completion_plane.py"
 )
 VERIFIER_TEST_PATH = ROOT / "tests" / "test_ai_system_completion_verifier.py"
+QUALIFICATION_PATH = (
+    ROOT / "skeleton" / "ai" / "evaluation" / "system_qualification.py"
+)
+QUALIFICATION_CLI_PATH = (
+    ROOT / "scripts" / "run_ai_system_completion_qualification.py"
+)
+QUALIFICATION_TEST_PATH = ROOT / "tests" / "test_ai_system_qualification.py"
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -88,6 +95,9 @@ def verify(head_sha: str) -> dict[str, object]:
         WORKFLOW_PATH,
         RUNTIME_TEST_PATH,
         VERIFIER_TEST_PATH,
+        QUALIFICATION_PATH,
+        QUALIFICATION_CLI_PATH,
+        QUALIFICATION_TEST_PATH,
     )
     missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.is_file()]
     if missing_files:
@@ -159,11 +169,43 @@ def verify(head_sha: str) -> dict[str, object]:
                 "runtime acceptance wiring incomplete: " + ", ".join(absent)
             )
 
+    if QUALIFICATION_PATH.is_file():
+        qualification_required = (
+            "qualify_system_completion",
+            "SystemQualificationReceipt",
+            "OfflineSocketGuard",
+            "prove_reproducibility",
+            "prove_learning_rollback",
+        )
+        absent = _contains_all(QUALIFICATION_PATH, qualification_required)
+        if absent:
+            errors.append(
+                "qualification runner wiring incomplete: " + ", ".join(absent)
+            )
+
+    if QUALIFICATION_CLI_PATH.is_file():
+        qualification_cli_required = (
+            "qualify_system_completion",
+            "--head-sha",
+            "--evidence-out",
+            "receipt.get(\"valid\")",
+        )
+        absent = _contains_all(
+            QUALIFICATION_CLI_PATH,
+            qualification_cli_required,
+        )
+        if absent:
+            errors.append(
+                "qualification CLI wiring incomplete: " + ", ".join(absent)
+            )
+
     if WORKFLOW_PATH.is_file():
         workflow_required = (
             "test_ai_system_completion_plane.py",
             "test_ai_system_completion_verifier.py",
             "verify_ai_system_completion.py",
+            "run_ai_system_completion_qualification.py",
+            ".ai-system-runtime-qualification.json",
             "github.event.pull_request.head.sha || github.sha",
         )
         absent = _contains_all(WORKFLOW_PATH, workflow_required)
