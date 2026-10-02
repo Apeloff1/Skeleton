@@ -5852,12 +5852,22 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Archive extraction rejects absolute and parent-traversal member paths before destination mutation.",
+        "Extraction is member-by-member through RootedFilesystem and never uses extract(), extractall(), or shutil.unpack_archive()."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_rejects_traversal_absolute_or_ambiguous_paths",
+        "skeleton/testing/test_security_archive_sandbox.py::test_tar_rejects_traversal_absolute_or_ambiguous_paths"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5875,7 +5885,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-006",
@@ -5889,12 +5899,23 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Archive extraction enforces per-member, total-expanded-size, and compression-ratio bounds before publication.",
+        "Streamed extraction fails closed if runtime bytes exceed preflight metadata or configured limits."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_total_expanded_size_bound_is_enforced",
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_compression_ratio_bound_is_enforced",
+        "skeleton/testing/test_security_archive_sandbox.py::test_archive_expansion_ratio_bound_is_enforced"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5913,7 +5934,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-007",
@@ -5927,12 +5948,21 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "ZIP symlink members and TAR symlink/hard-link members are rejected before extraction.",
+        "Special archive members cannot create link chains or non-regular filesystem objects."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_symlink_member_is_rejected"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5951,7 +5981,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-008",
