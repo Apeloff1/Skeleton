@@ -17,7 +17,7 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.conversations import ConversationStorageUnavailable, conversation_authority
@@ -256,6 +256,11 @@ class AIChatRequest(BaseModel):
 
 
 class AIChatCancelRequest(BaseModel):
+    idempotency_key: str = Field(
+        ...,
+        min_length=1,
+        max_length=1024,
+    )
     reason: str = Field(
         default="user_cancelled",
         min_length=1,
@@ -1452,10 +1457,10 @@ async def ai_chat(
     }
 
 
-@router.get("/chat/turns/{thread_id}/{idempotency_key}")
+@router.get("/chat/turns/{thread_id}")
 async def get_ai_chat_turn(
     thread_id: str,
-    idempotency_key: str,
+    idempotency_key: str = Query(..., min_length=1, max_length=1024),
     user=Depends(require_role("viewer")),
 ) -> Dict[str, Any]:
     """Probe/finalize one canonical chat turn without resending prompt context."""
@@ -1787,10 +1792,9 @@ async def get_ai_chat_turn(
     }
 
 
-@router.post("/chat/turns/{thread_id}/{idempotency_key}/cancel")
+@router.post("/chat/turns/{thread_id}/cancel")
 async def cancel_ai_chat_turn(
     thread_id: str,
-    idempotency_key: str,
     request: AIChatCancelRequest,
     user=Depends(require_role("viewer")),
 ) -> Dict[str, Any]:
@@ -1811,6 +1815,7 @@ async def cancel_ai_chat_turn(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
+    idempotency_key = request.idempotency_key
     user_message, assistant_message = _chat_turn_messages(
         transcript,
         idempotency_key,
