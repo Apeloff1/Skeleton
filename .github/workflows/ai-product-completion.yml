@@ -60,4 +60,5 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_ai_product_context.py
           skeleton/testing/test_ai_product_session.py
+          skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_vs001_functional_ai.py
