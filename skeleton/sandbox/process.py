@@ -170,7 +170,16 @@ def run_isolated(
         raise ProcessPolicyError("process isolation requires POSIX")
     lim = limits or ProcessLimits()
     args = check_argv(argv)
+    owned = jail is None
     box = jail or FsJail.temporary(prefix="sbx-proc-")
+    try:
+        return _run(args, box, cwd, stdin, env, lim)
+    finally:
+        if owned:
+            shutil.rmtree(box.root, ignore_errors=True)
+
+
+def _run(args: tuple[str, ...], box: FsJail, cwd: str | None, stdin: bytes | None, env: Mapping[str, str] | None, lim: ProcessLimits) -> ProcessResult:
     workdir = box.root if not cwd else box.resolve(cwd, must_exist=True)
     if not workdir.is_dir():
         raise ProcessPolicyError("cwd must be a directory inside the jail")
