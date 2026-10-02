@@ -66,7 +66,8 @@
     "unknown_usage_terminal_fence_required": true,
     "verification_receipt_identity_required": true,
     "terminal_outbox_delivery_required": true,
-    "persisted_terminal_evidence_integrity_required": true
+    "persisted_terminal_evidence_integrity_required": true,
+    "persisted_replay_evidence_integrity_required": true
   },
   "runtime_binding": "skeleton/ai/runtime/system_completion.py",
   "acceptance_bindings": [
@@ -98,7 +99,7 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff all 32 non-compensable requirements pass for one subject and exact git revision; execution, persistence integrity, crash recovery, verification receipt identity, terminal outbox delivery, unknown-usage accounting fences, sandboxing, provider privacy, governed memory, outbound networking, resource admission, shared pressure, retry idempotency, tenant isolation, learning, and receipt evidence must remain causally bound and independently reverified for digest integrity and proof semantics",
+  "completion_rule": "valid iff all 32 non-compensable requirements pass for one subject and exact git revision; request, turns, checkpoints, terminal results, verification receipts, outbox events, crash recovery, accounting fences, sandbox/privacy/network/resource/tenant boundaries, learning lineage, and emitted receipt evidence must remain causally bound, integrity-checked in persistence, and independently reverified for both digest and semantic correctness",
   "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
   "qualification_cli": "scripts/run_ai_system_completion_qualification.py",
   "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py",
