@@ -722,9 +722,13 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_argv_only_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Shell Quoting Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-018",
       "completion_checkbox": false,
