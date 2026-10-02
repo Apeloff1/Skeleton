@@ -11,7 +11,9 @@ class ReviewRoutingError(RuntimeError):
 
 
 def _identity(value: str, field: str) -> str:
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be text")
+    text = value.strip()
     if not text or len(text) > 192:
         raise ValueError(f"{field} must be non-empty bounded text")
     return text
