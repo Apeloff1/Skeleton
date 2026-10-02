@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
@@ -178,6 +178,18 @@ class SQLiteAsyncConversationAuthority:
         )
 
 
+class FailAssistantCommitOnceAuthority(SQLiteAsyncConversationAuthority):
+    def __init__(self, repository: SQLiteConversationRepository) -> None:
+        super().__init__(repository)
+        self.fail_once = True
+
+    async def commit_assistant_message(self, *args, **kwargs):
+        if self.fail_once:
+            self.fail_once = False
+            raise RuntimeError("simulated assistant commit crash")
+        return await super().commit_assistant_message(*args, **kwargs)
+
+
 def _load_backend_ai_route(monkeypatch):
     """Load the route without requiring the production Mongo adapter."""
 
@@ -247,6 +259,69 @@ def _verified(
         },
         evidence_refs=("evidence:backend-chat-local-e2e",),
     )
+
+
+def _engine_boundary(
+    *,
+    execution_path: Path,
+    submission_path: Path,
+    registry: ProviderRegistry,
+):
+    execution_repository = SQLiteExecutionRepository(execution_path)
+    submissions = SQLiteEngineSubmissionStore(submission_path)
+    service = EngineExecutionService(
+        execution_repository,
+        submissions,
+        EngineAuthorityRegistry(
+            [
+                EngineServiceGrant(
+                    service_principal="codedock-backend",
+                    scopes=frozenset(
+                        {
+                            "engine:submit",
+                            "engine:read",
+                            "engine:cancel",
+                            "engine:events",
+                            "engine:approve",
+                            "engine:memory",
+                        }
+                    ),
+                    tenant_ids=frozenset({TENANT}),
+                    capabilities=frozenset({"assistant.chat"}),
+                )
+            ]
+        ),
+    )
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=registry,
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified,
+    )
+    engine_app = FastAPI()
+    engine_app.include_router(engine_routes.router, prefix="/api/v1")
+    engine_app.dependency_overrides[engine_routes._engine_service] = lambda: service
+    engine_app.dependency_overrides[engine_routes._engine_service_token] = (
+        lambda: SERVICE_TOKEN
+    )
+    engine_app.dependency_overrides[engine_routes._engine_coordinator] = (
+        lambda: coordinator
+    )
+
+    from core.engine_client import EngineClient, EngineClientConfig
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://engine.test",
+            service_token=SERVICE_TOKEN,
+            service_principal="codedock-backend",
+            request_timeout_s=5,
+            poll_interval_s=0.001,
+            execution_timeout_s=10,
+        ),
+        transport=httpx.ASGITransport(app=engine_app),
+    )
+    return service, coordinator, client, execution_repository, submissions
 
 
 @pytest.mark.asyncio
@@ -416,3 +491,157 @@ async def test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_
     conversations.close()
     execution_repository.close()
     submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_backend_chat_recovers_durable_local_result_after_commit_crash_and_restart(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    monkeypatch.setenv(
+        "AI_ARCHITECTURE_ROOT",
+        str(Path(__file__).resolve().parents[2]),
+    )
+
+    conversation_path = tmp_path / "restart-conversation.sqlite3"
+    execution_path = tmp_path / "restart-execution.sqlite3"
+    submission_path = tmp_path / "restart-submission.sqlite3"
+
+    conversations = SQLiteConversationRepository(conversation_path)
+    thread = conversations.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Local engine restart recovery",
+        data_class="confidential",
+    )
+    authority = FailAssistantCommitOnceAuthority(conversations)
+
+    registry, first_calls = _local_registry()
+    (
+        service,
+        coordinator,
+        engine_client,
+        execution_repository,
+        submissions,
+    ) = _engine_boundary(
+        execution_path=execution_path,
+        submission_path=submission_path,
+        registry=registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: engine_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+
+    request = route.AIChatRequest(
+        message="Answer through the assembled local engine.",
+        thread_id=thread.thread_id,
+        idempotency_key="restart-crash-1",
+        expected_thread_version=thread.version,
+        context="Untrusted evidence for the local execution.",
+    )
+
+    with pytest.raises(HTTPException) as failed_commit:
+        await route.ai_chat(
+            request,
+            user={"email": OWNER, "tenant_id": TENANT},
+        )
+    assert failed_commit.value.status_code == 500
+    assert len(first_calls) == 1
+
+    user_only = conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert len(user_only) == 1
+    user_message = user_only[0]
+    assert user_message.author_type is ConversationAuthorType.USER
+
+    operation_id = str(
+        __import__("uuid").uuid5(
+            __import__("uuid").NAMESPACE_URL,
+            "skeleton-ai-chat:" + thread.thread_id + ":" + user_message.message_id,
+        )
+    )
+    execution_id = str(
+        __import__("uuid").uuid5(
+            __import__("uuid").NAMESPACE_URL,
+            "skeleton-ai-chat-execution:" + operation_id,
+        )
+    )
+    durable_before_restart = execution_repository.result(execution_id)
+    assert durable_before_restart is not None
+    assert durable_before_restart.status == "completed"
+    assert durable_before_restart.final_output == "Assembled local engine answer."
+
+    await coordinator.shutdown()
+    conversations.close()
+    execution_repository.close()
+    submissions.close()
+
+    reopened_conversations = SQLiteConversationRepository(conversation_path)
+    reopened_authority = SQLiteAsyncConversationAuthority(reopened_conversations)
+    restart_registry, restart_calls = _local_registry()
+    (
+        restarted_service,
+        restarted_coordinator,
+        restarted_client,
+        restarted_execution_repository,
+        restarted_submissions,
+    ) = _engine_boundary(
+        execution_path=execution_path,
+        submission_path=submission_path,
+        registry=restart_registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: restarted_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", reopened_authority)
+
+    recovered = await route.ai_chat(
+        route.AIChatRequest(
+            message=request.message,
+            thread_id=request.thread_id,
+            idempotency_key=request.idempotency_key,
+            expected_thread_version=thread.version,
+            context=request.context,
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+
+    assert recovered["success"] is True
+    assert recovered["response"] == "Assembled local engine answer."
+    assert recovered["engine_execution_id"] == execution_id
+    assert recovered["operation_id"] == operation_id
+    assert recovered["engine_runtime_provider"] == "local"
+    assert restart_calls == []
+
+    transcript = reopened_conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert [item.author_type.value for item in transcript] == [
+        "user",
+        "assistant",
+    ]
+    assert transcript[-1].provider_receipt_refs
+    assert all(
+        ref.startswith("provider:local:")
+        for ref in transcript[-1].provider_receipt_refs
+    )
+    assert (
+        restarted_execution_repository.result(execution_id).as_dict()
+        == durable_before_restart.as_dict()
+    )
+
+    await restarted_coordinator.shutdown()
+    reopened_conversations.close()
+    restarted_execution_repository.close()
+    restarted_submissions.close()
