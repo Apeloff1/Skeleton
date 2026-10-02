@@ -39,6 +39,30 @@ QUALIFICATION_RECEIPT_VERIFIER_PATH = (
 QUALIFICATION_RECEIPT_VERIFIER_TEST_PATH = (
     ROOT / "tests" / "test_ai_system_qualification_receipt_verifier.py"
 )
+SECURITY_BINDING_PATHS = tuple(
+    ROOT / path
+    for path in (
+        "skeleton/ai/runtime/sandbox/fs.py",
+        "skeleton/ai/runtime/sandbox/process.py",
+        "skeleton/ai/runtime/sandbox/injection.py",
+        "skeleton/ai/runtime/sandbox/sanitizers.py",
+        "skeleton/ai/shell/model_port.py",
+        "skeleton/ai/shell/provider_router.py",
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/security/outbound_url.py",
+        "skeleton/security/outbound_http.py",
+        "skeleton/testing/test_sandbox_isolation.py",
+        "skeleton/testing/test_sandbox_sanitize_inject.py",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "skeleton/testing/test_memory_writeback.py",
+        "skeleton/testing/test_outbound_url_resolution_security.py",
+        "skeleton/testing/test_security_outbound_http.py",
+        ".github/workflows/p0-provider-fallback-privacy.yml",
+        ".github/workflows/p0-memory-poisoning-evidence.yml",
+        ".github/workflows/p0-network-boundary-evidence.yml",
+    )
+)
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -106,6 +130,7 @@ def verify(head_sha: str) -> dict[str, object]:
         QUALIFICATION_TEST_PATH,
         QUALIFICATION_RECEIPT_VERIFIER_PATH,
         QUALIFICATION_RECEIPT_VERIFIER_TEST_PATH,
+        *SECURITY_BINDING_PATHS,
     )
     missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.is_file()]
     if missing_files:
@@ -154,6 +179,11 @@ def verify(head_sha: str) -> dict[str, object]:
         "strict_json_receipt_verification": True,
         "staged_finalization_crash_recovery_required": True,
         "negative_learning_gate_qualification_required": True,
+        "sandbox_boundary_qualification_required": True,
+        "injection_sanitization_qualification_required": True,
+        "provider_privacy_fallback_qualification_required": True,
+        "memory_poisoning_resistance_required": True,
+        "outbound_network_boundary_qualification_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -161,6 +191,25 @@ def verify(head_sha: str) -> dict[str, object]:
         for key, expected in required_authority.items():
             if authority.get(key) is not expected:
                 errors.append(f"authority control disabled or missing: {key}")
+
+    inherited_security = contract.get(
+        "inherited_security_bindings",
+        [],
+    )
+    if not isinstance(inherited_security, list) or not all(
+        isinstance(item, str) and item for item in inherited_security
+    ):
+        errors.append(
+            "inherited_security_bindings must be a string list"
+        )
+        inherited_security = []
+    expected_security = [
+        str(path.relative_to(ROOT)) for path in SECURITY_BINDING_PATHS
+    ]
+    if inherited_security != expected_security:
+        errors.append(
+            "inherited security binding inventory diverges"
+        )
 
     bindings = contract.get("acceptance_bindings", [])
     if not isinstance(bindings, list) or not all(isinstance(item, str) for item in bindings):
@@ -190,6 +239,13 @@ def verify(head_sha: str) -> dict[str, object]:
             "OfflineSocketGuard",
             "prove_reproducibility",
             "prove_learning_rollback",
+            "_hostile_environment_cycle",
+            "prove_sandbox_filesystem",
+            "prove_sandbox_process",
+            "prove_injection_sanitization",
+            "prove_provider_fallback_privacy",
+            "prove_memory_poisoning_resistance",
+            "prove_outbound_network_boundary",
         )
         absent = _contains_all(QUALIFICATION_PATH, qualification_required)
         if absent:
@@ -238,6 +294,10 @@ def verify(head_sha: str) -> dict[str, object]:
             "verify_ai_system_completion.py",
             "run_ai_system_completion_qualification.py",
             "verify_ai_system_qualification_receipt.py",
+            "test_sandbox_isolation.py",
+            "test_sandbox_sanitize_inject.py",
+            "test_memory_writeback.py",
+            "test_outbound_url_resolution_security.py",
             ".ai-system-runtime-qualification.json",
             ".ai-system-runtime-qualification-verification.json",
             "github.event.pull_request.head.sha || github.sha",
