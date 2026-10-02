@@ -38,7 +38,10 @@
     "skeleton/testing/test_ai_system_completion_plane.py",
     "tests/test_ai_system_completion_verifier.py",
     "scripts/verify_ai_system_completion.py",
-    ".github/workflows/ai-system-completion.yml"
+    ".github/workflows/ai-system-completion.yml",
+    "skeleton/ai/evaluation/system_qualification.py",
+    "scripts/run_ai_system_completion_qualification.py",
+    "tests/test_ai_system_qualification.py"
   ],
   "inherited_proofs": [
     {
@@ -58,5 +61,7 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff every required requirement has exactly one independently witnessed passing proof for the same subject and exact git revision, with request/result, verification candidate/context, memory ownership, and learning evaluation lineage preserved"
+  "completion_rule": "valid iff every required requirement has exactly one independently witnessed passing proof for the same subject and exact git revision, with request/result, verification candidate/context, memory ownership, and learning evaluation lineage preserved",
+  "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
+  "qualification_cli": "scripts/run_ai_system_completion_qualification.py"
 }
