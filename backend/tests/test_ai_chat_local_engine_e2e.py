@@ -1179,8 +1179,10 @@ async def test_cancelled_deferred_turn_closes_lineage_and_does_not_poison_next_h
 
     cancelled = await route.cancel_ai_chat_turn(
         thread.thread_id,
-        "cancel-turn-1",
-        route.AIChatCancelRequest(reason="user stopped generation"),
+        route.AIChatCancelRequest(
+            idempotency_key="cancel-turn-1",
+            reason="user stopped generation",
+        ),
         user={"email": OWNER, "tenant_id": TENANT},
     )
     assert cancelled["state"] == "cancelled"
