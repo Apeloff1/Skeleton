@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import threading
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from skeleton.security.text_identity import (
     TextIdentityError,
@@ -85,6 +85,38 @@ class MCPAuthorization:
     def remove(self, principal: str) -> bool:
         with self._lock:
             return self._items.pop(principal, None) is not None
+
+    def visible_tools(
+        self,
+        principal: str,
+        tools: Iterable[str],
+    ) -> tuple[str, ...]:
+        """Return only capabilities visible to a registered principal."""
+        try:
+            principal = require_security_identifier(
+                principal,
+                field="MCP principal",
+                max_length=256,
+            )
+        except TextIdentityError:
+            return ()
+        with self._lock:
+            policy = self._items.get(principal)
+        if policy is None:
+            return ()
+        visible: list[str] = []
+        for tool in tools:
+            try:
+                tool = require_security_identifier(
+                    tool,
+                    field="MCP tool",
+                    max_length=256,
+                )
+            except TextIdentityError:
+                continue
+            if policy.allows(tool):
+                visible.append(tool)
+        return tuple(visible)
 
     def inspect(
         self,
