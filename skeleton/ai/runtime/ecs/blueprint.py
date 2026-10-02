@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
