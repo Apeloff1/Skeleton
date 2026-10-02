@@ -186,6 +186,547 @@ def _contract_requirements() -> tuple[list[str], str]:
     return required, _digest(contract)
 
 
+def _boolean(details: dict[str, Any], key: str) -> bool:
+    value = details.get(key)
+    if not isinstance(value, bool):
+        raise ReceiptVerificationError(
+            f"proof detail {key} must be boolean"
+        )
+    return value
+
+
+def _integer(
+    details: dict[str, Any],
+    key: str,
+    *,
+    minimum: int = 0,
+) -> int:
+    value = details.get(key)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < minimum
+    ):
+        raise ReceiptVerificationError(
+            f"proof detail {key} must be integer >= {minimum}"
+        )
+    return value
+
+
+def _detail_text(details: dict[str, Any], key: str) -> str:
+    return _text(f"proof.details.{key}", details.get(key))
+
+
+def _detail_sha(details: dict[str, Any], key: str) -> str:
+    return _sha256(f"proof.details.{key}", details.get(key))
+
+
+def _detail_text_list(
+    details: dict[str, Any],
+    key: str,
+) -> list[str]:
+    return _string_list(
+        f"proof.details.{key}",
+        details.get(key),
+    )
+
+
+def _semantic_pass(
+    requirement: str,
+    details: dict[str, Any],
+    evidence_refs: list[str],
+    *,
+    expected_subject: str,
+) -> bool:
+    subject_bound = details.get("subject_bound")
+    if "subject_bound" in details and subject_bound is not True:
+        return False
+
+    if requirement == "execution.local_model":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _detail_text(details, "state") == "completed"
+            and _integer(
+                details,
+                "provider_receipt_count",
+                minimum=1,
+            ) >= 1
+            and any(
+                ref.startswith("provider:local:")
+                for ref in evidence_refs
+            )
+        )
+
+    if requirement == "execution.offline_isolation":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _integer(details, "network_attempt_count") == 0
+            and _integer(
+                details,
+                "provider_receipt_count",
+                minimum=1,
+            ) >= 1
+            and _boolean(
+                details,
+                "all_provider_receipts_local",
+            )
+        )
+
+    if requirement == "execution.request_result_binding":
+        request_execution = _detail_text(
+            details,
+            "request_execution_id",
+        )
+        result_execution = _detail_text(
+            details,
+            "result_execution_id",
+        )
+        return bool(
+            request_execution == expected_subject
+            and result_execution == expected_subject
+            and _detail_text(
+                details,
+                "request_operation_id",
+            )
+            == _detail_text(
+                details,
+                "result_operation_id",
+            )
+            and _SHA256.fullmatch(
+                _detail_text(
+                    details,
+                    "request_identity_digest",
+                )
+            )
+            is not None
+        )
+
+    if requirement == "execution.budget_bounds":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _integer(
+                details,
+                "observed_model_turns",
+                minimum=1,
+            )
+            <= _integer(
+                details,
+                "max_model_turns",
+                minimum=1,
+            )
+            and _integer(details, "observed_tool_calls")
+            <= _integer(
+                details,
+                "max_tool_calls",
+                minimum=1,
+            )
+        )
+
+    if requirement == "execution.stop_semantics":
+        return bool(
+            _detail_text(details, "deadline_status") == "failed"
+            and _detail_text(
+                details,
+                "deadline_error_code",
+            )
+            == "execution_deadline_exceeded"
+            and _boolean(details, "deadline_fenced")
+            and _detail_text(
+                details,
+                "cancellation_status",
+            )
+            == "cancelled"
+            and _detail_text(
+                details,
+                "cancellation_error_code",
+            )
+            == "cancellation_requested"
+            and _boolean(details, "cancellation_fenced")
+        )
+
+    if requirement == "execution.tool_authority":
+        allowed = _detail_text_list(
+            details,
+            "allowed_tool_ids",
+        )
+        observed = _detail_text_list(
+            details,
+            "observed_tool_ids",
+        )
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and observed
+            and _integer(
+                details,
+                "observed_call_count",
+                minimum=1,
+            )
+            == len(observed)
+            and _integer(
+                details,
+                "receipt_count",
+                minimum=1,
+            )
+            == len(observed)
+            and _boolean(details, "all_calls_authorized")
+            and all(item in allowed for item in observed)
+        )
+
+    if requirement == "execution.durable_recovery":
+        live_digest = _detail_sha(details, "live_digest")
+        recovered_digest = _detail_sha(
+            details,
+            "recovered_digest",
+        )
+        return bool(
+            _detail_text(
+                details,
+                "live_execution_id",
+            )
+            == expected_subject
+            and _detail_text(
+                details,
+                "recovered_execution_id",
+            )
+            == expected_subject
+            and live_digest == recovered_digest
+            and _boolean(details, "exact_match")
+        )
+
+    if requirement == "execution.staged_finalization_recovery":
+        return bool(
+            _detail_text(
+                details,
+                "staged_execution_id",
+            )
+            == expected_subject
+            and _detail_text(
+                details,
+                "recovered_execution_id",
+            )
+            == expected_subject
+            and _boolean(details, "exact_match")
+            and _boolean(details, "intent_cleared")
+        )
+
+    if requirement == "execution.replay_lineage":
+        return bool(
+            _integer(details, "turn_count", minimum=1) >= 1
+            and all(
+                _boolean(details, key)
+                for key in (
+                    "contiguous",
+                    "subject_bound",
+                    "operation_bound",
+                    "unique_turn_ids",
+                    "parent_linked",
+                    "checkpoints_bound",
+                )
+            )
+        )
+
+    if requirement == "execution.reproducibility":
+        return bool(
+            _detail_text(
+                details,
+                "primary_execution_id",
+            )
+            == expected_subject
+            and _detail_text(
+                details,
+                "replay_execution_id",
+            )
+            == expected_subject
+            and _boolean(details, "result_equal")
+            and _boolean(details, "output_equal")
+        )
+
+    if requirement == "execution.governed_effects":
+        receipts = _integer(details, "tool_receipt_count")
+        mutating = _integer(details, "mutating_tool_count")
+        verified = _integer(
+            details,
+            "verified_postcondition_count",
+        )
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and mutating <= receipts
+            and verified == mutating
+        )
+
+    if requirement == "verification.independent":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _detail_text(details, "outcome") == "passed"
+            and _boolean(details, "policy_satisfied")
+            and _integer(
+                details,
+                "evidence_count",
+                minimum=1,
+            ) >= 1
+        )
+
+    if requirement == "verification.claim_binding":
+        candidate = _detail_sha(details, "candidate_digest")
+        receipt_candidate = _detail_sha(
+            details,
+            "receipt_candidate_digest",
+        )
+        context = _detail_sha(details, "context_digest")
+        receipt_context = _detail_sha(
+            details,
+            "receipt_context_digest",
+        )
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and candidate == receipt_candidate
+            and context == receipt_context
+        )
+
+    if requirement == "context.integrity":
+        problems = details.get("problems")
+        if not isinstance(problems, list):
+            raise ReceiptVerificationError(
+                "proof detail problems must be a list"
+            )
+        return bool(
+            _detail_text(
+                details,
+                "context_subject_id",
+            )
+            == expected_subject
+            and _integer(details, "height", minimum=1) >= 1
+            and _integer(details, "problem_count") == 0
+            and problems == []
+        )
+
+    if requirement == "memory.lifecycle":
+        return bool(
+            _detail_text(
+                details,
+                "memory_subject_id",
+            )
+            == expected_subject
+            and _boolean(
+                details,
+                "recalled_before_delete",
+            )
+            and _boolean(
+                details,
+                "delete_acknowledged",
+            )
+            and _boolean(
+                details,
+                "absent_after_delete",
+            )
+        )
+
+    if requirement == "finalization.lineage":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _integer(
+                details,
+                "memory_ref_count",
+                minimum=1,
+            ) >= 1
+            and _integer(
+                details,
+                "artifact_ref_count",
+                minimum=1,
+            ) >= 1
+            and _boolean(
+                details,
+                "stream_terminal_bound",
+            )
+        )
+
+    if requirement == "security.sandbox_filesystem":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "safe_roundtrip")
+            and _boolean(details, "traversal_rejected")
+            and _boolean(details, "outside_untouched")
+        )
+
+    if requirement == "security.sandbox_process":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and all(
+                _boolean(details, key)
+                for key in (
+                    "clean_environment",
+                    "shell_string_rejected",
+                    "bounded_execution",
+                    "network_fail_closed",
+                )
+            )
+        )
+
+    if requirement == "security.injection_sanitization":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and all(
+                _boolean(details, key)
+                for key in (
+                    "prompt_attack_blocked",
+                    "shell_attack_blocked",
+                    "secret_redacted",
+                    "duplicate_json_rejected",
+                )
+            )
+        )
+
+    if requirement == "privacy.provider_fallback":
+        boundaries = _detail_text_list(
+            details,
+            "routed_boundaries",
+        )
+        models = _detail_text_list(
+            details,
+            "routed_model_ids",
+        )
+        rank = {
+            "local": 0,
+            "private_remote": 1,
+            "external": 2,
+        }
+        required = _detail_text(
+            details,
+            "required_boundary",
+        )
+        maximum = rank.get(required)
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and maximum is not None
+            and boundaries
+            and len(boundaries) == len(models)
+            and all(
+                item in rank and rank[item] <= maximum
+                for item in boundaries
+            )
+            and _boolean(
+                details,
+                "all_within_boundary",
+            )
+        )
+
+    if requirement == "memory.poisoning_resistance":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _detail_text(
+                details,
+                "committed_subject_id",
+            )
+            == expected_subject
+            and _boolean(
+                details,
+                "memory_subject_bound",
+            )
+            and _boolean(
+                details,
+                "valid_write_committed",
+            )
+            and _boolean(
+                details,
+                "missing_provenance_denied",
+            )
+            and _boolean(
+                details,
+                "conflicting_replay_rejected",
+            )
+        )
+
+    if requirement == "security.outbound_network_boundary":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and all(
+                _boolean(details, key)
+                for key in (
+                    "private_target_rejected",
+                    "mixed_dns_rejected",
+                    "peer_rebinding_rejected",
+                    "canonical_public_resolution",
+                )
+            )
+        )
+
+    if requirement == "learning.promotion":
+        expected_experiment = _detail_text(
+            details,
+            "expected_experiment_id",
+        )
+        return bool(
+            _detail_text(details, "from_version")
+            != _detail_text(details, "to_version")
+            and _detail_text(details, "active_version")
+            == _detail_text(details, "to_version")
+            and _detail_sha(
+                details,
+                "evaluation_digest",
+            )
+            and _detail_text(details, "evaluator_id")
+            != "learning-promotion-pipeline"
+            and _detail_text(details, "experiment_id")
+            == expected_experiment
+            and _boolean(details, "result_bound")
+            and _boolean(details, "evaluation_bound")
+            and _boolean(
+                details,
+                "failed_evaluation_rejected",
+            )
+            and _boolean(
+                details,
+                "cross_experiment_rejected",
+            )
+            and details.get("rollback") is False
+        )
+
+    if requirement == "learning.rollback":
+        expected_experiment = _detail_text(
+            details,
+            "expected_experiment_id",
+        )
+        return bool(
+            _detail_text(details, "from_version")
+            != _detail_text(details, "to_version")
+            and _detail_text(details, "active_version")
+            == _detail_text(details, "to_version")
+            and bool(_detail_text(details, "reason"))
+            and _detail_text(
+                details,
+                "promotion_experiment_id",
+            )
+            == expected_experiment
+            and _detail_text(
+                details,
+                "rollback_experiment_id",
+            )
+            == expected_experiment
+            and _boolean(details, "result_bound")
+            and _detail_sha(
+                details,
+                "promotion_evaluation_digest",
+            )
+            == _detail_sha(
+                details,
+                "rollback_evaluation_digest",
+            )
+            and _boolean(
+                details,
+                "evaluation_lineage_preserved",
+            )
+            and _boolean(
+                details,
+                "rollback_without_promotion_rejected",
+            )
+            and details.get("rollback") is True
+        )
+
+    raise ReceiptVerificationError(
+        f"no semantic verifier for requirement: {requirement}"
+    )
+
+
 def _proof_digest(
     proof: dict[str, Any],
     *,
@@ -232,6 +773,17 @@ def _proof_digest(
     if producer_id == verifier_id:
         raise ReceiptVerificationError(
             "proof producer cannot self-verify"
+        )
+
+    semantic_passed = _semantic_pass(
+        requirement,
+        details,
+        refs,
+        expected_subject=expected_subject,
+    )
+    if passed is not semantic_passed:
+        raise ReceiptVerificationError(
+            f"proof semantic pass mismatch: {requirement}"
         )
 
     calculated = _digest(
