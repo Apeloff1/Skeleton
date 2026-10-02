@@ -21,7 +21,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-CONDUCTOR_VERSION = "omega-ultra-1"
+CONDUCTOR_VERSION = "omega-ultra-1.1"
 
 Mode = Literal["pages", "percent", "bar"]
 Side = Literal["context", "response"]
@@ -199,7 +199,7 @@ class OmegaUltraConductor:
             committed = clicker.advance(force=progress)
             self.exact.add(digest)
             self.bloom.add(digest)
-            root = self.merkle.append(digest)
+            self.merkle.append(digest)
             self.global_seq += 1
             entry = Delivery(
                 seq=self.global_seq,
@@ -226,7 +226,7 @@ class OmegaUltraConductor:
                     old.full_content = None
             self.queues[side].append(entry.page_id)
             self.queues["audit"].append(digest)
-            return self._status("deliver", side=side, merkle=root[:24], page_id=entry.page_id)
+            return self._status("deliver", side=side, page_id=entry.page_id, content_hash=digest[:24])
 
     async def wipe_and_restart(self, mode: Mode | None = None, total: float | None = None) -> dict[str, Any]:
         return await self.begin(mode or self.mode, total or self.total, fresh=True)
