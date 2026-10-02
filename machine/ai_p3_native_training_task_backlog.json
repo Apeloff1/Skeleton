@@ -9,9 +9,9 @@
   "summary": {
     "task_count": 5,
     "in_progress_count": 0,
-    "ready_count": 2,
-    "blocked_count": 3,
-    "landed_unpromoted_count": 0,
+    "ready_count": 0,
+    "blocked_count": 0,
+    "landed_unpromoted_count": 5,
     "scheduled_volume_count": 24,
     "queued_volume_count": 173,
     "source_volume_count": 197
@@ -20,7 +20,7 @@
     {
       "task_id": "P3T2-DATA-01",
       "lane_id": "P3T2-L0",
-      "status": "ready",
+      "status": "landed_unpromoted",
       "title": "Data, lineage and dataset foundation",
       "depends_on": [],
       "primary_volume_refs": [
@@ -50,7 +50,13 @@
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "github:pr#2350",
+        "git-head:d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539",
+        "workflow:P3 Native Training Authority@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276688",
+        "workflow:P3 Data Provenance Foundation@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276543"
       ],
       "masterplan_obligations": [
         {
@@ -386,7 +392,7 @@
     {
       "task_id": "P3T2-GOVERNANCE-01",
       "lane_id": "P3T2-L1",
-      "status": "ready",
+      "status": "landed_unpromoted",
       "title": "Model/data provenance and rights",
       "depends_on": [
         "P3T2-DATA-01"
@@ -413,7 +419,15 @@
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "github:pr#2350",
+        "git-head:d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539",
+        "workflow:P3 Native Training Authority@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276688",
+        "workflow:P3 Data Provenance Foundation@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276543",
+        "workflow:P3 Post Training and Lifecycle@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276556"
       ],
       "masterplan_obligations": [
         {
@@ -544,7 +558,7 @@
     {
       "task_id": "P3T2-TRAINING-01",
       "lane_id": "P3T2-L2",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Native training control and recovery",
       "depends_on": [
         "P3T2-DATA-01",
@@ -575,7 +589,13 @@
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "github:pr#2350",
+        "git-head:d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539",
+        "workflow:P3 Native Training Authority@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276688",
+        "workflow:P3 Native Training Runtime@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276662"
       ],
       "masterplan_obligations": [
         {
@@ -829,7 +849,7 @@
     {
       "task_id": "P3T2-POSTTRAIN-01",
       "lane_id": "P3T2-L3",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Post-training, RL, curriculum and verifier models",
       "depends_on": [
         "P3T2-TRAINING-01"
@@ -857,7 +877,13 @@
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "github:pr#2350",
+        "git-head:d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539",
+        "workflow:P3 Native Training Authority@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276688",
+        "workflow:P3 Post Training and Lifecycle@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276556"
       ],
       "masterplan_obligations": [
         {
@@ -1029,7 +1055,7 @@
     {
       "task_id": "P3T2-LIFECYCLE-01",
       "lane_id": "P3T2-L4",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Model lifecycle, deprecation and migration",
       "depends_on": [
         "P3T2-GOVERNANCE-01",
@@ -1057,7 +1083,13 @@
       "evidence_refs": [
         "source:machine/ai_p3_engineering_closure.json#status=closed",
         "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "github:pr#2350",
+        "git-head:d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539",
+        "workflow:P3 Native Training Authority@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276688",
+        "workflow:P3 Post Training and Lifecycle@d4969b6f0f93ef9c6f9363d491e7e74cd9ee6539:success",
+        "github-actions-run:36970276556"
       ],
       "masterplan_obligations": [
         {

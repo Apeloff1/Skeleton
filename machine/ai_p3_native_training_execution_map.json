@@ -482,9 +482,9 @@
   "progress": {
     "task_count": 5,
     "in_progress_count": 0,
-    "ready_count": 2,
-    "blocked_count": 3,
-    "landed_unpromoted_count": 0,
+    "ready_count": 0,
+    "blocked_count": 0,
+    "landed_unpromoted_count": 5,
     "scheduled_volume_count": 24,
     "queued_volume_count": 173,
     "source_volume_count": 197
