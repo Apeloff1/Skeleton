@@ -11,6 +11,7 @@ on:
       - "machine/ai_p2_tranche1_plan.json"
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_local_model_deployment.py"

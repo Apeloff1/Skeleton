@@ -845,7 +845,6 @@ async def test_expired_deadline_fails_before_provider_io() -> None:
     assert provider.requests == []
 
 
-
 @pytest.mark.asyncio
 async def test_deadline_during_provider_io_cancels_provider_and_fails_durably() -> None:
     repo = SQLiteExecutionRepository()
