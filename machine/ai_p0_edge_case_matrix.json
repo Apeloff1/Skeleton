@@ -755,7 +755,9 @@
         "skeleton/skills",
         "skeleton/persistence",
         "backend/core/operation_stream_transport.py",
-        "frontend/src/product"
+        "frontend/src/product",
+        "skeleton/ai/runtime/inference/local.py",
+        "skeleton/ai/runtime/functional_ai.py"
       ],
       "historical_ids": [
         "HIST-AI-001",
@@ -826,7 +828,9 @@
         "planned:skeleton/testing/test_cognitive_recovery.py::test_cancel_complete_race_has_one_terminal_state",
         "planned:skeleton/testing/test_cognitive_verification.py::test_correlated_verifier_not_treated_as_independent",
         "planned:skeleton/testing/test_cognitive_goal_drift.py::test_plan_actions_remain_traceable_to_objective",
-        "planned:backend/tests/test_ai_operation_reconnect.py::test_browser_refresh_reconstructs_running_and_terminal_state"
+        "planned:backend/tests/test_ai_operation_reconnect.py::test_browser_refresh_reconstructs_running_and_terminal_state",
+        "skeleton/testing/test_local_inference.py",
+        "skeleton/testing/test_vs001_functional_ai.py"
       ],
       "acceptance": [
         "bounded loop cannot spin indefinitely",
@@ -835,8 +839,13 @@
         "terminal result binds route/provider/tool/verification/usage/memory/artifact/stream evidence",
         "VS-001 edge-case families are executable"
       ],
-      "edge_coverage_status": "mapped",
-      "evidence": [],
+      "edge_coverage_status": "test_implemented",
+      "evidence": [
+        "code:skeleton/ai/runtime/inference/local.py",
+        "code:skeleton/ai/runtime/functional_ai.py",
+        "test:skeleton/testing/test_local_inference.py",
+        "test:skeleton/testing/test_vs001_functional_ai.py"
+      ],
       "accepted_risks": []
     }
   ],

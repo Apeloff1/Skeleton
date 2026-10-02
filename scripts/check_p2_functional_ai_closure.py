@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Fail-closed verifier for the bounded P2 provider-independent AI frontier."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import re
+import sys
+from typing import Any, Sequence
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = Path("machine/ai_p2_functional_ai_closure.json")
+P1 = Path("machine/ai_p1_terminal_closure.json")
+P2 = Path("machine/ai_p2_execution_map.json")
+BACKLOG = Path("machine/ai_p2_task_backlog.json")
+TRANCHE = Path("machine/ai_p2_tranche1_plan.json")
+P0 = Path("machine/ai_p0_edge_case_matrix.json")
+
+CRITICAL = {"VOL-007", "VOL-097", "VOL-104"}
+FUNCTIONAL_TASK = "P2-T1-FUNCTIONAL-01"
+INFERENCE_TASK = "P2-T1-INFER-01"
+FORBIDDEN_LOCAL_MARKERS = (
+    "api.openai.com",
+    "api.x.ai",
+    "api.anthropic.com",
+    "OPENAI_API_KEY",
+    "XAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "from openai import",
+    "import openai",
+)
+
+
+class FunctionalAIClosureError(RuntimeError):
+    pass
+
+
+def _load(root: Path, rel: Path) -> dict[str, Any]:
+    try:
+        value = json.loads((root / rel).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FunctionalAIClosureError(f"cannot read {rel}") from exc
+    if not isinstance(value, dict):
+        raise FunctionalAIClosureError(f"{rel} must contain an object")
+    return value
+
+
+def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, Any]:
+    root = root.resolve()
+    manifest = _load(root, MANIFEST)
+    p1 = _load(root, P1)
+    p2 = _load(root, P2)
+    backlog = _load(root, BACKLOG)
+    tranche = _load(root, TRANCHE)
+    p0 = _load(root, P0)
+    errors: list[str] = []
+
+    if manifest.get("schema_version") != "skeleton.p2.functional_ai_closure.v1":
+        errors.append("functional closure schema drift")
+    allowed_status = {"candidate", "closed"}
+    if manifest.get("status") not in allowed_status:
+        errors.append("functional closure status must be candidate or closed")
+    if require_closed and manifest.get("status") != "closed":
+        errors.append("functional closure is not closed")
+    if manifest.get("claim_scope") != "provider_independent_functional_ai_frontier":
+        errors.append("functional closure claim scope drift")
+
+    if p1.get("status") != "closed":
+        errors.append("P1 terminal authority must be closed")
+    if tranche.get("status") != "activated":
+        errors.append("P2 T1 must be activated")
+
+    source = set(p2.get("source_scope", {}).get("volume_refs", []))
+    scheduled = set(p2.get("first_tranche", {}).get("scheduled_volume_refs", []))
+    queued = set(p2.get("first_tranche", {}).get("queued_volume_refs", []))
+    if len(source) != 314 or len(scheduled) != 57 or len(queued) != 257:
+        errors.append("P2 functional frontier requires exact 314/57/257 partition")
+    if source != scheduled | queued or scheduled & queued:
+        errors.append("P2 scheduled/queued partition is invalid")
+    if not CRITICAL <= scheduled:
+        errors.append("critical Functional-AI volumes are not scheduled")
+    declared_frontier = set(manifest.get("functional_frontier_volume_refs", []))
+    if len(declared_frontier) != 15 or not declared_frontier <= scheduled:
+        errors.append("functional frontier must contain the 15 activated T1 volumes")
+    if set(manifest.get("critical_volume_refs", [])) != CRITICAL:
+        errors.append("critical volume set must be VOL-007/VOL-097/VOL-104")
+
+    tasks = {
+        item.get("task_id"): item
+        for item in backlog.get("tasks", [])
+        if isinstance(item, dict) and item.get("task_id")
+    }
+    infer = tasks.get(INFERENCE_TASK, {})
+    functional = tasks.get(FUNCTIONAL_TASK, {})
+    if set(infer.get("primary_volume_refs", [])) != {"VOL-007"}:
+        errors.append("VOL-007 must be owned by P2-T1-INFER-01")
+    if set(functional.get("primary_volume_refs", [])) != {"VOL-097", "VOL-104"}:
+        errors.append("VOL-097/VOL-104 must be owned by P2-T1-FUNCTIONAL-01")
+
+    surfaces = manifest.get("executable_surfaces")
+    if not isinstance(surfaces, dict):
+        errors.append("executable_surfaces must be an object")
+        surfaces = {}
+    for key, rel in surfaces.items():
+        if not isinstance(rel, str) or not (root / rel).is_file():
+            errors.append(f"missing executable surface {key}: {rel!r}")
+
+    for rel in (
+        "skeleton/ai/runtime/inference/local.py",
+        "skeleton/ai/runtime/functional_ai.py",
+    ):
+        try:
+            text = (root / rel).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        hits = [marker for marker in FORBIDDEN_LOCAL_MARKERS if marker in text]
+        if hits:
+            errors.append(f"{rel} owns hosted-provider marker(s): {hits}")
+
+    local = root / "skeleton/ai/runtime/inference/local.py"
+    if local.is_file():
+        text = local.read_text(encoding="utf-8")
+        for marker in (
+            "class ReferenceNGramModel",
+            "class CallableLocalModel",
+            "class LocalInferenceEngine",
+            "class LocalInferenceScheduler",
+            "class LocalModelAdapter",
+        ):
+            if marker not in text:
+                errors.append(f"local inference missing {marker}")
+
+    functional_path = root / "skeleton/ai/runtime/functional_ai.py"
+    if functional_path.is_file():
+        text = functional_path.read_text(encoding="utf-8")
+        for marker in (
+            "LocalModelAdapter",
+            "CognitiveExecutionRuntime",
+            "SQLiteExecutionRepository",
+            "provider:local:",
+        ):
+            if marker not in text:
+                errors.append(f"VS-001 binding missing marker {marker}")
+
+    w11 = next(
+        (
+            item
+            for item in p0.get("packages", [])
+            if isinstance(item, dict) and item.get("id") == "WP-W11"
+        ),
+        None,
+    )
+    if not isinstance(w11, dict):
+        errors.append("P0 WP-W11 Cognitive Runtime is missing")
+    else:
+        if w11.get("edge_coverage_status") not in {
+            "test_implemented",
+            "evidence_passing",
+            "accepted",
+        }:
+            errors.append("P0 WP-W11 has not reached executable test coverage")
+        targets = set(map(str, w11.get("test_targets", [])))
+        for required in (
+            "skeleton/testing/test_local_inference.py",
+            "skeleton/testing/test_vs001_functional_ai.py",
+        ):
+            if required not in targets:
+                errors.append(f"P0 WP-W11 missing test target {required}")
+        if not w11.get("evidence"):
+            errors.append("P0 WP-W11 requires implementation evidence")
+
+    requirements = manifest.get("requirements")
+    if not isinstance(requirements, dict):
+        errors.append("functional closure requirements missing")
+    else:
+        false_required = (
+            "hosted_provider_credentials_required",
+            "network_required_for_model_inference",
+        )
+        true_required = (
+            "local_model_identity_required",
+            "governed_tool_authority_required",
+            "durable_terminal_state_required",
+            "reconnect_replay_required",
+            "independent_verification_required",
+            "exact_head_ci_required",
+        )
+        for key in false_required:
+            if requirements.get(key) is not False:
+                errors.append(f"{key} must be false")
+        for key in true_required:
+            if requirements.get(key) is not True:
+                errors.append(f"{key} must be true")
+
+    if manifest.get("status") == "closed":
+        for task_id in (
+            "P2-T1-DATA-01",
+            "P2-T1-SEC-01",
+            "P2-T1-INFER-01",
+            "P2-T1-RECOVERY-01",
+            "P2-T1-FUNCTIONAL-01",
+        ):
+            task = tasks.get(task_id, {})
+            if task.get("status") != "landed_unpromoted":
+                errors.append(f"closed functional frontier requires {task_id} landed_unpromoted")
+            refs = list(map(str, task.get("evidence_refs", [])))
+            if not any(ref.startswith("workflow:P2 Functional AI Acceptance@") and ref.endswith(":success") for ref in refs):
+                errors.append(f"{task_id} lacks Functional-AI exact-head evidence")
+
+    return {
+        "schema_version": 1,
+        "status": "valid" if not errors else "rejected",
+        "closure_status": manifest.get("status"),
+        "source_volume_count": len(source),
+        "scheduled_volume_count": len(scheduled),
+        "queued_volume_count": len(queued),
+        "critical_volume_count": len(CRITICAL),
+        "provider_independent": not any(
+            "hosted-provider marker" in error for error in errors
+        ),
+        "errors": errors,
+        "valid": not errors,
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--require-closed", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        result = validate(ROOT, require_closed=args.require_closed)
+    except FunctionalAIClosureError as exc:
+        print(f"P2 Functional AI closure: rejected: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    if not result["valid"]:
+        if not args.json:
+            for error in result["errors"]:
+                print(f"  - {error}", file=sys.stderr)
+        return 1
+    if not args.json:
+        print(
+            "P2 Functional AI closure: "
+            + ("CLOSED" if result["closure_status"] == "closed" else "CANDIDATE")
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
