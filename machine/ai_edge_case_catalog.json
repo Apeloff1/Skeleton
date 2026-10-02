@@ -2560,12 +2560,21 @@
         198
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Security-sensitive JSON parsing rejects duplicate object keys rather than accepting parser-dependent first/last value semantics.",
+        "Serialization rejects non-JSON tuple values and non-finite numbers."
+      ],
+      "tests": [
+        "tests/test_duplicate_key_is_not_json.py::test_a_duplicate_key_is_refused"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/jeeves/planning/serialization.py",
+        "test:tests/test_duplicate_key_is_not_json.py",
+        "workflow:P0 Duplicate JSON Key Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -2583,7 +2592,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-CONTRACT-002",
