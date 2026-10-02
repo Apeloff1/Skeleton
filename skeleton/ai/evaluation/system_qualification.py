@@ -272,11 +272,13 @@ class PersistenceReliabilityCycle:
     acknowledgement_persistent: bool
     acknowledgement_retry_stable: bool
     no_pending_after_ack: bool
+    state_tamper_rejected: bool
     turn_tamper_rejected: bool
     checkpoint_tamper_rejected: bool
     result_tamper_rejected: bool
     outbox_tamper_rejected: bool
     migration_backfill_verified: bool
+    state_digest_backfill_verified: bool
     replay_digest_backfill_verified: bool
 
 
@@ -1966,12 +1968,45 @@ def _persistence_reliability_cycle(
         )
     except ExecutionRepositoryCorruption:
         outbox_tamper_rejected = True
+
+    tamper_repository._connection.execute(
+        """
+        UPDATE ai_execution_state
+        SET version = version + 1
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (tamper_repository.namespace, request.execution_id),
+    )
+    state_tamper_rejected = False
+    try:
+        tamper_repository.get(request.execution_id)
+    except ExecutionRepositoryCorruption:
+        state_tamper_rejected = True
     tamper_repository.close()
 
     legacy_path = workdir / "system-qualification-legacy-digest.sqlite3"
     if legacy_path.exists():
         legacy_path.unlink()
     legacy = sqlite3.connect(legacy_path)
+    legacy.execute(
+        """
+        CREATE TABLE ai_execution_state (
+            namespace TEXT NOT NULL,
+            execution_id TEXT NOT NULL,
+            operation_id TEXT NOT NULL,
+            identity_digest TEXT NOT NULL,
+            request_json TEXT NOT NULL,
+            state TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            latest_turn_index INTEGER NOT NULL,
+            checkpoint_version INTEGER NOT NULL,
+            cancellation_requested INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(namespace, execution_id),
+            UNIQUE(namespace, operation_id, execution_id)
+        )
+        """
+    )
     legacy.execute(
         """
         CREATE TABLE ai_execution_turn (
@@ -2029,6 +2064,32 @@ def _persistence_reliability_cycle(
             )
         )
         """
+    )
+    legacy.execute(
+        """
+        INSERT INTO ai_execution_state(
+            namespace, execution_id, operation_id, identity_digest,
+            request_json, state, version, latest_turn_index,
+            checkpoint_version, cancellation_requested, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "ai_execution",
+            execution_request.execution_id,
+            execution_request.operation_id,
+            execution_request.identity_digest,
+            json.dumps(
+                execution_request.as_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            ExecutionState.COMPLETED.value,
+            1,
+            0,
+            1,
+            0,
+            QUALIFICATION_TIME.isoformat(),
+        ),
     )
     legacy_turn = AgentTurn(
         operation_id=request.operation_id,
@@ -2150,6 +2211,13 @@ def _persistence_reliability_cycle(
     legacy.close()
 
     migrated = SQLiteExecutionRepository(legacy_path)
+    state_row = migrated._connection.execute(
+        """
+        SELECT state_digest FROM ai_execution_state
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (migrated.namespace, request.execution_id),
+    ).fetchone()
     turn_row = migrated._connection.execute(
         """
         SELECT turn_digest FROM ai_execution_turn
@@ -2178,6 +2246,15 @@ def _persistence_reliability_cycle(
         """,
         (migrated.namespace, request.execution_id),
     ).fetchone()
+    migrated_execution = migrated.get(request.execution_id)
+    state_digest_backfill_verified = bool(
+        state_row is not None
+        and isinstance(state_row["state_digest"], str)
+        and len(state_row["state_digest"]) == 64
+        and migrated_execution.request.identity_digest
+        == execution_request.identity_digest
+        and migrated_execution.state is ExecutionState.COMPLETED
+    )
     replay_digest_backfill_verified = bool(
         turn_row is not None
         and isinstance(turn_row["turn_digest"], str)
@@ -2225,11 +2302,15 @@ def _persistence_reliability_cycle(
             acknowledgement_retry_stable
         ),
         no_pending_after_ack=no_pending_after_ack,
+        state_tamper_rejected=state_tamper_rejected,
         turn_tamper_rejected=turn_tamper_rejected,
         checkpoint_tamper_rejected=checkpoint_tamper_rejected,
         result_tamper_rejected=result_tamper_rejected,
         outbox_tamper_rejected=outbox_tamper_rejected,
         migration_backfill_verified=migration_backfill_verified,
+        state_digest_backfill_verified=(
+            state_digest_backfill_verified
+        ),
         replay_digest_backfill_verified=(
             replay_digest_backfill_verified
         ),
@@ -2386,6 +2467,7 @@ async def qualify_system_completion(
     )
     plane.prove_persisted_evidence_integrity(
         execution_id=primary.request.execution_id,
+        state_tamper_rejected=persistence.state_tamper_rejected,
         turn_tamper_rejected=persistence.turn_tamper_rejected,
         checkpoint_tamper_rejected=(
             persistence.checkpoint_tamper_rejected
@@ -2395,6 +2477,9 @@ async def qualify_system_completion(
         migration_backfill_verified=(
             persistence.migration_backfill_verified
         ),
+        state_digest_backfill_verified=(
+            persistence.state_digest_backfill_verified
+        ),
         replay_digest_backfill_verified=(
             persistence.replay_digest_backfill_verified
         ),
@@ -2402,6 +2487,8 @@ async def qualify_system_completion(
             "persistence-integrity:"
             + _digest(
                 {
+                    "state_tamper_rejected":
+                        persistence.state_tamper_rejected,
                     "turn_tamper_rejected":
                         persistence.turn_tamper_rejected,
                     "checkpoint_tamper_rejected":
@@ -2412,6 +2499,8 @@ async def qualify_system_completion(
                         persistence.outbox_tamper_rejected,
                     "migration_backfill_verified":
                         persistence.migration_backfill_verified,
+                    "state_digest_backfill_verified":
+                        persistence.state_digest_backfill_verified,
                     "replay_digest_backfill_verified":
                         persistence.replay_digest_backfill_verified,
                 }
