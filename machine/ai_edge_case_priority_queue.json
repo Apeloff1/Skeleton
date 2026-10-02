@@ -213,7 +213,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "passing"
+      "accountability_status": "planned"
     },
     {
       "rank": 7,
@@ -249,7 +249,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "passing"
+      "accountability_status": "planned"
     },
     {
       "rank": 8,
