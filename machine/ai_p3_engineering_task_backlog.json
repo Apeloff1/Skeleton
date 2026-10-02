@@ -1,0 +1,1067 @@
+{
+  "schema_version": "skeleton.ai.p3.engineering_task_backlog.v1",
+  "backlog_version": "0.1.0",
+  "status": "active",
+  "phase": "P3-T1",
+  "title": "P3-T1 Autonomous Engineering Extension Backlog",
+  "source_execution_map": "machine/ai_p3_engineering_execution_map.json",
+  "completion_authority": "Task state is implementation/evidence scheduling only; P3-T0 closure and independent sign-off remain separate.",
+  "tasks": [
+    {
+      "task_id": "P3-WORKFLOW-01",
+      "lane_id": "P3E-L0",
+      "status": "ready",
+      "title": "Compile deterministic workflow and task graph",
+      "depends_on": [],
+      "primary_volume_refs": [
+        "VOL-306",
+        "VOL-307",
+        "VOL-308",
+        "VOL-309",
+        "VOL-310",
+        "VOL-311",
+        "VOL-312",
+        "VOL-313",
+        "VOL-314",
+        "VOL-315",
+        "VOL-316"
+      ],
+      "objective": "Materialize versioned workflow IR/DSL compilation, semantic task typing, bounded decomposition, critical-path analysis, deterministic scheduling and simulation.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-306",
+          "title": "Workflow Intermediate Representation",
+          "accountability_id": "ACC-VOL-306",
+          "requirements": [
+            "IR includes dependencies, inputs/outputs, authority, retries, timeouts and compensation.",
+            "Compiler/runtime share the same versioned IR contract."
+          ],
+          "gaps": [
+            "define IR schema",
+            "bind DSL/compiler"
+          ],
+          "risks": [
+            "authoring/runtime semantic drift",
+            "invalid DAG"
+          ],
+          "contracts": [
+            "WorkflowIR",
+            "WorkflowNode",
+            "WorkflowEdge"
+          ]
+        },
+        {
+          "volume_ref": "VOL-307",
+          "title": "Workflow DSL",
+          "accountability_id": "ACC-VOL-307",
+          "requirements": [
+            "DSL cannot express undeclared privilege or bypass policy.",
+            "Parsing/versioning errors fail with precise diagnostics."
+          ],
+          "gaps": [
+            "define grammar",
+            "bind schema completion/tooling"
+          ],
+          "risks": [
+            "language injection",
+            "ambiguous syntax"
+          ],
+          "contracts": [
+            "WorkflowSource",
+            "DSLVersion",
+            "DSLDiagnostic"
+          ]
+        },
+        {
+          "volume_ref": "VOL-308",
+          "title": "Workflow Compiler",
+          "accountability_id": "ACC-VOL-308",
+          "requirements": [
+            "Compilation is deterministic for identical source/version.",
+            "Reject missing capabilities, cycles and invalid compensation before runtime."
+          ],
+          "gaps": [
+            "materialize compiler phases",
+            "bind capability registry"
+          ],
+          "risks": [
+            "compiler/runtime mismatch",
+            "cycle escapes validation"
+          ],
+          "contracts": [
+            "CompiledWorkflow",
+            "WorkflowLink",
+            "CompileResult"
+          ]
+        },
+        {
+          "volume_ref": "VOL-309",
+          "title": "Workflow Versioning",
+          "accountability_id": "ACC-VOL-309",
+          "requirements": [
+            "In-flight operations retain the workflow version they started with unless explicit migration occurs.",
+            "Version changes declare compatibility."
+          ],
+          "gaps": [
+            "define retention policy",
+            "bind migration"
+          ],
+          "risks": [
+            "workflow changes mid-run",
+            "unbounded old versions"
+          ],
+          "contracts": [
+            "WorkflowVersion",
+            "WorkflowCompatibility",
+            "WorkflowBinding"
+          ]
+        },
+        {
+          "volume_ref": "VOL-310",
+          "title": "Workflow Migration",
+          "accountability_id": "ACC-VOL-310",
+          "requirements": [
+            "Migration declares state mapping and irreversible transformations.",
+            "Unmigratable runs remain pinned or explicitly terminated/restarted."
+          ],
+          "gaps": [
+            "define migration protocol",
+            "bind version registry"
+          ],
+          "risks": [
+            "lost in-flight state",
+            "semantic change hidden"
+          ],
+          "contracts": [
+            "WorkflowMigration",
+            "StateMapping",
+            "WorkflowMigrationReceipt"
+          ]
+        },
+        {
+          "volume_ref": "VOL-311",
+          "title": "Semantic Task Types",
+          "accountability_id": "ACC-VOL-311",
+          "requirements": [
+            "Task type drives default policy/budgets/tests but cannot grant privilege.",
+            "Unknown tasks use conservative generic classification."
+          ],
+          "gaps": [
+            "define core types",
+            "bind priority/evaluation"
+          ],
+          "risks": [
+            "misclassification weakens gates",
+            "taxonomy explosion"
+          ],
+          "contracts": [
+            "TaskType",
+            "TaskProfile",
+            "TaskClassification"
+          ]
+        },
+        {
+          "volume_ref": "VOL-312",
+          "title": "Task Complexity Estimator",
+          "accountability_id": "ACC-VOL-312",
+          "requirements": [
+            "Estimator exposes uncertainty and calibration.",
+            "Underestimation cannot bypass hard limits; runtime can revise estimate."
+          ],
+          "gaps": [
+            "define features/baselines",
+            "bind scheduler/budgets"
+          ],
+          "risks": [
+            "systematic underestimate",
+            "complexity score gamed"
+          ],
+          "contracts": [
+            "ComplexityEstimate",
+            "ComplexityFeature",
+            "EstimateRevision"
+          ]
+        },
+        {
+          "volume_ref": "VOL-313",
+          "title": "Task Decomposition Engine",
+          "accountability_id": "ACC-VOL-313",
+          "requirements": [
+            "Subtasks preserve parent constraints/authority.",
+            "Detect over-decomposition, cycles and missing integration step."
+          ],
+          "gaps": [
+            "define decomposition heuristics",
+            "bind critical path"
+          ],
+          "risks": [
+            "constraint loss",
+            "fragmentation overhead"
+          ],
+          "contracts": [
+            "TaskDecomposition",
+            "Subtask",
+            "TaskDependency"
+          ]
+        },
+        {
+          "volume_ref": "VOL-314",
+          "title": "Critical Path Analysis",
+          "accountability_id": "ACC-VOL-314",
+          "requirements": [
+            "Use real dependency/state data rather than narrative estimates alone.",
+            "Recompute when task duration/dependency changes."
+          ],
+          "gaps": [
+            "bind task graph",
+            "surface blockers in roadmap"
+          ],
+          "risks": [
+            "missing dependency",
+            "stale durations"
+          ],
+          "contracts": [
+            "CriticalPath",
+            "TaskSlack",
+            "PathBlocker"
+          ]
+        },
+        {
+          "volume_ref": "VOL-315",
+          "title": "Scheduling Algorithms",
+          "accountability_id": "ACC-VOL-315",
+          "requirements": [
+            "Schedulers respect hard dependencies/leases/authority before optimization.",
+            "Algorithm choice is measurable and replaceable."
+          ],
+          "gaps": [
+            "implement baseline algorithms",
+            "bind simulator"
+          ],
+          "risks": [
+            "starvation",
+            "priority inversion"
+          ],
+          "contracts": [
+            "Schedule",
+            "SchedulingPolicy",
+            "Assignment"
+          ]
+        },
+        {
+          "volume_ref": "VOL-316",
+          "title": "Scheduling Simulator",
+          "accountability_id": "ACC-VOL-316",
+          "requirements": [
+            "Simulation is non-authoritative and labels assumptions.",
+            "Compare throughput/latency/fairness/resource metrics across policies."
+          ],
+          "gaps": [
+            "build trace format",
+            "calibrate to production"
+          ],
+          "risks": [
+            "simulator unrealistic",
+            "optimizing synthetic metric"
+          ],
+          "contracts": [
+            "SchedulingSimulation",
+            "WorkloadTrace",
+            "SimulationMetric"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-AUTONOMY-01",
+      "lane_id": "P3E-L1",
+      "status": "blocked",
+      "title": "Bound autonomy control and escalation",
+      "depends_on": [
+        "P3-WORKFLOW-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-317",
+        "VOL-319"
+      ],
+      "objective": "Add explicit autonomy control-state transitions, bounded escalation grants, revocation/de-escalation behavior, and evidence-bound control decisions.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-317",
+          "title": "Control Theory for Autonomy",
+          "accountability_id": "ACC-VOL-317",
+          "requirements": [
+            "Controllers cannot exceed policy/authority or resource bounds.",
+            "Stability/oscillation behavior is evaluated before production use."
+          ],
+          "gaps": [
+            "define safe controller candidates",
+            "bind autonomy levels"
+          ],
+          "risks": [
+            "unstable control loop",
+            "bad state estimate"
+          ],
+          "contracts": [
+            "AutonomyController",
+            "ControlSignal",
+            "ControlState"
+          ]
+        },
+        {
+          "volume_ref": "VOL-319",
+          "title": "Autonomy Escalation",
+          "accountability_id": "ACC-VOL-319",
+          "requirements": [
+            "Escalation requires explicit eligibility and approval policy.",
+            "Escalated grants expire/revoke cleanly."
+          ],
+          "gaps": [
+            "define transition rules",
+            "bind verifier/human gates"
+          ],
+          "risks": [
+            "self-escalation",
+            "stale elevated grant"
+          ],
+          "contracts": [
+            "AutonomyEscalation",
+            "EscalationGrant",
+            "EscalationEvidence"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-CHANGE-01",
+      "lane_id": "P3E-L2",
+      "status": "blocked",
+      "title": "Build workspace-aware safe-change planner",
+      "depends_on": [
+        "P3-WORKFLOW-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-330",
+        "VOL-331",
+        "VOL-332",
+        "VOL-333",
+        "VOL-334",
+        "VOL-335",
+        "VOL-336",
+        "VOL-337",
+        "VOL-338"
+      ],
+      "objective": "Bind project memory, workspace/resource identity, dependency graphs, rebuild impact, change-risk estimates and safe-change gates into deterministic repository work plans.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-330",
+          "title": "Project Memory",
+          "accountability_id": "ACC-VOL-330",
+          "requirements": [
+            "Project memory is isolated by project/tenant and trust class.",
+            "Memory updates preserve source and supersession lineage."
+          ],
+          "gaps": [
+            "define project memory schema",
+            "bind workspace model"
+          ],
+          "risks": [
+            "cross-project leak",
+            "stale decision retained"
+          ],
+          "contracts": [
+            "ProjectMemory",
+            "ProjectFact",
+            "ProjectMemoryRevision"
+          ]
+        },
+        {
+          "volume_ref": "VOL-331",
+          "title": "Workspace Model",
+          "accountability_id": "ACC-VOL-331",
+          "requirements": [
+            "Workspace links reference canonical underlying objects rather than duplicate them.",
+            "Membership/permission changes propagate to active operations."
+          ],
+          "gaps": [
+            "define authoritative workspace schema",
+            "bind product shell"
+          ],
+          "risks": [
+            "workspace becomes shadow state",
+            "stale permissions"
+          ],
+          "contracts": [
+            "Workspace",
+            "WorkspaceMember",
+            "WorkspaceResource"
+          ]
+        },
+        {
+          "volume_ref": "VOL-332",
+          "title": "Resource Namespace",
+          "accountability_id": "ACC-VOL-332",
+          "requirements": [
+            "Namespace resolution includes tenant/project/version scope.",
+            "Reject traversal, confusable or ambiguous resource names."
+          ],
+          "gaps": [
+            "define namespace grammar",
+            "bind resource service"
+          ],
+          "risks": [
+            "name collision",
+            "path traversal"
+          ],
+          "contracts": [
+            "ResourceName",
+            "ResourceNamespace",
+            "ResourceRef"
+          ]
+        },
+        {
+          "volume_ref": "VOL-333",
+          "title": "Resource Resolution Service",
+          "accountability_id": "ACC-VOL-333",
+          "requirements": [
+            "Resolution checks authority and lifecycle before returning handles.",
+            "Ambiguous/latest aliases are explicit and traceable."
+          ],
+          "gaps": [
+            "define resolver interface",
+            "bind artifact/model/tool registries"
+          ],
+          "risks": [
+            "alias races",
+            "cross-tenant resolution"
+          ],
+          "contracts": [
+            "ResourceQuery",
+            "ResourceHandle",
+            "ResolutionReceipt"
+          ]
+        },
+        {
+          "volume_ref": "VOL-334",
+          "title": "Artifact Dependency Graph",
+          "accountability_id": "ACC-VOL-334",
+          "requirements": [
+            "Edges are typed and version-specific.",
+            "Cycles are detected/handled according to artifact class."
+          ],
+          "gaps": [
+            "populate graph from producers",
+            "bind rebuild/impact"
+          ],
+          "risks": [
+            "missing edge",
+            "wrong-version dependency"
+          ],
+          "contracts": [
+            "ArtifactNode",
+            "ArtifactDependency",
+            "ArtifactGraph"
+          ]
+        },
+        {
+          "volume_ref": "VOL-335",
+          "title": "Artifact Rebuild Engine",
+          "accountability_id": "ACC-VOL-335",
+          "requirements": [
+            "Rebuild only from verified inputs/producer versions.",
+            "Compare rebuilt digest/semantic output against expectations."
+          ],
+          "gaps": [
+            "define rebuild policies",
+            "bind content addressing/cache"
+          ],
+          "risks": [
+            "non-reproducible producer",
+            "rebuild cascades unbounded"
+          ],
+          "contracts": [
+            "RebuildPlan",
+            "RebuildStep",
+            "RebuildEvidence"
+          ]
+        },
+        {
+          "volume_ref": "VOL-336",
+          "title": "Impact Analysis Engine",
+          "accountability_id": "ACC-VOL-336",
+          "requirements": [
+            "Use architecture/trace/dependency ownership graphs.",
+            "Expose uncertainty and missing edges instead of asserting complete impact."
+          ],
+          "gaps": [
+            "unify graph sources",
+            "bind changeset budget/CI"
+          ],
+          "risks": [
+            "missed dependency",
+            "overbroad impact slows CI"
+          ],
+          "contracts": [
+            "ImpactQuery",
+            "ImpactSet",
+            "ImpactEvidence"
+          ]
+        },
+        {
+          "volume_ref": "VOL-337",
+          "title": "Change Risk Estimator",
+          "accountability_id": "ACC-VOL-337",
+          "requirements": [
+            "Estimator does not replace hard gates.",
+            "Calibrate predicted risk against observed incidents/regressions."
+          ],
+          "gaps": [
+            "define baseline model",
+            "bind safe change planner"
+          ],
+          "risks": [
+            "false low risk",
+            "metric gaming"
+          ],
+          "contracts": [
+            "ChangeRisk",
+            "RiskFactor",
+            "RiskCalibration"
+          ]
+        },
+        {
+          "volume_ref": "VOL-338",
+          "title": "Safe Change Planner",
+          "accountability_id": "ACC-VOL-338",
+          "requirements": [
+            "Plan must satisfy ownership/compatibility/risk/budget constraints before mutation.",
+            "Prefer reversible staged changes for uncertain/high-impact work."
+          ],
+          "gaps": [
+            "bind impact/risk inputs",
+            "integrate engineering agent"
+          ],
+          "risks": [
+            "unsafe plan",
+            "missing integration step"
+          ],
+          "contracts": [
+            "SafeChangePlan",
+            "ChangeStep",
+            "ChangeGate"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-TOOLS-01",
+      "lane_id": "P3E-L3",
+      "status": "blocked",
+      "title": "Compose trusted tools and system changes",
+      "depends_on": [
+        "P3-AUTONOMY-01",
+        "P3-CHANGE-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-339",
+        "VOL-340",
+        "VOL-371",
+        "VOL-372",
+        "VOL-373",
+        "VOL-374",
+        "VOL-375",
+        "VOL-376",
+        "VOL-377"
+      ],
+      "objective": "Statically analyze and simulate plans, compose tools from declared capabilities/dependencies, validate tool health/results, and bind generated changes to contracts and extension points.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-339",
+          "title": "System Compiler Concept",
+          "accountability_id": "ACC-VOL-339",
+          "requirements": [
+            "Compiler outputs are derived artifacts, never new authority.",
+            "Generation is deterministic and traceable to input contracts."
+          ],
+          "gaps": [
+            "define bounded initial targets",
+            "bind provenance/review"
+          ],
+          "risks": [
+            "generated architecture diverges",
+            "compiler hides decisions"
+          ],
+          "contracts": [
+            "SystemSource",
+            "SystemCompilePlan",
+            "SystemArtifact"
+          ]
+        },
+        {
+          "volume_ref": "VOL-340",
+          "title": "Code Generation from Contracts",
+          "accountability_id": "ACC-VOL-340",
+          "requirements": [
+            "Generated files are clearly marked and reproducible.",
+            "Manual extension points avoid edits being overwritten."
+          ],
+          "gaps": [
+            "select generators",
+            "bind generated-file policy"
+          ],
+          "risks": [
+            "hand edits lost",
+            "generator/schema mismatch"
+          ],
+          "contracts": [
+            "GenerationSpec",
+            "GeneratedCode",
+            "ExtensionPoint"
+          ]
+        },
+        {
+          "volume_ref": "VOL-371",
+          "title": "Plan Static Analyzer",
+          "accountability_id": "ACC-VOL-371",
+          "requirements": [
+            "Analysis is deterministic over versioned plan IR.",
+            "Findings have location/severity/remediation."
+          ],
+          "gaps": [
+            "seed core lint rules",
+            "bind workflow compiler"
+          ],
+          "risks": [
+            "false negatives",
+            "rule drift"
+          ],
+          "contracts": [
+            "PlanLintRule",
+            "PlanDiagnostic",
+            "PlanAnalysis"
+          ]
+        },
+        {
+          "volume_ref": "VOL-372",
+          "title": "Plan Simulation",
+          "accountability_id": "ACC-VOL-372",
+          "requirements": [
+            "Simulation receipts are marked non-production evidence.",
+            "Include failure/timeout/resource scenarios, not only happy path."
+          ],
+          "gaps": [
+            "bind digital twin",
+            "define promotion thresholds"
+          ],
+          "risks": [
+            "simulation mismatch",
+            "simulated success overtrusted"
+          ],
+          "contracts": [
+            "PlanSimulation",
+            "SimulatedStep",
+            "SimulationFinding"
+          ]
+        },
+        {
+          "volume_ref": "VOL-373",
+          "title": "Tool Composition Engine",
+          "accountability_id": "ACC-VOL-373",
+          "requirements": [
+            "Composition cannot aggregate permissions into broader authority.",
+            "Data transformations between tools are schema/trust checked."
+          ],
+          "gaps": [
+            "define composition IR",
+            "bind tool SDK/workflows"
+          ],
+          "risks": [
+            "authority amplification",
+            "schema mismatch"
+          ],
+          "contracts": [
+            "ToolComposition",
+            "ToolBinding",
+            "CompositionResult"
+          ]
+        },
+        {
+          "volume_ref": "VOL-374",
+          "title": "Tool Dependency Graph",
+          "accountability_id": "ACC-VOL-374",
+          "requirements": [
+            "Dependencies are versioned and typed.",
+            "Planner can detect unavailable/conflicting tool chains before execution."
+          ],
+          "gaps": [
+            "populate graph",
+            "bind impact/failover"
+          ],
+          "risks": [
+            "hidden dependency",
+            "cyclic tool chain"
+          ],
+          "contracts": [
+            "ToolDependency",
+            "ToolGraph",
+            "ToolCompatibility"
+          ]
+        },
+        {
+          "volume_ref": "VOL-375",
+          "title": "Tool Health",
+          "accountability_id": "ACC-VOL-375",
+          "requirements": [
+            "Health distinguishes transport success from semantic correctness.",
+            "Stale health cannot authorize risky operations."
+          ],
+          "gaps": [
+            "define safe probes",
+            "bind tool routing"
+          ],
+          "risks": [
+            "200-OK but wrong result",
+            "probe causes side effect"
+          ],
+          "contracts": [
+            "ToolHealth",
+            "ToolProbe",
+            "ToolHealthState"
+          ]
+        },
+        {
+          "volume_ref": "VOL-376",
+          "title": "Tool Capability Discovery",
+          "accountability_id": "ACC-VOL-376",
+          "requirements": [
+            "Discovery data is untrusted until validated/signed according to source.",
+            "Discovered capability never implies granted authority."
+          ],
+          "gaps": [
+            "define discovery trust contract",
+            "bind tool SDK"
+          ],
+          "risks": [
+            "prompt injection via metadata",
+            "capability=authority confusion"
+          ],
+          "contracts": [
+            "ToolCapability",
+            "ToolManifest",
+            "ToolDiscoveryResult"
+          ]
+        },
+        {
+          "volume_ref": "VOL-377",
+          "title": "Tool Result Trust",
+          "accountability_id": "ACC-VOL-377",
+          "requirements": [
+            "Tool output is data, not instructions or authority.",
+            "High-impact results require independent validation where appropriate."
+          ],
+          "gaps": [
+            "define result trust levels",
+            "bind context compiler"
+          ],
+          "risks": [
+            "tool output injection",
+            "stale result trusted"
+          ],
+          "contracts": [
+            "ToolResultTrust",
+            "ToolEvidence",
+            "ToolValidation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-EFFECTS-01",
+      "lane_id": "P3E-L4",
+      "status": "blocked",
+      "title": "Ledger and compensate side effects",
+      "depends_on": [
+        "P3-TOOLS-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-378",
+        "VOL-379",
+        "VOL-380"
+      ],
+      "objective": "Make effect attempts durable, idempotent and auditable; require explicit compensation semantics and saga transitions before autonomous mutation can qualify.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-378",
+          "title": "Side-Effect Ledger",
+          "accountability_id": "ACC-VOL-378",
+          "requirements": [
+            "Ledger entries are durable before/after effects according to operation class.",
+            "Unknown outcomes remain unresolved until reconciliation."
+          ],
+          "gaps": [
+            "define effect state machine",
+            "bind tools/sagas"
+          ],
+          "risks": [
+            "effect executed twice",
+            "unknown marked failed"
+          ],
+          "contracts": [
+            "SideEffect",
+            "EffectAttempt",
+            "EffectReceipt"
+          ]
+        },
+        {
+          "volume_ref": "VOL-379",
+          "title": "Compensation Engine",
+          "accountability_id": "ACC-VOL-379",
+          "requirements": [
+            "Compensation semantics are explicit and not assumed equivalent to rollback.",
+            "Failed compensation becomes durable incident/reconciliation work."
+          ],
+          "gaps": [
+            "catalog compensable effects",
+            "bind side-effect ledger"
+          ],
+          "risks": [
+            "compensation duplicates harm",
+            "false rollback claim"
+          ],
+          "contracts": [
+            "Compensation",
+            "CompensationStep",
+            "CompensationResult"
+          ]
+        },
+        {
+          "volume_ref": "VOL-380",
+          "title": "Saga Workflows",
+          "accountability_id": "ACC-VOL-380",
+          "requirements": [
+            "Saga state is durable and resumable across process failure.",
+            "Each step has idempotency, timeout and compensation/reconciliation policy."
+          ],
+          "gaps": [
+            "unify transaction strategy",
+            "materialize saga runtime"
+          ],
+          "risks": [
+            "orphan saga",
+            "compensation order error"
+          ],
+          "contracts": [
+            "SagaDefinition",
+            "SagaInstance",
+            "SagaTransition"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3-AGENT-01",
+      "lane_id": "P3E-L5",
+      "status": "blocked",
+      "title": "Qualify autonomous engineering worker",
+      "depends_on": [
+        "P3-WORKFLOW-01",
+        "P3-AUTONOMY-01",
+        "P3-CHANGE-01",
+        "P3-TOOLS-01",
+        "P3-EFFECTS-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-203",
+        "VOL-204",
+        "VOL-206"
+      ],
+      "objective": "Prove VS-002 autonomous engineering, bounded multi-agent/self-improvement behavior, performance/economic evidence, disagreement handling, and the Autonomous AI Worker acceptance contract end to end.",
+      "acceptance": [
+        "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+        "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+        "Every effectful autonomous action must remain policy-bound, bounded, replayable or compensable, and independently verifiable.",
+        "Evidence must bind the exact branch/head and executable test or runtime receipt."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_expansion_closure.json#status=closed",
+        "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json",
+        "historical-evidence-head:191b119cd153b6e1505a1d00498f451143e9c59f"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-203",
+          "title": "Agent Performance Evidence",
+          "accountability_id": "ACC-VOL-203",
+          "requirements": [
+            "Score completion, correctness, recovery, cost and human intervention separately.",
+            "Bind observations to exact agent/task/config/model identity."
+          ],
+          "gaps": [
+            "define evidence metrics",
+            "bind to evaluation harness"
+          ],
+          "risks": [
+            "self-reported success",
+            "Goodhart behavior"
+          ],
+          "contracts": [
+            "AgentPerformanceRecord",
+            "AgentOutcome",
+            "AgentMetric"
+          ]
+        },
+        {
+          "volume_ref": "VOL-204",
+          "title": "Agent Economics",
+          "accountability_id": "ACC-VOL-204",
+          "requirements": [
+            "Attribute costs per agent/task/delegation chain.",
+            "Do not optimize cost by silently weakening authority, quality or verification."
+          ],
+          "gaps": [
+            "bind to cost governor",
+            "define delegation accounting"
+          ],
+          "risks": [
+            "runaway delegation spend",
+            "cheap low-quality routing"
+          ],
+          "contracts": [
+            "AgentCost",
+            "DelegationCost",
+            "AgentEconomicDecision"
+          ]
+        },
+        {
+          "volume_ref": "VOL-206",
+          "title": "Consensus & Disagreement",
+          "accountability_id": "ACC-VOL-206",
+          "requirements": [
+            "Keep independent evidence visible before aggregation.",
+            "Escalate unresolved high-impact disagreement instead of averaging it away."
+          ],
+          "gaps": [
+            "define aggregation rules",
+            "bind reviewer independence"
+          ],
+          "risks": [
+            "false consensus",
+            "majority amplifies shared error"
+          ],
+          "contracts": [
+            "ConsensusProposal",
+            "Dissent",
+            "ConsensusDecision"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "task_count": 6,
+    "in_progress_count": 0,
+    "ready_count": 1,
+    "blocked_count": 5,
+    "landed_unpromoted_count": 0,
+    "scheduled_volume_count": 37,
+    "queued_volume_count": 197,
+    "source_volume_count": 234
+  }
+}
