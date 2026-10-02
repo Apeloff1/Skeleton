@@ -42,7 +42,11 @@ from skeleton.ai.runtime.inference import (
     LocalToolCall,
 )
 from skeleton.ai.runtime.memory.core import Chunk, InMemoryTFIDFStore
-from skeleton.ai.runtime.system_completion import SystemCompletionPlane, SystemCompletionReport
+from skeleton.ai.runtime.system_completion import (
+    SystemCompletionPlane,
+    SystemCompletionReport,
+    completion_learning_experiment_id,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     ExecutionFinalizationBindings,
@@ -539,9 +543,15 @@ async def _stop_semantics_results(
     return deadline_run.result, cancellation_run.result
 
 
-def _learning_cycle() -> LearningCycle:
+def _learning_cycle(
+    subject_id: str,
+    result_digest: str,
+) -> LearningCycle:
     spec = ExperimentSpec(
-        experiment_id="system-qualification-learning",
+        experiment_id=completion_learning_experiment_id(
+            subject_id,
+            result_digest,
+        ),
         baseline_version="baseline-v1",
         candidate_version="candidate-v2",
         assignment_salt="system-qualification-salt",
@@ -683,7 +693,10 @@ async def qualify_system_completion(
         )
     )
 
-    learning = _learning_cycle()
+    learning = _learning_cycle(
+        primary.request.execution_id,
+        primary.run.evidence.result_digest,
+    )
     plane = SystemCompletionPlane(
         subject_id=primary.request.execution_id,
         source_revision=source_revision,
@@ -695,6 +708,7 @@ async def qualify_system_completion(
         provider_receipts=primary.run.evidence.provider_receipts,
     )
     plane.prove_offline_isolation(
+        execution_id=primary.request.execution_id,
         network_attempt_count=len(network.attempts),
         provider_receipts=primary.run.evidence.provider_receipts,
     )
@@ -703,6 +717,7 @@ async def qualify_system_completion(
         terminal,
     )
     plane.prove_budget_bounds(
+        execution_id=primary.request.execution_id,
         max_model_turns=primary.request.max_model_turns,
         max_tool_calls=primary.request.max_tool_calls,
         provider_receipts=terminal.provider_receipts,
@@ -713,6 +728,7 @@ async def qualify_system_completion(
         cancellation_result=cancellation_result,
     )
     plane.prove_tool_authority(
+        execution_id=primary.request.execution_id,
         allowed_tool_ids=primary.request.allowed_tool_ids,
         observed_tool_ids=primary.observed_tool_ids,
         receipt_refs=terminal.tool_receipts,
@@ -720,12 +736,15 @@ async def qualify_system_completion(
     plane.prove_durable_recovery(terminal, recovered)
     plane.prove_replay_lineage(recovered_turns)
     plane.prove_reproducibility(
+        primary_execution_id=primary.request.execution_id,
+        replay_execution_id=replay.request.execution_id,
         primary_result_digest=primary.run.evidence.result_digest,
         replay_result_digest=replay.run.evidence.result_digest,
         primary_output_digest=primary.run.evidence.final_output_digest,
         replay_output_digest=replay.run.evidence.final_output_digest,
     )
     plane.prove_governed_effects(
+        execution_id=primary.request.execution_id,
         tool_receipt_count=len(terminal.tool_receipts),
         mutating_tool_count=0,
         verified_postcondition_count=0,
@@ -737,6 +756,7 @@ async def qualify_system_completion(
         context_digest=primary.request.context_digest,
     )
     plane.prove_context_integrity(
+        context_subject_id=primary.request.execution_id,
         problems=context_ledger.verify(),
         height=context_ledger.height,
         head_hash=context_ledger.head.hash,
@@ -756,6 +776,7 @@ async def qualify_system_completion(
         active_version=learning.promoted_active,
         evaluation_digest=learning.evaluation.digest,
         evaluator_id=learning.evaluation.evaluator_id,
+        bound_result_digest=primary.run.evidence.result_digest,
     )
     plane.prove_learning_rollback(
         learning.rollback,
@@ -763,6 +784,7 @@ async def qualify_system_completion(
         expected_candidate=learning.spec.candidate_version,
         active_version=learning.rolled_back_active,
         promotion_receipt=learning.promotion,
+        bound_result_digest=primary.run.evidence.result_digest,
     )
 
     report = plane.report()
