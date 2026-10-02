@@ -1,0 +1,58 @@
+name: P0 Outbound Network Security Evidence
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/security/outbound_url.py"
+      - "skeleton/security/outbound_http.py"
+      - "skeleton/testing/test_outbound_url_resolution_security.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/backlog_registry.json"
+      - ".github/workflows/p0-outbound-network-evidence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/security/outbound_url.py"
+      - "skeleton/security/outbound_http.py"
+      - "skeleton/testing/test_outbound_url_resolution_security.py"
+      - "skeleton/testing/test_security_outbound_http.py"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/backlog_registry.json"
+      - ".github/workflows/p0-outbound-network-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p0-outbound-network-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  outbound-network-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Run outbound network security regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_outbound_url_resolution_security.py
+          skeleton/testing/test_security_outbound_http.py
