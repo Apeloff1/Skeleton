@@ -280,6 +280,7 @@ class CanonicalAIResponseEnvelope:
     execution_result_digest: str
     evidence_digest: str
     tool_receipt_refs: tuple[str, ...]
+    provider_receipt_refs: tuple[str, ...]
     memory_refs: tuple[str, ...]
     citation_refs: tuple[str, ...]
     artifact_refs: tuple[str, ...]
@@ -343,6 +344,7 @@ class CanonicalAIResponseEnvelope:
             "execution_result_digest": self.execution_result_digest,
             "evidence_digest": self.evidence_digest,
             "tool_receipt_refs": list(self.tool_receipt_refs),
+            "provider_receipt_refs": list(self.provider_receipt_refs),
             "memory_refs": list(self.memory_refs),
             "citation_refs": list(self.citation_refs),
             "artifact_refs": list(self.artifact_refs),
@@ -737,6 +739,12 @@ class CanonicalConversationAIRuntime:
             raise ConversationRepositoryCorruption(
                 "assistant tool receipts diverge from durable functional result"
             )
+        if tuple(assistant_message.provider_receipt_refs) != tuple(
+            terminal.provider_receipts
+        ):
+            raise ConversationRepositoryCorruption(
+                "assistant provider receipts diverge from durable functional result"
+            )
         if tuple(assistant_message.citation_refs) != tuple(terminal.evidence_refs):
             raise ConversationRepositoryCorruption(
                 "assistant evidence refs diverge from durable functional result"
@@ -759,6 +767,9 @@ class CanonicalConversationAIRuntime:
             execution_result_digest=evidence.result_digest,
             evidence_digest=_json_digest(evidence.as_dict()),
             tool_receipt_refs=tuple(assistant_message.tool_receipt_refs),
+            provider_receipt_refs=tuple(
+                assistant_message.provider_receipt_refs
+            ),
             memory_refs=tuple(assistant_message.memory_refs),
             citation_refs=tuple(assistant_message.citation_refs),
             artifact_refs=tuple(assistant_message.artifact_refs),
@@ -950,6 +961,7 @@ class CanonicalConversationAIRuntime:
             context_source_snapshot=context.source_snapshot,
             context_compiler_version=context.compiler_version,
             tool_receipt_refs=terminal.tool_receipts,
+            provider_receipt_refs=terminal.provider_receipts,
             memory_refs=terminal.memory_refs,
             citation_refs=terminal.evidence_refs,
             artifact_refs=terminal.artifact_refs,
