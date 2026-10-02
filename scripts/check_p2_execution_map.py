@@ -285,6 +285,46 @@ def validate(root: Path) -> dict:
     if unknown_task_lanes:
         raise P2ValidationError(f"tasks reference unknown lanes: {unknown_task_lanes}")
 
+    progress = p2.get("progress", {})
+    if not isinstance(progress, dict):
+        raise P2ValidationError("P2 progress must be an object")
+    expected_landed = [
+        task["task_id"]
+        for task in tasks
+        if task.get("status") == "landed_unpromoted"
+    ]
+    expected_active = [
+        task["task_id"]
+        for task in tasks
+        if task.get("status") in {"ready", "in_progress"}
+    ]
+    expected_blocked = [
+        task["task_id"]
+        for task in tasks
+        if task.get("status") == "blocked"
+    ]
+    for field, expected in (
+        ("landed_unpromoted_tasks", expected_landed),
+        ("active_tasks", expected_active),
+        ("blocked_tasks", expected_blocked),
+    ):
+        actual = progress.get(field)
+        if actual != expected:
+            raise P2ValidationError(
+                f"P2 progress {field} drift: {actual!r} != {expected!r}"
+            )
+    projected = (
+        list(progress.get("landed_unpromoted_tasks", []))
+        + list(progress.get("active_tasks", []))
+        + list(progress.get("blocked_tasks", []))
+    )
+    if len(projected) != len(set(projected)) or set(projected) != set(task_ids):
+        raise P2ValidationError(
+            "P2 progress projection must cover each task exactly once"
+        )
+    if not isinstance(progress.get("rule"), str) or not progress["rule"].strip():
+        raise P2ValidationError("P2 progress rule is required")
+
     summary = backlog.get("summary", {})
     expected_counts = {
         "task_count": len(tasks),
