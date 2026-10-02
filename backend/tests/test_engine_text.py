@@ -378,3 +378,125 @@ def test_engine_text_evidence_contract_is_bounded_and_unique() -> None:
                 },
             ),
         )
+
+
+@pytest.mark.asyncio
+async def test_engine_text_recovers_existing_execution_before_recompiling_changed_evidence() -> None:
+    class RecoveringClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        def __init__(self) -> None:
+            self.execute_calls = 0
+            self.wait_calls = 0
+            self.operation_id = None
+            self.execution_id = None
+
+        async def terminal_result_if_available(
+            self,
+            *,
+            execution_id,
+            actor_id,
+            tenant_id,
+            trace_id=None,
+        ):
+            self.execution_id = execution_id
+            assert trace_id is not None
+            self.operation_id = trace_id.removeprefix("engine-text:")
+            return EngineTerminalResult(
+                operation_id=self.operation_id,
+                execution_id=execution_id,
+                status="completed",
+                final_output="original durable answer",
+                usage={"model_turns": 1},
+                verification="verification:original",
+                verification_receipt={
+                    "verification_profile": "assistant_proposal",
+                    "claim_kind": "hypothesis",
+                    "outcome": "passed",
+                    "policy_satisfied": True,
+                    "policy": {
+                        "level": 0,
+                        "required_modes": ["structural"],
+                    },
+                },
+                evidence_refs=("evidence:original",),
+                provider_receipts=("provider:local:original",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
+                stream_terminal_event="stream-terminal:original",
+            )
+
+        async def wait_for_terminal(self, **_kwargs):
+            self.wait_calls += 1
+            raise AssertionError("completed recovery must not wait")
+
+        async def handoff_binding(
+            self,
+            execution_id,
+            *,
+            actor_id,
+            tenant_id,
+            trace_id=None,
+        ):
+            assert execution_id == self.execution_id
+            return SimpleNamespace(
+                operation_id=self.operation_id,
+                execution_id=execution_id,
+                turn_id="turn-original",
+                tenant_id=tenant_id,
+                actor_id=actor_id,
+                context_id="context-original",
+                context_digest="a" * 64,
+                compiler_version="compiler-original",
+                source_snapshot=(
+                    ("segment-original", "b" * 64),
+                ),
+                data_class="internal",
+                purpose="model-inference",
+                handoff_digest="c" * 64,
+                capability="assistant.compat",
+                idempotency_key="stable-recovery",
+                trace_id=trace_id or "trace-original",
+            )
+
+        async def execute(self, _command):
+            self.execute_calls += 1
+            raise AssertionError(
+                "existing durable execution must win over changed evidence"
+            )
+
+    client = RecoveringClient()
+    result = await execute_engine_text(
+        EngineTextRequest(
+            instructions="Rules",
+            prompt="Same canonical question",
+            idempotency_key="stable-recovery",
+            tenant_id="default",
+            actor_id="backend-ai",
+            capability="assistant.compat",
+            evidence=(
+                {
+                    "source_id": "retrieval:new",
+                    "content": "new retrieval that did not exist initially",
+                },
+            ),
+        ),
+        client=client,
+    )
+
+    assert result.text == "original durable answer"
+    assert result.context_id == "context-original"
+    assert result.context_digest == "a" * 64
+    assert result.context_source_snapshot == (
+        ("segment-original", "b" * 64),
+    )
+    assert result.provider_receipts == (
+        "provider:local:original",
+    )
+    assert client.execute_calls == 0
+    assert client.wait_calls == 0
