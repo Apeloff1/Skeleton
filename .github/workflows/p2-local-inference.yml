@@ -6,7 +6,6 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
-      - "skeleton/testing/test_llama_cpp_local_inference.py"
       - ".github/workflows/p2-local-inference.yml"
   push:
     branches:
@@ -15,6 +14,7 @@ on:
     paths:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/testing/test_local_inference.py"
+      - "skeleton/testing/test_llama_cpp_local_inference.py"
       - ".github/workflows/p2-local-inference.yml"
   workflow_dispatch:
 

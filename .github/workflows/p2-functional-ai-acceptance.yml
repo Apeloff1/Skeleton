@@ -12,10 +12,13 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/testing/test_local_inference.py"
+      - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_vs001_functional_ai.py"
       - "scripts/check_p1_terminal_closure_manifest.py"
       - "scripts/check_p2_tranche1_activated.py"
       - "scripts/check_p2_functional_ai_closure.py"
+      - "scripts/p2_functional_ai_exact_head.py"
+      - "tests/test_p2_functional_ai_exact_head.py"
       - "tests/test_p2_functional_ai_closure.py"
       - ".github/workflows/p2-functional-ai-acceptance.yml"
   push:
@@ -30,6 +33,8 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/ai/runtime/functional_ai.py"
       - "scripts/check_p2_functional_ai_closure.py"
+      - "scripts/p2_functional_ai_exact_head.py"
+      - "tests/test_p2_functional_ai_exact_head.py"
       - ".github/workflows/p2-functional-ai-acceptance.yml"
   workflow_dispatch:
 
@@ -51,6 +56,7 @@ jobs:
       XAI_API_KEY: ""
       ANTHROPIC_API_KEY: ""
       GOOGLE_API_KEY: ""
+      AZURE_OPENAI_API_KEY: ""
     steps:
       - name: Check out exact head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -74,13 +80,15 @@ jobs:
           python scripts/check_p1_terminal_closure_manifest.py --json
           python scripts/check_p2_tranche1_activated.py --json
           python scripts/check_ai_p0_edge_case_matrix.py
-          python scripts/check_p2_functional_ai_closure.py --json
+          python scripts/check_p2_functional_ai_closure.py --json --require-closed
       - name: Execute local Functional AI transaction
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_local_inference.py
+          skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_vs001_functional_ai.py
           tests/test_p2_functional_ai_closure.py
+          tests/test_p2_functional_ai_exact_head.py
       - name: Exercise state, event, security and recovery prerequisites
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
@@ -89,3 +97,13 @@ jobs:
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_security_rooted_fs.py
           skeleton/testing/test_state_recovery_drill.py
+      - name: Emit and verify exact-head Functional AI receipt
+        env:
+          EXACT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXACT_RUN_ID: ${{ github.run_id }}
+          EXACT_RUN_ATTEMPT: ${{ github.run_attempt }}
+          EXACT_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          receipt="$RUNNER_TEMP/p2-functional-ai-exact-head.json"
+          python scripts/p2_functional_ai_exact_head.py emit             --head-sha "$EXACT_HEAD_SHA"             --run-id "$EXACT_RUN_ID"             --run-attempt "$EXACT_RUN_ATTEMPT"             --event-name "$EXACT_EVENT_NAME"             --output "$receipt"
+          python scripts/p2_functional_ai_exact_head.py verify             --head-sha "$EXACT_HEAD_SHA"             --receipt "$receipt"

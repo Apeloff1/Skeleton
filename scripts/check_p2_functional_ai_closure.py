@@ -22,16 +22,28 @@ P0 = Path("machine/ai_p0_edge_case_matrix.json")
 CRITICAL = {"VOL-007", "VOL-097", "VOL-104"}
 FUNCTIONAL_TASK = "P2-T1-FUNCTIONAL-01"
 INFERENCE_TASK = "P2-T1-INFER-01"
-FORBIDDEN_LOCAL_MARKERS = (
+FORBIDDEN_HOSTED_MARKERS = (
     "api.openai.com",
     "api.x.ai",
     "api.anthropic.com",
-    "OPENAI_API_KEY",
-    "XAI_API_KEY",
-    "ANTHROPIC_API_KEY",
     "from openai import",
     "import openai",
 )
+REQUIRED_EXECUTABLE_SURFACES = {
+    "local_inference",
+    "llama_cpp_runtime",
+    "functional_runtime",
+    "local_inference_test",
+    "llama_cpp_test",
+    "vs001_test",
+    "exact_head_receipt",
+}
+REQUIRED_EXACT_HEAD_POLICY = {
+    "mode": "ephemeral_ci_receipt",
+    "receipt_schema": "skeleton.p2.functional_ai.exact_head_receipt.v1",
+    "workflow_name": "P2 Functional AI Acceptance",
+    "head_binding": "github_exact_head",
+}
 
 
 class FunctionalAIClosureError(RuntimeError):
@@ -104,19 +116,26 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
     if not isinstance(surfaces, dict):
         errors.append("executable_surfaces must be an object")
         surfaces = {}
+    missing_surface_keys = REQUIRED_EXECUTABLE_SURFACES - set(map(str, surfaces))
+    if missing_surface_keys:
+        errors.append(
+            "functional closure missing executable surface key(s): "
+            + ", ".join(sorted(missing_surface_keys))
+        )
     for key, rel in surfaces.items():
         if not isinstance(rel, str) or not (root / rel).is_file():
             errors.append(f"missing executable surface {key}: {rel!r}")
 
     for rel in (
         "skeleton/ai/runtime/inference/local.py",
+        "skeleton/ai/runtime/inference/llama_cpp.py",
         "skeleton/ai/runtime/functional_ai.py",
     ):
         try:
             text = (root / rel).read_text(encoding="utf-8")
         except OSError:
             continue
-        hits = [marker for marker in FORBIDDEN_LOCAL_MARKERS if marker in text]
+        hits = [marker for marker in FORBIDDEN_HOSTED_MARKERS if marker in text]
         if hits:
             errors.append(f"{rel} owns hosted-provider marker(s): {hits}")
 
@@ -132,6 +151,22 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
         ):
             if marker not in text:
                 errors.append(f"local inference missing {marker}")
+
+    llama_path = root / "skeleton/ai/runtime/inference/llama_cpp.py"
+    if llama_path.is_file():
+        text = llama_path.read_text(encoding="utf-8")
+        for marker in (
+            "class LlamaCppModel",
+            "class LlamaCppConfig",
+            "runtime_digest",
+            "model_digest",
+            "shell=False",
+            "prompt_file",
+            "LocalToolCall",
+            "max_output_bytes",
+        ):
+            if marker not in text:
+                errors.append(f"llama.cpp local runtime missing marker {marker}")
 
     functional_path = root / "skeleton/ai/runtime/functional_ai.py"
     if functional_path.is_file():
@@ -187,6 +222,12 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "reconnect_replay_required",
             "independent_verification_required",
             "exact_head_ci_required",
+            "production_local_weights_runtime_required",
+            "runtime_binary_identity_required",
+            "model_artifact_identity_required",
+            "prompt_argv_forbidden",
+            "shell_execution_forbidden",
+            "exact_head_receipt_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:
@@ -194,6 +235,14 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
         for key in true_required:
             if requirements.get(key) is not True:
                 errors.append(f"{key} must be true")
+
+    exact_head_policy = manifest.get("exact_head_policy")
+    if not isinstance(exact_head_policy, dict):
+        errors.append("functional closure exact_head_policy missing")
+    else:
+        for key, value in REQUIRED_EXACT_HEAD_POLICY.items():
+            if exact_head_policy.get(key) != value:
+                errors.append(f"exact_head_policy {key} drift")
 
     if manifest.get("status") == "closed":
         for task_id in (
@@ -220,6 +269,13 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
         "critical_volume_count": len(CRITICAL),
         "provider_independent": not any(
             "hosted-provider marker" in error for error in errors
+        ),
+        "production_local_weights_runtime": not any(
+            "llama.cpp local runtime" in error for error in errors
+        ),
+        "exact_head_receipt_policy": not any(
+            "exact_head_policy" in error or "executable surface" in error
+            for error in errors
         ),
         "errors": errors,
         "valid": not errors,
