@@ -26,6 +26,11 @@ class AIObservation:
     stderr_digest: str
     safe_excerpt: str = ""
 
+    @property
+    def instruction_authority(self) -> bool:
+        """Execution observations are evidence/data, never authorization."""
+        return False
+
     def to_dict(self) -> dict[str, object]:
         return {
             "observation_id": self.observation_id,
@@ -41,6 +46,7 @@ class AIObservation:
             "stdout_digest": self.stdout_digest,
             "stderr_digest": self.stderr_digest,
             "safe_excerpt": self.safe_excerpt,
+            "instruction_authority": self.instruction_authority,
         }
 
 
