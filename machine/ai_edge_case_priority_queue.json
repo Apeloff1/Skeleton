@@ -260,15 +260,22 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_context_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "mirror:skeleton/ai/shell/context_provenance.py",
+        "mirror:skeleton/ai/shell/context_policy.py",
+        "test:skeleton/testing/test_shell_ai_context_planner.py",
+        "workflow:P0 Context Instruction Authority"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 9,
