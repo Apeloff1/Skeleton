@@ -426,6 +426,15 @@ def _semantic_pass(
                 details,
                 "replay_digest_backfill_verified",
             )
+            and _boolean(details, "state_journal_verified")
+            and _boolean(
+                details,
+                "state_journal_tamper_rejected",
+            )
+            and _boolean(
+                details,
+                "state_journal_migration_seeded",
+            )
         )
 
     if requirement == "execution.replay_lineage":
