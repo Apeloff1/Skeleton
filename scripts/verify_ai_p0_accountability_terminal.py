@@ -271,8 +271,20 @@ def verify_terminal(
         if not isinstance(result, dict):
             errors.append("verifier-runner result must be an object")
             continue
+        key = str(result.get("key") or "")
+        group = next(
+            (item for item in groups if str(item.get("key") or "") == key),
+            None,
+        )
+        expected_receipt_verifier = str(
+            (group or {}).get("expected_receipt_verifier") or ""
+        )
         if result.get("passed") is not True:
-            errors.append(f"{result.get('key')}: fresh independent verifier did not pass")
+            errors.append(f"{key}: fresh independent verifier did not pass")
+        if not expected_receipt_verifier:
+            errors.append(f"{key}: expected receipt verifier is missing")
+        elif result.get("receipt_verifier") != expected_receipt_verifier:
+            errors.append(f"{key}: fresh verifier receipt identity mismatch")
         if result.get("receipt_head_sha") != head:
             errors.append(f"{result.get('key')}: child verifier receipt is not exact-head")
         if not result.get("receipt_digest"):
