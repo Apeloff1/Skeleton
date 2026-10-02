@@ -206,11 +206,11 @@
   ],
   "expected_counts": {
     "primary_volume_count": 12,
-    "canonical_backlog_item_count": 88,
+    "canonical_backlog_item_count": 93,
     "work_package_count": 31,
     "aiq_task_count": 42,
     "build_wave_count": 8,
     "debt_item_count": 24,
-    "roadmap_item_count": 15
+    "roadmap_item_count": 20
   }
 }
