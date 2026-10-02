@@ -490,3 +490,82 @@ def test_repository_reopens_durable_thread_and_messages(tmp_path) -> None:
     assert loaded.version == 2
     assert loaded.message_sequence == 1
     assert [item.content for item in messages] == ["durable"]
+
+
+def test_assistant_provider_receipts_round_trip_and_user_cannot_forge_them() -> None:
+    repo = SQLiteConversationRepository()
+    thread = repo.create_thread(
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=_now(),
+    )
+    user = _message(
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author=ConversationAuthorType.USER,
+        content="run locally",
+        idempotency_key="user-provider-provenance",
+    )
+    thread, _ = repo.append_message(
+        user,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="assistant-provider-provenance",
+        content="local result",
+        parent_message_id=user.message_id,
+        causal_user_message_id=user.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:local-provider",
+        provider_receipt_refs=(
+            "provider:local:response-a",
+            "provider:local:response-b",
+        ),
+    )
+    thread, stored = repo.append_message(
+        assistant,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+    loaded = repo.list_messages(
+        thread.thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )[-1]
+
+    assert stored.provider_receipt_refs == (
+        "provider:local:response-a",
+        "provider:local:response-b",
+    )
+    assert loaded.provider_receipt_refs == stored.provider_receipt_refs
+    assert loaded.as_dict()["provider_receipt_refs"] == [
+        "provider:local:response-a",
+        "provider:local:response-b",
+    ]
+
+    with pytest.raises(
+        ConversationContractError,
+        match="only assistant messages",
+    ):
+        ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=3,
+            author_type=ConversationAuthorType.USER,
+            created_at=_now(),
+            idempotency_key="forged-provider-provenance",
+            content="forged",
+            provider_receipt_refs=("provider:local:forged",),
+        )
