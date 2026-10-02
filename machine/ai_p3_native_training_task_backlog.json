@@ -1,0 +1,1189 @@
+{
+  "schema_version": "skeleton.ai.p3.native_training_task_backlog.v1",
+  "backlog_version": "0.1.0",
+  "status": "active",
+  "phase": "P3-T2",
+  "title": "P3-T2 Native Model Development Backlog",
+  "source_execution_map": "machine/ai_p3_native_training_execution_map.json",
+  "completion_authority": "Task state is implementation/evidence scheduling only; masterplan maturity, completion and independent sign-off remain separate.",
+  "summary": {
+    "task_count": 5,
+    "in_progress_count": 0,
+    "ready_count": 2,
+    "blocked_count": 3,
+    "landed_unpromoted_count": 0,
+    "scheduled_volume_count": 24,
+    "queued_volume_count": 173,
+    "source_volume_count": 197
+  },
+  "tasks": [
+    {
+      "task_id": "P3T2-DATA-01",
+      "lane_id": "P3T2-L0",
+      "status": "ready",
+      "title": "Data, lineage and dataset foundation",
+      "depends_on": [],
+      "primary_volume_refs": [
+        "VOL-135",
+        "VOL-136",
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
+      ],
+      "objective": "Materialize content-addressed dataset ingestion, lineage, quality, registry and synthetic-data custody as the deterministic substrate for provider-independent model training.",
+      "acceptance": [
+        "Preserve inherited masterplan contracts, risks, gaps, tests, evaluations, accountability and signing requirements.",
+        "Use credential-free local execution for training acceptance; hosted model APIs are not Functional-AI evidence.",
+        "All mutable artifacts require deterministic identity, lineage and fail-closed promotion gates.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature or independent verification signature.",
+        "Exact-head executable evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_engineering_closure.json#status=closed",
+        "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-135",
+          "title": "Cache Architecture",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-135",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Never let cache contents become sole authoritative state.",
+            "Bind cache keys to tenant/version/trust context and define stale behavior."
+          ],
+          "capabilities": [
+            "cache policy",
+            "invalidation",
+            "rebuild"
+          ],
+          "contracts": [
+            "CacheKey",
+            "CachePolicy",
+            "CacheEntry"
+          ],
+          "risks": [
+            "cache poisoning",
+            "cross-tenant key collision"
+          ],
+          "gaps": [
+            "catalog caches",
+            "define invalidation/rebuild contracts"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/runtime/state",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_cache_architecture.py"
+          ],
+          "evaluations": [
+            "planned:stale/poisoned cache evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-136",
+          "title": "Content Addressing",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-136",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Canonicalize bytes before digest where a format requires it.",
+            "Support digest migration without confusing logical identity."
+          ],
+          "capabilities": [
+            "digest addressing",
+            "integrity checks",
+            "digest migration"
+          ],
+          "contracts": [
+            "ContentDigest",
+            "AddressedObject",
+            "DigestPolicy"
+          ],
+          "risks": [
+            "canonicalization mismatch",
+            "hash algorithm lock-in"
+          ],
+          "gaps": [
+            "unify with VOL-076 CAS",
+            "define digest migration procedure"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/artifacts",
+            "planned:skeleton/storage/cas"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_content_addressing.py"
+          ],
+          "evaluations": [
+            "planned:digest migration evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-137",
+          "title": "Data Ingestion Engine",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-137",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Preserve source identity, acquisition time, rights/classification and parser version.",
+            "Quarantine malformed/untrusted inputs before downstream indexing."
+          ],
+          "capabilities": [
+            "ingestion pipelines",
+            "validation/quarantine",
+            "idempotent import"
+          ],
+          "contracts": [
+            "IngestionJob",
+            "IngestedRecord",
+            "QuarantineRecord"
+          ],
+          "risks": [
+            "parser bombs",
+            "duplicate ingest"
+          ],
+          "gaps": [
+            "converge acquired ingest lineage",
+            "bind ingestion to data lineage"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/data"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_data_ingestion.py"
+          ],
+          "evaluations": [
+            "planned:malformed/replayed ingestion corpus"
+          ]
+        },
+        {
+          "volume_ref": "VOL-138",
+          "title": "Document Intelligence",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-138",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Preserve page/region coordinates and extraction method for every derived claim.",
+            "Separate OCR/vision uncertainty from source text."
+          ],
+          "capabilities": [
+            "document parsing",
+            "layout extraction",
+            "document evidence"
+          ],
+          "contracts": [
+            "Document",
+            "DocumentRegion",
+            "ExtractionEvidence"
+          ],
+          "risks": [
+            "lost page provenance",
+            "prompt injection in document"
+          ],
+          "gaps": [
+            "define document schema",
+            "integrate trust labels with context"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "planned:skeleton/document"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_document_intelligence.py"
+          ],
+          "evaluations": [
+            "planned:layout/OCR adversarial corpus"
+          ]
+        },
+        {
+          "volume_ref": "VOL-139",
+          "title": "Data Lineage",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-139",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Record transformation identity, inputs, outputs and environment/version.",
+            "Propagate deletion, classification and trust constraints through derived data."
+          ],
+          "capabilities": [
+            "lineage graph",
+            "transformation receipts",
+            "impact tracing"
+          ],
+          "contracts": [
+            "LineageNode",
+            "LineageEdge",
+            "TransformationReceipt"
+          ],
+          "risks": [
+            "orphan derivative",
+            "classification laundering"
+          ],
+          "gaps": [
+            "materialize lineage graph",
+            "bind artifacts/datasets/indexes"
+          ],
+          "implementation_paths": [
+            "skeleton/persistence",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_data_lineage.py"
+          ],
+          "evaluations": [
+            "planned:deletion propagation evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-140",
+          "title": "Data Quality Engine",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-140",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Define quality checks per dataset/use case and retain raw measurements.",
+            "Block promotion when critical quality failures violate declared thresholds."
+          ],
+          "capabilities": [
+            "quality rules",
+            "drift detection",
+            "quality reports"
+          ],
+          "contracts": [
+            "DataQualityRule",
+            "QualityObservation",
+            "QualityReport"
+          ],
+          "risks": [
+            "quality score masks critical defect",
+            "silent distribution drift"
+          ],
+          "gaps": [
+            "define rule registry",
+            "bind dataset gates"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_data_quality.py"
+          ],
+          "evaluations": [
+            "planned:drift/anomaly benchmark"
+          ]
+        },
+        {
+          "volume_ref": "VOL-141",
+          "title": "Dataset Registry",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-141",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Give every dataset/split immutable identity and provenance.",
+            "Track permitted use, retention, PII and benchmark contamination."
+          ],
+          "capabilities": [
+            "dataset versioning",
+            "split registry",
+            "rights/contamination metadata"
+          ],
+          "contracts": [
+            "Dataset",
+            "DatasetVersion",
+            "DatasetSplit"
+          ],
+          "risks": [
+            "split leakage",
+            "rights ambiguity"
+          ],
+          "gaps": [
+            "materialize dataset manifests",
+            "bind training/eval consumers"
+          ],
+          "implementation_paths": [
+            "machine",
+            "datasets"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_dataset_registry.py"
+          ],
+          "evaluations": [
+            "planned:dataset fingerprint reproducibility"
+          ]
+        },
+        {
+          "volume_ref": "VOL-142",
+          "title": "Synthetic Data Factory",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-142",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Label synthetic origin and generator configuration permanently.",
+            "Measure diversity, validity, bias and leakage against real/reference data."
+          ],
+          "capabilities": [
+            "synthetic generation",
+            "filtering",
+            "quality comparison"
+          ],
+          "contracts": [
+            "SyntheticJob",
+            "SyntheticRecord",
+            "SyntheticQuality"
+          ],
+          "risks": [
+            "feedback-loop collapse",
+            "synthetic contamination"
+          ],
+          "gaps": [
+            "define generator lineage",
+            "add diversity/leakage gates"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "experiments"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_synthetic_data_factory.py"
+          ],
+          "evaluations": [
+            "planned:memorization/leakage evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3T2-GOVERNANCE-01",
+      "lane_id": "P3T2-L1",
+      "status": "ready",
+      "title": "Model/data provenance and rights",
+      "depends_on": [
+        "P3T2-DATA-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-179",
+        "VOL-407",
+        "VOL-408"
+      ],
+      "objective": "Bind model bills of materials, license intelligence and data-usage rights into dataset and model promotion decisions.",
+      "acceptance": [
+        "Preserve inherited masterplan contracts, risks, gaps, tests, evaluations, accountability and signing requirements.",
+        "Use credential-free local execution for training acceptance; hosted model APIs are not Functional-AI evidence.",
+        "All mutable artifacts require deterministic identity, lineage and fail-closed promotion gates.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature or independent verification signature.",
+        "Exact-head executable evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_engineering_closure.json#status=closed",
+        "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-179",
+          "title": "Model Bill of Materials",
+          "depth_pass": "DP-161-200",
+          "accountability_id": "ACC-VOL-179",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Bind MBOM to immutable model artifact/version.",
+            "Record training/post-training lineage without exposing restricted secrets/data."
+          ],
+          "capabilities": [
+            "model inventory",
+            "lineage",
+            "model compliance metadata"
+          ],
+          "contracts": [
+            "MBOM",
+            "ModelComponent",
+            "ModelLineage"
+          ],
+          "risks": [
+            "unknown base model lineage",
+            "license ambiguity"
+          ],
+          "gaps": [
+            "define MBOM schema",
+            "bind model registry promotion"
+          ],
+          "implementation_paths": [
+            "machine",
+            "training"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_model_bom.py"
+          ],
+          "evaluations": [
+            "planned:model lineage completeness audit"
+          ]
+        },
+        {
+          "volume_ref": "VOL-407",
+          "title": "License Intelligence",
+          "depth_pass": "DP-401-420",
+          "accountability_id": "ACC-VOL-407",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Track software/model/data licenses, obligations, compatibility and provenance per artifact/version.",
+            "Unknown or conflicting license state blocks incompatible distribution/use."
+          ],
+          "capabilities": [
+            "license registry",
+            "compatibility analysis",
+            "obligation tracking"
+          ],
+          "contracts": [
+            "LicenseRecord",
+            "LicenseObligation",
+            "LicenseCompatibility"
+          ],
+          "risks": [
+            "missing license provenance",
+            "incompatible combination"
+          ],
+          "gaps": [
+            "bind SBOM/MBOM/datasets",
+            "define review policy"
+          ],
+          "implementation_paths": [
+            "machine",
+            "planned:skeleton/artifacts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_license_intelligence.py"
+          ],
+          "evaluations": [
+            "planned:license conflict evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-408",
+          "title": "Data Usage Rights",
+          "depth_pass": "DP-401-420",
+          "accountability_id": "ACC-VOL-408",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Represent permitted purposes, geography, retention, training/eval/use restrictions and consent for data.",
+            "Rights propagate to derivatives/models/artifacts where required."
+          ],
+          "capabilities": [
+            "rights labels",
+            "purpose constraints",
+            "rights propagation"
+          ],
+          "contracts": [
+            "DataRights",
+            "UsageGrant",
+            "RightsDecision"
+          ],
+          "risks": [
+            "rights lost on transform",
+            "unauthorized training"
+          ],
+          "gaps": [
+            "define rights schema",
+            "bind lineage/training/exports"
+          ],
+          "implementation_paths": [
+            "skeleton/data",
+            "skeleton/security"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_data_usage_rights.py"
+          ],
+          "evaluations": [
+            "planned:derived-data rights evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3T2-TRAINING-01",
+      "lane_id": "P3T2-L2",
+      "status": "blocked",
+      "title": "Native training control and recovery",
+      "depends_on": [
+        "P3T2-DATA-01",
+        "P3T2-GOVERNANCE-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148"
+      ],
+      "objective": "Create a local training control plane with deterministic run identity, worker topology, checkpoint/resume, elastic fencing, observability and evaluation gates.",
+      "acceptance": [
+        "Preserve inherited masterplan contracts, risks, gaps, tests, evaluations, accountability and signing requirements.",
+        "Use credential-free local execution for training acceptance; hosted model APIs are not Functional-AI evidence.",
+        "All mutable artifacts require deterministic identity, lineage and fail-closed promotion gates.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature or independent verification signature.",
+        "Exact-head executable evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_engineering_closure.json#status=closed",
+        "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-143",
+          "title": "Training Control Plane",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-143",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Require registered inputs and explicit resource/budget admission.",
+            "Persist run state/checkpoints/evidence independently of worker lifetime."
+          ],
+          "capabilities": [
+            "training orchestration",
+            "resource admission",
+            "run registry"
+          ],
+          "contracts": [
+            "TrainingRun",
+            "TrainingConfig",
+            "TrainingAdmission"
+          ],
+          "risks": [
+            "untracked hyperparameter drift",
+            "run orphaning"
+          ],
+          "gaps": [
+            "define training manifest",
+            "bind runs to dataset/model registries"
+          ],
+          "implementation_paths": [
+            "training",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_training_control_plane.py"
+          ],
+          "evaluations": [
+            "planned:training run replay"
+          ]
+        },
+        {
+          "volume_ref": "VOL-144",
+          "title": "Distributed Training",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-144",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Define data/model parallel topology and collective timeouts explicitly.",
+            "Handle worker loss/stragglers without corrupting optimizer/model state."
+          ],
+          "capabilities": [
+            "distributed topology",
+            "collectives",
+            "worker recovery"
+          ],
+          "contracts": [
+            "TrainingWorker",
+            "TrainingTopology",
+            "CollectiveState"
+          ],
+          "risks": [
+            "collective deadlock",
+            "silent replica divergence"
+          ],
+          "gaps": [
+            "select topology abstractions",
+            "materialize failure drills"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/network"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_distributed_training.py"
+          ],
+          "evaluations": [
+            "planned:worker-loss/straggler evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-145",
+          "title": "Training Checkpointing",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-145",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Checkpoint all state required for semantically equivalent resume.",
+            "Verify digest and compatibility before restore."
+          ],
+          "capabilities": [
+            "checkpoint creation",
+            "checkpoint validation",
+            "resume"
+          ],
+          "contracts": [
+            "TrainingCheckpoint",
+            "CheckpointManifest",
+            "ResumeState"
+          ],
+          "risks": [
+            "partial checkpoint",
+            "resume changes training trajectory"
+          ],
+          "gaps": [
+            "define checkpoint schema",
+            "bind retention and CAS"
+          ],
+          "implementation_paths": [
+            "training",
+            "planned:skeleton/artifacts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_training_checkpointing.py"
+          ],
+          "evaluations": [
+            "planned:resume equivalence evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-146",
+          "title": "Elastic Training Recovery",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-146",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Record consumed data position and optimizer semantics across membership changes.",
+            "Use fencing/epoch identity to reject stale workers."
+          ],
+          "capabilities": [
+            "elastic membership",
+            "recovery epochs",
+            "stale-worker fencing"
+          ],
+          "contracts": [
+            "TrainingEpoch",
+            "WorkerFence",
+            "ElasticResume"
+          ],
+          "risks": [
+            "stale worker writes",
+            "sample duplication"
+          ],
+          "gaps": [
+            "design epoch/fence protocol",
+            "bind to checkpoints"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/reliability"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_elastic_training_recovery.py"
+          ],
+          "evaluations": [
+            "planned:scale-up/down recovery campaign"
+          ]
+        },
+        {
+          "volume_ref": "VOL-147",
+          "title": "Training Observability",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-147",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Capture enough telemetry to diagnose divergence without leaking restricted data.",
+            "Alert on non-finite values, stalls, throughput collapse and resource anomalies."
+          ],
+          "capabilities": [
+            "training metrics",
+            "anomaly detection",
+            "run tracing"
+          ],
+          "contracts": [
+            "TrainingMetric",
+            "TrainingTrace",
+            "TrainingAlert"
+          ],
+          "risks": [
+            "silent NaN propagation",
+            "telemetry overload"
+          ],
+          "gaps": [
+            "define training signal schema",
+            "bind alerts to runbooks"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/observability"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_training_observability.py"
+          ],
+          "evaluations": [
+            "planned:divergence/stall injection"
+          ]
+        },
+        {
+          "volume_ref": "VOL-148",
+          "title": "Training Evaluation Gates",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-148",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Evaluate candidates before registry promotion using fixed/versioned suites.",
+            "Require explicit disposition for regressions and uncertainty."
+          ],
+          "capabilities": [
+            "checkpoint evaluation",
+            "promotion gating",
+            "regression comparison"
+          ],
+          "contracts": [
+            "TrainingEvalGate",
+            "CheckpointEvaluation",
+            "ModelPromotion"
+          ],
+          "risks": [
+            "test-set overfitting",
+            "regression waived silently"
+          ],
+          "gaps": [
+            "define gate bundles",
+            "bind to model registry"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_training_eval_gates.py"
+          ],
+          "evaluations": [
+            "planned:champion/challenger evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3T2-POSTTRAIN-01",
+      "lane_id": "P3T2-L3",
+      "status": "blocked",
+      "title": "Post-training, RL, curriculum and verifier models",
+      "depends_on": [
+        "P3T2-TRAINING-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ],
+      "objective": "Materialize bounded post-training experiments, deterministic RL environments, curriculum progression and independently calibrated verifier-model programs.",
+      "acceptance": [
+        "Preserve inherited masterplan contracts, risks, gaps, tests, evaluations, accountability and signing requirements.",
+        "Use credential-free local execution for training acceptance; hosted model APIs are not Functional-AI evidence.",
+        "All mutable artifacts require deterministic identity, lineage and fail-closed promotion gates.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature or independent verification signature.",
+        "Exact-head executable evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_engineering_closure.json#status=closed",
+        "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-149",
+          "title": "Post-Training Lab",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-149",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Separate experimental post-training from production model authority.",
+            "Record data, objective, algorithm and evaluation lineage for every candidate."
+          ],
+          "capabilities": [
+            "post-training experiments",
+            "candidate registry",
+            "comparison"
+          ],
+          "contracts": [
+            "PostTrainingRun",
+            "PreferenceDataset",
+            "PostTrainingCandidate"
+          ],
+          "risks": [
+            "reward hacking",
+            "capability regression"
+          ],
+          "gaps": [
+            "define experiment families",
+            "bind promotion to eval gates"
+          ],
+          "implementation_paths": [
+            "training/post",
+            "experiments"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_post_training_lab.py"
+          ],
+          "evaluations": [
+            "planned:post-training ablation suite"
+          ]
+        },
+        {
+          "volume_ref": "VOL-150",
+          "title": "Reinforcement Learning Environments",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-150",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Keep environment side effects sandboxed and reproducible.",
+            "Version reward logic and detect exploitation/specification gaming."
+          ],
+          "capabilities": [
+            "RL environments",
+            "episode management",
+            "reward instrumentation"
+          ],
+          "contracts": [
+            "RLEnvironment",
+            "Episode",
+            "RewardSignal"
+          ],
+          "risks": [
+            "reward exploitation",
+            "non-reset contamination"
+          ],
+          "gaps": [
+            "define environment interface",
+            "materialize deterministic fixtures"
+          ],
+          "implementation_paths": [
+            "training/rl",
+            "skeleton/simulation"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_rl_environments.py"
+          ],
+          "evaluations": [
+            "planned:reward-hacking challenge suite"
+          ]
+        },
+        {
+          "volume_ref": "VOL-151",
+          "title": "Curriculum Engine",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-151",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Represent curriculum transitions and prerequisites explicitly.",
+            "Prevent easy-task cycling or metric gaming from starving required competencies."
+          ],
+          "capabilities": [
+            "curriculum graph",
+            "difficulty scheduling",
+            "progress feedback"
+          ],
+          "contracts": [
+            "Curriculum",
+            "CurriculumStage",
+            "ProgressSignal"
+          ],
+          "risks": [
+            "catastrophic forgetting",
+            "easy-task bias"
+          ],
+          "gaps": [
+            "define curriculum policy",
+            "bind stages to capability evals"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_curriculum_engine.py"
+          ],
+          "evaluations": [
+            "planned:curriculum ablation evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-152",
+          "title": "Verifier Model Program",
+          "depth_pass": "DP-121-160",
+          "accountability_id": "ACC-VOL-152",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Keep verifier authority separate from generator confidence.",
+            "Measure calibration, false accept/reject and shared-bias failure modes."
+          ],
+          "capabilities": [
+            "verifier models",
+            "calibration",
+            "ensemble/diversity"
+          ],
+          "contracts": [
+            "VerifierModel",
+            "VerificationScore",
+            "VerifierCalibration"
+          ],
+          "risks": [
+            "rubber-stamp verifier",
+            "shared training bias"
+          ],
+          "gaps": [
+            "define verifier registry",
+            "bind verification tasks to baselines"
+          ],
+          "implementation_paths": [
+            "training",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_verifier_model_program.py"
+          ],
+          "evaluations": [
+            "planned:correlated-error evaluation"
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "P3T2-LIFECYCLE-01",
+      "lane_id": "P3T2-L4",
+      "status": "blocked",
+      "title": "Model lifecycle, deprecation and migration",
+      "depends_on": [
+        "P3T2-GOVERNANCE-01",
+        "P3T2-TRAINING-01"
+      ],
+      "primary_volume_refs": [
+        "VOL-411",
+        "VOL-412",
+        "VOL-413"
+      ],
+      "objective": "Govern model promotion, deprecation, consumer migration and provider/local-model cutover with parity evidence and rollback-safe lifecycle state.",
+      "acceptance": [
+        "Preserve inherited masterplan contracts, risks, gaps, tests, evaluations, accountability and signing requirements.",
+        "Use credential-free local execution for training acceptance; hosted model APIs are not Functional-AI evidence.",
+        "All mutable artifacts require deterministic identity, lineage and fail-closed promotion gates.",
+        "No task may self-promote masterplan maturity, completion checkbox, implementation signature or independent verification signature.",
+        "Exact-head executable evidence is required before landed_unpromoted state."
+      ],
+      "priority": "P3",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false,
+      "evidence_refs": [
+        "source:machine/ai_p3_engineering_closure.json#status=closed",
+        "source:machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+        "source:machine/ai_master_plan.json"
+      ],
+      "masterplan_obligations": [
+        {
+          "volume_ref": "VOL-411",
+          "title": "Model Lifecycle Governance",
+          "depth_pass": "DP-401-420",
+          "accountability_id": "ACC-VOL-411",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Govern model intake, training, evaluation, deployment, operation, update, retirement and archive states.",
+            "Every transition requires declared evidence/owner and rollback/retention semantics."
+          ],
+          "capabilities": [
+            "model lifecycle",
+            "promotion/retirement",
+            "governance records"
+          ],
+          "contracts": [
+            "ModelLifecycle",
+            "ModelTransition",
+            "ModelGovernanceEvidence"
+          ],
+          "risks": [
+            "untracked production model",
+            "retired model reused"
+          ],
+          "gaps": [
+            "define lifecycle state machine",
+            "bind model ops/MBOM"
+          ],
+          "implementation_paths": [
+            "machine",
+            "skeleton/ai/providers"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_model_lifecycle_governance.py"
+          ],
+          "evaluations": [
+            "planned:invalid transition evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-412",
+          "title": "Model Deprecation",
+          "depth_pass": "DP-401-420",
+          "accountability_id": "ACC-VOL-412",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Deprecate models with usage inventory, replacement path, deadline, compatibility and rollback considerations.",
+            "Remove deprecated models only after supported consumers migrate or explicit exception."
+          ],
+          "capabilities": [
+            "model deprecation",
+            "consumer migration",
+            "retirement"
+          ],
+          "contracts": [
+            "ModelDeprecation",
+            "ModelConsumer",
+            "ModelRetirement"
+          ],
+          "risks": [
+            "forced migration regression",
+            "deprecated model never retired"
+          ],
+          "gaps": [
+            "inventory consumers",
+            "bind provider/model cards"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/providers",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_model_deprecation.py"
+          ],
+          "evaluations": [
+            "planned:consumer migration evaluation"
+          ]
+        },
+        {
+          "volume_ref": "VOL-413",
+          "title": "Provider Migration",
+          "depth_pass": "DP-401-420",
+          "accountability_id": "ACC-VOL-413",
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "requirements": [
+            "Migrate external/internal providers through capability, policy, quality, cost and data-boundary parity evidence.",
+            "Support staged dual-run/shadow/canary and rollback before full cutover."
+          ],
+          "capabilities": [
+            "provider migration",
+            "compatibility comparison",
+            "cutover/rollback"
+          ],
+          "contracts": [
+            "ProviderMigration",
+            "ProviderParity",
+            "ProviderCutover"
+          ],
+          "risks": [
+            "behavior drift",
+            "data residency regression"
+          ],
+          "gaps": [
+            "define parity matrix",
+            "bind shadow traffic"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/providers",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_provider_migration.py"
+          ],
+          "evaluations": [
+            "planned:provider parity benchmark"
+          ]
+        }
+      ]
+    }
+  ]
+}

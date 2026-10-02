@@ -1,0 +1,142 @@
+{
+  "schema_version": "skeleton.ai.p3.native_training_tranche.v1",
+  "plan_version": "0.1.0",
+  "status": "active",
+  "phase": "P3-T2",
+  "title": "Native Model Development and Training",
+  "purpose": "Advance the provider-independent AI from inference and autonomous engineering into a governed local data/training/post-training/model-lifecycle system.",
+  "parent_closure": {
+    "path": "machine/ai_p3_engineering_closure.json",
+    "closure_id": "P3-T1-AUTONOMOUS-ENGINEERING",
+    "required_status": "closed",
+    "merge_commit": "5fd439fed3bdc11bb13ecf6a37a7c32400dec778"
+  },
+  "source": {
+    "path": "machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+    "expected_volume_count": 197
+  },
+  "selection": {
+    "selected_volume_count": 24,
+    "selected_volume_refs": [
+      "VOL-135",
+      "VOL-136",
+      "VOL-137",
+      "VOL-138",
+      "VOL-139",
+      "VOL-140",
+      "VOL-141",
+      "VOL-142",
+      "VOL-143",
+      "VOL-144",
+      "VOL-145",
+      "VOL-146",
+      "VOL-147",
+      "VOL-148",
+      "VOL-149",
+      "VOL-150",
+      "VOL-151",
+      "VOL-152",
+      "VOL-179",
+      "VOL-407",
+      "VOL-408",
+      "VOL-411",
+      "VOL-412",
+      "VOL-413"
+    ],
+    "remaining_queued_volume_count": 173
+  },
+  "workstreams": [
+    {
+      "id": "P3-T2-DATA",
+      "task_id": "P3T2-DATA-01",
+      "lane_id": "P3T2-L0",
+      "name": "Data, lineage and dataset foundation",
+      "depends_on": [],
+      "volume_refs": [
+        "VOL-135",
+        "VOL-136",
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
+      ],
+      "objective": "Materialize content-addressed dataset ingestion, lineage, quality, registry and synthetic-data custody as the deterministic substrate for provider-independent model training."
+    },
+    {
+      "id": "P3-T2-GOV",
+      "task_id": "P3T2-GOVERNANCE-01",
+      "lane_id": "P3T2-L1",
+      "name": "Model/data provenance and rights",
+      "depends_on": [
+        "P3T2-DATA-01"
+      ],
+      "volume_refs": [
+        "VOL-179",
+        "VOL-407",
+        "VOL-408"
+      ],
+      "objective": "Bind model bills of materials, license intelligence and data-usage rights into dataset and model promotion decisions."
+    },
+    {
+      "id": "P3-T2-TRAIN",
+      "task_id": "P3T2-TRAINING-01",
+      "lane_id": "P3T2-L2",
+      "name": "Native training control and recovery",
+      "depends_on": [
+        "P3T2-DATA-01",
+        "P3T2-GOVERNANCE-01"
+      ],
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148"
+      ],
+      "objective": "Create a local training control plane with deterministic run identity, worker topology, checkpoint/resume, elastic fencing, observability and evaluation gates."
+    },
+    {
+      "id": "P3-T2-POST",
+      "task_id": "P3T2-POSTTRAIN-01",
+      "lane_id": "P3T2-L3",
+      "name": "Post-training, RL, curriculum and verifier models",
+      "depends_on": [
+        "P3T2-TRAINING-01"
+      ],
+      "volume_refs": [
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ],
+      "objective": "Materialize bounded post-training experiments, deterministic RL environments, curriculum progression and independently calibrated verifier-model programs."
+    },
+    {
+      "id": "P3-T2-LIFECYCLE",
+      "task_id": "P3T2-LIFECYCLE-01",
+      "lane_id": "P3T2-L4",
+      "name": "Model lifecycle, deprecation and migration",
+      "depends_on": [
+        "P3T2-GOVERNANCE-01",
+        "P3T2-TRAINING-01"
+      ],
+      "volume_refs": [
+        "VOL-411",
+        "VOL-412",
+        "VOL-413"
+      ],
+      "objective": "Govern model promotion, deprecation, consumer migration and provider/local-model cutover with parity evidence and rollback-safe lifecycle state."
+    }
+  ],
+  "invariants": [
+    "P3-T2 source scope equals the exact 197-volume queue left by merged P3-T1.",
+    "Scheduled and queued partitions are disjoint and together cover all 197 source volumes.",
+    "Every scheduled volume has exactly one task owner.",
+    "P3-T2 does not re-own P3-T0/P3-T1 volumes.",
+    "Training admission and model promotion fail closed when rights, lineage, checkpoint or evaluation evidence is missing.",
+    "File existence, line count or a passing happy path cannot promote masterplan maturity."
+  ]
+}
