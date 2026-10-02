@@ -47,7 +47,7 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
-      - name: Install focused test runtime
-        run: python -m pip install --disable-pip-version-check "pytest==8.4.2"
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
       - name: Run archive sandbox security regressions
         run: python -m pytest -q skeleton/testing/test_security_archive_sandbox.py
