@@ -53,15 +53,33 @@ class EngineChatResponse(str):
         cls,
         text: str,
         *,
+        operation_id: str,
         execution_id: str,
+        context_id: str,
+        context_digest: str,
+        context_source_snapshot: tuple[tuple[str, str], ...],
+        context_compiler_version: str,
         verification: str | None,
         evidence_refs: tuple[str, ...],
+        provider_receipts: tuple[str, ...],
+        tool_receipts: tuple[str, ...],
+        memory_refs: tuple[str, ...],
+        artifact_refs: tuple[str, ...],
         usage: Any,
     ):
         obj = str.__new__(cls, text)
+        obj.operation_id = operation_id
         obj.execution_id = execution_id
+        obj.context_id = context_id
+        obj.context_digest = context_digest
+        obj.context_source_snapshot = context_source_snapshot
+        obj.context_compiler_version = context_compiler_version
         obj.verification = verification
         obj.evidence_refs = evidence_refs
+        obj.provider_receipts = provider_receipts
+        obj.tool_receipts = tool_receipts
+        obj.memory_refs = memory_refs
+        obj.artifact_refs = artifact_refs
         obj.usage = usage
         return obj
 
@@ -338,9 +356,18 @@ class EngineChat:
         )
         return EngineChatResponse(
             response.text,
+            operation_id=response.operation_id,
             execution_id=response.execution_id,
+            context_id=response.context_id,
+            context_digest=response.context_digest,
+            context_source_snapshot=tuple(response.context_source_snapshot),
+            context_compiler_version=response.context_compiler_version,
             verification=response.verification,
             evidence_refs=tuple(response.evidence_refs),
+            provider_receipts=tuple(response.provider_receipts),
+            tool_receipts=tuple(response.tool_receipts),
+            memory_refs=tuple(response.memory_refs),
+            artifact_refs=tuple(response.artifact_refs),
             usage=response.usage,
         )
 
