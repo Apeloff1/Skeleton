@@ -569,6 +569,30 @@ def execution_status(
         raise
 
 
+@router.get("/executions/{execution_id}/handoff")
+def execution_handoff_binding(
+    execution_id: str,
+    request: Request,
+    actor_id: str = Query(..., min_length=1, max_length=512),
+    tenant_id: str = Query(..., min_length=1, max_length=512),
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    """Return durable context identity for authorized reconnect/finalization."""
+
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.handoff_binding(
+            execution_id,
+            verified_service_principal=principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
 @router.post("/executions/{execution_id}/cancel")
 async def cancel_execution(
     execution_id: str,
