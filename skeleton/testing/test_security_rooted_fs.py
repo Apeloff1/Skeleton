@@ -102,6 +102,31 @@ def test_normalization_rejects_windows_device_ads_and_alias_paths(
         fs(tmp_path).normalize(path)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "%2e%2e/escape",
+        "%2E%2E%2Fescape",
+        "safe%2f..%2fescape",
+        "safe%5c..%5cescape",
+        "%252e%252e%252fescape",
+        "C%3a/windows",
+        "file%3astream",
+        "nul%00byte",
+    ],
+)
+def test_normalization_rejects_encoded_path_metacharacters(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    with pytest.raises(FilesystemPathError, match="encoded"):
+        fs(tmp_path).normalize(path)
+
+
+def test_normalization_allows_literal_percent_when_not_an_escape(tmp_path: Path) -> None:
+    assert fs(tmp_path).normalize("report%done.txt") == "report%done.txt"
+
+
 def test_normalization_allows_nonreserved_windows_like_names(tmp_path: Path) -> None:
     boundary = fs(tmp_path)
     assert boundary.normalize("console.txt") == "console.txt"
