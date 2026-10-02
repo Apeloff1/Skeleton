@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
 import threading
@@ -10,6 +11,7 @@ import pytest
 from skeleton.ai.runtime.functional_ai import FunctionalAIRuntime
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
+    LocalInferenceCancelled,
     LocalInferenceEngine,
     LocalInferenceRequest,
     LocalInferenceResult,
@@ -358,6 +360,147 @@ async def test_execution_commit_crash_is_repaired_without_rerunning_model(tmp_pa
     assert len(transcript_after_repair) == 2
     assert transcript_after_repair[-1].author_type is ConversationAuthorType.ASSISTANT
 
+
+
+@pytest.mark.asyncio
+async def test_retry_fence_binds_full_turn_semantics(tmp_path) -> None:
+    product, _conversations, _functional, calls = _runtime(tmp_path)
+    thread = _create_thread(product)
+    await product.respond(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        request=CanonicalAITurnRequest(
+            message="First canonical turn.",
+            idempotency_key="semantic-fence",
+            expected_thread_version=thread.version,
+            max_model_turns=4,
+            created_at=NOW,
+        ),
+    )
+
+    with pytest.raises(Exception, match="turn semantics"):
+        await product.respond(
+            thread.thread_id,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            request=CanonicalAITurnRequest(
+                message="First canonical turn.",
+                idempotency_key="semantic-fence",
+                expected_thread_version=thread.version,
+                max_model_turns=5,
+                created_at=NOW + timedelta(minutes=5),
+            ),
+        )
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_durable_cancel_interrupts_running_local_inference(tmp_path) -> None:
+    entered = threading.Event()
+    cancel_seen = threading.Event()
+    model_digest = hashlib.sha256(
+        b"canonical-product-cancellable-local-model-v1"
+    ).hexdigest()
+
+    def runner(
+        request: LocalInferenceRequest,
+        cancel: threading.Event,
+    ) -> LocalInferenceResult:
+        assert request.prompt == "Cancellation turn."
+        entered.set()
+        while not cancel.wait(0.01):
+            pass
+        cancel_seen.set()
+        raise LocalInferenceCancelled("cancelled by canonical product runtime")
+
+    local = LocalModelAdapter(
+        LocalInferenceEngine(
+            CallableLocalModel(
+                model_id="canonical-product-cancellable-local",
+                model_digest=model_digest,
+                runner=runner,
+            )
+        )
+    )
+    functional = FunctionalAIRuntime(
+        SQLiteExecutionRepository(tmp_path / "cancel-execution.sqlite3"),
+        local,
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    conversations = SQLiteConversationRepository(
+        tmp_path / "cancel-conversation.sqlite3"
+    )
+    product = CanonicalConversationAIRuntime(
+        conversations,
+        functional,
+        instruction_policy=InstructionPolicy(
+            policy_id="product.canonical.cancel",
+            version="1",
+            instructions="Answer the canonical turn unless explicitly cancelled.",
+        ),
+    )
+    thread = product.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Cancelable canonical standalone AI",
+        data_class="internal",
+        created_at=NOW,
+    )
+
+    response_task = asyncio.create_task(
+        product.respond(
+            thread.thread_id,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            request=CanonicalAITurnRequest(
+                message="Cancellation turn.",
+                idempotency_key="cancel-me",
+                expected_thread_version=thread.version,
+                created_at=NOW,
+            ),
+        )
+    )
+    assert await asyncio.to_thread(entered.wait, 2.0)
+
+    cancelled = await product.cancel_turn(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        idempotency_key="cancel-me",
+        now=NOW + timedelta(seconds=1),
+    )
+    assert cancelled.result is not None
+    assert cancelled.result.status == "cancelled"
+    assert cancel_seen.is_set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await response_task
+
+    transcript = conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert len(transcript) == 1
+    assert transcript[0].author_type is ConversationAuthorType.USER
+
+    stored = functional.repository.result(cancelled.execution_id)
+    assert stored is not None
+    assert stored.status == "cancelled"
+    assert stored.final_output is None
+
+
+def test_reserved_product_identity_attachment_prefix_is_rejected() -> None:
+    with pytest.raises(ValueError, match="reserved product turn identity"):
+        CanonicalAITurnRequest(
+            message="Do something.",
+            idempotency_key="reserved-prefix",
+            expected_thread_version=1,
+            attachment_refs=("product-turn-sha256:" + "a" * 64,),
+            created_at=NOW,
+        )
 
 def test_external_context_cannot_inject_trusted_control(tmp_path) -> None:
     from skeleton.contracts.context import ContextKind
