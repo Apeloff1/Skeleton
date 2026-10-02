@@ -36,8 +36,9 @@ def test_preference_post_training_is_deterministic_and_lineage_bound() -> None:
     trainer=PreferenceWeightedPostTrainer()
     generated=trainer.build_dataset(base,prefs,chosen_weight=3)
     synthetic=[r for r in generated.records if r.synthetic_parent_refs]
-    assert len(synthetic)==3
-    assert {r.synthetic_parent_refs for r in synthetic}=={("preference:p1",)}
+    assert len(synthetic)==1
+    assert synthetic[0].synthetic_parent_refs==("preference:p1",)
+    assert synthetic[0].text.count("answer preferred")==3
     config=NativeTrainingConfig(order=2,epochs=2,evaluation_floor=0.5)
     a=trainer.train(base,prefs,config,chosen_weight=3)
     b=trainer.train(base,prefs,config,chosen_weight=3)

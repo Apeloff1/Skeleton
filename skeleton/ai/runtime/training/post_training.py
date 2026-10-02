@@ -57,17 +57,17 @@ class PreferenceWeightedPostTrainer:
         records=list(base.records)
         for pair in preferences:
             parent_ref="preference:"+pair.pair_id
-            for index in range(chosen_weight):
-                records.append(
-                    DatasetRecord(
-                        record_id=f"pref-{pair.pair_id}-chosen-{index}",
-                        text=(pair.prompt.strip()+" "+pair.chosen.strip()).strip(),
-                        source_ref=pair.source_ref,
-                        license_id=pair.license_id,
-                        usage_grant="train_eval",
-                        synthetic_parent_refs=(parent_ref,),
-                    )
+            unit=(pair.prompt.strip()+" "+pair.chosen.strip()).strip()
+            records.append(
+                DatasetRecord(
+                    record_id=f"pref-{pair.pair_id}-chosen-weight-{chosen_weight}",
+                    text=" ".join(unit for _ in range(chosen_weight)),
+                    source_ref=pair.source_ref,
+                    license_id=pair.license_id,
+                    usage_grant="train_eval",
+                    synthetic_parent_refs=(parent_ref,),
                 )
+            )
         return DatasetManifest(
             dataset_id=base.dataset_id+"-post",
             version=base.version+"+preferences",
