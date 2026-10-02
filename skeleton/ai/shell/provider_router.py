@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from skeleton.shells.ai.model_port import AIModelPort
+from skeleton.shells.ai.model_port import AIModelPort, ModelPrivacyBoundary
 from skeleton.shells.ai.provider_health import ProviderHealth, ProviderHealthRegistry
 from skeleton.shells.ai.trust import ModelTrustRegistry
 
@@ -20,6 +20,7 @@ class ProviderRoute:
             "model_id": self.model.model_id,
             "score": self.score,
             "reasons": list(self.reasons),
+            "privacy_boundary": self.model.capabilities.privacy_boundary.value,
         }
 
 
@@ -34,11 +35,19 @@ class AIProviderRouter:
         self.health = health
         self.trust = trust
 
-    def route(self, models: tuple[AIModelPort, ...]) -> tuple[ProviderRoute, ...]:
+    def route(
+        self,
+        models: tuple[AIModelPort, ...],
+        *,
+        max_privacy_boundary: ModelPrivacyBoundary = ModelPrivacyBoundary.EXTERNAL,
+    ) -> tuple[ProviderRoute, ...]:
+        max_privacy_boundary = ModelPrivacyBoundary(max_privacy_boundary)
         result = []
         seen = set()
         for model in models:
             if model.model_id in seen:
+                continue
+            if model.capabilities.privacy_boundary.rank > max_privacy_boundary.rank:
                 continue
             seen.add(model.model_id)
             snapshot = self.health.snapshot(model.model_id)
