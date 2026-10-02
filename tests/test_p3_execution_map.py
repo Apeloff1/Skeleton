@@ -29,7 +29,7 @@ class P3ExecutionMapTests(unittest.TestCase):
         self.assertEqual(result["queued_volume_count"], 234)
         self.assertEqual(result["task_count"], 6)
         self.assertEqual(result["ready_count"], 0)
-        self.assertEqual(result["blocked_count"], 3)
+        self.assertEqual(result["blocked_count"], 2)
         self.assertEqual(result["parent_functional_frontier"], "closed")
 
     def _fixture(self) -> Path:
@@ -96,8 +96,16 @@ class P3ExecutionMapTests(unittest.TestCase):
             for item in payload["tasks"]
             if item["task_id"] == "P3-VERTICAL-SUITE-01"
         )
+        dependency = next(
+            item
+            for item in payload["tasks"]
+            if item["task_id"] == "P3-DOMAIN-INTELLIGENCE-01"
+        )
+        dependency["status"] = "in_progress"
         task["status"] = "ready"
         payload["summary"]["ready_count"] = 1
+        payload["summary"]["in_progress_count"] = 1
+        payload["summary"]["landed_unpromoted_count"] = 2
         payload["summary"]["blocked_count"] = 2
         path.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(P3ValidationError, "unresolved dependencies"):
