@@ -737,13 +737,13 @@
     "completion_rule": "P3 task state does not replace masterplan maturity, signed accountability, vertical-slice evidence, or independent verification."
   },
   "progress": {
-    "source_volume_count": 257,
+    "task_count": 6,
+    "in_progress_count": 0,
+    "ready_count": 2,
+    "blocked_count": 3,
+    "landed_unpromoted_count": 1,
     "scheduled_volume_count": 23,
     "queued_volume_count": 234,
-    "task_count": 6,
-    "landed_unpromoted_count": 0,
-    "in_progress_count": 1,
-    "ready_count": 0,
-    "blocked_count": 5
+    "source_volume_count": 257
   }
 }

@@ -8,10 +8,10 @@
   "completion_authority": "Task state is implementation scheduling/evidence state only. Masterplan maturity and independent sign-off remain separate authorities.",
   "summary": {
     "task_count": 6,
-    "in_progress_count": 1,
-    "ready_count": 0,
-    "blocked_count": 5,
-    "landed_unpromoted_count": 0,
+    "in_progress_count": 0,
+    "ready_count": 2,
+    "blocked_count": 3,
+    "landed_unpromoted_count": 1,
     "scheduled_volume_count": 23,
     "queued_volume_count": 234,
     "source_volume_count": 257
@@ -20,7 +20,7 @@
     {
       "task_id": "P3-MODEL-FOUNDATION-01",
       "lane_id": "P3-L0",
-      "status": "in_progress",
+      "status": "landed_unpromoted",
       "title": "Model, research and multimodal foundation",
       "depends_on": [],
       "primary_volume_refs": [
@@ -49,7 +49,11 @@
         "implementation:skeleton/ai/learning/model_program.py",
         "implementation:skeleton/ai/research/source_lineage.py",
         "implementation:skeleton/ai/simulation/environment.py",
-        "implementation:skeleton/ai/runtime/multimodal/intake.py"
+        "implementation:skeleton/ai/runtime/multimodal/intake.py",
+        "github:pr#2347",
+        "git-head:50939b4ba919b4308376d94395df55634dd0b731",
+        "workflow:P3 Model Foundation@50939b4ba919b4308376d94395df55634dd0b731:success",
+        "github-actions-run:36964035037"
       ],
       "masterplan_obligations": [
         {
@@ -202,7 +206,7 @@
     {
       "task_id": "P3-DOMAIN-INTELLIGENCE-01",
       "lane_id": "P3-L1",
-      "status": "blocked",
+      "status": "ready",
       "title": "Specialized and domain intelligence",
       "depends_on": [
         "P3-MODEL-FOUNDATION-01"
@@ -381,7 +385,7 @@
     {
       "task_id": "P3-TRUST-EXPERIENCE-01",
       "lane_id": "P3-L2",
-      "status": "blocked",
+      "status": "ready",
       "title": "Explainability, accessibility, internationalization and compliance",
       "depends_on": [
         "P3-MODEL-FOUNDATION-01"
