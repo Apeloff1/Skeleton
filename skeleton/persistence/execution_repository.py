@@ -617,6 +617,7 @@ class SQLiteExecutionRepository:
         self,
         execution_id: str,
     ) -> tuple[dict[str, Any], ...]:
+        key = str(execution_id)
         with self._lock:
             rows = self._connection.execute(
                 """
@@ -624,7 +625,7 @@ class SQLiteExecutionRepository:
                 WHERE namespace = ? AND execution_id = ?
                 ORDER BY sequence ASC
                 """,
-                (self.namespace, str(execution_id)),
+                (self.namespace, key),
             ).fetchall()
             if not rows:
                 raise ExecutionRepositoryCorruption(
@@ -647,7 +648,7 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryCorruption(
                         "state journal payload sequence mismatch"
                     )
-                if event.get("execution_id") != execution_id:
+                if event.get("execution_id") != key:
                     raise ExecutionRepositoryCorruption(
                         "state journal execution mismatch"
                     )
@@ -685,6 +686,73 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryCorruption(
                         "state journal snapshot shape mismatch"
                     )
+                if event.get("schema_version") != 1:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal schema version mismatch"
+                    )
+                if event.get("operation_id") != snapshot["operation_id"]:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal operation identity mismatch"
+                    )
+                if snapshot["execution_id"] != key:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal snapshot execution mismatch"
+                    )
+                identity_digest = snapshot["identity_digest"]
+                if (
+                    not isinstance(identity_digest, str)
+                    or len(identity_digest) != 64
+                    or any(
+                        ch not in "0123456789abcdef"
+                        for ch in identity_digest
+                    )
+                ):
+                    raise ExecutionRepositoryCorruption(
+                        "state journal identity digest is invalid"
+                    )
+                try:
+                    ExecutionState(snapshot["state"])
+                except (TypeError, ValueError) as exc:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal snapshot state is invalid"
+                    ) from exc
+                for name, minimum in (
+                    ("version", 1),
+                    ("latest_turn_index", -1),
+                    ("checkpoint_version", 0),
+                ):
+                    value = snapshot[name]
+                    if (
+                        isinstance(value, bool)
+                        or not isinstance(value, int)
+                        or value < minimum
+                    ):
+                        raise ExecutionRepositoryCorruption(
+                            "state journal snapshot counter is invalid"
+                        )
+                if not isinstance(
+                    snapshot["cancellation_requested"],
+                    bool,
+                ):
+                    raise ExecutionRepositoryCorruption(
+                        "state journal cancellation flag is invalid"
+                    )
+                snapshot_time = _parse_time(
+                    snapshot["updated_at"],
+                    "state journal snapshot updated_at",
+                )
+                event_time = _parse_time(
+                    event.get("created_at"),
+                    "state journal created_at",
+                )
+                row_time = _parse_time(
+                    row["created_at"],
+                    "state journal row created_at",
+                )
+                if snapshot_time != event_time or event_time != row_time:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal timestamp mismatch"
+                    )
                 calculated_state_digest = execution_payload_digest(
                     snapshot
                 )
@@ -721,6 +789,92 @@ class SQLiteExecutionRepository:
                         raise ExecutionRepositoryCorruption(
                             "state journal from_version mismatch"
                         )
+                    if (
+                        snapshot["operation_id"]
+                        != previous_snapshot["operation_id"]
+                        or snapshot["identity_digest"]
+                        != previous_snapshot["identity_digest"]
+                    ):
+                        raise ExecutionRepositoryCorruption(
+                            "state journal execution identity changed"
+                        )
+
+                    mutation = event.get("mutation")
+                    previous_version = previous_snapshot["version"]
+                    same_state = (
+                        snapshot["state"]
+                        == previous_snapshot["state"]
+                    )
+                    same_turn = (
+                        snapshot["latest_turn_index"]
+                        == previous_snapshot["latest_turn_index"]
+                    )
+                    same_checkpoint = (
+                        snapshot["checkpoint_version"]
+                        == previous_snapshot["checkpoint_version"]
+                    )
+                    same_cancel = (
+                        snapshot["cancellation_requested"]
+                        == previous_snapshot["cancellation_requested"]
+                    )
+
+                    if mutation == "transition":
+                        valid_mutation = bool(
+                            snapshot["version"] == previous_version + 1
+                            and not same_state
+                            and same_turn
+                            and same_checkpoint
+                            and same_cancel
+                        )
+                    elif mutation == "cancellation_requested":
+                        valid_mutation = bool(
+                            snapshot["version"] == previous_version + 1
+                            and same_state
+                            and same_turn
+                            and same_checkpoint
+                            and snapshot["cancellation_requested"] is True
+                        )
+                    elif mutation == "turn_append":
+                        valid_mutation = bool(
+                            snapshot["version"] == previous_version + 1
+                            and same_state
+                            and snapshot["latest_turn_index"]
+                            == previous_snapshot["latest_turn_index"] + 1
+                            and same_checkpoint
+                            and same_cancel
+                        )
+                    elif mutation == "checkpoint":
+                        valid_mutation = bool(
+                            snapshot["version"] == previous_version + 1
+                            and same_state
+                            and same_turn
+                            and snapshot["checkpoint_version"]
+                            == previous_snapshot["checkpoint_version"] + 1
+                            and same_cancel
+                        )
+                    elif mutation == "finalization":
+                        valid_mutation = bool(
+                            snapshot["version"]
+                            in {
+                                previous_version + 1,
+                                previous_version + 2,
+                            }
+                            and snapshot["state"]
+                            in {
+                                ExecutionState.COMPLETED.value,
+                                ExecutionState.FAILED.value,
+                                ExecutionState.CANCELLED.value,
+                            }
+                            and same_turn
+                            and same_checkpoint
+                            and same_cancel
+                        )
+                    else:
+                        valid_mutation = False
+                    if not valid_mutation:
+                        raise ExecutionRepositoryCorruption(
+                            "state journal mutation semantics mismatch"
+                        )
 
                 material = dict(event)
                 history.append(
@@ -732,7 +886,7 @@ class SQLiteExecutionRepository:
                 parent_digest = str(row["event_digest"])
                 previous_event = event
 
-            current = self.get(execution_id)
+            current = self.get(key)
             current_material = self._execution_state_material(current)
             tail = history[-1]
             if tail["state_snapshot"] != current_material:
