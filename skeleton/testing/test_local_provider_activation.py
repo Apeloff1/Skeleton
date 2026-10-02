@@ -4,12 +4,16 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+
+import httpx
 import socket
 import threading
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI
 
+from backend.core.engine_client import EngineClient, EngineClientConfig
 from skeleton.ai.runtime.inference import (
     LocalInferenceCancelled,
     LocalModelArtifactError,
@@ -21,6 +25,12 @@ from skeleton.api.engine_authority import (
     EngineAuthorityRegistry,
     EngineServiceGrant,
     engine_request_binding,
+)
+from skeleton.api.engine_routes import (
+    _engine_coordinator,
+    _engine_service,
+    _engine_service_token,
+    router as engine_router,
 )
 from skeleton.api.engine_runtime import EngineExecutionCoordinator
 from skeleton.api.engine_service import (
@@ -473,6 +483,94 @@ async def test_engine_coordinator_interrupts_running_local_inference_and_finaliz
     assert status.execution_state == "cancelled"
     assert status.result is not None
     assert status.result["status"] == "cancelled"
+
+    await coordinator.shutdown()
+    service.repository.close()
+    service.submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_authenticated_engine_http_boundary_executes_local_provider_offline(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path, expected = _write_model(tmp_path)
+    _local_env(monkeypatch, path)
+    _block_internet(monkeypatch)
+
+    operation, command = _engine_bundle()
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "http-execution.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "http-submissions.sqlite3"),
+        EngineAuthorityRegistry(
+            [
+                EngineServiceGrant(
+                    service_principal="codedock-backend",
+                    scopes=frozenset(
+                        {
+                            "engine:submit",
+                            "engine:read",
+                            "engine:cancel",
+                            "engine:events",
+                            "engine:approve",
+                        }
+                    ),
+                    tenant_ids=frozenset({operation.tenant_id}),
+                    capabilities=frozenset({operation.capability}),
+                )
+            ]
+        ),
+    )
+    registry = ProviderRegistry.from_env()
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=registry,
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified,
+    )
+
+    service_token = "local-engine-http-test-" + ("x" * 40)
+    app = FastAPI()
+    app.include_router(engine_router, prefix="/api/v1")
+    app.dependency_overrides[_engine_service] = lambda: service
+    app.dependency_overrides[_engine_coordinator] = lambda: coordinator
+    app.dependency_overrides[_engine_service_token] = lambda: service_token
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton.test",
+            service_token=service_token,
+            service_principal="codedock-backend",
+            request_timeout_s=2,
+            poll_interval_s=0.001,
+            execution_timeout_s=5,
+        ),
+        transport=httpx.ASGITransport(app=app),
+    )
+    result = await client.execute(command)
+
+    assert result.status == "completed"
+    assert result.final_output
+    assert result.execution_id == command.execution_request.execution_id
+    assert result.operation_id == command.operation.operation_id
+    assert result.provider_receipts
+    assert all(
+        receipt.startswith("provider:local:")
+        for receipt in result.provider_receipts
+    )
+    assert registry.require_active().model == expected.model_id
+    assert registry.statuses()[0]["artifact"]["model_digest"] == expected.model_digest
+
+    events = await client.events(
+        result.execution_id,
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        trace_id=operation.trace_id,
+    )
+    assert any(
+        event.get("type") == "execution.result"
+        for event in events["events"]
+    )
 
     await coordinator.shutdown()
     service.repository.close()
