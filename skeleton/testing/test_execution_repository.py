@@ -230,6 +230,98 @@ def test_atomic_finalization_commits_result_before_terminal_outbox() -> None:
     assert pending[0].payload["verification"] == "verification:ver-1"
 
 
+def test_state_journal_hash_chain_tracks_mutations() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.LOADING,
+        expected_version=current.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    current = repo.request_cancel(
+        "exec-1",
+        expected_version=current.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    history = repo.state_history("exec-1")
+
+    assert [event["mutation"] for event in history] == [
+        "create",
+        "transition",
+        "cancellation_requested",
+    ]
+    assert [
+        event["state_snapshot"]["version"]
+        for event in history
+    ] == [1, 2, 3]
+    assert history[0]["parent_digest"] is None
+    assert history[1]["parent_digest"] == history[0]["event_digest"]
+    assert history[2]["parent_digest"] == history[1]["event_digest"]
+    assert history[-1]["state_snapshot"]["cancellation_requested"] is True
+
+
+def test_state_journal_rejects_digest_preserving_row_tamper() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    repo.transition(
+        "exec-1",
+        ExecutionState.LOADING,
+        expected_version=current.version,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_state_journal
+        SET event_json = replace(
+            event_json,
+            '"mutation":"transition"',
+            '"mutation":"forged-transition"'
+        )
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (repo.namespace, "exec-1"),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="state journal event digest mismatch",
+    ):
+        repo.state_history("exec-1")
+
+
+def test_state_journal_rejects_deleted_middle_event() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.LOADING,
+        expected_version=current.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    repo.request_cancel(
+        "exec-1",
+        expected_version=current.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    repo._connection.execute(
+        """
+        DELETE FROM ai_execution_state_journal
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (repo.namespace, "exec-1"),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="state journal sequence is not contiguous",
+    ):
+        repo.state_history("exec-1")
+
+
 def test_execution_state_digest_rejects_contract_valid_tampering() -> None:
     repo = SQLiteExecutionRepository()
     current = repo.create(_request(), now=_now())
