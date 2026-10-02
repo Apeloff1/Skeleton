@@ -586,9 +586,34 @@ async def _commit_canonical_assistant_turn(
     execution_id = generated.get("engine_execution_id")
     operation_id = generated.get("engine_operation_id")
     if execution_id:
-        if not isinstance(operation_id, str) or not operation_id.strip():
+        required_lineage = {
+            "engine_operation_id": operation_id,
+            "engine_context_id": generated.get("engine_context_id"),
+            "engine_context_digest": generated.get("engine_context_digest"),
+            "engine_context_compiler_version": generated.get(
+                "engine_context_compiler_version"
+            ),
+        }
+        missing = [
+            name
+            for name, value in required_lineage.items()
+            if not isinstance(value, str) or not value.strip()
+        ]
+        snapshot = generated.get("engine_context_source_snapshot")
+        if (
+            missing
+            or not isinstance(snapshot, (list, tuple))
+            or not snapshot
+        ):
             raise ValueError(
-                "engine-backed Jeeves result is missing operation identity"
+                "engine-backed Jeeves result is missing canonical lineage"
+            )
+        digest = str(generated["engine_context_digest"]).strip()
+        if len(digest) != 64 or any(
+            ch not in "0123456789abcdef" for ch in digest
+        ):
+            raise ValueError(
+                "engine-backed Jeeves context digest is invalid"
             )
     else:
         operation_id = str(
