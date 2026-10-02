@@ -5842,12 +5842,24 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Rooted filesystem rejects root, parent, and leaf symlink traversal before I/O.",
+        "Descriptor-relative operations remain bound when pathname parents are swapped concurrently."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_existing_symlink_file_is_never_read",
+        "skeleton/testing/test_security_rooted_fs.py::test_symlink_parent_is_never_traversed_for_write",
+        "skeleton/testing/test_security_rooted_fs.py::test_read_remains_bound_when_parent_path_is_swapped",
+        "skeleton/testing/test_security_rooted_fs.py::test_remove_file_rejects_symlink_without_touching_target"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Rooted Filesystem Race Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6465,12 +6477,23 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Writes use bounded temporary staging and atomic publication without leaving failed temporary files.",
+        "Temporary directories and streamed writes fail closed when rooted path identity changes during execution."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_stream_write_cannot_escape_after_parent_path_swap",
+        "skeleton/testing/test_security_rooted_fs.py::test_failed_stream_does_not_leave_temp_files",
+        "skeleton/testing/test_security_rooted_fs.py::test_temporary_directory_fails_closed_on_root_path_swap"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Rooted Filesystem Race Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
