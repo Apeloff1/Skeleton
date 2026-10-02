@@ -707,6 +707,39 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         evidence_refs=("privacy:tenant-isolation",),
     )
 
+    plane.prove_persisted_evidence_integrity(
+        execution_id=request.execution_id,
+        result_tamper_rejected=True,
+        outbox_tamper_rejected=True,
+        migration_backfill_verified=True,
+        evidence_refs=("persistence:terminal-integrity",),
+    )
+    plane.prove_verification_receipt_identity(
+        execution_id=request.execution_id,
+        identical_replay_stable=True,
+        conflicting_replay_rejected=True,
+        digest_tamper_rejected=True,
+        execution_binding_preserved=True,
+        evidence_refs=("verification:receipt-identity",),
+    )
+    plane.prove_terminal_outbox_delivery(
+        execution_id=request.execution_id,
+        one_pending_terminal_event=True,
+        acknowledgement_persistent=True,
+        acknowledgement_retry_stable=True,
+        no_pending_after_ack=True,
+        evidence_refs=("finalization:outbox",),
+    )
+    plane.prove_unknown_usage_fence(
+        execution_id=request.execution_id,
+        unknown_usage_recorded=True,
+        completion_blocked_while_unknown=True,
+        release_blocked_while_unknown=True,
+        conservative_resolution_required=True,
+        completion_succeeds_after_resolution=True,
+        evidence_refs=("resource:unknown-usage",),
+    )
+
     plane.prove_learning_promotion(
         promotion,
         expected_baseline=spec.baseline_version,
@@ -734,7 +767,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 28
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 32
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -1011,6 +1044,70 @@ def test_tenant_isolation_requires_cross_tenant_get_rejection() -> None:
         cross_tenant_get_rejected=False,
         subject_scope_preserved=True,
         evidence_refs=("privacy:tenant-isolation",),
+    )
+    assert proof.passed is False
+
+
+def test_persisted_integrity_requires_result_tamper_rejection() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="persistence-integrity",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_persisted_evidence_integrity(
+        execution_id="persistence-integrity",
+        result_tamper_rejected=False,
+        outbox_tamper_rejected=True,
+        migration_backfill_verified=True,
+        evidence_refs=("persistence:terminal-integrity",),
+    )
+    assert proof.passed is False
+
+
+def test_verification_receipt_identity_requires_conflict_rejection() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="receipt-identity",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_verification_receipt_identity(
+        execution_id="receipt-identity",
+        identical_replay_stable=True,
+        conflicting_replay_rejected=False,
+        digest_tamper_rejected=True,
+        execution_binding_preserved=True,
+        evidence_refs=("verification:receipt-identity",),
+    )
+    assert proof.passed is False
+
+
+def test_terminal_outbox_delivery_requires_persistent_ack() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="outbox-delivery",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_terminal_outbox_delivery(
+        execution_id="outbox-delivery",
+        one_pending_terminal_event=True,
+        acknowledgement_persistent=False,
+        acknowledgement_retry_stable=True,
+        no_pending_after_ack=True,
+        evidence_refs=("finalization:outbox",),
+    )
+    assert proof.passed is False
+
+
+def test_unknown_usage_fence_requires_resolution_before_completion() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="unknown-usage",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_unknown_usage_fence(
+        execution_id="unknown-usage",
+        unknown_usage_recorded=True,
+        completion_blocked_while_unknown=True,
+        release_blocked_while_unknown=True,
+        conservative_resolution_required=False,
+        completion_succeeds_after_resolution=True,
+        evidence_refs=("resource:unknown-usage",),
     )
     assert proof.passed is False
 
