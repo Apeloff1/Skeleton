@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -39,9 +41,28 @@ class BackupManager:
         if self._index_file.exists():
             self._index = json.loads(self._index_file.read_text(encoding="utf-8"))
 
+    @staticmethod
+    def _write_json_atomic(path: Path, payload: Any) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=path.name + ".",
+            suffix=".tmp",
+            dir=str(path.parent),
+        )
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
     def _save_index(self) -> None:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        self._index_file.write_text(json.dumps(self._index, indent=2), encoding="utf-8")
+        self._write_json_atomic(self._index_file, self._index)
 
     def _checksum(self, data: str) -> str:
         return hashlib.sha256(data.encode()).hexdigest()[:16]
@@ -69,7 +90,7 @@ class BackupManager:
             "checksums": {n: self._checksum(d) for n, d in captured.items()},
         }
         out = self.backup_dir / f"{backup_id}.json"
-        out.write_text(json.dumps(blob, indent=2), encoding="utf-8")
+        self._write_json_atomic(out, blob)
         entry = {
             "backup_id": backup_id,
             "label": label,
@@ -85,6 +106,80 @@ class BackupManager:
 
     def list_backups(self) -> List[Dict[str, Any]]:
         return list(self._index)
+
+    @staticmethod
+    def _validated_state_name(name: str) -> str:
+        if not isinstance(name, str) or name not in STATE_FILES:
+            raise ValueError("state name is not backup-managed")
+        return name
+
+    def delete_state(self, name: str) -> Dict[str, Any]:
+        """Delete live state and purge all historical backup copies.
+
+        Historical backups are preflighted before the live source is touched.
+        This makes malformed or missing backup state fail closed instead of
+        deleting the source while silently retaining an undeletable copy.
+        """
+        state_name = self._validated_state_name(name)
+        prepared: list[tuple[Path, Dict[str, Any]]] = []
+
+        for entry in self._index:
+            backup_id = str(entry.get("backup_id") or "").strip()
+            if not backup_id:
+                raise RuntimeError("backup index contains invalid backup identity")
+            path = self.backup_dir / f"{backup_id}.json"
+            if not path.exists():
+                raise RuntimeError(f"indexed backup is missing: {backup_id}")
+            try:
+                blob = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    f"indexed backup is unreadable: {backup_id}"
+                ) from exc
+            if not isinstance(blob, dict):
+                raise RuntimeError(f"indexed backup is malformed: {backup_id}")
+            files = blob.get("files")
+            checksums = blob.get("checksums")
+            if not isinstance(files, dict) or not isinstance(checksums, dict):
+                raise RuntimeError(f"indexed backup is malformed: {backup_id}")
+            updated = dict(blob)
+            updated_files = dict(files)
+            updated_checksums = dict(checksums)
+            updated_files.pop(state_name, None)
+            updated_checksums.pop(state_name, None)
+            updated["files"] = updated_files
+            updated["checksums"] = updated_checksums
+            prepared.append((path, updated))
+
+        purged_backups: list[str] = []
+        for path, blob in prepared:
+            self._write_json_atomic(path, blob)
+            purged_backups.append(str(blob["backup_id"]))
+
+        live = self.root / state_name
+        live_existed = live.exists()
+        if live_existed:
+            live.unlink()
+
+        changed_index = False
+        for entry in self._index:
+            files = list(entry.get("files") or [])
+            checksums = dict(entry.get("checksums") or {})
+            if state_name in files or state_name in checksums:
+                entry["files"] = [item for item in files if item != state_name]
+                checksums.pop(state_name, None)
+                entry["checksums"] = checksums
+                backup_path = self.backup_dir / f"{entry['backup_id']}.json"
+                entry["size_bytes"] = backup_path.stat().st_size
+                changed_index = True
+        if changed_index:
+            self._save_index()
+
+        return {
+            "state": state_name,
+            "live_deleted": live_existed,
+            "purged_backups": tuple(purged_backups),
+        }
 
     def verify(self, backup_id: str) -> Dict[str, Any]:
         path = self.backup_dir / f"{backup_id}.json"
