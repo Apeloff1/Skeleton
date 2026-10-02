@@ -143,6 +143,16 @@ def test_functional_runtime_bootstraps_from_local_model_manifest(tmp_path: Path)
     )
     assert runtime.local_model.provider_id == "local"
     assert runtime.local_model.model == "operator-agent-v1"
+    assert runtime.startup_qualification_receipt is not None
+    assert runtime.startup_qualification_receipt["status"] == "qualified"
+    assert (
+        runtime.startup_qualification_receipt["model_sha256"]
+        == runtime.local_model.engine.model.model_digest
+    )
+    assert (
+        runtime.startup_qualification_receipt["executable_sha256"]
+        == runtime.local_model.runtime_digest
+    )
 
 
 @pytest.mark.asyncio
@@ -230,3 +240,39 @@ def test_deployment_rejects_digest_pinned_non_gguf_artifact(tmp_path: Path) -> N
     manifest.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(LocalModelDeploymentError, match="GGUF"):
         LocalModelDeployment.load(manifest)
+
+
+def test_sync_qualification_binds_response_to_exact_runtime_and_model(
+    tmp_path: Path,
+) -> None:
+    from skeleton.ai.runtime.inference.deployment import (
+        qualify_local_model_deployment_sync,
+    )
+
+    manifest, runtime, model = _deployment(tmp_path)
+    receipt = qualify_local_model_deployment_sync(
+        manifest,
+        prompt="qualification identity binding",
+        max_output_tokens=8,
+    )
+    assert _sha(runtime) in receipt["response_id"]
+    assert _sha(model) in receipt["response_id"]
+    assert receipt["receipt_digest"]
+
+
+def test_manifest_bootstrap_fails_when_live_qualification_cannot_execute(
+    tmp_path: Path,
+) -> None:
+    manifest, runtime, _ = _deployment(tmp_path)
+    runtime.write_text("#!/usr/bin/env python3\nraise SystemExit(7)\n", encoding="utf-8")
+    runtime.chmod(0o755)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["executable_sha256"] = _sha(runtime)
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(Exception):
+        FunctionalAIRuntime.from_local_model_manifest(
+            SQLiteExecutionRepository(),
+            manifest,
+            AsyncToolRuntime(),
+            verification_hook=_verification,
+        )

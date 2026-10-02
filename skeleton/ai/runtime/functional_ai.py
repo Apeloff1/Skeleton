@@ -218,6 +218,7 @@ class FunctionalAIRuntime:
         self.repository = repository
         self.local_model = local_model
         self.tools = tools
+        self.startup_qualification_receipt: Mapping[str, object] | None = None
         self.runtime = CognitiveExecutionRuntime(
             repository,
             local_model,
@@ -239,9 +240,13 @@ class FunctionalAIRuntime:
         default_seed: int = 0,
         rehash_artifacts_each_run: bool = False,
     ) -> "FunctionalAIRuntime":
-        from skeleton.ai.runtime.inference.deployment import load_local_model_adapter
+        from skeleton.ai.runtime.inference.deployment import (
+            load_local_model_adapter,
+            qualify_local_model_deployment_sync,
+        )
 
-        return cls(
+        qualification = qualify_local_model_deployment_sync(manifest_path)
+        runtime = cls(
             repository,
             load_local_model_adapter(
                 manifest_path,
@@ -253,6 +258,8 @@ class FunctionalAIRuntime:
             verification_hook=verification_hook,
             finalization_binding_hook=finalization_binding_hook,
         )
+        runtime.startup_qualification_receipt = qualification
+        return runtime
 
     async def execute(self, request: FunctionalAIRequest) -> FunctionalAIRun:
         if not isinstance(request, FunctionalAIRequest):

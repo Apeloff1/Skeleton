@@ -199,6 +199,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "provider:local:",
             "from_local_model_manifest",
             "local_runtime_digest",
+            "startup_qualification_receipt",
+            "qualify_local_model_deployment_sync",
         ):
             if marker not in text:
                 errors.append(f"VS-001 binding missing marker {marker}")
@@ -257,6 +259,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "nonzero_tensor_model_required",
             "runtime_identity_bound_to_execution_evidence_required",
             "governed_tool_generation_schema_required",
+            "live_startup_local_model_qualification_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:

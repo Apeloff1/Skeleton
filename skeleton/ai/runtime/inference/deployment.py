@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import threading
 from typing import Any
 
 from .llama_cpp import (
@@ -273,34 +274,58 @@ def load_local_model_adapter(
     )
 
 
-async def qualify_local_model_deployment(
-    manifest_path: str | Path,
+def _qualification_request(
     *,
-    prompt: str = "Respond with a short offline readiness acknowledgement.",
-    max_output_tokens: int = 32,
-) -> dict[str, Any]:
+    prompt: str,
+    max_output_tokens: int,
+) -> LocalInferenceRequest:
     if not isinstance(prompt, str) or not prompt.strip():
         raise LocalModelDeploymentError("qualification prompt must be non-empty")
-    deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(
-        deployment.llama_cpp_config(rehash_artifacts_each_run=True)
-    )
-    result = await LocalInferenceEngine(model, cache_size=0).generate(
-        LocalInferenceRequest(
-            prompt=prompt,
-            instructions=(
-                "Offline local model qualification. Do not use external services."
-            ),
-            max_output_tokens=max_output_tokens,
-            seed=0,
+    if (
+        isinstance(max_output_tokens, bool)
+        or not isinstance(max_output_tokens, int)
+        or not 1 <= max_output_tokens <= 256
+    ):
+        raise LocalModelDeploymentError(
+            "qualification max_output_tokens must be in [1, 256]"
         )
+    return LocalInferenceRequest(
+        prompt=prompt,
+        instructions=(
+            "Offline local model qualification. Do not use external services."
+        ),
+        max_output_tokens=max_output_tokens,
+        seed=0,
     )
+
+
+def _qualification_receipt(
+    deployment: LocalModelDeployment,
+    model: LlamaCppModel,
+    result: object,
+    *,
+    prompt: str,
+) -> dict[str, Any]:
+    if not hasattr(result, "model_digest") or not hasattr(result, "text"):
+        raise LocalModelDeploymentError("qualification produced invalid result")
     if result.model_digest != deployment.model_sha256:
         raise LocalModelDeploymentError(
             "qualification result model identity drift"
         )
     if result.text is None or not result.text.strip():
         raise LocalModelDeploymentError("qualification produced no textual output")
+    response_id = getattr(result, "response_id", None)
+    if not isinstance(response_id, str) or not response_id.strip():
+        raise LocalModelDeploymentError(
+            "qualification result is missing response identity"
+        )
+    if (
+        deployment.executable_sha256 not in response_id
+        or deployment.model_sha256 not in response_id
+    ):
+        raise LocalModelDeploymentError(
+            "qualification response identity is not bound to runtime and model digests"
+        )
     receipt: dict[str, Any] = {
         "schema_version": QUALIFICATION_SCHEMA,
         "status": "qualified",
@@ -316,7 +341,7 @@ async def qualify_local_model_deployment(
         "output_sha256": hashlib.sha256(
             result.text.encode("utf-8")
         ).hexdigest(),
-        "response_id": result.response_id,
+        "response_id": response_id,
         "provider": "local",
         "network_required": False,
         "hosted_provider_credentials_required": False,
@@ -325,18 +350,52 @@ async def qualify_local_model_deployment(
     return receipt
 
 
+async def qualify_local_model_deployment(
+    manifest_path: str | Path,
+    *,
+    prompt: str = "Respond with a short offline readiness acknowledgement.",
+    max_output_tokens: int = 32,
+) -> dict[str, Any]:
+    deployment = LocalModelDeployment.load(manifest_path)
+    model = LlamaCppModel(
+        deployment.llama_cpp_config(rehash_artifacts_each_run=True)
+    )
+    result = await LocalInferenceEngine(model, cache_size=0).generate(
+        _qualification_request(
+            prompt=prompt,
+            max_output_tokens=max_output_tokens,
+        )
+    )
+    return _qualification_receipt(
+        deployment,
+        model,
+        result,
+        prompt=prompt,
+    )
+
+
 def qualify_local_model_deployment_sync(
     manifest_path: str | Path,
     *,
     prompt: str = "Respond with a short offline readiness acknowledgement.",
     max_output_tokens: int = 32,
 ) -> dict[str, Any]:
-    return asyncio.run(
-        qualify_local_model_deployment(
-            manifest_path,
+    deployment = LocalModelDeployment.load(manifest_path)
+    model = LlamaCppModel(
+        deployment.llama_cpp_config(rehash_artifacts_each_run=True)
+    )
+    result = model.infer(
+        _qualification_request(
             prompt=prompt,
             max_output_tokens=max_output_tokens,
-        )
+        ),
+        threading.Event(),
+    )
+    return _qualification_receipt(
+        deployment,
+        model,
+        result,
+        prompt=prompt,
     )
 
 
