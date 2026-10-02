@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import struct
 
 import pytest
 
@@ -50,7 +51,10 @@ def _deployment(tmp_path: Path) -> tuple[Path, Path, Path]:
     runtime.chmod(0o755)
     model = tmp_path / "models" / "agent.gguf"
     model.parent.mkdir()
-    model.write_bytes(b"GGUF-operator-owned-model-v1")
+    model.write_bytes(
+        struct.pack("<4sIQQ", b"GGUF", 3, 2, 1)
+        + b"operator-owned-model-v1"
+    )
     manifest = tmp_path / "deployment.json"
     manifest.write_text(
         json.dumps(
@@ -107,6 +111,9 @@ def test_deployment_manifest_binds_relative_artifacts_and_hashes(tmp_path: Path)
     assert deployment.executable_sha256 == _sha(runtime)
     assert deployment.model_sha256 == _sha(model)
     assert deployment.context_size == 2048
+    assert deployment.gguf_version == 3
+    assert deployment.gguf_tensor_count == 2
+    assert deployment.gguf_metadata_count == 1
 
 
 @pytest.mark.asyncio
@@ -153,6 +160,8 @@ async def test_qualification_receipt_exposes_hashes_not_raw_prompt(tmp_path: Pat
     assert receipt["hosted_provider_credentials_required"] is False
     assert receipt["model_sha256"] == _sha(model)
     assert receipt["executable_sha256"] == _sha(runtime)
+    assert receipt["gguf_version"] == 3
+    assert receipt["gguf_tensor_count"] == 2
     assert receipt["prompt_sha256"] == hashlib.sha256(prompt.encode()).hexdigest()
     assert prompt not in json.dumps(receipt)
 
@@ -210,4 +219,14 @@ def test_deployment_rejects_runtime_kind_drift(tmp_path: Path) -> None:
     payload["runtime_kind"] = "hosted-provider"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(LocalModelDeploymentError, match="runtime_kind must be llama.cpp-cli"):
+        LocalModelDeployment.load(manifest)
+
+
+def test_deployment_rejects_digest_pinned_non_gguf_artifact(tmp_path: Path) -> None:
+    manifest, _, model = _deployment(tmp_path)
+    model.write_bytes(b"arbitrary-binary-that-is-not-gguf")
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["model_sha256"] = _sha(model)
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LocalModelDeploymentError, match="GGUF"):
         LocalModelDeployment.load(manifest)

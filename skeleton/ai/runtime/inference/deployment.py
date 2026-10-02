@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-from .llama_cpp import LlamaCppConfig, LlamaCppModel, build_llama_cpp_adapter
+from .llama_cpp import LlamaCppConfig, LlamaCppModel, build_llama_cpp_adapter, inspect_gguf
 from .local import LocalInferenceEngine, LocalInferenceRequest, LocalModelAdapter
 
 
@@ -83,6 +83,9 @@ class LocalModelDeployment:
     model_path: Path
     model_sha256: str
     model_id: str
+    gguf_version: int
+    gguf_tensor_count: int
+    gguf_metadata_count: int
     timeout_seconds: float
     max_output_bytes: int
     max_stderr_bytes: int
@@ -174,6 +177,7 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(
                 f"invalid llama.cpp deployment config: {exc}"
             ) from exc
+        gguf = inspect_gguf(model)
         deployment = cls(
             manifest_path=resolved_manifest,
             runtime_kind="llama.cpp-cli",
@@ -182,6 +186,9 @@ class LocalModelDeployment:
             model_path=model,
             model_sha256=model_digest,
             model_id=model_id.strip(),
+            gguf_version=gguf.version,
+            gguf_tensor_count=gguf.tensor_count,
+            gguf_metadata_count=gguf.metadata_count,
             timeout_seconds=float(validated.timeout_seconds),
             max_output_bytes=validated.max_output_bytes,
             max_stderr_bytes=validated.max_stderr_bytes,
@@ -291,6 +298,9 @@ async def qualify_local_model_deployment(
         "model_sha256": deployment.model_sha256,
         "executable_sha256": deployment.executable_sha256,
         "manifest_sha256": deployment.manifest_digest,
+        "gguf_version": model.gguf_header.version,
+        "gguf_tensor_count": model.gguf_header.tensor_count,
+        "gguf_metadata_count": model.gguf_header.metadata_count,
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         "output_sha256": hashlib.sha256(
             result.text.encode("utf-8")

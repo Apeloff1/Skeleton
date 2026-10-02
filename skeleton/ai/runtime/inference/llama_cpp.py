@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import struct
 import subprocess
 import tempfile
 import threading
@@ -68,6 +69,23 @@ _INHERITED_ENV_ALLOWLIST = {
 
 class LlamaCppRuntimeError(RuntimeError):
     """The local llama.cpp process boundary failed closed."""
+
+
+@dataclass(frozen=True, slots=True)
+class GgufHeader:
+    """Small immutable admission record from the fixed GGUF file header."""
+
+    version: int
+    tensor_count: int
+    metadata_count: int
+
+    def __post_init__(self) -> None:
+        if self.version not in {2, 3}:
+            raise ValueError("supported GGUF version must be 2 or 3")
+        if self.tensor_count <= 0:
+            raise ValueError("GGUF tensor_count must be positive")
+        if self.metadata_count < 0:
+            raise ValueError("GGUF metadata_count must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,6 +197,30 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def inspect_gguf(path: Path) -> GgufHeader:
+    """Validate the fixed GGUF header without trusting extension or filename."""
+
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(24)
+    except OSError as exc:
+        raise LlamaCppRuntimeError(f"cannot read GGUF model header: {path}") from exc
+    if len(header) != 24:
+        raise LlamaCppRuntimeError("model artifact is too small to be GGUF")
+    magic, version, tensor_count, metadata_count = struct.unpack("<4sIQQ", header)
+    if magic != b"GGUF":
+        raise LlamaCppRuntimeError("model artifact does not contain GGUF magic")
+    if version not in {2, 3}:
+        raise LlamaCppRuntimeError(f"unsupported GGUF version: {version}")
+    if tensor_count <= 0:
+        raise LlamaCppRuntimeError("GGUF model declares zero tensors")
+    return GgufHeader(
+        version=version,
+        tensor_count=tensor_count,
+        metadata_count=metadata_count,
+    )
+
+
 def _identity(path_value: str, *, executable: bool, reject_symlink: bool) -> ArtifactIdentity:
     raw = Path(path_value).expanduser()
     if executable and not raw.is_absolute():
@@ -244,6 +286,7 @@ class LlamaCppModel:
         self._model = _identity(
             config.model_path, executable=False, reject_symlink=config.reject_model_symlink,
         )
+        self._gguf_header = inspect_gguf(Path(self._model.path))
         self.model_id = (
             config.model_id.strip() if config.model_id is not None
             else f"llama.cpp:{Path(self._model.path).stem}:{self._model.sha256[:12]}"
@@ -265,6 +308,10 @@ class LlamaCppModel:
     def runtime_artifact(self) -> ArtifactIdentity:
         return self._runtime
 
+    @property
+    def gguf_header(self) -> GgufHeader:
+        return self._gguf_header
+
     def _assert_artifacts_stable(self) -> None:
         for label, identity in (("runtime", self._runtime), ("model", self._model)):
             if not _stat_matches(identity):
@@ -273,6 +320,9 @@ class LlamaCppModel:
                 observed = _sha256_file(Path(identity.path))
                 if observed != identity.sha256:
                     raise LlamaCppRuntimeError(f"{label} artifact digest changed")
+        observed_header = inspect_gguf(Path(self._model.path))
+        if observed_header != self._gguf_header:
+            raise LlamaCppRuntimeError("GGUF fixed header changed")
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
@@ -508,8 +558,10 @@ def build_llama_cpp_adapter(
 
 __all__ = [
     "ArtifactIdentity",
+    "GgufHeader",
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",
     "build_llama_cpp_adapter",
+    "inspect_gguf",
 ]

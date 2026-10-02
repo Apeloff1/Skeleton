@@ -69,7 +69,9 @@
     "shell_execution_forbidden": true,
     "exact_head_receipt_required": true,
     "deployment_manifest_bootstrap_required": true,
-    "operator_local_model_qualification_required": true
+    "operator_local_model_qualification_required": true,
+    "gguf_format_validation_required": true,
+    "nonzero_tensor_model_required": true
   },
   "deferred_scope": {
     "queued_volume_count": 257,
@@ -116,6 +118,7 @@
     "bootstrap": "FunctionalAIRuntime.from_local_model_manifest",
     "qualification": "scripts/qualify_local_model_runtime.py",
     "bundled_weights_required_for_repository_ci": false,
-    "rule": "Repository CI proves the concrete offline runtime and deployment contract with local fixture artifacts; production operators must qualify their exact runtime binary and model weights before activation."
+    "rule": "Repository CI proves the concrete offline runtime and deployment contract with local fixture artifacts; production operators must qualify their exact runtime binary and model weights before activation.",
+    "model_format_admission": "GGUF magic + version 2/3 + positive tensor count before process launch"
   }
 }

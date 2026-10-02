@@ -167,6 +167,9 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "prompt_file",
             "LocalToolCall",
             "max_output_bytes",
+            "class GgufHeader",
+            "inspect_gguf",
+            "unsupported GGUF version",
         ):
             if marker not in text:
                 errors.append(f"llama.cpp local runtime missing marker {marker}")
@@ -247,6 +250,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "exact_head_receipt_required",
             "deployment_manifest_bootstrap_required",
             "operator_local_model_qualification_required",
+            "gguf_format_validation_required",
+            "nonzero_tensor_model_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:

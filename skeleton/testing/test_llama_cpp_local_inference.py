@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import os
 from pathlib import Path
+import struct
 import threading
 
 import pytest
@@ -91,7 +92,10 @@ def _artifacts(tmp_path: Path) -> tuple[Path, Path]:
     runtime.write_text(_FAKE_RUNTIME, encoding="utf-8")
     runtime.chmod(0o755)
     model = tmp_path / "fixture.gguf"
-    model.write_bytes(b"GGUF-fixture-open-weight-model-v1")
+    model.write_bytes(
+        struct.pack("<4sIQQ", b"GGUF", 3, 1, 0)
+        + b"fixture-open-weight-model-v1"
+    )
     return runtime, model
 
 
@@ -125,6 +129,8 @@ async def test_llama_cpp_executes_without_prompt_argv_or_provider_credentials(
     assert result.text == "offline subprocess answer"
     assert result.model_digest == expected_model_digest
     assert backend.runtime_digest != backend.model_digest
+    assert backend.gguf_header.version == 3
+    assert backend.gguf_header.tensor_count == 1
     assert result.response_id is not None and result.response_id.startswith("local:llama:")
 
 
@@ -295,3 +301,34 @@ async def test_vs001_crosses_real_local_process_boundary_and_recovers(
     assert stored.status == "completed"
     assert stored.final_output == run.execution.result.final_output
     assert stored.stream_terminal_event == run.evidence.stream_terminal_event
+
+
+def test_llama_cpp_rejects_non_gguf_model(tmp_path: Path) -> None:
+    runtime, model = _artifacts(tmp_path)
+    model.write_bytes(b"not-a-gguf-model-artifact")
+    with pytest.raises(LlamaCppRuntimeError, match="GGUF"):
+        LlamaCppModel(
+            LlamaCppConfig(executable=str(runtime), model_path=str(model))
+        )
+
+
+@pytest.mark.parametrize("version", [0, 1, 4, 99])
+def test_llama_cpp_rejects_unsupported_gguf_versions(
+    tmp_path: Path,
+    version: int,
+) -> None:
+    runtime, model = _artifacts(tmp_path)
+    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", version, 1, 0) + b"x")
+    with pytest.raises(LlamaCppRuntimeError, match="unsupported GGUF version"):
+        LlamaCppModel(
+            LlamaCppConfig(executable=str(runtime), model_path=str(model))
+        )
+
+
+def test_llama_cpp_rejects_zero_tensor_gguf(tmp_path: Path) -> None:
+    runtime, model = _artifacts(tmp_path)
+    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 0, 0) + b"x")
+    with pytest.raises(LlamaCppRuntimeError, match="zero tensors"):
+        LlamaCppModel(
+            LlamaCppConfig(executable=str(runtime), model_path=str(model))
+        )
