@@ -17,6 +17,7 @@ from core.route_privacy import require_route_provider_transfer
 from core.engine_client import (
     EngineClient,
     EngineClientError,
+    EngineNotFoundError,
     EngineTerminalResult,
     command_from_context,
 )
@@ -255,6 +256,47 @@ class EngineTextResponse:
     artifact_refs: tuple[str, ...] = ()
 
 
+def _terminal_response(
+    *,
+    request: EngineTextRequest,
+    terminal: EngineTerminalResult,
+    binding,
+    operation_id: str,
+    execution_id: str,
+) -> EngineTextResponse:
+    if (
+        terminal.operation_id != operation_id
+        or terminal.execution_id != execution_id
+        or binding.operation_id != operation_id
+        or binding.execution_id != execution_id
+        or binding.tenant_id != request.tenant_id
+        or binding.actor_id != request.actor_id
+        or binding.capability != request.capability
+        or binding.idempotency_key != request.idempotency_key
+        or binding.purpose != request.purpose
+        or binding.data_class != request.data_class
+    ):
+        raise EngineTextError(
+            "canonical engine terminal/handoff identity diverged from request"
+        )
+    return EngineTextResponse(
+        text=terminal.final_output,
+        operation_id=terminal.operation_id,
+        execution_id=terminal.execution_id,
+        context_id=binding.context_id,
+        context_digest=binding.context_digest,
+        context_source_snapshot=binding.source_snapshot,
+        context_compiler_version=binding.compiler_version,
+        verification=terminal.verification,
+        evidence_refs=terminal.evidence_refs,
+        provider_receipts=terminal.provider_receipts,
+        tool_receipts=terminal.tool_receipts,
+        memory_refs=terminal.memory_refs,
+        artifact_refs=terminal.artifact_refs,
+        usage=dict(terminal.usage),
+    )
+
+
 def _policy(request: EngineTextRequest) -> InstructionPolicy:
     digest = hashlib.sha256(
         request.instructions.encode("utf-8")
@@ -426,6 +468,43 @@ async def execute_engine_text(
         "backend-engine-text-turn",
         operation_id,
     )
+
+    # Recovery precedes context compilation. Product evidence/retrieval may
+    # change between attempts, but an already-admitted canonical execution is
+    # immutable truth for this idempotency identity.
+    try:
+        terminal = await active_client.terminal_result_if_available(
+            execution_id=execution_id,
+            actor_id=request.actor_id,
+            tenant_id=request.tenant_id,
+            trace_id="engine-text:" + operation_id,
+        )
+        if terminal is None:
+            terminal = await active_client.wait_for_terminal(
+                execution_id=execution_id,
+                actor_id=request.actor_id,
+                tenant_id=request.tenant_id,
+                trace_id="engine-text:" + operation_id,
+            )
+        binding = await active_client.handoff_binding(
+            execution_id,
+            actor_id=request.actor_id,
+            tenant_id=request.tenant_id,
+            trace_id="engine-text:" + operation_id,
+        )
+        return _terminal_response(
+            request=request,
+            terminal=terminal,
+            binding=binding,
+            operation_id=operation_id,
+            execution_id=execution_id,
+        )
+    except EngineNotFoundError:
+        pass
+    except EngineClientError as exc:
+        raise EngineTextError(
+            "canonical engine recovery failed"
+        ) from exc
     policy = _policy(request)
     output_reserve = min(
         131_072,
@@ -485,28 +564,23 @@ async def execute_engine_text(
         terminal: EngineTerminalResult = await active_client.execute(command)
     except EngineClientError as exc:
         raise EngineTextError("canonical engine text execution failed") from exc
-    if (
-        terminal.operation_id != operation_id
-        or terminal.execution_id != execution_id
-    ):
-        raise EngineTextError(
-            "canonical engine terminal identity diverged from compiled request"
+    try:
+        binding = await active_client.handoff_binding(
+            execution_id,
+            actor_id=request.actor_id,
+            tenant_id=request.tenant_id,
+            trace_id="engine-text:" + operation_id,
         )
-    return EngineTextResponse(
-        text=terminal.final_output,
-        operation_id=terminal.operation_id,
-        execution_id=terminal.execution_id,
-        context_id=envelope.context_id,
-        context_digest=envelope.context_digest,
-        context_source_snapshot=envelope.source_snapshot,
-        context_compiler_version=envelope.compiler_version,
-        verification=terminal.verification,
-        evidence_refs=terminal.evidence_refs,
-        provider_receipts=terminal.provider_receipts,
-        tool_receipts=terminal.tool_receipts,
-        memory_refs=terminal.memory_refs,
-        artifact_refs=terminal.artifact_refs,
-        usage=dict(terminal.usage),
+    except EngineClientError as exc:
+        raise EngineTextError(
+            "canonical engine handoff recovery failed"
+        ) from exc
+    return _terminal_response(
+        request=request,
+        terminal=terminal,
+        binding=binding,
+        operation_id=operation_id,
+        execution_id=execution_id,
     )
 
 
