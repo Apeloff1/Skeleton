@@ -53,6 +53,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Install focused model-foundation runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
       - name: Run provider-independent P3 model foundation
         run: python -m unittest -q skeleton.testing.test_p3_model_foundation
       - name: Revalidate P3 authority
