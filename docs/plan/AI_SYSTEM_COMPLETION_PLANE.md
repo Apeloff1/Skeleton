@@ -49,7 +49,7 @@ The canonical inventory is
 
 | Requirement | Required observation |
 | --- | --- |
-| `persistence.terminal_evidence_integrity` | Terminal result and outbox payload carry independent persisted digests, contract-valid tampering fails closed, and legacy stores backfill digests safely. |
+| `persistence.terminal_evidence_integrity` | Mutable execution state, turns, checkpoints, terminal results, and outbox payloads carry independent persisted digests; contract-valid tampering fails closed; legacy stores backfill safely; and a hash-chained execution-state journal proves mutation continuity. |
 | `verification.receipt_identity` | Identical verification-receipt replay is stable, conflicting identity replay is rejected, persisted receipt tampering is detected, and execution/result binding remains intact. |
 | `finalization.outbox_delivery` | Exactly one terminal event is pending, acknowledgement survives reopen, retry acknowledgement is stable, and no event remains pending after acknowledgement. |
 | `resource.unknown_usage_fence` | Unknown actual usage is recorded durably; completion and release are blocked until conservative usage resolution is supplied. |
@@ -179,6 +179,16 @@ all thirty-two proof types** from serialized evidence.
 This means a proof cannot survive by changing its details, setting
 `passed=true`, and recomputing every nested digest. A semantically
 contradictory but cryptographically self-consistent receipt still fails.
+
+Persistence uses the same principle internally. The authoritative execution
+repository integrity-binds the current state row, each turn, each checkpoint,
+terminal result, verification receipt, finalization intent, and outbox payload.
+In addition, every state mutation appends a hash-chained execution-state journal
+event containing the full post-mutation state snapshot and its parent digest.
+Journal verification checks both cryptographic continuity and mutation
+semantics for create, transition, cancellation, turn append, checkpoint, and
+finalization. Legacy databases receive an explicit `migration_snapshot` root
+rather than fabricated historical events.
 
 ## Exact-head CI
 
