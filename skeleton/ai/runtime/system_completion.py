@@ -82,6 +82,21 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+def completion_learning_experiment_id(
+    subject_id: str,
+    result_digest: str,
+) -> str:
+    """Return the only learning-experiment identity valid for this run result."""
+
+    subject = _text("subject_id", subject_id)
+    if not isinstance(result_digest, str) or _SHA256.fullmatch(result_digest) is None:
+        raise CompletionPlaneError("result_digest must be lowercase sha256")
+    binding = hashlib.sha256(
+        (subject + ":" + result_digest).encode("utf-8")
+    ).hexdigest()
+    return "system-completion-" + binding[:32]
+
+
 def _refs(values: Iterable[str], *, name: str = "evidence_refs") -> tuple[str, ...]:
     if isinstance(values, (str, bytes)):
         raise CompletionPlaneError(f"{name} must be an iterable of references")
@@ -325,8 +340,10 @@ class SystemCompletionPlane:
         result = run.result
         receipts = tuple(provider_receipts)
         passed = bool(
-            run.completed
+            run.execution_id == self.subject_id
+            and run.completed
             and result is not None
+            and result.execution_id == self.subject_id
             and result.status == "completed"
             and result.final_output
             and receipts
@@ -342,6 +359,12 @@ class SystemCompletionPlane:
             evidence_refs=refs,
             details={
                 "local_model_id": _text("local_model_id", local_model_id),
+                "execution_id": run.execution_id,
+                "subject_bound": (
+                    run.execution_id == self.subject_id
+                    and result is not None
+                    and result.execution_id == self.subject_id
+                ),
                 "state": run.state.value,
                 "provider_receipt_count": len(receipts),
             },
@@ -350,6 +373,7 @@ class SystemCompletionPlane:
     def prove_offline_isolation(
         self,
         *,
+        execution_id: str,
         network_attempt_count: int,
         provider_receipts: Sequence[str],
     ) -> RequirementProof:
@@ -361,9 +385,11 @@ class SystemCompletionPlane:
             raise CompletionPlaneError(
                 "network_attempt_count must be a non-negative integer"
             )
+        execution_id = _text("execution_id", execution_id)
         receipts = tuple(provider_receipts)
         passed = bool(
-            network_attempt_count == 0
+            execution_id == self.subject_id
+            and network_attempt_count == 0
             and receipts
             and all(ref.startswith("provider:local:") for ref in receipts)
         )
@@ -373,6 +399,8 @@ class SystemCompletionPlane:
             producer_id="functional-ai-runtime",
             evidence_refs=receipts,
             details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
                 "network_attempt_count": network_attempt_count,
                 "provider_receipt_count": len(receipts),
                 "all_provider_receipts_local": bool(receipts)
@@ -415,6 +443,7 @@ class SystemCompletionPlane:
     def prove_budget_bounds(
         self,
         *,
+        execution_id: str,
         max_model_turns: int,
         max_tool_calls: int,
         provider_receipts: Sequence[str],
@@ -426,10 +455,12 @@ class SystemCompletionPlane:
         ):
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise CompletionPlaneError(f"{name} must be a positive integer")
+        execution_id = _text("execution_id", execution_id)
         providers = tuple(provider_receipts)
         tools = tuple(tool_receipts)
         passed = bool(
-            providers
+            execution_id == self.subject_id
+            and providers
             and len(providers) <= max_model_turns
             and len(tools) <= max_tool_calls
         )
@@ -440,6 +471,8 @@ class SystemCompletionPlane:
             producer_id="cognitive-execution-runtime",
             evidence_refs=refs,
             details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
                 "max_model_turns": max_model_turns,
                 "observed_model_turns": len(providers),
                 "max_tool_calls": max_tool_calls,
@@ -503,15 +536,24 @@ class SystemCompletionPlane:
     def prove_tool_authority(
         self,
         *,
+        execution_id: str,
         allowed_tool_ids: Sequence[str],
         observed_tool_ids: Sequence[str],
         receipt_refs: Sequence[str],
     ) -> RequirementProof:
-        allowed = tuple(dict.fromkeys(_text("allowed_tool_id", item) for item in allowed_tool_ids))
-        observed = tuple(_text("observed_tool_id", item) for item in observed_tool_ids)
+        execution_id = _text("execution_id", execution_id)
+        allowed = tuple(
+            dict.fromkeys(
+                _text("allowed_tool_id", item) for item in allowed_tool_ids
+            )
+        )
+        observed = tuple(
+            _text("observed_tool_id", item) for item in observed_tool_ids
+        )
         receipts = tuple(_text("tool_receipt", item) for item in receipt_refs)
         passed = bool(
-            observed
+            execution_id == self.subject_id
+            and observed
             and len(observed) == len(receipts)
             and all(tool_id in allowed for tool_id in observed)
         )
@@ -521,6 +563,8 @@ class SystemCompletionPlane:
             producer_id="tool-runtime",
             evidence_refs=receipts,
             details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
                 "allowed_tool_ids": list(allowed),
                 "observed_tool_ids": list(observed),
                 "observed_call_count": len(observed),
@@ -536,7 +580,12 @@ class SystemCompletionPlane:
     ) -> RequirementProof:
         live_payload = live.as_dict()
         recovered_payload = None if recovered is None else recovered.as_dict()
-        passed = recovered_payload == live_payload
+        subject_bound = bool(
+            live.execution_id == self.subject_id
+            and recovered is not None
+            and recovered.execution_id == self.subject_id
+        )
+        passed = subject_bound and recovered_payload == live_payload
         refs = (
             "execution-result:" + live.execution_id,
             "recovery-digest:" + _digest(recovered_payload),
@@ -547,6 +596,11 @@ class SystemCompletionPlane:
             producer_id="execution-repository",
             evidence_refs=refs,
             details={
+                "subject_bound": subject_bound,
+                "live_execution_id": live.execution_id,
+                "recovered_execution_id": (
+                    None if recovered is None else recovered.execution_id
+                ),
                 "live_digest": _digest(live_payload),
                 "recovered_digest": _digest(recovered_payload),
                 "exact_match": passed,
@@ -613,11 +667,21 @@ class SystemCompletionPlane:
     def prove_reproducibility(
         self,
         *,
+        primary_execution_id: str,
+        replay_execution_id: str,
         primary_result_digest: str,
         replay_result_digest: str,
         primary_output_digest: str,
         replay_output_digest: str,
     ) -> RequirementProof:
+        primary_execution_id = _text(
+            "primary_execution_id",
+            primary_execution_id,
+        )
+        replay_execution_id = _text(
+            "replay_execution_id",
+            replay_execution_id,
+        )
         digests = {
             "primary_result_digest": primary_result_digest,
             "replay_result_digest": replay_result_digest,
@@ -627,11 +691,15 @@ class SystemCompletionPlane:
         for name, value in digests.items():
             if not isinstance(value, str) or _SHA256.fullmatch(value) is None:
                 raise CompletionPlaneError(f"{name} must be lowercase sha256")
+        subject_bound = (
+            primary_execution_id == self.subject_id
+            and replay_execution_id == self.subject_id
+        )
         result_equal = primary_result_digest == replay_result_digest
         output_equal = primary_output_digest == replay_output_digest
         return self._proof(
             CompletionRequirement.REPRODUCIBILITY,
-            passed=result_equal and output_equal,
+            passed=subject_bound and result_equal and output_equal,
             producer_id="functional-ai-runtime",
             evidence_refs=(
                 "run-result:" + primary_result_digest,
@@ -640,6 +708,9 @@ class SystemCompletionPlane:
                 "replay-output:" + replay_output_digest,
             ),
             details={
+                "primary_execution_id": primary_execution_id,
+                "replay_execution_id": replay_execution_id,
+                "subject_bound": subject_bound,
                 "result_equal": result_equal,
                 "output_equal": output_equal,
             },
@@ -648,16 +719,23 @@ class SystemCompletionPlane:
     def prove_governed_effects(
         self,
         *,
+        execution_id: str,
         tool_receipt_count: int,
         mutating_tool_count: int,
         verified_postcondition_count: int,
         receipt_refs: Iterable[str],
     ) -> RequirementProof:
-        counts = (tool_receipt_count, mutating_tool_count, verified_postcondition_count)
+        execution_id = _text("execution_id", execution_id)
+        counts = (
+            tool_receipt_count,
+            mutating_tool_count,
+            verified_postcondition_count,
+        )
         if any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in counts):
             raise CompletionPlaneError("tool effect counts must be non-negative integers")
         passed = (
-            mutating_tool_count <= tool_receipt_count
+            execution_id == self.subject_id
+            and mutating_tool_count <= tool_receipt_count
             and verified_postcondition_count == mutating_tool_count
         )
         return self._proof(
@@ -666,6 +744,8 @@ class SystemCompletionPlane:
             producer_id="tool-runtime",
             evidence_refs=receipt_refs,
             details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
                 "tool_receipt_count": tool_receipt_count,
                 "mutating_tool_count": mutating_tool_count,
                 "verified_postcondition_count": verified_postcondition_count,
@@ -680,7 +760,8 @@ class SystemCompletionPlane:
         receipt_mapping = dict(receipt) if isinstance(receipt, Mapping) else {}
         evidence = tuple(result.evidence_refs)
         passed = bool(
-            receipt_mapping.get("outcome") == "passed"
+            result.execution_id == self.subject_id
+            and receipt_mapping.get("outcome") == "passed"
             and receipt_mapping.get("policy_satisfied") is True
             and evidence
         )
@@ -692,6 +773,8 @@ class SystemCompletionPlane:
             producer_id="execution-verification-stage",
             evidence_refs=refs,
             details={
+                "execution_id": result.execution_id,
+                "subject_bound": result.execution_id == self.subject_id,
                 "outcome": receipt_mapping.get("outcome"),
                 "policy_satisfied": receipt_mapping.get("policy_satisfied"),
                 "evidence_count": len(evidence),
@@ -719,7 +802,8 @@ class SystemCompletionPlane:
         receipt_candidate_digest = receipt.get("candidate_digest")
         receipt_context_digest = receipt.get("context_digest")
         passed = bool(
-            candidate_digest
+            result.execution_id == self.subject_id
+            and candidate_digest
             and receipt_candidate_digest == candidate_digest
             and receipt_context_digest == context_digest
             and receipt.get("outcome") == "passed"
@@ -735,6 +819,8 @@ class SystemCompletionPlane:
                 "context:" + context_digest,
             ),
             details={
+                "execution_id": result.execution_id,
+                "subject_bound": result.execution_id == self.subject_id,
                 "candidate_digest": candidate_digest,
                 "receipt_candidate_digest": receipt_candidate_digest,
                 "context_digest": context_digest,
@@ -745,21 +831,32 @@ class SystemCompletionPlane:
     def prove_context_integrity(
         self,
         *,
+        context_subject_id: str,
         problems: Sequence[str],
         height: int,
         head_hash: str,
     ) -> RequirementProof:
+        context_subject_id = _text(
+            "context_subject_id",
+            context_subject_id,
+        )
         if isinstance(height, bool) or not isinstance(height, int) or height < 0:
             raise CompletionPlaneError("context ledger height is invalid")
         if not isinstance(head_hash, str) or _SHA256.fullmatch(head_hash) is None:
             raise CompletionPlaneError("context ledger head_hash must be sha256")
-        passed = height > 0 and not problems
+        passed = (
+            context_subject_id == self.subject_id
+            and height > 0
+            and not problems
+        )
         return self._proof(
             CompletionRequirement.CONTEXT_INTEGRITY,
             passed=passed,
             producer_id="context-ledger",
             evidence_refs=("context-ledger:" + head_hash,),
             details={
+                "context_subject_id": context_subject_id,
+                "subject_bound": context_subject_id == self.subject_id,
                 "height": height,
                 "problem_count": len(problems),
                 "problems": list(problems),
@@ -809,7 +906,8 @@ class SystemCompletionPlane:
         memory_refs = tuple(result.memory_refs)
         artifact_refs = tuple(result.artifact_refs)
         passed = bool(
-            result.status == "completed"
+            result.execution_id == self.subject_id
+            and result.status == "completed"
             and result.stream_terminal_event
             and memory_refs
             and artifact_refs
@@ -823,6 +921,8 @@ class SystemCompletionPlane:
             producer_id="execution-finalizer",
             evidence_refs=refs,
             details={
+                "execution_id": result.execution_id,
+                "subject_bound": result.execution_id == self.subject_id,
                 "memory_ref_count": len(memory_refs),
                 "artifact_ref_count": len(artifact_refs),
                 "stream_terminal_bound": result.stream_terminal_event is not None,
@@ -838,8 +938,13 @@ class SystemCompletionPlane:
         active_version: str,
         evaluation_digest: str,
         evaluator_id: str,
+        bound_result_digest: str,
     ) -> RequirementProof:
         evaluator_id = _text("evaluator_id", evaluator_id)
+        expected_experiment_id = completion_learning_experiment_id(
+            self.subject_id,
+            bound_result_digest,
+        )
         if not isinstance(evaluation_digest, str) or _SHA256.fullmatch(evaluation_digest) is None:
             raise CompletionPlaneError("evaluation_digest must be lowercase sha256")
         passed = bool(
@@ -848,6 +953,7 @@ class SystemCompletionPlane:
             and receipt.to_version == expected_candidate
             and active_version == expected_candidate
             and receipt.evaluation_digest == evaluation_digest
+            and receipt.experiment_id == expected_experiment_id
             and evaluator_id != "learning-promotion-pipeline"
         )
         return self._proof(
@@ -861,6 +967,9 @@ class SystemCompletionPlane:
                 "active_version": active_version,
                 "evaluation_digest": evaluation_digest,
                 "evaluator_id": evaluator_id,
+                "expected_experiment_id": expected_experiment_id,
+                "experiment_id": receipt.experiment_id,
+                "result_bound": receipt.experiment_id == expected_experiment_id,
                 "evaluation_bound": receipt.evaluation_digest == evaluation_digest,
                 "rollback": receipt.rollback,
             },
@@ -874,7 +983,12 @@ class SystemCompletionPlane:
         expected_candidate: str,
         active_version: str,
         promotion_receipt: PromotionReceipt,
+        bound_result_digest: str,
     ) -> RequirementProof:
+        expected_experiment_id = completion_learning_experiment_id(
+            self.subject_id,
+            bound_result_digest,
+        )
         passed = bool(
             receipt.rollback is True
             and receipt.from_version == expected_candidate
@@ -882,6 +996,8 @@ class SystemCompletionPlane:
             and active_version == expected_baseline
             and bool(receipt.reason)
             and promotion_receipt.rollback is False
+            and receipt.experiment_id == expected_experiment_id
+            and promotion_receipt.experiment_id == expected_experiment_id
             and receipt.evaluation_digest == promotion_receipt.evaluation_digest
         )
         return self._proof(
@@ -894,6 +1010,13 @@ class SystemCompletionPlane:
                 "to_version": receipt.to_version,
                 "active_version": active_version,
                 "reason": receipt.reason,
+                "expected_experiment_id": expected_experiment_id,
+                "promotion_experiment_id": promotion_receipt.experiment_id,
+                "rollback_experiment_id": receipt.experiment_id,
+                "result_bound": (
+                    receipt.experiment_id == expected_experiment_id
+                    and promotion_receipt.experiment_id == expected_experiment_id
+                ),
                 "promotion_evaluation_digest": promotion_receipt.evaluation_digest,
                 "rollback_evaluation_digest": receipt.evaluation_digest,
                 "evaluation_lineage_preserved": (
@@ -908,6 +1031,7 @@ __all__ = [
     "CompletionPlaneError",
     "CompletionRequirement",
     "REQUIRED_COMPLETION_REQUIREMENTS",
+    "completion_learning_experiment_id",
     "RequirementProof",
     "SystemCompletionPlane",
     "SystemCompletionReport",
