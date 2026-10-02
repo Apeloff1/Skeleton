@@ -1,0 +1,34 @@
+name: P3 Engineering Extension Authority
+on:
+  pull_request:
+    paths:
+      - "machine/ai_p3_engineering_execution_map.json"
+      - "machine/ai_p3_engineering_task_backlog.json"
+      - "scripts/check_p3_engineering_execution_map.py"
+      - "tests/test_p3_engineering_execution_map.py"
+      - ".github/workflows/p3-engineering-execution-map.yml"
+  push:
+    branches: [main, feat/p3-autonomous-engineering-frontier]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: p3-engineering-extension-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - run: python scripts/check_p3_engineering_execution_map.py --json
+      - run: python -m pytest -q tests/test_p3_engineering_execution_map.py
