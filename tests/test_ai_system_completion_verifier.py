@@ -52,6 +52,7 @@ def test_contract_declares_non_compensable_authority() -> None:
         "provider_privacy_fallback_qualification_required": True,
         "memory_poisoning_resistance_required": True,
         "outbound_network_boundary_qualification_required": True,
+        "qualification_semantic_reverification_required": True,
     }
 
 
