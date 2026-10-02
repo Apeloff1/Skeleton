@@ -177,3 +177,43 @@ async def test_api_startup_binds_canonical_artifact_store(
     ]
     assert calls[-1] == "recover"
     assert "memory" not in calls
+
+
+def test_server_health_exposes_engine_provider_identity_without_secrets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SKL_MONGO_URI", raising=False)
+    state = ServerState()
+
+    class _Registry:
+        active_id = "local"
+        available = True
+
+        def statuses(self):
+            return [
+                {
+                    "id": "local",
+                    "model": "local-test-model",
+                    "available": True,
+                    "network_policy": "none",
+                    "artifact": {
+                        "model_digest": "a" * 64,
+                        "artifact_sha256": "b" * 64,
+                        "reference": "local-model-artifact:" + ("b" * 64),
+                    },
+                }
+            ]
+
+    class _Coordinator:
+        provider_registry = _Registry()
+
+    state.engine_execution_coordinator = _Coordinator()
+    health = state.is_healthy()
+
+    assert health["checks"]["engine_provider"]["active"] == "local"
+    assert health["checks"]["engine_provider"]["available"] is True
+    provider = health["checks"]["engine_provider"]["statuses"][0]
+    assert provider["network_policy"] == "none"
+    assert provider["artifact"]["model_digest"] == "a" * 64
+    assert "key" not in str(provider).lower()
