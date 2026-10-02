@@ -18,7 +18,7 @@ import json
 import re
 from typing import Iterable, Mapping, Sequence
 
-from skeleton.contracts.ai_execution import AIExecutionResult
+from skeleton.contracts.ai_execution import AIExecutionResult, AgentTurn
 from skeleton.intelligence.execution_runtime import ExecutionRunResult
 from skeleton.ai.learning.promotion import PromotionReceipt
 
@@ -33,7 +33,10 @@ class CompletionPlaneError(ValueError):
 
 class CompletionRequirement(str, Enum):
     LOCAL_EXECUTION = "execution.local_model"
+    OFFLINE_ISOLATION = "execution.offline_isolation"
+    BUDGET_BOUNDS = "execution.budget_bounds"
     DURABLE_RECOVERY = "execution.durable_recovery"
+    REPLAY_LINEAGE = "execution.replay_lineage"
     GOVERNED_EFFECTS = "execution.governed_effects"
     INDEPENDENT_VERIFICATION = "verification.independent"
     CONTEXT_INTEGRITY = "context.integrity"
@@ -323,6 +326,74 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_offline_isolation(
+        self,
+        *,
+        network_attempt_count: int,
+        provider_receipts: Sequence[str],
+    ) -> RequirementProof:
+        if (
+            isinstance(network_attempt_count, bool)
+            or not isinstance(network_attempt_count, int)
+            or network_attempt_count < 0
+        ):
+            raise CompletionPlaneError(
+                "network_attempt_count must be a non-negative integer"
+            )
+        receipts = tuple(provider_receipts)
+        passed = bool(
+            network_attempt_count == 0
+            and receipts
+            and all(ref.startswith("provider:local:") for ref in receipts)
+        )
+        return self._proof(
+            CompletionRequirement.OFFLINE_ISOLATION,
+            passed=passed,
+            producer_id="functional-ai-runtime",
+            evidence_refs=receipts,
+            details={
+                "network_attempt_count": network_attempt_count,
+                "provider_receipt_count": len(receipts),
+                "all_provider_receipts_local": bool(receipts)
+                and all(ref.startswith("provider:local:") for ref in receipts),
+            },
+        )
+
+    def prove_budget_bounds(
+        self,
+        *,
+        max_model_turns: int,
+        max_tool_calls: int,
+        provider_receipts: Sequence[str],
+        tool_receipts: Sequence[str],
+    ) -> RequirementProof:
+        for name, value in (
+            ("max_model_turns", max_model_turns),
+            ("max_tool_calls", max_tool_calls),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise CompletionPlaneError(f"{name} must be a positive integer")
+        providers = tuple(provider_receipts)
+        tools = tuple(tool_receipts)
+        passed = bool(
+            providers
+            and len(providers) <= max_model_turns
+            and len(tools) <= max_tool_calls
+        )
+        refs = list(providers) + list(tools)
+        return self._proof(
+            CompletionRequirement.BUDGET_BOUNDS,
+            passed=passed,
+            producer_id="cognitive-execution-runtime",
+            evidence_refs=refs,
+            details={
+                "max_model_turns": max_model_turns,
+                "observed_model_turns": len(providers),
+                "max_tool_calls": max_tool_calls,
+                "observed_tool_calls": len(tools),
+            },
+        )
+
     def prove_durable_recovery(
         self,
         live: AIExecutionResult,
@@ -344,6 +415,63 @@ class SystemCompletionPlane:
                 "live_digest": _digest(live_payload),
                 "recovered_digest": _digest(recovered_payload),
                 "exact_match": passed,
+            },
+        )
+
+    def prove_replay_lineage(
+        self,
+        turns: Sequence[AgentTurn],
+    ) -> RequirementProof:
+        sequence = tuple(turns)
+        contiguous = all(
+            turn.turn_index == index for index, turn in enumerate(sequence)
+        )
+        subject_bound = bool(sequence) and all(
+            turn.execution_id == self.subject_id for turn in sequence
+        )
+        operation_bound = bool(sequence) and len(
+            {turn.operation_id for turn in sequence}
+        ) == 1
+        unique_turn_ids = len({turn.turn_id for turn in sequence}) == len(sequence)
+        parent_linked = bool(sequence)
+        for index, turn in enumerate(sequence):
+            if index == 0:
+                parent_linked = parent_linked and turn.parent_turn_id is None
+            else:
+                parent_linked = (
+                    parent_linked
+                    and turn.parent_turn_id == sequence[index - 1].turn_id
+                )
+        checkpoints_bound = bool(sequence) and all(
+            bool(turn.checkpoint_ref) for turn in sequence
+        )
+        passed = bool(
+            sequence
+            and contiguous
+            and subject_bound
+            and operation_bound
+            and unique_turn_ids
+            and parent_linked
+            and checkpoints_bound
+        )
+        refs = [
+            "turn:" + turn.turn_id for turn in sequence
+        ] + [
+            turn.checkpoint_ref for turn in sequence if turn.checkpoint_ref
+        ]
+        return self._proof(
+            CompletionRequirement.REPLAY_LINEAGE,
+            passed=passed,
+            producer_id="execution-repository",
+            evidence_refs=refs,
+            details={
+                "turn_count": len(sequence),
+                "contiguous": contiguous,
+                "subject_bound": subject_bound,
+                "operation_bound": operation_bound,
+                "unique_turn_ids": unique_turn_ids,
+                "parent_linked": parent_linked,
+                "checkpoints_bound": checkpoints_bound,
             },
         )
 
