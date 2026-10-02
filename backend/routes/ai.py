@@ -536,6 +536,22 @@ def _chat_turn_messages(
     return user_message, assistant_message
 
 
+def _chat_terminal_marker(transcript, user_message_id: str):
+    return next(
+        (
+            message
+            for message in reversed(transcript)
+            if message.author_type is ConversationAuthorType.SYSTEM_DERIVED
+            and message.parent_message_id == user_message_id
+            and any(
+                ref.startswith("chat-terminal:")
+                for ref in message.artifact_refs
+            )
+        ),
+        None,
+    )
+
+
 async def _commit_chat_terminal_marker(
     *,
     thread,
@@ -1328,6 +1344,7 @@ async def ai_chat(
                 artifact_refs=tuple(
                     result.get("engine_artifact_refs") or ()
                 ),
+                data_class=thread.data_class,
             )
         )
     except Exception as exc:
@@ -1363,6 +1380,480 @@ async def ai_chat(
         "context": context_envelope.binding_dict(),
         "timestamp": _utcnow(),
     }
+
+
+@router.get("/chat/turns/{thread_id}/{idempotency_key}")
+async def get_ai_chat_turn(
+    thread_id: str,
+    idempotency_key: str,
+    user=Depends(require_role("viewer")),
+) -> Dict[str, Any]:
+    """Probe/finalize one canonical chat turn without resending prompt context."""
+
+    tenant_id, owner_id = _chat_identity(user)
+    try:
+        thread = await conversation_authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        transcript = await conversation_authority.active_transcript(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
+    user_message, assistant_message = _chat_turn_messages(
+        transcript,
+        idempotency_key,
+    )
+    if user_message is None:
+        raise HTTPException(status_code=404, detail="Chat turn not found")
+
+    operation_id, execution_id = _chat_turn_ids(
+        thread.thread_id,
+        user_message.message_id,
+    )
+    if assistant_message is not None:
+        return {
+            "success": True,
+            "accepted": True,
+            "terminal": True,
+            "state": "completed",
+            "response": assistant_message.content,
+            "ai_generated": True,
+            "provider": "replayed",
+            "model": _active_model(),
+            "replayed": True,
+            "operation_id": operation_id,
+            "engine_execution_id": execution_id,
+            "ai_result_id": assistant_message.ai_result_id,
+            "engine_provider_receipts": list(
+                assistant_message.provider_receipt_refs
+            ),
+            "engine_runtime_provider": _engine_runtime_provider(
+                assistant_message.provider_receipt_refs
+            ),
+            "engine_tool_receipts": list(
+                assistant_message.tool_receipt_refs
+            ),
+            "engine_memory_refs": list(
+                assistant_message.memory_refs
+            ),
+            "engine_evidence_refs": list(
+                assistant_message.citation_refs
+            ),
+            "engine_artifact_refs": list(
+                assistant_message.artifact_refs
+            ),
+            "thread": thread.as_dict(),
+            "user_message": user_message.as_dict(),
+            "assistant_message": assistant_message.as_dict(),
+            "timestamp": _utcnow(),
+        }
+
+    terminal_marker = _chat_terminal_marker(
+        transcript,
+        user_message.message_id,
+    )
+    if terminal_marker is not None:
+        state = next(
+            (
+                ref.removeprefix("chat-terminal:")
+                for ref in terminal_marker.artifact_refs
+                if ref.startswith("chat-terminal:")
+            ),
+            "failed",
+        )
+        return {
+            "success": False,
+            "accepted": True,
+            "terminal": True,
+            "state": state,
+            "response": None,
+            "ai_generated": False,
+            "provider": "skeleton-engine",
+            "model": "engine-routed",
+            "replayed": True,
+            "operation_id": operation_id,
+            "engine_execution_id": execution_id,
+            "thread": thread.as_dict(),
+            "user_message": user_message.as_dict(),
+            "terminal_message": terminal_marker.as_dict(),
+            "timestamp": _utcnow(),
+        }
+
+    try:
+        engine_client = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine configuration is unavailable",
+        ) from exc
+    if engine_client is None:
+        raise HTTPException(status_code=503, detail="AI engine is unavailable")
+
+    trace_id = "chat:" + operation_id
+    try:
+        engine_status = await engine_client.status(
+            execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+        )
+        execution_state = str(
+            engine_status.get("execution_state") or "unknown"
+        )
+        if execution_state not in {"completed", "failed", "cancelled"}:
+            return {
+                "success": True,
+                "accepted": True,
+                "terminal": False,
+                "state": execution_state,
+                "cancellation_requested": bool(
+                    engine_status.get("cancellation_requested")
+                ),
+                "response": None,
+                "ai_generated": False,
+                "provider": "skeleton-engine",
+                "model": "engine-routed",
+                "replayed": False,
+                "operation_id": operation_id,
+                "engine_execution_id": execution_id,
+                "thread": thread.as_dict(),
+                "user_message": user_message.as_dict(),
+                "timestamp": _utcnow(),
+            }
+
+        engine_result = await engine_client.terminal_result_if_available(
+            execution_id=execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+        )
+        if engine_result is None:
+            raise EngineClientError(
+                "terminal status has no canonical terminal result"
+            )
+        binding = await engine_client.handoff_binding(
+            execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+        )
+    except EngineExecutionFailed as exc:
+        try:
+            latest_thread = await conversation_authority.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            transcript = await conversation_authority.active_transcript(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            existing_marker = _chat_terminal_marker(
+                transcript,
+                user_message.message_id,
+            )
+            if existing_marker is None:
+                latest_thread, existing_marker = (
+                    await _commit_chat_terminal_marker(
+                        thread=latest_thread,
+                        user_message=user_message,
+                        tenant_id=tenant_id,
+                        owner_id=owner_id,
+                        operation_id=operation_id,
+                        execution_id=execution_id,
+                        terminal_state=(
+                            "cancelled"
+                            if exc.status == "cancelled"
+                            else "failed"
+                        ),
+                        failure_code=exc.failure_code,
+                    )
+                )
+            return {
+                "success": False,
+                "accepted": True,
+                "terminal": True,
+                "state": (
+                    "cancelled"
+                    if exc.status == "cancelled"
+                    else "failed"
+                ),
+                "failure_code": exc.failure_code,
+                "response": None,
+                "ai_generated": False,
+                "provider": "skeleton-engine",
+                "model": "engine-routed",
+                "replayed": False,
+                "operation_id": operation_id,
+                "engine_execution_id": execution_id,
+                "thread": latest_thread.as_dict(),
+                "user_message": user_message.as_dict(),
+                "terminal_message": existing_marker.as_dict(),
+                "timestamp": _utcnow(),
+            }
+        except ConversationConflict:
+            # Another request may have finalized this turn concurrently.
+            return await get_ai_chat_turn(
+                thread_id,
+                idempotency_key,
+                user=user,
+            )
+    except EngineNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Chat execution not found") from exc
+    except EngineUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="AI engine is unavailable") from exc
+    except EngineClientError as exc:
+        raise HTTPException(status_code=502, detail="AI engine protocol failure") from exc
+
+    if (
+        binding.operation_id != operation_id
+        or binding.execution_id != execution_id
+        or binding.turn_id != user_message.message_id
+        or binding.idempotency_key != user_message.idempotency_key
+        or binding.capability != "assistant.chat"
+        or binding.purpose != "model-inference"
+    ):
+        raise HTTPException(
+            status_code=502,
+            detail="AI engine handoff identity mismatch",
+        )
+
+    ai_result_id = "engine-result:" + execution_id
+    assistant_key = idempotency_key + ":assistant"
+    try:
+        latest_thread = await conversation_authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        committed_thread, assistant_message = (
+            await conversation_authority.commit_assistant_message(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                content=engine_result.final_output,
+                idempotency_key=assistant_key,
+                expected_thread_version=latest_thread.version,
+                causal_user_message_id=user_message.message_id,
+                operation_id=operation_id,
+                ai_result_id=ai_result_id,
+                context_id=binding.context_id,
+                context_digest=binding.context_digest,
+                context_source_snapshot=binding.source_snapshot,
+                context_compiler_version=binding.compiler_version,
+                tool_receipt_refs=engine_result.tool_receipts,
+                provider_receipt_refs=engine_result.provider_receipts,
+                memory_refs=engine_result.memory_refs,
+                citation_refs=engine_result.evidence_refs,
+                artifact_refs=engine_result.artifact_refs,
+                data_class=latest_thread.data_class,
+            )
+        )
+    except ConversationConflict:
+        transcript = await conversation_authority.active_transcript(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        _user, concurrent_assistant = _chat_turn_messages(
+            transcript,
+            idempotency_key,
+        )
+        if concurrent_assistant is None:
+            raise
+        committed_thread = await conversation_authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        assistant_message = concurrent_assistant
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
+    return {
+        "success": True,
+        "accepted": True,
+        "terminal": True,
+        "state": "completed",
+        "response": engine_result.final_output,
+        "ai_generated": True,
+        "provider": "skeleton-engine",
+        "model": "engine-routed",
+        "replayed": False,
+        "operation_id": operation_id,
+        "engine_execution_id": execution_id,
+        "ai_result_id": ai_result_id,
+        "engine_verification": engine_result.verification,
+        "engine_evidence_refs": list(engine_result.evidence_refs),
+        "engine_provider_receipts": list(engine_result.provider_receipts),
+        "engine_runtime_provider": _engine_runtime_provider(
+            engine_result.provider_receipts
+        ),
+        "engine_tool_receipts": list(engine_result.tool_receipts),
+        "engine_memory_refs": list(engine_result.memory_refs),
+        "engine_artifact_refs": list(engine_result.artifact_refs),
+        "thread": committed_thread.as_dict(),
+        "user_message": user_message.as_dict(),
+        "assistant_message": assistant_message.as_dict(),
+        "context": {
+            "context_id": binding.context_id,
+            "context_digest": binding.context_digest,
+            "source_snapshot": [
+                list(item) for item in binding.source_snapshot
+            ],
+            "compiler_version": binding.compiler_version,
+            "handoff_digest": binding.handoff_digest,
+        },
+        "timestamp": _utcnow(),
+    }
+
+
+@router.post("/chat/turns/{thread_id}/{idempotency_key}/cancel")
+async def cancel_ai_chat_turn(
+    thread_id: str,
+    idempotency_key: str,
+    request: AIChatCancelRequest,
+    user=Depends(require_role("viewer")),
+) -> Dict[str, Any]:
+    """Request durable cancellation of an in-flight canonical chat turn."""
+
+    tenant_id, owner_id = _chat_identity(user)
+    try:
+        thread = await conversation_authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        transcript = await conversation_authority.active_transcript(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+
+    user_message, assistant_message = _chat_turn_messages(
+        transcript,
+        idempotency_key,
+    )
+    if user_message is None:
+        raise HTTPException(status_code=404, detail="Chat turn not found")
+    operation_id, execution_id = _chat_turn_ids(
+        thread.thread_id,
+        user_message.message_id,
+    )
+    if assistant_message is not None:
+        return {
+            "success": True,
+            "changed": False,
+            "terminal": True,
+            "state": "completed",
+            "operation_id": operation_id,
+            "engine_execution_id": execution_id,
+        }
+
+    marker = _chat_terminal_marker(transcript, user_message.message_id)
+    if marker is not None:
+        terminal_state = next(
+            (
+                ref.removeprefix("chat-terminal:")
+                for ref in marker.artifact_refs
+                if ref.startswith("chat-terminal:")
+            ),
+            "failed",
+        )
+        return {
+            "success": True,
+            "changed": False,
+            "terminal": True,
+            "state": terminal_state,
+            "operation_id": operation_id,
+            "engine_execution_id": execution_id,
+        }
+
+    try:
+        engine_client = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine configuration is unavailable",
+        ) from exc
+    if engine_client is None:
+        raise HTTPException(status_code=503, detail="AI engine is unavailable")
+
+    try:
+        status_payload = await engine_client.cancel(
+            execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            reason=request.reason,
+            trace_id="chat:" + operation_id,
+        )
+    except EngineNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Chat execution not found") from exc
+    except EngineUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="AI engine is unavailable") from exc
+    except EngineClientError as exc:
+        raise HTTPException(status_code=502, detail="AI engine protocol failure") from exc
+
+    state = str(status_payload.get("execution_state") or "unknown")
+    if state in {"failed", "cancelled"}:
+        try:
+            latest_thread = await conversation_authority.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            latest_transcript = await conversation_authority.active_transcript(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            if _chat_terminal_marker(
+                latest_transcript,
+                user_message.message_id,
+            ) is None:
+                await _commit_chat_terminal_marker(
+                    thread=latest_thread,
+                    user_message=user_message,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    terminal_state=(
+                        "cancelled"
+                        if state == "cancelled"
+                        else "failed"
+                    ),
+                    failure_code=(
+                        None
+                        if status_payload.get("failure_code") is None
+                        else str(status_payload["failure_code"])
+                    ),
+                )
+        except ConversationConflict:
+            pass
+
+    return {
+        "success": True,
+        "changed": bool(status_payload.get("cancellation_requested")),
+        "terminal": state in {"completed", "failed", "cancelled"},
+        "state": state,
+        "cancellation_requested": bool(
+            status_payload.get("cancellation_requested")
+        ),
+        "operation_id": operation_id,
+        "engine_execution_id": execution_id,
+        "timestamp": _utcnow(),
+    }
+
 
 
 @router.get("/providers")
