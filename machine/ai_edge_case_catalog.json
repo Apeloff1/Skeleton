@@ -4771,12 +4771,18 @@
       "requirements": [
         "Mandatory trusted policy/control segments are admitted before optional evidence and cannot be displaced by higher-priority untrusted context.",
         "Trusted control segments are not eligible for compaction that could alter or weaken policy semantics.",
-        "Compilation fails closed before provider I/O when required control text cannot fit the available context capacity."
+        "Compilation fails closed before provider I/O when required control text cannot fit the available context capacity.",
+        "Constraint-bearing policy turns are treated as required during context compaction.",
+        "Compaction fails closed when required policy turns exceed the available token budget rather than silently trimming policy.",
+        "Preserved-policy reporting is derived from exact retained text, not an inferred flag."
       ],
       "tests": [
         "skeleton/testing/test_context_compiler.py::test_mandatory_policy_cannot_be_displaced_by_high_priority_evidence",
         "skeleton/testing/test_context_compiler.py::test_mandatory_policy_fails_before_provider_when_it_cannot_fit",
-        "skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control"
+        "skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control",
+        "skeleton/testing/test_guarded_compaction.py::test_required_policy_turn_survives_heavy_context_compaction",
+        "skeleton/testing/test_guarded_compaction.py::test_policy_compaction_fails_if_required_turn_cannot_fit_budget",
+        "skeleton/testing/test_guarded_compaction.py::test_buried_constraint_yields_restate_hint"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -4785,7 +4791,10 @@
         "code:skeleton/context/compiler.py",
         "code:skeleton/context/compaction.py",
         "test:skeleton/testing/test_context_compiler.py",
-        "workflow:P0 Policy Context Retention"
+        "workflow:P0 Policy Context Retention",
+        "code:skeleton/memory/guarded_compaction.py",
+        "test:skeleton/testing/test_guarded_compaction.py",
+        "workflow:P0 Policy Retention Under Context Pressure"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
