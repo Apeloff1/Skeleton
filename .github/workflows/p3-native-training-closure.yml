@@ -1,0 +1,60 @@
+name: P3 Native Training Closure
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_p3_native_training_closure.json"
+      - "machine/ai_p3_native_training_execution_map.json"
+      - "machine/ai_p3_native_training_task_backlog.json"
+      - "scripts/check_p3_native_training_closure.py"
+      - "tests/test_p3_native_training_closure.py"
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/testing/test_p3_native_training_acceptance.py"
+      - ".github/workflows/p3-native-training-closure.yml"
+  push:
+    branches:
+      - main
+      - feat/p3-native-training-frontier
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-native-training-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  closure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - run: python scripts/check_p3_native_training_execution_map.py --json
+      - run: python scripts/check_p3_native_training_closure.py --json
+      - run: >-
+          python -m pytest -q
+          tests/test_p3_native_training_execution_map.py
+          tests/test_p3_native_training_closure.py
+          skeleton/testing/test_training_data_foundation.py
+          skeleton/testing/test_native_training_runtime.py
+          skeleton/testing/test_post_training_lifecycle.py
+          skeleton/testing/test_p3_native_training_acceptance.py
