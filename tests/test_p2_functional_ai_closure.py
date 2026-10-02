@@ -18,6 +18,8 @@ def test_current_functional_ai_frontier_is_closed_and_structurally_valid() -> No
     assert result["scheduled_volume_count"] == 57
     assert result["queued_volume_count"] == 257
     assert result["provider_independent"] is True
+    assert result["production_local_weights_runtime"] is True
+    assert result["exact_head_receipt_policy"] is True
 
 
 def test_closed_mode_accepts_closed_frontier() -> None:

@@ -74,6 +74,7 @@ class VectorEntry:
     chunk: Chunk
     vector: List[float]
     norm: float
+    source_id: str
 
 
 class VectorStore:
@@ -127,16 +128,45 @@ class VectorStore:
             "prepared_invalidations": 0,
         }
 
-    def add(self, chunk: Chunk) -> None:
+    @staticmethod
+    def _retention_source_id(chunk: Chunk, explicit_source_id: str | None) -> str:
+        source_id = explicit_source_id
+        if source_id is None:
+            raw = chunk.metadata.get("source_id")
+            source_id = raw if isinstance(raw, str) and raw else chunk.chunk_id
+        if not isinstance(source_id, str) or not source_id:
+            raise ValueError("source_id must be a non-empty string")
+        return source_id
+
+    def add(self, chunk: Chunk, *, source_id: str | None = None) -> None:
         vector = self._embedder_fn(chunk.text)
         norm = _unit_norm(vector)
-        self._entries[chunk.chunk_id] = VectorEntry(chunk=chunk, vector=vector, norm=norm)
+        retention_source_id = self._retention_source_id(chunk, source_id)
+        self._entries[chunk.chunk_id] = VectorEntry(
+            chunk=chunk,
+            vector=vector,
+            norm=norm,
+            source_id=retention_source_id,
+        )
         self._stats["added"] += 1
         self._invalidate_asm_prepared_cache()
 
-    def add_texts(self, texts: List[str], metadata: Optional[Dict[str, Any]] = None) -> int:
+    def add_texts(
+        self,
+        texts: List[str],
+        metadata: Optional[Dict[str, Any]] = None,
+        *,
+        source_id: str | None = None,
+    ) -> int:
         for i, text in enumerate(texts):
-            self.add(Chunk(text=text, chunk_id=f"vec-{len(self._entries)}-{i}", metadata=dict(metadata or {})))
+            self.add(
+                Chunk(
+                    text=text,
+                    chunk_id=f"vec-{len(self._entries)}-{i}",
+                    metadata=dict(metadata or {}),
+                ),
+                source_id=source_id,
+            )
         return len(texts)
 
     def query(self, text: str, top_k: int = 5, metadata_filter: Optional[Dict[str, Any]] = None) -> List[ScoredChunk]:
@@ -599,6 +629,21 @@ class VectorStore:
         if removed:
             self._invalidate_asm_prepared_cache()
         return removed
+
+    def purge_source(self, source_id: str) -> int:
+        """Delete every derived vector entry bound to one source object."""
+        if not isinstance(source_id, str) or not source_id:
+            raise ValueError("source_id must be a non-empty string")
+        doomed = [
+            chunk_id
+            for chunk_id, entry in self._entries.items()
+            if entry.source_id == source_id
+        ]
+        for chunk_id in doomed:
+            self._entries.pop(chunk_id, None)
+        if doomed:
+            self._invalidate_asm_prepared_cache()
+        return len(doomed)
 
     @staticmethod
     def _matches(metadata: Dict[str, Any], filt: Dict[str, Any]) -> bool:

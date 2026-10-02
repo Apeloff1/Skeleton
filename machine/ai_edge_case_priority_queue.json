@@ -78,9 +78,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "proven_fail_closed_compaction_trust_geometry_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compaction.py",
+        "code:skeleton/contracts/context.py",
+        "workflow:P0 Compaction Trust Geometry"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-018",
       "completion_checkbox": false,
@@ -109,9 +113,14 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-010",
       "completion_checkbox": false,
@@ -139,9 +148,14 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-009",
       "completion_checkbox": false,
@@ -170,9 +184,16 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_backup_erasure_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/reliability/backup_restore.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/reliability/backup_restore.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-010",
       "completion_checkbox": false,
@@ -318,9 +339,17 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_policy_retention_and_context_pressure_proof_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Policy Context Retention",
+        "code:skeleton/memory/guarded_compaction.py",
+        "test:skeleton/testing/test_guarded_compaction.py",
+        "workflow:P0 Policy Retention Under Context Pressure"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-013",
       "completion_checkbox": false,
@@ -376,9 +405,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_strict_json_parser_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/jeeves/planning/serialization.py",
+        "test:tests/test_duplicate_key_is_not_json.py",
+        "workflow:P0 Duplicate JSON Key Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-001",
       "completion_checkbox": false,
@@ -537,9 +570,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_curated_discovery_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-024",
       "completion_checkbox": false,
@@ -565,9 +604,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_privacy_bounded_fallback_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/model_port.py",
+        "code:skeleton/shells/ai/provider_router.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Provider Fallback Privacy"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-021",
       "completion_checkbox": false,
@@ -590,9 +634,16 @@
       "recommended_test_modes": [
         "regression"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_source_propagated_vector_erasure_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/memory/projection.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/memory/projection.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-009",
       "completion_checkbox": false,
@@ -616,9 +667,14 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_atomic_single_use_approval_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/approval.py",
+        "mirror:skeleton/ai/shell/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Approval TOCTOU Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-001",
       "completion_checkbox": false,
@@ -642,9 +698,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-011",
       "completion_checkbox": false,
@@ -668,9 +728,18 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_credential_aware_and_secret_safe_observability_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/observation_policy.py",
+        "code:skeleton/sandbox/sanitizers.py",
+        "workflow:P0 Observation Secret Redaction",
+        "code:skeleton/observability/redaction.py",
+        "mirror:skeleton/ai/runtime/observability/redaction.py",
+        "test:tests/test_observability.py",
+        "test:skeleton/testing/test_frontier_observability_correlation.py",
+        "workflow:P0 Secret Observability Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-015",
       "completion_checkbox": false,
@@ -694,9 +763,18 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-016",
       "completion_checkbox": false,
@@ -721,9 +799,15 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_process_boundary_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-018",
       "completion_checkbox": false,
@@ -780,9 +864,18 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_curated_and_principal_scoped_capability_discovery_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell",
+        "workflow:P0 Capability Discovery Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-025",
       "completion_checkbox": false,
@@ -807,9 +900,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_governed_memory_writeback_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/policy.py",
+        "code:skeleton/memory/writeback.py",
+        "workflow:P0 Memory Poisoning Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-003",
       "completion_checkbox": false,
@@ -889,9 +986,14 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_decoded_path_structural_guard_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/decoded_path.py",
+        "code:skeleton/sandbox/fs.py",
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "workflow:P0 Decoded Path Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-004",
       "completion_checkbox": false,
@@ -914,9 +1016,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-012",
       "completion_checkbox": false,
@@ -939,9 +1045,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-013",
       "completion_checkbox": false,
@@ -964,9 +1074,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-014",
       "completion_checkbox": false,
@@ -1017,9 +1131,18 @@
         "fault_injection",
         "property"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-019",
       "completion_checkbox": false,

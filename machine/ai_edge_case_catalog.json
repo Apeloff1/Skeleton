@@ -2560,12 +2560,21 @@
         198
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Security-sensitive JSON parsing rejects repeated object keys instead of accepting parser-dependent first/last-key semantics.",
+        "The same serialization boundary rejects non-JSON tuples and non-finite numbers."
+      ],
+      "tests": [
+        "tests/test_duplicate_key_is_not_json.py::test_a_duplicate_key_is_refused"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/jeeves/planning/serialization.py",
+        "test:tests/test_duplicate_key_is_not_json.py",
+        "workflow:P0 Duplicate JSON Key Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -2836,12 +2845,34 @@
         198
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Authority-bearing identifiers reject Unicode bidirectional controls and format controls before authorization lookup.",
+        "Bidi-bearing untrusted text is stripped by the sandbox sanitizer before model or display reuse.",
+        "Security-sensitive routing and authority identifiers reject Unicode bidirectional controls before comparison or dispatch.",
+        "Protocol and approval identities cannot contain invisible Unicode formatting characters."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity",
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_sanitize_text_strips_controls_bidi_invisibles_and_ansi",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_request_rejects_unicode_spoofing_in_routing_identity",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_rejects_ambiguous_unicode_authority_identity"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell/mcp_authz.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "test:skeleton/testing/test_sandbox_sanitize_inject.py",
+        "workflow:P0 Unicode Authority Identity",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Unicode Identity Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -2874,12 +2905,36 @@
         298
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Authority-bearing identifiers reject zero-width/invisible characters and NFKC compatibility aliases.",
+        "Mixed Latin, Greek, and Cyrillic authority identifiers fail closed to prevent common homoglyph confusion.",
+        "Canonical single-script Unicode identities remain usable.",
+        "Authority-bearing identifiers use ASCII identity to eliminate Unicode lookalike/confusable collisions.",
+        "Security labels reject non-NFKC and invisible/control character spellings before registration or approval."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_tool_names",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_allows_canonical_single_script_identity",
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_hidden_character_audit_and_tag_decoding",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_principal_rejects_confusable_unicode_identity",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_rejects_ambiguous_unicode_authority_identity"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell/mcp_authz.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "test:skeleton/testing/test_sandbox_sanitize_inject.py",
+        "workflow:P0 Unicode Authority Identity",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Unicode Identity Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -4374,12 +4429,28 @@
         362
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Durable memory writes require provenance by default and a source operation identity before persistence.",
+        "Memory proposals are staged without side effects; policy-denied proposals cannot mutate the canonical repository.",
+        "Restricted memory requires explicit review and governance-registration failure tombstones the write fail-closed."
+      ],
+      "tests": [
+        "skeleton/testing/test_memory_writeback.py::test_policy_denies_missing_provenance",
+        "skeleton/testing/test_memory_writeback.py::test_stage_is_side_effect_free_until_commit",
+        "skeleton/testing/test_memory_writeback.py::test_denied_proposal_never_mutates_repository",
+        "skeleton/testing/test_memory_writeback.py::test_review_hold_requires_explicit_approval",
+        "skeleton/testing/test_memory_writeback.py::test_governance_persistence_failure_tombstones_memory_fail_closed"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/memory_record.py",
+        "code:skeleton/memory/policy.py",
+        "code:skeleton/memory/writeback.py",
+        "test:skeleton/testing/test_memory_writeback.py",
+        "workflow:P0 Memory Poisoning Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4713,12 +4784,34 @@
         118
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Mandatory trusted policy/control segments are admitted before optional evidence and cannot be displaced by higher-priority untrusted context.",
+        "Trusted control segments are not eligible for compaction that could alter or weaken policy semantics.",
+        "Compilation fails closed before provider I/O when required control text cannot fit the available context capacity.",
+        "Constraint-bearing policy turns are treated as required during context compaction.",
+        "Compaction fails closed when required policy turns exceed the available token budget rather than silently trimming policy.",
+        "Preserved-policy reporting is derived from exact retained text, not an inferred flag."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_cannot_be_displaced_by_high_priority_evidence",
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_fails_before_provider_when_it_cannot_fit",
+        "skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control",
+        "skeleton/testing/test_guarded_compaction.py::test_required_policy_turn_survives_heavy_context_compaction",
+        "skeleton/testing/test_guarded_compaction.py::test_policy_compaction_fails_if_required_turn_cannot_fit_budget",
+        "skeleton/testing/test_guarded_compaction.py::test_buried_constraint_yields_restate_hint"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Policy Context Retention",
+        "code:skeleton/memory/guarded_compaction.py",
+        "test:skeleton/testing/test_guarded_compaction.py",
+        "workflow:P0 Policy Retention Under Context Pressure"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4997,12 +5090,25 @@
         228
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model/provider capabilities declare an explicit data privacy boundary.",
+        "Fallback routing accepts a maximum privacy boundary and excludes providers outside that boundary before health/trust scoring.",
+        "A degraded local/private provider cannot cause silent fallback to a broader external boundary."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_router_local_boundary_never_falls_back_external",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_router_private_boundary_excludes_external",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_route_serializes_privacy_boundary"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/model_port.py",
+        "code:skeleton/shells/ai/provider_router.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Provider Fallback Privacy"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "fault_injection",
@@ -5715,12 +5821,25 @@
         337
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Single-use approval validation and consumption occur in one registry critical section.",
+        "Concurrent consumers cannot both authorize from the same approval identity.",
+        "Approval remains bound to exact principal, intent fingerprint, and proposal fingerprint."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_consume_is_atomic_against_concurrent_reuse",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_mismatch_fails",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_consume_invalidates"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/approval.py",
+        "mirror:skeleton/ai/shell/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Approval TOCTOU Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5816,12 +5935,28 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Filesystem and workspace path boundaries reject percent-decoded traversal, absolute paths, drive prefixes, NULs, and encoded separators before later decoding can change path structure.",
+        "Double-encoded traversal fails closed within a bounded decode depth.",
+        "Benign percent-encoded non-structural filename text may remain literal."
+      ],
+      "tests": [
+        "skeleton/testing/test_decoded_path_security.py::test_decoded_path_guard_rejects_structural_ambiguity",
+        "skeleton/testing/test_decoded_path_security.py::test_sandbox_path_boundary_rejects_encoded_traversal",
+        "skeleton/testing/test_decoded_path_security.py::test_workspace_path_boundary_rejects_encoded_traversal",
+        "skeleton/testing/test_decoded_path_security.py::test_benign_encoded_filename_remains_literal_in_both_path_stacks"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/decoded_path.py",
+        "code:skeleton/sandbox/fs.py",
+        "mirror:skeleton/ai/runtime/sandbox/fs.py",
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "test:skeleton/testing/test_decoded_path_security.py",
+        "workflow:P0 Decoded Path Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -6107,12 +6242,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Outbound hostname resolution fails closed if any DNS answer is non-public.",
+        "The connected numeric peer must match the immutable approved DNS snapshot."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_mixed_dns_answer_with_any_private_address_fails_closed",
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_connect_time_peer_must_match_approved_resolution_snapshot",
+        "skeleton/testing/test_security_outbound_http.py::test_get_requires_connected_peer_to_match_dns_snapshot"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6141,12 +6289,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Every redirect destination is revalidated against the outbound HTTPS policy.",
+        "Cross-origin redirects require explicit opt-in and strip caller-provided headers before the next hop."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_redirect_revalidates_and_rejects_origin_or_security_change",
+        "skeleton/testing/test_security_outbound_http.py::test_redirect_cannot_change_security_boundary_by_default",
+        "skeleton/testing/test_security_outbound_http.py::test_cross_origin_redirect_drops_all_caller_headers"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6174,12 +6335,24 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Metadata-service and local/internal hostnames are rejected before transport use.",
+        "Literal loopback, link-local, private, reserved, and unspecified addresses are rejected."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_syntax_policy_rejects_local_or_non_public_targets",
+        "skeleton/testing/test_security_outbound_http.py::test_unsafe_url_is_rejected_before_transport"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6207,12 +6380,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "IPv4, IPv6, and IPv4-mapped IPv6 destinations are normalized through ipaddress before policy.",
+        "Any mapped/private/non-global connected peer is rejected even when hostname syntax is otherwise valid."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_validate_resolution_set_rejects_mixed_private_values",
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_connect_time_peer_can_never_be_private",
+        "skeleton/testing/test_security_outbound_http.py::test_peer_mismatch_or_private_peer_fails_before_body"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6240,12 +6426,40 @@
         173
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model-visible execution excerpts use credential-aware value redaction before keyword masking.",
+        "Bearer tokens, API keys, password assignments, and token-shaped credentials cannot survive REDACTED_EXCERPT exposure.",
+        "Metadata-only and digest-only observation modes remain free of raw output bytes.",
+        "Structured observability redacts credential-bearing keys and inline authorization/token/secret/password assignments before persistence or export.",
+        "Exception telemetry records stable exception types rather than arbitrary exception messages that may contain secrets.",
+        "Tool/runtime failure events preserve correlation while excluding raw secret-bearing failure text."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redacts_secret_values_not_just_secret_words",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redaction_preserves_benign_nonsecret_output",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_metadata_only_removes_excerpt",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_digest_only_reduces_surface",
+        "tests/test_observability.py::test_structured_logger_redacts_messages_and_context",
+        "tests/test_observability.py::test_text_redaction_removes_full_basic_authorization_credential",
+        "tests/test_observability.py::test_tracer_failure_never_persists_exception_message",
+        "skeleton/testing/test_frontier_observability_correlation.py::test_retry_event_is_correlated_and_does_not_store_exception_message",
+        "skeleton/testing/test_frontier_observability_correlation.py::test_tool_failure_event_exposes_type_not_secret_message"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/observation_policy.py",
+        "mirror:skeleton/ai/shell/observation_policy.py",
+        "code:skeleton/sandbox/sanitizers.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Observation Secret Redaction",
+        "code:skeleton/observability/redaction.py",
+        "mirror:skeleton/ai/runtime/observability/redaction.py",
+        "test:tests/test_observability.py",
+        "test:skeleton/testing/test_frontier_observability_correlation.py",
+        "workflow:P0 Secret Observability Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6274,12 +6488,34 @@
         173
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Child processes do not inherit the ambient parent environment by default.",
+        "Only explicitly allowlisted inherited/requested keys can reach a child, with bounded values and total size.",
+        "Sandboxed processes do not inherit caller PATH, PYTHONPATH, PYTHONHOME, dynamic-loader overrides, HOME, or TMPDIR.",
+        "Process-control environment keys cannot be reintroduced through explicit sandbox environment overrides."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_environment_is_not_implicitly_inherited",
+        "skeleton/testing/test_shell_runner.py::test_explicit_allowlisted_environment_is_forwarded",
+        "skeleton/testing/test_shell_runner.py::test_rejects_unapproved_environment_key",
+        "skeleton/testing/test_sandbox_isolation.py::test_scrub_env_pins_trusted_path_and_rejects_runtime_overrides",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_child_cannot_inherit_python_or_loader_injection",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_runs_in_jail_with_clean_env"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "mirror:skeleton/ai/runtime/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6341,12 +6577,25 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Host execution is argv-only with shell=False; shell metacharacters remain literal arguments instead of being reparsed by a command shell.",
+        "NUL and argument-count/byte limits are enforced before process launch."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_shell_metacharacters_remain_literal_argv",
+        "skeleton/testing/test_shell_runner.py::test_rejects_nul_argument",
+        "skeleton/testing/test_shell_runner.py::test_rejects_argument_count_over_policy"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6375,12 +6624,33 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Executable authority is registered as an absolute resolved file path and never resolved through ambient PATH.",
+        "Executable inode/metadata identity is pinned at policy construction and mutation/replacement before launch fails closed.",
+        "Executable basenames resolve through a fixed trusted PATH rather than the caller environment.",
+        "Relative executable paths are rejected so a writable working directory cannot shadow a granted executable."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_rejects_relative_executable_path",
+        "skeleton/testing/test_shell_runner.py::test_rejects_executable_replaced_after_policy_construction",
+        "skeleton/testing/test_shell_runner.py::test_rejects_in_place_executable_mutation_after_policy_construction",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_basename_ignores_attacker_controlled_parent_path",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_rejects_relative_executable_shadowing"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "mirror:skeleton/ai/runtime/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6729,12 +6999,27 @@
         350
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Every stored vector entry carries a retention source identity.",
+        "Canonical source tombstoning purges every vector entry bound to that source, including multi-fragment derivatives.",
+        "Derived vector deletion remains idempotent and preserves unrelated sources."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_vector_source_purge_removes_all_derived_embeddings",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_vector_source_identity_can_follow_source_metadata",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_canonical_tombstone_purges_all_vector_entries_for_source"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/memory/projection.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/memory/projection.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "regression"
@@ -6762,12 +7047,28 @@
         177
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Deleting backup-managed sensitive state purges every indexed historical backup copy before removing the live source.",
+        "Missing, unreadable, or malformed indexed backups fail closed before live deletion.",
+        "Purging deleted state preserves unrelated backup content and prevents restore from resurrecting the deleted state."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_history_purge_removes_deleted_sensitive_state",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_delete_state_fails_closed_before_live_delete_on_missing_backup",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_delete_state_purges_history_before_live_source",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_deletion_is_physical_and_ids_are_not_reused"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/reliability/backup_restore.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/reliability/backup_restore.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "fault_injection",
@@ -8087,12 +8388,28 @@
         139
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Context compaction never upgrades evidence trust and always emits DERIVED_UNTRUSTED for compacted eligible evidence.",
+        "Trusted-control and mandatory context cannot be compacted.",
+        "Compacted segments retain source identity, content digest provenance, tenant, purpose, data class, retention class, and derived_from lineage."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_downgrades_authorized_user_data_to_derived_untrusted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_never_upgrades_untrusted_retrieval_evidence",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_trusted_control_cannot_be_compacted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_mandatory_control_cannot_be_compacted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_identity_remains_bound_to_source_segment"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compaction.py",
+        "mirror:skeleton/ai/runtime/context/compaction.py",
+        "code:skeleton/contracts/context.py",
+        "test:skeleton/testing/test_context_compaction_trust_geometry.py",
+        "workflow:P0 Compaction Trust Geometry"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -8305,12 +8622,25 @@
         160
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model-visible tool descriptions must originate from the repository-owned curated command catalog.",
+        "Tool-description text is explicitly marked non-authoritative and rejects compatibility-unstable, bidi-control, and invisible-control spellings."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_descriptor_contains_effect_annotations",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_description_rejects_untrusted_origin",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_description_rejects_bidi_control"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -8344,12 +8674,37 @@
         376
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Externally exposed MCP discovery is filtered through the requesting principal's authorization policy.",
+        "Unknown or denied principals receive no tool descriptors, so tool existence is not a privilege oracle.",
+        "Tool discovery is scoped to a registered principal's authorization policy rather than the global tool manifest.",
+        "Unknown principals discover an empty capability set and denied tools are omitted from discovery results.",
+        "Principal-scoped discovery responses use private cache semantics and a digest derived only from visible descriptors.",
+        "Execution authorization still revalidates the principal/tool pair independently of discovery."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_hides_tools_from_unknown_principal",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_exposes_only_authorized_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_respects_denylist",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_list_tools_is_response_only",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_unknown_principal_discovers_no_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_denied_tool_is_hidden_from_discovery",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_surface_filter_digest_is_scoped_to_visible_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_prepares_structured_action_only"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell",
+        "workflow:P0 Capability Discovery Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",

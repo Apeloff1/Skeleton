@@ -8,6 +8,8 @@ import threading
 import time
 from typing import Callable
 
+from skeleton.security.text_identity import require_authority_identifier
+
 
 @dataclass(frozen=True)
 class AIPlanApproval:
@@ -62,6 +64,16 @@ class AIApprovalRegistry:
             raise ValueError("ttl_seconds must be positive")
         if not principal or not approved_by:
             raise ValueError("principal and approver are required")
+        principal = require_authority_identifier(
+            principal,
+            field="approval principal",
+            max_length=256,
+        )
+        approved_by = require_authority_identifier(
+            approved_by,
+            field="approval actor",
+            max_length=256,
+        )
         if len(intent_fingerprint) != 64 or len(proposal_fingerprint) != 64:
             raise ValueError("approval fingerprints must be SHA-256 hex")
         with self._lock:
@@ -87,6 +99,27 @@ class AIApprovalRegistry:
             self._items[approval_id] = item
             return item
 
+    def _require_locked(
+        self,
+        approval: AIPlanApproval,
+        *,
+        principal: str,
+        intent_fingerprint: str,
+        proposal_fingerprint: str,
+    ) -> AIPlanApproval:
+        """Validate one approval while the registry lock is already held."""
+        self._prune()
+        current = self._items.get(approval.approval_id)
+        if current != approval:
+            raise AIApprovalError("AI approval is stale, expired, or consumed")
+        if current.principal != principal:
+            raise AIApprovalError("AI approval principal mismatch")
+        if current.intent_fingerprint != intent_fingerprint:
+            raise AIApprovalError("AI approval intent mismatch")
+        if current.proposal_fingerprint != proposal_fingerprint:
+            raise AIApprovalError("AI approval proposal mismatch")
+        return current
+
     def require(
         self,
         approval: AIPlanApproval,
@@ -96,17 +129,12 @@ class AIApprovalRegistry:
         proposal_fingerprint: str,
     ) -> AIPlanApproval:
         with self._lock:
-            self._prune()
-            current = self._items.get(approval.approval_id)
-            if current != approval:
-                raise AIApprovalError("AI approval is stale, expired, or consumed")
-            if current.principal != principal:
-                raise AIApprovalError("AI approval principal mismatch")
-            if current.intent_fingerprint != intent_fingerprint:
-                raise AIApprovalError("AI approval intent mismatch")
-            if current.proposal_fingerprint != proposal_fingerprint:
-                raise AIApprovalError("AI approval proposal mismatch")
-            return current
+            return self._require_locked(
+                approval,
+                principal=principal,
+                intent_fingerprint=intent_fingerprint,
+                proposal_fingerprint=proposal_fingerprint,
+            )
 
     def consume(
         self,
@@ -116,13 +144,16 @@ class AIApprovalRegistry:
         intent_fingerprint: str,
         proposal_fingerprint: str,
     ) -> AIPlanApproval:
-        current = self.require(
-            approval,
-            principal=principal,
-            intent_fingerprint=intent_fingerprint,
-            proposal_fingerprint=proposal_fingerprint,
-        )
+        # Validation and single-use invalidation are one critical section.
+        # Releasing the lock between these operations would allow two callers
+        # to validate the same approval before either marks it consumed.
         with self._lock:
+            current = self._require_locked(
+                approval,
+                principal=principal,
+                intent_fingerprint=intent_fingerprint,
+                proposal_fingerprint=proposal_fingerprint,
+            )
             consumed = AIPlanApproval(
                 current.approval_id,
                 current.principal,

@@ -273,7 +273,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W07,WP-W08,WP-W10,WP-W14,WP-W17,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -296,7 +296,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W14,WP-W20,WP-W29",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -318,7 +318,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W00,WP-W01,WP-W10,WP-W18,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -442,7 +442,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W14,WP-W20,WP-W30",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -482,7 +482,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W01,WP-W18,WP-W20,WP-W22",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -522,7 +522,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "evidence_pending",
+      "status": "planned",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -542,7 +542,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "evidence_pending",
+      "status": "planned",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -562,7 +562,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20,WP-W27",
       "dependency_refs": [],
-      "status": "evidence_pending",
+      "status": "planned",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -678,7 +678,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W02,WP-W20,WP-W21",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -697,7 +697,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W02,WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -716,7 +716,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20,WP-W24",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -754,7 +754,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W10,WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -827,7 +827,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -917,7 +917,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
