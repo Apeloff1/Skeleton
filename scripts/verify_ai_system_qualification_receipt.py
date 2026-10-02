@@ -179,9 +179,9 @@ def _contract_requirements() -> tuple[list[str], str]:
         contract.get("required_requirements"),
         require_unique=True,
     )
-    if len(required) != 28:
+    if len(required) != 32:
         raise ReceiptVerificationError(
-            "completion contract must retain exactly 28 requirements"
+            "completion contract must retain exactly 32 requirements"
         )
     return required, _digest(contract)
 
@@ -409,6 +409,14 @@ def _semantic_pass(
             and _boolean(details, "intent_cleared")
         )
 
+    if requirement == "persistence.terminal_evidence_integrity":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "result_tamper_rejected")
+            and _boolean(details, "outbox_tamper_rejected")
+            and _boolean(details, "migration_backfill_verified")
+        )
+
     if requirement == "execution.replay_lineage":
         return bool(
             _integer(details, "turn_count", minimum=1) >= 1
@@ -483,6 +491,15 @@ def _semantic_pass(
             and context == receipt_context
         )
 
+    if requirement == "verification.receipt_identity":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "identical_replay_stable")
+            and _boolean(details, "conflicting_replay_rejected")
+            and _boolean(details, "digest_tamper_rejected")
+            and _boolean(details, "execution_binding_preserved")
+        )
+
     if requirement == "context.integrity":
         problems = details.get("problems")
         if not isinstance(problems, list):
@@ -538,6 +555,15 @@ def _semantic_pass(
                 details,
                 "stream_terminal_bound",
             )
+        )
+
+    if requirement == "finalization.outbox_delivery":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "one_pending_terminal_event")
+            and _boolean(details, "acknowledgement_persistent")
+            and _boolean(details, "acknowledgement_retry_stable")
+            and _boolean(details, "no_pending_after_ack")
         )
 
     if requirement == "security.sandbox_filesystem":
@@ -668,6 +694,28 @@ def _semantic_pass(
             and _boolean(
                 details,
                 "usage_reconciled",
+            )
+        )
+
+    if requirement == "resource.unknown_usage_fence":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(details, "unknown_usage_recorded")
+            and _boolean(
+                details,
+                "completion_blocked_while_unknown",
+            )
+            and _boolean(
+                details,
+                "release_blocked_while_unknown",
+            )
+            and _boolean(
+                details,
+                "conservative_resolution_required",
+            )
+            and _boolean(
+                details,
+                "completion_succeeds_after_resolution",
             )
         )
 
