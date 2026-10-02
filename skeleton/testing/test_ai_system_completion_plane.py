@@ -628,6 +628,53 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         post_delete_recalled_ids=recalled_after_delete,
     )
     plane.prove_finalization_lineage(terminal)
+    plane.prove_sandbox_filesystem(
+        execution_id=request.execution_id,
+        safe_roundtrip=True,
+        traversal_rejected=True,
+        outside_untouched=True,
+        evidence_refs=("sandbox:filesystem",),
+    )
+    plane.prove_sandbox_process(
+        execution_id=request.execution_id,
+        clean_environment=True,
+        shell_string_rejected=True,
+        bounded_execution=True,
+        network_fail_closed=True,
+        evidence_refs=("sandbox:process",),
+    )
+    plane.prove_injection_sanitization(
+        execution_id=request.execution_id,
+        prompt_attack_blocked=True,
+        shell_attack_blocked=True,
+        secret_redacted=True,
+        duplicate_json_rejected=True,
+        evidence_refs=("sandbox:injection",),
+    )
+    plane.prove_provider_fallback_privacy(
+        execution_id=request.execution_id,
+        required_boundary="local",
+        routed_boundaries=("local",),
+        routed_model_ids=("local-model",),
+        evidence_refs=("provider:privacy",),
+    )
+    plane.prove_memory_poisoning_resistance(
+        execution_id=request.execution_id,
+        valid_write_committed=True,
+        missing_provenance_denied=True,
+        conflicting_replay_rejected=True,
+        committed_subject_id=request.execution_id,
+        evidence_refs=("memory:poisoning",),
+    )
+    plane.prove_outbound_network_boundary(
+        execution_id=request.execution_id,
+        private_target_rejected=True,
+        mixed_dns_rejected=True,
+        peer_rebinding_rejected=True,
+        canonical_public_resolution=True,
+        evidence_refs=("network:boundary",),
+    )
+
     plane.prove_learning_promotion(
         promotion,
         expected_baseline=spec.baseline_version,
@@ -655,7 +702,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 18
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 24
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -776,6 +823,101 @@ async def test_replay_lineage_rejects_broken_parent(tmp_path) -> None:
     proof = plane.prove_replay_lineage(turns)
     assert proof.passed is False
     assert proof.details["parent_linked"] is False
+
+
+def test_sandbox_filesystem_escape_blocks_completion() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="sandbox-fs",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_sandbox_filesystem(
+        execution_id="sandbox-fs",
+        safe_roundtrip=True,
+        traversal_rejected=False,
+        outside_untouched=False,
+        evidence_refs=("sandbox:fs",),
+    )
+    assert proof.passed is False
+
+
+def test_sandbox_process_requires_all_fail_closed_controls() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="sandbox-process",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_sandbox_process(
+        execution_id="sandbox-process",
+        clean_environment=True,
+        shell_string_rejected=True,
+        bounded_execution=True,
+        network_fail_closed=False,
+        evidence_refs=("sandbox:process",),
+    )
+    assert proof.passed is False
+
+
+def test_injection_sanitization_requires_duplicate_json_rejection() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="injection",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_injection_sanitization(
+        execution_id="injection",
+        prompt_attack_blocked=True,
+        shell_attack_blocked=True,
+        secret_redacted=True,
+        duplicate_json_rejected=False,
+        evidence_refs=("injection:evidence",),
+    )
+    assert proof.passed is False
+
+
+def test_provider_fallback_privacy_rejects_external_route() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="provider-privacy",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_provider_fallback_privacy(
+        execution_id="provider-privacy",
+        required_boundary="local",
+        routed_boundaries=("local", "external"),
+        routed_model_ids=("local", "external"),
+        evidence_refs=("provider:route",),
+    )
+    assert proof.passed is False
+    assert proof.details["all_within_boundary"] is False
+
+
+def test_memory_poisoning_proof_requires_conflict_rejection() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="memory-poisoning",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_memory_poisoning_resistance(
+        execution_id="memory-poisoning",
+        valid_write_committed=True,
+        missing_provenance_denied=True,
+        conflicting_replay_rejected=False,
+        committed_subject_id="memory-poisoning",
+        evidence_refs=("memory:governed",),
+    )
+    assert proof.passed is False
+
+
+def test_outbound_network_boundary_rejects_peer_rebinding_gap() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="network-boundary",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_outbound_network_boundary(
+        execution_id="network-boundary",
+        private_target_rejected=True,
+        mixed_dns_rejected=True,
+        peer_rebinding_rejected=False,
+        canonical_public_resolution=True,
+        evidence_refs=("network:boundary",),
+    )
+    assert proof.passed is False
 
 
 def test_memory_requires_recall_and_observed_forgetting() -> None:
