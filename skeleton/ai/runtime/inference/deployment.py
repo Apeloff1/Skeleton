@@ -10,7 +10,13 @@ from pathlib import Path
 import re
 from typing import Any
 
-from .llama_cpp import LlamaCppConfig, LlamaCppModel, build_llama_cpp_adapter, inspect_gguf
+from .llama_cpp import (
+    LlamaCppConfig,
+    LlamaCppModel,
+    LlamaCppRuntimeError,
+    build_llama_cpp_adapter,
+    inspect_gguf,
+)
 from .local import LocalInferenceEngine, LocalInferenceRequest, LocalModelAdapter
 
 
@@ -177,7 +183,12 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(
                 f"invalid llama.cpp deployment config: {exc}"
             ) from exc
-        gguf = inspect_gguf(model)
+        try:
+            gguf = inspect_gguf(model)
+        except LlamaCppRuntimeError as exc:
+            raise LocalModelDeploymentError(
+                f"invalid GGUF model artifact: {exc}"
+            ) from exc
         deployment = cls(
             manifest_path=resolved_manifest,
             runtime_kind="llama.cpp-cli",
