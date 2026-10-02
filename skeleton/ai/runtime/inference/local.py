@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 import hashlib
 import json
 import random
@@ -25,7 +26,13 @@ import threading
 import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
-from skeleton.provider_runtime import ProviderAdapter, ProviderRequest, ProviderResponse
+from skeleton.provider_runtime import (
+    ProviderAdapter,
+    ProviderInvocationError,
+    ProviderProtocolViolationError,
+    ProviderRequest,
+    ProviderResponse,
+)
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
 
 
@@ -443,13 +450,31 @@ class LocalInferenceEngine:
         cancel = threading.Event()
         worker = asyncio.create_task(asyncio.to_thread(self.model.infer, request, cancel))
         try:
-            result = await worker
+            # Keep the worker task alive long enough to signal cooperative
+            # cancellation into the backend rather than cancelling the Task
+            # wrapper before the thread can observe its event.
+            result = await asyncio.shield(worker)
         except asyncio.CancelledError:
             cancel.set()
             try:
-                await asyncio.shield(worker)
-            except (asyncio.CancelledError, Exception):
-                pass
+                await asyncio.wait_for(
+                    asyncio.shield(worker),
+                    timeout=0.25,
+                )
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                # Python threads cannot be force-killed. The local backend
+                # contract is cooperative; after a bounded grace period detach
+                # and consume any eventual exception so the cancelled caller is
+                # never held open indefinitely.
+                def _consume(done: asyncio.Task[LocalInferenceResult]) -> None:
+                    if done.cancelled():
+                        return
+                    try:
+                        done.exception()
+                    except Exception:
+                        pass
+
+                worker.add_done_callback(_consume)
             raise
 
         if result.model_digest != self.model.model_digest:
@@ -596,9 +621,79 @@ class LocalModelAdapter(ProviderAdapter):
             raise ValueError("local runtime digest must be lowercase sha256")
         return value
 
+    def status(self) -> dict[str, Any]:
+        payload = super().status()
+        payload["network_policy"] = "none"
+        payload["execution_mode"] = "local"
+        receipt = getattr(self, "artifact_receipt", None)
+        if receipt is not None and hasattr(receipt, "as_dict"):
+            payload["artifact"] = receipt.as_dict()
+        return payload
+
+    @staticmethod
+    def _validate_request(request: ProviderRequest, *, model_id: str) -> None:
+        if not isinstance(request.instructions, str) or not request.instructions.strip():
+            raise ProviderProtocolViolationError(
+                "local model instructions must be non-empty"
+            )
+        if not isinstance(request.prompt, str) or not request.prompt.strip():
+            raise ProviderProtocolViolationError(
+                "local model prompt must be non-empty"
+            )
+        if request.model is not None:
+            if not isinstance(request.model, str) or request.model.strip() != model_id:
+                raise ProviderProtocolViolationError(
+                    "local model request identity does not match activated artifact"
+                )
+        if request.max_output_tokens is not None and (
+            isinstance(request.max_output_tokens, bool)
+            or not isinstance(request.max_output_tokens, int)
+            or request.max_output_tokens <= 0
+        ):
+            raise ProviderProtocolViolationError(
+                "local model max_output_tokens must be positive"
+            )
+        for message in request.history:
+            role = getattr(message, "role", None)
+            content = getattr(message, "content", None)
+            if (
+                role not in {"user", "assistant"}
+                or not isinstance(content, str)
+                or not content.strip()
+            ):
+                raise ProviderProtocolViolationError(
+                    "local model history contains an invalid message"
+                )
+        offered = {tool.tool_id for tool in request.tools}
+        if len(offered) != len(request.tools):
+            raise ProviderProtocolViolationError(
+                "local model request contains duplicate offered tools"
+            )
+        choice = str(request.tool_choice or "auto").strip().lower()
+        if choice not in {"none", "auto", "required", "specific"}:
+            raise ProviderProtocolViolationError(
+                "local model tool_choice is invalid"
+            )
+        if choice == "required" and not offered:
+            raise ProviderProtocolViolationError(
+                "required local tool choice has no offered tools"
+            )
+        if choice == "specific":
+            if not request.specific_tool_id or request.specific_tool_id not in offered:
+                raise ProviderProtocolViolationError(
+                    "specific local tool choice is not offered"
+                )
+        if request.deadline is not None:
+            deadline = request.deadline
+            if deadline.tzinfo is None or deadline.utcoffset() is None:
+                raise ProviderProtocolViolationError(
+                    "local model deadline must be timezone-aware"
+                )
+
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         if not isinstance(request, ProviderRequest):
             raise TypeError("request must be ProviderRequest")
+        self._validate_request(request, model_id=self.model)
         max_tokens = request.max_output_tokens or 256
         seed_material = "|".join(
             item or ""
@@ -609,7 +704,10 @@ class LocalModelAdapter(ProviderAdapter):
                 request.prompt,
             )
         )
-        derived_seed = int(hashlib.sha256(seed_material.encode("utf-8")).hexdigest()[:16], 16)
+        derived_seed = int(
+            hashlib.sha256(seed_material.encode("utf-8")).hexdigest()[:16],
+            16,
+        )
         local_request = LocalInferenceRequest(
             prompt=request.prompt,
             instructions=request.instructions,
@@ -623,7 +721,58 @@ class LocalModelAdapter(ProviderAdapter):
                 else dict(request.structured_output_schema)
             ),
         )
-        result = await self.engine.generate(local_request)
+
+        if request.deadline is None:
+            result = await self.engine.generate(local_request)
+        else:
+            remaining = (
+                request.deadline.astimezone(timezone.utc)
+                - datetime.now(timezone.utc)
+            ).total_seconds()
+            if remaining <= 0:
+                raise ProviderInvocationError(
+                    "local model deadline exceeded"
+                )
+            try:
+                result = await asyncio.wait_for(
+                    self.engine.generate(local_request),
+                    timeout=remaining,
+                )
+            except asyncio.TimeoutError as exc:
+                raise ProviderInvocationError(
+                    "local model deadline exceeded"
+                ) from exc
+
+        offered = {tool.tool_id for tool in request.tools}
+        returned = {item.tool_id for item in result.tool_calls}
+        if returned - offered:
+            raise ProviderProtocolViolationError(
+                "local model returned an unoffered tool call"
+            )
+        choice = str(request.tool_choice or "auto").strip().lower()
+        if choice == "none" and result.tool_calls:
+            raise ProviderProtocolViolationError(
+                "local model returned tool calls when tools were disabled"
+            )
+        if choice == "required" and not result.tool_calls:
+            raise ProviderProtocolViolationError(
+                "local model omitted a required tool call"
+            )
+        if choice == "specific" and any(
+            item.tool_id != request.specific_tool_id
+            for item in result.tool_calls
+        ):
+            raise ProviderProtocolViolationError(
+                "local model returned a non-selected tool"
+            )
+        if (
+            request.structured_output_schema is not None
+            and result.structured_output is None
+        ):
+            raise ProviderProtocolViolationError(
+                "local model omitted required structured output"
+            )
+
         tool_calls = tuple(
             ProviderToolCall(
                 call_id=item.call_id,
@@ -662,3 +811,4 @@ class LocalModelAdapter(ProviderAdapter):
             context_source_snapshot=request.context_source_snapshot,
             context_compiler_version=request.context_compiler_version,
         )
+
