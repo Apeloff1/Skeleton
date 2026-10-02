@@ -328,7 +328,10 @@ class ReferenceNGramModel:
     ) -> LocalInferenceResult:
         start = time.perf_counter()
         input_tokens = list(_tokenize(request.rendered_input))
-        context = list(input_tokens)
+        # The portable reference model conditions generation on the immediate
+        # user prompt rather than the synthetic role trailer in rendered_input.
+        # Full rendered_input still owns usage accounting and identity.
+        context = list(_tokenize(request.prompt))
         rng = random.Random(request.seed ^ int(self.model_digest[:16], 16))
         output: list[str] = []
         finish = "length"
