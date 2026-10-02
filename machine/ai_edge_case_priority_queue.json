@@ -894,9 +894,14 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_decoded_path_structural_guard_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/decoded_path.py",
+        "code:skeleton/sandbox/fs.py",
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "workflow:P0 Decoded Path Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-004",
       "completion_checkbox": false,
