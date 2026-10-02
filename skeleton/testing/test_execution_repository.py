@@ -18,6 +18,7 @@ from skeleton.contracts.verification import (
 )
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
+    ExecutionRepositoryCorruption,
     SQLiteExecutionRepository,
 )
 
@@ -227,6 +228,137 @@ def test_atomic_finalization_commits_result_before_terminal_outbox() -> None:
     assert pending[0].event_type == "execution.completed"
     assert pending[0].payload["result_ref"] == "execution-result:exec-1"
     assert pending[0].payload["verification"] == "verification:ver-1"
+
+
+def test_terminal_result_digest_rejects_contract_valid_payload_tampering() -> None:
+    repo = SQLiteExecutionRepository()
+    repo.create(_request(), now=_now())
+    current = _advance_to_provider_completed(repo, "exec-1")
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.VERIFYING,
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="artifact:trusted-answer",
+        verification="verification:ver-1",
+        usage={},
+        completed_at=_now(),
+    )
+    repo.finalize(
+        result,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_result
+        SET result_json = replace(
+            result_json,
+            'artifact:trusted-answer',
+            'artifact:forged-answer'
+        )
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (repo.namespace, "exec-1"),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="result digest mismatch",
+    ):
+        repo.result("exec-1")
+
+
+def test_terminal_outbox_digest_rejects_contract_valid_payload_tampering() -> None:
+    repo = SQLiteExecutionRepository()
+    repo.create(_request(), now=_now())
+    current = _advance_to_provider_completed(repo, "exec-1")
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.VERIFYING,
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="artifact:trusted-answer",
+        verification="verification:trusted",
+        usage={},
+        completed_at=_now(),
+    )
+    repo.finalize(
+        result,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_outbox
+        SET payload_json = replace(
+            payload_json,
+            'verification:trusted',
+            'verification:forged'
+        )
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (repo.namespace, "exec-1"),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="outbox payload digest mismatch",
+    ):
+        repo.pending_outbox(execution_id="exec-1")
+
+
+def test_terminal_outbox_acknowledgement_is_retry_stable() -> None:
+    repo = SQLiteExecutionRepository()
+    repo.create(_request(), now=_now())
+    current = _advance_to_provider_completed(repo, "exec-1")
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.VERIFYING,
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="artifact:final",
+        verification="verification:ver-1",
+        usage={},
+        completed_at=_now(),
+    )
+    repo.finalize(
+        result,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+    pending = repo.pending_outbox(execution_id="exec-1")
+    assert len(pending) == 1
+
+    first = repo.acknowledge_outbox(
+        pending[0].outbox_id,
+        published_at=_now() + timedelta(seconds=1),
+    )
+    replay = repo.acknowledge_outbox(
+        pending[0].outbox_id,
+        published_at=_now() + timedelta(seconds=9),
+    )
+
+    assert first.published is True
+    assert replay == first
+    assert repo.pending_outbox(execution_id="exec-1") == ()
 
 
 def test_finalization_replay_does_not_duplicate_terminal_event() -> None:
