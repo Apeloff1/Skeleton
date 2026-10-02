@@ -74,6 +74,34 @@ class SQLiteAsyncConversationAuthority:
             owner_id=owner_id,
         )
 
+    async def get_thread(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ):
+        return self.repository.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+
+    async def append_message(
+        self,
+        message,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        expected_thread_version: int,
+    ):
+        return self.repository.append_message(
+            message,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            expected_thread_version=expected_thread_version,
+        )
+
     async def append_user_message(
         self,
         thread_id: str,
