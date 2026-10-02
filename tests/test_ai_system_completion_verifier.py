@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 28
+    assert receipt["requirement_count"] == 32
     assert receipt["binding_count"] >= 9
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
@@ -57,6 +57,10 @@ def test_contract_declares_non_compensable_authority() -> None:
         "shared_pressure_qualification_required": True,
         "idempotent_retry_qualification_required": True,
         "tenant_isolation_qualification_required": True,
+        "unknown_usage_terminal_fence_required": True,
+        "verification_receipt_identity_required": True,
+        "terminal_outbox_delivery_required": True,
+        "persisted_terminal_evidence_integrity_required": True,
     }
 
 
@@ -109,5 +113,6 @@ def test_required_runtime_and_acceptance_files_are_digest_bound() -> None:
         "skeleton/persistence/memory_repository.py",
         "skeleton/testing/test_admission_runtime.py",
         "skeleton/testing/test_execution_repository.py",
+        "skeleton/persistence/execution_repository.py",
     }
     assert all(len(value) == 64 for value in digests.values())
