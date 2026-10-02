@@ -230,6 +230,32 @@ def test_atomic_finalization_commits_result_before_terminal_outbox() -> None:
     assert pending[0].payload["verification"] == "verification:ver-1"
 
 
+def test_execution_state_digest_rejects_contract_valid_tampering() -> None:
+    repo = SQLiteExecutionRepository()
+    current = repo.create(_request(), now=_now())
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.LOADING,
+        expected_version=current.version,
+        now=_now(),
+    )
+
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_state
+        SET version = version + 1
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (repo.namespace, "exec-1"),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryCorruption,
+        match="execution state digest mismatch",
+    ):
+        repo.get("exec-1")
+
+
 def test_turn_digest_rejects_contract_valid_payload_tampering() -> None:
     repo = SQLiteExecutionRepository()
     current = repo.create(_request(), now=_now())
