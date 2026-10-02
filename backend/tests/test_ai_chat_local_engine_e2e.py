@@ -324,6 +324,153 @@ def _engine_boundary(
     return service, coordinator, client, execution_repository, submissions
 
 
+def test_backend_chat_request_identity_changes_with_execution_semantics(monkeypatch) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    thread_id = str(uuid4())
+    base = route.AIChatRequest(
+        message="same message",
+        thread_id=thread_id,
+        idempotency_key="same-idem",
+        expected_thread_version=1,
+        context="context-a",
+    )
+    stale = route.AIChatRequest(
+        message=base.message,
+        thread_id=thread_id,
+        idempotency_key=base.idempotency_key,
+        expected_thread_version=99,
+        context=base.context,
+    )
+    changed_context = route.AIChatRequest(
+        message=base.message,
+        thread_id=thread_id,
+        idempotency_key=base.idempotency_key,
+        expected_thread_version=1,
+        context="context-b",
+    )
+    changed_memory = route.AIChatRequest(
+        message=base.message,
+        thread_id=thread_id,
+        idempotency_key=base.idempotency_key,
+        expected_thread_version=1,
+        context=base.context,
+        memory_policy=route.AIChatMemoryPolicy(
+            persist_verified_response=True,
+            kind="semantic",
+            namespace="assistant",
+        ),
+    )
+
+    identity = route._chat_request_identity_ref(base)
+    assert identity == route._chat_request_identity_ref(stale)
+    assert identity != route._chat_request_identity_ref(changed_context)
+    assert identity != route._chat_request_identity_ref(changed_memory)
+
+
+@pytest.mark.asyncio
+async def test_backend_chat_incomplete_user_without_engine_execution_submits_once(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    monkeypatch.setenv(
+        "AI_ARCHITECTURE_ROOT",
+        str(Path(__file__).resolve().parents[2]),
+    )
+
+    conversations = SQLiteConversationRepository(
+        tmp_path / "presubmit-conversation.sqlite3"
+    )
+    thread = conversations.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Pre-submit recovery",
+        data_class="confidential",
+    )
+    request = route.AIChatRequest(
+        message="Answer through the assembled local engine.",
+        thread_id=thread.thread_id,
+        idempotency_key="presubmit-recovery",
+        expected_thread_version=thread.version,
+        context="Untrusted evidence for the local execution.",
+    )
+    refs = (
+        "ephemeral-context-sha256:"
+        + hashlib.sha256(request.context.encode("utf-8")).hexdigest(),
+        route._chat_request_identity_ref(request),
+    )
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=datetime.now(timezone.utc),
+        idempotency_key=request.idempotency_key,
+        content=request.message,
+        attachment_refs=refs,
+        data_class=thread.data_class,
+    )
+    conversations.append_message(
+        user_message,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        expected_thread_version=thread.version,
+    )
+    authority = SQLiteAsyncConversationAuthority(conversations)
+
+    registry, local_calls = _local_registry()
+    (
+        service,
+        coordinator,
+        engine_client,
+        execution_repository,
+        submissions,
+    ) = _engine_boundary(
+        execution_path=tmp_path / "presubmit-execution.sqlite3",
+        submission_path=tmp_path / "presubmit-submission.sqlite3",
+        registry=registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: engine_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+
+    recovered = await route.ai_chat(
+        route.AIChatRequest(
+            message=request.message,
+            thread_id=request.thread_id,
+            idempotency_key=request.idempotency_key,
+            expected_thread_version=thread.version,
+            context=request.context,
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+
+    assert recovered["success"] is True
+    assert recovered["response"] == "Assembled local engine answer."
+    assert recovered["engine_runtime_provider"] == "local"
+    assert len(local_calls) == 1
+    assert execution_repository.result(recovered["engine_execution_id"]) is not None
+
+    transcript = conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert [item.author_type.value for item in transcript] == [
+        "user",
+        "assistant",
+    ]
+
+    await coordinator.shutdown()
+    conversations.close()
+    execution_repository.close()
+    submissions.close()
+
+
 @pytest.mark.asyncio
 async def test_backend_chat_crosses_real_engine_http_boundary_and_commits_local_result(
     tmp_path,
