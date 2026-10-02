@@ -979,7 +979,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "8253240982efcc80de90b88d36571f02978df9d8",
+      "source_git_object_sha": "0228ea9027d75e733b3c2330f28402cd52447b90",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2677,7 +2677,7 @@
       "source": "skeleton/shells/ai",
       "destination": "skeleton/ai/shell",
       "kind": "tree",
-      "source_git_object_sha": "fdc91a7a68144b474beaa12e0122280121c5e235",
+      "source_git_object_sha": "a843017bdcc4e83b3ef714df8fb071b95d0b1441",
       "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
       "work_package_refs": [
         "WP-W03",
@@ -4831,6 +4831,56 @@
       ],
       "move_batch": "B4-research-quarantine",
       "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children"
+    },
+    {
+      "id": "AIFT-ECS-ADAPTER",
+      "source": "skeleton/ecs",
+      "destination": "skeleton/ai/runtime/ecs",
+      "kind": "tree",
+      "role": "B023 blueprint-to-ECS adapter and AST-sandboxed game-logic scripting built on the deterministic simulation ECS core.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
+      "source_git_object_sha": "1d80229cfbf76638c570e615c4ee4a47e6b40700"
+    },
+    {
+      "id": "AIFT-EXEC-SANDBOX",
+      "source": "skeleton/sandbox",
+      "destination": "skeleton/ai/runtime/sandbox",
+      "kind": "tree",
+      "role": "B082/B086 execution sandbox: process and filesystem isolation, sanitizers and injection detection enforcing the generated-code mediator's decisions.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-007"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
+      "source_git_object_sha": "90d13b5535593ffd5ff55f244725665f9bd5896a"
     }
   ],
   "ci_enforcement": {

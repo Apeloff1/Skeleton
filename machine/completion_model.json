@@ -746,13 +746,15 @@
     }
   ],
   "blockers": {
-    "unresolved_p0_count": 34,
+    "unresolved_p0_count": 36,
     "unresolved_p0_refs": [
       "HIST-SYS-019",
       "OBSCURE-018",
       "EDGE-CONTRACT-010",
       "EDGE-CONTRACT-009",
       "EDGE-DATA-010",
+      "EDGE-SEC-008",
+      "EDGE-SEC-009",
       "EDGE-AI-001",
       "EDGE-AI-002",
       "EDGE-AI-013",

@@ -10,9 +10,13 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import Iterable, Iterator
 
+from skeleton.security.decoded_path import (
+    DecodedPathError,
+    reject_decoded_path_ambiguity,
+)
+
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _DRIVE = re.compile(r"^[A-Za-z]:")
-_ENCODED_PATH_META = re.compile(r"%(?:00|25|2e|2f|3a|5c)", re.IGNORECASE)
 _WINDOWS_DEVICE = re.compile(
     r"^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$",
     re.IGNORECASE,
@@ -24,7 +28,9 @@ def _reject_windows_ambiguous_component(part: str) -> None:
     if ":" in part:
         raise WorkspacePathError("workspace path contains alternate data stream syntax")
     if part.endswith((" ", ".")):
-        raise WorkspacePathError("workspace path has Windows-ambiguous trailing characters")
+        raise WorkspacePathError(
+            "workspace path has Windows-ambiguous trailing characters"
+        )
     device_stem = part.split(".", 1)[0].rstrip(" .")
     if _WINDOWS_DEVICE.fullmatch(device_stem):
         raise WorkspacePathError("workspace path uses a reserved Windows device name")
@@ -40,10 +46,10 @@ def normalize_relative_path(value: str | os.PathLike[str]) -> str:
         raise WorkspacePathError("path must be text")
     if not raw:
         raise WorkspacePathError("path cannot be empty")
-    if _ENCODED_PATH_META.search(raw):
-        raise WorkspacePathError(
-            "workspace path contains encoded path metacharacters"
-        )
+    try:
+        reject_decoded_path_ambiguity(raw)
+    except DecodedPathError as exc:
+        raise WorkspacePathError(str(exc)) from exc
     text = raw.replace("\\", "/")
     if text.startswith("/") or _DRIVE.match(text):
         raise WorkspacePathError("workspace path must be relative")
