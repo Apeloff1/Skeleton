@@ -1,0 +1,50 @@
+{
+  "schema_version": "skeleton.ai.system_completion_contract.v1",
+  "status": "active",
+  "purpose": "Fail-closed, non-compensable system completion contract for standalone AI/SI. Completion requires all cross-cutting proofs on one exact source revision; subsystem success cannot compensate for another missing plane.",
+  "required_requirements": [
+    "execution.local_model",
+    "execution.durable_recovery",
+    "execution.governed_effects",
+    "verification.independent",
+    "context.integrity",
+    "memory.lifecycle",
+    "finalization.lineage",
+    "learning.promotion",
+    "learning.rollback"
+  ],
+  "authority": {
+    "producer_must_differ_from_verifier": true,
+    "exact_subject_binding": true,
+    "exact_source_revision_binding": true,
+    "duplicate_proofs_forbidden": true,
+    "missing_proofs_fail_closed": true,
+    "failed_proofs_non_compensable": true
+  },
+  "runtime_binding": "skeleton/ai/runtime/system_completion.py",
+  "acceptance_bindings": [
+    "skeleton/testing/test_ai_system_completion_plane.py",
+    "tests/test_ai_system_completion_verifier.py",
+    "scripts/verify_ai_system_completion.py",
+    ".github/workflows/ai-system-completion.yml"
+  ],
+  "inherited_proofs": [
+    {
+      "requirement": "execution.local_model",
+      "source": "skeleton/ai/runtime/functional_ai.py",
+      "acceptance": "skeleton/testing/test_vs001_functional_ai.py"
+    },
+    {
+      "requirement": "execution.governed_effects",
+      "source": "skeleton/intelligence/execution_runtime.py",
+      "acceptance": "skeleton/testing/test_ai_effectiveness.py",
+      "note": "When the effectiveness lane is present, mutable effects must carry observed postconditions. The system-completion plane independently refuses count mismatch."
+    },
+    {
+      "requirement": "learning.promotion",
+      "source": "skeleton/ai/learning/promotion.py",
+      "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
+    }
+  ],
+  "completion_rule": "valid iff every required requirement has exactly one independently witnessed passing proof for the same subject and exact git revision"
+}
