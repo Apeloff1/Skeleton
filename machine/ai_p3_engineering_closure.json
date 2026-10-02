@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.p3.engineering_closure.v1",
   "closure_id": "P3-T1-AUTONOMOUS-ENGINEERING",
-  "status": "candidate",
+  "status": "closed",
   "claim_scope": "bounded_autonomous_engineering_extension",
   "claim": "The 37-volume P3-T1 autonomous-engineering extension is implementation-landed with exact-head executable evidence. This does not claim completion of the 197 remaining P3 volumes or independent masterplan sign-off.",
   "parent": {
@@ -102,5 +102,16 @@
     "queued_volume_count": 197,
     "rule": "The remaining P3 breadth remains explicit and must not be represented as complete by this closure."
   },
-  "closure_evidence": []
+  "closure_evidence": [
+    "github:pr#2348",
+    "git-head:ed19fe0fba8748286450847f4618cbc6badc6617",
+    "workflow:P3 Engineering Closure@ed19fe0fba8748286450847f4618cbc6badc6617:success",
+    "github-actions-run:36968052955",
+    "workflow:P3 Autonomous Engineering Acceptance@ed19fe0fba8748286450847f4618cbc6badc6617:success",
+    "github-actions-run:36968052946",
+    "workflow:P3 Engineering Extension Authority@ed19fe0fba8748286450847f4618cbc6badc6617:success",
+    "github-actions-run:36968052934",
+    "workflow:P3 VS-002 Engineering Agent@ed19fe0fba8748286450847f4618cbc6badc6617:success",
+    "github-actions-run:36968052903"
+  ]
 }
