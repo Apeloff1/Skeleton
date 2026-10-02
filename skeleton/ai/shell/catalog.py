@@ -19,11 +19,14 @@ class AIToolCard:
     max_timeout: float | None
     allow_stdin: bool
     allow_nonzero_success: bool
+    description_origin: str = "repository_command_catalog"
 
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
             "description": self.description,
+            "description_origin": self.description_origin,
+            "description_instruction_authority": False,
             "tags": list(self.tags),
             "required_capabilities": list(self.required_capabilities),
             "environment_keys": list(self.environment_keys),
