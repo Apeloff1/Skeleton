@@ -332,3 +332,85 @@ def test_llama_cpp_rejects_zero_tensor_gguf(tmp_path: Path) -> None:
         LlamaCppModel(
             LlamaCppConfig(executable=str(runtime), model_path=str(model))
         )
+
+
+@pytest.mark.parametrize(
+    "extra_arg",
+    [
+        "--model=/tmp/other.gguf",
+        "--prompt=override",
+        "--file=/tmp/prompt.txt",
+        "--n-predict=999",
+        "--seed=42",
+        "--temp=1.0",
+        "--ctx-size=4096",
+        "--threads=64",
+        "--batch-size=512",
+        "--gpu-layers=99",
+        "-m/tmp/other.gguf",
+        "-n999",
+        "-c4096",
+        "-t64",
+        "-b512",
+        "-ngl99",
+    ],
+)
+def test_llama_cpp_rejects_managed_argument_override(
+    tmp_path: Path,
+    extra_arg: str,
+) -> None:
+    runtime, model = _artifacts(tmp_path)
+    with pytest.raises(ValueError, match="may not override managed flag"):
+        LlamaCppConfig(
+            executable=str(runtime),
+            model_path=str(model),
+            extra_args=(extra_arg,),
+        )
+
+
+@pytest.mark.parametrize(
+    "extra_arg",
+    [
+        "--hf-repo=owner/model",
+        "--hf-file=model.gguf",
+        "--model-url=https://example.invalid/model.gguf",
+        "--url=https://example.invalid/model.gguf",
+        "--download",
+        "-hf=owner/model",
+    ],
+)
+def test_llama_cpp_rejects_remote_model_acquisition_flags(
+    tmp_path: Path,
+    extra_arg: str,
+) -> None:
+    runtime, model = _artifacts(tmp_path)
+    with pytest.raises(ValueError, match="remote model acquisition"):
+        LlamaCppConfig(
+            executable=str(runtime),
+            model_path=str(model),
+            extra_args=(extra_arg,),
+        )
+
+
+def test_llama_cpp_allows_unmanaged_local_tuning_flag(tmp_path: Path) -> None:
+    runtime, model = _artifacts(tmp_path)
+    config = LlamaCppConfig(
+        executable=str(runtime),
+        model_path=str(model),
+        extra_args=("--mlock",),
+    )
+    assert config.extra_args == ("--mlock",)
+
+
+@pytest.mark.parametrize("extra_arg", ["--mlock\n--model=x", "--mlock\x7f"])
+def test_llama_cpp_rejects_control_characters_in_extra_args(
+    tmp_path: Path,
+    extra_arg: str,
+) -> None:
+    runtime, model = _artifacts(tmp_path)
+    with pytest.raises(ValueError, match="control characters"):
+        LlamaCppConfig(
+            executable=str(runtime),
+            model_path=str(model),
+            extra_args=(extra_arg,),
+        )

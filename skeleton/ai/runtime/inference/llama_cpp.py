@@ -65,6 +65,27 @@ _INHERITED_ENV_ALLOWLIST = {
     "OMP_NUM_THREADS",
     "GGML_CUDA_ENABLE_UNIFIED_MEMORY",
 }
+_MANAGED_LONG_FLAGS = {
+    "--model",
+    "--prompt",
+    "--file",
+    "--n-predict",
+    "--seed",
+    "--temp",
+    "--ctx-size",
+    "--threads",
+    "--batch-size",
+    "--gpu-layers",
+}
+_MANAGED_SHORT_FLAGS = ("-m", "-p", "-f", "-n", "-c", "-t", "-b", "-ngl")
+_REMOTE_ACQUISITION_FLAGS = {
+    "--hf-repo",
+    "--hf-file",
+    "--model-url",
+    "--url",
+    "--download",
+}
+_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf",)
 
 
 class LlamaCppRuntimeError(RuntimeError):
@@ -162,18 +183,36 @@ class LlamaCppConfig:
             or not 0 <= float(self.temperature) <= 10
         ):
             raise ValueError("temperature must be finite and in [0, 10]")
-        forbidden_flags = {
-            "-m", "--model", "-p", "--prompt", "-f", "--file", "-n",
-            "--n-predict", "--seed",
-        }
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
                 raise ValueError("extra_args must contain non-empty strings")
-            if item in forbidden_flags:
+            if any(ord(ch) < 32 or ord(ch) == 127 for ch in item):
+                raise ValueError("extra_args may not contain control characters")
+            option = item.split("=", 1)[0] if item.startswith("--") else item
+            managed = option in _MANAGED_LONG_FLAGS
+            if not item.startswith("--"):
+                managed = managed or any(
+                    item == flag
+                    or (
+                        item.startswith(flag)
+                        and len(item) > len(flag)
+                        and item[len(flag)] not in {"-", "_"}
+                    )
+                    for flag in _MANAGED_SHORT_FLAGS
+                )
+            if managed:
                 raise ValueError(f"extra_args may not override managed flag {item}")
-            if "\x00" in item:
-                raise ValueError("extra_args may not contain NUL")
+            remote = option in _REMOTE_ACQUISITION_FLAGS
+            if not item.startswith("--"):
+                remote = remote or any(
+                    item == flag or item.startswith(flag + "=")
+                    for flag in _REMOTE_ACQUISITION_SHORT_FLAGS
+                )
+            if remote:
+                raise ValueError(
+                    f"extra_args may not enable remote model acquisition {item}"
+                )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
 
