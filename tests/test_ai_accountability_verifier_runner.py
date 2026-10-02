@@ -20,6 +20,7 @@ def _map(root: Path, scripts: list[str]) -> None:
             "key": f"G{index}",
             "gap_id": f"gap-{index}",
             "verifier_script": script,
+            "expected_receipt_verifier": "fixture-verifier-v1",
         }
         for index, script in enumerate(scripts)
     ]
@@ -186,3 +187,23 @@ def test_runner_rejects_duplicate_verifier_reuse(tmp_path: Path) -> None:
 
     with pytest.raises(RunnerError, match="reused by multiple groups"):
         run_verifiers(tmp_path, head_sha="abc123")
+
+
+def test_runner_rejects_unexpected_verifier_identity(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0").replace(
+            "'fixture-verifier-v1'",
+            "'different-verifier-v1'",
+        ),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+
+    receipt = run_verifiers(tmp_path, head_sha="abc123")
+
+    assert receipt["valid"] is False
+    assert receipt["failures"] == ["G0"]
+    assert receipt["results"][0]["receipt_error"] == (
+        "verifier receipt identity mismatch"
+    )
