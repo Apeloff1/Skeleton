@@ -19,6 +19,8 @@ on:
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_ai_chat_local_engine_e2e.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
@@ -52,6 +54,8 @@ on:
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/routes/ai.py"
+      - "backend/tests/test_ai_chat_local_engine_e2e.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
@@ -103,6 +107,7 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
+          "httpx>=0.27,<1"
       - name: Compile canonical product and local inference runtimes
         run: python -m compileall -q skeleton/ai/runtime/product skeleton/ai/runtime/inference
       - name: Verify canonical provider mirror and bootstrap contract
@@ -122,6 +127,7 @@ jobs:
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_server_governance_binding.py
           backend/tests/test_engine_client.py
+          backend/tests/test_ai_chat_local_engine_e2e.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_local_model_artifact.py
