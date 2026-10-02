@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.shells.ai.approval import AIApprovalError, AIApprovalRegistry
+from skeleton.shells.ai.approval import (
+    AIApprovalError,
+    AIApprovalRegistry,
+    AIPlanApproval,
+)
 from skeleton.shells.ai.budget import AIBudget, AIBudgetExceeded, AIBudgetLimit
 from skeleton.shells.ai.observation import AIObservation
 from skeleton.shells.ai.session import AISessionPhase, AIShellSession
@@ -62,6 +66,26 @@ def test_ai_approval_mismatch_fails(changes):
         args[key] = value() if callable(value) else value
     with pytest.raises(AIApprovalError):
         registry.require(approval, **args)
+
+
+def test_fabricated_model_approval_claim_has_no_registry_authority():
+    registry = AIApprovalRegistry(clock=lambda: 10.0)
+    fabricated = AIPlanApproval(
+        approval_id="model-says-approved",
+        principal="p",
+        intent_fingerprint=fp("a"),
+        proposal_fingerprint=fp("b"),
+        approved_by="model-output",
+        created_at=9.0,
+        expires_at=99.0,
+    )
+    with pytest.raises(AIApprovalError, match="stale, expired, or consumed"):
+        registry.require(
+            fabricated,
+            principal="p",
+            intent_fingerprint=fp("a"),
+            proposal_fingerprint=fp("b"),
+        )
 
 
 def test_ai_approval_consume_invalidates():
