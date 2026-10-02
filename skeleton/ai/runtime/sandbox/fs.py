@@ -18,6 +18,11 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from skeleton.security.decoded_path import (
+    DecodedPathError,
+    reject_decoded_path_ambiguity,
+)
+
 from .errors import FsPolicyError, PathEscapeError, QuotaExceededError
 
 MAX_PATH_CHARS = 1024
@@ -43,6 +48,10 @@ def check_relative(path: str) -> PurePosixPath:
         raise FsPolicyError("path too long", context={"maximum": MAX_PATH_CHARS})
     if "\x00" in path:
         raise PathEscapeError("path contains NUL")
+    try:
+        reject_decoded_path_ambiguity(path)
+    except DecodedPathError as exc:
+        raise PathEscapeError(str(exc), context={"path": path[:120]}) from exc
     norm = unicodedata.normalize("NFKC", path).replace("\\", "/")
     if norm != path.replace("\\", "/"):
         # Fullwidth dots/slashes etc. normalise into traversal on some stacks.

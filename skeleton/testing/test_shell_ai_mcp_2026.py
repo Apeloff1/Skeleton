@@ -95,6 +95,33 @@ def test_mcp_tool_descriptor_contains_effect_annotations():
     assert descriptor.annotations["effects"] == ["read_filesystem"]
     assert descriptor.annotations["idempotent"] is True
     assert descriptor.annotations["reversible"] is True
+    assert descriptor.annotations["descriptionInstructionAuthority"] is False
+    assert descriptor.description_origin == "repository_command_catalog"
+
+
+def test_mcp_tool_description_rejects_untrusted_origin() -> None:
+    descriptor = surface().descriptors()[0]
+    with pytest.raises(ValueError, match="curated repository catalog"):
+        type(descriptor)(
+            name=descriptor.name,
+            description=descriptor.description,
+            input_schema=descriptor.input_schema,
+            output_schema=descriptor.output_schema,
+            annotations=descriptor.annotations,
+            description_origin="remote-server",
+        )
+
+
+def test_mcp_tool_description_rejects_bidi_control() -> None:
+    descriptor = surface().descriptors()[0]
+    with pytest.raises(ValueError, match="bidi"):
+        type(descriptor)(
+            name=descriptor.name,
+            description="safe\u202ereversed",
+            input_schema=descriptor.input_schema,
+            output_schema=descriptor.output_schema,
+            annotations=descriptor.annotations,
+        )
 
 
 def test_mcp_request_routing_headers():
@@ -125,6 +152,49 @@ def test_mcp_response_success_cannot_contain_error():
             {},
             error_code="bad",
         )
+
+
+@pytest.mark.parametrize(
+    "principal",
+    (
+        "ali\u202ece",
+        "al\u200bice",
+        "ａｌｉｃｅ",
+        "aаlice",
+    ),
+)
+def test_mcp_auth_rejects_ambiguous_unicode_principals(principal: str) -> None:
+    with pytest.raises(ValueError):
+        MCPPrincipalPolicy(principal)
+
+
+@pytest.mark.parametrize(
+    "tool",
+    (
+        "py\u202ethon",
+        "py\u200bthon",
+        "ｐｙｔｈｏｎ",
+        "pуthon",
+    ),
+)
+def test_mcp_auth_rejects_ambiguous_unicode_tool_names(tool: str) -> None:
+    with pytest.raises(ValueError):
+        MCPPrincipalPolicy("alice", allowed_tools=frozenset({tool}))
+
+
+def test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity() -> None:
+    auth = MCPAuthorization()
+    auth.set(MCPPrincipalPolicy("alice", allowed_tools=frozenset({"python"})))
+    decision = auth.inspect("alice", "py\u200bthon")
+    assert decision.allowed is False
+    assert "invalid authority identity" in decision.reason
+
+
+def test_mcp_auth_allows_canonical_single_script_identity() -> None:
+    policy = MCPPrincipalPolicy("αλφα", allowed_tools=frozenset({"python"}))
+    auth = MCPAuthorization()
+    auth.set(policy)
+    assert auth.inspect("αλφα", "python").allowed is True
 
 
 def test_mcp_auth_unknown_principal_denied():
@@ -245,13 +315,39 @@ def test_mcp_gateway_rejects_protocol_mismatch():
         gateway.prepare_call(request, principal="alice")
 
 
-def test_mcp_gateway_list_tools_is_response_only():
+def test_mcp_gateway_discovery_hides_tools_from_unknown_principal():
     auth = MCPAuthorization()
     gateway = MCPAIShellGateway(surface(), auth)
-    response = gateway.list_tools()
+    response = gateway.list_tools(principal="unknown")
     assert response.ok
     assert response.result["protocolRevision"] == MCP_PROTOCOL_REVISION
-    assert response.result["tools"]
+    assert response.result["tools"] == []
+
+
+def test_mcp_gateway_discovery_exposes_only_authorized_tools():
+    auth = MCPAuthorization()
+    auth.set(
+        MCPPrincipalPolicy(
+            "alice",
+            allowed_tools=frozenset({"python"}),
+        )
+    )
+    gateway = MCPAIShellGateway(surface(), auth)
+    response = gateway.list_tools(principal="alice")
+    assert [item["name"] for item in response.result["tools"]] == ["python"]
+
+
+def test_mcp_gateway_discovery_respects_denylist():
+    auth = MCPAuthorization()
+    auth.set(
+        MCPPrincipalPolicy(
+            "alice",
+            denied_tools=frozenset({"python"}),
+        )
+    )
+    gateway = MCPAIShellGateway(surface(), auth)
+    response = gateway.list_tools(principal="alice")
+    assert response.result["tools"] == []
 
 
 def test_mcp_task_create_is_pending():
