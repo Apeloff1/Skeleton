@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 17
+    assert receipt["requirement_count"] == 18
     assert receipt["binding_count"] >= 9
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
@@ -45,6 +45,8 @@ def test_contract_declares_non_compensable_authority() -> None:
         "learning_result_binding_required": True,
         "qualification_receipt_rehash_required": True,
         "strict_json_receipt_verification": True,
+        "staged_finalization_crash_recovery_required": True,
+        "negative_learning_gate_qualification_required": True,
     }
 
 
