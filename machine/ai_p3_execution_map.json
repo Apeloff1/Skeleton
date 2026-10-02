@@ -738,8 +738,8 @@
   },
   "progress": {
     "task_count": 6,
-    "in_progress_count": 1,
-    "ready_count": 1,
+    "in_progress_count": 2,
+    "ready_count": 0,
     "blocked_count": 3,
     "landed_unpromoted_count": 1,
     "scheduled_volume_count": 23,
