@@ -6314,12 +6314,27 @@
         173
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model-visible execution excerpts use credential-aware value redaction before keyword masking.",
+        "Bearer tokens, API keys, password assignments, and token-shaped credentials cannot survive REDACTED_EXCERPT exposure.",
+        "Metadata-only and digest-only observation modes remain free of raw output bytes."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redacts_secret_values_not_just_secret_words",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redaction_preserves_benign_nonsecret_output",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_metadata_only_removes_excerpt",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_digest_only_reduces_surface"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/observation_policy.py",
+        "mirror:skeleton/ai/shell/observation_policy.py",
+        "code:skeleton/sandbox/sanitizers.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Observation Secret Redaction"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
