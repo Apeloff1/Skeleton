@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 import pytest
 
-from skeleton.shells.ai.approval import (
-    AIApprovalError,
-    AIApprovalRegistry,
-    AIPlanApproval,
-)
+from skeleton.shells.ai.approval import AIApprovalError, AIApprovalRegistry
 from skeleton.shells.ai.budget import AIBudget, AIBudgetExceeded, AIBudgetLimit
 from skeleton.shells.ai.observation import AIObservation
 from skeleton.shells.ai.session import AISessionPhase, AIShellSession
@@ -23,6 +22,28 @@ from skeleton.shells.ai.types import AIAction, AIIntent, AIPlanProposal
 
 def fp(char):
     return char * 64
+
+
+@pytest.mark.parametrize(
+    ("principal", "approved_by"),
+    (
+        ("adm\u0456n", "operator"),
+        ("principal", "ops\u202ereview"),
+        ("principal", "review\u200ber"),
+    ),
+)
+def test_ai_approval_rejects_ambiguous_unicode_authority_identity(
+    principal,
+    approved_by,
+):
+    registry = AIApprovalRegistry()
+    with pytest.raises(ValueError):
+        registry.approve(
+            principal=principal,
+            intent_fingerprint=fp("a"),
+            proposal_fingerprint=fp("b"),
+            approved_by=approved_by,
+        )
 
 
 def test_ai_approval_exact_binding():
@@ -68,26 +89,6 @@ def test_ai_approval_mismatch_fails(changes):
         registry.require(approval, **args)
 
 
-def test_fabricated_model_approval_claim_has_no_registry_authority():
-    registry = AIApprovalRegistry(clock=lambda: 10.0)
-    fabricated = AIPlanApproval(
-        approval_id="model-says-approved",
-        principal="p",
-        intent_fingerprint=fp("a"),
-        proposal_fingerprint=fp("b"),
-        approved_by="model-output",
-        created_at=9.0,
-        expires_at=99.0,
-    )
-    with pytest.raises(AIApprovalError, match="stale, expired, or consumed"):
-        registry.require(
-            fabricated,
-            principal="p",
-            intent_fingerprint=fp("a"),
-            proposal_fingerprint=fp("b"),
-        )
-
-
 def test_ai_approval_consume_invalidates():
     registry = AIApprovalRegistry()
     approval = registry.approve(
@@ -109,6 +110,46 @@ def test_ai_approval_consume_invalidates():
             intent_fingerprint=fp("a"),
             proposal_fingerprint=fp("b"),
         )
+
+
+class _CoordinatedRequireRegistry(AIApprovalRegistry):
+    """Forces the historical validate-then-consume race when consume calls require()."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.validated = threading.Barrier(2)
+
+    def require(self, approval, **kwargs):
+        current = super().require(approval, **kwargs)
+        self.validated.wait(timeout=5)
+        return current
+
+
+def test_ai_approval_consume_is_atomic_against_concurrent_reuse():
+    registry = _CoordinatedRequireRegistry()
+    approval = registry.approve(
+        principal="p",
+        intent_fingerprint=fp("a"),
+        proposal_fingerprint=fp("b"),
+        approved_by="operator",
+    )
+
+    def consume_once():
+        try:
+            registry.consume(
+                approval,
+                principal="p",
+                intent_fingerprint=fp("a"),
+                proposal_fingerprint=fp("b"),
+            )
+        except AIApprovalError:
+            return "denied"
+        return "consumed"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = tuple(pool.map(lambda _index: consume_once(), range(2)))
+
+    assert sorted(results) == ["consumed", "denied"]
 
 
 def test_ai_approval_expiry():

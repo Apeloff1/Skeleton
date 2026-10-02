@@ -21,12 +21,14 @@ on:
       - '!.github/workflows/**'
       - '.github/workflows/ci.yml'
 
-# Collapse superseded validation for the same PR or branch so rapid pushes do
-# not occupy runner capacity with stale commits. Workflow name keeps unrelated
-# pipelines isolated while PR number/ref scopes cancellation to one change set.
+# Collapse superseded validation for the same PR so rapid pushes do not occupy
+# runner capacity with stale commits. Pushes to main/develop queue behind the
+# active run instead of cancelling it, so every landed commit gets a verdict.
+# Workflow name keeps unrelated pipelines isolated while PR number/ref scopes
+# cancellation to one change set.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11.16"

@@ -3,9 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Callable, Mapping, Protocol, runtime_checkable
 
 from skeleton.shells.ai.protocol import AIModelRequest, AIModelResponse, parse_model_response
+
+
+class ModelPrivacyBoundary(str, Enum):
+    """Maximum data boundary a model/provider may receive."""
+
+    LOCAL = "local"
+    PRIVATE_REMOTE = "private_remote"
+    EXTERNAL = "external"
+
+    @property
+    def rank(self) -> int:
+        return {
+            ModelPrivacyBoundary.LOCAL: 0,
+            ModelPrivacyBoundary.PRIVATE_REMOTE: 1,
+            ModelPrivacyBoundary.EXTERNAL: 2,
+        }[self]
 
 
 @dataclass(frozen=True)
@@ -16,10 +33,16 @@ class ModelCapabilities:
     parallel_candidates: bool = False
     max_input_bytes: int = 2 * 1024 * 1024
     max_output_bytes: int = 2 * 1024 * 1024
+    privacy_boundary: ModelPrivacyBoundary = ModelPrivacyBoundary.EXTERNAL
 
     def __post_init__(self) -> None:
         if self.max_input_bytes <= 0 or self.max_output_bytes <= 0:
             raise ValueError("model byte limits must be positive")
+        object.__setattr__(
+            self,
+            "privacy_boundary",
+            ModelPrivacyBoundary(self.privacy_boundary),
+        )
 
 
 @runtime_checkable

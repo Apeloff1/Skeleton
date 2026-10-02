@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 from uuid import NAMESPACE_URL, uuid5
 
@@ -137,6 +138,7 @@ class FunctionalAIEvidence:
     status: str
     local_model_id: str
     local_model_digest: str
+    local_runtime_digest: str | None
     final_output_digest: str
     tool_receipt_count: int
     provider_receipts: tuple[str, ...]
@@ -159,6 +161,10 @@ class FunctionalAIEvidence:
             value = getattr(self, name)
             if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
                 raise ValueError(f"{name} must be lowercase sha256")
+        if self.local_runtime_digest is not None:
+            value = self.local_runtime_digest
+            if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise ValueError("local_runtime_digest must be lowercase sha256")
         if not all(ref.startswith("provider:local:") for ref in self.provider_receipts):
             raise ValueError("VS-001 provider receipts must all be local")
 
@@ -171,6 +177,7 @@ class FunctionalAIEvidence:
             "status": self.status,
             "local_model_id": self.local_model_id,
             "local_model_digest": self.local_model_digest,
+            "local_runtime_digest": self.local_runtime_digest,
             "final_output_digest": self.final_output_digest,
             "tool_receipt_count": self.tool_receipt_count,
             "provider_receipts": list(self.provider_receipts),
@@ -211,6 +218,7 @@ class FunctionalAIRuntime:
         self.repository = repository
         self.local_model = local_model
         self.tools = tools
+        self.startup_qualification_receipt: Mapping[str, object] | None = None
         self.runtime = CognitiveExecutionRuntime(
             repository,
             local_model,
@@ -218,6 +226,40 @@ class FunctionalAIRuntime:
             verification_hook=verification_hook,
             finalization_binding_hook=finalization_binding_hook,
         )
+
+    @classmethod
+    def from_local_model_manifest(
+        cls,
+        repository: SQLiteExecutionRepository,
+        manifest_path: str | Path,
+        tools: AsyncToolRuntime,
+        *,
+        verification_hook: VerificationHook,
+        finalization_binding_hook: FinalizationHook | None = None,
+        cache_size: int = 0,
+        default_seed: int = 0,
+        rehash_artifacts_each_run: bool = False,
+    ) -> "FunctionalAIRuntime":
+        from skeleton.ai.runtime.inference.deployment import (
+            load_local_model_adapter,
+            qualify_local_model_deployment_sync,
+        )
+
+        qualification = qualify_local_model_deployment_sync(manifest_path)
+        runtime = cls(
+            repository,
+            load_local_model_adapter(
+                manifest_path,
+                cache_size=cache_size,
+                default_seed=default_seed,
+                rehash_artifacts_each_run=rehash_artifacts_each_run,
+            ),
+            tools,
+            verification_hook=verification_hook,
+            finalization_binding_hook=finalization_binding_hook,
+        )
+        runtime.startup_qualification_receipt = qualification
+        return runtime
 
     async def execute(self, request: FunctionalAIRequest) -> FunctionalAIRun:
         if not isinstance(request, FunctionalAIRequest):
@@ -252,6 +294,7 @@ class FunctionalAIRuntime:
             status=terminal.status,
             local_model_id=self.local_model.model,
             local_model_digest=self.local_model.engine.model.model_digest,
+            local_runtime_digest=self.local_model.runtime_digest,
             final_output_digest=hashlib.sha256(
                 terminal.final_output.encode("utf-8")
             ).hexdigest(),

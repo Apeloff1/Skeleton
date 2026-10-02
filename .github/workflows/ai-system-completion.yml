@@ -1,0 +1,244 @@
+name: AI System Completion
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/runtime/system_completion.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/context/**"
+      - "skeleton/ai/runtime/memory/**"
+      - "skeleton/ai/learning/**"
+      - "skeleton/ai/evaluation/system_qualification.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_ai_system_completion_plane.py"
+      - "skeleton/testing/test_vs001_functional_ai.py"
+      - "skeleton/testing/test_vs005_self_improvement.py"
+      - "tests/test_ai_system_completion_verifier.py"
+      - "tests/test_ai_system_qualification.py"
+      - "tests/test_ai_system_qualification_receipt_verifier.py"
+      - "machine/ai_system_completion_contract.json"
+      - "scripts/verify_ai_system_completion.py"
+      - "scripts/run_ai_system_completion_qualification.py"
+      - "scripts/verify_ai_system_qualification_receipt.py"
+      - ".github/workflows/ai-system-completion.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/runtime/system_completion.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/context/**"
+      - "skeleton/ai/runtime/memory/**"
+      - "skeleton/ai/learning/**"
+      - "skeleton/ai/evaluation/system_qualification.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_ai_system_completion_plane.py"
+      - "skeleton/testing/test_vs001_functional_ai.py"
+      - "skeleton/testing/test_vs005_self_improvement.py"
+      - "tests/test_ai_system_completion_verifier.py"
+      - "tests/test_ai_system_qualification.py"
+      - "tests/test_ai_system_qualification_receipt_verifier.py"
+      - "machine/ai_system_completion_contract.json"
+      - "scripts/verify_ai_system_completion.py"
+      - "scripts/run_ai_system_completion_qualification.py"
+      - "scripts/verify_ai_system_qualification_receipt.py"
+      - ".github/workflows/ai-system-completion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-system-completion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  system-completion:
+    name: Non-compensable system completion
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Run integrated completion and inherited vertical regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_ai_system_completion_plane.py
+          skeleton/testing/test_vs001_functional_ai.py
+          skeleton/testing/test_vs005_self_improvement.py
+          skeleton/testing/test_sandbox_isolation.py
+          skeleton/testing/test_sandbox_sanitize_inject.py
+          skeleton/testing/test_shell_ai_observation_metrics_audit.py
+          skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_outbound_url_resolution_security.py
+          skeleton/testing/test_security_outbound_http.py
+          skeleton/testing/test_admission_runtime.py
+          skeleton/testing/test_execution_repository.py
+          tests/test_ai_system_completion_verifier.py
+          tests/test_ai_system_qualification.py
+          tests/test_ai_system_qualification_receipt_verifier.py
+
+      - name: Run executable assembled-AI qualification
+        env:
+          COMPLETION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/run_ai_system_completion_qualification.py
+          --head-sha "$COMPLETION_HEAD_SHA"
+          --evidence-out .ai-system-runtime-qualification.json
+          --print-evidence
+
+      - name: Independently rehash qualification receipt
+        env:
+          COMPLETION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_system_qualification_receipt.py
+          .ai-system-runtime-qualification.json
+          --head-sha "$COMPLETION_HEAD_SHA"
+          --evidence-out .ai-system-runtime-qualification-verification.json
+          --print-evidence
+
+      - name: Assert independent qualification verifier receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          verdict = json.loads(
+              Path(
+                  ".ai-system-runtime-qualification-verification.json"
+              ).read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if verdict.get("expected_head") != expected:
+              raise SystemExit("independent verifier is not exact-head")
+          if (
+              verdict.get("verifier")
+              != "independent-ai-system-qualification-receipt-v1"
+          ):
+              raise SystemExit("unexpected qualification verifier identity")
+          if verdict.get("valid") is not True or verdict.get("errors"):
+              raise SystemExit("independent qualification verification failed")
+          if len(verdict.get("contract_digest") or "") != 64:
+              raise SystemExit("qualification contract digest is missing")
+          if len(verdict.get("receipt_digest") or "") != 64:
+              raise SystemExit("qualification receipt was not independently hashed")
+          if len(verdict.get("verifier_digest") or "") != 64:
+              raise SystemExit("qualification verifier digest is missing")
+          print("Independent qualification receipt verified:", expected)
+          PY
+
+      - name: Assert executable qualification receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-system-runtime-qualification.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          report = receipt.get("report") or {}
+          proofs = report.get("proofs") or []
+          if receipt.get("source_revision") != expected:
+              raise SystemExit("runtime qualification receipt is not exact-head")
+          if receipt.get("valid") is not True:
+              raise SystemExit("runtime qualification receipt is invalid")
+          if report.get("valid") is not True:
+              raise SystemExit("runtime system-completion report is invalid")
+          if report.get("source_revision") != expected:
+              raise SystemExit("runtime report source revision is not exact-head")
+          if report.get("missing") or report.get("failed"):
+              raise SystemExit("runtime report contains open completion proofs")
+          if len(proofs) != 32:
+              raise SystemExit("runtime qualification must emit 32 proofs")
+          if any(proof.get("source_revision") != expected for proof in proofs):
+              raise SystemExit("a runtime proof is from a different source revision")
+          subject = receipt.get("subject_id")
+          if not subject or any(proof.get("subject_id") != subject for proof in proofs):
+              raise SystemExit("runtime proof subjects diverge")
+          if receipt.get("network_attempt_count") != 0:
+              raise SystemExit("runtime qualification attempted network I/O")
+          if receipt.get("primary_result_digest") != receipt.get("replay_result_digest"):
+              raise SystemExit("fresh replay result digest diverged")
+          if receipt.get("primary_output_digest") != receipt.get("replay_output_digest"):
+              raise SystemExit("fresh replay output digest diverged")
+          if receipt.get("observed_tool_ids") != receipt.get("replay_observed_tool_ids"):
+              raise SystemExit("fresh replay tool trace diverged")
+          if len(receipt.get("digest") or "") != 64:
+              raise SystemExit("runtime qualification digest is missing")
+          if len(report.get("digest") or "") != 64:
+              raise SystemExit("runtime report digest is missing")
+          if any(len(proof.get("digest") or "") != 64 for proof in proofs):
+              raise SystemExit("a runtime completion proof digest is missing")
+          print("Executable AI system qualification exact-head:", expected)
+          PY
+
+      - name: Emit exact-head system completion receipt
+        env:
+          COMPLETION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_system_completion.py
+          --head-sha "$COMPLETION_HEAD_SHA"
+          --evidence-out .ai-system-completion.json
+          --print-evidence
+
+      - name: Assert exact-head non-compensable closure receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-system-completion.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("system completion receipt is not exact-head")
+          if receipt.get("verifier") != "independent-ai-system-completion-v1":
+              raise SystemExit("unexpected system completion verifier identity")
+          if receipt.get("requirement_count") != 32:
+              raise SystemExit("system completion must prove exactly 32 required planes")
+          if receipt.get("requirements") != receipt.get("runtime_requirements"):
+              raise SystemExit("machine/runtime completion requirement inventories diverge")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("system completion receipt is invalid")
+          if not receipt.get("contract_digest"):
+              raise SystemExit("system completion contract is not digest-bound")
+          if len(receipt.get("file_digests") or {}) < 37:
+              raise SystemExit("system completion source bindings are incomplete")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("system completion receipt digest is missing")
+          print("AI system completion exact-head receipt:", expected)
+          PY

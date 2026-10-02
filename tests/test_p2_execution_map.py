@@ -132,6 +132,35 @@ class P2ExecutionMapTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2ValidationError, "all dependencies are landed"):
             MODULE.validate(root)
 
+    def test_rejects_stale_progress_projection(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_execution_map.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["progress"]["landed_unpromoted_tasks"] = data["progress"][
+            "landed_unpromoted_tasks"
+        ][:-1]
+        data["progress"]["active_tasks"] = ["P2-T1-FUNCTIONAL-01"]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.P2ValidationError,
+            "progress .* drift",
+        ):
+            MODULE.validate(root)
+
+    def test_rejects_progress_task_double_count(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_p2_execution_map.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["progress"]["active_tasks"] = [
+            data["progress"]["landed_unpromoted_tasks"][0]
+        ]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(
+            MODULE.P2ValidationError,
+            "progress active_tasks drift|cover each task exactly once",
+        ):
+            MODULE.validate(root)
+
     def test_rejects_landed_task_without_evidence(self) -> None:
         root = self._fixture()
         path = root / "machine/ai_p2_task_backlog.json"
