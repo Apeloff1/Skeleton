@@ -108,10 +108,64 @@ def test_scrub_env_drops_secrets() -> None:
         scrub_env({"API_KEY": "nope"})
 
 
+def test_scrub_env_pins_trusted_path_and_rejects_runtime_overrides() -> None:
+    env = scrub_env(base={"PATH": "/tmp/evil:/bin", "LANG": "C"})
+    assert env["PATH"] == "/usr/local/bin:/usr/bin:/bin"
+    for key in ("PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "DYLD_INSERT_LIBRARIES"):
+        with pytest.raises(ProcessPolicyError):
+            scrub_env({key: "/tmp/evil"}, base={})
+
+
 def test_argv_policy() -> None:
     for bad in ("ls -la", [], ["a\x00"], [1]):
         with pytest.raises(ProcessPolicyError):
             check_argv(bad)
+
+
+@posix_only
+def test_process_basename_ignores_attacker_controlled_parent_path(
+    jail: FsJail,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    evil = tmp_path / "evil"
+    evil.mkdir()
+    fake = evil / "true"
+    fake.write_text("#!/bin/sh\necho shadowed\n", encoding="utf-8")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", str(evil) + os.pathsep + os.environ.get("PATH", ""))
+    result = run_isolated(["true"], jail=jail)
+    assert result.ok
+    assert result.stdout == b""
+    assert result.argv[0] != str(fake)
+
+
+@posix_only
+def test_process_rejects_relative_executable_shadowing(jail: FsJail) -> None:
+    fake = jail.root / "tool"
+    fake.write_text("#!/bin/sh\necho shadowed\n", encoding="utf-8")
+    fake.chmod(0o755)
+    with pytest.raises(ProcessPolicyError, match="relative executable paths"):
+        run_isolated(["./tool"], jail=jail)
+
+
+@posix_only
+def test_process_child_cannot_inherit_python_or_loader_injection(
+    jail: FsJail,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("PYTHONPATH", "/tmp/evil-python")
+    monkeypatch.setenv("LD_PRELOAD", "/tmp/evil.so")
+    result = run_isolated(
+        [
+            sys.executable,
+            "-c",
+            "import os; print(os.environ.get('PYTHONPATH')); print(os.environ.get('LD_PRELOAD'))",
+        ],
+        jail=jail,
+    )
+    assert result.ok, result.stderr
+    assert result.text().splitlines() == ["None", "None"]
 
 
 @posix_only

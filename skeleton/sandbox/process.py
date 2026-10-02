@@ -29,8 +29,18 @@ from typing import Any
 from .errors import ProcessLimitError, ProcessPolicyError
 from .fs import FsJail
 
-SAFE_ENV_KEYS = frozenset({"PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TERM", "PYTHONHASHSEED", "PYTHONIOENCODING"})
+SAFE_ENV_KEYS = frozenset({"LANG", "LC_ALL", "LC_CTYPE", "TZ", "TERM", "PYTHONHASHSEED", "PYTHONIOENCODING"})
 _SECRET_HINTS = ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "KEY", "CREDENTIAL", "AUTH", "COOKIE", "SESSION")
+_DENIED_ENV_KEYS = frozenset({
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "VIRTUAL_ENV",
+    "BASH_ENV",
+    "ENV",
+})
 DEFAULT_PATH = "/usr/local/bin:/usr/bin:/bin"
 MAX_ARGV = 256
 MAX_ARG_CHARS = 32_768
@@ -85,13 +95,16 @@ def scrub_env(extra: Mapping[str, str] | None = None, *, base: Mapping[str, str]
     """Allowlisted environment; ``extra`` keys that look secret are refused."""
     src = os.environ if base is None else base
     env = {k: v for k, v in src.items() if k in SAFE_ENV_KEYS}
-    env.setdefault("PATH", DEFAULT_PATH)
+    env["PATH"] = DEFAULT_PATH
     env["PYTHONHASHSEED"] = env.get("PYTHONHASHSEED", "0")
     for key, value in (extra or {}).items():
         if not isinstance(key, str) or not key.replace("_", "").isalnum() or not isinstance(value, str):
             raise ProcessPolicyError("invalid environment entry", context={"key": repr(key)[:40]})
-        if any(h in key.upper() for h in _SECRET_HINTS):
+        upper = key.upper()
+        if any(h in upper for h in _SECRET_HINTS):
             raise ProcessPolicyError("secret-looking environment keys cannot be passed into the sandbox", context={"key": key})
+        if upper in _DENIED_ENV_KEYS or upper.startswith(("LD_", "DYLD_")):
+            raise ProcessPolicyError("process-control environment key cannot be overridden", context={"key": key})
         if "\x00" in value:
             raise ProcessPolicyError("environment values may not contain NUL")
         env[key] = value
@@ -109,6 +122,22 @@ def check_argv(argv: Sequence[str]) -> tuple[str, ...]:
             raise ProcessPolicyError("arguments must be NUL-free strings of bounded size")
         out.append(a)
     return tuple(out)
+
+
+def _resolve_argv0(args: tuple[str, ...]) -> tuple[str, ...]:
+    argv0 = args[0]
+    if os.path.isabs(argv0):
+        resolved = os.path.realpath(argv0)
+        if not os.path.isfile(resolved) or not os.access(resolved, os.X_OK):
+            raise ProcessPolicyError("executable is not a runnable regular file", context={"argv0": argv0})
+    else:
+        if "/" in argv0 or "\\" in argv0:
+            raise ProcessPolicyError("relative executable paths are forbidden", context={"argv0": argv0})
+        found = shutil.which(argv0, path=DEFAULT_PATH)
+        if found is None:
+            raise ProcessPolicyError("executable not found in trusted path", context={"argv0": argv0})
+        resolved = os.path.realpath(found)
+    return (resolved, *args[1:])
 
 
 def _preexec(limits: ProcessLimits):
@@ -136,7 +165,7 @@ def _preexec(limits: ProcessLimits):
 
 
 def network_isolation_available() -> bool:
-    exe = shutil.which("unshare")
+    exe = shutil.which("unshare", path=DEFAULT_PATH)
     if exe is None or not sys.platform.startswith("linux"):
         return False
     try:
@@ -169,7 +198,7 @@ def run_isolated(
     if os.name != "posix":
         raise ProcessPolicyError("process isolation requires POSIX")
     lim = limits or ProcessLimits()
-    args = check_argv(argv)
+    args = _resolve_argv0(check_argv(argv))
     owned = jail is None
     box = jail or FsJail.temporary(prefix="sbx-proc-")
     try:
@@ -190,7 +219,10 @@ def _run(args: tuple[str, ...], box: FsJail, cwd: str | None, stdin: bytes | Non
     if lim.network == "deny":
         if not network_isolation_available():
             raise ProcessPolicyError("network isolation requested but unavailable (fail closed)")
-        launch = [shutil.which("unshare") or "unshare", "--user", "--map-root-user", "--net", "--", *launch]
+        unshare = shutil.which("unshare", path=DEFAULT_PATH)
+        if unshare is None:
+            raise ProcessPolicyError("network isolation executable missing from trusted path")
+        launch = [os.path.realpath(unshare), "--user", "--map-root-user", "--net", "--", *launch]
 
     started = time.monotonic()
     try:

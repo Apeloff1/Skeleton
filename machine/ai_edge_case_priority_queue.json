@@ -742,13 +742,16 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_process_boundary_pending_exact_head_ci",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-016",
@@ -1104,13 +1107,16 @@
         "property"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_process_boundary_pending_exact_head_ci",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-019",
