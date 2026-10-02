@@ -30,6 +30,15 @@ from skeleton.forge.forge_quality import (
     persist_quality,
 )
 from skeleton.forge.validators import validate_with_quality
+from skeleton.forge.quality_rubric import rubric_for_verdict, rubric_from_item, suggest_next_actions
+from skeleton.forge.polish_scorecard import scorecard_batch, scorecard_for_item
+from skeleton.forge.polish_pipeline import (
+    batch_polish,
+    inspect_artefact as inspect_forge_artefact,
+    qc_dashboard as forge_qc_dashboard,
+    repair_cta_payload,
+    run_polish,
+)
 from skeleton.forge.validator import (
     CompositeValidator,
     Severity,
@@ -74,6 +83,16 @@ __all__ = [
     "candidate_failures",
     "attempt_repair",
     "polish_artefact",
+    "rubric_for_verdict",
+    "rubric_from_item",
+    "suggest_next_actions",
+    "scorecard_for_item",
+    "scorecard_batch",
+    "run_polish",
+    "batch_polish",
+    "inspect_forge_artefact",
+    "forge_qc_dashboard",
+    "repair_cta_payload",
     "forge_verify_until_green",
     "Blueprint",
     "Component",

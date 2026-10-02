@@ -29,7 +29,12 @@ def test_heavy_pr_validation_defers_drafts_and_restarts_when_ready() -> None:
             assert action in text, f"{name} lost required PR lifecycle action {action}"
 
         assert "concurrency:" in text, f"{name} must retain per-PR concurrency"
-        assert "github.event.pull_request.number" in text, (
+        # Per-PR lanes may key on the PR number, or (frontier-contracts) on the
+        # PR head ref so push and pull_request events for one branch coalesce.
+        assert (
+            "github.event.pull_request.number" in text
+            or "github.event.pull_request.head.ref" in text
+        ), (
             f"{name} must keep all PR lifecycle events in the same concurrency lane"
         )
         assert "github.event.pull_request.draft" in text, (
