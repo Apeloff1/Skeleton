@@ -33,6 +33,7 @@ from skeleton.contracts.ai_execution import (
     AgentTurn,
     ExecutionCheckpoint,
     ExecutionState,
+    execution_payload_digest,
 )
 from skeleton.ai.learning.promotion import (
     EvaluationReceipt,
@@ -1724,31 +1725,43 @@ def _persistence_reliability_cycle(
             "qualification expected a state-journal transition event"
         )
     original_event_json = str(journal_row["event_json"])
+    original_event = json.loads(original_event_json)
+    forged_event = dict(original_event)
+    forged_event["mutation"] = "checkpoint"
+    forged_event_digest = execution_payload_digest(forged_event)
     repository._connection.execute(
         """
         UPDATE ai_execution_state_journal
-        SET event_json = replace(
-            event_json,
-            '"mutation":"transition"',
-            '"mutation":"forged-transition"'
-        )
+        SET event_json = ?, event_digest = ?
         WHERE namespace = ? AND execution_id = ? AND sequence = 2
         """,
-        (repository.namespace, request.execution_id),
+        (
+            json.dumps(
+                forged_event,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            forged_event_digest,
+            repository.namespace,
+            request.execution_id,
+        ),
     )
     state_journal_tamper_rejected = False
     try:
         repository.state_history(request.execution_id)
-    except ExecutionRepositoryCorruption:
-        state_journal_tamper_rejected = True
+    except ExecutionRepositoryCorruption as exc:
+        state_journal_tamper_rejected = (
+            "mutation semantics mismatch" in str(exc)
+        )
     repository._connection.execute(
         """
         UPDATE ai_execution_state_journal
-        SET event_json = ?
+        SET event_json = ?, event_digest = ?
         WHERE namespace = ? AND execution_id = ? AND sequence = 2
         """,
         (
             original_event_json,
+            execution_payload_digest(original_event),
             repository.namespace,
             request.execution_id,
         ),
