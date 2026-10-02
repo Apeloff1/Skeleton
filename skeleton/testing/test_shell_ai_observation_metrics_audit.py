@@ -8,7 +8,11 @@ from skeleton.shells.ai.audit_export import AIAuditExporter
 from skeleton.shells.ai.calibration import AICalibration
 from skeleton.shells.ai.journal import AIDecisionJournal
 from skeleton.shells.ai.metrics import AIShellMetrics
-from skeleton.shells.ai.model_port import CallableAIModelPort, ModelCapabilities
+from skeleton.shells.ai.model_port import (
+    CallableAIModelPort,
+    ModelCapabilities,
+    ModelPrivacyBoundary,
+)
 from skeleton.shells.ai.observation import AIObservation
 from skeleton.shells.ai.observation_policy import (
     ObservationExposure,
@@ -176,6 +180,50 @@ def test_provider_router_structured_tool_capability_bonus():
     strong = model("strong", structured_output=True, tool_use=True)
     routes = router.route((weak, strong))
     assert routes[0].model.model_id == "strong"
+
+
+def test_provider_router_local_boundary_never_falls_back_external():
+    health = ProviderHealthRegistry()
+    health.record_failure("local")
+    health.record_success("external", latency_ms=1)
+    router = AIProviderRouter(health)
+    routes = router.route(
+        (
+            model("external", privacy_boundary=ModelPrivacyBoundary.EXTERNAL),
+            model("local", privacy_boundary=ModelPrivacyBoundary.LOCAL),
+        ),
+        max_privacy_boundary=ModelPrivacyBoundary.LOCAL,
+    )
+    assert [item.model.model_id for item in routes] == ["local"]
+    assert routes[0].model.capabilities.privacy_boundary is ModelPrivacyBoundary.LOCAL
+
+
+def test_provider_router_private_boundary_excludes_external():
+    health = ProviderHealthRegistry()
+    router = AIProviderRouter(health)
+    routes = router.route(
+        (
+            model("external", privacy_boundary=ModelPrivacyBoundary.EXTERNAL),
+            model("private", privacy_boundary=ModelPrivacyBoundary.PRIVATE_REMOTE),
+            model("local", privacy_boundary=ModelPrivacyBoundary.LOCAL),
+        ),
+        max_privacy_boundary=ModelPrivacyBoundary.PRIVATE_REMOTE,
+    )
+    assert {item.model.model_id for item in routes} == {"private", "local"}
+    assert all(
+        item.model.capabilities.privacy_boundary.rank
+        <= ModelPrivacyBoundary.PRIVATE_REMOTE.rank
+        for item in routes
+    )
+
+
+def test_provider_route_serializes_privacy_boundary():
+    health = ProviderHealthRegistry()
+    route = AIProviderRouter(health).route(
+        (model("local", privacy_boundary="local"),),
+        max_privacy_boundary="local",
+    )[0]
+    assert route.to_dict()["privacy_boundary"] == "local"
 
 
 def test_provider_router_uses_trust_when_available():
