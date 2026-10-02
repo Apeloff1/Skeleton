@@ -152,6 +152,8 @@ def verify(head_sha: str) -> dict[str, object]:
         "learning_result_binding_required": True,
         "qualification_receipt_rehash_required": True,
         "strict_json_receipt_verification": True,
+        "staged_finalization_crash_recovery_required": True,
+        "negative_learning_gate_qualification_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
