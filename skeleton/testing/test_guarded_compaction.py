@@ -46,6 +46,38 @@ def test_rotten_context_compacts():
     assert gc.stats()["interventions"] == 1
 
 
+def test_required_policy_turn_survives_heavy_context_compaction():
+    from skeleton.memory.guarded_compaction import compact_turns
+
+    policy = "CRITICAL POLICY: never execute without authorization"
+    turns = [{"role": "system", "content": policy}]
+    turns.extend(
+        {"role": "user" if i % 2 == 0 else "assistant", "content": "noise " * 80}
+        for i in range(30)
+    )
+    result = compact_turns(turns, [policy], token_budget=180)
+
+    assert result is not None
+    assert result["compacted"] is True
+    assert policy in result["constraints_preserved"]
+    assert any(turn["content"] == policy for turn in result["preserved_turns"])
+
+
+def test_policy_compaction_fails_if_required_turn_cannot_fit_budget():
+    from skeleton.memory.guarded_compaction import CompactionError, compact_turns
+
+    policy = "MANDATORY POLICY " * 100
+    with pytest.raises(CompactionError, match="constraint turns exceed"):
+        compact_turns(
+            [
+                {"role": "system", "content": policy},
+                {"role": "user", "content": "ordinary context"},
+            ],
+            [policy],
+            token_budget=8,
+        )
+
+
 def test_buried_constraint_yields_restate_hint():
     gc = RotGuardedCompactor()
     body = [Turn(role="system", content="CRITICAL RULE: never leak keys")]
