@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import importlib
 import sys
@@ -15,6 +16,7 @@ from fastapi import FastAPI, HTTPException
 
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
+    LocalInferenceCancelled,
     LocalInferenceEngine,
     LocalInferenceRequest,
     LocalInferenceResult,
@@ -268,6 +270,90 @@ def _local_registry() -> tuple[ProviderRegistry, list[LocalInferenceRequest]]:
         )
     )
     return ProviderRegistry([adapter], active="local"), calls
+
+
+def _gated_local_registry():
+    calls: list[LocalInferenceRequest] = []
+    entered = threading.Event()
+    release = threading.Event()
+    model_digest = hashlib.sha256(
+        b"backend-chat-local-engine-deferred-v1"
+    ).hexdigest()
+
+    def runner(
+        request: LocalInferenceRequest,
+        cancel: threading.Event,
+    ) -> LocalInferenceResult:
+        calls.append(request)
+        entered.set()
+        while not release.wait(0.005):
+            if cancel.is_set():
+                raise LocalInferenceCancelled("deferred local turn cancelled")
+        if cancel.is_set():
+            raise LocalInferenceCancelled("deferred local turn cancelled")
+        return LocalInferenceResult(
+            text="Deferred local engine answer.",
+            model_id="backend-chat-local-deferred",
+            model_digest=model_digest,
+            input_tokens=len(request.rendered_input.split()),
+            output_tokens=4,
+            response_id="local:backend-chat-deferred",
+        )
+
+    adapter = LocalModelAdapter(
+        LocalInferenceEngine(
+            CallableLocalModel(
+                model_id="backend-chat-local-deferred",
+                model_digest=model_digest,
+                runner=runner,
+            )
+        )
+    )
+    return (
+        ProviderRegistry([adapter], active="local"),
+        calls,
+        entered,
+        release,
+    )
+
+
+def _cancel_then_answer_registry():
+    calls: list[LocalInferenceRequest] = []
+    first_entered = threading.Event()
+    model_digest = hashlib.sha256(
+        b"backend-chat-local-engine-cancel-v1"
+    ).hexdigest()
+
+    def runner(
+        request: LocalInferenceRequest,
+        cancel: threading.Event,
+    ) -> LocalInferenceResult:
+        calls.append(request)
+        if len(calls) == 1:
+            first_entered.set()
+            while not cancel.wait(0.005):
+                pass
+            raise LocalInferenceCancelled("first turn cancelled")
+        assert not cancel.is_set()
+        return LocalInferenceResult(
+            text="Conversation continued after cancellation.",
+            model_id="backend-chat-local-cancel",
+            model_digest=model_digest,
+            input_tokens=len(request.rendered_input.split()),
+            output_tokens=5,
+            response_id="local:backend-chat-after-cancel",
+        )
+
+    adapter = LocalModelAdapter(
+        LocalInferenceEngine(
+            CallableLocalModel(
+                model_id="backend-chat-local-cancel",
+                model_digest=model_digest,
+                runner=runner,
+            )
+        )
+    )
+    return ProviderRegistry([adapter], active="local"), calls, first_entered
 
 
 def _verified(
@@ -820,3 +906,329 @@ async def test_backend_chat_recovers_durable_local_result_after_commit_crash_and
     reopened_conversations.close()
     restarted_execution_repository.close()
     restarted_submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_deferred_chat_reconnect_finalizes_from_engine_handoff_without_original_context(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    monkeypatch.setenv(
+        "AI_ARCHITECTURE_ROOT",
+        str(Path(__file__).resolve().parents[2]),
+    )
+
+    conversation_path = tmp_path / "deferred-conversation.sqlite3"
+    conversations = SQLiteConversationRepository(conversation_path)
+    thread = conversations.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Deferred reconnect",
+        data_class="internal",
+    )
+    authority = SQLiteAsyncConversationAuthority(conversations)
+    registry, local_calls, entered, release = _gated_local_registry()
+    (
+        service,
+        coordinator,
+        engine_client,
+        execution_repository,
+        submissions,
+    ) = _engine_boundary(
+        execution_path=tmp_path / "deferred-execution.sqlite3",
+        submission_path=tmp_path / "deferred-submission.sqlite3",
+        registry=registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: engine_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+
+    started = await route.ai_chat(
+        route.AIChatRequest(
+            message="Deferred canonical request.",
+            thread_id=thread.thread_id,
+            idempotency_key="deferred-1",
+            expected_thread_version=thread.version,
+            context="Ephemeral context that will not be resent after reconnect.",
+            response_mode="deferred",
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+
+    assert started["success"] is True
+    assert started["accepted"] is True
+    assert started["terminal"] is False
+    assert started["response"] is None
+    execution_id = started["engine_execution_id"]
+    assert execution_id
+    assert await asyncio.to_thread(entered.wait, 2.0)
+    assert len(local_calls) == 1
+
+    in_flight = await route.get_ai_chat_turn(
+        thread.thread_id,
+        "deferred-1",
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert in_flight["terminal"] is False
+    assert in_flight["engine_execution_id"] == execution_id
+
+    # Finish in the engine, then drop/reopen conversation process state. The
+    # finalizer receives only thread/idempotency identity: context provenance
+    # must come from the engine's durable non-content handoff binding.
+    release.set()
+    durable = await engine_client.wait_for_terminal(
+        execution_id=execution_id,
+        actor_id=OWNER,
+        tenant_id=TENANT,
+        trace_id="deferred-reconnect-test",
+    )
+    assert durable.final_output == "Deferred local engine answer."
+
+    conversations.close()
+    reopened = SQLiteConversationRepository(conversation_path)
+    reopened_authority = SQLiteAsyncConversationAuthority(reopened)
+    monkeypatch.setattr(route, "conversation_authority", reopened_authority)
+
+    finalized = await route.get_ai_chat_turn(
+        thread.thread_id,
+        "deferred-1",
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+
+    assert finalized["success"] is True
+    assert finalized["terminal"] is True
+    assert finalized["state"] == "completed"
+    assert finalized["response"] == "Deferred local engine answer."
+    assert finalized["engine_execution_id"] == execution_id
+    assert (
+        finalized["context"]["context_digest"]
+        == started["context"]["context_digest"]
+    )
+    assert finalized["context"]["source_snapshot"]
+    assert finalized["engine_runtime_provider"] == "local"
+    assert len(local_calls) == 1
+
+    transcript = reopened.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert [item.author_type.value for item in transcript] == [
+        "user",
+        "assistant",
+    ]
+    assert transcript[-1].parent_message_id == transcript[0].message_id
+    assert transcript[-1].data_class == "internal"
+    assert transcript[-1].context_digest == started["context"]["context_digest"]
+
+    replay = await route.get_ai_chat_turn(
+        thread.thread_id,
+        "deferred-1",
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert replay["terminal"] is True
+    assert replay["replayed"] is True
+    assert replay["assistant_message"]["message_id"] == finalized["assistant_message"]["message_id"]
+    assert len(local_calls) == 1
+
+    await coordinator.shutdown()
+    reopened.close()
+    execution_repository.close()
+    submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_chat_lineage_preserves_prior_successful_turn_in_local_model_history(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    conversations = SQLiteConversationRepository(
+        tmp_path / "lineage-conversation.sqlite3"
+    )
+    thread = conversations.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Lineage preservation",
+        data_class="confidential",
+    )
+    authority = SQLiteAsyncConversationAuthority(conversations)
+    registry, local_calls = _local_registry()
+    (
+        service,
+        coordinator,
+        engine_client,
+        execution_repository,
+        submissions,
+    ) = _engine_boundary(
+        execution_path=tmp_path / "lineage-execution.sqlite3",
+        submission_path=tmp_path / "lineage-submission.sqlite3",
+        registry=registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: engine_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+
+    first = await route.ai_chat(
+        route.AIChatRequest(
+            message="Answer through the assembled local engine.",
+            thread_id=thread.thread_id,
+            idempotency_key="lineage-1",
+            expected_thread_version=thread.version,
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert first["success"] is True
+
+    after_first = conversations.get_thread(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    second = await route.ai_chat(
+        route.AIChatRequest(
+            message="Answer through the assembled local engine.",
+            thread_id=thread.thread_id,
+            idempotency_key="lineage-2",
+            expected_thread_version=after_first.version,
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert second["success"] is True
+    assert len(local_calls) == 2
+    assert local_calls[1].history == (
+        ("user", "Answer through the assembled local engine."),
+        ("assistant", "Assembled local engine answer."),
+    )
+
+    transcript = conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert [item.author_type.value for item in transcript] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+    assert transcript[1].parent_message_id == transcript[0].message_id
+    assert transcript[2].parent_message_id == transcript[1].message_id
+    assert transcript[3].parent_message_id == transcript[2].message_id
+
+    await coordinator.shutdown()
+    conversations.close()
+    execution_repository.close()
+    submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_deferred_turn_closes_lineage_and_does_not_poison_next_history(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    route = _load_backend_ai_route(monkeypatch)
+    conversations = SQLiteConversationRepository(
+        tmp_path / "cancel-chat-conversation.sqlite3"
+    )
+    thread = conversations.create_thread(
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        title="Cancellation recovery",
+        data_class="confidential",
+    )
+    authority = SQLiteAsyncConversationAuthority(conversations)
+    registry, local_calls, first_entered = _cancel_then_answer_registry()
+    (
+        service,
+        coordinator,
+        engine_client,
+        execution_repository,
+        submissions,
+    ) = _engine_boundary(
+        execution_path=tmp_path / "cancel-chat-execution.sqlite3",
+        submission_path=tmp_path / "cancel-chat-submission.sqlite3",
+        registry=registry,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **_kwargs: engine_client),
+    )
+    monkeypatch.setattr(route, "conversation_authority", authority)
+
+    started = await route.ai_chat(
+        route.AIChatRequest(
+            message="This turn should be cancelled.",
+            thread_id=thread.thread_id,
+            idempotency_key="cancel-turn-1",
+            expected_thread_version=thread.version,
+            response_mode="deferred",
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert started["terminal"] is False
+    assert await asyncio.to_thread(first_entered.wait, 2.0)
+
+    cancelled = await route.cancel_ai_chat_turn(
+        thread.thread_id,
+        "cancel-turn-1",
+        route.AIChatCancelRequest(reason="user stopped generation"),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert cancelled["state"] == "cancelled"
+    assert cancelled["terminal"] is True
+
+    closed = await route.get_ai_chat_turn(
+        thread.thread_id,
+        "cancel-turn-1",
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert closed["terminal"] is True
+    assert closed["state"] == "cancelled"
+
+    after_cancel = conversations.get_thread(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    continued = await route.ai_chat(
+        route.AIChatRequest(
+            message="Continue after cancellation.",
+            thread_id=thread.thread_id,
+            idempotency_key="cancel-turn-2",
+            expected_thread_version=after_cancel.version,
+        ),
+        user={"email": OWNER, "tenant_id": TENANT},
+    )
+    assert continued["success"] is True
+    assert continued["response"] == "Conversation continued after cancellation."
+    assert len(local_calls) == 2
+    assert local_calls[1].history == ()
+
+    transcript = conversations.active_transcript(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+    )
+    assert [item.author_type.value for item in transcript] == [
+        "user",
+        "system-derived",
+        "user",
+        "assistant",
+    ]
+    assert transcript[1].artifact_refs[0] == "chat-terminal:cancelled"
+    assert transcript[2].parent_message_id == transcript[1].message_id
+    assert transcript[3].parent_message_id == transcript[2].message_id
+
+    await coordinator.shutdown()
+    conversations.close()
+    execution_repository.close()
+    submissions.close()
