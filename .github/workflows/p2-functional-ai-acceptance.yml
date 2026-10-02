@@ -77,13 +77,13 @@ jobs:
           python scripts/check_p2_functional_ai_closure.py --json
       - name: Execute local Functional AI transaction
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_vs001_functional_ai.py
           tests/test_p2_functional_ai_closure.py
       - name: Exercise state, event, security and recovery prerequisites
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_stream_store.py
           skeleton/testing/test_data_governance.py

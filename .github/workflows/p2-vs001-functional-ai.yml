@@ -54,4 +54,4 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
       - name: Execute credential-free VS-001
-        run: python -m pytest -q skeleton/testing/test_local_inference.py skeleton/testing/test_vs001_functional_ai.py
+        run: python -m pytest -q -p pytest_asyncio.plugin skeleton/testing/test_local_inference.py skeleton/testing/test_vs001_functional_ai.py

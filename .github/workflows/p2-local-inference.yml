@@ -52,4 +52,4 @@ jobs:
           OPENAI_API_KEY: ""
           XAI_API_KEY: ""
           ANTHROPIC_API_KEY: ""
-        run: python -m pytest -q skeleton/testing/test_local_inference.py
+        run: python -m pytest -q -p pytest_asyncio.plugin skeleton/testing/test_local_inference.py
