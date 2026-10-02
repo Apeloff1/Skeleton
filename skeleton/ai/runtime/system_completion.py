@@ -36,6 +36,7 @@ class CompletionRequirement(str, Enum):
     OFFLINE_ISOLATION = "execution.offline_isolation"
     REQUEST_RESULT_BINDING = "execution.request_result_binding"
     BUDGET_BOUNDS = "execution.budget_bounds"
+    STOP_SEMANTICS = "execution.stop_semantics"
     TOOL_AUTHORITY = "execution.tool_authority"
     DURABLE_RECOVERY = "execution.durable_recovery"
     REPLAY_LINEAGE = "execution.replay_lineage"
@@ -443,6 +444,59 @@ class SystemCompletionPlane:
                 "observed_model_turns": len(providers),
                 "max_tool_calls": max_tool_calls,
                 "observed_tool_calls": len(tools),
+            },
+        )
+
+    def prove_stop_semantics(
+        self,
+        *,
+        deadline_result: AIExecutionResult,
+        cancellation_result: AIExecutionResult,
+    ) -> RequirementProof:
+        if not isinstance(deadline_result, AIExecutionResult):
+            raise CompletionPlaneError("deadline_result must be AIExecutionResult")
+        if not isinstance(cancellation_result, AIExecutionResult):
+            raise CompletionPlaneError(
+                "cancellation_result must be AIExecutionResult"
+            )
+        deadline_error = deadline_result.usage.get("error_code")
+        cancellation_error = cancellation_result.usage.get("error_code")
+        deadline_fenced = bool(
+            deadline_result.status == "failed"
+            and deadline_error == "execution_deadline_exceeded"
+            and deadline_result.final_output is None
+            and not deadline_result.provider_receipts
+            and not deadline_result.tool_receipts
+            and deadline_result.stream_terminal_event
+        )
+        cancellation_fenced = bool(
+            cancellation_result.status == "cancelled"
+            and cancellation_error == "cancellation_requested"
+            and cancellation_result.final_output is None
+            and not cancellation_result.provider_receipts
+            and not cancellation_result.tool_receipts
+            and cancellation_result.stream_terminal_event
+        )
+        refs = [
+            "execution-result:" + deadline_result.execution_id,
+            "execution-result:" + cancellation_result.execution_id,
+        ]
+        if deadline_result.stream_terminal_event:
+            refs.append("stream:" + deadline_result.stream_terminal_event)
+        if cancellation_result.stream_terminal_event:
+            refs.append("stream:" + cancellation_result.stream_terminal_event)
+        return self._proof(
+            CompletionRequirement.STOP_SEMANTICS,
+            passed=deadline_fenced and cancellation_fenced,
+            producer_id="cognitive-execution-runtime",
+            evidence_refs=refs,
+            details={
+                "deadline_status": deadline_result.status,
+                "deadline_error_code": deadline_error,
+                "deadline_fenced": deadline_fenced,
+                "cancellation_status": cancellation_result.status,
+                "cancellation_error_code": cancellation_error,
+                "cancellation_fenced": cancellation_fenced,
             },
         )
 
