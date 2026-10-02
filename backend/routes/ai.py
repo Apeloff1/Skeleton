@@ -1113,19 +1113,64 @@ async def ai_chat(
 
 @router.get("/providers")
 async def get_ai_providers() -> Dict[str, Any]:
-    """Return the application-visible engine provider boundary."""
+    """Return a sanitized view of the actual engine-owned runtime provider."""
 
-    available = _engine_configured()
-    return {
-        "providers": [
-            {
-                "id": "skeleton-engine",
-                "available": available,
-                "ownership": "engine-process",
+    try:
+        client = EngineClient.from_env()
+    except EngineClientError:
+        client = None
+    if client is None:
+        return {
+            "providers": [],
+            "active": None,
+            "engine": "skeleton-engine",
+            "llm_available": False,
+        }
+    try:
+        runtime = await client.provider_status()
+    except EngineClientError:
+        return {
+            "providers": [],
+            "active": None,
+            "engine": "skeleton-engine",
+            "llm_available": False,
+        }
+
+    public_providers: list[dict[str, Any]] = []
+    for raw in runtime["providers"]:
+        row = {
+            "id": raw["id"],
+            "model": raw.get("model"),
+            "available": bool(raw["available"]),
+            "ownership": "engine-process",
+        }
+        for key in ("execution_mode", "network_policy"):
+            value = raw.get(key)
+            if isinstance(value, str) and value:
+                row[key] = value
+        artifact = raw.get("artifact")
+        if isinstance(artifact, dict):
+            allowed = {
+                key: artifact.get(key)
+                for key in (
+                    "schema",
+                    "model_id",
+                    "model_digest",
+                    "artifact_sha256",
+                    "artifact_bytes",
+                    "reference",
+                )
+                if artifact.get(key) is not None
             }
-        ],
-        "active": "skeleton-engine" if available else None,
-        "llm_available": available,
+            if allowed:
+                row["artifact"] = allowed
+        public_providers.append(row)
+
+    return {
+        "providers": public_providers,
+        "active": runtime["active"],
+        "engine": "skeleton-engine",
+        "llm_available": bool(runtime["available"]),
     }
 
 
