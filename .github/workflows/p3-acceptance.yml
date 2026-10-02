@@ -53,6 +53,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Install focused acceptance runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
       - name: Validate P3 authority
         run: python scripts/check_p3_execution_map.py --json
       - name: Execute vertical and acceptance regressions
