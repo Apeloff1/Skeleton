@@ -4,7 +4,10 @@
   "purpose": "Fail-closed, non-compensable system completion contract for standalone AI/SI. Completion requires all cross-cutting proofs on one exact source revision; subsystem success cannot compensate for another missing plane.",
   "required_requirements": [
     "execution.local_model",
+    "execution.offline_isolation",
+    "execution.budget_bounds",
     "execution.durable_recovery",
+    "execution.replay_lineage",
     "execution.governed_effects",
     "verification.independent",
     "context.integrity",
