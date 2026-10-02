@@ -709,9 +709,12 @@ async def test_system_completion_plane_composes_real_runtime_planes(
 
     plane.prove_persisted_evidence_integrity(
         execution_id=request.execution_id,
+        turn_tamper_rejected=True,
+        checkpoint_tamper_rejected=True,
         result_tamper_rejected=True,
         outbox_tamper_rejected=True,
         migration_backfill_verified=True,
+        replay_digest_backfill_verified=True,
         evidence_refs=("persistence:terminal-integrity",),
     )
     plane.prove_verification_receipt_identity(
@@ -1055,9 +1058,12 @@ def test_persisted_integrity_requires_result_tamper_rejection() -> None:
     )
     proof = plane.prove_persisted_evidence_integrity(
         execution_id="persistence-integrity",
+        turn_tamper_rejected=True,
+        checkpoint_tamper_rejected=True,
         result_tamper_rejected=False,
         outbox_tamper_rejected=True,
         migration_backfill_verified=True,
+        replay_digest_backfill_verified=True,
         evidence_refs=("persistence:terminal-integrity",),
     )
     assert proof.passed is False
