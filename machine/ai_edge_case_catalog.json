@@ -6421,12 +6421,17 @@
       "status": "catalogued",
       "requirements": [
         "Child processes do not inherit the ambient parent environment by default.",
-        "Only explicitly allowlisted inherited/requested keys can reach a child, with bounded values and total size."
+        "Only explicitly allowlisted inherited/requested keys can reach a child, with bounded values and total size.",
+        "Sandboxed processes do not inherit caller PATH, PYTHONPATH, PYTHONHOME, dynamic-loader overrides, HOME, or TMPDIR.",
+        "Process-control environment keys cannot be reintroduced through explicit sandbox environment overrides."
       ],
       "tests": [
         "skeleton/testing/test_shell_runner.py::test_environment_is_not_implicitly_inherited",
         "skeleton/testing/test_shell_runner.py::test_explicit_allowlisted_environment_is_forwarded",
-        "skeleton/testing/test_shell_runner.py::test_rejects_unapproved_environment_key"
+        "skeleton/testing/test_shell_runner.py::test_rejects_unapproved_environment_key",
+        "skeleton/testing/test_sandbox_isolation.py::test_scrub_env_pins_trusted_path_and_rejects_runtime_overrides",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_child_cannot_inherit_python_or_loader_injection",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_runs_in_jail_with_clean_env"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -6436,7 +6441,11 @@
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "mirror:skeleton/ai/runtime/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
@@ -6548,12 +6557,16 @@
       "status": "catalogued",
       "requirements": [
         "Executable authority is registered as an absolute resolved file path and never resolved through ambient PATH.",
-        "Executable inode/metadata identity is pinned at policy construction and mutation/replacement before launch fails closed."
+        "Executable inode/metadata identity is pinned at policy construction and mutation/replacement before launch fails closed.",
+        "Executable basenames resolve through a fixed trusted PATH rather than the caller environment.",
+        "Relative executable paths are rejected so a writable working directory cannot shadow a granted executable."
       ],
       "tests": [
         "skeleton/testing/test_shell_runner.py::test_rejects_relative_executable_path",
         "skeleton/testing/test_shell_runner.py::test_rejects_executable_replaced_after_policy_construction",
-        "skeleton/testing/test_shell_runner.py::test_rejects_in_place_executable_mutation_after_policy_construction"
+        "skeleton/testing/test_shell_runner.py::test_rejects_in_place_executable_mutation_after_policy_construction",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_basename_ignores_attacker_controlled_parent_path",
+        "skeleton/testing/test_sandbox_isolation.py::test_process_rejects_relative_executable_shadowing"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -6563,7 +6576,11 @@
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "mirror:skeleton/ai/runtime/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
