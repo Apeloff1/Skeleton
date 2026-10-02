@@ -137,8 +137,8 @@ jobs:
               raise SystemExit("runtime report source revision is not exact-head")
           if report.get("missing") or report.get("failed"):
               raise SystemExit("runtime report contains open completion proofs")
-          if len(proofs) != 17:
-              raise SystemExit("runtime qualification must emit 17 proofs")
+          if len(proofs) != 18:
+              raise SystemExit("runtime qualification must emit 18 proofs")
           if any(proof.get("source_revision") != expected for proof in proofs):
               raise SystemExit("a runtime proof is from a different source revision")
           subject = receipt.get("subject_id")
@@ -187,8 +187,8 @@ jobs:
               raise SystemExit("system completion receipt is not exact-head")
           if receipt.get("verifier") != "independent-ai-system-completion-v1":
               raise SystemExit("unexpected system completion verifier identity")
-          if receipt.get("requirement_count") != 17:
-              raise SystemExit("system completion must prove exactly 17 required planes")
+          if receipt.get("requirement_count") != 18:
+              raise SystemExit("system completion must prove exactly 18 required planes")
           if receipt.get("requirements") != receipt.get("runtime_requirements"):
               raise SystemExit("machine/runtime completion requirement inventories diverge")
           if receipt.get("valid") is not True or receipt.get("errors"):
