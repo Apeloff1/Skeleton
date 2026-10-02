@@ -6491,7 +6491,10 @@
         "Metadata-only and digest-only observation modes remain free of raw output bytes.",
         "Structured observability redacts credential-bearing keys and inline authorization/token/secret/password assignments before persistence or export.",
         "Exception telemetry records stable exception types rather than arbitrary exception messages that may contain secrets.",
-        "Tool/runtime failure events preserve correlation while excluding raw secret-bearing failure text."
+        "Tool/runtime failure events preserve correlation while excluding raw secret-bearing failure text.",
+        "Public/internal error envelopes do not persist arbitrary exception messages containing secrets.",
+        "Gateway responses and logs redact private handler details; orchestration records preserve stable error types without handler secret text.",
+        "Frontend crash/error surfaces route through shared secret-safe error helpers."
       ],
       "tests": [
         "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redacts_secret_values_not_just_secret_words",
@@ -6502,7 +6505,11 @@
         "tests/test_observability.py::test_text_redaction_removes_full_basic_authorization_credential",
         "tests/test_observability.py::test_tracer_failure_never_persists_exception_message",
         "skeleton/testing/test_frontier_observability_correlation.py::test_retry_event_is_correlated_and_does_not_store_exception_message",
-        "skeleton/testing/test_frontier_observability_correlation.py::test_tool_failure_event_exposes_type_not_secret_message"
+        "skeleton/testing/test_frontier_observability_correlation.py::test_tool_failure_event_exposes_type_not_secret_message",
+        "tests/test_api_gateway_error_redaction.py::test_handler_exception_detail_is_redacted_from_response_and_logs",
+        "tests/test_orchestration_error_redaction.py::test_handler_exception_message_is_not_persisted_in_run_or_step_records",
+        "tests/test_orchestration_error_redaction.py::test_transient_handler_message_is_redacted_when_retry_budget_is_exhausted",
+        "tests/test_app_error_redaction.py::test_error_boundary_does_not_post_raw_stacks"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -6517,7 +6524,12 @@
         "mirror:skeleton/ai/runtime/observability/redaction.py",
         "test:tests/test_observability.py",
         "test:skeleton/testing/test_frontier_observability_correlation.py",
-        "workflow:P0 Secret Observability Evidence"
+        "workflow:P0 Secret Observability Evidence",
+        "code:skeleton/shells/redaction.py",
+        "test:tests/test_api_gateway_error_redaction.py",
+        "test:tests/test_orchestration_error_redaction.py",
+        "test:tests/test_app_error_redaction.py",
+        "workflow:P0 Secret Error Redaction Evidence"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
