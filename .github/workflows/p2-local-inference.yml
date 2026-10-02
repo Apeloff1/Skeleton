@@ -40,7 +40,12 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Install focused test dependency
-        run: python -m pip install --disable-pip-version-check pytest
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
       - name: Run credential-free local inference acceptance
         env:
           OPENAI_API_KEY: ""
