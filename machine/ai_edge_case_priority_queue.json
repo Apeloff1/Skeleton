@@ -799,9 +799,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_governed_memory_writeback_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/policy.py",
+        "code:skeleton/memory/writeback.py",
+        "workflow:P0 Memory Poisoning Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-003",
       "completion_checkbox": false,
