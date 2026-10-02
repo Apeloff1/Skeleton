@@ -1,0 +1,180 @@
+{
+  "schema_version": "skeleton.anti_pattern_registry.v1",
+  "registry_version": "0.1.0",
+  "status": "active",
+  "purpose": "Seed anti-pattern governance from high/critical historical failures and bind structurally detectable patterns to CI surfaces.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-108",
+    "title": "Anti-Patterns",
+    "required_gap_texts": [
+      "seed registry from historical failures",
+      "bind detectable patterns to CI"
+    ]
+  },
+  "source": "machine/ai_edge_case_catalog.json",
+  "entries": [
+    {
+      "id": "AP-HIST-AI-002",
+      "source_case_id": "HIST-AI-002",
+      "title": "STRIPS planning",
+      "domain": "planning",
+      "criticality": "high",
+      "failure_history": "Preconditions/effects remain useful for tool plans, static analysis, rollback and simulation.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W11",
+        "WP-W12",
+        "WP-W13",
+        "WP-W17",
+        "WP-W25",
+        "WP-W26",
+        "WP-W30"
+      ],
+      "detectability": "design_review",
+      "detector_refs": [],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    },
+    {
+      "id": "AP-HIST-SYS-003",
+      "source_case_id": "HIST-SYS-003",
+      "title": "Petri nets",
+      "domain": "formal workflow",
+      "criticality": "high",
+      "failure_history": "Tokens/places/transitions provide a rigorous way to analyze workflow reachability, deadlocks and boundedness.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W11",
+        "WP-W12",
+        "WP-W18",
+        "WP-W19",
+        "WP-W26"
+      ],
+      "detectability": "design_review",
+      "detector_refs": [],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    },
+    {
+      "id": "AP-HIST-SYS-019",
+      "source_case_id": "HIST-SYS-019",
+      "title": "Capability security",
+      "domain": "security",
+      "criticality": "critical",
+      "failure_history": "Unforgeable scoped capabilities map cleanly to tool/agent authority.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "detectability": "automatable",
+      "detector_refs": [
+        "scripts/check_repository_python_sast.py"
+      ],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    },
+    {
+      "id": "AP-HIST-SYS-020",
+      "source_case_id": "HIST-SYS-020",
+      "title": "Saltzer–Schroeder principles",
+      "domain": "security",
+      "criticality": "critical",
+      "failure_history": "Least privilege, fail-safe defaults, complete mediation and economy of mechanism remain central AI-tool security lessons.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "detectability": "automatable",
+      "detector_refs": [
+        "scripts/check_repository_python_sast.py"
+      ],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    },
+    {
+      "id": "AP-HIST-SYS-021",
+      "source_case_id": "HIST-SYS-021",
+      "title": "Bell-LaPadula / Biba",
+      "domain": "information security",
+      "criticality": "critical",
+      "failure_history": "Confidentiality and integrity models show why data policy has more than one axis.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W20"
+      ],
+      "detectability": "automatable",
+      "detector_refs": [
+        "scripts/check_repository_python_sast.py"
+      ],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    },
+    {
+      "id": "AP-HIST-SYS-025",
+      "source_case_id": "HIST-SYS-025",
+      "title": "Smalltalk image persistence",
+      "domain": "runtime state",
+      "criticality": "high",
+      "failure_history": "Persistent execution worlds are powerful but blur code/state boundaries; explicit migration and reproducibility remain essential.",
+      "preferred_alternative": "Preserve the historical lesson as an explicit design/test constraint rather than relying on implicit convention.",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W18",
+        "WP-W25",
+        "WP-W30"
+      ],
+      "detectability": "automatable",
+      "detector_refs": [
+        "scripts/check_p2_traceability.py"
+      ],
+      "exception_policy": {
+        "allowed": true,
+        "owner_required": true,
+        "rationale_required": true,
+        "expires_at_required": true,
+        "max_days": 30
+      }
+    }
+  ],
+  "policy": {
+    "historical_seed_rule": "Every high/critical historical catalogue entry appears exactly once.",
+    "automate_when_observable": "Automatable entries carry at least one existing CI/script detector; conceptual lessons remain explicit design-review obligations.",
+    "exception_rule": "Exceptions require owner, rationale and expiry; permanent blanket exceptions are invalid."
+  }
+}

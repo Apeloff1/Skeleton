@@ -31,6 +31,12 @@ class RepositoryAntiPatternTests(unittest.TestCase):
         values.update(changes)
         return M.AntiPatternException(**values)
 
+    def test_exception_identity_and_evidence_do_not_coerce(self):
+        with self.assertRaises(TypeError):
+            self._exception(owner_id=True)
+        with self.assertRaises(TypeError):
+            self._exception(evidence_refs=(123,))
+
     def test_owned_bounded_exception_is_valid(self):
         M.validate_exception(
             self._exception(),

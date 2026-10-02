@@ -1,0 +1,100 @@
+{
+  "schema_version": "skeleton.priority_policy.v1",
+  "policy_version": "0.1.0",
+  "status": "active",
+  "purpose": "Separate non-compensable hard blockers from transparent bounded ranking signals with anti-starvation.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-094",
+    "title": "Priority Engine",
+    "required_gap_texts": [
+      "define priority factor schema",
+      "add anti-starvation constraints"
+    ]
+  },
+  "partitions": [
+    {
+      "rank": 0,
+      "id": "hard_blocker",
+      "matches": [
+        "unresolved P0 critical edge case",
+        "unsatisfied hard dependency",
+        "active build stop condition",
+        "security/trust/permission blocker"
+      ],
+      "rule": "always ordered before every soft-ranked item"
+    },
+    {
+      "rank": 1,
+      "id": "high_obligation",
+      "matches": [
+        "unresolved P1 edge case",
+        "P2 dependency-ready task",
+        "required recovery/compatibility evidence missing"
+      ],
+      "rule": "ordered before ordinary maintenance unless blocked by hard dependency"
+    },
+    {
+      "rank": 2,
+      "id": "soft_ranked",
+      "matches": [
+        "maintenance",
+        "debt",
+        "organization",
+        "optimization"
+      ],
+      "rule": "uses bounded soft factors only"
+    }
+  ],
+  "soft_factors": [
+    {
+      "id": "risk_severity",
+      "min": 0,
+      "max": 40,
+      "weight_cap": 40,
+      "provenance_required": true
+    },
+    {
+      "id": "dependency_fanout",
+      "min": 0,
+      "max": 25,
+      "weight_cap": 25,
+      "provenance_required": true
+    },
+    {
+      "id": "age",
+      "min": 0,
+      "max": 20,
+      "weight_cap": 20,
+      "provenance_required": true
+    },
+    {
+      "id": "evidence_deficit",
+      "min": 0,
+      "max": 15,
+      "weight_cap": 15,
+      "provenance_required": true
+    }
+  ],
+  "anti_starvation": {
+    "enabled": true,
+    "age_increment_per_epoch": 1,
+    "max_age_factor": 20,
+    "protected_partitions": [
+      "hard_blocker",
+      "high_obligation"
+    ],
+    "rule": "Age may reorder items only within the same non-hard partition; it can never outrank an unresolved hard blocker."
+  },
+  "tie_break": [
+    "partition rank",
+    "descending bounded soft score",
+    "oldest created epoch",
+    "canonical backlog id"
+  ],
+  "gaming_guards": [
+    "factor values require provenance",
+    "unknown factors score zero",
+    "weights cannot exceed declared caps",
+    "manual priority cannot bypass hard partitions"
+  ]
+}

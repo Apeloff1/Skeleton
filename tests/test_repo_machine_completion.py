@@ -17,6 +17,12 @@ sys.modules[SPEC.name] = M
 SPEC.loader.exec_module(M)
 
 class RepositoryCompletionTests(unittest.TestCase):
+    def test_completion_refs_and_paths_do_not_coerce(self):
+        with self.assertRaises(TypeError):
+            M.AtomicCompletion(evidence_refs=(123,))
+        with self.assertRaises(TypeError):
+            M.invalidated_by_change((123,), ("skeleton",))
+
     def test_verified_complete_requires_every_non_compensable_input(self):
         result = M.derive_atomic(
             M.AtomicCompletion(

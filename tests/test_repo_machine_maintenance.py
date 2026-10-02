@@ -35,6 +35,12 @@ class RepositoryMaintenanceTests(unittest.TestCase):
         values.update(changes)
         return M.DeletionAssessment(**values)
 
+    def test_maintenance_text_fields_do_not_coerce(self):
+        with self.assertRaises(TypeError):
+            self._assessment(path=123)
+        with self.assertRaises(TypeError):
+            self._assessment(regeneration_authority=True)
+
     def test_safe_candidate_requires_all_checks(self):
         decision = M.evaluate_deletion(self._assessment())
         self.assertTrue(decision.allowed)

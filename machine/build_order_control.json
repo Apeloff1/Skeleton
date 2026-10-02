@@ -1,0 +1,1639 @@
+{
+  "schema_version": "skeleton.build_order_control.v1",
+  "control_version": "0.1.1",
+  "status": "active",
+  "purpose": "Materialize every canonical wave and AIQ task into one acyclic construction DAG with explicit blocked-state reporting.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-109",
+    "title": "Build Order",
+    "required_gap_texts": [
+      "bind every AIQ task into construction DAG",
+      "materialize cycle/blocked-state reporting"
+    ]
+  },
+  "sources": [
+    "machine/ai_master_build_sequence.json",
+    "machine/ai_build_queue.json",
+    "machine/ai_engineering_task_matrix.json"
+  ],
+  "waves": [
+    {
+      "id": "MBW-00",
+      "name": "Authority, Contracts & Semantic Bedrock",
+      "hard_dependencies": [],
+      "overlap_allowed_with": [
+        "MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01"
+      ],
+      "stop_conditions": [
+        "human and machine plan disagree on identity or breadth",
+        "security-sensitive parsing remains permissive or ambiguous",
+        "a contract change lacks compatibility/migration semantics"
+      ],
+      "definition_of_done": [
+        "canonical contracts have explicit version/compatibility semantics",
+        "security-sensitive encodings fail closed",
+        "W00/W01 evidence is linked from the signed ledger"
+      ]
+    },
+    {
+      "id": "MBW-01",
+      "name": "Runtime Spine, Durable State & Recovery",
+      "hard_dependencies": [
+        "MBW-00"
+      ],
+      "overlap_allowed_with": [
+        "MBW-02",
+        "MBW-03"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W19"
+      ],
+      "stop_conditions": [
+        "derived stores become authoritative by convenience",
+        "retries can duplicate committed effects",
+        "backup exists without a verified restore path"
+      ],
+      "definition_of_done": [
+        "boot/shutdown/restart are deterministic",
+        "authoritative restore and projection rebuild are proven",
+        "event replay is idempotent and side-effect safe"
+      ]
+    },
+    {
+      "id": "MBW-02",
+      "name": "Model, Memory, Retrieval, Knowledge & Context",
+      "hard_dependencies": [
+        "MBW-00",
+        "MBW-01"
+      ],
+      "overlap_allowed_with": [
+        "MBW-03"
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "stop_conditions": [
+        "provider SDK objects leak into durable core state",
+        "context truncation can remove immutable policy before untrusted content",
+        "memory writes bypass governance or provenance"
+      ],
+      "definition_of_done": [
+        "provider routing preserves policy/privacy constraints",
+        "memory and retrieval writes are governed",
+        "context compilation preserves trust under pressure"
+      ]
+    },
+    {
+      "id": "MBW-03",
+      "name": "Privileged Action, Policy, Verification & Security",
+      "hard_dependencies": [
+        "MBW-00",
+        "MBW-01"
+      ],
+      "overlap_allowed_with": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "stop_conditions": [
+        "model output directly authorizes a privileged action",
+        "tool execution lacks idempotency/compensation semantics",
+        "network/filesystem normalization happens after authorization"
+      ],
+      "definition_of_done": [
+        "privileged actions require deterministic authorization",
+        "postconditions and receipts bind effects to operations",
+        "critical filesystem/network/process cases have executable evidence"
+      ]
+    },
+    {
+      "id": "MBW-04",
+      "name": "Cognition, Planning, Agents & Swarms",
+      "hard_dependencies": [
+        "MBW-02",
+        "MBW-03"
+      ],
+      "overlap_allowed_with": [
+        "MBW-06"
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "stop_conditions": [
+        "agent role text is treated as authority",
+        "plan executor can bypass tool/policy gates",
+        "checkpoint replay can repeat external side effects"
+      ],
+      "definition_of_done": [
+        "cognitive loops are bounded and recoverable",
+        "plan DAGs enforce pre/postconditions",
+        "agent delegation, leases and conflicts are mechanically constrained"
+      ]
+    },
+    {
+      "id": "MBW-05",
+      "name": "Observability, API, Product & Desktop",
+      "hard_dependencies": [
+        "MBW-01",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "overlap_allowed_with": [
+        "MBW-06"
+      ],
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "stop_conditions": [
+        "frontend optimistic state becomes canonical",
+        "stream replay lacks gap detection/resync",
+        "desktop path/process behavior is only tested on one platform"
+      ],
+      "definition_of_done": [
+        "reconnect/replay/resync is deterministic",
+        "UI is projection-only",
+        "operator-visible progress, cost, evidence and cancellation match durable state"
+      ]
+    },
+    {
+      "id": "MBW-06",
+      "name": "Evaluation, Research, Forge & Controlled Learning",
+      "hard_dependencies": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "overlap_allowed_with": [
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "stop_conditions": [
+        "production policy/model/config can be mutated directly by an experiment",
+        "benchmark result lacks environment/version/budget provenance",
+        "learning signal is treated as ground truth without validation"
+      ],
+      "definition_of_done": [
+        "benchmarks are versioned and contamination-aware",
+        "research claims preserve replication/negative-result lineage",
+        "candidate promotion requires champion/challenger, canary and rollback evidence"
+      ]
+    },
+    {
+      "id": "MBW-07",
+      "name": "Installer, Distributed Runtime & Production Hardening",
+      "hard_dependencies": [
+        "MBW-05",
+        "MBW-06"
+      ],
+      "overlap_allowed_with": [],
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "stop_conditions": [
+        "release depends on undocumented machine state",
+        "rollback cannot read the post-upgrade data shape",
+        "distributed placement ignores fencing/backpressure or hard resource limits",
+        "critical unresolved risk is hidden by aggregate green status"
+      ],
+      "definition_of_done": [
+        "clean-machine install/update/rollback is proven",
+        "distributed execution survives failover/congestion/resource pressure",
+        "release evidence, provenance, SLO/capacity and recovery artifacts are complete"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "AIQ-S0-STATE-01",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-STATE-02",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-STATE-01"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "task_dependencies": [
+        "AIQ-S0-STATE-01"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-STATE-03",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-01"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-STATE-02"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-STATE-03",
+      "task_dependencies": [
+        "AIQ-S0-STATE-02"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-GOV-01",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-GOV-02",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-GOV-01"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "task_dependencies": [
+        "AIQ-S0-GOV-01"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-GOV-03",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-GOV-02"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "task_dependencies": [
+        "AIQ-S0-GOV-02"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-COST-01",
+      "stage": 0,
+      "status": "done",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-COST-02",
+      "stage": 0,
+      "status": "in_progress",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-COST-03",
+      "stage": 0,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-PROV-01",
+      "stage": 0,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-PROV-02",
+      "stage": 0,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-PROV-01"
+      ],
+      "blocked_by": [
+        "AIQ-S0-PROV-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "task_dependencies": [
+        "AIQ-S0-PROV-01"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S0-PROV-03",
+      "stage": 0,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "hard_dependencies": [
+        "AIQ-S0-PROV-02"
+      ],
+      "blocked_by": [
+        "AIQ-S0-PROV-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "task_dependencies": [
+        "AIQ-S0-PROV-02"
+      ],
+      "closure_dependencies": [],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-CONV-01",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-CONV-02",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-CONV-01"
+      ],
+      "blocked_by": [
+        "AIQ-S1-CONV-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "task_dependencies": [
+        "AIQ-S1-CONV-01"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-CONV-03",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-CONV-02"
+      ],
+      "blocked_by": [
+        "AIQ-S1-CONV-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-CONV-03",
+      "task_dependencies": [
+        "AIQ-S1-CONV-02"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-MEM-01",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-MEM-02",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-MEM-01"
+      ],
+      "blocked_by": [
+        "AIQ-S1-MEM-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "task_dependencies": [
+        "AIQ-S1-MEM-01"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-MEM-03",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-MEM-02"
+      ],
+      "blocked_by": [
+        "AIQ-S1-MEM-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "task_dependencies": [
+        "AIQ-S1-MEM-02"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": []
+    },
+    {
+      "id": "AIQ-S1-TOOL-01",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S1-TOOL-02",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-TOOL-01"
+      ],
+      "blocked_by": [
+        "AIQ-S1-TOOL-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-01"
+      ],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S1-TOOL-03",
+      "stage": 1,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "hard_dependencies": [
+        "AIQ-S1-TOOL-02"
+      ],
+      "blocked_by": [
+        "AIQ-S1-TOOL-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-02"
+      ],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-CTX-01",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-CTX-02",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "hard_dependencies": [
+        "AIQ-S2-CTX-01"
+      ],
+      "blocked_by": [
+        "AIQ-S2-CTX-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "task_dependencies": [
+        "AIQ-S2-CTX-01"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-CTX-03",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "hard_dependencies": [
+        "AIQ-S2-CTX-02"
+      ],
+      "blocked_by": [
+        "AIQ-S2-CTX-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "task_dependencies": [
+        "AIQ-S2-CTX-02"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-PROTO-01",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-PROTO-02",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "hard_dependencies": [
+        "AIQ-S2-PROTO-01"
+      ],
+      "blocked_by": [
+        "AIQ-S2-PROTO-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-01"
+      ],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S2-PROTO-03",
+      "stage": 2,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "hard_dependencies": [
+        "AIQ-S2-PROTO-02"
+      ],
+      "blocked_by": [
+        "AIQ-S2-PROTO-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-02"
+      ],
+      "closure_dependencies": [
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S3-VER-01",
+      "stage": 3,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S3-VER-02",
+      "stage": 3,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "hard_dependencies": [
+        "AIQ-S3-VER-01"
+      ],
+      "blocked_by": [
+        "AIQ-S3-VER-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "task_dependencies": [
+        "AIQ-S3-VER-01"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S3-VER-03",
+      "stage": 3,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "hard_dependencies": [
+        "AIQ-S3-VER-02"
+      ],
+      "blocked_by": [
+        "AIQ-S3-VER-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "task_dependencies": [
+        "AIQ-S3-VER-02"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S4-EXEC-01",
+      "stage": 4,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S4-EXEC-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-state-authority-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    },
+    {
+      "id": "AIQ-S4-EXEC-02",
+      "stage": 4,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S4-EXEC-01"
+      ],
+      "blocked_by": [
+        "AIQ-S4-EXEC-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S4-EXEC-02",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-01"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-state-authority-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    },
+    {
+      "id": "AIQ-S4-EXEC-03",
+      "stage": 4,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S4-EXEC-02"
+      ],
+      "blocked_by": [
+        "AIQ-S4-EXEC-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S4-EXEC-03",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-02"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-state-authority-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    },
+    {
+      "id": "AIQ-S5-ENG-01",
+      "stage": 5,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S5-ENG-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S5-ENG-02",
+      "stage": 5,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [
+        "AIQ-S5-ENG-01"
+      ],
+      "blocked_by": [
+        "AIQ-S5-ENG-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S5-ENG-02",
+      "task_dependencies": [
+        "AIQ-S5-ENG-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S5-ENG-03",
+      "stage": 5,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [
+        "AIQ-S5-ENG-02"
+      ],
+      "blocked_by": [
+        "AIQ-S5-ENG-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S5-ENG-03",
+      "task_dependencies": [
+        "AIQ-S5-ENG-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-provider-surface-convergence"
+      ]
+    },
+    {
+      "id": "AIQ-S6-STREAM-01",
+      "stage": 6,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S6-STREAM-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary"
+      ]
+    },
+    {
+      "id": "AIQ-S6-STREAM-02",
+      "stage": 6,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [
+        "AIQ-S6-STREAM-01"
+      ],
+      "blocked_by": [
+        "AIQ-S6-STREAM-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S6-STREAM-02",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary"
+      ]
+    },
+    {
+      "id": "AIQ-S6-STREAM-03",
+      "stage": 6,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "hard_dependencies": [
+        "AIQ-S6-STREAM-02"
+      ],
+      "blocked_by": [
+        "AIQ-S6-STREAM-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S6-STREAM-03",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary"
+      ]
+    },
+    {
+      "id": "AIQ-S7-E2E-01",
+      "stage": 7,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [],
+      "blocked_by": [],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S7-E2E-01",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    },
+    {
+      "id": "AIQ-S7-E2E-02",
+      "stage": 7,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S7-E2E-01"
+      ],
+      "blocked_by": [
+        "AIQ-S7-E2E-01"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S7-E2E-02",
+      "task_dependencies": [
+        "AIQ-S7-E2E-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    },
+    {
+      "id": "AIQ-S7-E2E-03",
+      "stage": 7,
+      "status": "pending",
+      "wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "hard_dependencies": [
+        "AIQ-S7-E2E-02"
+      ],
+      "blocked_by": [
+        "AIQ-S7-E2E-02"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "stop_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "accountability_id": "ACC-AIQ-S7-E2E-03",
+      "task_dependencies": [
+        "AIQ-S7-E2E-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-governance-registry",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ],
+      "closure_blockers": [
+        "gap-cognitive-execution-loop",
+        "gap-context-compiler-convergence",
+        "gap-conversation-state-authority",
+        "gap-cost-admission",
+        "gap-engine-application-execution-boundary",
+        "gap-memory-durable-authority",
+        "gap-provider-interaction-protocol",
+        "gap-provider-surface-convergence",
+        "gap-streaming-protocol",
+        "gap-tool-runtime-convergence",
+        "gap-verification-evidence-contract"
+      ]
+    }
+  ],
+  "policy": {
+    "hard_dependency": "Hard dependency edges must be acyclic and satisfied before downstream strong promotion.",
+    "soft_overlap": "overlap_allowed_with is scheduling permission only, never completion authority.",
+    "task_coverage": "Every AIQ build-queue task appears exactly once and retains its task/closure dependencies.",
+    "blocked_reporting": "blocked_by is derived from current queue dependency status and may not be manually hidden.",
+    "task_dependency_rule": "Only task_dependencies form AIQ DAG edges. closure_dependencies are gap predicates and are reported separately.",
+    "closure_dependency_rule": "A closure gap is closed only when at least one canonical queue task owns that gap and every such task is done. Unclosed closure gaps block start only when can_start_before_closure_dependencies_close=false."
+  }
+}

@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
+import math
 import os
 from pathlib import Path, PurePosixPath
 import secrets
@@ -38,6 +39,15 @@ class StaleWriteError(RepositoryTransactionError):
 
 def _digest_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _identity(value: str, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be text")
+    text = value.strip()
+    if not text or len(text) > 192:
+        raise ValueError(f"{field} must be non-empty bounded text")
+    return text
 
 
 def _normalize_path(value: str) -> str:
@@ -85,10 +95,18 @@ class LeaseRegistry:
         max_leases: int = 256,
         max_ttl_s: float = 1800.0,
     ) -> None:
-        if max_leases <= 0 or max_ttl_s <= 0:
+        if isinstance(max_leases, bool) or not isinstance(max_leases, int):
+            raise TypeError("max_leases must be an integer")
+        if (
+            isinstance(max_ttl_s, bool)
+            or not isinstance(max_ttl_s, (int, float))
+            or not math.isfinite(float(max_ttl_s))
+        ):
+            raise TypeError("max_ttl_s must be finite numeric")
+        if max_leases <= 0 or float(max_ttl_s) <= 0:
             raise ValueError("lease bounds must be positive")
         self._clock = clock
-        self._max_leases = int(max_leases)
+        self._max_leases = max_leases
         self._max_ttl_s = float(max_ttl_s)
         self._leases: dict[str, EditLease] = {}
         self._lock = threading.RLock()
@@ -99,9 +117,13 @@ class LeaseRegistry:
             self._leases.pop(key, None)
 
     def acquire(self, owner_id: str, paths: Iterable[str], *, ttl_s: float = 300.0) -> EditLease:
-        owner = str(owner_id).strip()
-        if not owner or len(owner) > 192:
-            raise ValueError("owner_id must be non-empty bounded text")
+        owner = _identity(owner_id, "owner_id")
+        if (
+            isinstance(ttl_s, bool)
+            or not isinstance(ttl_s, (int, float))
+            or not math.isfinite(float(ttl_s))
+        ):
+            raise TypeError("lease ttl must be finite numeric")
         ttl = float(ttl_s)
         if ttl <= 0 or ttl > self._max_ttl_s:
             raise ValueError("lease ttl exceeds policy")
@@ -132,8 +154,10 @@ class LeaseRegistry:
         now = float(self._clock())
         with self._lock:
             self._prune(now)
-            lease = self._leases.get(str(lease_id))
-            if lease is None or lease.owner_id != str(owner_id):
+            lease_key = _identity(lease_id, "lease_id")
+            owner = _identity(owner_id, "owner_id")
+            lease = self._leases.get(lease_key)
+            if lease is None or lease.owner_id != owner:
                 raise LeaseExpiredError("edit lease is missing, expired, or owned by another actor")
             return lease
 
@@ -143,8 +167,10 @@ class LeaseRegistry:
         with self._lock:
             now = float(self._clock())
             self._prune(now)
-            lease = self._leases.get(str(lease_id))
-            if lease is None or lease.owner_id != str(owner_id):
+            lease_key = _identity(lease_id, "lease_id")
+            owner = _identity(owner_id, "owner_id")
+            lease = self._leases.get(lease_key)
+            if lease is None or lease.owner_id != owner:
                 raise LeaseExpiredError(
                     "edit lease is missing, expired, or owned by another actor"
                 )
@@ -152,10 +178,12 @@ class LeaseRegistry:
 
     def release(self, lease_id: str, owner_id: str) -> bool:
         with self._lock:
-            lease = self._leases.get(str(lease_id))
+            lease_key = _identity(lease_id, "lease_id")
+            owner = _identity(owner_id, "owner_id")
+            lease = self._leases.get(lease_key)
             if lease is None:
                 return False
-            if lease.owner_id != str(owner_id):
+            if lease.owner_id != owner:
                 raise LeaseExpiredError("cannot release another owner's lease")
             self._leases.pop(lease.lease_id, None)
             return True

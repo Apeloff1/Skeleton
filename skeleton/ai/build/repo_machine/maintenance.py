@@ -18,7 +18,9 @@ _NON_WAIVABLE_PROTECTED_PATHS = (
 
 
 def _text(value: str, field: str, *, max_len: int = 2048) -> str:
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be text")
+    text = value.strip()
     if not text or len(text) > max_len:
         raise ValueError(f"{field} must be non-empty bounded text")
     return text

@@ -1,0 +1,6095 @@
+{
+  "schema_version": "skeleton.work_package_control.v1",
+  "registry_version": "0.1.0",
+  "status": "active",
+  "purpose": "Bind all 31 canonical work packages to exact engineering/acceptance requirements, AIQ tasks, edge obligations, waves and signed evidence rollups.",
+  "masterplan_binding": {
+    "volume_ref": "VOL-095",
+    "title": "Build Work Packages",
+    "required_gap_texts": [
+      "bind all packages to exact requirements",
+      "materialize package evidence rollup"
+    ]
+  },
+  "sources": [
+    "machine/ai_engineering_pass.json",
+    "machine/ai_full_edge_case_matrix.json",
+    "machine/ai_build_queue.json",
+    "machine/ai_master_build_sequence.json",
+    "machine/ai_build_accountability.json"
+  ],
+  "packages": [
+    {
+      "id": "WP-W00",
+      "name": "Architecture authority",
+      "wave_ref": "MBW-00",
+      "engineering_class": "control",
+      "exact_requirements": [
+        {
+          "id": "WP-W00:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W00:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W00:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "one authority order"
+        },
+        {
+          "id": "WP-W00:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "no undeclared production root"
+        },
+        {
+          "id": "WP-W00:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "target/current drift recorded"
+        },
+        {
+          "id": "WP-W00:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "rollback manifest change"
+        },
+        {
+          "id": "WP-W00:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "restore prior authority graph"
+        },
+        {
+          "id": "WP-W00:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "421 contiguous volumes remain addressable"
+        },
+        {
+          "id": "WP-W00:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "all cross-cutting catalog references resolve"
+        },
+        {
+          "id": "WP-W00:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "breadth freeze cannot be bypassed by undocumented top-level plans"
+        },
+        {
+          "id": "WP-W00:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "architecture drift is detected before runtime/build tests"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-019",
+        "EDGE-CONTRACT-020",
+        "EDGE-DATA-004",
+        "HIST-SYS-018",
+        "HIST-SYS-019",
+        "HIST-SYS-022",
+        "HIST-SYS-023",
+        "HIST-SYS-025",
+        "OBSCURE-011",
+        "OBSCURE-022",
+        "OBSCURE-023",
+        "OBSCURE-029",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_ai_master_plan.py::test_master_plan_machine_contract_is_complete",
+        "skeleton/testing/test_ai_edge_case_catalog.py::test_edge_case_catalog_passes_validator",
+        "planned:skeleton/testing/test_ai_plan_traceability.py::test_human_machine_plan_cross_links_are_bidirectional",
+        "planned:skeleton/testing/test_ai_plan_traceability.py::test_no_implementation_status_without_evidence"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "rollback manifest change",
+        "restore prior authority graph"
+      ],
+      "evidence_rollup": {
+        "task_count": 6,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W01",
+      "name": "Contract primitives",
+      "wave_ref": "MBW-00",
+      "engineering_class": "contract",
+      "exact_requirements": [
+        {
+          "id": "WP-W01:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W01:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W01:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "canonical normalization"
+        },
+        {
+          "id": "WP-W01:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "stable identity"
+        },
+        {
+          "id": "WP-W01:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "explicit compatibility"
+        },
+        {
+          "id": "WP-W01:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "versioned decoder fallback"
+        },
+        {
+          "id": "WP-W01:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "migration/rollback fixture"
+        },
+        {
+          "id": "WP-W01:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-runtime round trips preserve identity and semantics"
+        },
+        {
+          "id": "WP-W01:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "malformed/ambiguous encodings fail deterministically"
+        },
+        {
+          "id": "WP-W01:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "time and numeric boundary behavior is platform-independent"
+        },
+        {
+          "id": "WP-W01:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "compatibility behavior is tested rather than assumed"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S2-PROTO-01",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S2-PROTO-01",
+        "ACC-AIQ-S2-PROTO-02",
+        "ACC-AIQ-S2-PROTO-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-002",
+        "EDGE-CONTRACT-003",
+        "EDGE-CONTRACT-004",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-006",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-013",
+        "EDGE-CONTRACT-014",
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-018",
+        "EDGE-CONTRACT-019",
+        "EDGE-CONTRACT-020",
+        "HIST-AI-002",
+        "HIST-AI-008",
+        "HIST-SYS-003",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-019",
+        "OBSCURE-004",
+        "OBSCURE-011",
+        "OBSCURE-028"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_duplicate_json_keys_fail_closed",
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_null_and_absent_are_not_conflated",
+        "planned:skeleton/testing/test_contract_serialization_edges.py::test_large_integer_round_trip_across_json_client_boundary",
+        "planned:skeleton/testing/test_contract_unicode_edges.py::test_identifier_normalization_and_confusables_policy",
+        "planned:skeleton/testing/test_contract_time_edges.py::test_deadline_duration_uses_monotonic_clock",
+        "planned:skeleton/testing/test_contract_compatibility.py::test_unknown_enum_value_is_not_privilege_escalation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "versioned decoder fallback",
+        "migration/rollback fixture"
+      ],
+      "evidence_rollup": {
+        "task_count": 6,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W02",
+      "name": "Kernel/lifecycle",
+      "wave_ref": "MBW-01",
+      "engineering_class": "runtime",
+      "exact_requirements": [
+        {
+          "id": "WP-W02:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W02:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W02:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "terminal-state finality"
+        },
+        {
+          "id": "WP-W02:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "deterministic lifecycle"
+        },
+        {
+          "id": "WP-W02:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "bounded shutdown"
+        },
+        {
+          "id": "WP-W02:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "safe restart"
+        },
+        {
+          "id": "WP-W02:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "orphan cleanup"
+        },
+        {
+          "id": "WP-W02:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "startup rollback"
+        },
+        {
+          "id": "WP-W02:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "boot and shutdown are deterministic"
+        },
+        {
+          "id": "WP-W02:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "readiness reflects mandatory dependency truth"
+        },
+        {
+          "id": "WP-W02:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "cancellation and shutdown are race-safe"
+        },
+        {
+          "id": "WP-W02:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "secrets do not spread through ambient process state"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S5-ENG-01",
+        "AIQ-S5-ENG-02",
+        "AIQ-S5-ENG-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S5-ENG-01",
+        "ACC-AIQ-S5-ENG-02",
+        "ACC-AIQ-S5-ENG-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-DIST-011",
+        "EDGE-DIST-030",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-SEC-015",
+        "EDGE-SEC-016",
+        "EDGE-SEC-020",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-005",
+        "HIST-SYS-018",
+        "HIST-SYS-022",
+        "OBSCURE-001",
+        "OBSCURE-004",
+        "OBSCURE-015",
+        "OBSCURE-028"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_app_assembly.py",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_live_not_ready_during_partial_boot",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_shutdown_orders_admission_drain_checkpoint_flush",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_cancel_race_resolves_one_terminal_state",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_child_process_secret_environment_is_minimal",
+        "planned:skeleton/testing/test_kernel_lifecycle_edges.py::test_suspend_resume_reprobes_health"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback"
+      ],
+      "evidence_rollup": {
+        "task_count": 6,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W03",
+      "name": "Durable state",
+      "wave_ref": "MBW-01",
+      "engineering_class": "state",
+      "exact_requirements": [
+        {
+          "id": "WP-W03:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W03:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W03:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "durable state is authority"
+        },
+        {
+          "id": "WP-W03:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "atomicity boundaries explicit"
+        },
+        {
+          "id": "WP-W03:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "read-your-write where promised"
+        },
+        {
+          "id": "WP-W03:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "WAL/transaction recovery"
+        },
+        {
+          "id": "WP-W03:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "backup/restore"
+        },
+        {
+          "id": "WP-W03:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "schema rollback"
+        },
+        {
+          "id": "WP-W03:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "canonical restore succeeds from tested backup"
+        },
+        {
+          "id": "WP-W03:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "derived loss is recoverable from authority"
+        },
+        {
+          "id": "WP-W03:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "concurrent writes preserve declared invariants"
+        },
+        {
+          "id": "WP-W03:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "migration/rollback behavior is executable evidence"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S0-STATE-01",
+        "AIQ-S0-STATE-02",
+        "AIQ-S0-STATE-03",
+        "AIQ-S1-CONV-01",
+        "AIQ-S1-CONV-02",
+        "AIQ-S1-CONV-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S0-STATE-01",
+        "ACC-AIQ-S0-STATE-02",
+        "ACC-AIQ-S0-STATE-03",
+        "ACC-AIQ-S1-CONV-01",
+        "ACC-AIQ-S1-CONV-02",
+        "ACC-AIQ-S1-CONV-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-DATA-001",
+        "EDGE-DATA-002",
+        "EDGE-DATA-003",
+        "EDGE-DATA-005",
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-DIST-001",
+        "EDGE-DIST-006",
+        "EDGE-DIST-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-022",
+        "EDGE-DIST-023",
+        "EDGE-DIST-024",
+        "EDGE-DIST-025",
+        "EDGE-HW-001",
+        "EDGE-HW-002",
+        "HIST-SYS-007",
+        "HIST-SYS-008",
+        "HIST-SYS-009",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-027",
+        "HIST-SYS-028",
+        "HIST-SYS-029",
+        "OBSCURE-002",
+        "OBSCURE-006",
+        "OBSCURE-010",
+        "OBSCURE-014",
+        "OBSCURE-029"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "planned:skeleton/testing/test_persistence_fault_windows.py::test_commit_ack_loss_replay_is_idempotent",
+        "planned:skeleton/testing/test_persistence_fault_windows.py::test_partial_multi_store_failure_preserves_authoritative_source",
+        "planned:skeleton/testing/test_persistence_concurrency.py::test_write_skew_invariant_is_guarded",
+        "planned:skeleton/testing/test_persistence_migrations.py::test_partial_migration_does_not_publish_new_schema_version",
+        "planned:skeleton/testing/test_persistence_restore.py::test_restore_then_rebuild_derived_indexes"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback"
+      ],
+      "evidence_rollup": {
+        "task_count": 12,
+        "queue_done_count": 6,
+        "implementation_signed_count": 6,
+        "verification_signed_count": 6,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W04",
+      "name": "Events",
+      "wave_ref": "MBW-01",
+      "engineering_class": "state",
+      "exact_requirements": [
+        {
+          "id": "WP-W04:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W04:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W04:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "idempotent consumption"
+        },
+        {
+          "id": "WP-W04:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "ordering semantics explicit"
+        },
+        {
+          "id": "WP-W04:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "replay cannot duplicate effects"
+        },
+        {
+          "id": "WP-W04:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "cursor resync"
+        },
+        {
+          "id": "WP-W04:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "dead-letter/replay"
+        },
+        {
+          "id": "WP-W04:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "poison-event isolation"
+        },
+        {
+          "id": "WP-W04:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "replay reconstructs the same operation projection"
+        },
+        {
+          "id": "WP-W04:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "transport loss does not become state loss"
+        },
+        {
+          "id": "WP-W04:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "duplicates/order anomalies cannot corrupt state"
+        },
+        {
+          "id": "WP-W04:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "terminal semantics are transactionally fenced"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-STATE-01",
+        "AIQ-S0-STATE-02",
+        "AIQ-S0-STATE-03",
+        "AIQ-S1-CONV-01",
+        "AIQ-S1-CONV-02",
+        "AIQ-S1-CONV-03",
+        "AIQ-S5-ENG-01",
+        "AIQ-S5-ENG-02",
+        "AIQ-S5-ENG-03",
+        "AIQ-S6-STREAM-01",
+        "AIQ-S6-STREAM-02",
+        "AIQ-S6-STREAM-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-STATE-01",
+        "ACC-AIQ-S0-STATE-02",
+        "ACC-AIQ-S0-STATE-03",
+        "ACC-AIQ-S1-CONV-01",
+        "ACC-AIQ-S1-CONV-02",
+        "ACC-AIQ-S1-CONV-03",
+        "ACC-AIQ-S5-ENG-01",
+        "ACC-AIQ-S5-ENG-02",
+        "ACC-AIQ-S5-ENG-03",
+        "ACC-AIQ-S6-STREAM-01",
+        "ACC-AIQ-S6-STREAM-02",
+        "ACC-AIQ-S6-STREAM-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-DIST-002",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-005",
+        "EDGE-DIST-013",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-030",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-013",
+        "OBSCURE-002",
+        "OBSCURE-027",
+        "OBSCURE-028"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_duplicate_and_out_of_order_delivery",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_reconnect_gap_replays_from_cursor",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_outbox_commit_then_publisher_crash",
+        "planned:skeleton/testing/test_operation_stream_faults.py::test_terminal_event_requires_committed_result"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ],
+      "evidence_rollup": {
+        "task_count": 15,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W05",
+      "name": "Model runtime",
+      "wave_ref": "MBW-02",
+      "engineering_class": "intelligence",
+      "exact_requirements": [
+        {
+          "id": "WP-W05:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W05:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W05:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "provider objects stop at adapter"
+        },
+        {
+          "id": "WP-W05:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "cancellation propagates"
+        },
+        {
+          "id": "WP-W05:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "output validation"
+        },
+        {
+          "id": "WP-W05:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "fallback/abort"
+        },
+        {
+          "id": "WP-W05:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "stream reconciliation"
+        },
+        {
+          "id": "WP-W05:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "provider quarantine"
+        },
+        {
+          "id": "WP-W05:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "provider substitution does not alter core contracts"
+        },
+        {
+          "id": "WP-W05:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "usage/error/refusal semantics are normalized"
+        },
+        {
+          "id": "WP-W05:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "reproduction evidence includes model identity"
+        },
+        {
+          "id": "WP-W05:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "provider failure cannot create duplicate downstream actions"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-PROV-01",
+        "AIQ-S0-PROV-02",
+        "AIQ-S0-PROV-03",
+        "AIQ-S2-PROTO-01",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-PROV-01",
+        "ACC-AIQ-S0-PROV-02",
+        "ACC-AIQ-S0-PROV-03",
+        "ACC-AIQ-S2-PROTO-01",
+        "ACC-AIQ-S2-PROTO-02",
+        "ACC-AIQ-S2-PROTO-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-014",
+        "EDGE-AI-015",
+        "EDGE-AI-016",
+        "EDGE-AI-017",
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-038",
+        "EDGE-HW-003",
+        "EDGE-HW-004",
+        "EDGE-HW-010",
+        "HIST-AI-023",
+        "HIST-AI-024",
+        "HIST-AI-025",
+        "HIST-AI-026",
+        "HIST-AI-027",
+        "OBSCURE-005",
+        "OBSCURE-021",
+        "OBSCURE-023"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_provider_contract.py",
+        "backend/tests/test_ai_provider_adapter.py",
+        "backend/tests/test_ai_provider_request_validation.py",
+        "planned:skeleton/testing/test_provider_normalization_edges.py::test_duplicate_tool_call_ids_rejected",
+        "planned:skeleton/testing/test_provider_normalization_edges.py::test_partial_structured_stream_not_committed",
+        "planned:skeleton/testing/test_provider_usage_edges.py::test_missing_usage_is_unknown",
+        "planned:skeleton/testing/test_provider_identity.py::test_alias_resolution_records_concrete_model_identity",
+        "planned:skeleton/testing/test_provider_recovery.py::test_timeout_outcome_is_ambiguous_not_false_failure"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ],
+      "evidence_rollup": {
+        "task_count": 9,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W06",
+      "name": "Model routing",
+      "wave_ref": "MBW-02",
+      "engineering_class": "intelligence",
+      "exact_requirements": [
+        {
+          "id": "WP-W06:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W06:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W06:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "routing respects authority/budget"
+        },
+        {
+          "id": "WP-W06:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "deterministic tie rules"
+        },
+        {
+          "id": "WP-W06:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "fallback bounded"
+        },
+        {
+          "id": "WP-W06:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "route fallback"
+        },
+        {
+          "id": "WP-W06:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "circuit break"
+        },
+        {
+          "id": "WP-W06:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "safe default"
+        },
+        {
+          "id": "WP-W06:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "no route bypasses hard constraints"
+        },
+        {
+          "id": "WP-W06:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "fallback remains policy-equivalent or fails explicitly"
+        },
+        {
+          "id": "WP-W06:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "routing decisions are reproducible and auditable"
+        },
+        {
+          "id": "WP-W06:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "budget/privacy violations are denied pre-I/O"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-COST-01",
+        "AIQ-S0-COST-02",
+        "AIQ-S0-COST-03",
+        "AIQ-S0-PROV-01",
+        "AIQ-S0-PROV-02",
+        "AIQ-S0-PROV-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-COST-01",
+        "ACC-AIQ-S0-COST-02",
+        "ACC-AIQ-S0-COST-03",
+        "ACC-AIQ-S0-PROV-01",
+        "ACC-AIQ-S0-PROV-02",
+        "ACC-AIQ-S0-PROV-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-020",
+        "EDGE-AI-021",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "HIST-AI-004",
+        "HIST-AI-026",
+        "HIST-AI-034",
+        "HIST-AI-040",
+        "OBSCURE-019",
+        "OBSCURE-021",
+        "OBSCURE-023"
+      ],
+      "test_targets": [
+        "backend/tests/test_model_router.py",
+        "skeleton/testing/test_cost_admission.py",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_tenant_quota.py",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_fallback_rechecks_modality_and_tool_support",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_fallback_cannot_cross_privacy_ceiling",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_alias_revision_is_part_of_route_receipt",
+        "planned:skeleton/testing/test_model_routing_edges.py::test_correlated_ensemble_not_counted_as_independent_verification"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ],
+      "evidence_rollup": {
+        "task_count": 9,
+        "queue_done_count": 1,
+        "implementation_signed_count": 1,
+        "verification_signed_count": 1,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W07",
+      "name": "Memory",
+      "wave_ref": "MBW-02",
+      "engineering_class": "state",
+      "exact_requirements": [
+        {
+          "id": "WP-W07:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W07:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W07:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "writes require policy"
+        },
+        {
+          "id": "WP-W07:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "provenance retained"
+        },
+        {
+          "id": "WP-W07:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "deletion/tombstone semantics explicit"
+        },
+        {
+          "id": "WP-W07:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "tombstone-safe restore"
+        },
+        {
+          "id": "WP-W07:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "reindex"
+        },
+        {
+          "id": "WP-W07:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "quarantine"
+        },
+        {
+          "id": "WP-W07:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "memory survives restart only through canonical repository"
+        },
+        {
+          "id": "WP-W07:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "poisoning/staleness is represented and testable"
+        },
+        {
+          "id": "WP-W07:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "deletion/retention propagates to projections"
+        },
+        {
+          "id": "WP-W07:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "memory improves tasks without becoming self-referential evidence authority"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S1-MEM-01",
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S1-MEM-01",
+        "ACC-AIQ-S1-MEM-02",
+        "ACC-AIQ-S1-MEM-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-003",
+        "EDGE-AI-004",
+        "EDGE-AI-033",
+        "EDGE-DATA-001",
+        "EDGE-DATA-009",
+        "EDGE-DATA-010",
+        "HIST-AI-008",
+        "HIST-AI-010",
+        "HIST-AI-017",
+        "HIST-AI-020",
+        "HIST-AI-027",
+        "HIST-AI-028",
+        "HIST-AI-029",
+        "OBSCURE-007",
+        "OBSCURE-018",
+        "OBSCURE-020"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_data_governance.py",
+        "planned:skeleton/testing/test_memory_writeback.py::test_model_text_alone_cannot_persist",
+        "planned:skeleton/testing/test_memory_writeback.py::test_poisoned_unverified_candidate_not_promoted",
+        "planned:skeleton/testing/test_memory_reconciliation.py::test_stale_memory_does_not_override_current_intent",
+        "planned:skeleton/testing/test_memory_reconciliation.py::test_contradiction_preserves_both_versions",
+        "planned:skeleton/testing/test_memory_deletion.py::test_delete_propagates_to_vector_projection",
+        "planned:skeleton/testing/test_memory_feedback_loop.py::test_generated_memory_cannot_self_corroborate"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine"
+      ],
+      "evidence_rollup": {
+        "task_count": 9,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W08",
+      "name": "Retrieval",
+      "wave_ref": "MBW-02",
+      "engineering_class": "intelligence",
+      "exact_requirements": [
+        {
+          "id": "WP-W08:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W08:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W08:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "authorization at query time"
+        },
+        {
+          "id": "WP-W08:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "provenance on result"
+        },
+        {
+          "id": "WP-W08:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "stale index detectable"
+        },
+        {
+          "id": "WP-W08:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "index rebuild"
+        },
+        {
+          "id": "WP-W08:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "version pin/fallback"
+        },
+        {
+          "id": "WP-W08:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "degraded lexical path"
+        },
+        {
+          "id": "WP-W08:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "hybrid baseline includes sparse retrieval rather than assuming dense superiority"
+        },
+        {
+          "id": "WP-W08:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "source deletion/freshness/versioning are explicit"
+        },
+        {
+          "id": "WP-W08:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "evidence lineage survives ranking/reranking"
+        },
+        {
+          "id": "WP-W08:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "retrieval cannot launder untrusted/generated content into authority"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S1-MEM-01",
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S1-MEM-01",
+        "ACC-AIQ-S1-MEM-02",
+        "ACC-AIQ-S1-MEM-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-007",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-010",
+        "EDGE-AI-011",
+        "EDGE-AI-034",
+        "EDGE-DATA-008",
+        "EDGE-DATA-009",
+        "HIST-AI-027",
+        "HIST-AI-030",
+        "HIST-AI-031",
+        "HIST-AI-032",
+        "OBSCURE-006",
+        "OBSCURE-010",
+        "OBSCURE-018"
+      ],
+      "test_targets": [
+        "tests/test_retrieval_pipeline_internals.py",
+        "tests/test_quad_retrieval_internals.py",
+        "skeleton/testing/test_retrieval_hot_path.py",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_duplicate_sources_do_not_inflate_independence",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_chunk_preserves_qualifier_context",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_embedding_version_mismatch_fails_closed",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_deleted_source_disappears_from_derived_index",
+        "planned:skeleton/testing/test_retrieval_edge_cases.py::test_generated_summary_is_not_independent_evidence"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path"
+      ],
+      "evidence_rollup": {
+        "task_count": 9,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W09",
+      "name": "Knowledge/evidence",
+      "wave_ref": "MBW-02",
+      "engineering_class": "evidence",
+      "exact_requirements": [
+        {
+          "id": "WP-W09:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W09:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W09:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "contradictions coexist"
+        },
+        {
+          "id": "WP-W09:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "temporal/scope qualifiers preserved"
+        },
+        {
+          "id": "WP-W09:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "source immutable"
+        },
+        {
+          "id": "WP-W09:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "rebuild from source ledger"
+        },
+        {
+          "id": "WP-W09:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "quarantine invalid edges"
+        },
+        {
+          "id": "WP-W09:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "claim state is evidence-derived"
+        },
+        {
+          "id": "WP-W09:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "scope and time are first-class"
+        },
+        {
+          "id": "WP-W09:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "contradictions do not corrupt prior state"
+        },
+        {
+          "id": "WP-W09:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "knowledge graph can explain source lineage and uncertainty"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S1-MEM-01",
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03",
+        "AIQ-S3-VER-01",
+        "AIQ-S3-VER-02",
+        "AIQ-S3-VER-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S1-MEM-01",
+        "ACC-AIQ-S1-MEM-02",
+        "ACC-AIQ-S1-MEM-03",
+        "ACC-AIQ-S3-VER-01",
+        "ACC-AIQ-S3-VER-02",
+        "ACC-AIQ-S3-VER-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-033",
+        "EDGE-AI-034",
+        "HIST-AI-005",
+        "HIST-AI-008",
+        "HIST-AI-016",
+        "HIST-AI-032",
+        "HIST-AI-040",
+        "OBSCURE-011",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_correlated_sources_not_counted_as_independent",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_temporal_scope_prevents_historical_fact_as_current",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_population_scope_prevents_invalid_generalization",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_contradictory_claims_coexist",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_model_generated_memory_cannot_self_verify_claim",
+        "planned:skeleton/testing/test_claim_evidence_graph.py::test_unknown_and_contested_are_terminal_valid_states"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ],
+      "evidence_rollup": {
+        "task_count": 12,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W10",
+      "name": "Context compiler",
+      "wave_ref": "MBW-02",
+      "engineering_class": "intelligence",
+      "exact_requirements": [
+        {
+          "id": "WP-W10:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W10:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W10:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "instruction authority preserved"
+        },
+        {
+          "id": "WP-W10:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "untrusted text cannot self-promote"
+        },
+        {
+          "id": "WP-W10:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "truncation policy deterministic"
+        },
+        {
+          "id": "WP-W10:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "safe minimal context fallback"
+        },
+        {
+          "id": "WP-W10:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "evidence omission signal"
+        },
+        {
+          "id": "WP-W10:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "same governed state produces deterministic context ordering under same budget/policy"
+        },
+        {
+          "id": "WP-W10:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "trust classes survive compilation"
+        },
+        {
+          "id": "WP-W10:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "truncation cannot remove mandatory controls"
+        },
+        {
+          "id": "WP-W10:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "context artifacts explain omissions/compression actions"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S1-CONV-01",
+        "AIQ-S1-CONV-02",
+        "AIQ-S1-CONV-03",
+        "AIQ-S1-MEM-01",
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03",
+        "AIQ-S2-CTX-01",
+        "AIQ-S2-CTX-02",
+        "AIQ-S2-CTX-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S1-CONV-01",
+        "ACC-AIQ-S1-CONV-02",
+        "ACC-AIQ-S1-CONV-03",
+        "ACC-AIQ-S1-MEM-01",
+        "ACC-AIQ-S1-MEM-02",
+        "ACC-AIQ-S1-MEM-03",
+        "ACC-AIQ-S2-CTX-01",
+        "ACC-AIQ-S2-CTX-02",
+        "ACC-AIQ-S2-CTX-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-007",
+        "EDGE-AI-012",
+        "EDGE-AI-013",
+        "EDGE-AI-037",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "HIST-AI-003",
+        "HIST-AI-024",
+        "HIST-AI-027",
+        "HIST-SYS-018",
+        "OBSCURE-018",
+        "OBSCURE-024",
+        "OBSCURE-025"
+      ],
+      "test_targets": [
+        "skeleton/testing/test_context_compiler.py",
+        "planned:skeleton/testing/test_context_security_edges.py::test_retrieved_prompt_injection_remains_untrusted",
+        "planned:skeleton/testing/test_context_security_edges.py::test_tool_output_instructions_cannot_gain_authority",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_mandatory_policy_never_trimmed",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_compression_retains_exception_and_provenance",
+        "planned:skeleton/testing/test_context_budget_edges.py::test_oversized_tool_result_becomes_reference"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "evidence_rollup": {
+        "task_count": 12,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W11",
+      "name": "Cognitive runtime",
+      "wave_ref": "MBW-04",
+      "engineering_class": "autonomy",
+      "exact_requirements": [
+        {
+          "id": "WP-W11:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W11:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W11:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "all loops bounded"
+        },
+        {
+          "id": "WP-W11:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "hidden reasoning not required for replay"
+        },
+        {
+          "id": "WP-W11:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "budgets propagate"
+        },
+        {
+          "id": "WP-W11:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "checkpoint/abort"
+        },
+        {
+          "id": "WP-W11:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "strategy downgrade"
+        },
+        {
+          "id": "WP-W11:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "safe terminal response"
+        },
+        {
+          "id": "WP-W11:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "bounded loop cannot spin indefinitely"
+        },
+        {
+          "id": "WP-W11:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "tool/approval authority remains external to generated text"
+        },
+        {
+          "id": "WP-W11:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "durable turn/checkpoint lineage survives crash/restart"
+        },
+        {
+          "id": "WP-W11:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "terminal result binds route/provider/tool/verification/usage/memory/artifact/stream evidence"
+        },
+        {
+          "id": "WP-W11:ACC:05",
+          "source": "edge_matrix.acceptance",
+          "text": "VS-001 edge-case families are executable"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S0-COST-01",
+        "AIQ-S0-COST-02",
+        "AIQ-S0-COST-03",
+        "AIQ-S1-CONV-01",
+        "AIQ-S1-CONV-02",
+        "AIQ-S1-CONV-03",
+        "AIQ-S1-TOOL-01",
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03",
+        "AIQ-S3-VER-01",
+        "AIQ-S3-VER-02",
+        "AIQ-S3-VER-03",
+        "AIQ-S4-EXEC-01",
+        "AIQ-S4-EXEC-02",
+        "AIQ-S4-EXEC-03",
+        "AIQ-S5-ENG-01",
+        "AIQ-S5-ENG-02",
+        "AIQ-S5-ENG-03",
+        "AIQ-S6-STREAM-01",
+        "AIQ-S6-STREAM-02",
+        "AIQ-S6-STREAM-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S0-COST-01",
+        "ACC-AIQ-S0-COST-02",
+        "ACC-AIQ-S0-COST-03",
+        "ACC-AIQ-S1-CONV-01",
+        "ACC-AIQ-S1-CONV-02",
+        "ACC-AIQ-S1-CONV-03",
+        "ACC-AIQ-S1-TOOL-01",
+        "ACC-AIQ-S1-TOOL-02",
+        "ACC-AIQ-S1-TOOL-03",
+        "ACC-AIQ-S3-VER-01",
+        "ACC-AIQ-S3-VER-02",
+        "ACC-AIQ-S3-VER-03",
+        "ACC-AIQ-S4-EXEC-01",
+        "ACC-AIQ-S4-EXEC-02",
+        "ACC-AIQ-S4-EXEC-03",
+        "ACC-AIQ-S5-ENG-01",
+        "ACC-AIQ-S5-ENG-02",
+        "ACC-AIQ-S5-ENG-03",
+        "ACC-AIQ-S6-STREAM-01",
+        "ACC-AIQ-S6-STREAM-02",
+        "ACC-AIQ-S6-STREAM-03",
+        "ACC-AIQ-S7-E2E-01",
+        "ACC-AIQ-S7-E2E-02",
+        "ACC-AIQ-S7-E2E-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-022",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-029",
+        "EDGE-AI-030",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-AI-035",
+        "EDGE-AI-036",
+        "EDGE-AI-039",
+        "EDGE-AI-040",
+        "EDGE-DIST-006",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-DIST-030",
+        "EDGE-UX-001",
+        "EDGE-UX-002",
+        "EDGE-UX-004",
+        "EDGE-UX-010",
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-003",
+        "HIST-SYS-010",
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-026"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_cognitive_execution_loop.py::test_prompt_only_completion",
+        "planned:skeleton/testing/test_cognitive_execution_loop.py::test_single_and_multi_tool_turns",
+        "planned:skeleton/testing/test_cognitive_stagnation.py::test_identical_failed_tool_cycle_stops",
+        "planned:skeleton/testing/test_cognitive_approval.py::test_approval_invalid_after_argument_change",
+        "planned:skeleton/testing/test_cognitive_approval.py::test_expired_approval_revalidates",
+        "planned:skeleton/testing/test_cognitive_recovery.py::test_side_effect_before_receipt_is_reconciled_not_blindly_replayed",
+        "planned:skeleton/testing/test_cognitive_recovery.py::test_cancel_complete_race_has_one_terminal_state",
+        "planned:skeleton/testing/test_cognitive_verification.py::test_correlated_verifier_not_treated_as_independent",
+        "planned:skeleton/testing/test_cognitive_goal_drift.py::test_plan_actions_remain_traceable_to_objective",
+        "planned:backend/tests/test_ai_operation_reconnect.py::test_browser_refresh_reconstructs_running_and_terminal_state"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "evidence_rollup": {
+        "task_count": 24,
+        "queue_done_count": 1,
+        "implementation_signed_count": 1,
+        "verification_signed_count": 1,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W12",
+      "name": "Planning",
+      "wave_ref": "MBW-04",
+      "engineering_class": "autonomy",
+      "exact_requirements": [
+        {
+          "id": "WP-W12:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W12:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W12:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "acyclic executable graph"
+        },
+        {
+          "id": "WP-W12:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "terminal behavior exists"
+        },
+        {
+          "id": "WP-W12:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "preconditions enforced"
+        },
+        {
+          "id": "WP-W12:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "replan from durable checkpoint"
+        },
+        {
+          "id": "WP-W12:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "dependency invalidation"
+        },
+        {
+          "id": "WP-W12:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W12:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W12:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W12:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-020",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-036",
+        "EDGE-DATA-008",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-004",
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-017",
+        "HIST-AI-018",
+        "HIST-AI-021",
+        "HIST-AI-031",
+        "HIST-AI-036",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-002",
+        "HIST-SYS-003",
+        "HIST-SYS-010",
+        "HIST-SYS-026",
+        "HIST-SYS-030",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w12_edge_contract.py",
+        "planned:tests/wp_w12_failure_injection.py",
+        "planned:benchmarks/wp_w12_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w12-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "replan from durable checkpoint",
+        "dependency invalidation"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W13",
+      "name": "Tools",
+      "wave_ref": "MBW-03",
+      "engineering_class": "action",
+      "exact_requirements": [
+        {
+          "id": "WP-W13:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W13:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W13:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "schema validation before action"
+        },
+        {
+          "id": "WP-W13:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "idempotency/compensation"
+        },
+        {
+          "id": "WP-W13:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "exact resource authorization"
+        },
+        {
+          "id": "WP-W13:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "compensation"
+        },
+        {
+          "id": "WP-W13:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "idempotency replay"
+        },
+        {
+          "id": "WP-W13:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "revoke/disable tool"
+        },
+        {
+          "id": "WP-W13:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W13:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W13:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W13:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S1-TOOL-01",
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S1-TOOL-01",
+        "ACC-AIQ-S1-TOOL-02",
+        "ACC-AIQ-S1-TOOL-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-002",
+        "EDGE-AI-014",
+        "EDGE-AI-015",
+        "EDGE-AI-020",
+        "EDGE-AI-022",
+        "EDGE-AI-023",
+        "EDGE-AI-027",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-AI-037",
+        "EDGE-AI-039",
+        "EDGE-AI-040",
+        "EDGE-DIST-006",
+        "EDGE-DIST-011",
+        "EDGE-DIST-021",
+        "EDGE-DIST-027",
+        "EDGE-HW-002",
+        "EDGE-HW-009",
+        "EDGE-SEC-002",
+        "EDGE-SEC-003",
+        "EDGE-SEC-004",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-008",
+        "EDGE-SEC-009",
+        "EDGE-SEC-011",
+        "EDGE-SEC-012",
+        "EDGE-SEC-013",
+        "EDGE-SEC-014",
+        "EDGE-SEC-016",
+        "EDGE-SEC-017",
+        "EDGE-SEC-018",
+        "EDGE-SEC-019",
+        "HIST-AI-002",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-AI-020",
+        "HIST-AI-027",
+        "HIST-SYS-002",
+        "HIST-SYS-006",
+        "HIST-SYS-009",
+        "HIST-SYS-010",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-SYS-023",
+        "HIST-SYS-024",
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-024",
+        "OBSCURE-025"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w13_edge_contract.py",
+        "planned:tests/wp_w13_failure_injection.py",
+        "planned:benchmarks/wp_w13_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w13-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool"
+      ],
+      "evidence_rollup": {
+        "task_count": 3,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W14",
+      "name": "Policy",
+      "wave_ref": "MBW-03",
+      "engineering_class": "action",
+      "exact_requirements": [
+        {
+          "id": "WP-W14:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W14:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W14:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "deny-by-default"
+        },
+        {
+          "id": "WP-W14:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "exact normalized resource check"
+        },
+        {
+          "id": "WP-W14:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "policy version bound to decision"
+        },
+        {
+          "id": "WP-W14:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "fail closed"
+        },
+        {
+          "id": "WP-W14:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "policy rollback"
+        },
+        {
+          "id": "WP-W14:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "decision invalidation"
+        },
+        {
+          "id": "WP-W14:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W14:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W14:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W14:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S1-TOOL-01",
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S1-TOOL-01",
+        "ACC-AIQ-S1-TOOL-02",
+        "ACC-AIQ-S1-TOOL-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-011",
+        "EDGE-AI-013",
+        "EDGE-AI-018",
+        "EDGE-AI-030",
+        "EDGE-AI-031",
+        "EDGE-AI-032",
+        "EDGE-AI-038",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-017",
+        "EDGE-DATA-010",
+        "EDGE-DIST-010",
+        "EDGE-DIST-019",
+        "EDGE-SEC-001",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-011",
+        "EDGE-SEC-020",
+        "EDGE-UX-009",
+        "HIST-AI-005",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-AI-032",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-SYS-021",
+        "OBSCURE-012",
+        "OBSCURE-018",
+        "OBSCURE-022",
+        "OBSCURE-023",
+        "OBSCURE-024"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w14_edge_contract.py",
+        "planned:tests/wp_w14_failure_injection.py",
+        "planned:benchmarks/wp_w14_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w14-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ],
+      "evidence_rollup": {
+        "task_count": 3,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W15",
+      "name": "Agent runtime",
+      "wave_ref": "MBW-04",
+      "engineering_class": "autonomy",
+      "exact_requirements": [
+        {
+          "id": "WP-W15:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W15:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W15:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "child authority subset parent"
+        },
+        {
+          "id": "WP-W15:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "identity durable"
+        },
+        {
+          "id": "WP-W15:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "lease ownership checked"
+        },
+        {
+          "id": "WP-W15:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "lease fencing"
+        },
+        {
+          "id": "WP-W15:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "checkpoint resume"
+        },
+        {
+          "id": "WP-W15:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "revoke delegation"
+        },
+        {
+          "id": "WP-W15:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W15:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W15:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W15:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-022",
+        "EDGE-AI-024",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-036",
+        "EDGE-DIST-020",
+        "HIST-AI-006",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-AI-033",
+        "HIST-SYS-001",
+        "HIST-SYS-019",
+        "HIST-SYS-030",
+        "OBSCURE-026"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w15_edge_contract.py",
+        "planned:tests/wp_w15_failure_injection.py",
+        "planned:benchmarks/wp_w15_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w15-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "lease fencing",
+        "checkpoint resume",
+        "revoke delegation"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W16",
+      "name": "Swarm",
+      "wave_ref": "MBW-04",
+      "engineering_class": "autonomy",
+      "exact_requirements": [
+        {
+          "id": "WP-W16:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W16:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W16:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "bounded fan-out"
+        },
+        {
+          "id": "WP-W16:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "single writer per conflict domain"
+        },
+        {
+          "id": "WP-W16:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "disagreement evidence-based"
+        },
+        {
+          "id": "WP-W16:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "re-elect/reassign"
+        },
+        {
+          "id": "WP-W16:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "conflict abort"
+        },
+        {
+          "id": "WP-W16:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "bounded decomposition"
+        },
+        {
+          "id": "WP-W16:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W16:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W16:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W16:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-025",
+        "EDGE-DATA-007",
+        "EDGE-DIST-007",
+        "EDGE-DIST-008",
+        "EDGE-DIST-018",
+        "EDGE-DIST-019",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-DIST-022",
+        "HIST-AI-006",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-AI-033",
+        "HIST-AI-034",
+        "HIST-AI-035",
+        "HIST-AI-036",
+        "HIST-AI-040",
+        "HIST-SYS-001",
+        "HIST-SYS-004",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016",
+        "OBSCURE-003",
+        "OBSCURE-017",
+        "OBSCURE-019",
+        "OBSCURE-026",
+        "OBSCURE-027"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w16_edge_contract.py",
+        "planned:tests/wp_w16_failure_injection.py",
+        "planned:benchmarks/wp_w16_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w16-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "re-elect/reassign",
+        "conflict abort",
+        "bounded decomposition"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W17",
+      "name": "Verification",
+      "wave_ref": "MBW-03",
+      "engineering_class": "evidence",
+      "exact_requirements": [
+        {
+          "id": "WP-W17:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W17:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W17:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "verification separate from confidence"
+        },
+        {
+          "id": "WP-W17:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "evidence immutable"
+        },
+        {
+          "id": "WP-W17:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "high-impact acceptance independent"
+        },
+        {
+          "id": "WP-W17:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "reject/redo"
+        },
+        {
+          "id": "WP-W17:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "evidence refresh"
+        },
+        {
+          "id": "WP-W17:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "escalation"
+        },
+        {
+          "id": "WP-W17:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W17:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W17:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W17:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S3-VER-01",
+        "AIQ-S3-VER-02",
+        "AIQ-S3-VER-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S3-VER-01",
+        "ACC-AIQ-S3-VER-02",
+        "ACC-AIQ-S3-VER-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-001",
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-008",
+        "EDGE-AI-009",
+        "EDGE-AI-012",
+        "EDGE-AI-023",
+        "EDGE-AI-024",
+        "EDGE-AI-029",
+        "EDGE-AI-033",
+        "EDGE-AI-034",
+        "EDGE-AI-037",
+        "EDGE-AI-039",
+        "EDGE-DATA-005",
+        "HIST-AI-002",
+        "HIST-AI-005",
+        "HIST-AI-019",
+        "HIST-AI-025",
+        "HIST-AI-033",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-SYS-018",
+        "OBSCURE-012",
+        "OBSCURE-013",
+        "OBSCURE-014",
+        "OBSCURE-018",
+        "OBSCURE-019",
+        "OBSCURE-020",
+        "OBSCURE-023",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w17_edge_contract.py",
+        "planned:tests/wp_w17_failure_injection.py",
+        "planned:benchmarks/wp_w17_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w17-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ],
+      "evidence_rollup": {
+        "task_count": 3,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W18",
+      "name": "Evaluation",
+      "wave_ref": "MBW-06",
+      "engineering_class": "evidence",
+      "exact_requirements": [
+        {
+          "id": "WP-W18:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W18:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W18:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "versioned data/config"
+        },
+        {
+          "id": "WP-W18:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "contamination tracked"
+        },
+        {
+          "id": "WP-W18:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "uncertainty reported"
+        },
+        {
+          "id": "WP-W18:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "freeze/revert benchmark"
+        },
+        {
+          "id": "WP-W18:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "invalidate contaminated runs"
+        },
+        {
+          "id": "WP-W18:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W18:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W18:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W18:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-015",
+        "EDGE-AI-018",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-AI-028",
+        "EDGE-AI-035",
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-021",
+        "EDGE-DIST-024",
+        "EDGE-HW-006",
+        "HIST-AI-018",
+        "HIST-AI-030",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-SYS-003",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016",
+        "HIST-SYS-025",
+        "OBSCURE-001",
+        "OBSCURE-019",
+        "OBSCURE-023",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w18_edge_contract.py",
+        "planned:tests/wp_w18_failure_injection.py",
+        "planned:benchmarks/wp_w18_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w18-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "freeze/revert benchmark",
+        "invalidate contaminated runs"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W19",
+      "name": "Resilience",
+      "wave_ref": "MBW-01",
+      "engineering_class": "runtime",
+      "exact_requirements": [
+        {
+          "id": "WP-W19:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W19:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W19:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "retry bounded"
+        },
+        {
+          "id": "WP-W19:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "jitter/backoff"
+        },
+        {
+          "id": "WP-W19:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "failure domains isolated"
+        },
+        {
+          "id": "WP-W19:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "trip breaker"
+        },
+        {
+          "id": "WP-W19:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "shed load"
+        },
+        {
+          "id": "WP-W19:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "restore checkpoint"
+        },
+        {
+          "id": "WP-W19:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W19:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W19:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W19:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-032",
+        "EDGE-AI-039",
+        "EDGE-AI-040",
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-019",
+        "EDGE-DATA-003",
+        "EDGE-DATA-005",
+        "EDGE-DATA-010",
+        "EDGE-DIST-001",
+        "EDGE-DIST-002",
+        "EDGE-DIST-004",
+        "EDGE-DIST-006",
+        "EDGE-DIST-008",
+        "EDGE-DIST-010",
+        "EDGE-DIST-011",
+        "EDGE-DIST-012",
+        "EDGE-DIST-013",
+        "EDGE-DIST-014",
+        "EDGE-DIST-015",
+        "EDGE-DIST-016",
+        "EDGE-DIST-017",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-029",
+        "EDGE-DIST-030",
+        "EDGE-HW-001",
+        "EDGE-HW-003",
+        "EDGE-HW-006",
+        "EDGE-UX-003",
+        "HIST-SYS-003",
+        "HIST-SYS-004",
+        "HIST-SYS-005",
+        "HIST-SYS-006",
+        "HIST-SYS-007",
+        "HIST-SYS-009",
+        "HIST-SYS-014",
+        "HIST-SYS-016",
+        "HIST-SYS-026",
+        "HIST-SYS-027",
+        "OBSCURE-001",
+        "OBSCURE-002",
+        "OBSCURE-004",
+        "OBSCURE-005",
+        "OBSCURE-006",
+        "OBSCURE-008",
+        "OBSCURE-009",
+        "OBSCURE-014",
+        "OBSCURE-015",
+        "OBSCURE-016"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w19_edge_contract.py",
+        "planned:tests/wp_w19_failure_injection.py",
+        "planned:benchmarks/wp_w19_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w19-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "trip breaker",
+        "shed load",
+        "restore checkpoint"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W20",
+      "name": "Security",
+      "wave_ref": "MBW-03",
+      "engineering_class": "action",
+      "exact_requirements": [
+        {
+          "id": "WP-W20:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W20:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W20:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "least authority"
+        },
+        {
+          "id": "WP-W20:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "secrets never become model data by default"
+        },
+        {
+          "id": "WP-W20:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "tenant boundaries enforced"
+        },
+        {
+          "id": "WP-W20:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "revoke credential"
+        },
+        {
+          "id": "WP-W20:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "isolate workspace"
+        },
+        {
+          "id": "WP-W20:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "incident rollback"
+        },
+        {
+          "id": "WP-W20:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W20:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W20:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W20:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-001",
+        "EDGE-AI-002",
+        "EDGE-AI-003",
+        "EDGE-AI-011",
+        "EDGE-AI-013",
+        "EDGE-AI-021",
+        "EDGE-AI-030",
+        "EDGE-AI-032",
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-009",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-011",
+        "EDGE-CONTRACT-012",
+        "EDGE-CONTRACT-017",
+        "EDGE-CONTRACT-020",
+        "EDGE-DATA-001",
+        "EDGE-DATA-002",
+        "EDGE-DATA-009",
+        "EDGE-DATA-010",
+        "EDGE-HW-006",
+        "EDGE-SEC-001",
+        "EDGE-SEC-002",
+        "EDGE-SEC-003",
+        "EDGE-SEC-004",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-008",
+        "EDGE-SEC-009",
+        "EDGE-SEC-010",
+        "EDGE-SEC-011",
+        "EDGE-SEC-012",
+        "EDGE-SEC-013",
+        "EDGE-SEC-014",
+        "EDGE-SEC-015",
+        "EDGE-SEC-016",
+        "EDGE-SEC-017",
+        "EDGE-SEC-018",
+        "EDGE-SEC-019",
+        "EDGE-SEC-020",
+        "HIST-AI-005",
+        "HIST-AI-007",
+        "HIST-AI-019",
+        "HIST-SYS-019",
+        "HIST-SYS-020",
+        "HIST-SYS-021",
+        "HIST-SYS-024",
+        "OBSCURE-010",
+        "OBSCURE-012",
+        "OBSCURE-018",
+        "OBSCURE-022",
+        "OBSCURE-024",
+        "OBSCURE-025"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w20_edge_contract.py",
+        "planned:tests/wp_w20_failure_injection.py",
+        "planned:benchmarks/wp_w20_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w20-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "revoke credential",
+        "isolate workspace",
+        "incident rollback"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W21",
+      "name": "Observability",
+      "wave_ref": "MBW-05",
+      "engineering_class": "evidence",
+      "exact_requirements": [
+        {
+          "id": "WP-W21:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W21:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W21:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "operation reconstructable"
+        },
+        {
+          "id": "WP-W21:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "telemetry bounded"
+        },
+        {
+          "id": "WP-W21:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "sensitive data classified"
+        },
+        {
+          "id": "WP-W21:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "degraded telemetry mode"
+        },
+        {
+          "id": "WP-W21:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "sampling control"
+        },
+        {
+          "id": "WP-W21:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "retention repair"
+        },
+        {
+          "id": "WP-W21:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W21:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W21:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W21:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-017",
+        "EDGE-AI-019",
+        "EDGE-DIST-011",
+        "EDGE-HW-002",
+        "EDGE-HW-005",
+        "EDGE-HW-006",
+        "EDGE-HW-007",
+        "EDGE-SEC-015",
+        "HIST-AI-016",
+        "HIST-AI-035",
+        "HIST-SYS-009",
+        "HIST-SYS-013",
+        "OBSCURE-001",
+        "OBSCURE-015",
+        "OBSCURE-016",
+        "OBSCURE-017",
+        "OBSCURE-021"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w21_edge_contract.py",
+        "planned:tests/wp_w21_failure_injection.py",
+        "planned:benchmarks/wp_w21_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w21-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "degraded telemetry mode",
+        "sampling control",
+        "retention repair"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W22",
+      "name": "API/streaming",
+      "wave_ref": "MBW-05",
+      "engineering_class": "surface",
+      "exact_requirements": [
+        {
+          "id": "WP-W22:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W22:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W22:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "terminal finality"
+        },
+        {
+          "id": "WP-W22:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "replay/resync"
+        },
+        {
+          "id": "WP-W22:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "slow client bounded"
+        },
+        {
+          "id": "WP-W22:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "cursor resync"
+        },
+        {
+          "id": "WP-W22:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "idempotent submit"
+        },
+        {
+          "id": "WP-W22:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "client backoff"
+        },
+        {
+          "id": "WP-W22:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W22:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W22:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W22:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [
+        "AIQ-S5-ENG-01",
+        "AIQ-S5-ENG-02",
+        "AIQ-S5-ENG-03",
+        "AIQ-S6-STREAM-01",
+        "AIQ-S6-STREAM-02",
+        "AIQ-S6-STREAM-03"
+      ],
+      "accountability_refs": [
+        "ACC-AIQ-S5-ENG-01",
+        "ACC-AIQ-S5-ENG-02",
+        "ACC-AIQ-S5-ENG-03",
+        "ACC-AIQ-S6-STREAM-01",
+        "ACC-AIQ-S6-STREAM-02",
+        "ACC-AIQ-S6-STREAM-03"
+      ],
+      "edge_case_refs": [
+        "EDGE-AI-014",
+        "EDGE-AI-016",
+        "EDGE-AI-017",
+        "EDGE-CONTRACT-001",
+        "EDGE-CONTRACT-002",
+        "EDGE-CONTRACT-003",
+        "EDGE-CONTRACT-004",
+        "EDGE-CONTRACT-005",
+        "EDGE-CONTRACT-006",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-017",
+        "EDGE-CONTRACT-018",
+        "EDGE-DIST-002",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-005",
+        "EDGE-DIST-007",
+        "EDGE-DIST-012",
+        "EDGE-DIST-013",
+        "EDGE-DIST-017",
+        "EDGE-DIST-023",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-SEC-009",
+        "EDGE-UX-002",
+        "EDGE-UX-006",
+        "EDGE-UX-007",
+        "EDGE-UX-008",
+        "HIST-AI-006",
+        "HIST-AI-033",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-028",
+        "OBSCURE-009",
+        "OBSCURE-013",
+        "OBSCURE-027"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w22_edge_contract.py",
+        "planned:tests/wp_w22_failure_injection.py",
+        "planned:benchmarks/wp_w22_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w22-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "cursor resync",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "evidence_rollup": {
+        "task_count": 6,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W23",
+      "name": "Product",
+      "wave_ref": "MBW-05",
+      "engineering_class": "surface",
+      "exact_requirements": [
+        {
+          "id": "WP-W23:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W23:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W23:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "UI never authoritative"
+        },
+        {
+          "id": "WP-W23:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "blockers/warnings visible"
+        },
+        {
+          "id": "WP-W23:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "destructive action confirmed"
+        },
+        {
+          "id": "WP-W23:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "reconcile from durable state"
+        },
+        {
+          "id": "WP-W23:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "disable unsafe action"
+        },
+        {
+          "id": "WP-W23:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W23:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W23:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W23:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-004",
+        "EDGE-AI-029",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-011",
+        "EDGE-CONTRACT-013",
+        "EDGE-DIST-004",
+        "EDGE-SEC-008",
+        "EDGE-UX-001",
+        "EDGE-UX-002",
+        "EDGE-UX-003",
+        "EDGE-UX-004",
+        "EDGE-UX-005",
+        "EDGE-UX-006",
+        "EDGE-UX-007",
+        "EDGE-UX-008",
+        "EDGE-UX-009",
+        "HIST-AI-005",
+        "HIST-SYS-004",
+        "HIST-SYS-024"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w23_edge_contract.py",
+        "planned:tests/wp_w23_failure_injection.py",
+        "planned:benchmarks/wp_w23_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w23-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "reconcile from durable state",
+        "disable unsafe action"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W24",
+      "name": "Desktop",
+      "wave_ref": "MBW-05",
+      "engineering_class": "surface",
+      "exact_requirements": [
+        {
+          "id": "WP-W24:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W24:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W24:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "least local privilege"
+        },
+        {
+          "id": "WP-W24:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "platform path/process semantics explicit"
+        },
+        {
+          "id": "WP-W24:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "safe shutdown"
+        },
+        {
+          "id": "WP-W24:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "repair/doctor"
+        },
+        {
+          "id": "WP-W24:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "restart"
+        },
+        {
+          "id": "WP-W24:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "settings rollback"
+        },
+        {
+          "id": "WP-W24:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W24:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W24:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W24:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-CONTRACT-011",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-SEC-008",
+        "EDGE-SEC-009",
+        "EDGE-SEC-018",
+        "EDGE-UX-003",
+        "HIST-AI-022",
+        "HIST-SYS-005",
+        "HIST-SYS-013"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w24_edge_contract.py",
+        "planned:tests/wp_w24_failure_injection.py",
+        "planned:benchmarks/wp_w24_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w24-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "repair/doctor",
+        "restart",
+        "settings rollback"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W25",
+      "name": "Installer",
+      "wave_ref": "MBW-07",
+      "engineering_class": "production",
+      "exact_requirements": [
+        {
+          "id": "WP-W25:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W25:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W25:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "verified artifacts"
+        },
+        {
+          "id": "WP-W25:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "atomic update boundary"
+        },
+        {
+          "id": "WP-W25:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "rollback compatibility proven"
+        },
+        {
+          "id": "WP-W25:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "transaction rollback"
+        },
+        {
+          "id": "WP-W25:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "repair mode"
+        },
+        {
+          "id": "WP-W25:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "previous-version restore"
+        },
+        {
+          "id": "WP-W25:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W25:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W25:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W25:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-019",
+        "EDGE-DATA-002",
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-DIST-025",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-UX-005",
+        "HIST-AI-002",
+        "HIST-SYS-025",
+        "OBSCURE-010",
+        "OBSCURE-029"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w25_edge_contract.py",
+        "planned:tests/wp_w25_failure_injection.py",
+        "planned:benchmarks/wp_w25_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w25-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "transaction rollback",
+        "repair mode",
+        "previous-version restore"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W26",
+      "name": "Research",
+      "wave_ref": "MBW-06",
+      "engineering_class": "research",
+      "exact_requirements": [
+        {
+          "id": "WP-W26:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W26:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W26:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "source lineage immutable"
+        },
+        {
+          "id": "WP-W26:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "retractions propagate"
+        },
+        {
+          "id": "WP-W26:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "research cannot promote itself"
+        },
+        {
+          "id": "WP-W26:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "invalidate candidate"
+        },
+        {
+          "id": "WP-W26:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "preserve negative result"
+        },
+        {
+          "id": "WP-W26:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "source correction"
+        },
+        {
+          "id": "WP-W26:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W26:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W26:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W26:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-005",
+        "EDGE-AI-006",
+        "EDGE-AI-025",
+        "EDGE-AI-026",
+        "EDGE-AI-027",
+        "EDGE-AI-030",
+        "EDGE-DIST-030",
+        "EDGE-HW-006",
+        "EDGE-UX-004",
+        "HIST-AI-001",
+        "HIST-AI-002",
+        "HIST-AI-003",
+        "HIST-AI-004",
+        "HIST-AI-005",
+        "HIST-AI-006",
+        "HIST-AI-007",
+        "HIST-AI-008",
+        "HIST-AI-009",
+        "HIST-AI-010",
+        "HIST-AI-011",
+        "HIST-AI-012",
+        "HIST-AI-013",
+        "HIST-AI-014",
+        "HIST-AI-015",
+        "HIST-AI-016",
+        "HIST-AI-017",
+        "HIST-AI-018",
+        "HIST-AI-019",
+        "HIST-AI-020",
+        "HIST-AI-021",
+        "HIST-AI-022",
+        "HIST-AI-023",
+        "HIST-AI-024",
+        "HIST-AI-025",
+        "HIST-AI-026",
+        "HIST-AI-027",
+        "HIST-AI-028",
+        "HIST-AI-029",
+        "HIST-AI-030",
+        "HIST-AI-031",
+        "HIST-AI-032",
+        "HIST-AI-033",
+        "HIST-AI-034",
+        "HIST-AI-035",
+        "HIST-AI-036",
+        "HIST-AI-037",
+        "HIST-AI-038",
+        "HIST-AI-039",
+        "HIST-AI-040",
+        "HIST-SYS-003",
+        "HIST-SYS-030",
+        "OBSCURE-019",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w26_edge_contract.py",
+        "planned:tests/wp_w26_failure_injection.py",
+        "planned:benchmarks/wp_w26_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w26-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "invalidate candidate",
+        "preserve negative result",
+        "source correction"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W27",
+      "name": "Forge",
+      "wave_ref": "MBW-06",
+      "engineering_class": "research",
+      "exact_requirements": [
+        {
+          "id": "WP-W27:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W27:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W27:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "candidate isolation"
+        },
+        {
+          "id": "WP-W27:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "no direct production mutation"
+        },
+        {
+          "id": "WP-W27:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "champion baseline fixed"
+        },
+        {
+          "id": "WP-W27:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "discard candidate"
+        },
+        {
+          "id": "WP-W27:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "restore champion"
+        },
+        {
+          "id": "WP-W27:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "quarantine artifacts"
+        },
+        {
+          "id": "WP-W27:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W27:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W27:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W27:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-025",
+        "EDGE-AI-035",
+        "EDGE-DATA-002",
+        "EDGE-DATA-003",
+        "EDGE-DATA-004",
+        "EDGE-SEC-001",
+        "EDGE-SEC-005",
+        "EDGE-SEC-006",
+        "EDGE-SEC-007",
+        "EDGE-SEC-009",
+        "EDGE-UX-010",
+        "HIST-AI-007",
+        "HIST-AI-018",
+        "HIST-AI-019",
+        "HIST-AI-036",
+        "HIST-SYS-019",
+        "OBSCURE-007",
+        "OBSCURE-011",
+        "OBSCURE-029"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w27_edge_contract.py",
+        "planned:tests/wp_w27_failure_injection.py",
+        "planned:benchmarks/wp_w27_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w27-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "discard candidate",
+        "restore champion",
+        "quarantine artifacts"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W28",
+      "name": "Learning",
+      "wave_ref": "MBW-06",
+      "engineering_class": "research",
+      "exact_requirements": [
+        {
+          "id": "WP-W28:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W28:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W28:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "feedback provenance"
+        },
+        {
+          "id": "WP-W28:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "no silent online authority change"
+        },
+        {
+          "id": "WP-W28:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "rollback target retained"
+        },
+        {
+          "id": "WP-W28:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "rollback candidate"
+        },
+        {
+          "id": "WP-W28:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "disable signal source"
+        },
+        {
+          "id": "WP-W28:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "retrain from frozen data"
+        },
+        {
+          "id": "WP-W28:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W28:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W28:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W28:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-028",
+        "EDGE-AI-033",
+        "EDGE-AI-034",
+        "EDGE-AI-035",
+        "EDGE-AI-036",
+        "EDGE-DIST-020",
+        "HIST-AI-009",
+        "HIST-AI-011",
+        "HIST-AI-018",
+        "HIST-AI-023",
+        "HIST-AI-035"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w28_edge_contract.py",
+        "planned:tests/wp_w28_failure_injection.py",
+        "planned:benchmarks/wp_w28_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w28-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "rollback candidate",
+        "disable signal source",
+        "retrain from frozen data"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W29",
+      "name": "Distributed runtime",
+      "wave_ref": "MBW-07",
+      "engineering_class": "production",
+      "exact_requirements": [
+        {
+          "id": "WP-W29:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W29:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W29:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "fencing tokens"
+        },
+        {
+          "id": "WP-W29:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "topology/resource budgets"
+        },
+        {
+          "id": "WP-W29:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "no split-brain writer"
+        },
+        {
+          "id": "WP-W29:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "fence/reassign"
+        },
+        {
+          "id": "WP-W29:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "drain worker"
+        },
+        {
+          "id": "WP-W29:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "checkpoint restore"
+        },
+        {
+          "id": "WP-W29:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W29:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W29:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W29:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-032",
+        "EDGE-CONTRACT-007",
+        "EDGE-CONTRACT-008",
+        "EDGE-CONTRACT-010",
+        "EDGE-CONTRACT-011",
+        "EDGE-CONTRACT-013",
+        "EDGE-CONTRACT-014",
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-016",
+        "EDGE-CONTRACT-019",
+        "EDGE-DATA-007",
+        "EDGE-DIST-001",
+        "EDGE-DIST-002",
+        "EDGE-DIST-003",
+        "EDGE-DIST-004",
+        "EDGE-DIST-007",
+        "EDGE-DIST-008",
+        "EDGE-DIST-009",
+        "EDGE-DIST-010",
+        "EDGE-DIST-011",
+        "EDGE-DIST-012",
+        "EDGE-DIST-013",
+        "EDGE-DIST-014",
+        "EDGE-DIST-015",
+        "EDGE-DIST-016",
+        "EDGE-DIST-017",
+        "EDGE-DIST-018",
+        "EDGE-DIST-019",
+        "EDGE-DIST-020",
+        "EDGE-DIST-021",
+        "EDGE-DIST-022",
+        "EDGE-DIST-025",
+        "EDGE-DIST-026",
+        "EDGE-DIST-027",
+        "EDGE-DIST-028",
+        "EDGE-DIST-029",
+        "EDGE-HW-001",
+        "EDGE-HW-002",
+        "EDGE-HW-003",
+        "EDGE-HW-004",
+        "EDGE-HW-006",
+        "EDGE-HW-007",
+        "EDGE-HW-008",
+        "EDGE-HW-009",
+        "EDGE-HW-010",
+        "EDGE-SEC-008",
+        "EDGE-SEC-020",
+        "EDGE-UX-003",
+        "EDGE-UX-009",
+        "HIST-AI-026",
+        "HIST-SYS-001",
+        "HIST-SYS-002",
+        "HIST-SYS-004",
+        "HIST-SYS-005",
+        "HIST-SYS-007",
+        "HIST-SYS-008",
+        "HIST-SYS-009",
+        "HIST-SYS-010",
+        "HIST-SYS-011",
+        "HIST-SYS-012",
+        "HIST-SYS-013",
+        "HIST-SYS-014",
+        "HIST-SYS-015",
+        "HIST-SYS-016",
+        "HIST-SYS-017",
+        "HIST-SYS-026",
+        "HIST-SYS-027",
+        "HIST-SYS-028",
+        "HIST-SYS-029",
+        "HIST-SYS-030",
+        "OBSCURE-001",
+        "OBSCURE-002",
+        "OBSCURE-003",
+        "OBSCURE-005",
+        "OBSCURE-006",
+        "OBSCURE-008",
+        "OBSCURE-009",
+        "OBSCURE-010",
+        "OBSCURE-016",
+        "OBSCURE-017",
+        "OBSCURE-027",
+        "OBSCURE-028"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w29_edge_contract.py",
+        "planned:tests/wp_w29_failure_injection.py",
+        "planned:benchmarks/wp_w29_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w29-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "fence/reassign",
+        "drain worker",
+        "checkpoint restore"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    },
+    {
+      "id": "WP-W30",
+      "name": "Production hardening",
+      "wave_ref": "MBW-07",
+      "engineering_class": "production",
+      "exact_requirements": [
+        {
+          "id": "WP-W30:DIM:ENG-REQ",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REQ"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-IFACE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-IFACE"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-STATE",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-STATE"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-AUTH",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-AUTH"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-FAIL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-FAIL"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-REC",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REC"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-NFR",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-NFR"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-CAP",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-CAP"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-COMPAT",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-COMPAT"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-OBS",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OBS"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-TEST",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-TEST"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-EVAL",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-EVAL"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-REPRO",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-REPRO"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-DEPLOY",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-DEPLOY"
+        },
+        {
+          "id": "WP-W30:DIM:ENG-OWN",
+          "source": "engineering.required_dimensions",
+          "text": "ENG-OWN"
+        },
+        {
+          "id": "WP-W30:HARD:01",
+          "source": "engineering.hard_invariants",
+          "text": "promotion evidence complete"
+        },
+        {
+          "id": "WP-W30:HARD:02",
+          "source": "engineering.hard_invariants",
+          "text": "rollback executable"
+        },
+        {
+          "id": "WP-W30:HARD:03",
+          "source": "engineering.hard_invariants",
+          "text": "operational ownership explicit"
+        },
+        {
+          "id": "WP-W30:REC:01",
+          "source": "engineering.recovery_requirements",
+          "text": "rollback/redeploy"
+        },
+        {
+          "id": "WP-W30:REC:02",
+          "source": "engineering.recovery_requirements",
+          "text": "incident mode"
+        },
+        {
+          "id": "WP-W30:REC:03",
+          "source": "engineering.recovery_requirements",
+          "text": "restore from verified backup"
+        },
+        {
+          "id": "WP-W30:ACC:01",
+          "source": "edge_matrix.acceptance",
+          "text": "all mapped catalog IDs resolve"
+        },
+        {
+          "id": "WP-W30:ACC:02",
+          "source": "edge_matrix.acceptance",
+          "text": "critical/high dispositions are machine-readable"
+        },
+        {
+          "id": "WP-W30:ACC:03",
+          "source": "edge_matrix.acceptance",
+          "text": "required evidence modes are represented by executable evidence before hardening"
+        },
+        {
+          "id": "WP-W30:ACC:04",
+          "source": "edge_matrix.acceptance",
+          "text": "cross-package cases retain all applicable owners"
+        }
+      ],
+      "task_refs": [],
+      "accountability_refs": [],
+      "edge_case_refs": [
+        "EDGE-AI-012",
+        "EDGE-AI-013",
+        "EDGE-AI-018",
+        "EDGE-AI-019",
+        "EDGE-AI-020",
+        "EDGE-AI-021",
+        "EDGE-AI-022",
+        "EDGE-AI-035",
+        "EDGE-AI-038",
+        "EDGE-CONTRACT-015",
+        "EDGE-CONTRACT-020",
+        "EDGE-DATA-002",
+        "EDGE-DATA-003",
+        "EDGE-DATA-004",
+        "EDGE-DATA-005",
+        "EDGE-DATA-006",
+        "EDGE-DATA-007",
+        "EDGE-DATA-010",
+        "EDGE-DIST-011",
+        "EDGE-DIST-017",
+        "EDGE-DIST-028",
+        "EDGE-HW-001",
+        "EDGE-HW-002",
+        "EDGE-HW-007",
+        "EDGE-SEC-010",
+        "EDGE-UX-003",
+        "HIST-AI-002",
+        "HIST-AI-009",
+        "HIST-AI-022",
+        "HIST-AI-023",
+        "HIST-SYS-005",
+        "HIST-SYS-006",
+        "HIST-SYS-013",
+        "HIST-SYS-018",
+        "HIST-SYS-025",
+        "OBSCURE-001",
+        "OBSCURE-006",
+        "OBSCURE-008",
+        "OBSCURE-014",
+        "OBSCURE-015",
+        "OBSCURE-016",
+        "OBSCURE-018",
+        "OBSCURE-021",
+        "OBSCURE-023",
+        "OBSCURE-029",
+        "OBSCURE-030"
+      ],
+      "test_targets": [
+        "planned:skeleton/testing/test_wp_w30_edge_contract.py",
+        "planned:tests/wp_w30_failure_injection.py",
+        "planned:benchmarks/wp_w30_adversarial_eval.py",
+        "planned:docs/runbooks/wp-w30-recovery.md"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "rollback_recovery": [
+        "rollback/redeploy",
+        "incident mode",
+        "restore from verified backup"
+      ],
+      "evidence_rollup": {
+        "task_count": 0,
+        "queue_done_count": 0,
+        "implementation_signed_count": 0,
+        "verification_signed_count": 0,
+        "package_evidence_count": 0,
+        "state": "evidence_pending"
+      },
+      "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
+    }
+  ],
+  "policy": {
+    "exact_requirement_rule": "Requirement entries are literal source values from engineering profiles and edge-matrix acceptance; validators reject narrowing/drift.",
+    "atomic_task_rule": "Every AIQ task is bound through its declared work_package_refs.",
+    "evidence_rule": "Queue done is historical task state only; package completion derives from signed accountability and package evidence.",
+    "no_manual_completion": true
+  }
+}
