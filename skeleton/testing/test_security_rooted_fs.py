@@ -187,6 +187,56 @@ def test_invalid_read_bound_is_rejected(
         fs(tmp_path).read_bytes("x", max_bytes=bound)  # type: ignore[arg-type]
 
 
+def _make_hardlink_or_skip(source: Path, target: Path) -> None:
+    try:
+        os.link(source, target)
+    except OSError:
+        pytest.skip("hardlinks unavailable")
+
+
+def test_read_rejects_hardlink_alias_to_outside_inode(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-hardlink-read-outside"
+    outside.write_bytes(b"secret")
+    inside = tmp_path / "alias"
+    _make_hardlink_or_skip(outside, inside)
+    with pytest.raises(FilesystemPathError, match="hardlink"):
+        fs(tmp_path).read_bytes("alias")
+    assert outside.read_bytes() == b"secret"
+
+
+def test_snapshot_rejects_hardlink_alias(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-hardlink-snapshot-outside"
+    outside.write_bytes(b"secret")
+    inside = tmp_path / "alias"
+    _make_hardlink_or_skip(outside, inside)
+    with pytest.raises(FilesystemPathError, match="hardlink"):
+        fs(tmp_path).snapshot("alias")
+
+
+def test_write_rejects_existing_hardlink_alias_without_mutating_source(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-hardlink-write-outside"
+    outside.write_bytes(b"original")
+    inside = tmp_path / "alias"
+    _make_hardlink_or_skip(outside, inside)
+    with pytest.raises(FilesystemPathError, match="hardlink"):
+        fs(tmp_path).write_bytes("alias", b"replacement")
+    assert outside.read_bytes() == b"original"
+    assert inside.read_bytes() == b"original"
+
+
+def test_remove_rejects_hardlink_alias_without_unlinking_it(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-hardlink-remove-outside"
+    outside.write_bytes(b"original")
+    inside = tmp_path / "alias"
+    _make_hardlink_or_skip(outside, inside)
+    with pytest.raises(FilesystemPathError, match="hardlink"):
+        fs(tmp_path).remove_file("alias")
+    assert outside.exists()
+    assert inside.exists()
+
+
 def test_existing_symlink_file_is_never_read(tmp_path: Path) -> None:
     outside = tmp_path.parent / f"{tmp_path.name}-outside"
     outside.write_text("secret", encoding="utf-8")
