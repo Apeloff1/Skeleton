@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.engine_chat import EngineChat, UserMessage
+from core.engine_client import EngineClient, EngineClientError
 from core.engine_text import EngineTextError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.persistence.conversation_repository import ConversationConflict
@@ -55,6 +56,30 @@ _ENGINE_EXECUTION_SCOPE: ContextVar[str | None] = ContextVar(
 
 
 # ── shared helpers ─────────────────────────────────────────────
+async def _local_engine_provider_active() -> bool:
+    """Ask the canonical engine whether local model inference is active."""
+
+    try:
+        client = EngineClient.from_env()
+        if client is None:
+            return False
+        status = await client.provider_status(
+            trace_id="jeeves-provider-mode",
+        )
+    except EngineClientError:
+        return False
+    if not status.get("available") or status.get("active") != "local":
+        return False
+    return any(
+        item.get("id") == "local"
+        and item.get("available") is True
+        and item.get("execution_mode") == "local"
+        and item.get("network_policy") == "none"
+        for item in status.get("providers", ())
+        if isinstance(item, dict)
+    )
+
+
 def _canon_context(
     query: str,
     top_k: int = 5,
@@ -93,11 +118,13 @@ def _derive_dataset(recalled: List[Dict]) -> Dict:
 
 async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool,
                          conversation_context: str = "") -> Dict:
-    """Free-tier cascade: local extractive → free → paid LLM."""
+    """Use canonical local model when active; otherwise retain bounded fallback."""
+
     tier = free_tier.decide(needs_reasoning)
+    local_model_active = await _local_engine_provider_active()
     ctx = "\n".join(f"[{i+1}] {(r.get('payload') or {}).get('extract') or (r.get('payload') or {}).get('content') or ''}"[:300]
                     for i, r in enumerate(recalled[:5]))
-    if tier in ("local", "free"):
+    if tier in ("local", "free") and not local_model_active:
         head = ""
         if recalled:
             p = recalled[0].get("payload") or {}
@@ -142,7 +169,11 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
         )
         return {
             "text": response.text,
-            "tier": "paid",
+            "tier": (
+                "local-model"
+                if local_model_active
+                else "paid"
+            ),
             "model": "skeleton-engine",
             "engine_operation_id": response.operation_id,
             "engine_execution_id": response.execution_id,
