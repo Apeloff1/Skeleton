@@ -12,7 +12,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | --- | --- |
 | `machine/ai_master_plan.json` | `2fdd74be113360ba79072a1c1268adb7612b8efb` |
 | `machine/ai_p2_execution_map.json` | `ab63555687746a28690f7c14a07b416a3240bf22` |
-| `machine/ai_p2_task_backlog.json` | `ff6135934a9f25ae3a8a473e5b97ba1552d99b97` |
+| `machine/ai_p2_task_backlog.json` | `a21f8528c5d644ac65ad97138c8504c79b9bf889` |
 
 ## P2 execution boundary
 
@@ -31,11 +31,11 @@ This document is a deterministic projection of machine authority. It has no comp
 | `P2-NATIVE-01` | `P2-L6` | `landed_unpromoted` | `P2-QUAL-01` |
 | `P2-QUAL-01` | `P2-L4` | `landed_unpromoted` | `P2-TRACE-01` |
 | `P2-REPO-01` | `P2-L3` | `landed_unpromoted` | `P2-ARCH-01`, `P2-TRACE-01` |
-| `P2-T1-DATA-01` | `P2-T1-L0` | `ready` | `P2-NATIVE-01` |
-| `P2-T1-FUNCTIONAL-01` | `P2-T1-L4` | `blocked` | `P2-T1-DATA-01`, `P2-T1-SEC-01`, `P2-T1-INFER-01`, `P2-T1-RECOVERY-01` |
-| `P2-T1-INFER-01` | `P2-T1-L2` | `blocked` | `P2-T1-SEC-01` |
-| `P2-T1-RECOVERY-01` | `P2-T1-L3` | `blocked` | `P2-T1-DATA-01`, `P2-T1-SEC-01` |
-| `P2-T1-SEC-01` | `P2-T1-L1` | `ready` | `P2-NATIVE-01` |
+| `P2-T1-DATA-01` | `P2-T1-L0` | `landed_unpromoted` | `P2-NATIVE-01` |
+| `P2-T1-FUNCTIONAL-01` | `P2-T1-L4` | `landed_unpromoted` | `P2-T1-DATA-01`, `P2-T1-SEC-01`, `P2-T1-INFER-01`, `P2-T1-RECOVERY-01` |
+| `P2-T1-INFER-01` | `P2-T1-L2` | `landed_unpromoted` | `P2-T1-SEC-01` |
+| `P2-T1-RECOVERY-01` | `P2-T1-L3` | `landed_unpromoted` | `P2-T1-DATA-01`, `P2-T1-SEC-01` |
+| `P2-T1-SEC-01` | `P2-T1-L1` | `landed_unpromoted` | `P2-NATIVE-01` |
 | `P2-TRACE-01` | `P2-L2` | `landed_unpromoted` | `P2-ARCH-01` |
 
 ## Scheduled masterplan volumes
