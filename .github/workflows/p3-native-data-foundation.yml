@@ -42,6 +42,6 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Install focused test runtime
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+        run: >-\n          python -m pip install --disable-pip-version-check\n          "pytest>=8,<9"\n          "pydantic==2.13.5"\n          "pydantic-settings==2.15.0"\n          "fastapi==0.136.1"
       - name: Run provider-independent data acceptance
         run: python -m pytest -q skeleton/testing/test_p3_data_foundation.py
