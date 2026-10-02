@@ -4383,12 +4383,28 @@
         362
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Durable memory writes require provenance by default and a source operation identity before persistence.",
+        "Memory proposals are staged without side effects; policy-denied proposals cannot mutate the canonical repository.",
+        "Restricted memory requires explicit review and governance-registration failure tombstones the write fail-closed."
+      ],
+      "tests": [
+        "skeleton/testing/test_memory_writeback.py::test_policy_denies_missing_provenance",
+        "skeleton/testing/test_memory_writeback.py::test_stage_is_side_effect_free_until_commit",
+        "skeleton/testing/test_memory_writeback.py::test_denied_proposal_never_mutates_repository",
+        "skeleton/testing/test_memory_writeback.py::test_review_hold_requires_explicit_approval",
+        "skeleton/testing/test_memory_writeback.py::test_governance_persistence_failure_tombstones_memory_fail_closed"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/memory_record.py",
+        "code:skeleton/memory/policy.py",
+        "code:skeleton/memory/writeback.py",
+        "test:skeleton/testing/test_memory_writeback.py",
+        "workflow:P0 Memory Poisoning Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
