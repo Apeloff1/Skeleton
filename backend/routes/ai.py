@@ -37,7 +37,7 @@ from skeleton.contracts.context import (
     ContextSegment,
     ContextTrust,
 )
-from skeleton.contracts.conversation import ConversationAuthorType
+from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
@@ -246,6 +246,21 @@ class AIChatRequest(BaseModel):
             "result into canonical long-term memory."
         ),
     )
+    response_mode: Literal["wait", "deferred"] = Field(
+        default="wait",
+        description=(
+            "Delivery behavior only. 'deferred' submits the canonical engine "
+            "execution and returns its identity without waiting for completion."
+        ),
+    )
+
+
+class AIChatCancelRequest(BaseModel):
+    reason: str = Field(
+        default="user_cancelled",
+        min_length=1,
+        max_length=2048,
+    )
 
 
 def _chat_memory_write_intent(
@@ -355,9 +370,24 @@ def _chat_error(exc: Exception) -> HTTPException:
 
 
 def _provider_history(messages, *, exclude_message_id: str | None = None) -> List[Dict[str, str]]:
+    # Failed/cancelled turns are closed by a system-derived terminal marker.
+    # Their user prompt must not leak forward as an unanswered provider-history
+    # turn, otherwise a later model sees work that canonical execution rejected.
+    abandoned_user_ids = {
+        message.parent_message_id
+        for message in messages
+        if message.author_type is ConversationAuthorType.SYSTEM_DERIVED
+        and message.parent_message_id is not None
+        and any(
+            ref.startswith("chat-terminal:")
+            for ref in message.artifact_refs
+        )
+    }
     history: List[Dict[str, str]] = []
     for message in messages:
         if exclude_message_id is not None and message.message_id == exclude_message_id:
+            continue
+        if message.message_id in abandoned_user_ids:
             continue
         if message.content is None:
             continue
@@ -456,6 +486,114 @@ def _engine_runtime_provider(
         if separator and provider_id:
             providers.add(provider_id)
     return next(iter(providers)) if len(providers) == 1 else None
+
+
+def _chat_turn_ids(
+    thread_id: str,
+    user_message_id: str,
+) -> tuple[str, str]:
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-ai-chat:" + thread_id + ":" + user_message_id,
+        )
+    )
+    execution_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-ai-chat-execution:" + operation_id,
+        )
+    )
+    return operation_id, execution_id
+
+
+def _chat_turn_messages(
+    transcript,
+    idempotency_key: str,
+):
+    user_message = next(
+        (
+            message
+            for message in reversed(transcript)
+            if message.author_type is ConversationAuthorType.USER
+            and message.idempotency_key == idempotency_key
+        ),
+        None,
+    )
+    if user_message is None:
+        return None, None
+    assistant_key = idempotency_key + ":assistant"
+    assistant_message = next(
+        (
+            message
+            for message in reversed(transcript)
+            if message.author_type is ConversationAuthorType.ASSISTANT
+            and message.causal_user_message_id == user_message.message_id
+            and message.idempotency_key == assistant_key
+        ),
+        None,
+    )
+    return user_message, assistant_message
+
+
+async def _commit_chat_terminal_marker(
+    *,
+    thread,
+    user_message,
+    tenant_id: str,
+    owner_id: str,
+    operation_id: str,
+    execution_id: str,
+    terminal_state: str,
+    failure_code: str | None = None,
+):
+    if terminal_state not in {"failed", "cancelled"}:
+        raise ValueError("terminal_state must be failed or cancelled")
+    marker = ConversationMessage(
+        message_id=str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                "skeleton-ai-chat-terminal:"
+                + thread.thread_id
+                + ":"
+                + user_message.message_id
+                + ":"
+                + terminal_state,
+            )
+        ),
+        thread_id=thread.thread_id,
+        branch_id=user_message.branch_id,
+        sequence=thread.message_sequence + 1,
+        author_type=ConversationAuthorType.SYSTEM_DERIVED,
+        created_at=datetime.now(timezone.utc),
+        idempotency_key=(
+            user_message.idempotency_key
+            + ":terminal:"
+            + terminal_state
+        ),
+        content=(
+            "AI execution "
+            + terminal_state
+            + (
+                "."
+                if not failure_code
+                else " (" + str(failure_code)[:128] + ")."
+            )
+        ),
+        parent_message_id=user_message.message_id,
+        operation_id=operation_id,
+        artifact_refs=(
+            "chat-terminal:" + terminal_state,
+            "engine-execution:" + execution_id,
+        ),
+        data_class=thread.data_class,
+    )
+    return await conversation_authority.append_message(
+        marker,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+        expected_thread_version=thread.version,
+    )
 
 
 def _extract_code_blocks(text: str) -> list[dict[str, str]]:
@@ -844,17 +982,9 @@ async def ai_chat(
         transcript,
         exclude_message_id=user_message.message_id,
     )
-    operation_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            "skeleton-ai-chat:" + thread.thread_id + ":" + user_message.message_id,
-        )
-    )
-    execution_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            "skeleton-ai-chat-execution:" + operation_id,
-        )
+    operation_id, execution_id = _chat_turn_ids(
+        thread.thread_id,
+        user_message.message_id,
     )
     context_envelope = _compile_chat_context(
         thread=thread,
@@ -908,7 +1038,7 @@ async def ai_chat(
         engine_started = time.monotonic()
         try:
             engine_result = None
-            if retrying_incomplete_turn:
+            if retrying_incomplete_turn and request.response_mode == "wait":
                 try:
                     engine_result = await engine_client.wait_for_terminal(
                         execution_id=execution_id,
@@ -954,7 +1084,34 @@ async def ai_chat(
                     ),
                     memory_write_intent=memory_write_intent,
                 )
-                engine_result = await engine_client.execute(command)
+                if request.response_mode == "deferred":
+                    ack = await engine_client.submit(command)
+                    engine_result = await engine_client.terminal_result_if_available(
+                        execution_id=execution_id,
+                        actor_id=owner_id,
+                        tenant_id=tenant_id,
+                        trace_id="chat:" + operation_id,
+                    )
+                    if engine_result is None:
+                        return {
+                            "success": True,
+                            "accepted": True,
+                            "terminal": False,
+                            "state": str(ack.get("state") or "admitted"),
+                            "response": None,
+                            "ai_generated": False,
+                            "provider": "skeleton-engine",
+                            "model": "engine-routed",
+                            "replayed": False,
+                            "operation_id": operation_id,
+                            "engine_execution_id": execution_id,
+                            "thread": thread.as_dict(),
+                            "user_message": user_message.as_dict(),
+                            "context": context_envelope.binding_dict(),
+                            "timestamp": _utcnow(),
+                        }
+                else:
+                    engine_result = await engine_client.execute(command)
         except EngineExecutionFailed as exc:
             logger.warning(
                 "canonical engine execution failed operation=%s execution=%s code=%s",
@@ -962,6 +1119,35 @@ async def ai_chat(
                 execution_id,
                 exc.failure_code or "unknown",
             )
+            try:
+                current_thread = await conversation_authority.get_thread(
+                    request.thread_id,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                )
+                await _commit_chat_terminal_marker(
+                    thread=current_thread,
+                    user_message=user_message,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    terminal_state=(
+                        "cancelled"
+                        if exc.status == "cancelled"
+                        else "failed"
+                    ),
+                    failure_code=exc.failure_code,
+                )
+            except ConversationConflict:
+                # A concurrent finalizer may already have closed the turn.
+                pass
+            except Exception:
+                logger.exception(
+                    "failed to close terminal chat turn operation=%s execution=%s",
+                    operation_id,
+                    execution_id,
+                )
             return {
                 "success": False,
                 "response": "The AI execution could not be safely completed. Retry the request.",
