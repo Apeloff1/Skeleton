@@ -703,7 +703,7 @@ async def qualify_system_completion(
     *,
     source_revision: str,
 ) -> SystemQualificationReceipt:
-    """Execute and independently qualify the 17-plane completion chain."""
+    """Execute and independently qualify the 18-plane completion chain."""
 
     root = Path(workdir)
     root.mkdir(parents=True, exist_ok=True)
