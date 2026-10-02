@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "93c5d0388426c665f0ee6753ebefa7967a40ef66",
+      "source_git_object_sha": "a63aacb8a16e298ef784fe203d97201f88bfbbd0",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
