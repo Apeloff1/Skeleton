@@ -405,15 +405,20 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_strict_canonical_bytes_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/contracts/canonical.py",
+        "mirror:skeleton/ai/runtime/contracts/canonical.py",
+        "test:skeleton/testing/test_canonical_contract_security.py",
+        "workflow:P0 Canonical Signing Bytes"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 14,
