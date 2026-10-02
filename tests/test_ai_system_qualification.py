@@ -13,7 +13,7 @@ HEAD = "d" * 40
 
 
 @pytest.mark.asyncio
-async def test_executable_system_qualification_emits_seventeen_exact_revision_proofs(
+async def test_executable_system_qualification_emits_eighteen_exact_revision_proofs(
     tmp_path,
 ) -> None:
     receipt = await qualify_system_completion(
@@ -21,12 +21,14 @@ async def test_executable_system_qualification_emits_seventeen_exact_revision_pr
         source_revision=HEAD,
     )
 
-    assert receipt.valid is True
+    assert receipt.valid is True, receipt.as_dict()
+    assert receipt.invalid_reasons == ()
+    assert all(receipt.validity_checks.values())
     assert receipt.source_revision == HEAD
     assert receipt.report.valid is True
     assert receipt.report.missing == ()
     assert receipt.report.failed == ()
-    assert len(receipt.report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 17
+    assert len(receipt.report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 18
     assert receipt.network_attempt_count == 0
     assert receipt.primary_result_digest == receipt.replay_result_digest
     assert receipt.primary_output_digest == receipt.replay_output_digest
@@ -40,7 +42,7 @@ async def test_executable_system_qualification_emits_seventeen_exact_revision_pr
     assert payload["valid"] is True
     assert payload["report"]["valid"] is True
     assert payload["report"]["source_revision"] == HEAD
-    assert len(payload["report"]["proofs"]) == 17
+    assert len(payload["report"]["proofs"]) == 18
     assert all(
         proof["source_revision"] == HEAD
         for proof in payload["report"]["proofs"]
@@ -60,6 +62,8 @@ async def test_qualification_receipt_rejects_replay_digest_divergence(
         replay_result_digest="0" * 64,
     )
     assert divergent.valid is False
+    assert "result_reproducible" in divergent.invalid_reasons
+    assert divergent.validity_checks["result_reproducible"] is False
     assert divergent.digest != receipt.digest
 
 
