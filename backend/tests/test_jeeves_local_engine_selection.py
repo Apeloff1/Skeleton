@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gameforge.jeeves.chat_contract import HistoryMessage
 from routes import jeeves_compose
 
 
@@ -136,3 +137,110 @@ async def test_extractive_mode_stays_explicit_without_active_local_engine(
     assert result["model"] == "local-extractive"
     assert result["engine_execution_id"] is None
     assert result["engine_verification"] is None
+
+
+@pytest.mark.asyncio
+async def test_same_jeeves_turn_keeps_engine_identity_across_retrieval_drift(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        jeeves_compose.free_tier,
+        "decide",
+        lambda _needs_reasoning: "paid",
+    )
+
+    async def local_inactive():
+        return False
+
+    monkeypatch.setattr(
+        jeeves_compose,
+        "_local_engine_provider_active",
+        local_inactive,
+    )
+
+    init_keys: list[str | None] = []
+    requests: list[dict[str, object]] = []
+
+    class FakeEngineChat:
+        def __init__(self, **kwargs):
+            init_keys.append(kwargs.get("turn_idempotency_key"))
+            self.history = []
+            self.evidence = []
+
+        def with_max_tokens(self, _value):
+            return self
+
+        def add_history_message(self, role, content):
+            self.history.append((role, content))
+            return self
+
+        def add_evidence(self, source_id, content, *, kind="retrieval_evidence"):
+            self.evidence.append((source_id, content, kind))
+            return self
+
+        async def send_message(self, message):
+            requests.append(
+                {
+                    "prompt": message.text,
+                    "history": tuple(self.history),
+                    "evidence": tuple(self.evidence),
+                }
+            )
+            return SimpleNamespace(
+                text="answer",
+                operation_id="operation",
+                execution_id="execution",
+                context_id="context",
+                context_digest="a" * 64,
+                context_source_snapshot=(("segment", "b" * 64),),
+                context_compiler_version="compiler",
+                verification="verification",
+                evidence_refs=(),
+                provider_receipts=("provider:local:one",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
+            )
+
+    monkeypatch.setattr(jeeves_compose, "EngineChat", FakeEngineChat)
+
+    token = jeeves_compose._ENGINE_EXECUTION_SCOPE.set(
+        "jeeves-chat:session:turn-42"
+    )
+    try:
+        history = [
+            HistoryMessage(role="user", content="prior question"),
+            HistoryMessage(role="assistant", content="prior answer"),
+        ]
+        await jeeves_compose._generate_text(
+            "current question",
+            [{"path": "old", "payload": {"content": "old retrieval"}}],
+            True,
+            conversation_history=history,
+            project_context="project notes",
+        )
+        await jeeves_compose._generate_text(
+            "current question",
+            [{"path": "new", "payload": {"content": "new retrieval"}}],
+            True,
+            conversation_history=history,
+            project_context="project notes",
+        )
+    finally:
+        jeeves_compose._ENGINE_EXECUTION_SCOPE.reset(token)
+
+    assert init_keys[0] is not None
+    assert init_keys[0] == init_keys[1]
+    assert requests[0]["prompt"] == "current question"
+    assert requests[1]["prompt"] == "current question"
+    assert requests[0]["history"] == (
+        ("user", "prior question"),
+        ("assistant", "prior answer"),
+    )
+    assert requests[1]["history"] == requests[0]["history"]
+    assert requests[0]["evidence"] != requests[1]["evidence"]
+    assert any(
+        item[2] == "artifact"
+        and item[1] == "project notes"
+        for item in requests[0]["evidence"]
+    )
