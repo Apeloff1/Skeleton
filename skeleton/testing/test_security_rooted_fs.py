@@ -71,6 +71,42 @@ def test_normalization_is_deterministic(
     assert fs(tmp_path).normalize(raw) == expected
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "CON",
+        "con.txt",
+        "aux.json",
+        "NUL",
+        "COM1",
+        "com9.log",
+        "LPT1",
+        "lpt9.txt",
+        "COM¹",
+        "LPT³.log",
+        "folder/PRN.txt",
+        "folder/file.txt:secret",
+        "file:stream",
+        "trailing.",
+        "trailing ",
+        "folder/name. ",
+    ],
+)
+def test_normalization_rejects_windows_device_ads_and_alias_paths(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    with pytest.raises(FilesystemPathError):
+        fs(tmp_path).normalize(path)
+
+
+def test_normalization_allows_nonreserved_windows_like_names(tmp_path: Path) -> None:
+    boundary = fs(tmp_path)
+    assert boundary.normalize("console.txt") == "console.txt"
+    assert boundary.normalize("com10.txt") == "com10.txt"
+    assert boundary.normalize("lpt0.txt") == "lpt0.txt"
+
+
 def test_path_byte_bound_is_enforced(tmp_path: Path) -> None:
     boundary = fs(tmp_path, max_path_bytes=8)
     with pytest.raises(FilesystemQuotaError, match="byte bound"):
