@@ -5854,12 +5854,28 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Filesystem and workspace path boundaries reject percent-decoded traversal, absolute paths, drive prefixes, NULs, and encoded separators before later decoding can change path structure.",
+        "Double-encoded traversal fails closed within a bounded decode depth.",
+        "Benign percent-encoded non-structural filename text may remain literal."
+      ],
+      "tests": [
+        "skeleton/testing/test_decoded_path_security.py::test_decoded_path_guard_rejects_structural_ambiguity",
+        "skeleton/testing/test_decoded_path_security.py::test_sandbox_path_boundary_rejects_encoded_traversal",
+        "skeleton/testing/test_decoded_path_security.py::test_workspace_path_boundary_rejects_encoded_traversal",
+        "skeleton/testing/test_decoded_path_security.py::test_benign_encoded_filename_remains_literal_in_both_path_stacks"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/decoded_path.py",
+        "code:skeleton/sandbox/fs.py",
+        "mirror:skeleton/ai/runtime/sandbox/fs.py",
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "test:skeleton/testing/test_decoded_path_security.py",
+        "workflow:P0 Decoded Path Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
