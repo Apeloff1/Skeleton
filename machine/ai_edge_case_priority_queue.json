@@ -712,11 +712,16 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_credential_aware_observation_redaction_pending_exact_head_ci",
+      "disposition": "implemented_credential_aware_and_secret_safe_observability_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/observation_policy.py",
         "code:skeleton/sandbox/sanitizers.py",
-        "workflow:P0 Observation Secret Redaction"
+        "workflow:P0 Observation Secret Redaction",
+        "code:skeleton/observability/redaction.py",
+        "mirror:skeleton/ai/runtime/observability/redaction.py",
+        "test:tests/test_observability.py",
+        "test:skeleton/testing/test_frontier_observability_correlation.py",
+        "workflow:P0 Secret Observability Evidence"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-015",
