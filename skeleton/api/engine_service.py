@@ -485,6 +485,27 @@ class EngineContextHandoff:
             "handoff_digest": self.handoff_digest,
         }
 
+    def binding_dict(self) -> dict[str, Any]:
+        """Return the immutable context identity without prompt/history content."""
+
+        return {
+            "schema_version": self.schema_version,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+            "tenant_id": self.tenant_id,
+            "context_id": self.context_id,
+            "context_digest": self.context_digest,
+            "compiler_version": self.compiler_version,
+            "source_snapshot": [
+                [segment_id, digest]
+                for segment_id, digest in self.source_snapshot
+            ],
+            "data_class": self.data_class,
+            "purpose": self.purpose,
+            "handoff_digest": self.handoff_digest,
+        }
+
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "EngineContextHandoff":
         data = _json_object(payload, "compiled_context")
@@ -2795,6 +2816,49 @@ class EngineExecutionService:
             updated_at=execution.updated_at,
             cancellation_requested=execution.cancellation_requested,
         )
+
+    def handoff_binding(
+        self,
+        execution_id: str,
+        *,
+        verified_service_principal: str,
+        actor_id: str | None = None,
+        tenant_id: str | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Return durable non-content context lineage for reconnect/finalization."""
+
+        stored = self._stored_for_access(
+            execution_id,
+            verified_service_principal=verified_service_principal,
+            scope="engine:read",
+            now=now,
+        )
+        operation = stored.command.operation
+        if actor_id is not None and str(actor_id).strip() != operation.actor_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        handoff = stored.command.compiled_context
+        if (
+            handoff.operation_id != operation.operation_id
+            or handoff.execution_id != execution_id
+            or handoff.tenant_id != operation.tenant_id
+        ):
+            raise EngineServiceError(
+                "stored engine context handoff identity is inconsistent"
+            )
+        return {
+            **handoff.binding_dict(),
+            "actor_id": operation.actor_id,
+            "capability": operation.capability,
+            "idempotency_key": operation.idempotency_key,
+            "trace_id": operation.trace_id,
+        }
 
     def cancel(
         self,
