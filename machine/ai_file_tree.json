@@ -643,7 +643,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "6934c1f9b267ce23340110e4dc40bed60186d6a7",
+      "source_git_object_sha": "67fbc5903f1cf331602ee1ba77d758470e4db575",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -2677,7 +2677,7 @@
       "source": "skeleton/shells/ai",
       "destination": "skeleton/ai/shell",
       "kind": "tree",
-      "source_git_object_sha": "a843017bdcc4e83b3ef714df8fb071b95d0b1441",
+      "source_git_object_sha": "108d562be03cbbb6271547ab87ad6713c169abcd",
       "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
       "work_package_refs": [
         "WP-W03",

@@ -114,11 +114,12 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_rejecting_unicode_identity_boundary_pending_exact_head_ci",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
         "code:skeleton/shells/ai/mcp_authz.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-010",
@@ -148,11 +149,12 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_rejecting_unicode_identity_boundary_pending_exact_head_ci",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
         "code:skeleton/shells/ai/mcp_authz.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-009",
