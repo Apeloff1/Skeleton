@@ -270,6 +270,178 @@ class EngineClientConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineContextBinding:
+    """Non-content durable context lineage returned by the engine."""
+
+    operation_id: str
+    execution_id: str
+    turn_id: str
+    tenant_id: str
+    actor_id: str
+    context_id: str
+    context_digest: str
+    compiler_version: str
+    source_snapshot: tuple[tuple[str, str], ...]
+    data_class: str
+    purpose: str
+    handoff_digest: str
+    capability: str
+    idempotency_key: str
+    trace_id: str
+
+    @classmethod
+    def from_payload(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        expected_execution_id: str,
+        expected_actor_id: str,
+        expected_tenant_id: str,
+    ) -> "EngineContextBinding":
+        body = _json_object(payload, "handoff_binding")
+        execution_id = _text(
+            body.get("execution_id"),
+            "handoff_binding.execution_id",
+            maximum=192,
+        )
+        if execution_id != expected_execution_id:
+            raise EngineProtocolError(
+                "handoff binding execution identity mismatch"
+            )
+        actor_id = _text(
+            body.get("actor_id"),
+            "handoff_binding.actor_id",
+            maximum=512,
+        )
+        tenant_id = _text(
+            body.get("tenant_id"),
+            "handoff_binding.tenant_id",
+            maximum=512,
+        )
+        if actor_id != expected_actor_id or tenant_id != expected_tenant_id:
+            raise EngineProtocolError(
+                "handoff binding actor/tenant identity mismatch"
+            )
+        context_digest = _text(
+            body.get("context_digest"),
+            "handoff_binding.context_digest",
+            maximum=64,
+        )
+        handoff_digest = _text(
+            body.get("handoff_digest"),
+            "handoff_binding.handoff_digest",
+            maximum=64,
+        )
+        for name, digest in (
+            ("context_digest", context_digest),
+            ("handoff_digest", handoff_digest),
+        ):
+            if len(digest) != 64 or any(
+                ch not in "0123456789abcdef" for ch in digest
+            ):
+                raise EngineProtocolError(
+                    f"handoff binding {name} is not lowercase sha256"
+                )
+
+        raw_snapshot = body.get("source_snapshot")
+        if not isinstance(raw_snapshot, list) or not raw_snapshot:
+            raise EngineProtocolError(
+                "handoff binding source_snapshot is missing"
+            )
+        snapshot: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for index, raw in enumerate(raw_snapshot):
+            if not isinstance(raw, list) or len(raw) != 2:
+                raise EngineProtocolError(
+                    f"handoff binding source_snapshot[{index}] is invalid"
+                )
+            segment_id = _text(
+                raw[0],
+                f"handoff binding source_snapshot[{index}].segment_id",
+                maximum=512,
+            )
+            digest = _text(
+                raw[1],
+                f"handoff binding source_snapshot[{index}].digest",
+                maximum=64,
+            )
+            if (
+                segment_id in seen
+                or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)
+            ):
+                raise EngineProtocolError(
+                    "handoff binding source snapshot is invalid"
+                )
+            seen.add(segment_id)
+            snapshot.append((segment_id, digest))
+
+        data_class = _text(
+            body.get("data_class"),
+            "handoff_binding.data_class",
+            maximum=32,
+        ).lower()
+        if data_class not in {
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+        }:
+            raise EngineProtocolError(
+                "handoff binding data_class is invalid"
+            )
+        return cls(
+            operation_id=_text(
+                body.get("operation_id"),
+                "handoff_binding.operation_id",
+                maximum=192,
+            ),
+            execution_id=execution_id,
+            turn_id=_text(
+                body.get("turn_id"),
+                "handoff_binding.turn_id",
+                maximum=512,
+            ),
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            context_id=_text(
+                body.get("context_id"),
+                "handoff_binding.context_id",
+                maximum=192,
+            ),
+            context_digest=context_digest,
+            compiler_version=_text(
+                body.get("compiler_version"),
+                "handoff_binding.compiler_version",
+                maximum=128,
+            ),
+            source_snapshot=tuple(snapshot),
+            data_class=data_class,
+            purpose=_text(
+                body.get("purpose"),
+                "handoff_binding.purpose",
+                maximum=256,
+            ),
+            handoff_digest=handoff_digest,
+            capability=_text(
+                body.get("capability"),
+                "handoff_binding.capability",
+                maximum=256,
+            ),
+            idempotency_key=_text(
+                body.get("idempotency_key"),
+                "handoff_binding.idempotency_key",
+                maximum=1024,
+            ),
+            trace_id=_text(
+                body.get("trace_id"),
+                "handoff_binding.trace_id",
+                maximum=512,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EngineTerminalResult:
     """Normalized terminal result returned to application routes."""
 
@@ -1605,6 +1777,36 @@ class EngineClient:
             trace_id=trace_id,
         )
 
+    async def handoff_binding(
+        self,
+        execution_id: str,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> EngineContextBinding:
+        execution = quote(
+            _text(execution_id, "execution_id", maximum=192),
+            safe="",
+        )
+        actor = _text(actor_id, "actor_id", maximum=512)
+        tenant = _text(tenant_id, "tenant_id", maximum=512)
+        payload = await self._request(
+            "GET",
+            f"/executions/{execution}/handoff",
+            params={
+                "actor_id": actor,
+                "tenant_id": tenant,
+            },
+            trace_id=trace_id,
+        )
+        return EngineContextBinding.from_payload(
+            payload,
+            expected_execution_id=execution_id,
+            expected_actor_id=actor,
+            expected_tenant_id=tenant,
+        )
+
     async def events(
         self,
         execution_id: str,
@@ -1909,6 +2111,68 @@ class EngineClient:
                 result = candidate
         return result
 
+    async def terminal_result_if_available(
+        self,
+        *,
+        execution_id: str,
+        actor_id: str,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> EngineTerminalResult | None:
+        """Probe once; return None while running and normalize terminal truth."""
+
+        status = await self.status(
+            execution_id,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+        )
+        state = _text(
+            status.get("execution_state"),
+            "execution_state",
+            maximum=64,
+        )
+        if state not in self._TERMINAL_STATES:
+            return None
+
+        events = await self.events(
+            execution_id,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+        )
+        result = self._result_from_events(events)
+        if result is None:
+            raise EngineProtocolError(
+                "terminal engine execution is missing result event"
+            )
+        if state != "completed":
+            usage = result.get("usage")
+            failure_code = (
+                str(usage.get("error_code"))
+                if isinstance(usage, Mapping)
+                and usage.get("error_code") is not None
+                else (
+                    None
+                    if status.get("failure_code") is None
+                    else str(status["failure_code"])
+                )
+            )
+            raise EngineExecutionFailed(
+                "engine execution reached non-success terminal state"
+                + (" (" + failure_code + ")" if failure_code else ""),
+                execution_id=execution_id,
+                status=state,
+                failure_code=failure_code,
+                result=result,
+            )
+        normalized = EngineTerminalResult.from_payload(result)
+        if normalized.execution_id != execution_id:
+            raise EngineProtocolError(
+                "terminal result execution identity mismatch"
+            )
+        return normalized
+
     async def wait_for_terminal(
         self,
         *,
@@ -1940,55 +2204,14 @@ class EngineClient:
                     "engine execution did not reach terminal state in time"
                 )
 
-            status = await self.status(
-                execution_id,
+            terminal = await self.terminal_result_if_available(
+                execution_id=execution_id,
                 actor_id=actor_id,
                 tenant_id=tenant_id,
                 trace_id=trace_id,
             )
-            state = _text(
-                status.get("execution_state"),
-                "execution_state",
-                maximum=64,
-            )
-            if state in self._TERMINAL_STATES:
-                events = await self.events(
-                    execution_id,
-                    actor_id=actor_id,
-                    tenant_id=tenant_id,
-                    trace_id=trace_id,
-                )
-                result = self._result_from_events(events)
-                if result is None:
-                    raise EngineProtocolError(
-                        "terminal engine execution is missing result event"
-                    )
-                if state != "completed":
-                    usage = result.get("usage")
-                    failure_code = (
-                        str(usage.get("error_code"))
-                        if isinstance(usage, Mapping)
-                        and usage.get("error_code") is not None
-                        else (
-                            None
-                            if status.get("failure_code") is None
-                            else str(status["failure_code"])
-                        )
-                    )
-                    raise EngineExecutionFailed(
-                        "engine execution reached non-success terminal state"
-                        + (" (" + failure_code + ")" if failure_code else ""),
-                        execution_id=execution_id,
-                        status=state,
-                        failure_code=failure_code,
-                        result=result,
-                    )
-                normalized = EngineTerminalResult.from_payload(result)
-                if normalized.execution_id != execution_id:
-                    raise EngineProtocolError(
-                        "terminal result execution identity mismatch"
-                    )
-                return normalized
+            if terminal is not None:
+                return terminal
 
             await asyncio.sleep(self.config.poll_interval_s)
 
