@@ -20,7 +20,13 @@
     "memory.lifecycle",
     "finalization.lineage",
     "learning.promotion",
-    "learning.rollback"
+    "learning.rollback",
+    "security.sandbox_filesystem",
+    "security.sandbox_process",
+    "security.injection_sanitization",
+    "privacy.provider_fallback",
+    "memory.poisoning_resistance",
+    "security.outbound_network_boundary"
   ],
   "authority": {
     "producer_must_differ_from_verifier": true,
@@ -38,7 +44,12 @@
     "qualification_receipt_rehash_required": true,
     "strict_json_receipt_verification": true,
     "staged_finalization_crash_recovery_required": true,
-    "negative_learning_gate_qualification_required": true
+    "negative_learning_gate_qualification_required": true,
+    "sandbox_boundary_qualification_required": true,
+    "injection_sanitization_qualification_required": true,
+    "provider_privacy_fallback_qualification_required": true,
+    "memory_poisoning_resistance_required": true,
+    "outbound_network_boundary_qualification_required": true
   },
   "runtime_binding": "skeleton/ai/runtime/system_completion.py",
   "acceptance_bindings": [
@@ -70,8 +81,29 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff all 18 requirements pass for one subject and exact git revision; source evidence must belong to that execution; staged finalization must survive close/reopen and clear after recovery; verification binds exact candidate/context; memory binds owner; learning binds the qualified result and proves rejection of invalid promotion/rollback paths; emitted JSON independently rehashes under strict duplicate-key rejection",
+  "completion_rule": "valid iff all 24 non-compensable requirements pass for one subject and exact git revision; execution, crash recovery, security sandboxing, provider privacy, governed memory, outbound networking, verification, learning, and independently rehashed receipt evidence must all remain causally bound and fail closed",
   "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
   "qualification_cli": "scripts/run_ai_system_completion_qualification.py",
-  "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py"
+  "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py",
+  "inherited_security_bindings": [
+    "skeleton/ai/runtime/sandbox/fs.py",
+    "skeleton/ai/runtime/sandbox/process.py",
+    "skeleton/ai/runtime/sandbox/injection.py",
+    "skeleton/ai/runtime/sandbox/sanitizers.py",
+    "skeleton/ai/shell/model_port.py",
+    "skeleton/ai/shell/provider_router.py",
+    "skeleton/memory/policy.py",
+    "skeleton/memory/writeback.py",
+    "skeleton/security/outbound_url.py",
+    "skeleton/security/outbound_http.py",
+    "skeleton/testing/test_sandbox_isolation.py",
+    "skeleton/testing/test_sandbox_sanitize_inject.py",
+    "skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+    "skeleton/testing/test_memory_writeback.py",
+    "skeleton/testing/test_outbound_url_resolution_security.py",
+    "skeleton/testing/test_security_outbound_http.py",
+    ".github/workflows/p0-provider-fallback-privacy.yml",
+    ".github/workflows/p0-memory-poisoning-evidence.yml",
+    ".github/workflows/p0-network-boundary-evidence.yml"
+  ]
 }
