@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 12
+    assert receipt["requirement_count"] == 16
     assert receipt["binding_count"] >= 4
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
@@ -37,6 +37,10 @@ def test_contract_declares_non_compensable_authority() -> None:
         "duplicate_proofs_forbidden": True,
         "missing_proofs_fail_closed": True,
         "failed_proofs_non_compensable": True,
+        "proof_source_revision_binding": True,
+        "cross_execution_evidence_mixing_forbidden": True,
+        "verification_candidate_context_binding": True,
+        "learning_evaluation_lineage_required": True,
     }
 
 
