@@ -2561,8 +2561,8 @@
       ],
       "status": "catalogued",
       "requirements": [
-        "Security-sensitive JSON parsing rejects duplicate object keys rather than accepting parser-dependent first/last value semantics.",
-        "Serialization rejects non-JSON tuple values and non-finite numbers."
+        "Security-sensitive JSON parsing rejects repeated object keys instead of accepting parser-dependent first/last-key semantics.",
+        "The same serialization boundary rejects non-JSON tuples and non-finite numbers."
       ],
       "tests": [
         "tests/test_duplicate_key_is_not_json.py::test_a_duplicate_key_is_refused"
