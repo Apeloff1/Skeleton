@@ -11,14 +11,17 @@
     "execution.tool_authority",
     "execution.durable_recovery",
     "execution.staged_finalization_recovery",
+    "persistence.terminal_evidence_integrity",
     "execution.replay_lineage",
     "execution.reproducibility",
     "execution.governed_effects",
     "verification.independent",
     "verification.claim_binding",
+    "verification.receipt_identity",
     "context.integrity",
     "memory.lifecycle",
     "finalization.lineage",
+    "finalization.outbox_delivery",
     "learning.promotion",
     "learning.rollback",
     "security.sandbox_filesystem",
@@ -28,6 +31,7 @@
     "memory.poisoning_resistance",
     "security.outbound_network_boundary",
     "resource.admission_quota",
+    "resource.unknown_usage_fence",
     "resource.shared_pressure",
     "execution.idempotent_retry",
     "privacy.tenant_isolation"
@@ -58,7 +62,11 @@
     "resource_admission_qualification_required": true,
     "shared_pressure_qualification_required": true,
     "idempotent_retry_qualification_required": true,
-    "tenant_isolation_qualification_required": true
+    "tenant_isolation_qualification_required": true,
+    "unknown_usage_terminal_fence_required": true,
+    "verification_receipt_identity_required": true,
+    "terminal_outbox_delivery_required": true,
+    "persisted_terminal_evidence_integrity_required": true
   },
   "runtime_binding": "skeleton/ai/runtime/system_completion.py",
   "acceptance_bindings": [
@@ -90,7 +98,7 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff all 28 non-compensable requirements pass for one subject and exact git revision; execution, crash recovery, sandboxing, provider privacy, governed memory, outbound networking, resource admission, shared pressure, retry idempotency, tenant isolation, verification, learning, and receipt evidence must remain causally bound and independently reverified for both digest integrity and proof semantics",
+  "completion_rule": "valid iff all 32 non-compensable requirements pass for one subject and exact git revision; execution, persistence integrity, crash recovery, verification receipt identity, terminal outbox delivery, unknown-usage accounting fences, sandboxing, provider privacy, governed memory, outbound networking, resource admission, shared pressure, retry idempotency, tenant isolation, learning, and receipt evidence must remain causally bound and independently reverified for digest integrity and proof semantics",
   "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
   "qualification_cli": "scripts/run_ai_system_completion_qualification.py",
   "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py",
@@ -120,6 +128,7 @@
     "skeleton/intelligence/shared_pressure.py",
     "skeleton/persistence/memory_repository.py",
     "skeleton/testing/test_admission_runtime.py",
-    "skeleton/testing/test_execution_repository.py"
+    "skeleton/testing/test_execution_repository.py",
+    "skeleton/persistence/execution_repository.py"
   ]
 }
