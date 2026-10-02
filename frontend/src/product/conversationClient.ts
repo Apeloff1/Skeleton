@@ -325,7 +325,7 @@ export async function startConversationTurn(
 ): Promise<ConversationTurn> {
   const data = await requireData(
     api.post<ConversationTurn>(
-      '/api/v1/ai/chat',
+      '/api/ai/chat',
       {
         message: input.message,
         thread_id: thread.thread_id,
@@ -362,7 +362,7 @@ export async function getConversationTurn(
 ): Promise<ConversationTurn> {
   const data = await requireData(
     api.get<ConversationTurn>(
-      '/api/v1/ai/chat/turns/'
+      '/api/ai/chat/turns/'
         + encodeURIComponent(threadId)
         + '/'
         + encodeURIComponent(idempotencyKey),
@@ -392,7 +392,7 @@ export async function cancelConversationTurn(
 ): Promise<ConversationTurn> {
   return requireData(
     api.post<ConversationTurn>(
-      '/api/v1/ai/chat/turns/'
+      '/api/ai/chat/turns/'
         + encodeURIComponent(threadId)
         + '/'
         + encodeURIComponent(idempotencyKey)
