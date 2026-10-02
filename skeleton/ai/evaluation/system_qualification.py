@@ -30,6 +30,8 @@ from uuid import NAMESPACE_URL, uuid5
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     AIExecutionResult,
+    AgentTurn,
+    ExecutionCheckpoint,
     ExecutionState,
 )
 from skeleton.ai.learning.promotion import (
@@ -270,9 +272,12 @@ class PersistenceReliabilityCycle:
     acknowledgement_persistent: bool
     acknowledgement_retry_stable: bool
     no_pending_after_ack: bool
+    turn_tamper_rejected: bool
+    checkpoint_tamper_rejected: bool
     result_tamper_rejected: bool
     outbox_tamper_rejected: bool
     migration_backfill_verified: bool
+    replay_digest_backfill_verified: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -1841,11 +1846,85 @@ def _persistence_reliability_cycle(
             expected_version=tamper_execution.version,
             now=QUALIFICATION_TIME,
         )
+    tamper_turn = AgentTurn(
+        operation_id=request.operation_id,
+        execution_id=request.execution_id,
+        turn_id="system-qualification-tamper-turn",
+        parent_turn_id=None,
+        turn_index=0,
+        phase=ExecutionState.PROVIDER_COMPLETED,
+        context_digest=request.context_digest,
+        checkpoint_ref=(
+            "execution-checkpoint:" + request.execution_id + ":1"
+        ),
+        status="provider_completed",
+    )
+    tamper_execution = tamper_repository.append_turn(
+        tamper_turn,
+        expected_execution_version=tamper_execution.version,
+        now=QUALIFICATION_TIME,
+    )
+    tamper_checkpoint = tamper_repository.checkpoint(
+        request.execution_id,
+        {
+            "phase": "qualification-tamper",
+            "execution_id": request.execution_id,
+        },
+        expected_execution_version=tamper_execution.version,
+        expected_checkpoint_version=tamper_execution.checkpoint_version,
+        now=QUALIFICATION_TIME,
+    )
+    tamper_execution = tamper_repository.get(request.execution_id)
     tamper_repository.finalize(
         terminal,
         expected_execution_version=tamper_execution.version,
         now=QUALIFICATION_TIME,
     )
+
+    tamper_repository._connection.execute(
+        """
+        UPDATE ai_execution_turn
+        SET turn_json = replace(
+            turn_json,
+            '"status":"provider_completed"',
+            '"status":"forged_completed"'
+        )
+        WHERE namespace = ? AND execution_id = ? AND turn_id = ?
+        """,
+        (
+            tamper_repository.namespace,
+            request.execution_id,
+            tamper_turn.turn_id,
+        ),
+    )
+    turn_tamper_rejected = False
+    try:
+        tamper_repository.turns(request.execution_id)
+    except ExecutionRepositoryCorruption:
+        turn_tamper_rejected = True
+
+    tamper_repository._connection.execute(
+        """
+        UPDATE ai_execution_checkpoint
+        SET checkpoint_json = replace(
+            checkpoint_json,
+            '"state":"verifying"',
+            '"state":"provider_completed"'
+        )
+        WHERE namespace = ? AND execution_id = ?
+          AND checkpoint_version = ?
+        """,
+        (
+            tamper_repository.namespace,
+            request.execution_id,
+            tamper_checkpoint.checkpoint_version,
+        ),
+    )
+    checkpoint_tamper_rejected = False
+    try:
+        tamper_repository.latest_checkpoint(request.execution_id)
+    except ExecutionRepositoryCorruption:
+        checkpoint_tamper_rejected = True
 
     original_output = terminal.final_output or ""
     forged_output = original_output + " forged"
@@ -1895,6 +1974,32 @@ def _persistence_reliability_cycle(
     legacy = sqlite3.connect(legacy_path)
     legacy.execute(
         """
+        CREATE TABLE ai_execution_turn (
+            namespace TEXT NOT NULL,
+            execution_id TEXT NOT NULL,
+            turn_id TEXT NOT NULL,
+            turn_index INTEGER NOT NULL,
+            parent_turn_id TEXT,
+            turn_json TEXT NOT NULL,
+            PRIMARY KEY(namespace, execution_id, turn_id),
+            UNIQUE(namespace, execution_id, turn_index)
+        )
+        """
+    )
+    legacy.execute(
+        """
+        CREATE TABLE ai_execution_checkpoint (
+            namespace TEXT NOT NULL,
+            execution_id TEXT NOT NULL,
+            checkpoint_version INTEGER NOT NULL,
+            checkpoint_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(namespace, execution_id, checkpoint_version)
+        )
+        """
+    )
+    legacy.execute(
+        """
         CREATE TABLE ai_execution_result (
             namespace TEXT NOT NULL,
             execution_id TEXT NOT NULL,
@@ -1924,6 +2029,71 @@ def _persistence_reliability_cycle(
             )
         )
         """
+    )
+    legacy_turn = AgentTurn(
+        operation_id=request.operation_id,
+        execution_id=request.execution_id,
+        turn_id="system-qualification-legacy-turn",
+        parent_turn_id=None,
+        turn_index=0,
+        phase=ExecutionState.PROVIDER_COMPLETED,
+        context_digest=request.context_digest,
+        checkpoint_ref=(
+            "execution-checkpoint:" + request.execution_id + ":1"
+        ),
+        status="provider_completed",
+    )
+    legacy_checkpoint = ExecutionCheckpoint(
+        operation_id=request.operation_id,
+        execution_id=request.execution_id,
+        checkpoint_version=1,
+        execution_version=1,
+        state=ExecutionState.VERIFYING,
+        latest_turn_index=0,
+        payload={
+            "phase": "legacy-qualification",
+            "execution_id": request.execution_id,
+        },
+        created_at=QUALIFICATION_TIME,
+    )
+    legacy.execute(
+        """
+        INSERT INTO ai_execution_turn(
+            namespace, execution_id, turn_id, turn_index,
+            parent_turn_id, turn_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "ai_execution",
+            request.execution_id,
+            legacy_turn.turn_id,
+            legacy_turn.turn_index,
+            legacy_turn.parent_turn_id,
+            json.dumps(
+                legacy_turn.as_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        ),
+    )
+    legacy.execute(
+        """
+        INSERT INTO ai_execution_checkpoint(
+            namespace, execution_id, checkpoint_version,
+            checkpoint_json, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            "ai_execution",
+            request.execution_id,
+            legacy_checkpoint.checkpoint_version,
+            json.dumps(
+                legacy_checkpoint.as_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            QUALIFICATION_TIME.isoformat(),
+        ),
     )
     legacy_payload = terminal.as_dict()
     legacy.execute(
@@ -1980,6 +2150,20 @@ def _persistence_reliability_cycle(
     legacy.close()
 
     migrated = SQLiteExecutionRepository(legacy_path)
+    turn_row = migrated._connection.execute(
+        """
+        SELECT turn_digest FROM ai_execution_turn
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (migrated.namespace, request.execution_id),
+    ).fetchone()
+    checkpoint_row = migrated._connection.execute(
+        """
+        SELECT checkpoint_digest FROM ai_execution_checkpoint
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (migrated.namespace, request.execution_id),
+    ).fetchone()
     result_row = migrated._connection.execute(
         """
         SELECT result_digest FROM ai_execution_result
@@ -1994,6 +2178,17 @@ def _persistence_reliability_cycle(
         """,
         (migrated.namespace, request.execution_id),
     ).fetchone()
+    replay_digest_backfill_verified = bool(
+        turn_row is not None
+        and isinstance(turn_row["turn_digest"], str)
+        and len(turn_row["turn_digest"]) == 64
+        and checkpoint_row is not None
+        and isinstance(checkpoint_row["checkpoint_digest"], str)
+        and len(checkpoint_row["checkpoint_digest"]) == 64
+        and migrated.turns(request.execution_id) == (legacy_turn,)
+        and migrated.latest_checkpoint(request.execution_id)
+        == legacy_checkpoint
+    )
     migration_backfill_verified = bool(
         result_row is not None
         and isinstance(result_row["result_digest"], str)
@@ -2030,9 +2225,14 @@ def _persistence_reliability_cycle(
             acknowledgement_retry_stable
         ),
         no_pending_after_ack=no_pending_after_ack,
+        turn_tamper_rejected=turn_tamper_rejected,
+        checkpoint_tamper_rejected=checkpoint_tamper_rejected,
         result_tamper_rejected=result_tamper_rejected,
         outbox_tamper_rejected=outbox_tamper_rejected,
         migration_backfill_verified=migration_backfill_verified,
+        replay_digest_backfill_verified=(
+            replay_digest_backfill_verified
+        ),
     )
 
 
@@ -2186,21 +2386,34 @@ async def qualify_system_completion(
     )
     plane.prove_persisted_evidence_integrity(
         execution_id=primary.request.execution_id,
+        turn_tamper_rejected=persistence.turn_tamper_rejected,
+        checkpoint_tamper_rejected=(
+            persistence.checkpoint_tamper_rejected
+        ),
         result_tamper_rejected=persistence.result_tamper_rejected,
         outbox_tamper_rejected=persistence.outbox_tamper_rejected,
         migration_backfill_verified=(
             persistence.migration_backfill_verified
         ),
+        replay_digest_backfill_verified=(
+            persistence.replay_digest_backfill_verified
+        ),
         evidence_refs=(
             "persistence-integrity:"
             + _digest(
                 {
+                    "turn_tamper_rejected":
+                        persistence.turn_tamper_rejected,
+                    "checkpoint_tamper_rejected":
+                        persistence.checkpoint_tamper_rejected,
                     "result_tamper_rejected":
                         persistence.result_tamper_rejected,
                     "outbox_tamper_rejected":
                         persistence.outbox_tamper_rejected,
                     "migration_backfill_verified":
                         persistence.migration_backfill_verified,
+                    "replay_digest_backfill_verified":
+                        persistence.replay_digest_backfill_verified,
                 }
             ),
         ),
