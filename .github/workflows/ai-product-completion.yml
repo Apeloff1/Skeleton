@@ -1,0 +1,63 @@
+name: AI Product Completion Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/runtime/product/**"
+      - "skeleton/testing/test_ai_product_*.py"
+      - ".github/workflows/ai-product-completion.yml"
+      - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/runtime/product/**"
+      - "skeleton/testing/test_ai_product_*.py"
+      - ".github/workflows/ai-product-completion.yml"
+      - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-product-completion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product-completion:
+    name: Reverse End-to-End Product Path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<1"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - name: Compile product runtime
+        run: python -m compileall -q skeleton/ai/runtime/product
+      - name: Run reverse product-path acceptance
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_ai_product_context.py
+          skeleton/testing/test_ai_product_session.py
+          skeleton/testing/test_vs001_functional_ai.py
