@@ -13,7 +13,7 @@ from typing import Iterable, Iterator
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _DRIVE = re.compile(r"^[A-Za-z]:")
 _WINDOWS_DEVICE = re.compile(
-    r"^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$",
+    r"^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$",
     re.IGNORECASE,
 )
 
@@ -24,7 +24,8 @@ def _reject_windows_ambiguous_component(part: str) -> None:
         raise WorkspacePathError("workspace path contains alternate data stream syntax")
     if part.endswith((" ", ".")):
         raise WorkspacePathError("workspace path has Windows-ambiguous trailing characters")
-    if _WINDOWS_DEVICE.fullmatch(part):
+    device_stem = part.split(".", 1)[0].rstrip(" .")
+    if _WINDOWS_DEVICE.fullmatch(device_stem):
         raise WorkspacePathError("workspace path uses a reserved Windows device name")
 
 
