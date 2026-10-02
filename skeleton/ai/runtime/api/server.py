@@ -595,6 +595,25 @@ class ServerState:
                 checks["swarm_tenant_broker"] = tenant_broker.status()
             except Exception:
                 checks["swarm_tenant_broker"] = {"error": "tenant broker status failed"}
+        coordinator = self.engine_execution_coordinator
+        if coordinator is not None:
+            registry = getattr(coordinator, "provider_registry", None)
+            if registry is not None:
+                try:
+                    active_id = str(getattr(registry, "active_id", "") or "")
+                    available = bool(getattr(registry, "available", False))
+                    statuses_fn = getattr(registry, "statuses", None)
+                    statuses = statuses_fn() if callable(statuses_fn) else []
+                    checks["engine_provider"] = {
+                        "active": active_id or None,
+                        "available": available,
+                        "statuses": statuses,
+                    }
+                except Exception:
+                    checks["engine_provider"] = {
+                        "error": "provider status failed"
+                    }
+
         has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
         swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
         recovery_mismatch = False
