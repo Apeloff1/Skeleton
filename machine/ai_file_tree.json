@@ -149,7 +149,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "1669fd5239399ce2e52a74a16c464862b49bb4ea",
+      "source_git_object_sha": "72ee8b70f25fff3b677d39c0c5c48ba96760d64e",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -295,7 +295,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "d277b7146bf2b0a8037330faec15b4c159de6b09",
+      "source_git_object_sha": "231f07dbc7cd12bfc98d63dc10b8d5026e59a4b0",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -689,7 +689,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "968804c6506a46da7f12732fbdf98ddcc3f549b5",
+      "source_git_object_sha": "f16c68ccbdc4a75a04a2c5dd0c7a3248ff4a6c29",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "f8a04c9194fc79aa3d8edfdd28ee66674d38efba",
+      "source_git_object_sha": "5846f80f36f8e9b9e159585f0624c64e793dd2ec",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -858,7 +858,7 @@
       "source": "skeleton/cognition",
       "destination": "skeleton/ai/cognition",
       "kind": "tree",
-      "source_git_object_sha": "062d67911079893e9169ef8114ddb7ec120dd3a9",
+      "source_git_object_sha": "85da7b869084e212f80c74634e860cf387aed5e7",
       "role": "cognition and telemetry support",
       "work_package_refs": [
         "WP-W00",
@@ -954,7 +954,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "856257ce45a03ca9682f05e6ec0bcdb91ca2900b",
+      "source_git_object_sha": "ccbbaae31345e87ec74e2d10cc22e28b2365a9aa",
       "role": "world-model and simulation plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1691,7 +1691,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "e9e5708b9c452594ccab5abe5574fe29817d4b21",
+      "source_git_object_sha": "1f4854df16014f163a44a7b2bb52a5495d26879d",
       "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
       "work_package_refs": [
         "WP-W11",
