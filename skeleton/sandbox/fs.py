@@ -132,7 +132,7 @@ class FsJail:
     def read_bytes(self, path: str, *, limit: int | None = None) -> bytes:
         target = self.resolve(path, must_exist=True)
         cap = self.policy.max_file_bytes if limit is None else limit
-        fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
         try:
             st = os.fstat(fd)
             if not stat.S_ISREG(st.st_mode):
