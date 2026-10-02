@@ -634,9 +634,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-011",
       "completion_checkbox": false,
@@ -906,9 +910,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-012",
       "completion_checkbox": false,
@@ -931,9 +939,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-013",
       "completion_checkbox": false,
@@ -956,9 +968,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-014",
       "completion_checkbox": false,
