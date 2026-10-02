@@ -2845,12 +2845,26 @@
         198
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Authority-bearing identifiers reject Unicode bidirectional controls and format controls before authorization lookup.",
+        "Bidi-bearing untrusted text is stripped by the sandbox sanitizer before model or display reuse."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity",
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_sanitize_text_strips_controls_bidi_invisibles_and_ansi"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell/mcp_authz.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "test:skeleton/testing/test_sandbox_sanitize_inject.py",
+        "workflow:P0 Unicode Authority Identity"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
@@ -2883,12 +2897,28 @@
         298
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Authority-bearing identifiers reject zero-width/invisible characters and NFKC compatibility aliases.",
+        "Mixed Latin, Greek, and Cyrillic authority identifiers fail closed to prevent common homoglyph confusion.",
+        "Canonical single-script Unicode identities remain usable."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_principals",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_rejects_ambiguous_unicode_tool_names",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_auth_allows_canonical_single_script_identity",
+        "skeleton/testing/test_sandbox_sanitize_inject.py::test_hidden_character_audit_and_tag_decoding"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/text_identity.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell/mcp_authz.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "test:skeleton/testing/test_sandbox_sanitize_inject.py",
+        "workflow:P0 Unicode Authority Identity"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",

@@ -127,6 +127,49 @@ def test_mcp_response_success_cannot_contain_error():
         )
 
 
+@pytest.mark.parametrize(
+    "principal",
+    (
+        "ali\u202ece",
+        "al\u200bice",
+        "ａｌｉｃｅ",
+        "aаlice",
+    ),
+)
+def test_mcp_auth_rejects_ambiguous_unicode_principals(principal: str) -> None:
+    with pytest.raises(ValueError):
+        MCPPrincipalPolicy(principal)
+
+
+@pytest.mark.parametrize(
+    "tool",
+    (
+        "py\u202ethon",
+        "py\u200bthon",
+        "ｐｙｔｈｏｎ",
+        "pуthon",
+    ),
+)
+def test_mcp_auth_rejects_ambiguous_unicode_tool_names(tool: str) -> None:
+    with pytest.raises(ValueError):
+        MCPPrincipalPolicy("alice", allowed_tools=frozenset({tool}))
+
+
+def test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity() -> None:
+    auth = MCPAuthorization()
+    auth.set(MCPPrincipalPolicy("alice", allowed_tools=frozenset({"python"})))
+    decision = auth.inspect("alice", "py\u200bthon")
+    assert decision.allowed is False
+    assert "invalid authority identity" in decision.reason
+
+
+def test_mcp_auth_allows_canonical_single_script_identity() -> None:
+    policy = MCPPrincipalPolicy("αλφα", allowed_tools=frozenset({"python"}))
+    auth = MCPAuthorization()
+    auth.set(policy)
+    assert auth.inspect("αλφα", "python").allowed is True
+
+
 def test_mcp_auth_unknown_principal_denied():
     auth = MCPAuthorization()
     decision = auth.inspect("unknown", "python")
