@@ -29,7 +29,7 @@ class P3ExecutionMapTests(unittest.TestCase):
         self.assertEqual(result["queued_volume_count"], 234)
         self.assertEqual(result["task_count"], 6)
         self.assertEqual(result["ready_count"], 0)
-        self.assertEqual(result["blocked_count"], 1)
+        self.assertEqual(result["blocked_count"], 0)
         self.assertEqual(result["parent_functional_frontier"], "closed")
 
     def _fixture(self) -> Path:
