@@ -10,6 +10,7 @@ import threading
 
 import pytest
 
+from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.ai.learning.promotion import (
     EvaluationReceipt,
     ExperimentSpec,
@@ -35,6 +36,7 @@ from skeleton.ai.runtime.system_completion import (
     SystemCompletionPlane,
 )
 from skeleton.intelligence.execution_runtime import (
+    CognitiveExecutionRuntime,
     ExecutionFinalizationBindings,
     ExecutionVerificationDecision,
 )
@@ -177,6 +179,92 @@ async def _functional_run(
     )
     return database, request, await runtime.execute(request), tuple(observed_tool_ids)
 
+
+
+def _stop_request(kind: str, *, deadline: bool) -> AIExecutionRequest:
+    stop_policy = {"max_repeat_tool_batches": 1}
+    if deadline:
+        stop_policy["deadline"] = NOW.isoformat()
+    return AIExecutionRequest(
+        operation_id=f"system-completion-stop-operation-{kind}",
+        execution_id=f"system-completion-stop-execution-{kind}",
+        objective="Prove runtime stop semantics fail closed.",
+        context_policy={
+            "tenant_id": "default",
+            "data_class": "internal",
+            "capability": "vs001.functional_ai",
+        },
+        tool_policy={
+            "tenant_id": "default",
+            "data_class": "internal",
+            "purpose": "tool-execution",
+            "allowed_tool_ids": [],
+        },
+        resource_budget={
+            "max_model_turns": 1,
+            "max_tool_calls": 1,
+        },
+        stop_policy=stop_policy,
+        created_at=NOW,
+    )
+
+
+async def _stop_semantics_results(tmp_path):
+    context_digest = hashlib.sha256(b"system-completion-stop-context").hexdigest()
+
+    deadline_repository = SQLiteExecutionRepository(
+        tmp_path / "system-completion-deadline.sqlite3"
+    )
+    deadline_runtime = CognitiveExecutionRuntime(
+        deadline_repository,
+        _local_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    deadline_request = _stop_request("deadline", deadline=True)
+    deadline_run = await deadline_runtime.start(
+        deadline_request,
+        instructions="Do not execute after the deadline.",
+        prompt="This request is already at its deadline.",
+        context_digest=context_digest,
+        now=NOW,
+    )
+    assert deadline_run.result is not None
+
+    cancellation_repository = SQLiteExecutionRepository(
+        tmp_path / "system-completion-cancellation.sqlite3"
+    )
+    cancellation_runtime = CognitiveExecutionRuntime(
+        cancellation_repository,
+        _local_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    cancellation_request = _stop_request("cancellation", deadline=False)
+    execution = cancellation_repository.create(cancellation_request, now=NOW)
+    payload = cancellation_runtime._initial_payload(
+        cancellation_request,
+        instructions="Stop before any provider or tool work.",
+        prompt="Cancellation qualification.",
+        context_digest=context_digest,
+        history=(),
+    )
+    execution, _checkpoint_ref = cancellation_runtime._checkpoint(
+        execution,
+        payload,
+        now=NOW,
+    )
+    cancellation_repository.request_cancel(
+        cancellation_request.execution_id,
+        expected_version=execution.version,
+        now=NOW,
+    )
+    cancellation_run = await cancellation_runtime.resume(
+        cancellation_request.execution_id,
+        now=NOW,
+    )
+    assert cancellation_run.result is not None
+    return deadline_run.result, cancellation_run.result
 
 def _learning_cycle():
     spec = ExperimentSpec(
@@ -347,6 +435,11 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         provider_receipts=terminal.provider_receipts,
         tool_receipts=terminal.tool_receipts,
     )
+    deadline_result, cancellation_result = await _stop_semantics_results(tmp_path)
+    plane.prove_stop_semantics(
+        deadline_result=deadline_result,
+        cancellation_result=cancellation_result,
+    )
     plane.prove_tool_authority(
         allowed_tool_ids=request.allowed_tool_ids,
         observed_tool_ids=observed_tool_ids,
@@ -405,7 +498,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 16
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 17
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -565,6 +658,29 @@ def test_self_verified_proof_is_rejected() -> None:
         )
 
 
+
+
+@pytest.mark.asyncio
+async def test_stop_semantics_require_deadline_and_cancellation_fences(tmp_path) -> None:
+    deadline_result, cancellation_result = await _stop_semantics_results(tmp_path)
+    tampered_cancellation = replace(
+        cancellation_result,
+        usage={
+            **dict(cancellation_result.usage),
+            "error_code": "unexpected_stop_reason",
+        },
+    )
+    plane = SystemCompletionPlane(
+        subject_id="stop-semantics-subject",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_stop_semantics(
+        deadline_result=deadline_result,
+        cancellation_result=tampered_cancellation,
+    )
+    assert proof.passed is False
+    assert proof.details["deadline_fenced"] is True
+    assert proof.details["cancellation_fenced"] is False
 
 def test_tool_authority_rejects_undeclared_tool() -> None:
     plane = SystemCompletionPlane(
