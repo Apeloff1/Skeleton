@@ -85,6 +85,25 @@ def test_syntax_policy_rejects_local_or_non_public_targets(url: str) -> None:
         validate_public_https_url(url)
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://[::ffff:127.0.0.1]/",
+        "https://[::ffff:10.0.0.1]/",
+        "https://[::ffff:169.254.169.254]/",
+    ],
+)
+def test_ipv4_mapped_ipv6_private_targets_are_rejected(url: str) -> None:
+    with pytest.raises(ValueError, match="non-public"):
+        validate_public_https_url(url)
+
+
+def test_ipv4_mapped_ipv6_public_target_remains_public() -> None:
+    value, host = validate_public_https_url("https://[::ffff:8.8.8.8]/")
+    assert value == "https://[::ffff:8.8.8.8]/"
+    assert host == "::ffff:8.8.8.8"
+
+
 def test_public_literal_ip_skips_dns_but_still_builds_snapshot() -> None:
     called = False
 
