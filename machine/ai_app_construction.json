@@ -1684,6 +1684,40 @@
       ]
     },
     {
+      "id": "local",
+      "state": "active",
+      "adapter": "skeleton/ai/runtime/inference/local.py:LocalModelAdapter",
+      "bootstrap": "skeleton/ai/runtime/inference/artifact.py:local_model_adapter_from_env",
+      "protocol": "Skeleton provider-neutral local inference; model execution remains inside the engine process",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [],
+      "required_configuration": [
+        "AI_LOCAL_MODEL_PATH"
+      ],
+      "optional_configuration": [
+        "AI_LOCAL_MODEL_CACHE_SIZE",
+        "AI_LOCAL_MODEL_SEED"
+      ],
+      "capabilities": [
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "none; local artifact loading and inference must not perform provider network I/O",
+      "artifact_policy": "bounded UTF-8 JSON, duplicate-key rejection, non-finite rejection, exact model digest verification",
+      "supported_artifact_schemas": [
+        "reference_ngram",
+        "skeleton.numpy_recurrent_lm.v1"
+      ],
+      "recurrent_backend": "skeleton/ai/runtime/inference/neural.py:NumpyRecurrentLM",
+      "artifact_builder": "skeleton-train-local-model",
+      "engine_dependency_extra": "local-inference",
+      "execution_owner": "skeleton/provider_runtime.py",
+      "artifact_owner": "skeleton/ai/runtime/inference/artifact.py",
+      "activation_rule": "AI_PROVIDER=local registers only the local adapter; external secondary and semantic-verifier configuration fail closed"
+    },
+    {
       "id": "openai-compatible-secondary",
       "state": "optional",
       "adapter": "skeleton/provider_runtime.py:OpenAICompatibleSecondaryAdapter",
