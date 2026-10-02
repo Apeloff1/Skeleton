@@ -85,6 +85,11 @@ def verify_terminal(
     bridge = _load(closure_map_receipt)
 
     errors: list[str] = []
+    current_digests = {
+        "build_queue": _digest(queue_path),
+        "accountability_ledger": _digest(ledger_path),
+        "closure_map": _digest(map_path),
+    }
     tasks = queue.get("tasks")
     records = ledger.get("records")
     groups = _groups(mapping)
@@ -242,6 +247,15 @@ def verify_terminal(
         errors.append("closure-map receipt does not cover all 14 groups")
     if bridge.get("candidate_counts") != expected_candidate_counts:
         errors.append("closure-map receipt is not terminal 42/42 done")
+    bridge_digests = bridge.get("digests")
+    if not isinstance(bridge_digests, dict):
+        errors.append("closure-map receipt digests are missing")
+    else:
+        for name, expected_digest in current_digests.items():
+            if bridge_digests.get(name) != expected_digest:
+                errors.append(
+                    f"closure-map receipt {name} digest does not match current repository"
+                )
 
     if runner.get("head_sha") != head:
         errors.append("verifier-runner receipt is not exact-head")
@@ -309,9 +323,7 @@ def verify_terminal(
         "fresh_verifier_pass_count": int(runner.get("passed_count") or 0),
         "bridge_signed_task_count": bridge_signed_count,
         "digests": {
-            "build_queue": _digest(queue_path),
-            "accountability_ledger": _digest(ledger_path),
-            "closure_map": _digest(map_path),
+            **current_digests,
             "verifier_runner_receipt": _digest(verifier_receipt),
             "closure_map_receipt": _digest(closure_map_receipt),
         },
