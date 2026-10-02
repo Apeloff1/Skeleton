@@ -409,3 +409,40 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
         "provider:local:retry",
     )
     assert attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_jeeves_rejects_engine_result_with_partial_lineage(
+    canonical_authority,
+) -> None:
+    _repository, _authority = canonical_authority
+    session_id = "partial-lineage-session"
+    turn = await jeeves_compose._append_canonical_user_turn(
+        ChatReq(
+            session_id=session_id,
+            client_message_id="partial-turn-1",
+            message="Do not accept partial lineage.",
+        ),
+        session_id,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="missing canonical lineage",
+    ):
+        await jeeves_compose._commit_canonical_assistant_turn(
+            authority=turn[0],
+            thread=turn[1],
+            user_message=turn[2],
+            tenant_id=turn[3],
+            owner_id=turn[4],
+            session_id=session_id,
+            client_message_id="partial-turn-1",
+            generated={
+                "text": "Unverifiable answer",
+                "model": "skeleton-engine",
+                "engine_operation_id": "operation-partial",
+                "engine_execution_id": "execution-partial",
+                # Context identity intentionally omitted.
+            },
+        )
