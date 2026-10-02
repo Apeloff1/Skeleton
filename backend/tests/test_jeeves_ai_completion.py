@@ -278,6 +278,10 @@ async def test_jeeves_persists_full_engine_context_and_receipt_lineage(
                 ["segment-engine-lineage", source_digest],
             ],
             "engine_context_compiler_version": "compiler-engine-lineage",
+            "engine_tenant_id": turn[3],
+            "engine_actor_id": turn[4],
+            "engine_capability": "assistant.chat",
+            "engine_data_class": turn[1].data_class,
             "engine_provider_receipts": ["provider:local:receipt"],
             "engine_tool_receipts": ["tool:read:receipt"],
             "engine_memory_refs": ["memory:episodic:one"],
@@ -342,6 +346,7 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
         recalled,
         needs_reasoning,
         conversation_context="",
+        **engine_identity,
     ):
         nonlocal attempts
         attempts += 1
@@ -362,6 +367,10 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
                 ["segment-retry", "d" * 64],
             ],
             "engine_context_compiler_version": "compiler-retry",
+            "engine_tenant_id": engine_identity["engine_tenant_id"],
+            "engine_actor_id": engine_identity["engine_actor_id"],
+            "engine_capability": engine_identity["engine_capability"],
+            "engine_data_class": engine_identity["engine_data_class"],
             "engine_verification": "verification:retry",
             "engine_evidence_refs": ["evidence:retry"],
             "engine_provider_receipts": ["provider:local:retry"],
