@@ -200,7 +200,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "14762a9f1763d47cd8b06b011e84f90c93f5e5d6",
+      "source_git_object_sha": "17a5c311a91626d5a14dbaa7b96b783e2814d142",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"

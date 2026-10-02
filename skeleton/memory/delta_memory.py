@@ -759,9 +759,95 @@ def build_delta_memory(
     return PersistingDeltaMemory(store, window_cap=window_cap)
 
 
+# -- memory-hex port + adapter registry ---------------------------------
+
+
+@runtime_checkable
+class DeltaMemoryPort(Protocol):
+    """Hex port for Δ-Memory consumers.
+
+    Both ``DeltaMemory`` and ``PersistingDeltaMemory`` satisfy it; callers
+    depend on this surface, adapters are chosen by name at wiring time via
+    ``create_delta_memory``.
+    """
+
+    def write(self, key: str, value: Any) -> None: ...
+
+    def read(self, key: str) -> Optional[Any]: ...
+
+    def lookup(self, key: str) -> Tuple[bool, Any]: ...
+
+    def delete(self, key: str) -> bool: ...
+
+    def compact(self) -> int: ...
+
+    def stats(self) -> Dict[str, Any]: ...
+
+    def materialize(self) -> Dict[str, Any]: ...
+
+
+DeltaMemoryFactory = Callable[..., DeltaMemoryPort]
+
+_ADAPTERS: Dict[str, DeltaMemoryFactory] = {}
+_ADAPTERS_LOCK = threading.Lock()
+
+
+def register_delta_memory_adapter(
+    name: str, factory: DeltaMemoryFactory, *, replace: bool = False
+) -> None:
+    """Register a named Δ-Memory adapter factory (extend-only by default)."""
+    key = str(name).strip()
+    if not key:
+        raise ValueError("adapter name is required")
+    if not callable(factory):
+        raise TypeError("factory must be callable")
+    with _ADAPTERS_LOCK:
+        if key in _ADAPTERS and not replace:
+            raise ValueError(f"delta memory adapter {key!r} already registered")
+        _ADAPTERS[key] = factory
+
+
+def delta_memory_adapters() -> List[str]:
+    """Sorted names of registered adapters."""
+    with _ADAPTERS_LOCK:
+        return sorted(_ADAPTERS)
+
+
+def create_delta_memory(adapter: str = "memory", **kwargs: Any) -> DeltaMemoryPort:
+    """Build a Δ-Memory through a registered adapter; result must honor the port."""
+    with _ADAPTERS_LOCK:
+        factory = _ADAPTERS.get(str(adapter).strip())
+    if factory is None:
+        raise KeyError(
+            f"unknown delta memory adapter {adapter!r}; known: {delta_memory_adapters()}"
+        )
+    built = factory(**kwargs)
+    if not isinstance(built, DeltaMemoryPort):
+        raise TypeError(f"adapter {adapter!r} did not return a DeltaMemoryPort")
+    return built
+
+
+def _json_file_adapter(
+    *, path: Path | str, strict: bool = False, fsync: bool = True, **kwargs: Any
+) -> PersistingDeltaMemory:
+    store = JsonFileDeltaSnapshotStore(path, strict=strict, fsync=fsync)
+    return PersistingDeltaMemory(store, **kwargs)
+
+
+def _in_memory_persisting_adapter(**kwargs: Any) -> PersistingDeltaMemory:
+    return PersistingDeltaMemory(InMemoryDeltaSnapshotStore(), **kwargs)
+
+
+register_delta_memory_adapter("memory", DeltaMemory)
+register_delta_memory_adapter("json_file", _json_file_adapter)
+register_delta_memory_adapter("in_memory_persisting", _in_memory_persisting_adapter)
+
+
 __all__ = [
     "DEFAULT_WINDOW_CAP",
     "DeltaMemory",
+    "DeltaMemoryFactory",
+    "DeltaMemoryPort",
     "DeltaMemoryStats",
     "DeltaMetricsSink",
     "DeltaSnapshotCorrupt",
@@ -771,4 +857,7 @@ __all__ = [
     "PersistingDeltaMemory",
     "SNAPSHOT_FILE_VERSION",
     "build_delta_memory",
+    "create_delta_memory",
+    "delta_memory_adapters",
+    "register_delta_memory_adapter",
 ]

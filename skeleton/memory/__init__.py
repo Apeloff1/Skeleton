@@ -10,6 +10,7 @@ Exports:
 - MemoryTrinity: Unified fusion across planes
 - RepetitionScheduler: Spaced repetition consolidation
 - ConsolidationCycle: KREM due-refresh → scheduler → dream wiring
+- DeltaMemory / DeltaMemoryPort: bounded Δ-window store + adapter registry
 """
 
 from skeleton.memory.core import (
@@ -36,6 +37,12 @@ from skeleton.memory.jvm_vector_accelerator import (
     get_default_vector_accelerator,
 )
 from skeleton.memory.consolidation import ConsolidationCycle, wire_from_genesis
+from skeleton.memory.delta_memory import (
+    DeltaMemory,
+    DeltaMemoryPort,
+    create_delta_memory,
+    register_delta_memory_adapter,
+)
 
 __all__ = [
     "InMemoryTFIDFStore",
@@ -61,4 +68,8 @@ __all__ = [
     "TrinityResult",
     "ConsolidationCycle",
     "wire_from_genesis",
+    "DeltaMemory",
+    "DeltaMemoryPort",
+    "create_delta_memory",
+    "register_delta_memory_adapter",
 ]
