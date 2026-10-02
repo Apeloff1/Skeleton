@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 import re
 
+from skeleton.sandbox.sanitizers import redact_secrets
 from skeleton.shells.ai.observation import AIObservation
 
 
@@ -59,6 +60,7 @@ class ObservationPolicyEngine:
             data["safe_excerpt"] = ""
             return data
         excerpt = observation.safe_excerpt[: self.policy.max_excerpt_chars]
+        excerpt, _ = redact_secrets(excerpt)
         for pattern in self._patterns:
             excerpt = pattern.sub("[REDACTED]", excerpt)
         data["safe_excerpt"] = excerpt

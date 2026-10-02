@@ -125,6 +125,21 @@ def ref_scoped_cancellation(workflow: str) -> bool:
     )
 
 
+def pr_only_ref_scoped_cancellation(workflow: str) -> bool:
+    """Return true when PRs cancel superseded runs but branch pushes queue."""
+    group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
+    return bool(
+        group
+        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and re.search(
+            r"^\s*cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*(?:#.*)?$",
+            workflow,
+            re.MULTILINE,
+        )
+        is not None
+    )
+
+
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
     """Count immutable action pins carrying the expected human-readable generation."""
     pattern = re.compile(
@@ -314,7 +329,10 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci) or sha_scoped_cancellation(ci) or ref_scoped_cancellation(ci),
+        cancel_false(ci)
+        or sha_scoped_cancellation(ci)
+        or ref_scoped_cancellation(ci)
+        or pr_only_ref_scoped_cancellation(ci),
         "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )

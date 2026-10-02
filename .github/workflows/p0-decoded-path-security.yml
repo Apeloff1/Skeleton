@@ -1,0 +1,41 @@
+name: P0 Decoded Path Security
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/security/decoded_path.py"
+      - "skeleton/sandbox/fs.py"
+      - "skeleton/ai/runtime/sandbox/fs.py"
+      - "skeleton/shells/workspace_txn/pathing.py"
+      - "skeleton/testing/test_decoded_path_security.py"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/backlog_registry.json"
+      - ".github/workflows/p0-decoded-path-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decoded-path-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Verify sandbox mirror
+        run: cmp skeleton/sandbox/fs.py skeleton/ai/runtime/sandbox/fs.py
+      - name: Run decoded-path regressions
+        run: python -m pytest -q skeleton/testing/test_decoded_path_security.py
