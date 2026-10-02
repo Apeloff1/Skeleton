@@ -5953,7 +5953,8 @@
         "Special archive members cannot create link chains or non-regular filesystem objects."
       ],
       "tests": [
-        "skeleton/testing/test_security_archive_sandbox.py::test_zip_symlink_member_is_rejected"
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_symlink_member_is_rejected",
+        "skeleton/testing/test_security_archive_sandbox.py::test_tar_special_members_are_rejected"
       ],
       "properties": [],
       "chaos_cases": [],
