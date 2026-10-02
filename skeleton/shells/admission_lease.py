@@ -84,6 +84,16 @@ class AdmissionLeases:
             del self._items[lease.key]
             return True
 
+    def consume(self,lease:AdmissionLease)->AdmissionLease:
+        """Atomically commit a current admission lease for one effect."""
+        with self._lock:
+            self._prune()
+            current=self._items.get(lease.key)
+            if current!=lease:
+                raise AdmissionLeaseConflict("admission lease is stale or expired")
+            del self._items[lease.key]
+            return current
+
     def require(self,lease:AdmissionLease)->AdmissionLease:
         with self._lock:
             self._prune()
