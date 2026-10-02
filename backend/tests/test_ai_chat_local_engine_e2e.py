@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 import pytest
@@ -562,14 +562,14 @@ async def test_backend_chat_recovers_durable_local_result_after_commit_crash_and
     assert user_message.author_type is ConversationAuthorType.USER
 
     operation_id = str(
-        __import__("uuid").uuid5(
-            __import__("uuid").NAMESPACE_URL,
+        uuid5(
+            NAMESPACE_URL,
             "skeleton-ai-chat:" + thread.thread_id + ":" + user_message.message_id,
         )
     )
     execution_id = str(
-        __import__("uuid").uuid5(
-            __import__("uuid").NAMESPACE_URL,
+        uuid5(
+            NAMESPACE_URL,
             "skeleton-ai-chat-execution:" + operation_id,
         )
     )
