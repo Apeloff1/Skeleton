@@ -9,6 +9,10 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "machine/ai_app_construction.json"
+      - "skeleton/testing/test_local_provider_activation.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_context_compiler.py"
@@ -26,6 +30,10 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/ai/runtime/provider_runtime.py"
+      - "machine/ai_app_construction.json"
+      - "skeleton/testing/test_local_provider_activation.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_context_compiler.py"
@@ -72,12 +80,19 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
-      - name: Compile canonical product runtime
-        run: python -m compileall -q skeleton/ai/runtime/product
+      - name: Compile canonical product and local inference runtimes
+        run: python -m compileall -q skeleton/ai/runtime/product skeleton/ai/runtime/inference
+      - name: Verify canonical provider mirror and bootstrap contract
+        run: |
+          cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
+          python scripts/check_provider_bootstrap.py
+          python scripts/verify_provider_surface_closure.py
       - name: Run canonical reverse product-path acceptance
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_local_inference.py
+          skeleton/testing/test_local_provider_activation.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_vs001_functional_ai.py
