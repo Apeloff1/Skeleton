@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import socket
 import threading
 
 import pytest
@@ -228,7 +229,23 @@ def _learning_cycle():
 
 
 @pytest.mark.asyncio
-async def test_system_completion_plane_composes_real_runtime_planes(tmp_path) -> None:
+async def test_system_completion_plane_composes_real_runtime_planes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    original_socket = socket.socket
+    network_attempts = []
+
+    def guarded_socket(*args, **kwargs):
+        family = args[0] if args else kwargs.get("family", socket.AF_INET)
+        if family in {socket.AF_INET, socket.AF_INET6}:
+            network_attempts.append(str(family))
+            raise AssertionError(
+                "system completion attempted external network I/O"
+            )
+        return original_socket(*args, **kwargs)
+
+    monkeypatch.setattr(socket, "socket", guarded_socket)
     database, request, run = await _functional_run(tmp_path)
     terminal = run.execution.result
     assert terminal is not None
@@ -236,6 +253,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(tmp_path) ->
     # Persistence/recovery: reopen the SQLite store as a separate runtime would.
     recovered_repository = SQLiteExecutionRepository(database)
     recovered = recovered_repository.result(request.execution_id)
+    recovered_turns = recovered_repository.turns(request.execution_id)
 
     # Context integrity: create a non-genesis block and verify the hash chain.
     context_ledger = ContextLedger()
@@ -280,7 +298,18 @@ async def test_system_completion_plane_composes_real_runtime_planes(tmp_path) ->
         local_model_id=run.evidence.local_model_id,
         provider_receipts=run.evidence.provider_receipts,
     )
+    plane.prove_offline_isolation(
+        network_attempt_count=len(network_attempts),
+        provider_receipts=run.evidence.provider_receipts,
+    )
+    plane.prove_budget_bounds(
+        max_model_turns=request.max_model_turns,
+        max_tool_calls=request.max_tool_calls,
+        provider_receipts=terminal.provider_receipts,
+        tool_receipts=terminal.tool_receipts,
+    )
     plane.prove_durable_recovery(terminal, recovered)
+    plane.prove_replay_lineage(recovered_turns)
     plane.prove_governed_effects(
         tool_receipt_count=len(terminal.tool_receipts),
         mutating_tool_count=0,
@@ -317,7 +346,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(tmp_path) ->
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 9
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 12
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -361,6 +390,54 @@ def test_mutating_effect_without_matching_postcondition_fails_closed() -> None:
     )
     assert proof.passed is False
     assert plane.report().valid is False
+
+
+def test_offline_isolation_fails_on_any_network_attempt() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="offline-subject",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_offline_isolation(
+        network_attempt_count=1,
+        provider_receipts=("provider:local:receipt",),
+    )
+    assert proof.passed is False
+    assert plane.report().failed == ("execution.offline_isolation",)
+
+
+def test_budget_bounds_are_hard_limits() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="budget-subject",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_budget_bounds(
+        max_model_turns=1,
+        max_tool_calls=1,
+        provider_receipts=(
+            "provider:local:first",
+            "provider:local:second",
+        ),
+        tool_receipts=("tool:one",),
+    )
+    assert proof.passed is False
+    assert proof.details["observed_model_turns"] == 2
+
+
+@pytest.mark.asyncio
+async def test_replay_lineage_rejects_broken_parent(tmp_path) -> None:
+    database, request, _run = await _functional_run(tmp_path)
+    repository = SQLiteExecutionRepository(database)
+    turns = list(repository.turns(request.execution_id))
+    assert len(turns) >= 2
+    turns[1] = replace(turns[1], parent_turn_id="tampered-parent")
+
+    plane = SystemCompletionPlane(
+        subject_id=request.execution_id,
+        source_revision=HEAD,
+    )
+    proof = plane.prove_replay_lineage(turns)
+    assert proof.passed is False
+    assert proof.details["parent_linked"] is False
 
 
 def test_memory_requires_recall_and_observed_forgetting() -> None:
