@@ -26,6 +26,7 @@ def _fixture(root: Path) -> tuple[Path, Path]:
         prefix = f"AIQ-G{group_index:02d}-"
         gap_id = f"gap-{group_index:02d}"
         verifier_script = f"scripts/verify_{key.lower()}.py"
+        verifier_digest = f"{group_index + 101:064x}"
         groups.append(
             {
                 "key": key,
@@ -33,6 +34,7 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 "gap_id": gap_id,
                 "verifier_script": verifier_script,
                 "expected_receipt_verifier": "fixture-verifier-v1",
+                "expected_script_sha256": verifier_digest,
             }
         )
         results.append(
@@ -43,6 +45,7 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 "receipt_verifier": "fixture-verifier-v1",
                 "receipt_head_sha": HEAD,
                 "receipt_digest": f"{group_index + 1:064x}",
+                "script_digest": verifier_digest,
             }
         )
         for task_index in range(3):
@@ -251,5 +254,27 @@ def test_terminal_verifier_rejects_fresh_verifier_identity_drift(
     assert receipt["valid"] is False
     assert any(
         "fresh verifier receipt identity mismatch" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_terminal_verifier_rejects_fresh_verifier_script_digest_drift(
+    tmp_path: Path,
+) -> None:
+    runner, bridge = _fixture(tmp_path)
+    payload = json.loads(runner.read_text(encoding="utf-8"))
+    payload["results"][0]["script_digest"] = "f" * 64
+    runner.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_terminal(
+        tmp_path,
+        head_sha=HEAD,
+        verifier_receipt=runner,
+        closure_map_receipt=bridge,
+    )
+
+    assert receipt["valid"] is False
+    assert any(
+        "fresh verifier script digest mismatch" in error
         for error in receipt["errors"]
     )
