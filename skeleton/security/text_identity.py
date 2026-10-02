@@ -32,6 +32,7 @@ def require_security_identifier(
     *,
     field: str = "identifier",
     max_length: int = 256,
+    ascii_only: bool = False,
 ) -> str:
     """Return *value* only when its Unicode identity is unambiguous.
 
@@ -47,6 +48,8 @@ def require_security_identifier(
         raise TextIdentityError(f"invalid {field} length")
     if unicodedata.normalize("NFKC", value) != value:
         raise TextIdentityError(f"{field} is not NFKC-canonical")
+    if ascii_only and not value.isascii():
+        raise TextIdentityError(f"{field} must use ASCII")
 
     scripts: set[str] = set()
     for character in value:
@@ -65,4 +68,23 @@ def require_security_identifier(
     return value
 
 
-__all__ = ["TextIdentityError", "require_security_identifier"]
+def require_authority_identifier(
+    value: str,
+    *,
+    field: str = "authority identifier",
+    max_length: int = 256,
+) -> str:
+    """Require an ASCII-only identifier at an authority or routing boundary."""
+    return require_security_identifier(
+        value,
+        field=field,
+        max_length=max_length,
+        ascii_only=True,
+    )
+
+
+__all__ = [
+    "TextIdentityError",
+    "require_authority_identifier",
+    "require_security_identifier",
+]
