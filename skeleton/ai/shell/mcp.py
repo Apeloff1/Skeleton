@@ -12,7 +12,7 @@ import hashlib
 import json
 import unicodedata
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from skeleton.shells.ai.manifest import AIToolManifest
 
@@ -252,11 +252,16 @@ class MCPToolSurface:
     def list_tools(
         self,
         *,
-        allowed_names: frozenset[str] | None = None,
+        allowed_names: Iterable[str] | None = None,
+        cache_scope: str | None = None,
     ) -> MCPToolList:
         tools = self.descriptors()
         if allowed_names is not None:
-            tools = tuple(item for item in tools if item.name in allowed_names)
+            allowed = frozenset(allowed_names)
+            tools = tuple(item for item in tools if item.name in allowed)
+        effective_cache_scope = self.cache_scope if cache_scope is None else cache_scope
+        if effective_cache_scope not in {"public", "private", "no-store"}:
+            raise ValueError("invalid MCP cache scope")
         raw = json.dumps(
             [item.to_dict() for item in tools],
             sort_keys=True,
@@ -266,6 +271,6 @@ class MCPToolSurface:
             MCP_PROTOCOL_REVISION,
             tools,
             self.ttl_ms,
-            self.cache_scope,
+            effective_cache_scope,
             hashlib.sha256(raw).hexdigest(),
         )

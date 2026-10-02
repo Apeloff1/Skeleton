@@ -851,13 +851,16 @@
         "integration"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_curated_discovery_pending_exact_head_ci",
+      "disposition": "implemented_curated_and_principal_scoped_capability_discovery_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/catalog.py",
         "code:skeleton/shells/ai/mcp.py",
         "code:skeleton/shells/ai/mcp_gateway.py",
         "test:skeleton/testing/test_shell_ai_mcp_2026.py",
-        "workflow:P0 Tool Discovery Authority"
+        "workflow:P0 Tool Discovery Authority",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell",
+        "workflow:P0 Capability Discovery Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-025",
