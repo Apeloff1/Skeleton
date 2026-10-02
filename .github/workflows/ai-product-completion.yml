@@ -4,7 +4,16 @@ on:
   pull_request:
     paths:
       - "skeleton/ai/runtime/product/**"
-      - "skeleton/testing/test_ai_product_*.py"
+      - "skeleton/context/**"
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_ai_product_canonical.py"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_conversation_repository.py"
+      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   push:
@@ -12,7 +21,16 @@ on:
       - main
     paths:
       - "skeleton/ai/runtime/product/**"
-      - "skeleton/testing/test_ai_product_*.py"
+      - "skeleton/context/**"
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/ai/runtime/functional_ai.py"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_ai_product_canonical.py"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_conversation_repository.py"
+      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   workflow_dispatch:
@@ -26,11 +44,12 @@ concurrency:
 
 jobs:
   product-completion:
-    name: Reverse End-to-End Product Path
+    name: Canonical Reverse End-to-End Product Path
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
       OPENAI_API_KEY: ""
       XAI_API_KEY: ""
       ANTHROPIC_API_KEY: ""
@@ -53,12 +72,12 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
-      - name: Compile product runtime
+      - name: Compile canonical product runtime
         run: python -m compileall -q skeleton/ai/runtime/product
-      - name: Run reverse product-path acceptance
+      - name: Run canonical reverse product-path acceptance
         run: >-
-          python -m pytest -q
-          skeleton/testing/test_ai_product_context.py
-          skeleton/testing/test_ai_product_session.py
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_vs001_functional_ai.py
