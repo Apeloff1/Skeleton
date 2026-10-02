@@ -8,10 +8,10 @@
   "completion_authority": "Task state is implementation scheduling/evidence state only. Masterplan maturity and independent sign-off remain separate authorities.",
   "summary": {
     "task_count": 6,
-    "in_progress_count": 2,
+    "in_progress_count": 1,
     "ready_count": 0,
     "blocked_count": 3,
-    "landed_unpromoted_count": 1,
+    "landed_unpromoted_count": 2,
     "scheduled_volume_count": 23,
     "queued_volume_count": 234,
     "source_volume_count": 257
@@ -388,7 +388,7 @@
     {
       "task_id": "P3-TRUST-EXPERIENCE-01",
       "lane_id": "P3-L2",
-      "status": "in_progress",
+      "status": "landed_unpromoted",
       "title": "Explainability, accessibility, internationalization and compliance",
       "depends_on": [
         "P3-MODEL-FOUNDATION-01"
@@ -418,7 +418,11 @@
         "source:machine/ai_master_plan.json",
         "implementation:skeleton/cognition/trust_experience.py",
         "mirror:skeleton/ai/cognition/trust_experience.py",
-        "test:skeleton/testing/test_p3_trust_experience.py"
+        "test:skeleton/testing/test_p3_trust_experience.py",
+        "github:pr#2347",
+        "git-head:9a410187c6b46c665bed2cbbccc1d5f686882a7b",
+        "workflow:P3 Trust Experience@9a410187c6b46c665bed2cbbccc1d5f686882a7b:success",
+        "github-actions-run:36964520163"
       ],
       "masterplan_obligations": [
         {
