@@ -9,6 +9,13 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/ai/runtime/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
+      - "skeleton/ai/runtime/api/engine_routes.py"
+      - "backend/core/engine_client.py"
+      - "backend/tests/test_engine_client.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
       - "machine/ai_app_construction.json"
@@ -31,6 +38,13 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/ai/runtime/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
+      - "skeleton/ai/runtime/api/engine_routes.py"
+      - "backend/core/engine_client.py"
+      - "backend/tests/test_engine_client.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
       - "machine/ai_app_construction.json"
@@ -86,6 +100,8 @@ jobs:
       - name: Verify canonical provider mirror and bootstrap contract
         run: |
           cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
+          cmp skeleton/api/engine_runtime.py skeleton/ai/runtime/api/engine_runtime.py
+          cmp skeleton/api/engine_routes.py skeleton/ai/runtime/api/engine_routes.py
           python scripts/check_provider_bootstrap.py
           python scripts/verify_provider_surface_closure.py
       - name: Run canonical reverse product-path acceptance
@@ -94,6 +110,8 @@ jobs:
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_local_provider_activation.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          backend/tests/test_engine_client.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_local_model_artifact.py
