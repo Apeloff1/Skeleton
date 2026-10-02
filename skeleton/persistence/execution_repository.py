@@ -25,6 +25,7 @@ from skeleton.contracts.ai_execution import (
     ExecutionCheckpoint,
     ExecutionFinalizationIntent,
     ExecutionState,
+    execution_payload_digest,
 )
 from skeleton.contracts.verification import VerificationReceipt
 
@@ -196,6 +197,7 @@ class SQLiteExecutionRepository:
                 CREATE TABLE IF NOT EXISTS ai_execution_result (
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
+                    result_digest TEXT NOT NULL,
                     result_json TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id),
@@ -245,6 +247,7 @@ class SQLiteExecutionRepository:
                     execution_id TEXT NOT NULL,
                     execution_version INTEGER NOT NULL,
                     event_type TEXT NOT NULL,
+                    payload_digest TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     published_at TEXT,
@@ -259,6 +262,72 @@ class SQLiteExecutionRepository:
                 ON ai_execution_outbox(namespace, published_at, created_at);
                 """
             )
+            result_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_result)"
+                )
+            }
+            if "result_digest" not in result_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_result "
+                    "ADD COLUMN result_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, result_json
+                FROM ai_execution_result
+                WHERE result_digest IS NULL OR result_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["result_json"], "result_json")
+                result = self._result_from_payload(payload)
+                digest = execution_payload_digest(result.as_dict())
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_result
+                    SET result_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                    ),
+                )
+
+            outbox_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_outbox)"
+                )
+            }
+            if "payload_digest" not in outbox_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_outbox "
+                    "ADD COLUMN payload_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, outbox_id, payload_json
+                FROM ai_execution_outbox
+                WHERE payload_digest IS NULL OR payload_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["payload_json"], "payload_json")
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_outbox
+                    SET payload_digest = ?
+                    WHERE namespace = ? AND outbox_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["outbox_id"],
+                    ),
+                )
 
     @staticmethod
     def _request_from_dict(payload: dict[str, Any]) -> AIExecutionRequest:
@@ -368,7 +437,15 @@ class SQLiteExecutionRepository:
     def _result_from_row(cls, row: sqlite3.Row) -> AIExecutionResult:
         try:
             payload = _json_object(row["result_json"], "result_json")
-            return cls._result_from_payload(payload)
+            result = cls._result_from_payload(payload)
+            digest = execution_payload_digest(result.as_dict())
+            if digest != row["result_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted result digest mismatch"
+                )
+            return result
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted result violates contract"
@@ -461,19 +538,32 @@ class SQLiteExecutionRepository:
 
     @staticmethod
     def _outbox_from_row(row: sqlite3.Row) -> ExecutionOutboxEvent:
-        return ExecutionOutboxEvent(
-            outbox_id=row["outbox_id"],
-            execution_id=row["execution_id"],
-            execution_version=int(row["execution_version"]),
-            event_type=row["event_type"],
-            payload=_json_object(row["payload_json"], "payload_json"),
-            created_at=_parse_time(row["created_at"], "created_at"),
-            published_at=(
-                None
-                if row["published_at"] is None
-                else _parse_time(row["published_at"], "published_at")
-            ),
-        )
+        try:
+            payload = _json_object(row["payload_json"], "payload_json")
+            digest = execution_payload_digest(payload)
+            if digest != row["payload_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted outbox payload digest mismatch"
+                )
+            return ExecutionOutboxEvent(
+                outbox_id=row["outbox_id"],
+                execution_id=row["execution_id"],
+                execution_version=int(row["execution_version"]),
+                event_type=row["event_type"],
+                payload=payload,
+                created_at=_parse_time(row["created_at"], "created_at"),
+                published_at=(
+                    None
+                    if row["published_at"] is None
+                    else _parse_time(row["published_at"], "published_at")
+                ),
+            )
+        except ExecutionRepositoryCorruption:
+            raise
+        except Exception as exc:
+            raise ExecutionRepositoryCorruption(
+                "persisted outbox event violates contract"
+            ) from exc
 
     def create(
         self,
@@ -1158,12 +1248,14 @@ class SQLiteExecutionRepository:
                 self._connection.execute(
                     """
                     INSERT INTO ai_execution_result(
-                        namespace, execution_id, result_json, completed_at
-                    ) VALUES (?, ?, ?, ?)
+                        namespace, execution_id, result_digest,
+                        result_json, completed_at
+                    ) VALUES (?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
                         result.execution_id,
+                        execution_payload_digest(result.as_dict()),
                         _json_dump(result.as_dict()),
                         result.completed_at.isoformat(),
                     ),
@@ -1195,8 +1287,9 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_outbox(
                         namespace, outbox_id, execution_id, execution_version,
-                        event_type, payload_json, created_at, published_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+                        event_type, payload_digest, payload_json,
+                        created_at, published_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
                     """,
                     (
                         self.namespace,
@@ -1204,6 +1297,7 @@ class SQLiteExecutionRepository:
                         result.execution_id,
                         next_version,
                         "execution." + result.status,
+                        execution_payload_digest(payload),
                         _json_dump(payload),
                         instant.isoformat(),
                     ),
