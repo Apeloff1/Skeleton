@@ -179,9 +179,9 @@ def _contract_requirements() -> tuple[list[str], str]:
         contract.get("required_requirements"),
         require_unique=True,
     )
-    if len(required) != 17:
+    if len(required) != 18:
         raise ReceiptVerificationError(
-            "completion contract must retain exactly 17 requirements"
+            "completion contract must retain exactly 18 requirements"
         )
     return required, _digest(contract)
 
