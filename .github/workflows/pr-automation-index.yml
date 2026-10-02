@@ -87,7 +87,8 @@ jobs:
       PR_RUNNER_RETRY_ATTEMPTS: "3"
       PR_RUNNER_RETRY_CEILING_SECONDS: "30"
       # main is currently not branch-protected; exact live base-head binding remains mandatory.
-      # Set the repository variable to true when branch protection/rulesets are enforced.\n      PR_RUNNER_REQUIRE_PROTECTED_BASE: ${{ vars.PR_RUNNER_REQUIRE_PROTECTED_BASE || 'false' }}
+      # Set the repository variable to true when branch protection/rulesets are enforced.
+      PR_RUNNER_REQUIRE_PROTECTED_BASE: ${{ vars.PR_RUNNER_REQUIRE_PROTECTED_BASE || 'false' }}
       PR_RUNNER_REQUIRE_EXACT_BASE_HEAD: "true"
       PR_RUNNER_QUEUE_PRESSURE_HOLD: "true"
       PR_RUNNER_PUBLISH_GATE_STATUS: "true"
@@ -172,6 +173,11 @@ jobs:
               echo "workflow_run completion is missing head SHA or branch" >&2
               exit 2
             fi
+            [[ "$WORKFLOW_RUN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "workflow_run head SHA must be a canonical 40-hex commit OID" >&2
+              exit 2
+            }
+            printf 'P2_SOURCE_HEAD_SHA=%s\n' "$WORKFLOW_RUN_HEAD_SHA" >> "$GITHUB_ENV"
             args+=(--head-sha="$WORKFLOW_RUN_HEAD_SHA" --head-ref="$WORKFLOW_RUN_HEAD_REF")
             if [[ -n "${DEFAULT_BRANCH}" ]]; then
               args+=(--default-branch="$DEFAULT_BRANCH")
@@ -181,6 +187,54 @@ jobs:
             args+=(--limit 25)
           fi
           run_pr_automation "${args[@]}"
+
+      - name: Emit P2 PR Automation qualification evidence
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success'
+        shell: bash
+        env:
+          P2_PR_AUTOMATION_ATTESTATION_KEY: ${{ secrets.P2_PR_AUTOMATION_ATTESTATION_KEY }}
+          P2_AUTOMATION_MODE: ${{ steps.mode.outputs.mode }}
+          P2_SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          P2_SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${P2_PR_AUTOMATION_ATTESTATION_KEY:-}" ]]; then
+            echo "P2 PR Automation attestation key is not configured; no live evidence emitted."
+            exit 0
+          fi
+          [[ "${P2_SOURCE_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "workflow_run head SHA must be a canonical 40-hex commit OID" >&2
+            exit 2
+          }
+          report=".pr-automation/runner-report.json"
+          [[ -f "$report" ]] || {
+            echo "trusted PR Automation runner report is missing" >&2
+            exit 2
+          }
+          rm -f .pr-automation/p2-pr-automation-evidence.json
+          mkdir -p .p2-evidence
+          evidence=".p2-evidence/pr-automation.json"
+          python scripts/qualify_spine_pr_automation_runner.py \
+            --report "$report" \
+            --repository "$GITHUB_REPOSITORY" \
+            --expected-head "$P2_SOURCE_HEAD_SHA" \
+            --source-run-id "$P2_SOURCE_RUN_ID" \
+            --source-run-attempt "$P2_SOURCE_RUN_ATTEMPT" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --mode "$P2_AUTOMATION_MODE" \
+            --evidence-out "$evidence"
+
+      - name: Upload P2 PR Automation qualification evidence
+        if: always() && github.event_name == 'workflow_run'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: p2-pr-automation-evidence-${{ github.run_id }}
+          path: .p2-evidence/pr-automation.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Save durable PR index
         if: always()

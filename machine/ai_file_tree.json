@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "fbc36ee223125dc9636609c4404439a3fdfe9afb",
+      "source_git_object_sha": "e9ecacf5110e7ae7d56abc49b6d6457c1f36282b",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -1624,7 +1624,7 @@
       "source": "skeleton/pr_automation",
       "destination": "skeleton/ai/build/pr_automation",
       "kind": "tree",
-      "source_git_object_sha": "943a16fa9dcabf71443498edb7254d456122be4b",
+      "source_git_object_sha": "f9e7817958be10279150dbed6cfa628555f89ee1",
       "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
       "work_package_refs": [
         "WP-W15",

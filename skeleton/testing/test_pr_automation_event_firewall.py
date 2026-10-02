@@ -29,7 +29,7 @@ def event(
     upstream_workflow: str = "Merge Readiness",
     run_id: int = 100,
     run_attempt: int = 1,
-    workflow_id: int = 200,
+    workflow_id: int = 358774735,
     status: str = "completed",
     conclusion: str = "success",
     source_event: str = "pull_request",
@@ -59,7 +59,7 @@ def workflow_env(**overrides: str) -> dict[str, str]:
         "WORKFLOW_RUN_NAME": "Merge Readiness",
         "WORKFLOW_RUN_ID": "100",
         "WORKFLOW_RUN_ATTEMPT": "1",
-        "WORKFLOW_RUN_WORKFLOW_ID": "200",
+        "WORKFLOW_RUN_WORKFLOW_ID": "358774735",
         "WORKFLOW_RUN_STATUS": "completed",
         "WORKFLOW_RUN_CONCLUSION": "success",
         "WORKFLOW_RUN_EVENT": "pull_request",
@@ -140,15 +140,33 @@ def test_policy_can_name_multiple_exact_trusted_upstreams() -> None:
     policy = EventFirewallPolicy(
         trusted_upstream_workflows=frozenset(
             {"Merge Readiness", "Emergency Readiness"}
-        )
+        ),
+        trusted_upstream_identities=frozenset(
+            {
+                ("Merge Readiness", 358774735),
+                ("Emergency Readiness", 999001),
+            }
+        ),
     )
 
     decision = admit_workflow_run(
-        event(upstream_workflow="Emergency Readiness"),
+        event(
+            upstream_workflow="Emergency Readiness",
+            workflow_id=999001,
+        ),
         policy=policy,
     )
 
     assert decision.level is AdmissionLevel.MUTATE
+
+
+def test_same_name_wrong_workflow_id_is_dropped() -> None:
+    decision = admit_workflow_run(
+        event(workflow_id=999999999)
+    )
+
+    assert decision.level is AdmissionLevel.DROP
+    assert "identity is not trusted" in decision.reason
 
 
 def test_workflow_name_matching_is_exact_not_case_folded() -> None:
@@ -276,7 +294,7 @@ def test_event_from_env_requires_all_authority_fields() -> None:
     assert parsed.upstream_workflow == "Merge Readiness"
     assert parsed.run_id == 100
     assert parsed.run_attempt == 1
-    assert parsed.workflow_id == 200
+    assert parsed.workflow_id == 358774735
     assert parsed.conclusion == "success"
     assert parsed.source_event == "pull_request"
     assert parsed.pr_hints == (123,)
@@ -490,4 +508,17 @@ def test_workflow_does_not_interpolate_authority_metadata_directly_into_shell() 
     assert (
         dollar + "{{ github.event.workflow_run.head_repository.full_name }}"
         not in text
+    )
+
+def test_workflow_exports_protected_base_control_as_active_env() -> None:
+    from pathlib import Path
+
+    text = Path(".github/workflows/pr-automation-index.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "\\n      PR_RUNNER_REQUIRE_PROTECTED_BASE" not in text
+    assert any(
+        line.strip().startswith("PR_RUNNER_REQUIRE_PROTECTED_BASE:")
+        and not line.lstrip().startswith("#")
+        for line in text.splitlines()
     )
