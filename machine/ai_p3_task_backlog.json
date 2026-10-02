@@ -8,8 +8,8 @@
   "completion_authority": "Task state is implementation scheduling/evidence state only. Masterplan maturity and independent sign-off remain separate authorities.",
   "summary": {
     "task_count": 6,
-    "in_progress_count": 0,
-    "ready_count": 1,
+    "in_progress_count": 1,
+    "ready_count": 0,
     "blocked_count": 2,
     "landed_unpromoted_count": 3,
     "scheduled_volume_count": 23,
@@ -579,7 +579,7 @@
     {
       "task_id": "P3-VERTICAL-SUITE-01",
       "lane_id": "P3-L3",
-      "status": "ready",
+      "status": "in_progress",
       "title": "VS-002 through VS-007 executable validation suite",
       "depends_on": [
         "P3-MODEL-FOUNDATION-01",
@@ -610,7 +610,10 @@
       "evidence_refs": [
         "source:machine/ai_p2_functional_ai_closure.json",
         "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/eval/vertical_suite.py",
+        "mirror:skeleton/ai/evaluation/vertical_suite.py",
+        "tests:skeleton/testing/test_vs002_engineering_agent.py..test_vs007_desktop_product.py"
       ],
       "masterplan_obligations": [
         {
