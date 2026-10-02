@@ -8497,12 +8497,25 @@
         160
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model-visible tool descriptions must originate from the repository-owned curated command catalog.",
+        "Tool-description text is explicitly marked non-authoritative and rejects compatibility-unstable, bidi-control, and invisible-control spellings."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_descriptor_contains_effect_annotations",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_description_rejects_untrusted_origin",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_tool_description_rejects_bidi_control"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -8536,12 +8549,25 @@
         376
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Externally exposed MCP discovery is filtered through the requesting principal's authorization policy.",
+        "Unknown or denied principals receive no tool descriptors, so tool existence is not a privilege oracle."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_hides_tools_from_unknown_principal",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_exposes_only_authorized_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_respects_denylist"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",

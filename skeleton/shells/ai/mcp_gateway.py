@@ -39,8 +39,13 @@ class MCPAIShellGateway:
         self.authorization = authorization
         self.replay_guard = replay_guard
 
-    def list_tools(self) -> MCPResponseEnvelope:
-        listing = self.tools.list_tools()
+    def list_tools(self, *, principal: str) -> MCPResponseEnvelope:
+        allowed_names = frozenset(
+            item.name
+            for item in self.tools.descriptors()
+            if self.authorization.inspect(principal, item.name).allowed
+        )
+        listing = self.tools.list_tools(allowed_names=allowed_names)
         return MCPResponseEnvelope(
             "tools-list",
             True,
