@@ -511,6 +511,7 @@ async def execute_engine_text(
                 binding=binding,
                 operation_id=operation_id,
                 execution_id=execution_id,
+                turn_id=turn_id,
             )
         except EngineNotFoundError:
             pass
