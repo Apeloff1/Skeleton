@@ -108,6 +108,7 @@ class EngineChat:
         verification_profile: str = "assistant_proposal",
         data_class: str = "internal",
         purpose: str = "model-inference",
+        turn_idempotency_key: str | None = None,
         engine_executor=None,
         **_: Any,
     ) -> None:
@@ -159,6 +160,18 @@ class EngineChat:
         ).strip()
         self.data_class = str(data_class).strip().lower()
         self.purpose = str(purpose).strip()
+        if turn_idempotency_key is None:
+            self._turn_idempotency_key = None
+        else:
+            normalized_turn_key = str(turn_idempotency_key).strip()
+            if (
+                not normalized_turn_key
+                or len(normalized_turn_key) > 1024
+            ):
+                raise ValueError(
+                    "turn_idempotency_key must be 1..1024 characters"
+                )
+            self._turn_idempotency_key = normalized_turn_key
         self._engine_executor = engine_executor or execute_engine_text
         if not callable(self._engine_executor):
             raise TypeError("engine_executor must be callable")
@@ -344,6 +357,13 @@ class EngineChat:
         return str(text)
 
     def _idempotency_key(self, prompt: str) -> str:
+        if self._turn_idempotency_key is not None:
+            return (
+                "engine-chat-explicit:"
+                + hashlib.sha256(
+                    self._turn_idempotency_key.encode("utf-8")
+                ).hexdigest()
+            )
         policy = self.instruction_policy
         instructions = (
             self.system_message.strip()
