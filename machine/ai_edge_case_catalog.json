@@ -6807,12 +6807,24 @@
         177
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Deleting backup-managed sensitive state purges every indexed historical backup copy before removing the live source.",
+        "Unreadable or malformed indexed backups fail closed before live deletion.",
+        "Restore cannot resurrect state that was purged by the deletion operation."
+      ],
+      "tests": [
+        "skeleton/testing/test_backup_retention_security.py::test_delete_state_purges_live_and_all_historical_backup_copies",
+        "skeleton/testing/test_backup_retention_security.py::test_delete_state_fails_closed_before_live_delete_when_backup_is_unreadable",
+        "skeleton/testing/test_backup_retention_security.py::test_delete_state_rejects_unmanaged_or_traversal_names"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/reliability/backup_restore.py",
+        "test:skeleton/testing/test_backup_retention_security.py",
+        "workflow:P0 Backup Sensitive Deletion"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "fault_injection",
