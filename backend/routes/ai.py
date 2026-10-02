@@ -573,6 +573,55 @@ def _chat_terminal_marker(transcript, user_message_id: str):
     )
 
 
+def _validate_chat_handoff_binding(
+    *,
+    binding,
+    engine_result,
+    thread,
+    user_message,
+    operation_id: str,
+    execution_id: str,
+) -> None:
+    """Fail closed unless recovered engine lineage is the exact chat turn."""
+
+    expected_user_segment = conversation_message_segment(
+        thread,
+        user_message,
+        purpose="model-inference",
+    )
+    expected_policy_segment = CHAT_INSTRUCTION_POLICY.to_segment(
+        tenant_id="*",
+        purpose="model-inference",
+        created_at=user_message.created_at,
+        mandatory=True,
+    )
+    snapshot = set(binding.source_snapshot)
+    if (
+        binding.operation_id != operation_id
+        or binding.execution_id != execution_id
+        or engine_result.operation_id != operation_id
+        or engine_result.execution_id != execution_id
+        or binding.turn_id != user_message.message_id
+        or binding.idempotency_key != user_message.idempotency_key
+        or binding.capability != "assistant.chat"
+        or binding.purpose != "model-inference"
+        or binding.data_class != thread.data_class
+        or (
+            expected_user_segment.segment_id,
+            expected_user_segment.content_digest,
+        )
+        not in snapshot
+        or (
+            expected_policy_segment.segment_id,
+            expected_policy_segment.content_digest,
+        )
+        not in snapshot
+    ):
+        raise EngineClientError(
+            "recovered engine handoff does not match canonical chat lineage"
+        )
+
+
 async def _commit_chat_terminal_marker(
     *,
     thread,
@@ -1633,18 +1682,20 @@ async def get_ai_chat_turn(
     except EngineClientError as exc:
         raise HTTPException(status_code=502, detail="AI engine protocol failure") from exc
 
-    if (
-        binding.operation_id != operation_id
-        or binding.execution_id != execution_id
-        or binding.turn_id != user_message.message_id
-        or binding.idempotency_key != user_message.idempotency_key
-        or binding.capability != "assistant.chat"
-        or binding.purpose != "model-inference"
-    ):
+    try:
+        _validate_chat_handoff_binding(
+            binding=binding,
+            engine_result=engine_result,
+            thread=thread,
+            user_message=user_message,
+            operation_id=operation_id,
+            execution_id=execution_id,
+        )
+    except EngineClientError as exc:
         raise HTTPException(
             status_code=502,
             detail="AI engine handoff identity mismatch",
-        )
+        ) from exc
 
     ai_result_id = "engine-result:" + execution_id
     assistant_key = idempotency_key + ":assistant"
