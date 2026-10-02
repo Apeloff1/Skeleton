@@ -174,6 +174,7 @@ class SQLiteExecutionRepository:
                     turn_id TEXT NOT NULL,
                     turn_index INTEGER NOT NULL,
                     parent_turn_id TEXT,
+                    turn_digest TEXT NOT NULL,
                     turn_json TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id, turn_id),
                     UNIQUE(namespace, execution_id, turn_index),
@@ -186,6 +187,7 @@ class SQLiteExecutionRepository:
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
                     checkpoint_version INTEGER NOT NULL,
+                    checkpoint_digest TEXT NOT NULL,
                     checkpoint_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id, checkpoint_version),
@@ -262,6 +264,79 @@ class SQLiteExecutionRepository:
                 ON ai_execution_outbox(namespace, published_at, created_at);
                 """
             )
+            turn_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_turn)"
+                )
+            }
+            if "turn_digest" not in turn_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_turn "
+                    "ADD COLUMN turn_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, turn_id, turn_json
+                FROM ai_execution_turn
+                WHERE turn_digest IS NULL OR turn_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["turn_json"], "turn_json")
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_turn
+                    SET turn_digest = ?
+                    WHERE namespace = ? AND execution_id = ? AND turn_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                        row["turn_id"],
+                    ),
+                )
+
+            checkpoint_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_checkpoint)"
+                )
+            }
+            if "checkpoint_digest" not in checkpoint_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_checkpoint "
+                    "ADD COLUMN checkpoint_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, checkpoint_version,
+                       checkpoint_json
+                FROM ai_execution_checkpoint
+                WHERE checkpoint_digest IS NULL OR checkpoint_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(
+                    row["checkpoint_json"],
+                    "checkpoint_json",
+                )
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_checkpoint
+                    SET checkpoint_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                      AND checkpoint_version = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                        row["checkpoint_version"],
+                    ),
+                )
+
             result_columns = {
                 str(row["name"])
                 for row in self._connection.execute(
@@ -371,7 +446,7 @@ class SQLiteExecutionRepository:
     def _turn_from_row(row: sqlite3.Row) -> AgentTurn:
         try:
             payload = _json_object(row["turn_json"], "turn_json")
-            return AgentTurn(
+            turn = AgentTurn(
                 operation_id=payload["operation_id"],
                 execution_id=payload["execution_id"],
                 turn_id=payload["turn_id"],
@@ -388,6 +463,14 @@ class SQLiteExecutionRepository:
                 checkpoint_ref=payload["checkpoint_ref"],
                 status=payload["status"],
             )
+            digest = execution_payload_digest(turn.as_dict())
+            if digest != row["turn_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted turn digest mismatch"
+                )
+            return turn
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted turn violates contract"
@@ -397,7 +480,7 @@ class SQLiteExecutionRepository:
     def _checkpoint_from_row(row: sqlite3.Row) -> ExecutionCheckpoint:
         try:
             payload = _json_object(row["checkpoint_json"], "checkpoint_json")
-            return ExecutionCheckpoint(
+            checkpoint = ExecutionCheckpoint(
                 operation_id=payload["operation_id"],
                 execution_id=payload["execution_id"],
                 checkpoint_version=int(payload["checkpoint_version"]),
@@ -408,6 +491,14 @@ class SQLiteExecutionRepository:
                 payload_digest=payload["payload_digest"],
                 created_at=_parse_time(payload["created_at"], "created_at"),
             )
+            digest = execution_payload_digest(checkpoint.as_dict())
+            if digest != row["checkpoint_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted checkpoint digest mismatch"
+                )
+            return checkpoint
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted checkpoint violates contract"
@@ -776,8 +867,8 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_turn(
                         namespace, execution_id, turn_id, turn_index,
-                        parent_turn_id, turn_json
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        parent_turn_id, turn_digest, turn_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
@@ -785,6 +876,7 @@ class SQLiteExecutionRepository:
                         turn.turn_id,
                         turn.turn_index,
                         turn.parent_turn_id,
+                        execution_payload_digest(turn.as_dict()),
                         _json_dump(turn.as_dict()),
                     ),
                 )
@@ -877,13 +969,14 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_checkpoint(
                         namespace, execution_id, checkpoint_version,
-                        checkpoint_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?)
+                        checkpoint_digest, checkpoint_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
                         execution_id,
                         next_checkpoint_version,
+                        execution_payload_digest(checkpoint.as_dict()),
                         _json_dump(checkpoint.as_dict()),
                         instant.isoformat(),
                     ),
