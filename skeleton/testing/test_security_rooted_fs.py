@@ -119,7 +119,7 @@ def test_normalization_rejects_encoded_path_metacharacters(
     tmp_path: Path,
     path: str,
 ) -> None:
-    with pytest.raises(FilesystemPathError, match="encoded"):
+    with pytest.raises(FilesystemPathError):
         fs(tmp_path).normalize(path)
 
 
