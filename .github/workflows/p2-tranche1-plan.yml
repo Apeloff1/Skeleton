@@ -1,0 +1,64 @@
+name: P2 Tranche 1 Prepared Plan
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_p2_tranche1_plan.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "scripts/check_p2_tranche1_plan.py"
+      - "scripts/prepare_p2_tranche1_activation.py"
+      - "tests/test_p2_tranche1_plan.py"
+      - "tests/test_p2_tranche1_activation.py"
+      - "docs/plan/P2_TRANCHE1_RUNTIME_TRUST.md"
+      - ".github/workflows/p2-tranche1-plan.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-t1-runtime-trust-plan
+    paths:
+      - "machine/ai_p2_tranche1_plan.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "scripts/check_p2_tranche1_plan.py"
+      - "tests/test_p2_tranche1_plan.py"
+      - "docs/plan/P2_TRANCHE1_RUNTIME_TRUST.md"
+      - ".github/workflows/p2-tranche1-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-tranche1-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate prepared T1 scope and activation fence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Validate prepared tranche
+        run: python scripts/check_p2_tranche1_plan.py --json
+
+      - name: Run plan and activation regressions
+        run: >-
+          python -m unittest -v
+          tests.test_p2_tranche1_plan
+          tests.test_p2_tranche1_activation
