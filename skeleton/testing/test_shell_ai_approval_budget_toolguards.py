@@ -24,6 +24,28 @@ def fp(char):
     return char * 64
 
 
+@pytest.mark.parametrize(
+    ("principal", "approved_by"),
+    (
+        ("adm\u0456n", "operator"),
+        ("principal", "ops\u202ereview"),
+        ("principal", "review\u200ber"),
+    ),
+)
+def test_ai_approval_rejects_ambiguous_unicode_authority_identity(
+    principal,
+    approved_by,
+):
+    registry = AIApprovalRegistry()
+    with pytest.raises(ValueError):
+        registry.approve(
+            principal=principal,
+            intent_fingerprint=fp("a"),
+            proposal_fingerprint=fp("b"),
+            approved_by=approved_by,
+        )
+
+
 def test_ai_approval_exact_binding():
     registry = AIApprovalRegistry()
     approval = registry.approve(
