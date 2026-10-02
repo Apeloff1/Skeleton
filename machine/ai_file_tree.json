@@ -2677,7 +2677,7 @@
       "source": "skeleton/shells/ai",
       "destination": "skeleton/ai/shell",
       "kind": "tree",
-      "source_git_object_sha": "8dc533185a81f0653e10f718a3e763cf3d72bc54",
+      "source_git_object_sha": "a843017bdcc4e83b3ef714df8fb071b95d0b1441",
       "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
       "work_package_refs": [
         "WP-W03",
