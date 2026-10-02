@@ -17,9 +17,11 @@ on:
       - "skeleton/testing/test_vs005_self_improvement.py"
       - "tests/test_ai_system_completion_verifier.py"
       - "tests/test_ai_system_qualification.py"
+      - "tests/test_ai_system_qualification_receipt_verifier.py"
       - "machine/ai_system_completion_contract.json"
       - "scripts/verify_ai_system_completion.py"
       - "scripts/run_ai_system_completion_qualification.py"
+      - "scripts/verify_ai_system_qualification_receipt.py"
       - ".github/workflows/ai-system-completion.yml"
   push:
     branches:
@@ -37,9 +39,11 @@ on:
       - "skeleton/testing/test_vs005_self_improvement.py"
       - "tests/test_ai_system_completion_verifier.py"
       - "tests/test_ai_system_qualification.py"
+      - "tests/test_ai_system_qualification_receipt_verifier.py"
       - "machine/ai_system_completion_contract.json"
       - "scripts/verify_ai_system_completion.py"
       - "scripts/run_ai_system_completion_qualification.py"
+      - "scripts/verify_ai_system_qualification_receipt.py"
       - ".github/workflows/ai-system-completion.yml"
   workflow_dispatch:
 
@@ -85,6 +89,7 @@ jobs:
           skeleton/testing/test_vs005_self_improvement.py
           tests/test_ai_system_completion_verifier.py
           tests/test_ai_system_qualification.py
+          tests/test_ai_system_qualification_receipt_verifier.py
 
       - name: Run executable assembled-AI qualification
         env:
@@ -93,6 +98,16 @@ jobs:
           python scripts/run_ai_system_completion_qualification.py
           --head-sha "$COMPLETION_HEAD_SHA"
           --evidence-out .ai-system-runtime-qualification.json
+          --print-evidence
+
+      - name: Independently rehash qualification receipt
+        env:
+          COMPLETION_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_system_qualification_receipt.py
+          .ai-system-runtime-qualification.json
+          --head-sha "$COMPLETION_HEAD_SHA"
+          --evidence-out .ai-system-runtime-qualification-verification.json
           --print-evidence
 
       - name: Assert executable qualification receipt
