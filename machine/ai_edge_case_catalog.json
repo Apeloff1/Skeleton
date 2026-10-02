@@ -4768,12 +4768,25 @@
         118
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Mandatory trusted policy/control segments are admitted before optional evidence and cannot be displaced by higher-priority untrusted context.",
+        "Trusted control segments are not eligible for compaction that could alter or weaken policy semantics.",
+        "Compilation fails closed before provider I/O when required control text cannot fit the available context capacity."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_cannot_be_displaced_by_high_priority_evidence",
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_fails_before_provider_when_it_cannot_fit",
+        "skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Policy Context Retention"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
