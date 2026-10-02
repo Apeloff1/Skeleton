@@ -132,6 +132,7 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
         causal_user_message_id=user_message.message_id,
         operation_id=operation_id,
         ai_result_id="engine-result:" + execution_id,
+        provider_receipt_refs=("provider:local:response-1",),
     )
     committed = ConversationThread(
         thread_id=initial.thread_id,
@@ -178,6 +179,10 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
                 final_output="engine answer",
                 verification="verification:engine-test",
                 evidence_refs=("evidence:engine-test",),
+                provider_receipts=("provider:local:response-1",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     fake_client = FakeEngineClient()
@@ -238,6 +243,9 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     )
     assert captured["commit"]["ai_result_id"] == "engine-result:" + execution_id
     assert captured["commit"]["operation_id"] == operation_id
+    assert captured["commit"]["provider_receipt_refs"] == (
+        "provider:local:response-1",
+    )
     assert body["success"] is True
     assert body["response"] == "engine answer"
     assert body["provider"] == "skeleton-engine"
@@ -246,6 +254,13 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     assert body["engine_execution_id"] == execution_id
     assert body["engine_verification"] == "verification:engine-test"
     assert body["engine_evidence_refs"] == ["evidence:engine-test"]
+    assert body["engine_provider_receipts"] == [
+        "provider:local:response-1"
+    ]
+    assert body["engine_runtime_provider"] == "local"
+    assert body["assistant_message"]["provider_receipt_refs"] == [
+        "provider:local:response-1"
+    ]
     assert "memory_write_intent" not in (
         command.execution_request.context_policy
     )
@@ -567,3 +582,92 @@ def test_memory_opt_in_without_canonical_engine_fails_closed(
     assert body["success"] is False
     assert body["error_code"] == "memory_persistence_unavailable"
     assert body["ai_generated"] is False
+
+
+def test_replayed_chat_preserves_local_provider_provenance_without_engine_call(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread(version=3, sequence=2)
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="replay-local",
+        content="question",
+    )
+    operation_id = str(uuid4())
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="replay-local:assistant",
+        content="persisted local answer",
+        parent_message_id=user_message.message_id,
+        causal_user_message_id=user_message.message_id,
+        operation_id=operation_id,
+        ai_result_id="engine-result:replay-local",
+        provider_receipt_refs=(
+            "provider:local:persisted-response",
+        ),
+    )
+
+    async def active_transcript(*_args, **_kwargs):
+        return user_message, assistant
+
+    async def append_user_message(*_args, **_kwargs):
+        return initial, user_message
+
+    class EngineMustNotRun:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, _command):
+            raise AssertionError("replayed canonical assistant must not rerun engine")
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: EngineMustNotRun()),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+        ),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "question",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "replay-local",
+            "expected_thread_version": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["replayed"] is True
+    assert body["response"] == "persisted local answer"
+    assert body["engine_runtime_provider"] == "local"
+    assert body["engine_provider_receipts"] == [
+        "provider:local:persisted-response"
+    ]
+    assert body["assistant_message"]["provider_receipt_refs"] == [
+        "provider:local:persisted-response"
+    ]
