@@ -18,6 +18,18 @@ RS parity (core surface, unchanged from #1649):
 Extensions (Python-side, extend-only): tombstone deletes, batch writes,
 materialized views, export/load state, and snapshot persistence ports.
 
+RS parity extras (additive):
+- ``lookup`` / ``get`` mirror RS ``Option<Value>``: a stored ``None`` (JSON
+  ``null``) is distinguishable from an absent key, which plain ``read``
+  cannot express.
+- ``json_values=True`` mirrors RS ``serde_json::Value`` storage: values are
+  validated as strict JSON at write time (non-finite floats rejected, tuples
+  become lists, map keys become strings) and reads return independent
+  copies, so callers can never mutate stored state (RS ``read`` clones).
+  Default stays ``False`` so the #1649 reference semantics are unchanged.
+- Documented divergence: RS ``new(0)`` compacts on every write; Python keeps
+  rejecting ``window_cap < 1`` (#1649 contract) — use ``window_cap=1``.
+
 Distinct from ``backend/gameforge/omega/delta_memory.py`` (KDA associative
 matrix). This module is the RS *window* semantics port — extend-only; does
 not touch OmniFabric, SagaRegistry, Diet, Court, or API lifespan.
@@ -25,6 +37,7 @@ not touch OmniFabric, SagaRegistry, Diet, Court, or API lifespan.
 
 from __future__ import annotations
 
+import copy
 import json
 import threading
 from dataclasses import dataclass
@@ -46,6 +59,18 @@ DEFAULT_WINDOW_CAP = 512
 
 # Tombstone marker for delete-as-delta (survives until compacted away).
 _TOMBSTONE: object = object()
+
+# Sentinel for "key absent" in ``get`` (distinct from a stored ``None``).
+_MISSING: object = object()
+
+
+def _json_clone(value: Any) -> Any:
+    """Strict JSON round-trip (RS ``serde_json::Value`` parity).
+
+    Raises ``ValueError`` for non-finite floats and ``TypeError`` for values
+    JSON cannot represent, before any state is touched.
+    """
+    return json.loads(json.dumps(value, allow_nan=False))
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,10 +167,12 @@ class DeltaMemory:
         window_cap: int = DEFAULT_WINDOW_CAP,
         *,
         on_compact: Optional[Callable[[Mapping[str, Any]], None]] = None,
+        json_values: bool = False,
     ) -> None:
         if window_cap < 1:
             raise ValueError("window_cap must be >= 1")
         self.window_cap = int(window_cap)
+        self.json_values = bool(json_values)
         self._window: List[Tuple[str, Any]] = []
         self._snapshot: Dict[str, Any] = {}
         self.compactions = 0
@@ -159,6 +186,7 @@ class DeltaMemory:
 
     def write(self, key: str, value: Any) -> None:
         """Append a delta; compact into snapshot when the window is full."""
+        value = self._ingest(value)
         with self._lock:
             self._window.append((str(key), value))
             self._writes += 1
@@ -172,10 +200,33 @@ class DeltaMemory:
             self._reads += 1
             for k, v in reversed(self._window):
                 if k == key:
-                    return None if v is _TOMBSTONE else v
+                    return None if v is _TOMBSTONE else self._egress(v)
             if key not in self._snapshot:
                 return None
-            return self._snapshot[key]
+            return self._egress(self._snapshot[key])
+
+    def lookup(self, key: str) -> Tuple[bool, Any]:
+        """RS ``Option`` parity: ``(found, value)``.
+
+        ``(True, None)`` means a stored ``None``/JSON ``null``; ``(False,
+        None)`` means absent or tombstoned. Counts as a read.
+        """
+        key = str(key)
+        with self._lock:
+            self._reads += 1
+            for k, v in reversed(self._window):
+                if k == key:
+                    if v is _TOMBSTONE:
+                        return False, None
+                    return True, self._egress(v)
+            if key in self._snapshot:
+                return True, self._egress(self._snapshot[key])
+            return False, None
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Like ``read`` but returns ``default`` only when the key is absent."""
+        found, value = self.lookup(key)
+        return value if found else default
 
     def compact(self) -> int:
         """Force-compact any pending window deltas into the snapshot."""
@@ -230,6 +281,10 @@ class DeltaMemory:
     def write_many(self, items: Iterable[Tuple[str, Any]]) -> int:
         """Batch-append deltas. Returns number of writes applied."""
         n = 0
+        if self.json_values:
+            # Validate the whole batch up front so a bad value cannot leave a
+            # half-applied batch behind.
+            items = [(str(k), _json_clone(v)) for k, v in items]
         with self._lock:
             for key, value in items:
                 self._window.append((str(key), value))
@@ -247,13 +302,13 @@ class DeltaMemory:
     def items(self) -> List[Tuple[str, Any]]:
         """Sorted ``(key, value)`` pairs for the materialized view."""
         with self._lock:
-            merged = self._materialize_locked()
+            merged = self._egress(self._materialize_locked())
             return sorted(merged.items(), key=lambda kv: kv[0])
 
     def materialize(self) -> Dict[str, Any]:
         """Return a copy of the fully merged key→value map."""
         with self._lock:
-            return self._materialize_locked()
+            return self._egress(self._materialize_locked())
 
     def clear(self) -> None:
         """Drop window and snapshot; counters retained for observability."""
@@ -275,8 +330,8 @@ class DeltaMemory:
                 "writes": self._writes,
                 "reads": self._reads,
                 "deletes": self._deletes,
-                "snapshot": dict(self._snapshot),
-                "window": window,
+                "snapshot": self._egress(dict(self._snapshot)),
+                "window": self._egress(window),
             }
 
     def load_state(self, state: Mapping[str, Any]) -> None:
@@ -287,7 +342,7 @@ class DeltaMemory:
             snap = state.get("snapshot", {})
             if not isinstance(snap, Mapping):
                 raise TypeError("snapshot must be a mapping")
-            self._snapshot = {str(k): v for k, v in snap.items()}
+            self._snapshot = {str(k): self._ingest(v) for k, v in snap.items()}
             window_raw = state.get("window", [])
             restored: List[Tuple[str, Any]] = []
             if isinstance(window_raw, list):
@@ -298,7 +353,7 @@ class DeltaMemory:
                     if len(entry) >= 3 and entry[2]:
                         restored.append((k, _TOMBSTONE))
                     else:
-                        restored.append((k, entry[1]))
+                        restored.append((k, self._ingest(entry[1])))
             self._window = restored
             if "compactions" in state:
                 self.compactions = int(state["compactions"])
@@ -319,13 +374,20 @@ class DeltaMemory:
 
     def apply_snapshot(self, snapshot: Mapping[str, Any], *, replace: bool = True) -> None:
         """Load a compacted snapshot (e.g. from ``DeltaSnapshotPort``)."""
+        incoming = {str(k): self._ingest(v) for k, v in snapshot.items()}
         with self._lock:
             if replace:
-                self._snapshot = {str(k): v for k, v in snapshot.items()}
+                self._snapshot = incoming
             else:
-                self._snapshot.update({str(k): v for k, v in snapshot.items()})
+                self._snapshot.update(incoming)
 
     # -- internals -------------------------------------------------------
+
+    def _ingest(self, value: Any) -> Any:
+        return _json_clone(value) if self.json_values else value
+
+    def _egress(self, value: Any) -> Any:
+        return copy.deepcopy(value) if self.json_values else value
 
     def _compact_locked(self) -> None:
         for k, v in self._window:
@@ -336,7 +398,7 @@ class DeltaMemory:
         self._window.clear()
         self.compactions += 1
         if self._on_compact is not None:
-            self._on_compact(dict(self._snapshot))
+            self._on_compact(self._egress(dict(self._snapshot)))
 
     def _visible_locked(self, key: str) -> bool:
         for k, v in reversed(self._window):
