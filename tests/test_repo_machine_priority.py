@@ -17,6 +17,12 @@ sys.modules[SPEC.name] = M
 SPEC.loader.exec_module(M)
 
 class RepositoryPriorityTests(unittest.TestCase):
+    def test_priority_ids_do_not_coerce(self):
+        with self.assertRaises(TypeError):
+            M.decide_priority(123)
+        with self.assertRaises(TypeError):
+            M.HardBlocker(True, 500)
+
     def test_hard_blocker_dominates_soft_score(self):
         hard = M.decide_priority(
             "A",
