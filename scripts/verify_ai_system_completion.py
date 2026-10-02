@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Independent exact-head verifier for the AI system-completion plane.
+
+The runtime acceptance test proves behavior.  This verifier proves that the
+machine contract, runtime requirement inventory, acceptance bindings, and CI
+wiring all describe the same non-compensable closure surface on the exact head.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Iterable
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT_PATH = ROOT / "machine" / "ai_system_completion_contract.json"
+RUNTIME_PATH = ROOT / "skeleton" / "ai" / "runtime" / "system_completion.py"
+WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ai-system-completion.yml"
+RUNTIME_TEST_PATH = (
+    ROOT / "skeleton" / "testing" / "test_ai_system_completion_plane.py"
+)
+VERIFIER_TEST_PATH = ROOT / "tests" / "test_ai_system_completion_verifier.py"
+_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _git_head() -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("system completion contract must be an object")
+    return payload
+
+
+def _runtime_requirements() -> list[str]:
+    # Import only the completion module's public inventory.  The repository is
+    # already on PYTHONPATH in CI and this prevents a second hand-maintained list.
+    from skeleton.ai.runtime.system_completion import (  # noqa: PLC0415
+        REQUIRED_COMPLETION_REQUIREMENTS,
+    )
+
+    return [item.value for item in REQUIRED_COMPLETION_REQUIREMENTS]
+
+
+def _contains_all(path: Path, needles: Iterable[str]) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    return [needle for needle in needles if needle not in text]
+
+
+def verify(head_sha: str) -> dict[str, object]:
+    errors: list[str] = []
+    head_sha = head_sha.strip()
+    if _GIT_SHA.fullmatch(head_sha) is None:
+        errors.append("head_sha must be a lowercase 40-character git sha")
+
+    required_files = (
+        CONTRACT_PATH,
+        RUNTIME_PATH,
+        WORKFLOW_PATH,
+        RUNTIME_TEST_PATH,
+        VERIFIER_TEST_PATH,
+    )
+    missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.is_file()]
+    if missing_files:
+        errors.append("missing required files: " + ", ".join(sorted(missing_files)))
+
+    contract: dict[str, object] = {}
+    if CONTRACT_PATH.is_file():
+        try:
+            contract = _load_contract()
+        except Exception as exc:  # pragma: no cover - surfaced in receipt
+            errors.append(f"contract parse failed: {exc}")
+
+    requirements = contract.get("required_requirements", [])
+    if not isinstance(requirements, list) or not all(
+        isinstance(item, str) and item for item in requirements
+    ):
+        errors.append("contract required_requirements must be non-empty strings")
+        requirements = []
+    if len(requirements) != len(set(requirements)):
+        errors.append("contract contains duplicate requirements")
+
+    runtime_requirements: list[str] = []
+    if RUNTIME_PATH.is_file():
+        try:
+            runtime_requirements = _runtime_requirements()
+        except Exception as exc:  # pragma: no cover - surfaced in receipt
+            errors.append(f"runtime requirement import failed: {exc}")
+    if requirements != runtime_requirements:
+        errors.append("machine contract and runtime requirement inventory diverge")
+
+    authority = contract.get("authority")
+    required_authority = {
+        "producer_must_differ_from_verifier": True,
+        "exact_subject_binding": True,
+        "exact_source_revision_binding": True,
+        "duplicate_proofs_forbidden": True,
+        "missing_proofs_fail_closed": True,
+        "failed_proofs_non_compensable": True,
+    }
+    if not isinstance(authority, dict):
+        errors.append("contract authority must be an object")
+    else:
+        for key, expected in required_authority.items():
+            if authority.get(key) is not expected:
+                errors.append(f"authority control disabled or missing: {key}")
+
+    bindings = contract.get("acceptance_bindings", [])
+    if not isinstance(bindings, list) or not all(isinstance(item, str) for item in bindings):
+        errors.append("acceptance_bindings must be a string list")
+        bindings = []
+    for binding in bindings:
+        if not (ROOT / binding).is_file():
+            errors.append(f"acceptance binding missing: {binding}")
+
+    if RUNTIME_TEST_PATH.is_file() and requirements:
+        absent = _contains_all(RUNTIME_TEST_PATH, requirements)
+        if absent:
+            errors.append(
+                "runtime acceptance does not name every requirement: "
+                + ", ".join(absent)
+            )
+
+    if WORKFLOW_PATH.is_file():
+        workflow_required = (
+            "test_ai_system_completion_plane.py",
+            "test_ai_system_completion_verifier.py",
+            "verify_ai_system_completion.py",
+            "github.event.pull_request.head.sha || github.sha",
+        )
+        absent = _contains_all(WORKFLOW_PATH, workflow_required)
+        if absent:
+            errors.append("workflow wiring incomplete: " + ", ".join(absent))
+
+    file_digests = {
+        str(path.relative_to(ROOT)): _sha256(path)
+        for path in required_files
+        if path.is_file()
+    }
+    contract_digest = _sha256(CONTRACT_PATH) if CONTRACT_PATH.is_file() else None
+
+    receipt: dict[str, object] = {
+        "schema_version": "skeleton.ai.system_completion_verifier_receipt.v1",
+        "verifier": "independent-ai-system-completion-v1",
+        "head_sha": head_sha,
+        "requirement_count": len(requirements),
+        "requirements": list(requirements),
+        "runtime_requirements": runtime_requirements,
+        "binding_count": len(bindings),
+        "contract_digest": contract_digest,
+        "file_digests": file_digests,
+        "errors": errors,
+        "valid": not errors,
+    }
+    receipt["receipt_digest"] = hashlib.sha256(_canonical(receipt)).hexdigest()
+    return receipt
+
+
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--head-sha", default=None)
+    parser.add_argument("--evidence-out", default=None)
+    parser.add_argument("--print-evidence", action="store_true")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(list(sys.argv[1:] if argv is None else argv))
+    head_sha = args.head_sha or _git_head()
+    receipt = verify(head_sha)
+    encoded = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    if args.evidence_out:
+        output = Path(args.evidence_out)
+        if not output.is_absolute():
+            output = ROOT / output
+        output.write_text(encoded, encoding="utf-8")
+    if args.print_evidence:
+        print(encoded, end="")
+    if not receipt["valid"]:
+        for error in receipt["errors"]:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
