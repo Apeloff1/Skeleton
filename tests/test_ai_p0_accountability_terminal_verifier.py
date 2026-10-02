@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -90,9 +91,13 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 }
             )
 
-    _write(root, "machine/ai_build_queue.json", {"tasks": tasks})
-    _write(root, "machine/ai_build_accountability.json", {"records": records})
-    _write(
+    queue_path = _write(root, "machine/ai_build_queue.json", {"tasks": tasks})
+    ledger_path = _write(
+        root,
+        "machine/ai_build_accountability.json",
+        {"records": records},
+    )
+    map_path = _write(
         root,
         "machine/ai_accountability_closure_map.json",
         {
@@ -129,6 +134,13 @@ def _fixture(root: Path) -> tuple[Path, Path]:
                 "verification_ready": 0,
                 "completion_ready": 0,
                 "done": 42,
+            },
+            "digests": {
+                "build_queue": hashlib.sha256(queue_path.read_bytes()).hexdigest(),
+                "accountability_ledger": hashlib.sha256(
+                    ledger_path.read_bytes()
+                ).hexdigest(),
+                "closure_map": hashlib.sha256(map_path.read_bytes()).hexdigest(),
             },
         },
     )
@@ -276,5 +288,28 @@ def test_terminal_verifier_rejects_fresh_verifier_script_digest_drift(
     assert receipt["valid"] is False
     assert any(
         "fresh verifier script digest mismatch" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_terminal_verifier_rejects_stale_closure_map_manifest_digest(
+    tmp_path: Path,
+) -> None:
+    runner, bridge = _fixture(tmp_path)
+    payload = json.loads(bridge.read_text(encoding="utf-8"))
+    payload["digests"]["build_queue"] = "0" * 64
+    bridge.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_terminal(
+        tmp_path,
+        head_sha=HEAD,
+        verifier_receipt=runner,
+        closure_map_receipt=bridge,
+    )
+
+    assert receipt["valid"] is False
+    assert any(
+        "closure-map receipt build_queue digest does not match current repository"
+        in error
         for error in receipt["errors"]
     )
