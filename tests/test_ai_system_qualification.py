@@ -13,7 +13,7 @@ HEAD = "d" * 40
 
 
 @pytest.mark.asyncio
-async def test_executable_system_qualification_emits_twenty_eight_exact_revision_proofs(
+async def test_executable_system_qualification_emits_thirty_two_exact_revision_proofs(
     tmp_path,
 ) -> None:
     receipt = await qualify_system_completion(
@@ -28,7 +28,7 @@ async def test_executable_system_qualification_emits_twenty_eight_exact_revision
     assert receipt.report.valid is True
     assert receipt.report.missing == ()
     assert receipt.report.failed == ()
-    assert len(receipt.report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 28
+    assert len(receipt.report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 32
     assert receipt.network_attempt_count == 0
     assert receipt.primary_result_digest == receipt.replay_result_digest
     assert receipt.primary_output_digest == receipt.replay_output_digest
@@ -42,7 +42,7 @@ async def test_executable_system_qualification_emits_twenty_eight_exact_revision
     assert payload["valid"] is True
     assert payload["report"]["valid"] is True
     assert payload["report"]["source_revision"] == HEAD
-    assert len(payload["report"]["proofs"]) == 28
+    assert len(payload["report"]["proofs"]) == 32
     assert all(
         proof["source_revision"] == HEAD
         for proof in payload["report"]["proofs"]
