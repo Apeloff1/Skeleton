@@ -6,6 +6,8 @@ on:
     paths:
       - "skeleton/memory/vector.py"
       - "skeleton/ai/runtime/memory/vector.py"
+      - "skeleton/memory/projection.py"
+      - "skeleton/ai/runtime/memory/projection.py"
       - "skeleton/reliability/backup_restore.py"
       - "skeleton/ai/runtime/reliability/backup_restore.py"
       - "skeleton/testing/test_p0_data_lifecycle_erasure.py"
@@ -40,6 +42,7 @@ jobs:
       - name: Verify AI-tree mirrors
         run: |
           cmp skeleton/memory/vector.py skeleton/ai/runtime/memory/vector.py
+          cmp skeleton/memory/projection.py skeleton/ai/runtime/memory/projection.py
           cmp skeleton/reliability/backup_restore.py skeleton/ai/runtime/reliability/backup_restore.py
       - name: Run lifecycle erasure regressions
         run: python -m pytest -q skeleton/testing/test_p0_data_lifecycle_erasure.py
