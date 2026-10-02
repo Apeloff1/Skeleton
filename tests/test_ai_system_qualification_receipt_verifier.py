@@ -213,7 +213,7 @@ async def test_independent_verifier_rejects_semantically_forged_rehashed_proof(
 
 
 @pytest.mark.asyncio
-async def test_independent_verifier_semantically_challenges_all_28_proofs(
+async def test_independent_verifier_semantically_challenges_all_32_proofs(
     tmp_path,
 ) -> None:
     _receipt, path = await _write_receipt(tmp_path)
@@ -236,6 +236,8 @@ async def test_independent_verifier_semantically_challenges_all_28_proofs(
             ("exact_match", False),
         "execution.staged_finalization_recovery":
             ("intent_cleared", False),
+        "persistence.terminal_evidence_integrity":
+            ("result_tamper_rejected", False),
         "execution.replay_lineage":
             ("parent_linked", False),
         "execution.reproducibility":
@@ -246,12 +248,16 @@ async def test_independent_verifier_semantically_challenges_all_28_proofs(
             ("policy_satisfied", False),
         "verification.claim_binding":
             ("receipt_context_digest", "0" * 64),
+        "verification.receipt_identity":
+            ("conflicting_replay_rejected", False),
         "context.integrity":
             ("problem_count", 1),
         "memory.lifecycle":
             ("absent_after_delete", False),
         "finalization.lineage":
             ("artifact_ref_count", 0),
+        "finalization.outbox_delivery":
+            ("acknowledgement_persistent", False),
         "learning.promotion":
             ("failed_evaluation_rejected", False),
         "learning.rollback":
@@ -270,6 +276,8 @@ async def test_independent_verifier_semantically_challenges_all_28_proofs(
             ("peer_rebinding_rejected", False),
         "resource.admission_quota":
             ("over_quota_rejected", False),
+        "resource.unknown_usage_fence":
+            ("completion_blocked_while_unknown", False),
         "resource.shared_pressure":
             ("second_worker_blocked", False),
         "execution.idempotent_retry":
