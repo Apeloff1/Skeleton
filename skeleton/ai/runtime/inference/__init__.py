@@ -1,5 +1,12 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
+from .artifact import (
+    LoadedLocalModel,
+    LocalModelArtifactError,
+    LocalModelArtifactReceipt,
+    load_local_model_artifact,
+    local_model_adapter_from_env,
+)
 from .deployment import (
     LocalModelDeployment,
     LocalModelDeploymentError,
@@ -32,28 +39,42 @@ from .local import (
 )
 
 __all__ = [
-    "LocalModelDeployment",
-    "LocalModelDeploymentError",
-    "LOCAL_MODEL_DEPLOYMENT_SCHEMA",
-    "QUALIFICATION_SCHEMA",
-    "load_local_model_adapter",
-    "qualify_local_model_deployment",
-    "qualify_local_model_deployment_sync",
     "ArtifactIdentity",
-    "GgufHeader",
-    "LlamaCppConfig",
-    "LlamaCppModel",
-    "LlamaCppRuntimeError",
-    "build_llama_cpp_adapter",
-    "inspect_gguf",
     "CallableLocalModel",
+    "GgufHeader",
+    "LoadedLocalModel",
+    "LOCAL_MODEL_DEPLOYMENT_SCHEMA",
     "LocalInferenceCancelled",
     "LocalInferenceEngine",
     "LocalInferenceRequest",
     "LocalInferenceResult",
     "LocalInferenceScheduler",
     "LocalModelAdapter",
+    "LocalModelArtifactError",
+    "LocalModelArtifactReceipt",
     "LocalModelBackend",
+    "LocalModelDeployment",
+    "LocalModelDeploymentError",
     "LocalToolCall",
+    "LlamaCppConfig",
+    "LlamaCppModel",
+    "LlamaCppRuntimeError",
+    "NumpyRecurrentLM",
+    "QUALIFICATION_SCHEMA",
     "ReferenceNGramModel",
+    "build_llama_cpp_adapter",
+    "inspect_gguf",
+    "load_local_model_adapter",
+    "load_local_model_artifact",
+    "local_model_adapter_from_env",
+    "qualify_local_model_deployment",
+    "qualify_local_model_deployment_sync",
 ]
+
+
+def __getattr__(name: str):
+    if name == "NumpyRecurrentLM":
+        from .neural import NumpyRecurrentLM
+
+        return NumpyRecurrentLM
+    raise AttributeError(name)
