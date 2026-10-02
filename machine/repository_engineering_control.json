@@ -37031,6 +37031,50 @@
         "depends_on": [
           "P2-L4"
         ]
+      },
+      {
+        "id": "P2-T1-L0",
+        "name": "State, consistency and event delivery",
+        "sequence": 7,
+        "depends_on": [
+          "P2-L6"
+        ]
+      },
+      {
+        "id": "P2-T1-L1",
+        "name": "Security, privacy and tenant boundaries",
+        "sequence": 8,
+        "depends_on": [
+          "P2-L6"
+        ]
+      },
+      {
+        "id": "P2-T1-L2",
+        "name": "Inference reliability",
+        "sequence": 9,
+        "depends_on": [
+          "P2-T1-L1"
+        ]
+      },
+      {
+        "id": "P2-T1-L3",
+        "name": "Operational recovery slice",
+        "sequence": 10,
+        "depends_on": [
+          "P2-T1-L0",
+          "P2-T1-L1"
+        ]
+      },
+      {
+        "id": "P2-T1-L4",
+        "name": "Functional AI acceptance slice",
+        "sequence": 11,
+        "depends_on": [
+          "P2-T1-L0",
+          "P2-T1-L1",
+          "P2-T1-L2",
+          "P2-T1-L3"
+        ]
       }
     ],
     "items": [
@@ -37148,13 +37192,92 @@
         "roadmap_id": "ROADMAP-P2-NATIVE-01",
         "task_id": "P2-NATIVE-01",
         "lane_id": "P2-L6",
-        "status": "in_progress",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-QUAL-01"
         ],
         "volume_refs": [
           "VOL-032",
           "VOL-033"
+        ],
+        "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
+      },
+      {
+        "roadmap_id": "ROADMAP-P2-T1-DATA-01",
+        "task_id": "P2-T1-DATA-01",
+        "lane_id": "P2-T1-L0",
+        "status": "landed_unpromoted",
+        "depends_on": [
+          "P2-NATIVE-01"
+        ],
+        "volume_refs": [
+          "VOL-005",
+          "VOL-039",
+          "VOL-132",
+          "VOL-134"
+        ],
+        "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
+      },
+      {
+        "roadmap_id": "ROADMAP-P2-T1-SEC-01",
+        "task_id": "P2-T1-SEC-01",
+        "lane_id": "P2-T1-L1",
+        "status": "landed_unpromoted",
+        "depends_on": [
+          "P2-NATIVE-01"
+        ],
+        "volume_refs": [
+          "VOL-026",
+          "VOL-027",
+          "VOL-167",
+          "VOL-169",
+          "VOL-172",
+          "VOL-175"
+        ],
+        "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
+      },
+      {
+        "roadmap_id": "ROADMAP-P2-T1-INFER-01",
+        "task_id": "P2-T1-INFER-01",
+        "lane_id": "P2-T1-L2",
+        "status": "landed_unpromoted",
+        "depends_on": [
+          "P2-T1-SEC-01"
+        ],
+        "volume_refs": [
+          "VOL-007"
+        ],
+        "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
+      },
+      {
+        "roadmap_id": "ROADMAP-P2-T1-RECOVERY-01",
+        "task_id": "P2-T1-RECOVERY-01",
+        "lane_id": "P2-T1-L3",
+        "status": "landed_unpromoted",
+        "depends_on": [
+          "P2-T1-DATA-01",
+          "P2-T1-SEC-01"
+        ],
+        "volume_refs": [
+          "VOL-091",
+          "VOL-096"
+        ],
+        "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
+      },
+      {
+        "roadmap_id": "ROADMAP-P2-T1-FUNCTIONAL-01",
+        "task_id": "P2-T1-FUNCTIONAL-01",
+        "lane_id": "P2-T1-L4",
+        "status": "landed_unpromoted",
+        "depends_on": [
+          "P2-T1-DATA-01",
+          "P2-T1-SEC-01",
+          "P2-T1-INFER-01",
+          "P2-T1-RECOVERY-01"
+        ],
+        "volume_refs": [
+          "VOL-097",
+          "VOL-104"
         ],
         "completion_authority": "signed evidence/accountability; roadmap state alone has no authority"
       }
@@ -37248,11 +37371,51 @@
       },
       {
         "task_id": "P2-NATIVE-01",
-        "declared_status": "in_progress",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "in_progress"
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-T1-DATA-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-T1-SEC-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-T1-INFER-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-T1-RECOVERY-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
+      },
+      {
+        "task_id": "P2-T1-FUNCTIONAL-01",
+        "declared_status": "landed_unpromoted",
+        "implementation_signed": false,
+        "verification_signed": false,
+        "completion_checkbox": false,
+        "derived_state": "evidence_pending"
       }
     ],
     "derivation_engine": "skeleton/repo_machine/completion.py",

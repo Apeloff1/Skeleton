@@ -1,0 +1,86 @@
+{
+  "schema_version": "skeleton.p2.functional_ai_closure.v1",
+  "closure_id": "P2-FUNCTIONAL-AI-FRONTIER",
+  "status": "closed",
+  "claim_scope": "provider_independent_functional_ai_frontier",
+  "claim": "P2 functional closure requires executable credential-free local model inference, governed model-tool-model execution, durable terminal state/reconnect, independent verification, and mapped state/security/recovery controls. It does not claim the remaining queued P2 capability volumes are implemented.",
+  "source_scope": {
+    "p2_volume_count": 314,
+    "scheduled_volume_count": 57,
+    "queued_volume_count": 257
+  },
+  "functional_frontier_volume_refs": [
+    "VOL-005",
+    "VOL-007",
+    "VOL-026",
+    "VOL-027",
+    "VOL-039",
+    "VOL-091",
+    "VOL-096",
+    "VOL-097",
+    "VOL-104",
+    "VOL-132",
+    "VOL-134",
+    "VOL-167",
+    "VOL-169",
+    "VOL-172",
+    "VOL-175"
+  ],
+  "critical_volume_refs": [
+    "VOL-007",
+    "VOL-097",
+    "VOL-104"
+  ],
+  "authority": {
+    "p1_terminal": "machine/ai_p1_terminal_closure.json",
+    "p2_map": "machine/ai_p2_execution_map.json",
+    "p2_backlog": "machine/ai_p2_task_backlog.json",
+    "tranche": "machine/ai_p2_tranche1_plan.json",
+    "p0_runtime_overlay": "machine/ai_p0_edge_case_matrix.json",
+    "verifier": "scripts/check_p2_functional_ai_closure.py"
+  },
+  "executable_surfaces": {
+    "local_inference": "skeleton/ai/runtime/inference/local.py",
+    "functional_runtime": "skeleton/ai/runtime/functional_ai.py",
+    "local_inference_test": "skeleton/testing/test_local_inference.py",
+    "vs001_test": "skeleton/testing/test_vs001_functional_ai.py"
+  },
+  "requirements": {
+    "hosted_provider_credentials_required": false,
+    "network_required_for_model_inference": false,
+    "local_model_identity_required": true,
+    "governed_tool_authority_required": true,
+    "durable_terminal_state_required": true,
+    "reconnect_replay_required": true,
+    "independent_verification_required": true,
+    "exact_head_ci_required": true
+  },
+  "deferred_scope": {
+    "queued_volume_count": 257,
+    "rule": "Queued P2 breadth remains explicit and must not be erased or represented as completed by this bounded functional frontier."
+  },
+  "evidence_refs": [
+    "github:pr#2346",
+    "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+    "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967807",
+    "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967976",
+    "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967833"
+  ],
+  "closed_frontier": {
+    "task_ids": [
+      "P2-T1-DATA-01",
+      "P2-T1-SEC-01",
+      "P2-T1-INFER-01",
+      "P2-T1-RECOVERY-01",
+      "P2-T1-FUNCTIONAL-01"
+    ],
+    "evidence_head": "c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+    "acceptance_run_id": 36960967807,
+    "local_inference_run_id": 36960967976,
+    "vs001_run_id": 36960967833,
+    "completion_authority": "landed_unpromoted evidence only; no maturity, checkbox, implementation-signature, or verification-signature promotion"
+  }
+}

@@ -1,0 +1,55 @@
+name: P2 Local Inference
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/testing/test_local_inference.py"
+      - ".github/workflows/p2-local-inference.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-functional-ai-closure-atomic
+    paths:
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/testing/test_local_inference.py"
+      - ".github/workflows/p2-local-inference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-local-inference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-inference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<1"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - name: Run credential-free local inference acceptance
+        env:
+          OPENAI_API_KEY: ""
+          XAI_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
+        run: python -m pytest -q skeleton/testing/test_local_inference.py

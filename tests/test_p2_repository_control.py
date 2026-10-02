@@ -23,7 +23,7 @@ class P2RepositoryControlTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["volume_count"], 12)
-        self.assertEqual(result["backlog_count"], 88)
+        self.assertEqual(result["backlog_count"], 93)
         self.assertEqual(result["work_package_count"], 31)
         self.assertEqual(result["aiq_task_count"], 42)
         self.assertEqual(result["wave_count"], 8)

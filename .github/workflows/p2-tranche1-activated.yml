@@ -1,4 +1,4 @@
-name: P2 Tranche 1 State
+name: P2 T1 Activated Runtime Trust
 
 on:
   pull_request:
@@ -6,13 +6,9 @@ on:
       - "machine/ai_p2_tranche1_plan.json"
       - "machine/ai_p2_execution_map.json"
       - "machine/ai_p2_task_backlog.json"
-      - "scripts/check_p2_tranche1_plan.py"
       - "scripts/check_p2_tranche1_activated.py"
-      - "scripts/prepare_p2_tranche1_activation.py"
-      - "tests/test_p2_tranche1_plan.py"
-      - "tests/test_p2_tranche1_activation.py"
       - "tests/test_p2_tranche1_activated.py"
-      - ".github/workflows/p2-tranche1-plan.yml"
+      - ".github/workflows/p2-tranche1-activated.yml"
   push:
     branches:
       - main
@@ -21,25 +17,20 @@ on:
       - "machine/ai_p2_tranche1_plan.json"
       - "machine/ai_p2_execution_map.json"
       - "machine/ai_p2_task_backlog.json"
-      - "scripts/check_p2_tranche1_plan.py"
       - "scripts/check_p2_tranche1_activated.py"
-      - "scripts/prepare_p2_tranche1_activation.py"
-      - "tests/test_p2_tranche1_plan.py"
-      - "tests/test_p2_tranche1_activation.py"
       - "tests/test_p2_tranche1_activated.py"
-      - ".github/workflows/p2-tranche1-plan.yml"
+      - ".github/workflows/p2-tranche1-activated.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: p2-tranche1-state-${{ github.event.pull_request.number || github.ref }}
+  group: p2-t1-activated-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate activated T1 state
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -54,13 +45,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
-      - name: Validate activated tranche
-        run: python scripts/check_p2_tranche1_plan.py --json
       - name: Install focused test dependency
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
-      - name: Run tranche-state regressions
-        run: >-
-          python -m pytest -q
-          tests/test_p2_tranche1_plan.py
-          tests/test_p2_tranche1_activation.py
-          tests/test_p2_tranche1_activated.py
+      - name: Validate activated T1
+        run: python scripts/check_p2_tranche1_activated.py --json
+      - name: Run activation regressions
+        run: python -m pytest -q tests/test_p2_tranche1_activated.py
