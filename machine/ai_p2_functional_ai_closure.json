@@ -68,5 +68,19 @@
     "github-actions-run:36960967976",
     "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
     "github-actions-run:36960967833"
-  ]
+  ],
+  "closed_frontier": {
+    "task_ids": [
+      "P2-T1-DATA-01",
+      "P2-T1-SEC-01",
+      "P2-T1-INFER-01",
+      "P2-T1-RECOVERY-01",
+      "P2-T1-FUNCTIONAL-01"
+    ],
+    "evidence_head": "c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+    "acceptance_run_id": 36960967807,
+    "local_inference_run_id": 36960967976,
+    "vs001_run_id": 36960967833,
+    "completion_authority": "landed_unpromoted evidence only; no maturity, checkbox, implementation-signature, or verification-signature promotion"
+  }
 }
