@@ -29,7 +29,7 @@ class P3ExecutionMapTests(unittest.TestCase):
         self.assertEqual(result["queued_volume_count"], 234)
         self.assertEqual(result["task_count"], 6)
         self.assertEqual(result["ready_count"], 0)
-        self.assertEqual(result["blocked_count"], 5)
+        self.assertEqual(result["blocked_count"], 3)
         self.assertEqual(result["parent_functional_frontier"], "closed")
 
     def _fixture(self) -> Path:
@@ -91,9 +91,14 @@ class P3ExecutionMapTests(unittest.TestCase):
     def test_rejects_ready_task_with_unlanded_dependencies(self) -> None:
         root = self._fixture()
         path, payload = self._load(root, "machine/ai_p3_task_backlog.json")
-        payload["tasks"][1]["status"] = "ready"
-        payload["summary"]["ready_count"] = 2
-        payload["summary"]["blocked_count"] = 4
+        task = next(
+            item
+            for item in payload["tasks"]
+            if item["task_id"] == "P3-VERTICAL-SUITE-01"
+        )
+        task["status"] = "ready"
+        payload["summary"]["ready_count"] = 1
+        payload["summary"]["blocked_count"] = 2
         path.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(P3ValidationError, "unresolved dependencies"):
             validate(root)
