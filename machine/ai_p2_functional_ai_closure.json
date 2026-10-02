@@ -37,13 +37,23 @@
     "p2_backlog": "machine/ai_p2_task_backlog.json",
     "tranche": "machine/ai_p2_tranche1_plan.json",
     "p0_runtime_overlay": "machine/ai_p0_edge_case_matrix.json",
-    "verifier": "scripts/check_p2_functional_ai_closure.py"
+    "verifier": "scripts/check_p2_functional_ai_closure.py",
+    "exact_head_receipt": "scripts/p2_functional_ai_exact_head.py",
+    "local_model_qualifier": "scripts/qualify_local_model_runtime.py"
   },
   "executable_surfaces": {
     "local_inference": "skeleton/ai/runtime/inference/local.py",
     "functional_runtime": "skeleton/ai/runtime/functional_ai.py",
     "local_inference_test": "skeleton/testing/test_local_inference.py",
-    "vs001_test": "skeleton/testing/test_vs001_functional_ai.py"
+    "vs001_test": "skeleton/testing/test_vs001_functional_ai.py",
+    "llama_cpp_runtime": "skeleton/ai/runtime/inference/llama_cpp.py",
+    "llama_cpp_test": "skeleton/testing/test_llama_cpp_local_inference.py",
+    "exact_head_receipt": "scripts/p2_functional_ai_exact_head.py",
+    "local_model_deployment": "skeleton/ai/runtime/inference/deployment.py",
+    "local_model_deployment_test": "skeleton/testing/test_local_model_deployment.py",
+    "local_model_qualifier": "scripts/qualify_local_model_runtime.py",
+    "cognitive_execution_runtime": "skeleton/intelligence/execution_runtime.py",
+    "cognitive_execution_runtime_test": "skeleton/testing/test_execution_runtime.py"
   },
   "requirements": {
     "hosted_provider_credentials_required": false,
@@ -53,7 +63,23 @@
     "durable_terminal_state_required": true,
     "reconnect_replay_required": true,
     "independent_verification_required": true,
-    "exact_head_ci_required": true
+    "exact_head_ci_required": true,
+    "production_local_weights_runtime_required": true,
+    "runtime_binary_identity_required": true,
+    "model_artifact_identity_required": true,
+    "prompt_argv_forbidden": true,
+    "shell_execution_forbidden": true,
+    "exact_head_receipt_required": true,
+    "deployment_manifest_bootstrap_required": true,
+    "operator_local_model_qualification_required": true,
+    "gguf_format_validation_required": true,
+    "nonzero_tensor_model_required": true,
+    "runtime_identity_bound_to_execution_evidence_required": true,
+    "governed_tool_generation_schema_required": true,
+    "live_startup_local_model_qualification_required": true,
+    "provider_deadline_cancellation_required": true,
+    "cooperative_local_provider_cancellation_required": true,
+    "local_structured_output_schema_parity_required": true
   },
   "deferred_scope": {
     "queued_volume_count": 257,
@@ -81,6 +107,32 @@
     "acceptance_run_id": 36960967807,
     "local_inference_run_id": 36960967976,
     "vs001_run_id": 36960967833,
-    "completion_authority": "landed_unpromoted evidence only; no maturity, checkbox, implementation-signature, or verification-signature promotion"
+    "completion_authority": "landed_unpromoted evidence only; no maturity, checkbox, implementation-signature, or verification-signature promotion",
+    "current_exact_head_authority": "scripts/p2_functional_ai_exact_head.py + P2 Functional AI Acceptance"
+  },
+  "exact_head_policy": {
+    "mode": "ephemeral_ci_receipt",
+    "receipt_schema": "skeleton.p2.functional_ai.exact_head_receipt.v1",
+    "workflow_name": "P2 Functional AI Acceptance",
+    "head_binding": "github_exact_head",
+    "historical_evidence_refs_are_non_authoritative_for_future_heads": true,
+    "rule": "Each current head must regenerate and verify an ephemeral receipt after focused runtime, security, state and recovery acceptance. An embedded historical SHA cannot satisfy a later exact-head claim."
+  },
+  "evidence_semantics": "evidence_refs and closed_frontier.evidence_head record the original landing evidence only; current exact-head authority comes from a regenerated ephemeral CI receipt.",
+  "standalone_runtime": {
+    "deployment_schema": "skeleton.local_model.deployment.v1",
+    "runtime_kind": "llama.cpp-cli",
+    "artifact_identity": "sha256(runtime binary + model weights)",
+    "bootstrap": "FunctionalAIRuntime.from_local_model_manifest",
+    "qualification": "scripts/qualify_local_model_runtime.py",
+    "bundled_weights_required_for_repository_ci": false,
+    "rule": "Repository CI proves the concrete offline runtime and deployment contract with local fixture artifacts; production operators must qualify their exact runtime binary and model weights before activation.",
+    "model_format_admission": "GGUF magic + version 2/3 + positive tensor count before process launch",
+    "execution_evidence": "FunctionalAIEvidence.local_runtime_digest plus durable provider receipt response IDs bind runtime binary SHA-256 and model SHA-256 to every llama.cpp turn",
+    "tool_generation_constraint": "llama.cpp --json-schema-file generated per request; tool_id is enum-constrained to declared governed tools while AsyncToolRuntime remains final argument-schema authority",
+    "activation_gate": "FunctionalAIRuntime.from_local_model_manifest performs a live offline inference qualification against the exact digest-pinned runtime and model before constructing the execution runtime",
+    "provider_deadline_enforcement": "CognitiveExecutionRuntime bounds provider I/O with asyncio.wait_for using the logical execution deadline and durably finalizes timeout as execution_deadline_exceeded",
+    "cancellation_enforcement": "LocalModelAdapter advertises cooperative cancellation; CognitiveExecutionRuntime polls durable cancellation authority and cancels the in-flight local provider coroutine, which propagates into LocalInferenceEngine and terminates the subprocess",
+    "structured_output_enforcement": "LocalModelAdapter preserves ProviderRequest.structured_output_schema; llama.cpp receives the canonical schema through --json-schema-file and parsed output is independently validated with validate_json_value before ProviderResponse exposure"
   }
 }

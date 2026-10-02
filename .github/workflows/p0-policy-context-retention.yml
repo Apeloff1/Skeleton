@@ -1,0 +1,57 @@
+name: P0 Policy Context Retention
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/context/compiler.py"
+      - "skeleton/context/compaction.py"
+      - "skeleton/contracts/context.py"
+      - "skeleton/testing/test_context_compiler.py"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - ".github/workflows/p0-policy-context-retention.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/context/compiler.py"
+      - "skeleton/context/compaction.py"
+      - "skeleton/contracts/context.py"
+      - "skeleton/testing/test_context_compiler.py"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - ".github/workflows/p0-policy-context-retention.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p0-policy-context-retention-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-context-retention:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Run policy-retention regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_context_compiler.py::test_mandatory_policy_cannot_be_displaced_by_high_priority_evidence
+          skeleton/testing/test_context_compiler.py::test_mandatory_policy_fails_before_provider_when_it_cannot_fit
+          skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control

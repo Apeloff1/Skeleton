@@ -54,5 +54,11 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         # `import skeleton` loads skeleton.config.settings, which needs pydantic.
         run: |
+          # Missing model configuration is an expected setup state, not a bot
+          # failure: skip cleanly (no secret values are printed).
+          if [[ -z "${MODEL_API_URL:-}" || -z "${MODEL_API_KEY:-}" || -z "${MODEL_NAME:-}" ]]; then
+            echo "::notice title=Repository bot skipped::MODEL_API_URL, MODEL_API_KEY and MODEL_NAME must all be configured; skipping ${{ matrix.bot }} bot."
+            exit 0
+          fi
           python -m pip install --disable-pip-version-check "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
           python -m skeleton.automation.repo_bots --mode "${{ matrix.bot }}"
