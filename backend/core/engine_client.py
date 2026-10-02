@@ -1519,6 +1519,66 @@ class EngineClient:
             trace_id=command.operation.trace_id,
         )
 
+    async def provider_status(
+        self,
+        *,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read non-secret provider identity from the canonical engine."""
+
+        payload = await self._request(
+            "GET",
+            "/providers",
+            trace_id=trace_id,
+        )
+        active = _text(
+            payload.get("active"),
+            "provider_status.active",
+            maximum=128,
+        )
+        available = payload.get("available")
+        if not isinstance(available, bool):
+            raise EngineProtocolError(
+                "provider_status.available must be boolean"
+            )
+        raw_providers = payload.get("providers")
+        if not isinstance(raw_providers, list) or not raw_providers:
+            raise EngineProtocolError(
+                "provider_status.providers must be a non-empty list"
+            )
+        providers: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for index, raw in enumerate(raw_providers):
+            if not isinstance(raw, Mapping):
+                raise EngineProtocolError(
+                    f"provider_status.providers[{index}] must be an object"
+                )
+            item = dict(raw)
+            provider_id = _text(
+                item.get("id"),
+                f"provider_status.providers[{index}].id",
+                maximum=128,
+            )
+            if provider_id in seen:
+                raise EngineProtocolError(
+                    "provider_status contains duplicate provider id"
+                )
+            seen.add(provider_id)
+            if not isinstance(item.get("available"), bool):
+                raise EngineProtocolError(
+                    f"provider_status.providers[{index}].available must be boolean"
+                )
+            providers.append(item)
+        if active not in seen:
+            raise EngineProtocolError(
+                "provider_status active provider is not declared"
+            )
+        return {
+            "active": active,
+            "available": available,
+            "providers": providers,
+        }
+
     async def status(
         self,
         execution_id: str,
