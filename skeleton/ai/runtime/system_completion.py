@@ -675,22 +675,26 @@ class SystemCompletionPlane:
         self,
         *,
         execution_id: str,
+        state_tamper_rejected: bool,
         turn_tamper_rejected: bool,
         checkpoint_tamper_rejected: bool,
         result_tamper_rejected: bool,
         outbox_tamper_rejected: bool,
         migration_backfill_verified: bool,
+        state_digest_backfill_verified: bool,
         replay_digest_backfill_verified: bool,
         evidence_refs: Iterable[str],
     ) -> RequirementProof:
         execution_id = _text("execution_id", execution_id)
         passed = bool(
             execution_id == self.subject_id
+            and state_tamper_rejected
             and turn_tamper_rejected
             and checkpoint_tamper_rejected
             and result_tamper_rejected
             and outbox_tamper_rejected
             and migration_backfill_verified
+            and state_digest_backfill_verified
             and replay_digest_backfill_verified
         )
         return self._proof(
@@ -701,6 +705,7 @@ class SystemCompletionPlane:
             details={
                 "execution_id": execution_id,
                 "subject_bound": execution_id == self.subject_id,
+                "state_tamper_rejected": bool(state_tamper_rejected),
                 "turn_tamper_rejected": bool(turn_tamper_rejected),
                 "checkpoint_tamper_rejected": bool(
                     checkpoint_tamper_rejected
@@ -709,6 +714,9 @@ class SystemCompletionPlane:
                 "outbox_tamper_rejected": bool(outbox_tamper_rejected),
                 "migration_backfill_verified": bool(
                     migration_backfill_verified
+                ),
+                "state_digest_backfill_verified": bool(
+                    state_digest_backfill_verified
                 ),
                 "replay_digest_backfill_verified": bool(
                     replay_digest_backfill_verified
