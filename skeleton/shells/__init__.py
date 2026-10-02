@@ -6,6 +6,11 @@ observes, and explains shell work.
 """
 
 from skeleton.shells.admission import AdmissionDecision, CommandAdmission
+from skeleton.shells.admission_lease import (
+    AdmissionLease,
+    AdmissionLeaseConflict,
+    AdmissionLeases,
+)
 from skeleton.shells.arguments import ArgumentPolicy, ArgumentPolicySet, OptionRule, ValueConstraint
 from skeleton.shells.audit import AuditEvent, CompositeAuditSink, JsonlAuditSink, MemoryAuditSink, NullAuditSink, RedactingAuditSink
 from skeleton.shells.batch import BatchExecutor, BatchItem, BatchResult
@@ -88,7 +93,7 @@ from skeleton.shells.worker import (
 from skeleton.shells.workspace import WorkspacePolicy
 
 __all__ = [
-    "AdmissionDecision", "ArgumentPolicy", "ArgumentPolicySet", "ArgumentRejected", "AuditEvent",
+    "AdmissionDecision", "AdmissionLease", "AdmissionLeaseConflict", "AdmissionLeases", "ArgumentPolicy", "ArgumentPolicySet", "ArgumentRejected", "AuditEvent",
     "BatchExecutor", "BatchItem", "BatchResult", "CapabilityDenied", "CapabilityGrant", "ChainedReceipt",
     "CircuitBreaker", "CircuitOpen", "CircuitPolicy", "CircuitRegistry", "CircuitSnapshot", "CircuitState",
     "CommandAdmission", "CommandCatalog", "CommandDefinition", "CommandExplanation", "CommandMetrics",
