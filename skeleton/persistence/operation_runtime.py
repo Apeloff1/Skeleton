@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import math
 from threading import Event, RLock, Thread
 from typing import Any
 from uuid import uuid4
@@ -85,8 +86,11 @@ class DurableOperationRuntime:
             default_deadline_s, bool
         ):
             raise TypeError("default_deadline_s must be numeric")
-        if float(default_deadline_s) <= 0:
-            raise ValueError("default_deadline_s must be positive")
+        if (
+            not math.isfinite(float(default_deadline_s))
+            or float(default_deadline_s) <= 0
+        ):
+            raise ValueError("default_deadline_s must be finite and positive")
 
         self.orchestrator = orchestrator
         self.operations = operations
@@ -160,11 +164,8 @@ class DurableOperationRuntime:
                 error_type = type(exc).__name__
                 break
 
-        remaining = len(
-            self.operations.pending_outbox(
-                operation_id=operation_id,
-                limit=self.outbox_batch_size,
-            )
+        remaining = self.operations.pending_outbox_count(
+            operation_id=operation_id,
         )
         report = OutboxDispatchReport(
             attempted=len(pending),
@@ -224,9 +225,10 @@ class DurableOperationRuntime:
         if (
             not isinstance(timeout_s, (int, float))
             or isinstance(timeout_s, bool)
+            or not math.isfinite(float(timeout_s))
             or float(timeout_s) <= 0
         ):
-            raise ValueError("timeout_s must be positive")
+            raise ValueError("timeout_s must be finite and positive")
         with self._dispatcher_lock:
             thread = self._dispatcher_thread
             self._dispatcher_stop.set()
@@ -277,19 +279,36 @@ class DurableOperationRuntime:
         if deadline is None:
             deadline_at = now + timedelta(seconds=self.default_deadline_s)
         else:
+            if (
+                isinstance(deadline, bool)
+                or not isinstance(deadline, (int, float))
+                or not math.isfinite(float(deadline))
+            ):
+                raise TypeError("deadline must be a finite numeric epoch")
             deadline_at = datetime.fromtimestamp(float(deadline), tz=timezone.utc)
             if deadline_at <= now:
                 raise ValueError("deadline must be in the future")
 
+        if not isinstance(tenant_id, str):
+            raise TypeError("tenant_id must be text")
+        if not isinstance(actor_id, str):
+            raise TypeError("actor_id must be text")
+        if idempotency_key is not None and not isinstance(idempotency_key, str):
+            raise TypeError("idempotency_key must be text when provided")
+        if trace_id is not None and not isinstance(trace_id, str):
+            raise TypeError("trace_id must be text when provided")
+
         envelope = OperationEnvelope(
             operation_id=str(uuid4()),
-            tenant_id=str(tenant_id).strip() or "system",
-            actor_id=str(actor_id).strip() or "api",
+            tenant_id=tenant_id,
+            actor_id=actor_id,
             capability="intelligence.reason",
             created_at=now,
             deadline=deadline_at,
-            idempotency_key=idempotency_key or str(uuid4()),
-            trace_id=trace_id or str(uuid4()),
+            idempotency_key=(
+                str(uuid4()) if idempotency_key is None else idempotency_key
+            ),
+            trace_id=str(uuid4()) if trace_id is None else trace_id,
         )
         current = self.operations.create(envelope, now=now)
         self._dispatch_after_commit(current.envelope.operation_id)
@@ -350,9 +369,7 @@ class DurableOperationRuntime:
             if callable(getattr(self.orchestrator, "stats", None))
             else {}
         )
-        pending = len(
-            self.operations.pending_outbox(limit=self.outbox_batch_size)
-        )
+        pending = self.operations.pending_outbox_count()
         return {
             **dict(base),
             "durable_operation_runtime": {

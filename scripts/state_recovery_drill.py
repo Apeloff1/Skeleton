@@ -26,6 +26,7 @@ import sqlite3
 from typing import Any, Iterable, Mapping
 
 SCRATCH_PREFIX = "skeleton_recovery_drill_"
+SQLITE_SCRATCH_PREFIX = "skeleton_recovery_drill_"
 
 
 class RecoveryDrillError(RuntimeError):
@@ -37,14 +38,33 @@ def utc_now() -> str:
 
 
 def require_scratch_database(name: str) -> str:
-    value = str(name).strip()
-    if not value.startswith(SCRATCH_PREFIX):
+    if not isinstance(name, str) or not name.strip():
+        raise RecoveryDrillError("refusing destructive recovery drill: scratch database name must be non-empty text")
+    if name != name.strip():
+        raise RecoveryDrillError("scratch database name must be canonical text")
+    if not name.startswith(SCRATCH_PREFIX):
         raise RecoveryDrillError(
             f"refusing destructive recovery drill outside {SCRATCH_PREFIX}* database"
         )
-    if len(value) > 120:
+    if len(name) > 120:
         raise RecoveryDrillError("scratch database name is too long")
-    return value
+    return name
+
+
+def require_scratch_directory(path: str | Path) -> Path:
+    if isinstance(path, bool) or not isinstance(path, (str, Path)):
+        raise RecoveryDrillError("scratch workdir must be a path")
+    raw = Path(path)
+    if raw.name in {"", ".", ".."} or not raw.name.startswith(SQLITE_SCRATCH_PREFIX):
+        raise RecoveryDrillError(
+            "refusing destructive SQLite recovery drill outside "
+            f"{SQLITE_SCRATCH_PREFIX}* workdir"
+        )
+    parent = raw.parent.resolve()
+    target = parent / raw.name
+    if target.exists() and target.is_symlink():
+        raise RecoveryDrillError("scratch workdir must not be a symlink")
+    return target
 
 
 def canonical_json(value: Any) -> str:
@@ -856,7 +876,7 @@ def run_operation_sqlite_drill(
     from skeleton.persistence.operation_runtime import DurableOperationRuntime
     from skeleton.persistence.operation_store import SQLiteOperationStore
 
-    root = Path(workdir)
+    root = require_scratch_directory(workdir)
     root.mkdir(parents=True, exist_ok=True)
     source_path = root / "operation_state.sqlite"
     backup_path = root / "operation_state.backup.sqlite"
@@ -1157,7 +1177,7 @@ def run_engine_sqlite_bundle_drill(
     )
     from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
-    root = Path(workdir)
+    root = require_scratch_directory(workdir)
     source_root = root / "source"
     backup_root = root / "backup"
     restored_root = root / "restored"
@@ -1480,11 +1500,334 @@ def run_engine_sqlite_bundle_drill(
     return result
 
 
+
+def run_spine_bind_sqlite_drill(
+    workdir: str | Path,
+    *,
+    cleanup: bool = True,
+) -> dict[str, Any]:
+    """Destroy/restore the dark P2 bind checkpoint authority in scratch SQLite."""
+
+    from skeleton.persistence.spine_bind_bundle import SpineBindBundle
+    from skeleton.persistence.spine_bind_bundle_verify import SpineBindBundleVerify
+    from skeleton.persistence.spine_bind_checkpoint import SpineBindCheckpoint
+    from skeleton.persistence.spine_bind_checkpoint_chain import (
+        SpineBindCheckpointChain,
+    )
+    from skeleton.persistence.spine_bind_checkpoint_replay import (
+        SpineBindCheckpointReplay,
+    )
+    from skeleton.persistence.spine_bind_checkpoint_tenant import (
+        SpineBindCheckpointTenant,
+    )
+    from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
+    from skeleton.persistence.spine_bind_restore_receipt import SpineBindRestoreReceipt
+    from skeleton.persistence.spine_bind_restore_verify import SpineBindRestoreVerify
+    from skeleton.persistence.spine_bind_restore_journal import SpineBindRestoreJournal
+    from skeleton.persistence.spine_bind_restore_replay import SpineBindRestoreReplay
+    from skeleton.persistence.spine_bind_restore_tenant import SpineBindRestoreTenant
+    from skeleton.persistence.spine_bind_restore_chain import SpineBindRestoreChain
+    from skeleton.persistence.spine_bind_restore_continuity import SpineBindRestoreContinuity
+    from skeleton.persistence.spine_bind_restore_export import SpineBindRestoreExport
+    from skeleton.persistence.spine_bind_restore_export_verify import SpineBindRestoreExportVerify
+    from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
+
+    root = require_scratch_directory(workdir)
+    root.mkdir(parents=True, exist_ok=True)
+    source_path = root / "spine_bind_checkpoint.sqlite"
+    backup_path = root / "spine_bind_checkpoint.backup.sqlite"
+    restored_path = root / "spine_bind_checkpoint.restored.sqlite"
+    receipt_source_path = root / "spine_bind_restore_receipt.sqlite"
+    receipt_backup_path = root / "spine_bind_restore_receipt.backup.sqlite"
+    receipt_restored_path = root / "spine_bind_restore_receipt.restored.sqlite"
+    portable_evidence_path = root / "spine_bind_restore_evidence.json"
+    for candidate in (
+        source_path,
+        backup_path,
+        restored_path,
+        receipt_source_path,
+        receipt_backup_path,
+        receipt_restored_path,
+        portable_evidence_path,
+    ):
+        if candidate.exists():
+            candidate.unlink()
+
+    tenant_id = "tenant-spine-bind-recovery"
+    created_at = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+    snapshot = SpineBindSnapshot().card(
+        tenant_id=tenant_id,
+        bind={
+            "kind": "spine_bind_card",
+            "tenant_id": tenant_id,
+            "digest": "a" * 64,
+            "moved": False,
+            "epoch_before": 11,
+            "epoch_after": 11,
+            "apply_landed": False,
+        },
+        chain={
+            "kind": "spine_bind_chain",
+            "tenant_id": tenant_id,
+            "digest": "b" * 64,
+            "rewritten": False,
+            "merged": False,
+        },
+        gap={
+            "kind": "spine_bind_gap",
+            "tenant_id": tenant_id,
+            "missing": [2, 5],
+            "seen": [1, 3, 4],
+            "filled": False,
+            "green": False,
+        },
+        surface={
+            "kind": "spine_bind_surface",
+            "tenant_id": tenant_id,
+            "provider_claimed": 0,
+            "pr_claimed": 0,
+            "green": False,
+            "merged": False,
+        },
+    )
+    recovery = SpineBindRecovery().plan(snapshot)
+    source = SpineBindCheckpoint(source_path)
+    try:
+        seeded_checkpoint = source.append(recovery, now=created_at)
+        if source.count(tenant_id) != 1:
+            raise RecoveryDrillError("bind checkpoint seed row count changed")
+    finally:
+        source.close()
+
+    source_snapshot = capture_sqlite_database(source_path)
+    online_backup_sqlite(source_path, backup_path)
+    backup_snapshot = capture_sqlite_database(backup_path)
+    verify_sqlite_snapshot(source_snapshot, backup_snapshot)
+
+    source_path.unlink()
+    online_backup_sqlite(backup_path, restored_path)
+    restored_snapshot = capture_sqlite_database(restored_path)
+    verification = verify_sqlite_snapshot(backup_snapshot, restored_snapshot)
+
+    restored = SpineBindCheckpoint(restored_path)
+    replay_reader = SpineBindCheckpointReplay(restored_path)
+    tenant_reader = SpineBindCheckpointTenant(restored_path)
+    chain_reader = SpineBindCheckpointChain(restored_path)
+    try:
+        checkpoint = restored.read(tenant_id)
+        if checkpoint.get("seen") is not True:
+            raise RecoveryDrillError("restored bind checkpoint missing")
+        if checkpoint.get("recovery_digest") != seeded_checkpoint["recovery_digest"]:
+            raise RecoveryDrillError("restored bind checkpoint digest changed")
+        if checkpoint.get("activated") is not False:
+            raise RecoveryDrillError("restored bind checkpoint activated")
+
+        replay = replay_reader.replay(checkpoint)
+        own = tenant_reader.card(tenant_id)
+        foreign = tenant_reader.card("tenant-spine-bind-foreign")
+        chain = chain_reader.seal(tenant_id)
+        if own.get("count") != 1 or foreign.get("count") != 0:
+            raise RecoveryDrillError("bind checkpoint tenant isolation changed")
+
+        bundle = SpineBindBundle().card(
+            checkpoint=checkpoint,
+            replay=replay,
+            tenant=own,
+            chain=chain,
+        )
+        verified = SpineBindBundleVerify().verify(bundle)
+        if verified.get("verified") is not True:
+            raise RecoveryDrillError("bind checkpoint bundle verification failed")
+        if verified.get("activated") is not False:
+            raise RecoveryDrillError("bind checkpoint bundle activated")
+
+        restore_receipt = SpineBindRestoreReceipt().card(
+            backup_digest=backup_snapshot["digest"],
+            restore_digest=restored_snapshot["digest"],
+            expected_recovery_digest=seeded_checkpoint["recovery_digest"],
+            checkpoint=checkpoint,
+            replay=replay,
+            tenant=own,
+            chain=chain,
+            bundle=bundle,
+            verified=verified,
+        )
+        restore_verified = SpineBindRestoreVerify().verify(restore_receipt)
+        if restore_verified.get("verified") is not True:
+            raise RecoveryDrillError("bind restore receipt verification failed")
+        if restore_verified.get("activated") is not False:
+            raise RecoveryDrillError("bind restore receipt activated")
+
+        restore_journal_store = SpineBindRestoreJournal(receipt_source_path)
+        try:
+            restore_journal = restore_journal_store.append(
+                restore_receipt,
+                now=datetime(2026, 10, 1, 13, 0, tzinfo=timezone.utc),
+            )
+            if restore_journal_store.count(tenant_id) != 1:
+                raise RecoveryDrillError("restore receipt journal row count changed")
+        finally:
+            restore_journal_store.close()
+
+        receipt_source_snapshot = capture_sqlite_database(receipt_source_path)
+        online_backup_sqlite(receipt_source_path, receipt_backup_path)
+        receipt_backup_snapshot = capture_sqlite_database(receipt_backup_path)
+        verify_sqlite_snapshot(receipt_source_snapshot, receipt_backup_snapshot)
+
+        receipt_source_path.unlink()
+        online_backup_sqlite(receipt_backup_path, receipt_restored_path)
+        receipt_restored_snapshot = capture_sqlite_database(receipt_restored_path)
+        receipt_sqlite_verification = verify_sqlite_snapshot(
+            receipt_backup_snapshot,
+            receipt_restored_snapshot,
+        )
+
+        receipt_replay_reader = SpineBindRestoreReplay(receipt_restored_path)
+        receipt_tenant_reader = SpineBindRestoreTenant(receipt_restored_path)
+        receipt_chain_reader = SpineBindRestoreChain(receipt_restored_path)
+        try:
+            receipt_replay = receipt_replay_reader.replay(restore_journal)
+            receipt_own = receipt_tenant_reader.card(tenant_id)
+            receipt_foreign = receipt_tenant_reader.card("tenant-spine-bind-restore-foreign")
+            receipt_chain = receipt_chain_reader.seal(tenant_id)
+            if receipt_own.get("count") != 1 or receipt_foreign.get("count") != 0:
+                raise RecoveryDrillError("restore receipt tenant isolation changed")
+            restore_continuity = SpineBindRestoreContinuity().card(
+                receipt=restore_receipt,
+                journal=restore_journal,
+                replay=receipt_replay,
+                tenant=receipt_own,
+                chain=receipt_chain,
+            )
+            if restore_continuity.get("durable") is not True:
+                raise RecoveryDrillError("restore receipt continuity is not durable")
+            if restore_continuity.get("activated") is not False:
+                raise RecoveryDrillError("restore receipt continuity activated")
+
+            portable_export = SpineBindRestoreExport().card(
+                receipt=restore_receipt,
+                continuity=restore_continuity,
+            )
+            portable_evidence_path.write_text(
+                portable_export["export_json"],
+                encoding="utf-8",
+            )
+            roundtrip_export = {
+                **portable_export,
+                "export_json": portable_evidence_path.read_text(encoding="utf-8"),
+            }
+            portable_verified = SpineBindRestoreExportVerify().verify(
+                roundtrip_export
+            )
+            if portable_verified.get("verified") is not True:
+                raise RecoveryDrillError("portable restore evidence was not verified")
+            if portable_verified.get("activated") is not False:
+                raise RecoveryDrillError("portable restore evidence activated")
+        finally:
+            receipt_replay_reader.close()
+            receipt_tenant_reader.close()
+            receipt_chain_reader.close()
+    finally:
+        restored.close()
+        replay_reader.close()
+        tenant_reader.close()
+        chain_reader.close()
+
+    result = {
+        "status": "passed",
+        "policy": "spine-bind-checkpoint-dark-restore",
+        "backup_digest": backup_snapshot["digest"],
+        "restore_digest": restored_snapshot["digest"],
+        "sqlite": verification,
+        "checkpoint": {
+            "tenant_id": tenant_id,
+            "recovery_digest": checkpoint["recovery_digest"],
+            "snapshot_digest": checkpoint["snapshot_digest"],
+            "rows": own["count"],
+        },
+        "replay": {
+            "rows_before": replay["rows_before"],
+            "rows_after": replay["rows_after"],
+            "inserted": replay["inserted"],
+            "rewritten": replay["rewritten"],
+        },
+        "tenant": {
+            "own_count": own["count"],
+            "foreign_count": foreign["count"],
+        },
+        "chain": {
+            "rows": chain["rows"],
+            "digest": chain["digest"],
+            "rewritten": chain["rewritten"],
+        },
+        "bundle": {
+            "digest": bundle["digest"],
+            "verified": verified["verified"],
+            "activated": verified["activated"],
+        },
+        "restore_receipt": {
+            "digest": restore_receipt["digest"],
+            "backup_restore_digest": restore_receipt["backup_restore_digest"],
+            "recovery_digest": restore_receipt["recovery_digest"],
+            "verified": restore_verified["verified"],
+            "activated": restore_verified["activated"],
+        },
+        "portable_evidence": {
+            "digest": portable_export["digest"],
+            "bytes": portable_export["bytes"],
+            "verified": portable_verified["verified"],
+            "roundtrip_exact": roundtrip_export["export_json"] == portable_export["export_json"],
+            "activated": portable_verified["activated"],
+        },
+        "restore_journal": {
+            "backup_digest": receipt_backup_snapshot["digest"],
+            "restore_digest": receipt_restored_snapshot["digest"],
+            "sqlite": receipt_sqlite_verification,
+            "receipt_digest": restore_journal["receipt_digest"],
+            "row_digest": restore_journal["row_digest"],
+            "rows": receipt_own["count"],
+            "foreign_rows": receipt_foreign["count"],
+            "replay_rows_before": receipt_replay["rows_before"],
+            "replay_rows_after": receipt_replay["rows_after"],
+            "replay_inserted": receipt_replay["inserted"],
+            "chain_digest": receipt_chain["digest"],
+            "chain_rows": receipt_chain["rows"],
+            "continuity_digest": restore_continuity["digest"],
+            "durable": restore_continuity["durable"],
+            "tenant_isolated": restore_continuity["tenant_isolated"],
+            "replay_safe": restore_continuity["replay_safe"],
+            "activated": restore_continuity["activated"],
+        },
+        "activation_claimed": False,
+        "apply_landed": False,
+        "live_motor": False,
+        "dispatcher_running": False,
+        "ci_green": False,
+        "merged": False,
+    }
+
+    if cleanup:
+        for candidate in (
+            source_path,
+            backup_path,
+            restored_path,
+            receipt_source_path,
+            receipt_backup_path,
+            receipt_restored_path,
+            portable_evidence_path,
+        ):
+            if candidate.exists():
+                candidate.unlink()
+        if root.exists() and not any(root.iterdir()):
+            root.rmdir()
+
+    return result
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "mode",
-        choices=["live-mongo", "live-sqlite", "live-engine-sqlite"],
+        choices=["live-mongo", "live-sqlite", "live-engine-sqlite", "live-spine-bind-sqlite"],
     )
     parser.add_argument("--uri")
     parser.add_argument("--workdir")
@@ -1525,6 +1868,15 @@ def main() -> int:
                 "live-engine-sqlite requires --workdir"
             )
         result = run_engine_sqlite_bundle_drill(
+            args.workdir,
+            cleanup=not args.no_cleanup,
+        )
+    elif args.mode == "live-spine-bind-sqlite":
+        if not args.workdir:
+            raise RecoveryDrillError(
+                "live-spine-bind-sqlite requires --workdir"
+            )
+        result = run_spine_bind_sqlite_drill(
             args.workdir,
             cleanup=not args.no_cleanup,
         )

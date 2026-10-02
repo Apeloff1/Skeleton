@@ -16,6 +16,7 @@ from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
 from skeleton.persistence.operation_store import (
     OperationStoreConflict,
     OperationStoreCorruptionError,
+    OperationStoreError,
     SQLiteOperationStore,
 )
 
@@ -255,6 +256,65 @@ def test_outbox_dispatch_to_stream_is_retry_stable_and_acknowledgeable(
         assert operations.pending_outbox() == ()
 
 
+def test_operation_store_rejects_coerced_identity_inputs(
+    tmp_path: Path,
+) -> None:
+    operation = _operation()
+    with SQLiteOperationStore(tmp_path / "operations.sqlite") as store:
+        store.create(operation, now=BASE_TIME)
+
+        with pytest.raises(OperationStoreError, match="operation_id"):
+            store.get(True)
+        with pytest.raises(OperationStoreError, match="identity_digest"):
+            store.get_by_identity_digest(123)
+        with pytest.raises(OperationStoreError, match="operation_id"):
+            store.pending_outbox(operation_id=123)
+
+        event = store.pending_outbox()[0]
+        with pytest.raises(OperationStoreError, match="outbox_id"):
+            store.acknowledge_outbox(True)
+        assert UUID(event.outbox_id)
+
+
+def test_outbox_ack_cannot_predate_event_creation(
+    tmp_path: Path,
+) -> None:
+    operation = _operation()
+    with SQLiteOperationStore(tmp_path / "operations.sqlite") as store:
+        store.create(operation, now=BASE_TIME)
+        event = store.pending_outbox()[0]
+
+        with pytest.raises(
+            OperationStoreConflict,
+            match="cannot precede outbox creation",
+        ):
+            store.acknowledge_outbox(
+                event.outbox_id,
+                published_at=BASE_TIME - timedelta(seconds=1),
+            )
+
+        assert store.pending_outbox() == (event,)
+
+
+def test_pending_outbox_count_is_exact_beyond_page_limit(
+    tmp_path: Path,
+) -> None:
+    with SQLiteOperationStore(tmp_path / "operations.sqlite") as store:
+        for index in range(5):
+            operation = _operation(
+                operation_id=str(uuid4()),
+                idempotency_key=f"count-{index}",
+                trace_id=f"count-trace-{index}",
+            )
+            store.create(
+                operation,
+                now=BASE_TIME + timedelta(seconds=index),
+            )
+
+        assert len(store.pending_outbox(limit=2)) == 2
+        assert store.pending_outbox_count() == 5
+
+
 def test_outbox_acknowledgement_is_idempotent(
     tmp_path: Path,
 ) -> None:
@@ -274,6 +334,41 @@ def test_outbox_acknowledgement_is_idempotent(
 
         assert first == second
         assert first.published_at == BASE_TIME + timedelta(seconds=1)
+
+
+def test_fractional_persisted_versions_are_rejected_as_corruption(
+    tmp_path: Path,
+) -> None:
+    operation = _operation()
+    with SQLiteOperationStore(tmp_path / "operations.sqlite") as store:
+        store.create(operation, now=BASE_TIME)
+        store._connection.execute(
+            """
+            UPDATE operation_state
+            SET version = 1.5
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (store.namespace, operation.operation_id),
+        )
+        with pytest.raises(OperationStoreCorruptionError, match="version"):
+            store.get(operation.operation_id)
+
+    operation = _operation(idempotency_key="fractional-outbox")
+    with SQLiteOperationStore(tmp_path / "outbox.sqlite") as store:
+        store.create(operation, now=BASE_TIME)
+        store._connection.execute(
+            """
+            UPDATE operation_outbox
+            SET operation_version = 1.5
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (store.namespace, operation.operation_id),
+        )
+        with pytest.raises(
+            OperationStoreCorruptionError,
+            match="operation_version",
+        ):
+            store.pending_outbox(operation_id=operation.operation_id)
 
 
 def test_persisted_operation_corruption_is_rejected(

@@ -42,12 +42,13 @@ _CONSUMER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 def _consumer_id(value: str) -> str:
     if not isinstance(value, str):
         raise StreamContractError("consumer_id must be a string")
-    normalized = value.strip()
-    if not _CONSUMER_ID_RE.fullmatch(normalized):
+    if value != value.strip():
+        raise StreamContractError("consumer_id must be canonical text")
+    if not _CONSUMER_ID_RE.fullmatch(value):
         raise StreamContractError(
             "consumer_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
         )
-    return normalized
+    return value
 
 
 _WORKER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -56,12 +57,13 @@ _WORKER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 def _worker_id(value: str) -> str:
     if not isinstance(value, str):
         raise StreamContractError("worker_id must be a string")
-    normalized = value.strip()
-    if not _WORKER_ID_RE.fullmatch(normalized):
+    if value != value.strip():
+        raise StreamContractError("worker_id must be canonical text")
+    if not _WORKER_ID_RE.fullmatch(value):
         raise StreamContractError(
             "worker_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
         )
-    return normalized
+    return value
 
 
 def _aware_utc(value: datetime | None = None) -> datetime:
@@ -117,6 +119,19 @@ class StreamWorkerLease:
         }
 
 
+def _persisted_int(
+    value: object,
+    field: str,
+    *,
+    minimum: int = 0,
+) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise StreamStoreCorruptionError(
+            f"{field} must be persisted as an integer >= {minimum}"
+        )
+    return value
+
+
 def _reject_constant(value: str) -> object:
     raise ValueError(f"non-finite JSON constant: {value}")
 
@@ -140,9 +155,10 @@ class SQLiteOperationEventStore:
         namespace: str = "operation_stream",
         capacity_per_operation: int = 100_000,
     ) -> None:
-        namespace = namespace.strip()
-        if not namespace:
-            raise ValueError("namespace must not be empty")
+        if not isinstance(namespace, str) or not namespace.strip():
+            raise ValueError("namespace must be non-empty text")
+        if namespace != namespace.strip():
+            raise ValueError("namespace must be canonical text")
         if (
             isinstance(capacity_per_operation, bool)
             or not isinstance(capacity_per_operation, int)
@@ -267,7 +283,11 @@ class SQLiteOperationEventStore:
             return StreamEvent(
                 operation_id=row["operation_id"],
                 event_id=row["event_id"],
-                sequence=int(row["sequence"]),
+                sequence=_persisted_int(
+                    row["sequence"],
+                    "sequence",
+                    minimum=1,
+                ),
                 type=row["event_type"],
                 timestamp=cls._decode_timestamp(row["timestamp"]),
                 payload=cls._decode_payload(row["payload_json"]),
@@ -440,10 +460,10 @@ class SQLiteOperationEventStore:
                     )
                 event = StreamEvent(
                     operation_id=operation_id,
-                    event_id=event_id or str(uuid4()),
+                    event_id=str(uuid4()) if event_id is None else event_id,
                     sequence=max(latest, compacted) + 1,
                     type=event_type,
-                    timestamp=timestamp or datetime.now().astimezone(),
+                    timestamp=timestamp or datetime.now(timezone.utc),
                     payload=payload,
                 )
                 payload_json = self._encode_payload(event)
@@ -522,9 +542,10 @@ class SQLiteOperationEventStore:
         row: sqlite3.Row,
     ) -> StreamConsumerCheckpoint:
         try:
-            acknowledged = int(row["acknowledged_through"])
-            if acknowledged < 0:
-                raise ValueError("acknowledged_through must be non-negative")
+            acknowledged = _persisted_int(
+                row["acknowledged_through"],
+                "acknowledged_through",
+            )
             return StreamConsumerCheckpoint(
                 operation_id=row["operation_id"],
                 consumer_id=_consumer_id(row["consumer_id"]),
@@ -571,7 +592,11 @@ class SQLiteOperationEventStore:
                     """,
                     (self.namespace, operation_id, consumer),
                 ).fetchone()
-                acknowledged = 0 if row is None else int(row["acknowledged_through"])
+                acknowledged = (
+                    0
+                    if row is None
+                    else self._consumer_from_row(row).acknowledged_through
+                )
                 self._connection.execute(
                     """
                     INSERT INTO operation_stream_consumer(
@@ -661,7 +686,12 @@ class SQLiteOperationEventStore:
                     raise StreamContractError(
                         "consumer must register before acknowledging"
                     )
-                current = int(row["acknowledged_through"])
+                current_checkpoint = self._consumer_from_row(row)
+                if current_checkpoint.lease_expires_at <= instant:
+                    raise StreamContractError(
+                        "consumer lease expired; register before acknowledging"
+                    )
+                current = current_checkpoint.acknowledged_through
                 acknowledged = max(current, sequence)
                 self._connection.execute(
                     """
@@ -695,9 +725,11 @@ class SQLiteOperationEventStore:
     @classmethod
     def _worker_lease_from_row(cls, row: sqlite3.Row) -> StreamWorkerLease:
         try:
-            generation = int(row["generation"])
-            if generation < 1:
-                raise ValueError("generation must be positive")
+            generation = _persisted_int(
+                row["generation"],
+                "generation",
+                minimum=1,
+            )
             return StreamWorkerLease(
                 operation_id=row["operation_id"],
                 worker_id=_worker_id(row["worker_id"]),
@@ -895,8 +927,68 @@ class SQLiteOperationEventStore:
         *,
         now: datetime | None = None,
     ) -> int:
-        safe = self.safe_compaction_sequence(operation_id, now=now)
-        return self.compact_through(operation_id, safe)
+        """Compact only to the active-consumer watermark in one write transaction.
+
+        The watermark and deletion must share the same BEGIN IMMEDIATE transaction.
+        Otherwise a consumer can register after the watermark is read but before
+        deletion, allowing history that the new consumer still needs to be removed.
+        """
+        instant = _aware_utc(now)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                head = self._ensure_head(operation_id)
+                current = int(head["compacted_through"])
+                row = self._connection.execute(
+                    """
+                    SELECT MIN(acknowledged_through)
+                    FROM operation_stream_consumer
+                    WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                    """,
+                    (self.namespace, operation_id, instant.isoformat()),
+                ).fetchone()
+                if row is None or row[0] is None:
+                    self._connection.execute("COMMIT")
+                    return 0
+                safe = max(current, int(row[0]))
+                if safe <= current:
+                    self._connection.execute("COMMIT")
+                    return 0
+
+                latest_row = self._connection.execute(
+                    """
+                    SELECT COALESCE(MAX(sequence), ?)
+                    FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (current, self.namespace, operation_id),
+                ).fetchone()
+                latest = int(latest_row[0])
+                if safe > latest:
+                    raise StreamStoreCorruptionError(
+                        "active consumer acknowledgement exceeds durable stream head"
+                    )
+
+                cursor = self._connection.execute(
+                    """
+                    DELETE FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ? AND sequence <= ?
+                    """,
+                    (self.namespace, operation_id, safe),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_head
+                    SET compacted_through = ?
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (safe, self.namespace, operation_id),
+                )
+                self._connection.execute("COMMIT")
+                return int(cursor.rowcount)
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def compact_through(self, operation_id: str, sequence: int) -> int:
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:

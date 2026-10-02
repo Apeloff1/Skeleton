@@ -37,7 +37,10 @@ python scripts/state_recovery_drill.py live-mongo \
 ```
 
 The script refuses database names that do not begin with
-`skeleton_recovery_drill_`.
+`skeleton_recovery_drill_`. Destructive SQLite recovery modes enforce the
+same rule on the final work-directory component and reject symlink workdirs;
+for example, use `/tmp/skeleton_recovery_drill_operation_sqlite`, never an
+existing application data directory.
 
 The dedicated `State Recovery Drill` GitHub Actions workflow boots an isolated
 Mongo 7 service and proves:

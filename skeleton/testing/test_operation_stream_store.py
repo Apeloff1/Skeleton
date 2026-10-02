@@ -115,6 +115,45 @@ def test_sqlite_stream_duplicate_identity_is_idempotent_only_when_identical(
             store.append_event(conflict)
 
 
+def test_fractional_persisted_stream_counters_are_rejected(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "events.sqlite"
+    operation_id = str(uuid4())
+    with SQLiteOperationEventStore(path) as store:
+        store.append(operation_id, "operation.started", {})
+        store._connection.execute(
+            """
+            UPDATE operation_stream_event
+            SET sequence = 1.5
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (store.namespace, operation_id),
+        )
+        with pytest.raises(StreamStoreCorruptionError, match="sequence"):
+            store.replay(ReplayCursor(operation_id))
+
+    operation_id = str(uuid4())
+    with SQLiteOperationEventStore(tmp_path / "leases.sqlite") as store:
+        store.append(operation_id, "operation.started", {})
+        lease = store.acquire_worker_lease(
+            operation_id,
+            "worker-a",
+            lease_seconds=30,
+        )
+        assert lease is not None
+        store._connection.execute(
+            """
+            UPDATE operation_stream_worker_lease
+            SET generation = 1.5
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (store.namespace, operation_id),
+        )
+        with pytest.raises(StreamStoreCorruptionError, match="generation"):
+            store.active_worker_lease(operation_id)
+
+
 def test_sqlite_stream_detects_persisted_payload_corruption(tmp_path: Path) -> None:
     path = tmp_path / "events.sqlite"
     operation_id = str(uuid4())
@@ -131,6 +170,18 @@ def test_sqlite_stream_detects_persisted_payload_corruption(tmp_path: Path) -> N
 
         with pytest.raises(StreamStoreCorruptionError):
             store.replay(ReplayCursor(operation_id))
+
+
+def test_sqlite_stream_rejects_explicit_empty_event_id(tmp_path: Path) -> None:
+    operation_id = str(uuid4())
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        with pytest.raises(StreamContractError, match="event_id"):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": 1},
+                event_id="",
+            )
 
 
 def test_sqlite_stream_explicit_event_id_append_is_retry_idempotent(
@@ -187,6 +238,59 @@ def test_sqlite_stream_explicit_event_id_conflict_fails_closed(
             )
 
 
+def test_stream_identity_values_must_be_canonical(tmp_path: Path) -> None:
+    operation_id = str(uuid4())
+    path = tmp_path / "events.sqlite"
+
+    with SQLiteOperationEventStore(path) as store:
+        store.append(operation_id, "operation.created", {"state": "created"})
+        with pytest.raises(StreamContractError, match="consumer_id must be canonical"):
+            store.register_consumer(operation_id, " client-a ")
+        with pytest.raises(StreamContractError, match="worker_id must be canonical"):
+            store.acquire_worker_lease(operation_id, " worker-a ")
+
+    with pytest.raises(ValueError, match="namespace must be canonical"):
+        SQLiteOperationEventStore(path, namespace=" operation_stream ")
+
+
+def test_corrupt_consumer_checkpoint_is_not_reused(tmp_path: Path) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        store.append(operation_id, "operation.created", {"state": "created"})
+        store.register_consumer(
+            operation_id,
+            "client-a",
+            lease_seconds=300,
+            now=base,
+        )
+        store._connection.execute(
+            """
+            UPDATE operation_stream_consumer
+            SET acknowledged_through = -1
+            WHERE namespace = ? AND operation_id = ? AND consumer_id = ?
+            """,
+            (store.namespace, operation_id, "client-a"),
+        )
+
+        with pytest.raises(StreamStoreCorruptionError):
+            store.register_consumer(
+                operation_id,
+                "client-a",
+                lease_seconds=300,
+                now=base + timedelta(seconds=1),
+            )
+        with pytest.raises(StreamStoreCorruptionError):
+            store.acknowledge_consumer(
+                operation_id,
+                "client-a",
+                1,
+                lease_seconds=300,
+                now=base + timedelta(seconds=1),
+            )
+
+
 def test_consumer_acknowledgements_gate_safe_compaction(
     tmp_path: Path,
 ) -> None:
@@ -238,6 +342,108 @@ def test_consumer_acknowledgements_gate_safe_compaction(
             now=base + timedelta(seconds=2),
         ) == 2
         assert store.head(operation_id)["compacted_through"] == 2
+
+
+def test_compact_acknowledged_recomputes_watermark_inside_transaction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        for index in range(1, 4):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": index},
+                timestamp=base + timedelta(seconds=index),
+            )
+        store.register_consumer(
+            operation_id,
+            "slow-client",
+            lease_seconds=300,
+            now=base,
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "slow-client",
+            1,
+            lease_seconds=300,
+            now=base + timedelta(seconds=1),
+        )
+
+        monkeypatch.setattr(
+            store,
+            "safe_compaction_sequence",
+            lambda *args, **kwargs: 3,
+        )
+
+        assert store.compact_acknowledged(
+            operation_id,
+            now=base + timedelta(seconds=2),
+        ) == 1
+        assert store.head(operation_id)["compacted_through"] == 1
+        assert [
+            event.sequence
+            for event in store.replay(
+                ReplayCursor(operation_id, after_sequence=1)
+            )
+        ] == [2, 3]
+
+
+def test_expired_consumer_must_reregister_before_acknowledging(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        for index in range(1, 4):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": index},
+                timestamp=base + timedelta(seconds=index),
+            )
+        store.register_consumer(
+            operation_id,
+            "client-a",
+            lease_seconds=1,
+            now=base,
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "client-a",
+            1,
+            lease_seconds=1,
+            now=base,
+        )
+
+        with pytest.raises(StreamContractError, match="lease expired"):
+            store.acknowledge_consumer(
+                operation_id,
+                "client-a",
+                2,
+                lease_seconds=30,
+                now=base + timedelta(seconds=2),
+            )
+
+        restored = store.register_consumer(
+            operation_id,
+            "client-a",
+            lease_seconds=30,
+            now=base + timedelta(seconds=2),
+        )
+        assert restored.acknowledged_through == 1
+        advanced = store.acknowledge_consumer(
+            operation_id,
+            "client-a",
+            2,
+            lease_seconds=30,
+            now=base + timedelta(seconds=3),
+        )
+        assert advanced.acknowledged_through == 2
 
 
 def test_expired_consumer_stops_blocking_active_consumer_watermark(

@@ -16,6 +16,20 @@ def test_recovery_drill_refuses_non_scratch_database_names() -> None:
     )
 
 
+def test_sqlite_recovery_drill_requires_scratch_workdir(tmp_path) -> None:
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_operation_sqlite_drill(tmp_path / "unsafe", cleanup=False)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="refusing destructive SQLite recovery drill",
+    ):
+        drill.run_engine_sqlite_bundle_drill(tmp_path / "unsafe-engine", cleanup=False)
+
+
 def test_recovery_journal_forbids_derived_rebuild_before_authority_verify() -> None:
     journal = drill.RecoveryJournal()
 
@@ -191,7 +205,7 @@ def test_operation_sqlite_restore_preserves_authority_and_outbox_order(
     tmp_path,
 ) -> None:
     result = drill.run_operation_sqlite_drill(
-        tmp_path / "sqlite-recovery",
+        tmp_path / "skeleton_recovery_drill_sqlite",
         cleanup=False,
     )
 
@@ -255,7 +269,7 @@ def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
     tmp_path,
 ) -> None:
     result = drill.run_engine_sqlite_bundle_drill(
-        tmp_path / "engine-bundle",
+        tmp_path / "skeleton_recovery_drill_engine_bundle",
         cleanup=False,
     )
 
@@ -319,3 +333,58 @@ def test_derived_rebuild_includes_only_active_canonical_memory() -> None:
             ),
         }
     ]
+
+
+def test_spine_bind_checkpoint_restore_preserves_dark_evidence(tmp_path) -> None:
+    result = drill.run_spine_bind_sqlite_drill(
+        tmp_path / "skeleton_recovery_drill_spine_bind",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["policy"] == "spine-bind-checkpoint-dark-restore"
+    assert result["backup_digest"] == result["restore_digest"]
+    assert result["checkpoint"]["rows"] == 1
+    assert len(result["checkpoint"]["recovery_digest"]) == 64
+    assert result["replay"] == {
+        "rows_before": 1,
+        "rows_after": 1,
+        "inserted": False,
+        "rewritten": False,
+    }
+    assert result["tenant"]["own_count"] == 1
+    assert result["tenant"]["foreign_count"] == 0
+    assert result["chain"]["rows"] == 1
+    assert result["chain"]["rewritten"] is False
+    assert result["bundle"]["verified"] is True
+    assert result["bundle"]["activated"] is False
+    assert len(result["restore_receipt"]["digest"]) == 64
+    assert result["restore_receipt"]["backup_restore_digest"] == result["backup_digest"]
+    assert result["restore_receipt"]["recovery_digest"] == result["checkpoint"]["recovery_digest"]
+    assert result["restore_receipt"]["verified"] is True
+    assert result["restore_receipt"]["activated"] is False
+    assert result["restore_journal"]["backup_digest"] == result["restore_journal"]["restore_digest"]
+    assert result["restore_journal"]["receipt_digest"] == result["restore_receipt"]["digest"]
+    assert result["restore_journal"]["rows"] == 1
+    assert result["restore_journal"]["foreign_rows"] == 0
+    assert result["restore_journal"]["replay_rows_before"] == 1
+    assert result["restore_journal"]["replay_rows_after"] == 1
+    assert result["restore_journal"]["replay_inserted"] is False
+    assert result["restore_journal"]["chain_rows"] == 1
+    assert len(result["restore_journal"]["chain_digest"]) == 64
+    assert len(result["restore_journal"]["continuity_digest"]) == 64
+    assert result["restore_journal"]["durable"] is True
+    assert result["restore_journal"]["tenant_isolated"] is True
+    assert result["restore_journal"]["replay_safe"] is True
+    assert result["restore_journal"]["activated"] is False
+    assert len(result["portable_evidence"]["digest"]) == 64
+    assert result["portable_evidence"]["bytes"] > 0
+    assert result["portable_evidence"]["verified"] is True
+    assert result["portable_evidence"]["roundtrip_exact"] is True
+    assert result["portable_evidence"]["activated"] is False
+    assert result["activation_claimed"] is False
+    assert result["apply_landed"] is False
+    assert result["live_motor"] is False
+    assert result["dispatcher_running"] is False
+    assert result["ci_green"] is False
+    assert result["merged"] is False
