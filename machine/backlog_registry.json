@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.backlog_registry.v1",
-  "registry_version": "0.1.0",
+  "registry_version": "0.2.0",
   "status": "active",
   "purpose": "Canonical deduplicated backlog IDs preserving P2 task, edge-case and masterplan-gap provenance.",
   "masterplan_binding": {
@@ -140,13 +140,107 @@
       "dependency_refs": [
         "BL-P2-P2-QUAL-01"
       ],
-      "status": "in_progress",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
       ],
       "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
       "dedupe_key": "p2_task:P2-NATIVE-01"
+    },
+    {
+      "id": "BL-P2-P2-T1-DATA-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-T1-DATA-01",
+      "rationale": "State, consistency and event delivery",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-T1-DATA-01",
+      "dependency_refs": [
+        "BL-P2-P2-NATIVE-01"
+      ],
+      "status": "ready",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-T1-DATA-01"
+    },
+    {
+      "id": "BL-P2-P2-T1-SEC-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-T1-SEC-01",
+      "rationale": "Security, privacy and tenant boundaries",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-T1-SEC-01",
+      "dependency_refs": [
+        "BL-P2-P2-NATIVE-01"
+      ],
+      "status": "ready",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-T1-SEC-01"
+    },
+    {
+      "id": "BL-P2-P2-T1-INFER-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-T1-INFER-01",
+      "rationale": "Inference reliability",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-T1-INFER-01",
+      "dependency_refs": [
+        "BL-P2-P2-T1-SEC-01"
+      ],
+      "status": "blocked",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-T1-INFER-01"
+    },
+    {
+      "id": "BL-P2-P2-T1-RECOVERY-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-T1-RECOVERY-01",
+      "rationale": "Operational recovery slice",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-T1-RECOVERY-01",
+      "dependency_refs": [
+        "BL-P2-P2-T1-DATA-01",
+        "BL-P2-P2-T1-SEC-01"
+      ],
+      "status": "blocked",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-T1-RECOVERY-01"
+    },
+    {
+      "id": "BL-P2-P2-T1-FUNCTIONAL-01",
+      "source_type": "p2_task",
+      "source_ref": "P2-T1-FUNCTIONAL-01",
+      "rationale": "Functional AI acceptance slice",
+      "owner": "p2-control-plane",
+      "owner_ref": "P2-T1-FUNCTIONAL-01",
+      "dependency_refs": [
+        "BL-P2-P2-T1-DATA-01",
+        "BL-P2-P2-T1-SEC-01",
+        "BL-P2-P2-T1-INFER-01",
+        "BL-P2-P2-T1-RECOVERY-01"
+      ],
+      "status": "blocked",
+      "priority_class": "phase",
+      "provenance": [
+        "machine/ai_p2_task_backlog.json"
+      ],
+      "closure_rule": "implementation may be landed only with evidence refs; masterplan completion/signoff remains separate",
+      "dedupe_key": "p2_task:P2-T1-FUNCTIONAL-01"
     },
     {
       "id": "BL-EDGE-HIST-SYS-019",

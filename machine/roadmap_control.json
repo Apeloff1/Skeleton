@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.roadmap_control.v1",
-  "roadmap_version": "0.1.0",
+  "roadmap_version": "0.2.0",
   "status": "active",
   "purpose": "Bind roadmap state to canonical construction/P2 dependency DAGs while preserving explicit revision lineage and breadth freeze.",
   "masterplan_binding": {
@@ -334,7 +334,101 @@
         "VOL-032",
         "VOL-033"
       ],
-      "status": "in_progress",
+      "status": "landed_unpromoted",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-T1-DATA-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-T1-DATA-01",
+      "depends_on": [
+        "ROAD-P2-NATIVE-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039",
+        "VOL-132",
+        "VOL-134"
+      ],
+      "status": "ready",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-T1-SEC-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-T1-SEC-01",
+      "depends_on": [
+        "ROAD-P2-NATIVE-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-026",
+        "VOL-027",
+        "VOL-167",
+        "VOL-169",
+        "VOL-172",
+        "VOL-175"
+      ],
+      "status": "ready",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-T1-INFER-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-T1-INFER-01",
+      "depends_on": [
+        "ROAD-P2-T1-SEC-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-007"
+      ],
+      "status": "blocked",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-T1-RECOVERY-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-T1-RECOVERY-01",
+      "depends_on": [
+        "ROAD-P2-T1-DATA-01",
+        "ROAD-P2-T1-SEC-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-091",
+        "VOL-096"
+      ],
+      "status": "blocked",
+      "acceptance_gates": [
+        "source task evidence and masterplan obligations remain authoritative"
+      ]
+    },
+    {
+      "id": "ROAD-P2-T1-FUNCTIONAL-01",
+      "kind": "p2_lane",
+      "source_ref": "P2-T1-FUNCTIONAL-01",
+      "depends_on": [
+        "ROAD-P2-T1-DATA-01",
+        "ROAD-P2-T1-SEC-01",
+        "ROAD-P2-T1-INFER-01",
+        "ROAD-P2-T1-RECOVERY-01"
+      ],
+      "work_package_refs": [],
+      "volume_refs": [
+        "VOL-097",
+        "VOL-104"
+      ],
+      "status": "blocked",
       "acceptance_gates": [
         "source task evidence and masterplan obligations remain authoritative"
       ]
@@ -372,6 +466,15 @@
       "p2_backlog_version": "0.2.0",
       "build_sequence_version": "1.1.0",
       "reason": "bind repository roadmap to current governed P2 and build-sequence source versions",
+      "preserves_history": true
+    },
+    {
+      "id": "ROAD-REV-0005",
+      "event": "p2_t1_activation_sync",
+      "p2_map_version": "0.2.0",
+      "p2_backlog_version": "0.2.0",
+      "build_sequence_version": "1.1.0",
+      "reason": "synchronize roadmap to activated P2-T1 runtime-trust and Functional-AI ownership",
       "preserves_history": true
     }
   ],

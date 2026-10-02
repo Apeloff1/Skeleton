@@ -11,14 +11,14 @@ This document is a deterministic projection of machine authority. It has no comp
 | Source | Git blob SHA-1 |
 | --- | --- |
 | `machine/ai_master_plan.json` | `2fdd74be113360ba79072a1c1268adb7612b8efb` |
-| `machine/ai_p2_execution_map.json` | `dc8b92e87cf405324e52b831603a912c3d58357d` |
-| `machine/ai_p2_task_backlog.json` | `33a860536b75f70e7af3cadcd0e5c5c99db600a2` |
+| `machine/ai_p2_execution_map.json` | `ab63555687746a28690f7c14a07b416a3240bf22` |
+| `machine/ai_p2_task_backlog.json` | `ff6135934a9f25ae3a8a473e5b97ba1552d99b97` |
 
 ## P2 execution boundary
 
 - Source scope: **314** deferred masterplan volumes.
-- First tranche scheduled: **42** volumes.
-- Explicitly queued: **272** volumes.
+- First tranche scheduled: **57** volumes.
+- Explicitly queued: **257** volumes.
 - Execution-map state: `active`.
 
 ## Task dependency/status projection
@@ -28,9 +28,14 @@ This document is a deterministic projection of machine authority. It has no comp
 | `P2-ARCH-01` | `P2-L1` | `landed_unpromoted` | `P2-CTRL-01` |
 | `P2-CTRL-01` | `P2-L0` | `landed_unpromoted` | — |
 | `P2-DOC-01` | `P2-L5` | `landed_unpromoted` | `P2-TRACE-01` |
-| `P2-NATIVE-01` | `P2-L6` | `in_progress` | `P2-QUAL-01` |
+| `P2-NATIVE-01` | `P2-L6` | `landed_unpromoted` | `P2-QUAL-01` |
 | `P2-QUAL-01` | `P2-L4` | `landed_unpromoted` | `P2-TRACE-01` |
 | `P2-REPO-01` | `P2-L3` | `landed_unpromoted` | `P2-ARCH-01`, `P2-TRACE-01` |
+| `P2-T1-DATA-01` | `P2-T1-L0` | `ready` | `P2-NATIVE-01` |
+| `P2-T1-FUNCTIONAL-01` | `P2-T1-L4` | `blocked` | `P2-T1-DATA-01`, `P2-T1-SEC-01`, `P2-T1-INFER-01`, `P2-T1-RECOVERY-01` |
+| `P2-T1-INFER-01` | `P2-T1-L2` | `blocked` | `P2-T1-SEC-01` |
+| `P2-T1-RECOVERY-01` | `P2-T1-L3` | `blocked` | `P2-T1-DATA-01`, `P2-T1-SEC-01` |
+| `P2-T1-SEC-01` | `P2-T1-L1` | `ready` | `P2-NATIVE-01` |
 | `P2-TRACE-01` | `P2-L2` | `landed_unpromoted` | `P2-ARCH-01` |
 
 ## Scheduled masterplan volumes
@@ -79,6 +84,21 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-090` | Generated Documentation | `unverified` |
 | `VOL-032` | High-Performance Native Core | `unverified` |
 | `VOL-033` | Java / JVM Plane | `unverified` |
+| `VOL-005` | Data & Persistence | `unverified` |
+| `VOL-007` | Inference Engine | `unverified` |
+| `VOL-026` | Cybersecurity | `unverified` |
+| `VOL-027` | Privacy & Data Protection | `unverified` |
+| `VOL-039` | Event Architecture | `unverified` |
+| `VOL-091` | Operations Manual | `unverified` |
+| `VOL-096` | VS-000 Foundation Recovery Slice | `unverified` |
+| `VOL-097` | VS-001 Functional AI | `unverified` |
+| `VOL-104` | Acceptance: Functional AI | `unverified` |
+| `VOL-132` | Consistency Model | `unverified` |
+| `VOL-134` | Outbox / Inbox Patterns | `unverified` |
+| `VOL-167` | Threat Model | `unverified` |
+| `VOL-169` | Security Boundaries | `unverified` |
+| `VOL-172` | Egress Control | `unverified` |
+| `VOL-175` | Tenant Isolation | `unverified` |
 
 ## Authority boundary
 
