@@ -12,6 +12,10 @@ on:
       - "skeleton/api/engine_runtime.py"
       - "skeleton/ai/runtime/api/engine_runtime.py"
       - "skeleton/api/engine_routes.py"
+      - "skeleton/api/server.py"
+      - "skeleton/ai/runtime/api/server.py"
+      - "skeleton/testing/test_server_governance_binding.py"
+      - "docker-compose.yml"
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
       - "backend/tests/test_engine_client.py"
@@ -41,6 +45,10 @@ on:
       - "skeleton/api/engine_runtime.py"
       - "skeleton/ai/runtime/api/engine_runtime.py"
       - "skeleton/api/engine_routes.py"
+      - "skeleton/api/server.py"
+      - "skeleton/ai/runtime/api/server.py"
+      - "skeleton/testing/test_server_governance_binding.py"
+      - "docker-compose.yml"
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
       - "backend/tests/test_engine_client.py"
@@ -71,7 +79,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      PYTHONPATH: "."
+      PYTHONPATH: ".:backend"
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
       OPENAI_API_KEY: ""
       XAI_API_KEY: ""
@@ -102,6 +110,7 @@ jobs:
           cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
           cmp skeleton/api/engine_runtime.py skeleton/ai/runtime/api/engine_runtime.py
           cmp skeleton/api/engine_routes.py skeleton/ai/runtime/api/engine_routes.py
+          cmp skeleton/api/server.py skeleton/ai/runtime/api/server.py
           python scripts/check_provider_bootstrap.py
           python scripts/verify_provider_surface_closure.py
       - name: Run canonical reverse product-path acceptance
@@ -111,6 +120,7 @@ jobs:
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_local_provider_activation.py
           skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_server_governance_binding.py
           backend/tests/test_engine_client.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
