@@ -144,23 +144,33 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             "text": response.text,
             "tier": "paid",
             "model": "skeleton-engine",
+            "engine_operation_id": response.operation_id,
             "engine_execution_id": response.execution_id,
+            "engine_context_id": response.context_id,
+            "engine_context_digest": response.context_digest,
+            "engine_context_source_snapshot": list(
+                response.context_source_snapshot
+            ),
+            "engine_context_compiler_version": (
+                response.context_compiler_version
+            ),
             "engine_verification": response.verification,
             "engine_evidence_refs": list(response.evidence_refs),
-        }
-    except EngineTextError:
-        return {
-            "text": (
-                "The generative engine is unavailable. I couldn't produce "
-                "an answer to this request. Please try again after checking "
-                "the engine configuration."
+            "engine_provider_receipts": list(
+                response.provider_receipts
             ),
-            "tier": "local",
-            "model": "unavailable-fallback",
-            "engine_execution_id": None,
-            "engine_verification": None,
-            "engine_evidence_refs": [],
+            "engine_tool_receipts": list(response.tool_receipts),
+            "engine_memory_refs": list(response.memory_refs),
+            "engine_artifact_refs": list(response.artifact_refs),
         }
+    except EngineTextError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "generative engine execution is unavailable; "
+                "retry the same turn later"
+            ),
+        ) from exc
 
 
 def _build_artifacts(forms: List[str], title: str, text: str, ds: Dict,
@@ -394,6 +404,7 @@ async def _import_legacy_rows_to_canonical(
         await _ensure_canonical_thread(session_id)
     )
     imported = 0
+    parent_message_id = None
     for index, row in enumerate(rows):
         user_text = row.get("role_user")
         assistant_text = row.get("role_jeeves")
@@ -418,6 +429,7 @@ async def _import_legacy_rows_to_canonical(
                 client_message_id
             ),
             expected_thread_version=thread.version,
+            parent_message_id=parent_message_id,
             data_class="internal",
         )
         generated = {
@@ -438,6 +450,7 @@ async def _import_legacy_rows_to_canonical(
             client_message_id=client_message_id,
             generated=generated,
         )
+        parent_message_id = _assistant.message_id
         imported += 1
     return imported
 
@@ -525,6 +538,17 @@ async def _append_canonical_user_turn(
                 ),
             )
 
+    if (
+        transcript
+        and transcript[-1].author_type is ConversationAuthorType.USER
+        and transcript[-1].idempotency_key == user_idempotency_key
+    ):
+        parent_message_id = transcript[-1].parent_message_id
+    else:
+        parent_message_id = (
+            transcript[-1].message_id if transcript else None
+        )
+
     prior_sequence = thread.message_sequence
     thread, message = await authority.append_user_message(
         thread.thread_id,
@@ -533,6 +557,7 @@ async def _append_canonical_user_turn(
         content=req.message,
         idempotency_key=user_idempotency_key,
         expected_thread_version=thread.version,
+        parent_message_id=parent_message_id,
         attachment_refs=request_refs,
         data_class="internal",
     )
@@ -558,18 +583,25 @@ async def _commit_canonical_assistant_turn(
     client_message_id: str | None,
     generated: Dict[str, Any],
 ):
-    operation_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            (
-                "skeleton-jeeves-operation:"
-                + session_id
-                + ":"
-                + user_message.message_id
-            ),
-        )
-    )
     execution_id = generated.get("engine_execution_id")
+    operation_id = generated.get("engine_operation_id")
+    if execution_id:
+        if not isinstance(operation_id, str) or not operation_id.strip():
+            raise ValueError(
+                "engine-backed Jeeves result is missing operation identity"
+            )
+    else:
+        operation_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                (
+                    "skeleton-jeeves-operation:"
+                    + session_id
+                    + ":"
+                    + user_message.message_id
+                ),
+            )
+        )
     if execution_id:
         ai_result_id = "engine-result:" + str(execution_id)
     else:
@@ -595,10 +627,57 @@ async def _commit_canonical_assistant_turn(
         causal_user_message_id=user_message.message_id,
         operation_id=operation_id,
         ai_result_id=ai_result_id,
-        tool_receipt_refs=(),
+        context_id=(
+            generated.get("engine_context_id")
+            if execution_id
+            else None
+        ),
+        context_digest=(
+            generated.get("engine_context_digest")
+            if execution_id
+            else None
+        ),
+        context_source_snapshot=(
+            tuple(
+                tuple(item)
+                for item in (
+                    generated.get(
+                        "engine_context_source_snapshot"
+                    )
+                    or ()
+                )
+            )
+            if execution_id
+            else ()
+        ),
+        context_compiler_version=(
+            generated.get("engine_context_compiler_version")
+            if execution_id
+            else None
+        ),
+        tool_receipt_refs=tuple(
+            str(item)
+            for item in generated.get("engine_tool_receipts") or ()
+            if str(item).strip()
+        ),
+        provider_receipt_refs=tuple(
+            str(item)
+            for item in generated.get("engine_provider_receipts") or ()
+            if str(item).strip()
+        ),
+        memory_refs=tuple(
+            str(item)
+            for item in generated.get("engine_memory_refs") or ()
+            if str(item).strip()
+        ),
         citation_refs=tuple(
             str(item)
             for item in generated.get("engine_evidence_refs") or ()
+            if str(item).strip()
+        ),
+        artifact_refs=tuple(
+            str(item)
+            for item in generated.get("engine_artifact_refs") or ()
             if str(item).strip()
         ),
         data_class="internal",
