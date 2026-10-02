@@ -91,7 +91,10 @@ from skeleton.memory.writeback import (
     MemoryStageConflict,
     MemoryWriteDenied,
 )
-from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.persistence.memory_repository import (
+    MemoryNotFound,
+    SQLiteMemoryRepository,
+)
 from skeleton.security.outbound_url import (
     resolve_public_https_url,
     validate_connected_peer,
@@ -100,6 +103,22 @@ from skeleton.security.outbound_url import (
 from skeleton.shells.ai.provider_health import ProviderHealthRegistry
 from skeleton.vault.governance_registry import GovernanceRegistry
 
+from skeleton.intelligence.admission import (
+    AdmissionError,
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionRuntime,
+    AdmissionRuntimeConflict,
+)
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
+    SharedPressurePolicy,
+    SqliteSharedPressureLedger,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     ExecutionFinalizationBindings,
@@ -204,6 +223,25 @@ class HostileEnvironmentCycle:
     network_mixed_dns_rejected: bool
     network_peer_rebinding_rejected: bool
     network_canonical_public_resolution: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceIsolationCycle:
+    admitted_within_budget: bool
+    over_quota_rejected: bool
+    denial_capacity_unchanged: bool
+    usage_reconciled: bool
+    identical_retry_stable: bool
+    conflicting_retry_rejected: bool
+    no_double_reservation: bool
+    first_worker_admitted: bool
+    second_worker_blocked: bool
+    capacity_released: bool
+    second_worker_admitted_after_release: bool
+    owner_tenant_visible: bool
+    other_tenant_hidden: bool
+    cross_tenant_get_rejected: bool
+    subject_scope_preserved: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -1123,12 +1161,345 @@ def _hostile_environment_cycle(
     )
 
 
+def _resource_isolation_cycle(
+    workdir: Path,
+    *,
+    execution_id: str,
+    operation_id: str,
+) -> ResourceIsolationCycle:
+    tenant_id = "system-qualification-tenant"
+    quota = TenantQuotaLedger()
+    quota.configure(
+        tenant_id,
+        TenantQuota(
+            window_id="system-qualification-window",
+            max_operations=8,
+            max_input_tokens=10,
+            max_output_tokens=10,
+            max_cost_usd=5.0,
+            max_tool_calls=16,
+            max_artifact_bytes=4096,
+            max_storage_bytes=4096,
+            max_concurrent_operations=2,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=quota)
+    base_request = AdmissionRequest(
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        capability="system-qualification",
+        budget=ResourceBudget(
+            max_input_tokens=10,
+            max_output_tokens=10,
+            max_cost_usd=5.0,
+            max_wall_seconds=10.0,
+            max_provider_attempts=2,
+            max_tool_calls=4,
+            max_artifact_bytes=4096,
+            max_storage_bytes=4096,
+            max_concurrency=2,
+            max_queue_depth=8,
+        ),
+        estimate=UsageEstimate(
+            input_tokens=5,
+            output_tokens=1,
+            cost_usd=0.1,
+            wall_seconds=0.5,
+            provider_attempts=1,
+            tool_calls=1,
+        ),
+    )
+    first_lease = runtime.admit(
+        base_request,
+        now_wall=10.0,
+    )
+    admitted_within_budget = bool(
+        first_lease.decision.admitted
+        and first_lease.quota_reservation is not None
+    )
+    replay_lease = runtime.admit(
+        base_request,
+        now_wall=10.1,
+    )
+    identical_retry_stable = replay_lease == first_lease
+    initial_snapshot = quota.snapshot(tenant_id)
+    no_double_reservation = bool(
+        runtime.pressure.active_operations == 1
+        and initial_snapshot["active_reservations"] == 1
+    )
+
+    conflicting_retry_rejected = False
+    conflicting_request = AdmissionRequest(
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        capability="system-qualification",
+        budget=ResourceBudget(
+            max_input_tokens=9,
+            max_output_tokens=10,
+            max_cost_usd=5.0,
+            max_wall_seconds=10.0,
+            max_provider_attempts=2,
+            max_tool_calls=4,
+            max_artifact_bytes=4096,
+            max_storage_bytes=4096,
+            max_concurrency=2,
+            max_queue_depth=8,
+        ),
+        estimate=base_request.estimate,
+    )
+    try:
+        runtime.admit(
+            conflicting_request,
+            now_wall=10.2,
+        )
+    except AdmissionRuntimeConflict:
+        conflicting_retry_rejected = True
+
+    over_quota_rejected = False
+    second_request = AdmissionRequest(
+        operation_id=str(
+            uuid5(
+                NAMESPACE_URL,
+                "system-qualification-over-quota:" + execution_id,
+            )
+        ),
+        tenant_id=tenant_id,
+        capability="system-qualification",
+        budget=base_request.budget,
+        estimate=UsageEstimate(
+            input_tokens=6,
+            output_tokens=1,
+            cost_usd=0.1,
+            wall_seconds=0.5,
+            provider_attempts=1,
+            tool_calls=1,
+        ),
+    )
+    try:
+        runtime.admit(
+            second_request,
+            now_wall=10.3,
+        )
+    except AdmissionError:
+        over_quota_rejected = True
+    denied_snapshot = quota.snapshot(tenant_id)
+    denial_capacity_unchanged = bool(
+        runtime.pressure.active_operations == 1
+        and denied_snapshot["active_reservations"] == 1
+    )
+
+    completion = runtime.complete(
+        operation_id,
+        UsageEstimate(
+            input_tokens=4,
+            output_tokens=1,
+            cost_usd=0.08,
+            wall_seconds=0.4,
+            provider_attempts=1,
+            tool_calls=1,
+        ),
+        now_wall=10.4,
+    )
+    completed_snapshot = quota.snapshot(tenant_id)
+    usage_reconciled = bool(
+        completion.quota_completion is not None
+        and completed_snapshot["active_reservations"] == 0
+        and completed_snapshot["committed"]["operations"] == 1
+        and completed_snapshot["committed"]["input_tokens"] == 4
+        and runtime.pressure.active_operations == 0
+    )
+
+    pressure_path = workdir / "system-qualification-pressure.sqlite3"
+    if pressure_path.exists():
+        pressure_path.unlink()
+    policy = SharedPressurePolicy(
+        scope="system-qualification",
+        max_concurrency=1,
+        max_queue_depth=8,
+        max_tenant_concurrency=1,
+        max_tenant_queue_depth=4,
+        soft_shed_fraction=1.0,
+        protect_priority_at_or_below=100,
+        default_lease_seconds=30.0,
+    )
+
+    first_pressure = SqliteSharedPressureLedger(pressure_path)
+    first_pressure.configure(policy)
+    second_pressure = SqliteSharedPressureLedger(pressure_path)
+    try:
+        second_pressure.configure(policy)
+    except SharedPressureConflict:
+        pass
+
+    first_runtime = AdmissionRuntime(
+        shared_pressure_ledger=first_pressure,
+        shared_pressure_scope=policy.scope,
+        shared_pressure_owner_id="system-qualification-worker-a",
+    )
+    second_runtime = AdmissionRuntime(
+        shared_pressure_ledger=second_pressure,
+        shared_pressure_scope=policy.scope,
+        shared_pressure_owner_id="system-qualification-worker-b",
+    )
+    first_pressure_request = AdmissionRequest(
+        operation_id=str(
+            uuid5(
+                NAMESPACE_URL,
+                "system-qualification-pressure-a:" + execution_id,
+            )
+        ),
+        tenant_id="pressure-tenant-a",
+        capability="system-qualification",
+        budget=ResourceBudget(
+            max_input_tokens=10,
+            max_output_tokens=10,
+            max_cost_usd=1.0,
+            max_wall_seconds=10.0,
+            max_provider_attempts=1,
+            max_tool_calls=1,
+            max_artifact_bytes=1024,
+            max_storage_bytes=1024,
+            max_concurrency=2,
+            max_queue_depth=8,
+        ),
+        estimate=UsageEstimate(input_tokens=1),
+    )
+    second_pressure_request = AdmissionRequest(
+        operation_id=str(
+            uuid5(
+                NAMESPACE_URL,
+                "system-qualification-pressure-b:" + execution_id,
+            )
+        ),
+        tenant_id="pressure-tenant-b",
+        capability="system-qualification",
+        budget=first_pressure_request.budget,
+        estimate=UsageEstimate(input_tokens=1),
+    )
+    pressure_lease = first_runtime.admit(
+        first_pressure_request,
+        now_wall=20.0,
+    )
+    first_worker_admitted = pressure_lease.decision.admitted
+
+    second_worker_blocked = False
+    try:
+        second_runtime.admit(
+            second_pressure_request,
+            now_wall=20.1,
+        )
+    except AdmissionError:
+        second_worker_blocked = True
+
+    first_runtime.complete(
+        first_pressure_request.operation_id,
+        UsageEstimate(input_tokens=1),
+        now_wall=20.2,
+    )
+    pressure_snapshot = first_pressure.snapshot(
+        policy.scope,
+        now=20.3,
+    )
+    capacity_released = pressure_snapshot.active == 0
+    second_after_release = second_runtime.admit(
+        second_pressure_request,
+        now_wall=20.4,
+    )
+    second_worker_admitted_after_release = (
+        second_after_release.decision.admitted
+    )
+    second_runtime.complete(
+        second_pressure_request.operation_id,
+        UsageEstimate(input_tokens=1),
+        now_wall=20.5,
+    )
+
+    isolation_path = (
+        workdir / "system-qualification-tenant-isolation.sqlite3"
+    )
+    if isolation_path.exists():
+        isolation_path.unlink()
+    isolation_repository = SQLiteMemoryRepository(isolation_path)
+    isolation_proposal = MemoryWriteProposal(
+        proposal_id=str(
+            uuid5(
+                NAMESPACE_URL,
+                "system-qualification-tenant-memory:" + execution_id,
+            )
+        ),
+        tenant_id=tenant_id,
+        namespace="completion-isolation",
+        subject_id=execution_id,
+        kind=MemoryKind.SEMANTIC,
+        idempotency_key="system-qualification-tenant-memory",
+        proposed_at=QUALIFICATION_TIME,
+        content="tenant-scoped completion evidence",
+        provenance_refs=("execution:" + execution_id,),
+        source_operation_id=operation_id,
+        data_class="internal",
+    )
+    isolated_record = isolation_repository.commit(
+        isolation_proposal,
+        now=QUALIFICATION_TIME,
+    )
+    owner_records = isolation_repository.list_subject(
+        tenant_id=tenant_id,
+        namespace=isolation_proposal.namespace,
+        subject_id=execution_id,
+    )
+    owner_tenant_visible = isolated_record in owner_records
+    other_records = isolation_repository.list_subject(
+        tenant_id="other-tenant",
+        namespace=isolation_proposal.namespace,
+        subject_id=execution_id,
+    )
+    other_tenant_hidden = other_records == ()
+    cross_tenant_get_rejected = False
+    try:
+        isolation_repository.get(
+            isolated_record.memory_id,
+            tenant_id="other-tenant",
+            namespace=isolation_proposal.namespace,
+        )
+    except MemoryNotFound:
+        cross_tenant_get_rejected = True
+    wrong_subject = isolation_repository.list_subject(
+        tenant_id=tenant_id,
+        namespace=isolation_proposal.namespace,
+        subject_id="different-subject",
+    )
+    subject_scope_preserved = bool(
+        isolated_record.subject_id == execution_id
+        and wrong_subject == ()
+    )
+
+    return ResourceIsolationCycle(
+        admitted_within_budget=admitted_within_budget,
+        over_quota_rejected=over_quota_rejected,
+        denial_capacity_unchanged=denial_capacity_unchanged,
+        usage_reconciled=usage_reconciled,
+        identical_retry_stable=identical_retry_stable,
+        conflicting_retry_rejected=conflicting_retry_rejected,
+        no_double_reservation=no_double_reservation,
+        first_worker_admitted=first_worker_admitted,
+        second_worker_blocked=second_worker_blocked,
+        capacity_released=capacity_released,
+        second_worker_admitted_after_release=(
+            second_worker_admitted_after_release
+        ),
+        owner_tenant_visible=owner_tenant_visible,
+        other_tenant_hidden=other_tenant_hidden,
+        cross_tenant_get_rejected=cross_tenant_get_rejected,
+        subject_scope_preserved=subject_scope_preserved,
+    )
+
+
 async def qualify_system_completion(
     workdir: str | Path,
     *,
     source_revision: str,
 ) -> SystemQualificationReceipt:
-    """Execute and independently qualify the 24-plane completion chain."""
+    """Execute and independently qualify the 28-plane completion chain."""
 
     root = Path(workdir)
     root.mkdir(parents=True, exist_ok=True)
@@ -1152,6 +1523,11 @@ async def qualify_system_completion(
         raise RuntimeError("qualification execution did not publish terminal result")
 
     hostile = _hostile_environment_cycle(
+        root,
+        execution_id=primary.request.execution_id,
+        operation_id=primary.request.operation_id,
+    )
+    resources = _resource_isolation_cycle(
         root,
         execution_id=primary.request.execution_id,
         operation_id=primary.request.operation_id,
@@ -1424,6 +1800,98 @@ async def qualify_system_completion(
                         hostile.network_peer_rebinding_rejected,
                     "canonical_public_resolution":
                         hostile.network_canonical_public_resolution,
+                }
+            ),
+        ),
+    )
+
+    plane.prove_resource_admission(
+        execution_id=primary.request.execution_id,
+        admitted_within_budget=resources.admitted_within_budget,
+        over_quota_rejected=resources.over_quota_rejected,
+        denial_capacity_unchanged=(
+            resources.denial_capacity_unchanged
+        ),
+        usage_reconciled=resources.usage_reconciled,
+        evidence_refs=(
+            "resource-admission:"
+            + _digest(
+                {
+                    "admitted": resources.admitted_within_budget,
+                    "over_quota_rejected":
+                        resources.over_quota_rejected,
+                    "capacity_unchanged":
+                        resources.denial_capacity_unchanged,
+                    "usage_reconciled":
+                        resources.usage_reconciled,
+                }
+            ),
+        ),
+    )
+    plane.prove_shared_pressure(
+        execution_id=primary.request.execution_id,
+        first_worker_admitted=resources.first_worker_admitted,
+        second_worker_blocked=resources.second_worker_blocked,
+        capacity_released=resources.capacity_released,
+        second_worker_admitted_after_release=(
+            resources.second_worker_admitted_after_release
+        ),
+        evidence_refs=(
+            "shared-pressure:"
+            + _digest(
+                {
+                    "first_admitted":
+                        resources.first_worker_admitted,
+                    "second_blocked":
+                        resources.second_worker_blocked,
+                    "capacity_released":
+                        resources.capacity_released,
+                    "second_after_release":
+                        resources.second_worker_admitted_after_release,
+                }
+            ),
+        ),
+    )
+    plane.prove_idempotent_retry(
+        execution_id=primary.request.execution_id,
+        identical_retry_stable=resources.identical_retry_stable,
+        conflicting_retry_rejected=(
+            resources.conflicting_retry_rejected
+        ),
+        no_double_reservation=resources.no_double_reservation,
+        evidence_refs=(
+            "idempotent-retry:"
+            + _digest(
+                {
+                    "stable": resources.identical_retry_stable,
+                    "conflict_rejected":
+                        resources.conflicting_retry_rejected,
+                    "no_double_reservation":
+                        resources.no_double_reservation,
+                }
+            ),
+        ),
+    )
+    plane.prove_tenant_isolation(
+        execution_id=primary.request.execution_id,
+        owner_tenant_visible=resources.owner_tenant_visible,
+        other_tenant_hidden=resources.other_tenant_hidden,
+        cross_tenant_get_rejected=(
+            resources.cross_tenant_get_rejected
+        ),
+        subject_scope_preserved=resources.subject_scope_preserved,
+        evidence_refs=(
+            "tenant-isolation:"
+            + _digest(
+                {
+                    "owner_visible":
+                        resources.owner_tenant_visible,
+                    "other_hidden":
+                        resources.other_tenant_hidden,
+                    "cross_get_rejected":
+                        resources.cross_tenant_get_rejected,
+                    "subject_scope":
+                        resources.subject_scope_preserved,
                 }
             ),
         ),
