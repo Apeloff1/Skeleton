@@ -18,7 +18,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
     assert receipt["requirement_count"] == 17
-    assert receipt["binding_count"] >= 7
+    assert receipt["binding_count"] >= 9
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
 
@@ -43,6 +43,8 @@ def test_contract_declares_non_compensable_authority() -> None:
         "learning_evaluation_lineage_required": True,
         "evidence_source_execution_binding": True,
         "learning_result_binding_required": True,
+        "qualification_receipt_rehash_required": True,
+        "strict_json_receipt_verification": True,
     }
 
 
@@ -75,5 +77,7 @@ def test_required_runtime_and_acceptance_files_are_digest_bound() -> None:
         "skeleton/ai/evaluation/system_qualification.py",
         "scripts/run_ai_system_completion_qualification.py",
         "tests/test_ai_system_qualification.py",
+        "scripts/verify_ai_system_qualification_receipt.py",
+        "tests/test_ai_system_qualification_receipt_verifier.py",
     }
     assert all(len(value) == 64 for value in digests.values())
