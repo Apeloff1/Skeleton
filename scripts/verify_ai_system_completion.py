@@ -61,6 +61,13 @@ SECURITY_BINDING_PATHS = tuple(
         ".github/workflows/p0-provider-fallback-privacy.yml",
         ".github/workflows/p0-memory-poisoning-evidence.yml",
         ".github/workflows/p0-network-boundary-evidence.yml",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota.py",
+        "skeleton/intelligence/shared_pressure.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_execution_repository.py",
     )
 )
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -185,6 +192,10 @@ def verify(head_sha: str) -> dict[str, object]:
         "memory_poisoning_resistance_required": True,
         "outbound_network_boundary_qualification_required": True,
         "qualification_semantic_reverification_required": True,
+        "resource_admission_qualification_required": True,
+        "shared_pressure_qualification_required": True,
+        "idempotent_retry_qualification_required": True,
+        "tenant_isolation_qualification_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -247,6 +258,11 @@ def verify(head_sha: str) -> dict[str, object]:
             "prove_provider_fallback_privacy",
             "prove_memory_poisoning_resistance",
             "prove_outbound_network_boundary",
+            "_resource_isolation_cycle",
+            "prove_resource_admission",
+            "prove_shared_pressure",
+            "prove_idempotent_retry",
+            "prove_tenant_isolation",
         )
         absent = _contains_all(QUALIFICATION_PATH, qualification_required)
         if absent:
@@ -301,6 +317,8 @@ def verify(head_sha: str) -> dict[str, object]:
             "test_sandbox_sanitize_inject.py",
             "test_memory_writeback.py",
             "test_outbound_url_resolution_security.py",
+            "test_admission_runtime.py",
+            "test_execution_repository.py",
             ".ai-system-runtime-qualification.json",
             ".ai-system-runtime-qualification-verification.json",
             "github.event.pull_request.head.sha || github.sha",
