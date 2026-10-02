@@ -4300,12 +4300,24 @@
         168
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Retrieved evidence is structurally untrusted and cannot enter the trusted instruction channel.",
+        "Provider projection wraps retrieved content as explicitly untrusted data while preserving trusted policy separately."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_retrieved_prompt_injection_is_data_never_instruction_authority",
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_untrusted_data_kinds_cannot_be_constructed_as_trusted_control"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4323,7 +4335,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-AI-002",
@@ -4337,12 +4349,24 @@
         377
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Tool-result context cannot be constructed as trusted control.",
+        "Commands or approval claims inside tool output remain untrusted evidence and cannot self-authorize a subsequent action."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_tool_output_instruction_laundering_stays_untrusted_data",
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_untrusted_data_kinds_cannot_be_constructed_as_trusted_control"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4360,7 +4384,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-AI-003",
@@ -5320,12 +5344,24 @@
         256
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Generated text claiming authorization has zero authority without a registry-issued approval bound to exact principal, intent, and proposal fingerprints.",
+        "Consumed approvals cannot be replayed."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_generated_approval_text_cannot_fabricate_durable_authorization",
+        "skeleton/testing/test_p0_ai_authority_boundaries.py::test_consumed_authorization_cannot_be_replayed_from_generated_text"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/context.py",
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_p0_ai_authority_boundaries.py",
+        "workflow:P0 AI Authority Boundaries"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5343,7 +5379,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-AI-031",
