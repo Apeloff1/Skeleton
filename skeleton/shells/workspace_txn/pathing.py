@@ -12,6 +12,20 @@ from typing import Iterable, Iterator
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _DRIVE = re.compile(r"^[A-Za-z]:")
+_WINDOWS_DEVICE = re.compile(
+    r"^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$",
+    re.IGNORECASE,
+)
+
+
+def _reject_windows_ambiguous_component(part: str) -> None:
+    """Reject path spellings that alias or escape on Windows filesystems."""
+    if ":" in part:
+        raise WorkspacePathError("workspace path contains alternate data stream syntax")
+    if part.endswith((" ", ".")):
+        raise WorkspacePathError("workspace path has Windows-ambiguous trailing characters")
+    if _WINDOWS_DEVICE.fullmatch(part):
+        raise WorkspacePathError("workspace path uses a reserved Windows device name")
 
 
 class WorkspacePathError(ValueError):
@@ -38,6 +52,7 @@ def normalize_relative_path(value: str | os.PathLike[str]) -> str:
             continue
         if _CONTROL.search(part):
             raise WorkspacePathError("workspace path contains control characters")
+        _reject_windows_ambiguous_component(part)
         parts.append(part)
     if not parts:
         raise WorkspacePathError("path normalizes to root")
