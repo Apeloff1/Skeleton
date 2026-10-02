@@ -33,7 +33,16 @@ __all__ = [
     "LocalModelArtifactReceipt",
     "LocalModelBackend",
     "LocalToolCall",
+    "NumpyRecurrentLM",
     "ReferenceNGramModel",
     "load_local_model_artifact",
     "local_model_adapter_from_env",
 ]
+
+
+def __getattr__(name: str):
+    if name == "NumpyRecurrentLM":
+        from .neural import NumpyRecurrentLM
+
+        return NumpyRecurrentLM
+    raise AttributeError(name)
