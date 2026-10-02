@@ -423,6 +423,25 @@ def _compile_chat_context(
             mandatory=True,
         )
     ]
+    terminal_markers = [
+        message
+        for message in transcript
+        if message.author_type is ConversationAuthorType.SYSTEM_DERIVED
+        and message.parent_message_id is not None
+        and any(
+            ref.startswith("chat-terminal:")
+            for ref in message.artifact_refs
+        )
+    ]
+    abandoned_user_ids = {
+        message.parent_message_id
+        for message in terminal_markers
+        if message.parent_message_id is not None
+    }
+    terminal_marker_ids = {
+        message.message_id
+        for message in terminal_markers
+    }
     segments.extend(
         conversation_message_segment(
             thread,
@@ -430,6 +449,8 @@ def _compile_chat_context(
             purpose=purpose,
         )
         for message in transcript
+        if message.message_id not in abandoned_user_ids
+        and message.message_id not in terminal_marker_ids
     )
     if request_context:
         segments.append(
