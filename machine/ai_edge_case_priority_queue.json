@@ -78,9 +78,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "proven_fail_closed_compaction_trust_geometry_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compaction.py",
+        "code:skeleton/contracts/context.py",
+        "workflow:P0 Compaction Trust Geometry"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-018",
       "completion_checkbox": false,
