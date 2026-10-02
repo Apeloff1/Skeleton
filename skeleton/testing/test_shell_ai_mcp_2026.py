@@ -137,6 +137,34 @@ def test_mcp_request_routing_headers():
     }
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("request_id", "req\u202e1"),
+        ("method", "tools/\u200bcall"),
+        ("name", "pyth\u043en"),
+    ),
+)
+def test_mcp_request_rejects_unicode_spoofing_in_routing_identity(
+    field,
+    value,
+):
+    values = {
+        "request_id": "request-1",
+        "method": "tools/call",
+        "name": "python",
+        "arguments": {},
+    }
+    values[field] = value
+    with pytest.raises(ValueError):
+        MCPRequestEnvelope(**values)
+
+
+def test_mcp_principal_rejects_confusable_unicode_identity():
+    with pytest.raises(ValueError, match="ASCII"):
+        MCPPrincipalPolicy("adm\u0456n")
+
+
 def test_mcp_request_copies_arguments():
     args = {"args": ["-V"]}
     request = MCPRequestEnvelope("r", "tools/call", "python", args)

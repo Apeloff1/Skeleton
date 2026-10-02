@@ -8,6 +8,8 @@ import threading
 import time
 from typing import Callable
 
+from skeleton.security.text_identity import require_authority_identifier
+
 
 @dataclass(frozen=True)
 class AIPlanApproval:
@@ -62,6 +64,16 @@ class AIApprovalRegistry:
             raise ValueError("ttl_seconds must be positive")
         if not principal or not approved_by:
             raise ValueError("principal and approver are required")
+        principal = require_authority_identifier(
+            principal,
+            field="approval principal",
+            max_length=256,
+        )
+        approved_by = require_authority_identifier(
+            approved_by,
+            field="approval actor",
+            max_length=256,
+        )
         if len(intent_fingerprint) != 64 or len(proposal_fingerprint) != 64:
             raise ValueError("approval fingerprints must be SHA-256 hex")
         with self._lock:
