@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.p3.expansion_closure.v1",
   "closure_id": "P3-AUTONOMOUS-INTELLIGENCE-EXPANSION",
-  "status": "candidate",
+  "status": "closed",
   "claim_scope": "bounded_autonomous_intelligence_expansion_frontier",
   "claim": "The 23-volume P3-T0 autonomous-intelligence expansion frontier is implementation-landed with executable evidence. This does not claim completion of the remaining 234 queued P3 volumes or independent masterplan sign-off.",
   "parent": {
@@ -86,7 +86,14 @@
     "workflow:P3 Construction Authority@16a444e334b362084fac0a608b79f3b27c62e962:success",
     "github-actions-run:36966546962",
     "workflow:P3 Vertical Suite@633606bbea4ffdae25dab89b4839a24c012c8c17:success",
-    "github-actions-run:36965987976"
+    "github-actions-run:36965987976",
+    "git-head:f77ad97a243744f9386d6d3ee50cc680d50fc9d2",
+    "workflow:P3 Expansion Closure@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782652",
+    "workflow:P3 Execution Map@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782715",
+    "workflow:P3 Construction Authority@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782719"
   ],
   "deferred_scope": {
     "queued_volume_count": 234,
@@ -98,5 +105,13 @@
     "mode": "stacked",
     "rule": "The autonomous-engineering frontier must reconcile against the landed P3 authority and cannot re-own or erase already scheduled P3-T0 volumes."
   },
-  "closure_evidence": []
+  "closure_evidence": [
+    "git-head:f77ad97a243744f9386d6d3ee50cc680d50fc9d2",
+    "workflow:P3 Expansion Closure@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782652",
+    "workflow:P3 Execution Map@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782715",
+    "workflow:P3 Construction Authority@f77ad97a243744f9386d6d3ee50cc680d50fc9d2:success",
+    "github-actions-run:36966782719"
+  ]
 }
