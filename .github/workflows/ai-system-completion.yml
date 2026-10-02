@@ -105,8 +105,8 @@ jobs:
               raise SystemExit("system completion receipt is not exact-head")
           if receipt.get("verifier") != "independent-ai-system-completion-v1":
               raise SystemExit("unexpected system completion verifier identity")
-          if receipt.get("requirement_count") != 16:
-              raise SystemExit("system completion must prove exactly 16 required planes")
+          if receipt.get("requirement_count") != 17:
+              raise SystemExit("system completion must prove exactly 17 required planes")
           if receipt.get("requirements") != receipt.get("runtime_requirements"):
               raise SystemExit("machine/runtime completion requirement inventories diverge")
           if receipt.get("valid") is not True or receipt.get("errors"):
