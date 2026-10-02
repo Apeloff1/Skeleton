@@ -529,9 +529,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_curated_discovery_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-024",
       "completion_checkbox": false,
@@ -776,9 +782,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_curated_discovery_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/catalog.py",
+        "code:skeleton/shells/ai/mcp.py",
+        "code:skeleton/shells/ai/mcp_gateway.py",
+        "test:skeleton/testing/test_shell_ai_mcp_2026.py",
+        "workflow:P0 Tool Discovery Authority"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-025",
       "completion_checkbox": false,
