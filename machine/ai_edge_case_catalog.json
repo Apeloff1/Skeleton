@@ -6399,12 +6399,23 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Untrusted process execution accepts argv sequences only and rejects shell command strings.",
+        "Shell metacharacters, variable references, and wildcard characters are passed as literal arguments and are never reinterpreted by a platform shell."
+      ],
+      "tests": [
+        "skeleton/testing/test_sandbox_isolation.py::test_argv_policy",
+        "skeleton/testing/test_sandbox_isolation.py::test_shell_metacharacters_are_passed_as_literal_argv",
+        "skeleton/testing/test_sandbox_isolation.py::test_wildcards_are_not_shell_expanded"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Shell Quoting Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
