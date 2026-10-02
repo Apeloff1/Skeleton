@@ -116,6 +116,9 @@ jobs:
           cmp skeleton/api/engine_runtime.py skeleton/ai/runtime/api/engine_runtime.py
           cmp skeleton/api/engine_routes.py skeleton/ai/runtime/api/engine_routes.py
           cmp skeleton/api/server.py skeleton/ai/runtime/api/server.py
+          cmp skeleton/contracts/conversation.py skeleton/ai/runtime/contracts/conversation.py
+          cmp skeleton/persistence/conversation_repository.py skeleton/ai/runtime/persistence/conversation_repository.py
+          cmp skeleton/context/sources/conversation.py skeleton/ai/runtime/context/sources/conversation.py
           python scripts/check_provider_bootstrap.py
           python scripts/verify_provider_surface_closure.py
       - name: Run canonical reverse product-path acceptance
