@@ -144,16 +144,36 @@ class SystemQualificationReceipt:
     replay_observed_tool_ids: tuple[str, ...]
 
     @property
-    def valid(self) -> bool:
-        return bool(
-            self.report.valid
-            and self.report.subject_id == self.subject_id
-            and self.report.source_revision == self.source_revision
-            and self.network_attempt_count == 0
-            and self.primary_result_digest == self.replay_result_digest
-            and self.primary_output_digest == self.replay_output_digest
-            and self.observed_tool_ids == self.replay_observed_tool_ids
+    def validity_checks(self) -> dict[str, bool]:
+        return {
+            "report_valid": self.report.valid,
+            "subject_bound": self.report.subject_id == self.subject_id,
+            "source_revision_bound": (
+                self.report.source_revision == self.source_revision
+            ),
+            "network_isolated": self.network_attempt_count == 0,
+            "result_reproducible": (
+                self.primary_result_digest == self.replay_result_digest
+            ),
+            "output_reproducible": (
+                self.primary_output_digest == self.replay_output_digest
+            ),
+            "tool_trace_reproducible": (
+                self.observed_tool_ids == self.replay_observed_tool_ids
+            ),
+        }
+
+    @property
+    def invalid_reasons(self) -> tuple[str, ...]:
+        return tuple(
+            name
+            for name, passed in self.validity_checks.items()
+            if not passed
         )
+
+    @property
+    def valid(self) -> bool:
+        return all(self.validity_checks.values())
 
     @property
     def digest(self) -> str:
@@ -170,6 +190,7 @@ class SystemQualificationReceipt:
                 "network_attempt_count": self.network_attempt_count,
                 "observed_tool_ids": list(self.observed_tool_ids),
                 "replay_observed_tool_ids": list(self.replay_observed_tool_ids),
+                "validity_checks": self.validity_checks,
                 "valid": self.valid,
             }
         )
@@ -187,6 +208,8 @@ class SystemQualificationReceipt:
             "network_attempt_count": self.network_attempt_count,
             "observed_tool_ids": list(self.observed_tool_ids),
             "replay_observed_tool_ids": list(self.replay_observed_tool_ids),
+            "validity_checks": self.validity_checks,
+            "invalid_reasons": list(self.invalid_reasons),
             "valid": self.valid,
             "digest": self.digest,
         }
