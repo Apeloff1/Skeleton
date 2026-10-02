@@ -1,0 +1,224 @@
+{
+  "schema_version": "skeleton.ai.p3.tranche2_plan.v1",
+  "plan_version": "0.1.0",
+  "status": "active",
+  "phase": "P3",
+  "title": "Native Learning & Research Frontier",
+  "purpose": "Expand the provider-independent AI into native data/training, multimodal, research/evaluation, efficient local serving and bounded compute fabric.",
+  "parent_closure": {
+    "path": "machine/ai_p3_engineering_closure.json",
+    "required_status": "closed",
+    "source_queue_count": 197
+  },
+  "source": {
+    "path": "machine/ai_p3_engineering_execution_map.json#/first_tranche/queued_volume_refs",
+    "expected_volume_count": 197
+  },
+  "selection": {
+    "selected_volume_count": 52,
+    "selected_volume_refs": [
+      "VOL-133",
+      "VOL-135",
+      "VOL-136",
+      "VOL-137",
+      "VOL-138",
+      "VOL-139",
+      "VOL-140",
+      "VOL-141",
+      "VOL-142",
+      "VOL-143",
+      "VOL-144",
+      "VOL-145",
+      "VOL-146",
+      "VOL-147",
+      "VOL-148",
+      "VOL-149",
+      "VOL-150",
+      "VOL-151",
+      "VOL-152",
+      "VOL-153",
+      "VOL-154",
+      "VOL-155",
+      "VOL-156",
+      "VOL-157",
+      "VOL-158",
+      "VOL-159",
+      "VOL-209",
+      "VOL-210",
+      "VOL-211",
+      "VOL-212",
+      "VOL-213",
+      "VOL-214",
+      "VOL-215",
+      "VOL-249",
+      "VOL-250",
+      "VOL-216",
+      "VOL-217",
+      "VOL-218",
+      "VOL-219",
+      "VOL-220",
+      "VOL-221",
+      "VOL-222",
+      "VOL-223",
+      "VOL-224",
+      "VOL-383",
+      "VOL-384",
+      "VOL-387",
+      "VOL-388",
+      "VOL-389",
+      "VOL-400",
+      "VOL-401",
+      "VOL-402"
+    ],
+    "remaining_queued_volume_count": 145
+  },
+  "workstreams": [
+    {
+      "id": "P3-T2-DATA",
+      "task_id": "P3-DATA-FOUNDATION-01",
+      "lane_id": "P3-T2-L0",
+      "name": "Data, lineage and dataset foundation",
+      "depends_on": [],
+      "volume_refs": [
+        "VOL-133",
+        "VOL-135",
+        "VOL-136",
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
+      ],
+      "objective": "Make data ingestion, lineage, quality, datasets, synthetic data, caching, content addressing, and transaction semantics executable and provenance-bound for native learning."
+    },
+    {
+      "id": "P3-T2-TRAIN",
+      "task_id": "P3-TRAINING-CONTROL-01",
+      "lane_id": "P3-T2-L1",
+      "name": "Native training control and recovery",
+      "depends_on": [
+        "P3-DATA-FOUNDATION-01"
+      ],
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149",
+        "VOL-150",
+        "VOL-151",
+        "VOL-152"
+      ],
+      "objective": "Materialize a provider-independent training control plane with distributed execution, checkpoint/recovery, observability, evaluation gates, post-training, curricula, RL environments, and verifier-model custody."
+    },
+    {
+      "id": "P3-T2-MM",
+      "task_id": "P3-MULTIMODAL-PIPELINE-01",
+      "lane_id": "P3-T2-L2",
+      "name": "Multimodal ingestion and retrieval",
+      "depends_on": [
+        "P3-DATA-FOUNDATION-01"
+      ],
+      "volume_refs": [
+        "VOL-153",
+        "VOL-154",
+        "VOL-155",
+        "VOL-156",
+        "VOL-157",
+        "VOL-158",
+        "VOL-159"
+      ],
+      "objective": "Create typed local multimodal ingestion, vision/document/audio/video surfaces and retrieval contracts without hosted-provider dependence."
+    },
+    {
+      "id": "P3-T2-RESEARCH",
+      "task_id": "P3-RESEARCH-SCIENCE-01",
+      "lane_id": "P3-T2-L3",
+      "name": "Research, evidence and causal science",
+      "depends_on": [
+        "P3-DATA-FOUNDATION-01"
+      ],
+      "volume_refs": [
+        "VOL-209",
+        "VOL-210",
+        "VOL-211",
+        "VOL-212",
+        "VOL-213",
+        "VOL-214",
+        "VOL-215",
+        "VOL-249",
+        "VOL-250"
+      ],
+      "objective": "Materialize artifact review, research teams, literature/citation evidence, reproducibility, experiment comparison, statistics, hypotheses and causal knowledge with provenance and conflict handling."
+    },
+    {
+      "id": "P3-T2-EVAL",
+      "task_id": "P3-EVALUATION-SYSTEM-01",
+      "lane_id": "P3-T2-L4",
+      "name": "Model and agent evaluation system",
+      "depends_on": [
+        "P3-TRAINING-CONTROL-01",
+        "P3-MULTIMODAL-PIPELINE-01",
+        "P3-RESEARCH-SCIENCE-01"
+      ],
+      "volume_refs": [
+        "VOL-216",
+        "VOL-217",
+        "VOL-218",
+        "VOL-219",
+        "VOL-220",
+        "VOL-221",
+        "VOL-222",
+        "VOL-223",
+        "VOL-224"
+      ],
+      "objective": "Build model/agent evaluation, long-horizon benchmarks, contamination controls, human evaluation and evidence-backed model/dataset/tool/agent cards."
+    },
+    {
+      "id": "P3-T2-SERVE",
+      "task_id": "P3-LOCAL-SERVING-01",
+      "lane_id": "P3-T2-L5",
+      "name": "Local model serving efficiency",
+      "depends_on": [
+        "P3-TRAINING-CONTROL-01",
+        "P3-EVALUATION-SYSTEM-01"
+      ],
+      "volume_refs": [
+        "VOL-383",
+        "VOL-384",
+        "VOL-387",
+        "VOL-388",
+        "VOL-389"
+      ],
+      "objective": "Add local memory-aware serving controls, model eviction, KV/prefix caching, and speculative inference with deterministic identity and bounded fallback."
+    },
+    {
+      "id": "P3-T2-COMPUTE",
+      "task_id": "P3-COMPUTE-FABRIC-01",
+      "lane_id": "P3-T2-L6",
+      "name": "Build, evaluation and research compute fabric",
+      "depends_on": [
+        "P3-TRAINING-CONTROL-01",
+        "P3-EVALUATION-SYSTEM-01",
+        "P3-LOCAL-SERVING-01"
+      ],
+      "volume_refs": [
+        "VOL-400",
+        "VOL-401",
+        "VOL-402"
+      ],
+      "objective": "Create bounded build/evaluation/research compute queues with ownership, admission, cancellation, fairness, and durable evidence."
+    }
+  ],
+  "invariants": [
+    "Source scope equals the exact 197-volume queue left by P3-T1.",
+    "Selected and queued partitions are disjoint and cover the source exactly.",
+    "Every scheduled volume has one task owner.",
+    "Canonical contracts, risks, gaps, tests, evaluations and accountability are inherited without narrowing.",
+    "No task can self-sign or self-promote maturity.",
+    "Local AI training and serving acceptance may not depend on hosted-provider credentials."
+  ]
+}
