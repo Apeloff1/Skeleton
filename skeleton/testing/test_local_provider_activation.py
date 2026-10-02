@@ -5,11 +5,13 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import socket
+import threading
 from uuid import uuid4
 
 import pytest
 
 from skeleton.ai.runtime.inference import (
+    LocalInferenceCancelled,
     LocalModelArtifactError,
     ReferenceNGramModel,
     load_local_model_artifact,
@@ -367,6 +369,110 @@ async def test_engine_coordinator_executes_local_registry_without_hosted_provide
     assert all(item.startswith("provider:local:") for item in result.provider_receipts)
     assert result.verification_receipt["outcome"] == "passed"
     assert registry.require_active().model == expected.model_id
+
+    await coordinator.shutdown()
+    service.repository.close()
+    service.submissions.close()
+
+
+@pytest.mark.asyncio
+async def test_engine_coordinator_interrupts_running_local_inference_and_finalizes_cancelled(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path, _expected = _write_model(tmp_path)
+    _local_env(monkeypatch, path)
+    _block_internet(monkeypatch)
+
+    operation, command = _engine_bundle()
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "cancel-execution.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "cancel-submissions.sqlite3"),
+        EngineAuthorityRegistry(
+            [
+                EngineServiceGrant(
+                    service_principal="codedock-backend",
+                    scopes=frozenset(
+                        {
+                            "engine:submit",
+                            "engine:read",
+                            "engine:cancel",
+                            "engine:events",
+                            "engine:approve",
+                        }
+                    ),
+                    tenant_ids=frozenset({operation.tenant_id}),
+                    capabilities=frozenset({operation.capability}),
+                )
+            ]
+        ),
+    )
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        now=operation.created_at,
+    )
+
+    registry = ProviderRegistry.from_env()
+    adapter = registry.require_active()
+    entered = threading.Event()
+    cancel_seen = threading.Event()
+    calls = 0
+
+    def blocking_infer(request, cancel):
+        nonlocal calls
+        calls += 1
+        entered.set()
+        while not cancel.wait(0.01):
+            pass
+        cancel_seen.set()
+        raise LocalInferenceCancelled("engine-local inference cancelled")
+
+    monkeypatch.setattr(adapter.engine.model, "infer", blocking_infer)
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=registry,
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified,
+    )
+
+    await coordinator.ensure_started(command)
+    assert await asyncio.to_thread(entered.wait, 2.0)
+
+    status = service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        now=operation.created_at + timedelta(seconds=1),
+    )
+    assert status.cancellation_requested is True
+
+    await coordinator.interrupt_cancelled_execution(
+        command.execution_request.execution_id
+    )
+    result = await _wait_result(
+        service,
+        command.execution_request.execution_id,
+    )
+
+    assert cancel_seen.is_set()
+    assert calls == 1
+    assert result.status == "cancelled"
+    assert result.final_output is None
+    assert result.usage["error_code"] == "cancellation_requested"
+
+    status = service.status(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+    )
+    assert status.execution_state == "cancelled"
+    assert status.result is not None
+    assert status.result["status"] == "cancelled"
 
     await coordinator.shutdown()
     service.repository.close()
