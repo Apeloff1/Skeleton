@@ -7,7 +7,7 @@ addition to atomic accountability and vertical-suite checks. Its job is to
 prevent a false-positive completion verdict when many subsystems are green but
 one cross-cutting lifecycle is still broken.
 
-Completion is **non-compensable**. All seventeen requirements must have one
+Completion is **non-compensable**. All eighteen requirements must have one
 passing, independently witnessed proof for the same execution subject and exact
 Git revision. Extra green evidence cannot compensate for a missing or failed
 proof.
@@ -22,7 +22,7 @@ proof.
 | `execution.budget_bounds` | Observed provider and tool calls remain within hard request budgets. |
 | `execution.stop_semantics` | An expired deadline and a durable cancellation both terminate before provider/tool work and cannot publish user-visible success. |
 | `execution.tool_authority` | Every observed tool invocation is declared by the request and has a corresponding receipt. |
-| `execution.durable_recovery` | A separately reopened repository yields the exact terminal result, not a best-effort reconstruction. |
+| `execution.durable_recovery` | A separately reopened repository yields the exact terminal result, not a best-effort reconstruction. |\n| `execution.staged_finalization_recovery` | A staged terminal intent survives repository close/reopen, finalizes to the exact result, and is cleared after recovery. |
 | `execution.replay_lineage` | Recovered turns are contiguous, subject/operation-bound, uniquely identified, parent-linked, and checkpoint-bound. |
 | `execution.reproducibility` | A fresh repository/run of the same deterministic local request reproduces result and final-output digests. |
 | `execution.governed_effects` | Every mutating tool receipt has a matching observed postcondition; read-only traffic cannot counterfeit mutable-effect proof. |
@@ -62,7 +62,7 @@ lineage are also fail-closed.
 
 ## Causal closure graph
 
-The seventeen proofs are not a bag of independent booleans. They form one
+The eighteen proofs are not a bag of independent booleans. They form one
 causal chain:
 
 `request identity -> local/offline execution -> budget + stop fences ->
@@ -91,7 +91,7 @@ One qualification run:
 5. checks hard model-turn/tool-call budgets and declared-tool authority;
 6. independently exercises an already-expired deadline and a durable
    cancellation request, requiring both to stop before provider/tool work;
-7. reopens SQLite and compares the full terminal result exactly;
+7. reopens SQLite and compares the full terminal result exactly;\n8. stages a second terminal intent, closes SQLite to simulate a crash, reopens it, finalizes the staged result, and requires the intent to clear;
 8. validates recovered turn parentage, sequence, operation identity, and
    checkpoint lineage;
 9. reruns the same request in a fresh SQLite repository and requires identical
@@ -102,7 +102,7 @@ One qualification run:
 13. promotes the evaluated candidate and verifies active-version transition;
 14. executes rollback and verifies baseline restoration under the same
    evaluation digest;
-15. submits all seventeen proofs to `SystemCompletionPlane`;
+15. submits all eighteen proofs to `SystemCompletionPlane`;
 16. emits a canonical `SystemQualificationReceipt` containing the report,
    run/replay digests, observed tool trace, network-attempt count, and receipt
    digest.
@@ -146,7 +146,7 @@ CI independently asserts that the executable receipt:
 
 - is bound to the exact PR head;
 - is valid with no missing/failed requirements;
-- contains exactly seventeen proofs;
+- contains exactly eighteen proofs;
 - has one subject and one source revision across all proofs;
 - reports zero network attempts;
 - reproduces result/output digests and tool trace on a fresh run;
