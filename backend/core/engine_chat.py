@@ -188,6 +188,7 @@ class EngineChat:
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
+        self._evidence: list[dict[str, str]] = []
         self._queued_prompt: str | None = None
 
     def with_model(self, provider: str, model: str) -> "EngineChat":
@@ -266,6 +267,69 @@ class EngineChat:
             "engine chat role must be system, user, or assistant"
         )
 
+    def add_history_message(
+        self,
+        role: str,
+        content: str,
+    ) -> "EngineChat":
+        """Add canonical prior conversation without queuing a new prompt."""
+
+        normalized_role = str(role).strip().lower()
+        text = str(content).strip()
+        if normalized_role not in {"user", "assistant"}:
+            raise ValueError(
+                "engine chat history role must be user or assistant"
+            )
+        if not text:
+            raise ValueError(
+                "engine chat history content must be non-empty"
+            )
+        self._history.append(
+            {"role": normalized_role, "content": text}
+        )
+        if len(self._history) > 1024:
+            raise ValueError(
+                "engine chat history exceeds maximum turn count"
+            )
+        return self
+
+    def add_evidence(
+        self,
+        source_id: str,
+        content: str,
+        *,
+        kind: str = "retrieval_evidence",
+    ) -> "EngineChat":
+        """Attach product evidence as untrusted canonical context, not prompt."""
+
+        source = str(source_id).strip()
+        text = str(content).strip()
+        normalized_kind = str(kind).strip().lower()
+        if not source or not text:
+            raise ValueError(
+                "engine chat evidence source/content must be non-empty"
+            )
+        if normalized_kind not in {"retrieval_evidence", "artifact"}:
+            raise ValueError(
+                "engine chat evidence kind is unsupported"
+            )
+        if any(item["source_id"] == source for item in self._evidence):
+            raise ValueError(
+                "engine chat evidence source_id must be unique"
+            )
+        self._evidence.append(
+            {
+                "source_id": source,
+                "content": text,
+                "kind": normalized_kind,
+            }
+        )
+        if len(self._evidence) > 256:
+            raise ValueError(
+                "engine chat evidence exceeds maximum segment count"
+            )
+        return self
+
     @staticmethod
     def _prompt_text(message: Any) -> str:
         if isinstance(message, str):
@@ -291,6 +355,7 @@ class EngineChat:
                 "turn_index": len(self._history),
                 "prompt": prompt,
                 "history": self._history,
+                "evidence": self._evidence,
                 "instruction_policy_id": (
                     None if policy is None else policy.policy_id
                 ),
@@ -337,6 +402,7 @@ class EngineChat:
                 None if policy is None else policy.version
             ),
             history=tuple(self._history),
+            evidence=tuple(self._evidence),
             tenant_id=self.tenant_id,
             actor_id=self.actor_id,
             capability=self.capability,
