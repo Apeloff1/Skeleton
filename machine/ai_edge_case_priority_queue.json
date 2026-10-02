@@ -557,9 +557,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_privacy_bounded_fallback_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/model_port.py",
+        "code:skeleton/shells/ai/provider_router.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Provider Fallback Privacy"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-021",
       "completion_checkbox": false,
