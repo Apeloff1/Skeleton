@@ -1,0 +1,857 @@
+{
+  "schema_version": "skeleton.p2.tranche_plan.v1",
+  "plan_version": "0.1.0",
+  "status": "prepared_non_owning",
+  "tranche_id": "P2-T1",
+  "title": "Runtime Trust, Recovery and Functional Acceptance",
+  "purpose": "Prepare the next P2 expansion from the still-queued masterplan scope without transferring ownership or bypassing the P2-T0 landing fence.",
+  "authority": {
+    "master_plan": "machine/ai_master_plan.json",
+    "p2_execution_map": "machine/ai_p2_execution_map.json",
+    "p2_task_backlog": "machine/ai_p2_task_backlog.json",
+    "validator": "scripts/check_p2_tranche1_plan.py",
+    "human_plan": "docs/plan/P2_TRANCHE1_RUNTIME_TRUST.md"
+  },
+  "activation": {
+    "mode": "explicit_followup_only",
+    "ownership_effect_before_activation": "none",
+    "required_first_tranche_task_status": "landed_unpromoted",
+    "required_first_tranche_task_ids": [
+      "P2-CTRL-01",
+      "P2-ARCH-01",
+      "P2-TRACE-01",
+      "P2-REPO-01",
+      "P2-QUAL-01",
+      "P2-DOC-01",
+      "P2-NATIVE-01"
+    ],
+    "rule": "This prepared plan cannot add task ownership or remove refs from the queued set. Activation requires a separate reviewed change after every P2-T0 task is landed_unpromoted."
+  },
+  "selection": {
+    "selected_volume_count": 15,
+    "selected_volume_refs": [
+      "VOL-005",
+      "VOL-007",
+      "VOL-026",
+      "VOL-027",
+      "VOL-039",
+      "VOL-091",
+      "VOL-096",
+      "VOL-097",
+      "VOL-104",
+      "VOL-132",
+      "VOL-134",
+      "VOL-167",
+      "VOL-169",
+      "VOL-172",
+      "VOL-175"
+    ],
+    "source_queue_count": 272,
+    "source_queue_ref": "machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
+    "selection_principles": [
+      "Prefer shallow or foundational volumes with concrete runtime anchors over speculative breadth.",
+      "Prioritize persistence/event consistency, security/privacy boundaries, inference reliability, and recovery/functional acceptance.",
+      "Use existing tests as starting evidence only; missing planned harnesses remain explicit implementation work.",
+      "Do not select model-training, world-model, multimodal, or domain-specialist breadth before runtime-trust foundations are exercised end to end."
+    ],
+    "exclusions": [
+      {
+        "volume_refs": [
+          "VOL-006"
+        ],
+        "reason": "native training and model-registry infrastructure remain largely planned rather than runtime-anchored"
+      },
+      {
+        "volume_refs": [
+          "VOL-019",
+          "VOL-073"
+        ],
+        "reason": "world/simulation breadth remains behind state, security and recovery authority"
+      },
+      {
+        "volume_refs": [
+          "VOL-020"
+        ],
+        "reason": "multimodal convergence remains behind security/privacy and functional acceptance foundations"
+      },
+      {
+        "volume_refs": [
+          "VOL-071",
+          "VOL-072",
+          "VOL-074"
+        ],
+        "reason": "domain-specialist expansion remains behind general runtime-trust and acceptance evidence"
+      }
+    ]
+  },
+  "workstreams": [
+    {
+      "id": "P2-T1-DATA",
+      "name": "State, consistency and event delivery",
+      "depends_on": [],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039",
+        "VOL-132",
+        "VOL-134"
+      ],
+      "objective": "Converge state ownership, consistency guarantees, event compatibility, replay/retention and outbox/inbox semantics with recovery evidence."
+    },
+    {
+      "id": "P2-T1-SEC",
+      "name": "Security, privacy and tenant boundaries",
+      "depends_on": [],
+      "volume_refs": [
+        "VOL-026",
+        "VOL-027",
+        "VOL-167",
+        "VOL-169",
+        "VOL-172",
+        "VOL-175"
+      ],
+      "objective": "Bind threat identities, trust-boundary crossings, egress canonicalization, tenant isolation and deletion/privacy semantics to executable controls."
+    },
+    {
+      "id": "P2-T1-INFER",
+      "name": "Inference reliability",
+      "depends_on": [
+        "P2-T1-SEC"
+      ],
+      "volume_refs": [
+        "VOL-007"
+      ],
+      "objective": "Deepen provider/inference cancellation, retry, cache correctness and measured serving behavior under the existing provider contract."
+    },
+    {
+      "id": "P2-T1-RECOVERY",
+      "name": "Operational recovery slice",
+      "depends_on": [
+        "P2-T1-DATA",
+        "P2-T1-SEC"
+      ],
+      "volume_refs": [
+        "VOL-091",
+        "VOL-096"
+      ],
+      "objective": "Create versioned runbook authority and an end-to-end foundation recovery harness with power-loss/replay/rebuild evidence."
+    },
+    {
+      "id": "P2-T1-FUNCTIONAL",
+      "name": "Functional AI acceptance slice",
+      "depends_on": [
+        "P2-T1-DATA",
+        "P2-T1-SEC",
+        "P2-T1-INFER",
+        "P2-T1-RECOVERY"
+      ],
+      "volume_refs": [
+        "VOL-097",
+        "VOL-104"
+      ],
+      "objective": "Materialize the canonical functional-AI fixture and immutable acceptance evidence without self-signoff."
+    }
+  ],
+  "volume_selection_evidence": [
+    {
+      "volume_ref": "VOL-005",
+      "selection_class": "existing_tested_core",
+      "existing_implementation_anchors": [
+        "machine/state_topology.json",
+        "skeleton/persistence",
+        "backend/services/database.py",
+        "scripts/state_recovery_drill.py"
+      ],
+      "existing_test_anchors": [
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/testing/test_operation_store.py",
+        "backend/tests/test_rag_state_authority.py"
+      ],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-005",
+        "title": "Data & Persistence",
+        "depth_pass": "DP-000-040",
+        "accountability_id": "ACC-VOL-005",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "StateOwner",
+          "RepositoryTransaction",
+          "MigrationPlan",
+          "BackupManifest"
+        ],
+        "risks": [
+          "split-brain ownership",
+          "partial multi-store writes",
+          "rollback incompatibility",
+          "backup that cannot restore"
+        ],
+        "gaps": [
+          "converge remaining legacy state owners",
+          "add migration compatibility rehearsal to release qualification"
+        ],
+        "implementation_paths": [
+          "machine/state_topology.json",
+          "skeleton/persistence",
+          "backend/services/database.py",
+          "scripts/state_recovery_drill.py"
+        ],
+        "tests": [
+          "skeleton/testing/test_state_recovery_drill.py",
+          "skeleton/testing/test_operation_store.py",
+          "backend/tests/test_rag_state_authority.py"
+        ],
+        "evaluations": [
+          "planned:partial-commit fault matrix",
+          "planned:restore consistency evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-007",
+      "selection_class": "existing_tested_core",
+      "existing_implementation_anchors": [
+        "skeleton/provider_runtime.py",
+        "skeleton/provider_contract.py"
+      ],
+      "existing_test_anchors": [
+        "tests/test_model_runtime.py",
+        "backend/tests/test_ai_provider_reliability.py",
+        "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      ],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-007",
+        "title": "Inference Engine",
+        "depth_pass": "DP-000-040",
+        "accountability_id": "ACC-VOL-007",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "ModelRequest",
+          "ModelResult",
+          "ModelStreamEvent",
+          "InferenceUsage"
+        ],
+        "risks": [
+          "duplicate provider effects during retry",
+          "KV/prefix cache semantic corruption",
+          "uncancelled expensive work"
+        ],
+        "gaps": [
+          "continuous batching and local serving need dedicated implementation",
+          "speculative decoding requires measured correctness gates"
+        ],
+        "implementation_paths": [
+          "skeleton/provider_runtime.py",
+          "skeleton/provider_contract.py",
+          "backend/services/ai_service.py",
+          "planned:skeleton/inference"
+        ],
+        "tests": [
+          "tests/test_model_runtime.py",
+          "backend/tests/test_ai_provider_reliability.py",
+          "skeleton/testing/test_provider_stream_reliability_profiles.py"
+        ],
+        "evaluations": [
+          "planned:stream/cancel/failover matrix",
+          "planned:latency-cost-quality characterization"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-026",
+      "selection_class": "existing_tested_core",
+      "existing_implementation_anchors": [
+        "skeleton/security",
+        "backend/scripts",
+        "scripts/check_repository_python_sast.py"
+      ],
+      "existing_test_anchors": [
+        "skeleton/testing/test_security_rooted_fs.py",
+        "skeleton/testing/test_security_archive_sandbox.py",
+        "skeleton/testing/test_security_outbound_http.py"
+      ],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-026",
+        "title": "Cybersecurity",
+        "depth_pass": "DP-000-040",
+        "accountability_id": "ACC-VOL-026",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "SecurityContext",
+          "SecretRef",
+          "EgressPolicy",
+          "SandboxPolicy"
+        ],
+        "risks": [
+          "TOCTOU",
+          "SSRF/DNS rebinding",
+          "path/archive escape",
+          "secret leakage",
+          "dependency compromise"
+        ],
+        "gaps": [
+          "complete unified threat model",
+          "bind runtime tool permissions to capability-security primitives"
+        ],
+        "implementation_paths": [
+          "skeleton/security",
+          "backend/scripts",
+          "scripts/check_repository_python_sast.py"
+        ],
+        "tests": [
+          "skeleton/testing/test_security_rooted_fs.py",
+          "skeleton/testing/test_security_archive_sandbox.py",
+          "skeleton/testing/test_security_outbound_http.py"
+        ],
+        "evaluations": [
+          "planned:threat-model coverage review",
+          "planned:continuous adversarial security suite"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-027",
+      "selection_class": "existing_tested_core",
+      "existing_implementation_anchors": [
+        "skeleton/vault",
+        "backend/routes/governance.py",
+        "machine/state_topology.json"
+      ],
+      "existing_test_anchors": [
+        "skeleton/testing/test_data_governance.py",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_lifecycle_adapters.py"
+      ],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-027",
+        "title": "Privacy & Data Protection",
+        "depth_pass": "DP-000-040",
+        "accountability_id": "ACC-VOL-027",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "DataClassification",
+          "RetentionPolicy",
+          "DeletionReceipt",
+          "ExportManifest"
+        ],
+        "risks": [
+          "derived data survives deletion",
+          "backup retains sensitive data",
+          "cross-tenant leakage",
+          "residency drift"
+        ],
+        "gaps": [
+          "regional policy mapping remains incomplete",
+          "prove deletion through all future derived stores"
+        ],
+        "implementation_paths": [
+          "skeleton/vault",
+          "backend/routes/governance.py",
+          "machine/state_topology.json"
+        ],
+        "tests": [
+          "skeleton/testing/test_data_governance.py",
+          "skeleton/testing/test_data_lifecycle.py",
+          "skeleton/testing/test_lifecycle_adapters.py"
+        ],
+        "evaluations": [
+          "planned:deletion completeness drill",
+          "planned:provider-data-minimization audit"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-039",
+      "selection_class": "existing_tested_core",
+      "existing_implementation_anchors": [
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/persistence"
+      ],
+      "existing_test_anchors": [
+        "skeleton/testing/test_operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py"
+      ],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-039",
+        "title": "Event Architecture",
+        "depth_pass": "DP-000-040",
+        "accountability_id": "ACC-VOL-039",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "EventEnvelope",
+          "EventCursor",
+          "OutboxRecord",
+          "InboxRecord"
+        ],
+        "risks": [
+          "duplicate/out-of-order events",
+          "consumer side effect before inbox marker",
+          "schema drift"
+        ],
+        "gaps": [
+          "formalize event compatibility registry",
+          "add compaction/replay retention contracts"
+        ],
+        "implementation_paths": [
+          "skeleton/frontier/operation_stream.py",
+          "skeleton/frontier/operation_stream_store.py",
+          "skeleton/persistence"
+        ],
+        "tests": [
+          "skeleton/testing/test_operation_stream.py",
+          "skeleton/testing/test_operation_stream_store.py",
+          "planned:skeleton/testing/test_event_replay.py"
+        ],
+        "evaluations": [
+          "planned:duplicate/out-of-order fault suite",
+          "planned:event replay determinism evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-091",
+      "selection_class": "harness_gap_over_existing_runtime",
+      "existing_implementation_anchors": [
+        "docs",
+        "scripts",
+        "skeleton/observability"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-091",
+        "title": "Operations Manual",
+        "depth_pass": "DP-081-120",
+        "accountability_id": "ACC-VOL-091",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "Runbook",
+          "RunbookStep",
+          "RunbookValidation"
+        ],
+        "risks": [
+          "stale commands",
+          "missing escalation",
+          "circular recovery dependency"
+        ],
+        "gaps": [
+          "establish runbook registry",
+          "bind drills to runbook versions"
+        ],
+        "implementation_paths": [
+          "docs",
+          "scripts",
+          "skeleton/observability"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_runbook_references.py",
+          "planned:runbook command validation tests"
+        ],
+        "evaluations": [
+          "planned:operator recovery drill",
+          "planned:runbook dependency-loss evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-096",
+      "selection_class": "vertical_slice_harness_gap",
+      "existing_implementation_anchors": [
+        "skeleton/app",
+        "skeleton/persistence",
+        "skeleton/frontier"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-096",
+        "title": "VS-000 Foundation Recovery Slice",
+        "depth_pass": "DP-081-120",
+        "accountability_id": "ACC-VOL-096",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "VS000Scenario",
+          "RecoveryCheckpoint",
+          "RecoveryEvidence"
+        ],
+        "risks": [
+          "unrecoverable state",
+          "duplicate event replay",
+          "derived-state authority"
+        ],
+        "gaps": [
+          "materialize end-to-end VS-000 harness",
+          "bind recovery evidence to release gates"
+        ],
+        "implementation_paths": [
+          "skeleton/app",
+          "skeleton/persistence",
+          "skeleton/frontier"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_vs000_foundation_recovery.py",
+          "planned:state recovery drill integration"
+        ],
+        "evaluations": [
+          "planned:power-loss/restart campaign",
+          "planned:projection rebuild evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-097",
+      "selection_class": "vertical_slice_harness_gap",
+      "existing_implementation_anchors": [
+        "skeleton/ai",
+        "backend",
+        "frontend"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-097",
+        "title": "VS-001 Functional AI",
+        "depth_pass": "DP-081-120",
+        "accountability_id": "ACC-VOL-097",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "VS001Request",
+          "VS001Execution",
+          "VS001Evidence"
+        ],
+        "risks": [
+          "authority gap",
+          "context trust loss",
+          "stream/commit divergence"
+        ],
+        "gaps": [
+          "materialize canonical VS-001 fixture",
+          "bind all W00-W17 dependencies"
+        ],
+        "implementation_paths": [
+          "skeleton/ai",
+          "backend",
+          "frontend"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_vs001_functional_ai.py",
+          "planned:frontend VS-001 reconnect E2E"
+        ],
+        "evaluations": [
+          "planned:full functional AI acceptance",
+          "planned:tool failure/recovery variant"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-104",
+      "selection_class": "acceptance_harness_gap",
+      "existing_implementation_anchors": [
+        "machine",
+        "docs/plan",
+        "skeleton/eval"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-104",
+        "title": "Acceptance: Functional AI",
+        "depth_pass": "DP-081-120",
+        "accountability_id": "ACC-VOL-104",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "FunctionalAIAcceptance",
+          "AcceptanceCriterion",
+          "AcceptanceEvidence"
+        ],
+        "risks": [
+          "demo-only acceptance",
+          "missing negative evidence",
+          "stale signoff"
+        ],
+        "gaps": [
+          "define exact acceptance matrix",
+          "bind signoff to immutable evidence bundle"
+        ],
+        "implementation_paths": [
+          "machine",
+          "docs/plan",
+          "skeleton/eval"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_functional_ai_acceptance.py",
+          "planned:acceptance evidence integrity tests"
+        ],
+        "evaluations": [
+          "planned:acceptance replay evaluation",
+          "planned:failure-mode coverage audit"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-132",
+      "selection_class": "semantic_contract_gap_over_existing_runtime",
+      "existing_implementation_anchors": [
+        "skeleton/persistence",
+        "machine/state_topology.json"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-132",
+        "title": "Consistency Model",
+        "depth_pass": "DP-121-160",
+        "accountability_id": "ACC-VOL-132",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "ConsistencyProfile",
+          "ReadGuarantee",
+          "WriteGuarantee"
+        ],
+        "risks": [
+          "hidden eventual consistency",
+          "read-your-writes violation"
+        ],
+        "gaps": [
+          "classify state domains",
+          "bind guarantees to stores"
+        ],
+        "implementation_paths": [
+          "skeleton/persistence",
+          "machine/state_topology.json"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_consistency_profiles.py"
+        ],
+        "evaluations": [
+          "planned:partition/staleness evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-134",
+      "selection_class": "semantic_contract_gap_over_existing_runtime",
+      "existing_implementation_anchors": [
+        "skeleton/persistence",
+        "skeleton/frontier"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-134",
+        "title": "Outbox / Inbox Patterns",
+        "depth_pass": "DP-121-160",
+        "accountability_id": "ACC-VOL-134",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "OutboxRecord",
+          "InboxRecord",
+          "DeliveryAttempt"
+        ],
+        "risks": [
+          "lost event",
+          "duplicate external effect"
+        ],
+        "gaps": [
+          "generalize current event stores",
+          "bind retention/replay policy"
+        ],
+        "implementation_paths": [
+          "skeleton/persistence",
+          "skeleton/frontier"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_outbox_inbox.py"
+        ],
+        "evaluations": [
+          "planned:crash-between-state-and-publish drill"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-167",
+      "selection_class": "security_model_gap_over_existing_controls",
+      "existing_implementation_anchors": [
+        "docs/security",
+        "machine"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-167",
+        "title": "Threat Model",
+        "depth_pass": "DP-161-200",
+        "accountability_id": "ACC-VOL-167",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "Threat",
+          "AttackSurface",
+          "Mitigation"
+        ],
+        "risks": [
+          "stale threat model",
+          "unowned mitigation"
+        ],
+        "gaps": [
+          "materialize threat IDs",
+          "bind PR impact triggers"
+        ],
+        "implementation_paths": [
+          "docs/security",
+          "machine"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_threat_model.py"
+        ],
+        "evaluations": [
+          "planned:threat-control coverage audit"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-169",
+      "selection_class": "security_model_gap_over_existing_controls",
+      "existing_implementation_anchors": [
+        "skeleton/security",
+        "machine"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-169",
+        "title": "Security Boundaries",
+        "depth_pass": "DP-161-200",
+        "accountability_id": "ACC-VOL-169",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "SecurityBoundary",
+          "BoundaryCrossing",
+          "BoundaryDecision"
+        ],
+        "risks": [
+          "implicit trust crossing",
+          "fallback privilege widening"
+        ],
+        "gaps": [
+          "map all trust boundaries",
+          "bind crossings to trace model"
+        ],
+        "implementation_paths": [
+          "skeleton/security",
+          "machine"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_security_boundaries.py"
+        ],
+        "evaluations": [
+          "planned:boundary-bypass evaluation"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-172",
+      "selection_class": "security_model_gap_over_existing_controls",
+      "existing_implementation_anchors": [
+        "skeleton/security",
+        "skeleton/network"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-172",
+        "title": "Egress Control",
+        "depth_pass": "DP-161-200",
+        "accountability_id": "ACC-VOL-172",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "EgressPolicy",
+          "EgressRequest",
+          "EgressDecision"
+        ],
+        "risks": [
+          "SSRF",
+          "policy bypass via redirects"
+        ],
+        "gaps": [
+          "implement destination canonicalization",
+          "bind network tools to egress policy"
+        ],
+        "implementation_paths": [
+          "skeleton/security",
+          "skeleton/network"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_egress_control.py"
+        ],
+        "evaluations": [
+          "planned:SSRF/DNS-rebinding campaign"
+        ]
+      }
+    },
+    {
+      "volume_ref": "VOL-175",
+      "selection_class": "security_model_gap_over_existing_controls",
+      "existing_implementation_anchors": [
+        "skeleton/security",
+        "skeleton/persistence"
+      ],
+      "existing_test_anchors": [],
+      "masterplan_obligation": {
+        "volume_ref": "VOL-175",
+        "title": "Tenant Isolation",
+        "depth_pass": "DP-161-200",
+        "accountability_id": "ACC-VOL-175",
+        "implementation_status": "unverified",
+        "completion_checkbox": false,
+        "signing_required": true,
+        "contracts": [
+          "TenantScope",
+          "TenantBoundary",
+          "TenantAccessDecision"
+        ],
+        "risks": [
+          "tenant bleed",
+          "shared cache leak"
+        ],
+        "gaps": [
+          "propagate tenant identity universally",
+          "bind isolation to trace/evidence"
+        ],
+        "implementation_paths": [
+          "skeleton/security",
+          "skeleton/persistence"
+        ],
+        "tests": [
+          "planned:skeleton/testing/test_tenant_isolation_deep.py"
+        ],
+        "evaluations": [
+          "planned:cross-tenant red-team campaign"
+        ]
+      }
+    }
+  ],
+  "non_authority_rules": [
+    "This plan does not modify machine/ai_p2_execution_map.json scheduled/queued ownership.",
+    "This plan does not add P2 backlog tasks, mark any existing task complete, or assert implementation/verification signatures.",
+    "Selection evidence proves only that implementation roots exist; it is not maturity or completion evidence.",
+    "Activation must preserve the complete 314-volume source partition and unique ownership."
+  ]
+}
