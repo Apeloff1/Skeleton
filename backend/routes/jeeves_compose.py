@@ -116,8 +116,17 @@ def _derive_dataset(recalled: List[Dict]) -> Dict:
             "title": "Canon Relevance"}
 
 
-async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool,
-                         conversation_context: str = "") -> Dict:
+async def _generate_text(
+    query: str,
+    recalled: List[Dict],
+    needs_reasoning: bool,
+    conversation_context: str = "",
+    *,
+    engine_tenant_id: str = "default",
+    engine_actor_id: str = "jeeves-compose",
+    engine_capability: str = "assistant.compat",
+    engine_data_class: str = "internal",
+) -> Dict:
     """Use canonical local model when active; otherwise retain bounded fallback."""
 
     tier = free_tier.decide(needs_reasoning)
@@ -161,8 +170,10 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
         chat = EngineChat(
             session_id=engine_session_id,
             instruction_policy=JEEVES_CHAT_POLICY,
-            actor_id="jeeves-compose",
-            capability="assistant.compat",
+            tenant_id=engine_tenant_id,
+            actor_id=engine_actor_id,
+            capability=engine_capability,
+            data_class=engine_data_class,
         ).with_max_tokens(8_192)
         response = await chat.send_message(
             UserMessage(text=prompt)
@@ -177,6 +188,10 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             "model": "skeleton-engine",
             "engine_operation_id": response.operation_id,
             "engine_execution_id": response.execution_id,
+            "engine_tenant_id": engine_tenant_id,
+            "engine_actor_id": engine_actor_id,
+            "engine_capability": engine_capability,
+            "engine_data_class": engine_data_class,
             "engine_context_id": response.context_id,
             "engine_context_digest": response.context_digest,
             "engine_context_source_snapshot": list(
@@ -624,6 +639,10 @@ async def _commit_canonical_assistant_turn(
             "engine_context_compiler_version": generated.get(
                 "engine_context_compiler_version"
             ),
+            "engine_tenant_id": generated.get("engine_tenant_id"),
+            "engine_actor_id": generated.get("engine_actor_id"),
+            "engine_capability": generated.get("engine_capability"),
+            "engine_data_class": generated.get("engine_data_class"),
         }
         missing = [
             name
@@ -645,6 +664,16 @@ async def _commit_canonical_assistant_turn(
         ):
             raise ValueError(
                 "engine-backed Jeeves context digest is invalid"
+            )
+        if (
+            generated["engine_tenant_id"] != tenant_id
+            or generated["engine_actor_id"] != owner_id
+            or generated["engine_capability"] != "assistant.chat"
+            or generated["engine_data_class"] != thread.data_class
+        ):
+            raise ValueError(
+                "engine-backed Jeeves execution identity does not match "
+                "canonical conversation authority"
             )
     else:
         operation_id = str(
@@ -1077,12 +1106,20 @@ async def chat(req: ChatReq):
                     req.context,
                     effective_history,
                 ),
+                engine_tenant_id=canonical_turn[3],
+                engine_actor_id=canonical_turn[4],
+                engine_capability="assistant.chat",
+                engine_data_class=canonical_turn[1].data_class,
             )
         else:
             gen = await _generate_text(
                 req.message,
                 recalled,
                 needs_reasoning,
+                engine_tenant_id=canonical_turn[3],
+                engine_actor_id=canonical_turn[4],
+                engine_capability="assistant.chat",
+                engine_data_class=canonical_turn[1].data_class,
             )
     finally:
         _ENGINE_EXECUTION_SCOPE.reset(execution_scope_token)
