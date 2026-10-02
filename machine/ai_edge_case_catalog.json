@@ -6776,21 +6776,22 @@
       "status": "catalogued",
       "requirements": [
         "Every stored vector entry carries a retention source identity.",
-        "Deleting one source identity can purge every derived vector entry bound to that source without deleting unrelated vectors.",
-        "Source identity may be supplied explicitly or inherited from governed source metadata."
+        "Canonical source tombstoning purges every vector entry bound to that source, including multi-fragment derivatives.",
+        "Derived vector deletion remains idempotent and preserves unrelated sources."
       ],
       "tests": [
         "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_vector_source_purge_removes_all_derived_embeddings",
-        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_vector_source_identity_can_follow_source_metadata"
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_vector_source_identity_can_follow_source_metadata",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_canonical_tombstone_purges_all_vector_entries_for_source"
       ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
       "evidence": [
         "code:skeleton/memory/vector.py",
-        "code:skeleton/reliability/backup_restore.py",
+        "code:skeleton/memory/projection.py",
         "mirror:skeleton/ai/runtime/memory/vector.py",
-        "mirror:skeleton/ai/runtime/reliability/backup_restore.py",
+        "mirror:skeleton/ai/runtime/memory/projection.py",
         "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
         "workflow:P0 Data Lifecycle Erasure"
       ],
@@ -6822,14 +6823,15 @@
       ],
       "status": "catalogued",
       "requirements": [
-        "Retained backup payloads support physical removal of a governed state file across all historical backups.",
-        "Purging deleted sensitive state preserves unrelated backup content and leaves remaining backup checksums verifiable.",
-        "Individual backup deletion removes both the physical artifact and its index entry without reusing an existing backup identity."
+        "Deleting backup-managed sensitive state purges every indexed historical backup copy before removing the live source.",
+        "Missing, unreadable, or malformed indexed backups fail closed before live deletion.",
+        "Purging deleted state preserves unrelated backup content and prevents restore from resurrecting the deleted state."
       ],
       "tests": [
         "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_history_purge_removes_deleted_sensitive_state",
-        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_deletion_is_physical_and_ids_are_not_reused",
-        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_identity_rejects_noncanonical_paths"
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_delete_state_fails_closed_before_live_delete_on_missing_backup",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_delete_state_purges_history_before_live_source",
+        "skeleton/testing/test_p0_data_lifecycle_erasure.py::test_backup_deletion_is_physical_and_ids_are_not_reused"
       ],
       "properties": [],
       "chaos_cases": [],
