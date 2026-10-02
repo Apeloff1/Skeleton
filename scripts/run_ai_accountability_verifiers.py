@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -117,6 +118,19 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
                 raise RunnerError(
                     f"{key}: expected_receipt_verifier is required"
                 )
+            expected_script_sha256 = str(
+                group.get("expected_script_sha256") or ""
+            ).strip()
+            if not re.fullmatch(r"[0-9a-f]{64}", expected_script_sha256):
+                raise RunnerError(
+                    f"{key}: expected_script_sha256 must be a SHA-256 digest"
+                )
+            actual_script_sha256 = hashlib.sha256(script.read_bytes()).hexdigest()
+            if actual_script_sha256 != expected_script_sha256:
+                raise RunnerError(
+                    f"{key}: verifier script digest drift "
+                    f"(expected {expected_script_sha256}, found {actual_script_sha256})"
+                )
             if rel in seen:
                 raise RunnerError(
                     f"verifier script is reused by multiple groups: {rel}"
@@ -192,7 +206,8 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
                 "gap_id": gap_id,
                 "verifier_script": rel,
                 "expected_receipt_verifier": expected_receipt_verifier,
-                "script_digest": hashlib.sha256(script.read_bytes()).hexdigest(),
+                "expected_script_sha256": expected_script_sha256,
+                "script_digest": actual_script_sha256,
                 "returncode": returncode,
                 "passed": passed,
                 "stdout_tail": stdout,
