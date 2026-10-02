@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import pytest
 
+from skeleton.shells.admission_lease import AdmissionLeaseConflict, AdmissionLeases
 from skeleton.shells.arguments import ArgumentPolicy, ArgumentPolicySet, OptionRule
 from skeleton.shells.audit import MemoryAuditSink
 from skeleton.shells.capabilities import CapabilityGrant, ShellCapability
@@ -264,3 +265,124 @@ def test_executor_retry_sleep_is_capped_by_config(tmp_path):
         retry=RetryPolicy(max_attempts=2, retry_returncodes=frozenset({75}), initial_delay_seconds=99),
     )
     assert sleeps == [0.5]
+
+
+def test_executor_requires_effect_time_admission_when_registry_is_configured(tmp_path):
+    now = [0.0]
+    registry = AdmissionLeases(clock=lambda: now[0])
+    runner = FakeRunner(tmp_path, [ok_result()])
+    executor = ShellExecutor(
+        runner,
+        grant=full_grant(),
+        admission_leases=registry,
+    )
+    command = ShellCommand("python", cwd=tmp_path)
+    with pytest.raises(AdmissionLeaseConflict, match="required"):
+        executor.execute(command)
+    assert runner.commands == []
+
+
+def test_executor_consumes_matching_lease_at_effect_commit_point(tmp_path):
+    now = [0.0]
+    registry = AdmissionLeases(clock=lambda: now[0])
+    runner = FakeRunner(tmp_path, [ok_result()])
+    executor = ShellExecutor(
+        runner,
+        grant=full_grant(),
+        admission_leases=registry,
+    )
+    command = ShellCommand("python", cwd=tmp_path)
+    fingerprint = executor.execution_fingerprint(command)
+    lease = registry.acquire(
+        fingerprint,
+        principal="test",
+        command="python",
+        ttl_seconds=10,
+    )
+    assert executor.execute(command, admission_lease=lease).ok
+    with pytest.raises(AdmissionLeaseConflict, match="stale or expired"):
+        registry.require(lease)
+    with pytest.raises(AdmissionLeaseConflict):
+        executor.execute(command, admission_lease=lease)
+    assert len(runner.commands) == 1
+
+
+def test_executor_rejects_lease_revoked_by_pre_hook_before_spawn(tmp_path):
+    now = [0.0]
+    registry = AdmissionLeases(clock=lambda: now[0])
+    runner = FakeRunner(tmp_path, [ok_result()])
+    holder = {}
+
+    def revoke(_metadata):
+        assert registry.release(holder["lease"])
+
+    executor = ShellExecutor(
+        runner,
+        grant=full_grant(),
+        admission_leases=registry,
+        hooks=HookRegistry(pre=[revoke]),
+    )
+    command = ShellCommand("python", cwd=tmp_path)
+    holder["lease"] = registry.acquire(
+        executor.execution_fingerprint(command),
+        principal="test",
+        command="python",
+        ttl_seconds=10,
+    )
+    with pytest.raises(AdmissionLeaseConflict, match="stale or expired"):
+        executor.execute(command, admission_lease=holder["lease"])
+    assert runner.commands == []
+
+
+def test_executor_rejects_lease_expired_by_pre_hook_before_spawn(tmp_path):
+    now = [0.0]
+    registry = AdmissionLeases(clock=lambda: now[0])
+    runner = FakeRunner(tmp_path, [ok_result()])
+
+    def expire(_metadata):
+        now[0] = 2.0
+
+    executor = ShellExecutor(
+        runner,
+        grant=full_grant(),
+        admission_leases=registry,
+        hooks=HookRegistry(pre=[expire]),
+    )
+    command = ShellCommand("python", cwd=tmp_path)
+    lease = registry.acquire(
+        executor.execution_fingerprint(command),
+        principal="test",
+        command="python",
+        ttl_seconds=1.0,
+    )
+    with pytest.raises(AdmissionLeaseConflict, match="stale or expired"):
+        executor.execute(command, admission_lease=lease)
+    assert runner.commands == []
+
+
+def test_effect_lease_binds_environment_values_not_only_keys(tmp_path):
+    registry = AdmissionLeases()
+    runner = FakeRunner(tmp_path, [ok_result()])
+    executor = ShellExecutor(
+        runner,
+        grant=full_grant(),
+        admission_leases=registry,
+    )
+    approved = ShellCommand(
+        "python",
+        cwd=tmp_path,
+        env={"MODE": "safe"},
+    )
+    changed = ShellCommand(
+        "python",
+        cwd=tmp_path,
+        env={"MODE": "unsafe"},
+    )
+    lease = registry.acquire(
+        executor.execution_fingerprint(approved),
+        principal="test",
+        command="python",
+    )
+    with pytest.raises(AdmissionLeaseConflict, match="does not match"):
+        executor.execute(changed, admission_lease=lease)
+    assert runner.commands == []
