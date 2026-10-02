@@ -272,18 +272,31 @@ def _verification(
 
 
 async def _finalization(
-    _request,
+    request: AIExecutionRequest,
     candidate: str,
     payload: Mapping[str, object],
 ) -> ExecutionFinalizationBindings:
-    result_binding = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
-    payload_binding = _digest(dict(payload))
+    candidate_digest = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+    context_digest = payload.get("context_digest")
+    if (
+        not isinstance(context_digest, str)
+        or len(context_digest) != 64
+        or any(ch not in "0123456789abcdef" for ch in context_digest)
+    ):
+        raise RuntimeError("qualification finalization lost context digest")
+    artifact_binding = _digest(
+        {
+            "request_identity_digest": request.identity_digest,
+            "context_digest": context_digest,
+            "candidate_digest": candidate_digest,
+        }
+    )
     return ExecutionFinalizationBindings(
         memory_refs=(
-            "memory:system-qualification:" + result_binding,
+            "memory:system-qualification:" + candidate_digest,
         ),
         artifact_refs=(
-            "artifact:system-qualification:" + payload_binding,
+            "artifact:system-qualification:" + artifact_binding,
         ),
     )
 
@@ -352,101 +365,6 @@ async def _run_once(
     )
 
 
-
-def _stop_request(kind: str, *, deadline: bool) -> AIExecutionRequest:
-    stop_policy: dict[str, object] = {"max_repeat_tool_batches": 1}
-    if deadline:
-        stop_policy["deadline"] = QUALIFICATION_TIME.isoformat()
-    return AIExecutionRequest(
-        operation_id=f"system-qualification-stop-operation-{kind}",
-        execution_id=f"system-qualification-stop-execution-{kind}",
-        objective="Prove standalone AI stop semantics fail closed.",
-        context_policy={
-            "tenant_id": "default",
-            "data_class": "internal",
-            "capability": "vs001.functional_ai",
-        },
-        tool_policy={
-            "tenant_id": "default",
-            "data_class": "internal",
-            "purpose": "tool-execution",
-            "allowed_tool_ids": [],
-        },
-        resource_budget={
-            "max_model_turns": 1,
-            "max_tool_calls": 1,
-        },
-        stop_policy=stop_policy,
-        created_at=QUALIFICATION_TIME,
-    )
-
-
-async def _stop_semantics_results(
-    workdir: Path,
-):
-    context_digest = hashlib.sha256(
-        b"system-qualification-stop-context-v1"
-    ).hexdigest()
-
-    deadline_repository = SQLiteExecutionRepository(
-        workdir / "system-qualification-deadline.sqlite3"
-    )
-    deadline_runtime = CognitiveExecutionRuntime(
-        deadline_repository,
-        _local_model(),
-        AsyncToolRuntime(),
-        verification_hook=_verification,
-    )
-    deadline_request = _stop_request("deadline", deadline=True)
-    deadline_run = await deadline_runtime.start(
-        deadline_request,
-        instructions="Do not execute after the deadline.",
-        prompt="This qualification request is already at its deadline.",
-        context_digest=context_digest,
-        now=QUALIFICATION_TIME,
-    )
-    if deadline_run.result is None:
-        raise RuntimeError("deadline qualification did not terminate")
-
-    cancellation_repository = SQLiteExecutionRepository(
-        workdir / "system-qualification-cancellation.sqlite3"
-    )
-    cancellation_runtime = CognitiveExecutionRuntime(
-        cancellation_repository,
-        _local_model(),
-        AsyncToolRuntime(),
-        verification_hook=_verification,
-    )
-    cancellation_request = _stop_request("cancellation", deadline=False)
-    execution = cancellation_repository.create(
-        cancellation_request,
-        now=QUALIFICATION_TIME,
-    )
-    payload = cancellation_runtime._initial_payload(
-        cancellation_request,
-        instructions="Stop before any provider or tool work.",
-        prompt="Cancellation qualification.",
-        context_digest=context_digest,
-        history=(),
-    )
-    execution, _checkpoint_ref = cancellation_runtime._checkpoint(
-        execution,
-        payload,
-        now=QUALIFICATION_TIME,
-    )
-    cancellation_repository.request_cancel(
-        cancellation_request.execution_id,
-        expected_version=execution.version,
-        now=QUALIFICATION_TIME,
-    )
-    cancellation_run = await cancellation_runtime.resume(
-        cancellation_request.execution_id,
-        now=QUALIFICATION_TIME,
-    )
-    if cancellation_run.result is None:
-        raise RuntimeError("cancellation qualification did not terminate")
-
-    return deadline_run.result, cancellation_run.result
 
 def _stop_request(kind: str, *, deadline: bool) -> AIExecutionRequest:
     stop_policy: dict[str, object] = {"max_repeat_tool_batches": 1}
