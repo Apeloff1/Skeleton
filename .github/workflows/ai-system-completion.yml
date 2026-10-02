@@ -93,6 +93,8 @@ jobs:
           skeleton/testing/test_memory_writeback.py
           skeleton/testing/test_outbound_url_resolution_security.py
           skeleton/testing/test_security_outbound_http.py
+          skeleton/testing/test_admission_runtime.py
+          skeleton/testing/test_execution_repository.py
           tests/test_ai_system_completion_verifier.py
           tests/test_ai_system_qualification.py
           tests/test_ai_system_qualification_receipt_verifier.py
@@ -176,8 +178,8 @@ jobs:
               raise SystemExit("runtime report source revision is not exact-head")
           if report.get("missing") or report.get("failed"):
               raise SystemExit("runtime report contains open completion proofs")
-          if len(proofs) != 24:
-              raise SystemExit("runtime qualification must emit 24 proofs")
+          if len(proofs) != 28:
+              raise SystemExit("runtime qualification must emit 28 proofs")
           if any(proof.get("source_revision") != expected for proof in proofs):
               raise SystemExit("a runtime proof is from a different source revision")
           subject = receipt.get("subject_id")
@@ -226,15 +228,15 @@ jobs:
               raise SystemExit("system completion receipt is not exact-head")
           if receipt.get("verifier") != "independent-ai-system-completion-v1":
               raise SystemExit("unexpected system completion verifier identity")
-          if receipt.get("requirement_count") != 24:
-              raise SystemExit("system completion must prove exactly 24 required planes")
+          if receipt.get("requirement_count") != 28:
+              raise SystemExit("system completion must prove exactly 28 required planes")
           if receipt.get("requirements") != receipt.get("runtime_requirements"):
               raise SystemExit("machine/runtime completion requirement inventories diverge")
           if receipt.get("valid") is not True or receipt.get("errors"):
               raise SystemExit("system completion receipt is invalid")
           if not receipt.get("contract_digest"):
               raise SystemExit("system completion contract is not digest-bound")
-          if len(receipt.get("file_digests") or {}) < 29:
+          if len(receipt.get("file_digests") or {}) < 36:
               raise SystemExit("system completion source bindings are incomplete")
           if len(receipt.get("receipt_digest") or "") != 64:
               raise SystemExit("system completion receipt digest is missing")
