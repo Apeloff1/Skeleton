@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 import os
 import socket
+import sqlite3
 import sys
 import threading
 from typing import Mapping
@@ -86,6 +87,11 @@ from skeleton.ai.shell.model_port import (
 )
 from skeleton.ai.shell.provider_router import AIProviderRouter
 from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
+from skeleton.contracts.verification import (
+    VerificationLevel,
+    VerificationOutcome,
+    VerificationReceipt,
+)
 from skeleton.memory.writeback import (
     GovernedMemoryWriter,
     MemoryStageConflict,
@@ -112,6 +118,7 @@ from skeleton.intelligence.admission import (
 from skeleton.intelligence.admission_runtime import (
     AdmissionRuntime,
     AdmissionRuntimeConflict,
+    AdmissionRuntimeError,
 )
 from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.intelligence.shared_pressure import (
@@ -124,7 +131,11 @@ from skeleton.intelligence.execution_runtime import (
     ExecutionFinalizationBindings,
     ExecutionVerificationDecision,
 )
-from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.persistence.execution_repository import (
+    ExecutionRepositoryConflict,
+    ExecutionRepositoryCorruption,
+    SQLiteExecutionRepository,
+)
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -242,6 +253,26 @@ class ResourceIsolationCycle:
     other_tenant_hidden: bool
     cross_tenant_get_rejected: bool
     subject_scope_preserved: bool
+    unknown_usage_recorded: bool
+    completion_blocked_while_unknown: bool
+    release_blocked_while_unknown: bool
+    conservative_resolution_required: bool
+    completion_succeeds_after_resolution: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PersistenceReliabilityCycle:
+    verification_identical_replay_stable: bool
+    verification_conflicting_replay_rejected: bool
+    verification_digest_tamper_rejected: bool
+    verification_execution_binding_preserved: bool
+    one_pending_terminal_event: bool
+    acknowledgement_persistent: bool
+    acknowledgement_retry_stable: bool
+    no_pending_after_ack: bool
+    result_tamper_rejected: bool
+    outbox_tamper_rejected: bool
+    migration_backfill_verified: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -1473,6 +1504,123 @@ def _resource_isolation_cycle(
         and wrong_subject == ()
     )
 
+    unknown_tenant = "system-qualification-unknown-usage"
+    unknown_quota = TenantQuotaLedger()
+    unknown_quota.configure(
+        unknown_tenant,
+        TenantQuota(
+            window_id="system-qualification-unknown-window",
+            max_operations=2,
+            max_input_tokens=20,
+            max_output_tokens=20,
+            max_cost_usd=2.0,
+            max_tool_calls=8,
+            max_artifact_bytes=2048,
+            max_storage_bytes=2048,
+            max_concurrent_operations=1,
+        ),
+    )
+    unknown_runtime = AdmissionRuntime(quota_ledger=unknown_quota)
+    unknown_operation = str(
+        uuid5(
+            NAMESPACE_URL,
+            "system-qualification-unknown-usage:" + execution_id,
+        )
+    )
+    unknown_request = AdmissionRequest(
+        operation_id=unknown_operation,
+        tenant_id=unknown_tenant,
+        capability="system-qualification",
+        budget=ResourceBudget(
+            max_input_tokens=20,
+            max_output_tokens=20,
+            max_cost_usd=2.0,
+            max_wall_seconds=10.0,
+            max_provider_attempts=2,
+            max_tool_calls=8,
+            max_artifact_bytes=2048,
+            max_storage_bytes=2048,
+            max_concurrency=1,
+            max_queue_depth=4,
+        ),
+        estimate=UsageEstimate(
+            input_tokens=2,
+            output_tokens=1,
+            tool_calls=1,
+        ),
+    )
+    unknown_lease = unknown_runtime.admit(
+        unknown_request,
+        now_wall=30.0,
+    )
+    unknown_event = "qualification-unknown-tool-usage"
+    unknown_runtime.mark_usage_unknown(
+        unknown_operation,
+        unknown_event,
+        "tool",
+        "tool usage receipt temporarily unavailable",
+        now_wall=30.1,
+    )
+    reservation = unknown_lease.quota_reservation
+    if reservation is None:
+        raise RuntimeError(
+            "unknown-usage qualification requires quota reservation"
+        )
+    unresolved = unknown_quota.unresolved_usage(
+        reservation.reservation_id
+    )
+    unknown_usage_recorded = bool(
+        len(unresolved) == 1
+        and unknown_runtime.snapshot()["unknown_usage_events"] == 1
+    )
+
+    completion_blocked_while_unknown = False
+    try:
+        unknown_runtime.complete(
+            unknown_operation,
+            UsageEstimate(input_tokens=2, output_tokens=1),
+            now_wall=30.2,
+        )
+    except AdmissionRuntimeError as exc:
+        completion_blocked_while_unknown = str(exc).startswith(
+            "actual_usage_unknown:"
+        )
+
+    release_blocked_while_unknown = False
+    try:
+        unknown_runtime.release(unknown_operation)
+    except AdmissionRuntimeError as exc:
+        release_blocked_while_unknown = str(exc).startswith(
+            "actual_usage_unknown:"
+        )
+
+    unknown_runtime.resolve_unknown_usage(
+        unknown_operation,
+        unknown_event,
+        UsageEstimate(tool_calls=2),
+        now_wall=30.3,
+    )
+    conservative_resolution_required = bool(
+        unknown_quota.unresolved_usage(reservation.reservation_id) == ()
+        and unknown_quota.metered_usage(
+            reservation.reservation_id
+        ).tool_calls == 2
+    )
+    unknown_completion = unknown_runtime.complete(
+        unknown_operation,
+        UsageEstimate(
+            input_tokens=2,
+            output_tokens=1,
+            tool_calls=1,
+        ),
+        now_wall=30.4,
+    )
+    completion_succeeds_after_resolution = bool(
+        unknown_completion.quota_completion is not None
+        and unknown_completion.quota_completion.actual.tool_calls == 2
+        and unknown_runtime.pressure.active_operations == 0
+    )
+
     return ResourceIsolationCycle(
         admitted_within_budget=admitted_within_budget,
         over_quota_rejected=over_quota_rejected,
@@ -1491,6 +1639,400 @@ def _resource_isolation_cycle(
         other_tenant_hidden=other_tenant_hidden,
         cross_tenant_get_rejected=cross_tenant_get_rejected,
         subject_scope_preserved=subject_scope_preserved,
+        unknown_usage_recorded=unknown_usage_recorded,
+        completion_blocked_while_unknown=(
+            completion_blocked_while_unknown
+        ),
+        release_blocked_while_unknown=(
+            release_blocked_while_unknown
+        ),
+        conservative_resolution_required=(
+            conservative_resolution_required
+        ),
+        completion_succeeds_after_resolution=(
+            completion_succeeds_after_resolution
+        ),
+    )
+
+
+def _persistence_reliability_cycle(
+    workdir: Path,
+    *,
+    request: FunctionalAIRequest,
+    terminal: AIExecutionResult,
+) -> PersistenceReliabilityCycle:
+    database_path = (
+        workdir / "system-qualification-persistence-reliability.sqlite3"
+    )
+    if database_path.exists():
+        database_path.unlink()
+
+    repository = SQLiteExecutionRepository(database_path)
+    execution_request = request.to_execution_request()
+    execution = repository.create(
+        execution_request,
+        now=QUALIFICATION_TIME,
+    )
+    for state in (
+        ExecutionState.LOADING,
+        ExecutionState.ASSEMBLING_CONTEXT,
+        ExecutionState.ROUTING,
+        ExecutionState.PROVIDER_PENDING,
+        ExecutionState.PROVIDER_COMPLETED,
+        ExecutionState.VERIFYING,
+    ):
+        execution = repository.transition(
+            execution_request.execution_id,
+            state,
+            expected_version=execution.version,
+            now=QUALIFICATION_TIME,
+        )
+    repository.finalize(
+        terminal,
+        expected_execution_version=execution.version,
+        now=QUALIFICATION_TIME,
+    )
+
+    receipt_id = str(
+        uuid5(
+            NAMESPACE_URL,
+            "system-qualification-verification-receipt:"
+            + request.execution_id,
+        )
+    )
+    claim_id = str(
+        uuid5(
+            NAMESPACE_URL,
+            "system-qualification-verification-claim:"
+            + request.execution_id,
+        )
+    )
+    check_id = str(
+        uuid5(
+            NAMESPACE_URL,
+            "system-qualification-verification-check:"
+            + request.execution_id,
+        )
+    )
+    receipt = VerificationReceipt(
+        receipt_id=receipt_id,
+        claim_id=claim_id,
+        claim_digest=hashlib.sha256(
+            (terminal.final_output or "").encode("utf-8")
+        ).hexdigest(),
+        tenant_id="system-qualification",
+        operation_id=request.operation_id,
+        execution_id=request.execution_id,
+        result_ref="execution-result:" + request.execution_id,
+        outcome=VerificationOutcome.PASSED,
+        policy_level=VerificationLevel.STRUCTURAL,
+        required_modes=("structural",),
+        policy_satisfied=True,
+        check_id=check_id,
+        verifier_id="system-qualification:receipt-identity-v1",
+        verified_at=QUALIFICATION_TIME,
+    )
+    first_receipt = repository.remember_verification_receipt(receipt)
+    replay_receipt = repository.remember_verification_receipt(receipt)
+    verification_identical_replay_stable = replay_receipt == first_receipt
+    verification_execution_binding_preserved = bool(
+        replay_receipt.execution_id == request.execution_id
+        and replay_receipt.operation_id == request.operation_id
+        and replay_receipt.result_ref
+        == "execution-result:" + request.execution_id
+    )
+
+    conflicting = VerificationReceipt(
+        receipt_id=receipt.receipt_id,
+        claim_id=receipt.claim_id,
+        claim_digest=receipt.claim_digest,
+        tenant_id=receipt.tenant_id,
+        operation_id=receipt.operation_id,
+        execution_id=receipt.execution_id,
+        result_ref=receipt.result_ref,
+        outcome=receipt.outcome,
+        policy_level=receipt.policy_level,
+        required_modes=receipt.required_modes,
+        policy_satisfied=receipt.policy_satisfied,
+        check_id=receipt.check_id,
+        verifier_id="system-qualification:conflicting-verifier-v1",
+        verified_at=receipt.verified_at,
+    )
+    verification_conflicting_replay_rejected = False
+    try:
+        repository.remember_verification_receipt(conflicting)
+    except ExecutionRepositoryConflict:
+        verification_conflicting_replay_rejected = True
+
+    repository._connection.execute(
+        """
+        UPDATE ai_verification_receipt
+        SET receipt_json = replace(
+            receipt_json,
+            'receipt-identity-v1',
+            'receipt-identity-v2'
+        )
+        WHERE namespace = ? AND receipt_id = ?
+        """,
+        (repository.namespace, receipt.receipt_id),
+    )
+    verification_digest_tamper_rejected = False
+    try:
+        repository.verification_receipt(receipt.receipt_id)
+    except ExecutionRepositoryCorruption:
+        verification_digest_tamper_rejected = True
+
+    pending = repository.pending_outbox(
+        execution_id=request.execution_id
+    )
+    one_pending_terminal_event = bool(
+        len(pending) == 1
+        and pending[0].event_type == "execution.completed"
+        and pending[0].execution_id == request.execution_id
+    )
+    if len(pending) != 1:
+        raise RuntimeError(
+            "persistence qualification expected one terminal outbox event"
+        )
+    first_ack = repository.acknowledge_outbox(
+        pending[0].outbox_id,
+        published_at=QUALIFICATION_TIME,
+    )
+    replay_ack = repository.acknowledge_outbox(
+        pending[0].outbox_id,
+        published_at=QUALIFICATION_TIME.replace(second=1),
+    )
+    acknowledgement_retry_stable = replay_ack == first_ack
+    no_pending_after_ack = (
+        repository.pending_outbox(
+            execution_id=request.execution_id
+        )
+        == ()
+    )
+    repository.close()
+
+    reopened = SQLiteExecutionRepository(database_path)
+    persisted_ack = reopened.acknowledge_outbox(
+        first_ack.outbox_id,
+        published_at=QUALIFICATION_TIME.replace(second=2),
+    )
+    acknowledgement_persistent = persisted_ack == first_ack
+    reopened.close()
+
+    tamper_path = workdir / "system-qualification-tamper.sqlite3"
+    if tamper_path.exists():
+        tamper_path.unlink()
+    tamper_repository = SQLiteExecutionRepository(tamper_path)
+    tamper_execution = tamper_repository.create(
+        execution_request,
+        now=QUALIFICATION_TIME,
+    )
+    for state in (
+        ExecutionState.LOADING,
+        ExecutionState.ASSEMBLING_CONTEXT,
+        ExecutionState.ROUTING,
+        ExecutionState.PROVIDER_PENDING,
+        ExecutionState.PROVIDER_COMPLETED,
+        ExecutionState.VERIFYING,
+    ):
+        tamper_execution = tamper_repository.transition(
+            execution_request.execution_id,
+            state,
+            expected_version=tamper_execution.version,
+            now=QUALIFICATION_TIME,
+        )
+    tamper_repository.finalize(
+        terminal,
+        expected_execution_version=tamper_execution.version,
+        now=QUALIFICATION_TIME,
+    )
+
+    original_output = terminal.final_output or ""
+    forged_output = original_output + " forged"
+    tamper_repository._connection.execute(
+        """
+        UPDATE ai_execution_result
+        SET result_json = replace(result_json, ?, ?)
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (
+            original_output,
+            forged_output,
+            tamper_repository.namespace,
+            request.execution_id,
+        ),
+    )
+    result_tamper_rejected = False
+    try:
+        tamper_repository.result(request.execution_id)
+    except ExecutionRepositoryCorruption:
+        result_tamper_rejected = True
+
+    tamper_repository._connection.execute(
+        """
+        UPDATE ai_execution_outbox
+        SET payload_json = replace(
+            payload_json,
+            '"status":"completed"',
+            '"status":"degraded"'
+        )
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (tamper_repository.namespace, request.execution_id),
+    )
+    outbox_tamper_rejected = False
+    try:
+        tamper_repository.pending_outbox(
+            execution_id=request.execution_id
+        )
+    except ExecutionRepositoryCorruption:
+        outbox_tamper_rejected = True
+    tamper_repository.close()
+
+    legacy_path = workdir / "system-qualification-legacy-digest.sqlite3"
+    if legacy_path.exists():
+        legacy_path.unlink()
+    legacy = sqlite3.connect(legacy_path)
+    legacy.execute(
+        """
+        CREATE TABLE ai_execution_result (
+            namespace TEXT NOT NULL,
+            execution_id TEXT NOT NULL,
+            result_json TEXT NOT NULL,
+            completed_at TEXT NOT NULL,
+            PRIMARY KEY(namespace, execution_id)
+        )
+        """
+    )
+    legacy.execute(
+        """
+        CREATE TABLE ai_execution_outbox (
+            namespace TEXT NOT NULL,
+            outbox_id TEXT NOT NULL,
+            execution_id TEXT NOT NULL,
+            execution_version INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            published_at TEXT,
+            PRIMARY KEY(namespace, outbox_id),
+            UNIQUE(
+                namespace,
+                execution_id,
+                event_type,
+                execution_version
+            )
+        )
+        """
+    )
+    legacy_payload = terminal.as_dict()
+    legacy.execute(
+        """
+        INSERT INTO ai_execution_result(
+            namespace, execution_id, result_json, completed_at
+        ) VALUES (?, ?, ?, ?)
+        """,
+        (
+            "ai_execution",
+            request.execution_id,
+            json.dumps(
+                legacy_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            terminal.completed_at.isoformat(),
+        ),
+    )
+    outbox_payload = {
+        "operation_id": terminal.operation_id,
+        "execution_id": terminal.execution_id,
+        "status": terminal.status,
+        "result_ref": "execution-result:" + terminal.execution_id,
+    }
+    legacy.execute(
+        """
+        INSERT INTO ai_execution_outbox(
+            namespace, outbox_id, execution_id, execution_version,
+            event_type, payload_json, created_at, published_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+        """,
+        (
+            "ai_execution",
+            str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "system-qualification-legacy-outbox:"
+                    + request.execution_id,
+                )
+            ),
+            request.execution_id,
+            1,
+            "execution.completed",
+            json.dumps(
+                outbox_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            QUALIFICATION_TIME.isoformat(),
+        ),
+    )
+    legacy.commit()
+    legacy.close()
+
+    migrated = SQLiteExecutionRepository(legacy_path)
+    result_row = migrated._connection.execute(
+        """
+        SELECT result_digest FROM ai_execution_result
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (migrated.namespace, request.execution_id),
+    ).fetchone()
+    outbox_row = migrated._connection.execute(
+        """
+        SELECT payload_digest FROM ai_execution_outbox
+        WHERE namespace = ? AND execution_id = ?
+        """,
+        (migrated.namespace, request.execution_id),
+    ).fetchone()
+    migration_backfill_verified = bool(
+        result_row is not None
+        and isinstance(result_row["result_digest"], str)
+        and len(result_row["result_digest"]) == 64
+        and outbox_row is not None
+        and isinstance(outbox_row["payload_digest"], str)
+        and len(outbox_row["payload_digest"]) == 64
+        and migrated.result(request.execution_id) == terminal
+        and len(
+            migrated.pending_outbox(
+                execution_id=request.execution_id
+            )
+        )
+        == 1
+    )
+    migrated.close()
+
+    return PersistenceReliabilityCycle(
+        verification_identical_replay_stable=(
+            verification_identical_replay_stable
+        ),
+        verification_conflicting_replay_rejected=(
+            verification_conflicting_replay_rejected
+        ),
+        verification_digest_tamper_rejected=(
+            verification_digest_tamper_rejected
+        ),
+        verification_execution_binding_preserved=(
+            verification_execution_binding_preserved
+        ),
+        one_pending_terminal_event=one_pending_terminal_event,
+        acknowledgement_persistent=acknowledgement_persistent,
+        acknowledgement_retry_stable=(
+            acknowledgement_retry_stable
+        ),
+        no_pending_after_ack=no_pending_after_ack,
+        result_tamper_rejected=result_tamper_rejected,
+        outbox_tamper_rejected=outbox_tamper_rejected,
+        migration_backfill_verified=migration_backfill_verified,
     )
 
 
@@ -1499,7 +2041,7 @@ async def qualify_system_completion(
     *,
     source_revision: str,
 ) -> SystemQualificationReceipt:
-    """Execute and independently qualify the 28-plane completion chain."""
+    """Execute and independently qualify the 32-plane completion chain."""
 
     root = Path(workdir)
     root.mkdir(parents=True, exist_ok=True)
@@ -1531,6 +2073,11 @@ async def qualify_system_completion(
         root,
         execution_id=primary.request.execution_id,
         operation_id=primary.request.operation_id,
+    )
+    persistence = _persistence_reliability_cycle(
+        root,
+        request=primary.request,
+        terminal=terminal,
     )
 
     recovered_repository = SQLiteExecutionRepository(primary.database_path)
@@ -1637,6 +2184,27 @@ async def qualify_system_completion(
         staged_intent_digest=staged_intent_digest,
         intent_cleared=staged_intent_cleared,
     )
+    plane.prove_persisted_evidence_integrity(
+        execution_id=primary.request.execution_id,
+        result_tamper_rejected=persistence.result_tamper_rejected,
+        outbox_tamper_rejected=persistence.outbox_tamper_rejected,
+        migration_backfill_verified=(
+            persistence.migration_backfill_verified
+        ),
+        evidence_refs=(
+            "persistence-integrity:"
+            + _digest(
+                {
+                    "result_tamper_rejected":
+                        persistence.result_tamper_rejected,
+                    "outbox_tamper_rejected":
+                        persistence.outbox_tamper_rejected,
+                    "migration_backfill_verified":
+                        persistence.migration_backfill_verified,
+                }
+            ),
+        ),
+    )
     plane.prove_replay_lineage(recovered_turns)
     plane.prove_reproducibility(
         primary_execution_id=primary.request.execution_id,
@@ -1658,6 +2226,36 @@ async def qualify_system_completion(
         terminal,
         context_digest=primary.request.context_digest,
     )
+    plane.prove_verification_receipt_identity(
+        execution_id=primary.request.execution_id,
+        identical_replay_stable=(
+            persistence.verification_identical_replay_stable
+        ),
+        conflicting_replay_rejected=(
+            persistence.verification_conflicting_replay_rejected
+        ),
+        digest_tamper_rejected=(
+            persistence.verification_digest_tamper_rejected
+        ),
+        execution_binding_preserved=(
+            persistence.verification_execution_binding_preserved
+        ),
+        evidence_refs=(
+            "verification-receipt-identity:"
+            + _digest(
+                {
+                    "identical_replay":
+                        persistence.verification_identical_replay_stable,
+                    "conflict_rejected":
+                        persistence.verification_conflicting_replay_rejected,
+                    "tamper_rejected":
+                        persistence.verification_digest_tamper_rejected,
+                    "execution_binding":
+                        persistence.verification_execution_binding_preserved,
+                }
+            ),
+        ),
+    )
     plane.prove_context_integrity(
         context_subject_id=primary.request.execution_id,
         problems=context_ledger.verify(),
@@ -1672,6 +2270,34 @@ async def qualify_system_completion(
         post_delete_recalled_ids=recalled_after_delete,
     )
     plane.prove_finalization_lineage(terminal)
+    plane.prove_terminal_outbox_delivery(
+        execution_id=primary.request.execution_id,
+        one_pending_terminal_event=(
+            persistence.one_pending_terminal_event
+        ),
+        acknowledgement_persistent=(
+            persistence.acknowledgement_persistent
+        ),
+        acknowledgement_retry_stable=(
+            persistence.acknowledgement_retry_stable
+        ),
+        no_pending_after_ack=persistence.no_pending_after_ack,
+        evidence_refs=(
+            "terminal-outbox:"
+            + _digest(
+                {
+                    "one_pending":
+                        persistence.one_pending_terminal_event,
+                    "persistent":
+                        persistence.acknowledgement_persistent,
+                    "retry_stable":
+                        persistence.acknowledgement_retry_stable,
+                    "no_pending":
+                        persistence.no_pending_after_ack,
+                }
+            ),
+        ),
+    )
     plane.prove_sandbox_filesystem(
         execution_id=primary.request.execution_id,
         safe_roundtrip=hostile.filesystem_safe_roundtrip,
@@ -1824,6 +2450,38 @@ async def qualify_system_completion(
                         resources.denial_capacity_unchanged,
                     "usage_reconciled":
                         resources.usage_reconciled,
+                }
+            ),
+        ),
+    )
+    plane.prove_unknown_usage_fence(
+        execution_id=primary.request.execution_id,
+        unknown_usage_recorded=resources.unknown_usage_recorded,
+        completion_blocked_while_unknown=(
+            resources.completion_blocked_while_unknown
+        ),
+        release_blocked_while_unknown=(
+            resources.release_blocked_while_unknown
+        ),
+        conservative_resolution_required=(
+            resources.conservative_resolution_required
+        ),
+        completion_succeeds_after_resolution=(
+            resources.completion_succeeds_after_resolution
+        ),
+        evidence_refs=(
+            "unknown-usage-fence:"
+            + _digest(
+                {
+                    "recorded": resources.unknown_usage_recorded,
+                    "completion_blocked":
+                        resources.completion_blocked_while_unknown,
+                    "release_blocked":
+                        resources.release_blocked_while_unknown,
+                    "resolved":
+                        resources.conservative_resolution_required,
+                    "completion_after_resolution":
+                        resources.completion_succeeds_after_resolution,
                 }
             ),
         ),
