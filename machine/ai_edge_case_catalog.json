@@ -4338,7 +4338,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "evidence_pending"
+      "accountability_status": "planned"
     },
     {
       "id": "EDGE-AI-002",
