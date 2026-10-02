@@ -67,9 +67,30 @@ class BackupManager:
     def _checksum(self, data: str) -> str:
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
+    @staticmethod
+    def _safe_backup_id(backup_id: str) -> str:
+        if (
+            not isinstance(backup_id, str)
+            or len(backup_id) < 2
+            or backup_id[0] != "b"
+            or not backup_id[1:].isdigit()
+        ):
+            raise ValueError("invalid backup_id")
+        return backup_id
+
+    def _next_backup_id(self) -> str:
+        sequence = [
+            int(item["backup_id"][1:])
+            for item in self._index
+            if isinstance(item.get("backup_id"), str)
+            and item["backup_id"].startswith("b")
+            and item["backup_id"][1:].isdigit()
+        ]
+        return f"b{(max(sequence, default=0) + 1):04d}"
+
     def backup(self, label: str = "", incremental: bool = False) -> Dict[str, Any]:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_id = f"b{len(self._index) + 1:04d}"
+        backup_id = self._next_backup_id()
         last = self._index[-1] if (incremental and self._index) else None
         captured: Dict[str, str] = {}
         for name in STATE_FILES:
@@ -109,8 +130,7 @@ class BackupManager:
 
     def delete_backup(self, backup_id: str) -> bool:
         """Physically remove one retained backup and its index entry."""
-        if not isinstance(backup_id, str) or not backup_id:
-            raise ValueError("backup_id must be a non-empty string")
+        backup_id = self._safe_backup_id(backup_id)
         match = next(
             (item for item in self._index if item.get("backup_id") == backup_id),
             None,
@@ -181,6 +201,7 @@ class BackupManager:
         return len(staged)
 
     def verify(self, backup_id: str) -> Dict[str, Any]:
+        backup_id = self._safe_backup_id(backup_id)
         path = self.backup_dir / f"{backup_id}.json"
         if not path.exists():
             return {"backup_id": backup_id, "valid": False, "error": "not found"}
@@ -189,6 +210,7 @@ class BackupManager:
         return {"backup_id": backup_id, "valid": not bad, "corrupted": bad}
 
     def restore(self, backup_id: str, dry_run: bool = True) -> Dict[str, Any]:
+        backup_id = self._safe_backup_id(backup_id)
         path = self.backup_dir / f"{backup_id}.json"
         if not path.exists():
             raise FileNotFoundError(f"backup not found: {backup_id}")
