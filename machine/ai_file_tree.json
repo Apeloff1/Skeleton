@@ -1386,7 +1386,7 @@
       "source": "skeleton/gate_plane",
       "destination": "skeleton/ai/runtime/policy/gate_plane",
       "kind": "tree",
-      "source_git_object_sha": "1aace0e1227833ab40c569de774bbb61790d098e",
+      "source_git_object_sha": "a86d0e7a5a9938647966de028a61608db7f88289",
       "role": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
       "work_package_refs": [
         "WP-W14",
