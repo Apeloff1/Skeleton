@@ -1993,6 +1993,36 @@ class EngineClient:
             )
         return execution_id
 
+    async def _cancel_after_client_abort(
+        self,
+        command: EngineExecutionCommand,
+    ) -> None:
+        """Best-effort bounded durable cancellation after caller interruption."""
+
+        try:
+            cleanup = asyncio.create_task(
+                self.cancel(
+                    command.execution_request.execution_id,
+                    actor_id=command.operation.actor_id,
+                    tenant_id=command.operation.tenant_id,
+                    reason="client_cancelled",
+                    trace_id=command.operation.trace_id,
+                )
+            )
+            await asyncio.wait_for(
+                asyncio.shield(cleanup),
+                timeout=min(self.config.request_timeout_s, 5.0),
+            )
+        except (
+            asyncio.TimeoutError,
+            EngineClientError,
+            httpx.HTTPError,
+        ):
+            # The caller cancellation remains primary. The engine execution is
+            # durable, so a failed cleanup request can still be reconciled by
+            # explicit status/cancel or server-side deadline/recovery policy.
+            return
+
     async def execute(
         self,
         command: EngineExecutionCommand,
@@ -2002,35 +2032,39 @@ class EngineClient:
 
         execution_id = command.execution_request.execution_id
         try:
-            ack = await self.submit(command)
-        except EngineUnavailableError as first_error:
             try:
-                recovered = await self._recover_ambiguous_submit(command)
-            except EngineUnavailableError:
-                raise first_error
-            if not recovered:
+                ack = await self.submit(command)
+            except EngineUnavailableError as first_error:
                 try:
-                    ack = await self.submit(command)
-                except EngineUnavailableError as retry_error:
+                    recovered = await self._recover_ambiguous_submit(command)
+                except EngineUnavailableError:
+                    raise first_error
+                if not recovered:
                     try:
-                        recovered = await self._recover_ambiguous_submit(command)
-                    except (EngineNotFoundError, EngineUnavailableError):
-                        raise retry_error
-                    if not recovered:
-                        raise retry_error
+                        ack = await self.submit(command)
+                    except EngineUnavailableError as retry_error:
+                        try:
+                            recovered = await self._recover_ambiguous_submit(command)
+                        except (EngineNotFoundError, EngineUnavailableError):
+                            raise retry_error
+                        if not recovered:
+                            raise retry_error
+                    else:
+                        execution_id = self._validate_ack_identity(ack, command)
                 else:
-                    execution_id = self._validate_ack_identity(ack, command)
+                    execution_id = command.execution_request.execution_id
             else:
-                execution_id = command.execution_request.execution_id
-        else:
-            execution_id = self._validate_ack_identity(ack, command)
+                execution_id = self._validate_ack_identity(ack, command)
 
-        return await self.wait_for_terminal(
-            execution_id=execution_id,
-            actor_id=command.operation.actor_id,
-            tenant_id=command.operation.tenant_id,
-            trace_id=command.operation.trace_id,
-        )
+            return await self.wait_for_terminal(
+                execution_id=execution_id,
+                actor_id=command.operation.actor_id,
+                tenant_id=command.operation.tenant_id,
+                trace_id=command.operation.trace_id,
+            )
+        except asyncio.CancelledError:
+            await self._cancel_after_client_abort(command)
+            raise
 
 
 __all__ = [
