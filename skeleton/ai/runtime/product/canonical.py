@@ -182,6 +182,10 @@ class CanonicalAITurnRequest:
             if not isinstance(raw, str) or not raw.strip():
                 raise ValueError("attachment_refs must contain non-empty strings")
             value = raw.strip()
+            if value.startswith("product-turn-sha256:"):
+                raise ValueError(
+                    "attachment_refs cannot use reserved product turn identity prefix"
+                )
             if value not in attachments:
                 attachments.append(value)
         if len(attachments) > 256:
