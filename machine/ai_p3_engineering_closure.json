@@ -1,0 +1,106 @@
+{
+  "schema_version": "skeleton.p3.engineering_closure.v1",
+  "closure_id": "P3-T1-AUTONOMOUS-ENGINEERING",
+  "status": "candidate",
+  "claim_scope": "bounded_autonomous_engineering_extension",
+  "claim": "The 37-volume P3-T1 autonomous-engineering extension is implementation-landed with exact-head executable evidence. This does not claim completion of the 197 remaining P3 volumes or independent masterplan sign-off.",
+  "parent": {
+    "closure": "machine/ai_p3_expansion_closure.json",
+    "required_status": "closed",
+    "source_volume_count": 234
+  },
+  "frontier": {
+    "scheduled_volume_count": 37,
+    "queued_volume_count": 197,
+    "scheduled_volume_refs": [
+      "VOL-306",
+      "VOL-307",
+      "VOL-308",
+      "VOL-309",
+      "VOL-310",
+      "VOL-311",
+      "VOL-312",
+      "VOL-313",
+      "VOL-314",
+      "VOL-315",
+      "VOL-316",
+      "VOL-317",
+      "VOL-319",
+      "VOL-330",
+      "VOL-331",
+      "VOL-332",
+      "VOL-333",
+      "VOL-334",
+      "VOL-335",
+      "VOL-336",
+      "VOL-337",
+      "VOL-338",
+      "VOL-339",
+      "VOL-340",
+      "VOL-371",
+      "VOL-372",
+      "VOL-373",
+      "VOL-374",
+      "VOL-375",
+      "VOL-376",
+      "VOL-377",
+      "VOL-378",
+      "VOL-379",
+      "VOL-380",
+      "VOL-203",
+      "VOL-204",
+      "VOL-206"
+    ],
+    "task_ids": [
+      "P3-WORKFLOW-01",
+      "P3-AUTONOMY-01",
+      "P3-CHANGE-01",
+      "P3-TOOLS-01",
+      "P3-EFFECTS-01",
+      "P3-AGENT-01"
+    ]
+  },
+  "inherited_prerequisites": {
+    "volume_refs": [
+      "VOL-098",
+      "VOL-100",
+      "VOL-101",
+      "VOL-105"
+    ],
+    "rule": "Inherited P3-T0 evidence only; these volumes are not owned again by T1."
+  },
+  "requirements": {
+    "required_task_status": "landed_unpromoted",
+    "completion_checkbox_must_remain_false": true,
+    "implementation_signature_must_remain_false": true,
+    "verification_signature_must_remain_false": true,
+    "exact_head_ci_required": true
+  },
+  "executable_surfaces": {
+    "workflow": "skeleton/ai/runtime/autonomous_engineering/workflow.py",
+    "autonomy": "skeleton/ai/runtime/autonomous_engineering/autonomy.py",
+    "safe_change": "skeleton/ai/runtime/autonomous_engineering/safe_change.py",
+    "tooling": "skeleton/ai/runtime/autonomous_engineering/tooling.py",
+    "effects": "skeleton/ai/runtime/autonomous_engineering/effects.py",
+    "coordination": "skeleton/ai/runtime/autonomous_engineering/coordination.py",
+    "improvement": "skeleton/ai/runtime/autonomous_engineering/improvement.py",
+    "worker": "skeleton/ai/runtime/autonomous_engineering/worker.py",
+    "agent": "skeleton/ai/runtime/autonomous_engineering/agent.py"
+  },
+  "evidence_head": "b6613f809710954f729605cf99f80497e0973bd9",
+  "evidence_refs": [
+    "github:pr#2348",
+    "git-head:b6613f809710954f729605cf99f80497e0973bd9",
+    "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
+    "github-actions-run:36967864712",
+    "workflow:P3 Workflow Compiler@b6613f809710954f729605cf99f80497e0973bd9:success",
+    "github-actions-run:36967864731",
+    "workflow:P3 Autonomous Engineering Acceptance@b6613f809710954f729605cf99f80497e0973bd9:success",
+    "github-actions-run:36967864688"
+  ],
+  "deferred_scope": {
+    "queued_volume_count": 197,
+    "rule": "The remaining P3 breadth remains explicit and must not be represented as complete by this closure."
+  },
+  "closure_evidence": []
+}
