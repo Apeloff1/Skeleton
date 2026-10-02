@@ -39,6 +39,7 @@ class CompletionRequirement(str, Enum):
     STOP_SEMANTICS = "execution.stop_semantics"
     TOOL_AUTHORITY = "execution.tool_authority"
     DURABLE_RECOVERY = "execution.durable_recovery"
+    STAGED_FINALIZATION_RECOVERY = "execution.staged_finalization_recovery"
     REPLAY_LINEAGE = "execution.replay_lineage"
     REPRODUCIBILITY = "execution.reproducibility"
     GOVERNED_EFFECTS = "execution.governed_effects"
@@ -607,6 +608,55 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_staged_finalization_recovery(
+        self,
+        *,
+        staged_result: AIExecutionResult,
+        recovered_result: AIExecutionResult | None,
+        staged_intent_digest: str,
+        intent_cleared: bool,
+    ) -> RequirementProof:
+        if _SHA256.fullmatch(staged_intent_digest) is None:
+            raise CompletionPlaneError(
+                "staged_intent_digest must be lowercase sha256"
+            )
+        if not isinstance(intent_cleared, bool):
+            raise CompletionPlaneError("intent_cleared must be boolean")
+        staged_payload = staged_result.as_dict()
+        recovered_payload = (
+            None
+            if recovered_result is None
+            else recovered_result.as_dict()
+        )
+        subject_bound = bool(
+            staged_result.execution_id == self.subject_id
+            and recovered_result is not None
+            and recovered_result.execution_id == self.subject_id
+        )
+        exact_match = recovered_payload == staged_payload
+        passed = subject_bound and exact_match and intent_cleared
+        return self._proof(
+            CompletionRequirement.STAGED_FINALIZATION_RECOVERY,
+            passed=passed,
+            producer_id="execution-repository",
+            evidence_refs=(
+                "finalization-intent:" + staged_intent_digest,
+                "staged-result:" + _digest(staged_payload),
+                "recovered-result:" + _digest(recovered_payload),
+            ),
+            details={
+                "subject_bound": subject_bound,
+                "exact_match": exact_match,
+                "intent_cleared": intent_cleared,
+                "staged_execution_id": staged_result.execution_id,
+                "recovered_execution_id": (
+                    None
+                    if recovered_result is None
+                    else recovered_result.execution_id
+                ),
+            },
+        )
+
     def prove_replay_lineage(
         self,
         turns: Sequence[AgentTurn],
@@ -939,8 +989,18 @@ class SystemCompletionPlane:
         evaluation_digest: str,
         evaluator_id: str,
         bound_result_digest: str,
+        failed_evaluation_rejected: bool,
+        cross_experiment_rejected: bool,
     ) -> RequirementProof:
         evaluator_id = _text("evaluator_id", evaluator_id)
+        if not isinstance(failed_evaluation_rejected, bool):
+            raise CompletionPlaneError(
+                "failed_evaluation_rejected must be boolean"
+            )
+        if not isinstance(cross_experiment_rejected, bool):
+            raise CompletionPlaneError(
+                "cross_experiment_rejected must be boolean"
+            )
         expected_experiment_id = completion_learning_experiment_id(
             self.subject_id,
             bound_result_digest,
@@ -955,6 +1015,8 @@ class SystemCompletionPlane:
             and receipt.evaluation_digest == evaluation_digest
             and receipt.experiment_id == expected_experiment_id
             and evaluator_id != "learning-promotion-pipeline"
+            and failed_evaluation_rejected
+            and cross_experiment_rejected
         )
         return self._proof(
             CompletionRequirement.LEARNING_PROMOTION,
@@ -970,7 +1032,11 @@ class SystemCompletionPlane:
                 "expected_experiment_id": expected_experiment_id,
                 "experiment_id": receipt.experiment_id,
                 "result_bound": receipt.experiment_id == expected_experiment_id,
-                "evaluation_bound": receipt.evaluation_digest == evaluation_digest,
+                "evaluation_bound": (
+                    receipt.evaluation_digest == evaluation_digest
+                ),
+                "failed_evaluation_rejected": failed_evaluation_rejected,
+                "cross_experiment_rejected": cross_experiment_rejected,
                 "rollback": receipt.rollback,
             },
         )
@@ -984,7 +1050,12 @@ class SystemCompletionPlane:
         active_version: str,
         promotion_receipt: PromotionReceipt,
         bound_result_digest: str,
+        rollback_without_promotion_rejected: bool,
     ) -> RequirementProof:
+        if not isinstance(rollback_without_promotion_rejected, bool):
+            raise CompletionPlaneError(
+                "rollback_without_promotion_rejected must be boolean"
+            )
         expected_experiment_id = completion_learning_experiment_id(
             self.subject_id,
             bound_result_digest,
@@ -999,6 +1070,7 @@ class SystemCompletionPlane:
             and receipt.experiment_id == expected_experiment_id
             and promotion_receipt.experiment_id == expected_experiment_id
             and receipt.evaluation_digest == promotion_receipt.evaluation_digest
+            and rollback_without_promotion_rejected
         )
         return self._proof(
             CompletionRequirement.LEARNING_ROLLBACK,
@@ -1020,7 +1092,11 @@ class SystemCompletionPlane:
                 "promotion_evaluation_digest": promotion_receipt.evaluation_digest,
                 "rollback_evaluation_digest": receipt.evaluation_digest,
                 "evaluation_lineage_preserved": (
-                    receipt.evaluation_digest == promotion_receipt.evaluation_digest
+                    receipt.evaluation_digest
+                    == promotion_receipt.evaluation_digest
+                ),
+                "rollback_without_promotion_rejected": (
+                    rollback_without_promotion_rejected
                 ),
                 "rollback": receipt.rollback,
             },
