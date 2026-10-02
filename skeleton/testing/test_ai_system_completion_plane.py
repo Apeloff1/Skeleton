@@ -10,11 +10,16 @@ import threading
 
 import pytest
 
-from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.contracts.ai_execution import (
+    AIExecutionRequest,
+    AIExecutionResult,
+    ExecutionState,
+)
 from skeleton.ai.learning.promotion import (
     EvaluationReceipt,
     ExperimentSpec,
     FeedbackLedger,
+    FeedbackPromotionError,
     FeedbackPromotionPipeline,
 )
 from skeleton.ai.runtime.context.ledger import ContextLedger
@@ -267,6 +272,56 @@ async def _stop_semantics_results(tmp_path):
     assert cancellation_run.result is not None
     return deadline_run.result, cancellation_run.result
 
+def _staged_finalization_recovery(
+    tmp_path,
+    request: FunctionalAIRequest,
+    terminal: AIExecutionResult,
+):
+    database = tmp_path / "system-completion-staged-recovery.sqlite3"
+    repository = SQLiteExecutionRepository(database)
+    execution_request = request.to_execution_request()
+    execution = repository.create(execution_request, now=NOW)
+    for state in (
+        ExecutionState.LOADING,
+        ExecutionState.ASSEMBLING_CONTEXT,
+        ExecutionState.ROUTING,
+        ExecutionState.PROVIDER_PENDING,
+        ExecutionState.PROVIDER_COMPLETED,
+    ):
+        execution = repository.transition(
+            execution_request.execution_id,
+            state,
+            expected_version=execution.version,
+            now=NOW,
+        )
+
+    intent = repository.stage_finalization(
+        terminal,
+        expected_execution_version=execution.version,
+        now=NOW,
+    )
+    intent_digest = intent.intent_digest
+    repository.close()
+
+    reopened = SQLiteExecutionRepository(database)
+    recovered_intent = reopened.finalization_intent(
+        execution_request.execution_id
+    )
+    assert recovered_intent is not None
+    assert recovered_intent.intent_digest == intent_digest
+    reopened.finalize_staged(
+        execution_request.execution_id,
+        now=NOW,
+    )
+    recovered_result = reopened.result(execution_request.execution_id)
+    intent_cleared = (
+        reopened.finalization_intent(execution_request.execution_id)
+        is None
+    )
+    reopened.close()
+    return intent_digest, recovered_result, intent_cleared
+
+
 def _learning_cycle(subject_id: str, result_digest: str):
     spec = ExperimentSpec(
         experiment_id=completion_learning_experiment_id(
@@ -304,6 +359,66 @@ def _learning_cycle(subject_id: str, result_digest: str):
 
     assert {"baseline", "candidate"} <= set(by_variant)
     selected = (by_variant["baseline"], by_variant["candidate"])
+
+    failed_evaluation = EvaluationReceipt(
+        experiment_id=spec.experiment_id,
+        baseline_version=spec.baseline_version,
+        candidate_version=spec.candidate_version,
+        evaluator_id="system-completion:negative-evaluator",
+        passed=False,
+        event_ids=tuple(event.event_id for event in selected),
+        metric_delta=0.35,
+        evaluated_at=1900,
+        evidence_ref="eval:system-completion:expected-failure",
+    )
+    negative_pipeline = FeedbackPromotionPipeline()
+    try:
+        negative_pipeline.promote(
+            spec,
+            selected,
+            failed_evaluation,
+            promoted_at=1950,
+        )
+    except FeedbackPromotionError:
+        failed_evaluation_rejected = True
+    else:
+        failed_evaluation_rejected = False
+
+    cross_experiment = EvaluationReceipt(
+        experiment_id="system-completion-cross-experiment",
+        baseline_version=spec.baseline_version,
+        candidate_version=spec.candidate_version,
+        evaluator_id="system-completion:negative-evaluator",
+        passed=True,
+        event_ids=tuple(event.event_id for event in selected),
+        metric_delta=0.35,
+        evaluated_at=1960,
+        evidence_ref="eval:system-completion:cross-experiment",
+    )
+    try:
+        negative_pipeline.promote(
+            spec,
+            selected,
+            cross_experiment,
+            promoted_at=1970,
+        )
+    except FeedbackPromotionError:
+        cross_experiment_rejected = True
+    else:
+        cross_experiment_rejected = False
+
+    rollback_probe = FeedbackPromotionPipeline()
+    try:
+        rollback_probe.rollback(
+            spec,
+            reason="reject rollback before promotion",
+            rolled_back_at=1980,
+        )
+    except FeedbackPromotionError:
+        rollback_without_promotion_rejected = True
+    else:
+        rollback_without_promotion_rejected = False
+
     receipt = EvaluationReceipt(
         experiment_id=spec.experiment_id,
         baseline_version=spec.baseline_version,
@@ -331,6 +446,9 @@ def _learning_cycle(subject_id: str, result_digest: str):
         promoted_active,
         rollback,
         rolled_back_active,
+        failed_evaluation_rejected,
+        cross_experiment_rejected,
+        rollback_without_promotion_rejected,
     )
 
 
@@ -360,6 +478,15 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     recovered_repository = SQLiteExecutionRepository(database)
     recovered = recovered_repository.result(request.execution_id)
     recovered_turns = recovered_repository.turns(request.execution_id)
+    (
+        staged_intent_digest,
+        staged_recovered_result,
+        staged_intent_cleared,
+    ) = _staged_finalization_recovery(
+        tmp_path,
+        request,
+        terminal,
+    )
 
     # Context integrity: create a non-genesis block and verify the hash chain.
     context_ledger = ContextLedger()
@@ -400,6 +527,9 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         promoted_active,
         rollback,
         rolled_back_active,
+        failed_evaluation_rejected,
+        cross_experiment_rejected,
+        rollback_without_promotion_rejected,
     ) = _learning_cycle(
         request.execution_id,
         run.evidence.result_digest,
@@ -456,6 +586,12 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         receipt_refs=terminal.tool_receipts,
     )
     plane.prove_durable_recovery(terminal, recovered)
+    plane.prove_staged_finalization_recovery(
+        staged_result=terminal,
+        recovered_result=staged_recovered_result,
+        staged_intent_digest=staged_intent_digest,
+        intent_cleared=staged_intent_cleared,
+    )
     plane.prove_replay_lineage(recovered_turns)
     plane.prove_reproducibility(
         primary_execution_id=request.execution_id,
@@ -500,6 +636,8 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         evaluation_digest=evaluation.digest,
         evaluator_id=evaluation.evaluator_id,
         bound_result_digest=run.evidence.result_digest,
+        failed_evaluation_rejected=failed_evaluation_rejected,
+        cross_experiment_rejected=cross_experiment_rejected,
     )
     plane.prove_learning_rollback(
         rollback,
@@ -508,13 +646,16 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         active_version=rolled_back_active,
         promotion_receipt=promotion,
         bound_result_digest=run.evidence.result_digest,
+        rollback_without_promotion_rejected=(
+            rollback_without_promotion_rejected
+        ),
     )
 
     report = plane.report()
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 17
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 18
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -543,6 +684,32 @@ async def test_durable_recovery_is_exact_not_best_effort(tmp_path) -> None:
     assert proof.passed is False
     assert plane.report().valid is False
     assert plane.report().failed == ("execution.durable_recovery",)
+
+
+def test_staged_finalization_recovery_requires_intent_cleanup() -> None:
+    from skeleton.contracts.ai_execution import AIExecutionResult
+
+    result = AIExecutionResult(
+        operation_id="staged-operation",
+        execution_id="staged-subject",
+        status="completed",
+        final_output="stable",
+        usage={},
+        completed_at=NOW,
+    )
+    plane = SystemCompletionPlane(
+        subject_id="staged-subject",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_staged_finalization_recovery(
+        staged_result=result,
+        recovered_result=result,
+        staged_intent_digest=hashlib.sha256(b"intent").hexdigest(),
+        intent_cleared=False,
+    )
+    assert proof.passed is False
+    assert proof.details["exact_match"] is True
+    assert proof.details["intent_cleared"] is False
 
 
 def test_mutating_effect_without_matching_postcondition_fails_closed() -> None:
