@@ -142,12 +142,17 @@ def verify(head_sha: str) -> dict[str, object]:
         if not (ROOT / binding).is_file():
             errors.append(f"acceptance binding missing: {binding}")
 
-    if RUNTIME_TEST_PATH.is_file() and requirements:
-        absent = _contains_all(RUNTIME_TEST_PATH, requirements)
+    if RUNTIME_TEST_PATH.is_file():
+        runtime_test_required = (
+            "SystemCompletionPlane",
+            "REQUIRED_COMPLETION_REQUIREMENTS",
+            "test_system_completion_plane_composes_real_runtime_planes",
+            "test_missing_requirement_cannot_be_compensated_by_other_green_proofs",
+        )
+        absent = _contains_all(RUNTIME_TEST_PATH, runtime_test_required)
         if absent:
             errors.append(
-                "runtime acceptance does not name every requirement: "
-                + ", ".join(absent)
+                "runtime acceptance wiring incomplete: " + ", ".join(absent)
             )
 
     if WORKFLOW_PATH.is_file():
