@@ -719,6 +719,22 @@ def test_tool_authority_rejects_undeclared_tool() -> None:
     assert proof.details["all_calls_authorized"] is False
 
 
+def test_source_execution_cannot_be_relabelled_as_completion_subject() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="expected-execution",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_budget_bounds(
+        execution_id="different-execution",
+        max_model_turns=8,
+        max_tool_calls=8,
+        provider_receipts=("provider:local:one",),
+        tool_receipts=("tool:one",),
+    )
+    assert proof.passed is False
+    assert proof.details["subject_bound"] is False
+
+
 def test_request_result_binding_rejects_cross_operation_result() -> None:
     request = FunctionalAIRequest(
         request_id="binding-test",
@@ -763,7 +779,9 @@ def test_reproducibility_requires_result_and_output_equivalence() -> None:
         replay_output_digest=a,
     )
     assert proof.passed is False
-    assert proof.details == {"result_equal": False, "output_equal": True}
+    assert proof.details["subject_bound"] is True
+    assert proof.details["result_equal"] is False
+    assert proof.details["output_equal"] is True
 
 
 def test_verification_binding_rejects_receipt_for_other_candidate() -> None:
