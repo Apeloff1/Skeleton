@@ -6373,13 +6373,21 @@
       "requirements": [
         "Model-visible execution excerpts use credential-aware value redaction before keyword masking.",
         "Bearer tokens, API keys, password assignments, and token-shaped credentials cannot survive REDACTED_EXCERPT exposure.",
-        "Metadata-only and digest-only observation modes remain free of raw output bytes."
+        "Metadata-only and digest-only observation modes remain free of raw output bytes.",
+        "Structured observability redacts credential-bearing keys and inline authorization/token/secret/password assignments before persistence or export.",
+        "Exception telemetry records stable exception types rather than arbitrary exception messages that may contain secrets.",
+        "Tool/runtime failure events preserve correlation while excluding raw secret-bearing failure text."
       ],
       "tests": [
         "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redacts_secret_values_not_just_secret_words",
         "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_redaction_preserves_benign_nonsecret_output",
         "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_metadata_only_removes_excerpt",
-        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_digest_only_reduces_surface"
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_digest_only_reduces_surface",
+        "tests/test_observability.py::test_structured_logger_redacts_messages_and_context",
+        "tests/test_observability.py::test_text_redaction_removes_full_basic_authorization_credential",
+        "tests/test_observability.py::test_tracer_failure_never_persists_exception_message",
+        "skeleton/testing/test_frontier_observability_correlation.py::test_retry_event_is_correlated_and_does_not_store_exception_message",
+        "skeleton/testing/test_frontier_observability_correlation.py::test_tool_failure_event_exposes_type_not_secret_message"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -6389,7 +6397,12 @@
         "mirror:skeleton/ai/shell/observation_policy.py",
         "code:skeleton/sandbox/sanitizers.py",
         "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
-        "workflow:P0 Observation Secret Redaction"
+        "workflow:P0 Observation Secret Redaction",
+        "code:skeleton/observability/redaction.py",
+        "mirror:skeleton/ai/runtime/observability/redaction.py",
+        "test:tests/test_observability.py",
+        "test:skeleton/testing/test_frontier_observability_correlation.py",
+        "workflow:P0 Secret Observability Evidence"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
