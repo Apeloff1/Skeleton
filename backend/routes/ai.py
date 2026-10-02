@@ -918,6 +918,19 @@ async def ai_chat(
             )
         context_refs.append(_chat_request_identity_ref(request))
         context_attachment_refs = tuple(context_refs)
+
+        # Preserve the canonical active lineage.  On an idempotent retry of an
+        # already-persisted incomplete user turn, reuse its original parent
+        # rather than accidentally making the turn its own parent or rebinding
+        # the idempotency identity after deployment.
+        if retrying_incomplete_turn:
+            parent_message_id = existing_transcript[-1].parent_message_id
+        else:
+            parent_message_id = (
+                existing_transcript[-1].message_id
+                if existing_transcript
+                else None
+            )
         thread, user_message = await conversation_authority.append_user_message(
             request.thread_id,
             tenant_id=tenant_id,
@@ -925,6 +938,7 @@ async def ai_chat(
             content=request.message,
             idempotency_key=request.idempotency_key,
             expected_thread_version=request.expected_thread_version,
+            parent_message_id=parent_message_id,
             attachment_refs=context_attachment_refs,
         )
         transcript = await conversation_authority.active_transcript(
