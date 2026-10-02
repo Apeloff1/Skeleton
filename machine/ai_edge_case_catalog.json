@@ -4369,12 +4369,25 @@
         168
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Untrusted retrieved context is denied by default before model exposure.",
+        "When explicitly admitted, repository/user/tool data remains non-authoritative and cannot rewrite canonical intent."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_context_planner.py::test_context_planner_rejects_untrusted_retrieved_instructions_by_default",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_explicitly_allowed_untrusted_context_remains_data_not_intent",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_repository_context_never_inherits_instruction_authority"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4406,12 +4419,24 @@
         377
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Tool observations are structurally marked instruction_authority=false in every model-visible exposure mode.",
+        "Tool output remains evidence/data and cannot create host grants, approvals, or execution permits."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_tool_output_is_structurally_non_authoritative",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_observation_digest_only_reduces_surface"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5440,12 +5465,24 @@
         256
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Approval authority exists only as live registry-backed state bound to exact principal, intent, and proposal fingerprints.",
+        "Fabricated approval objects or generated approval claims are rejected as unregistered/stale."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_fabricated_model_approval_claim_has_no_registry_authority",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_mismatch_fails"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",

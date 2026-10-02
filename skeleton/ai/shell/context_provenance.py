@@ -59,6 +59,18 @@ class ContextItem:
         object.__setattr__(self, "sensitivity", ContextSensitivity(self.sensitivity))
         object.__setattr__(self, "metadata", MappingProxyType(metadata))
 
+    @property
+    def instruction_authority(self) -> bool:
+        """Only trusted host intent/policy/state may carry instruction authority."""
+        return (
+            self.trust in {ContextTrust.SYSTEM, ContextTrust.TRUSTED}
+            and self.kind in {
+                ContextKind.GOAL,
+                ContextKind.POLICY,
+                ContextKind.SYSTEM_STATE,
+            }
+        )
+
     def to_dict(self, *, include_content: bool = True) -> dict[str, object]:
         data = {
             "item_id": self.item_id,
@@ -67,6 +79,7 @@ class ContextItem:
             "sensitivity": self.sensitivity.value,
             "source": self.source,
             "metadata": dict(self.metadata),
+            "instruction_authority": self.instruction_authority,
             "content_digest": hashlib.sha256(self.content.encode()).hexdigest(),
         }
         if include_content:
@@ -134,6 +147,7 @@ class ContextBundle:
                 "trust": item.trust.value,
                 "sensitivity": item.sensitivity.value,
                 "source": item.source,
+                "instruction_authority": item.instruction_authority,
                 "content": item.content,
             }
             for item in self.items
