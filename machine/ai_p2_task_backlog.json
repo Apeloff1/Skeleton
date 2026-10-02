@@ -1229,7 +1229,7 @@
     {
       "task_id": "P2-T1-DATA-01",
       "lane_id": "P2-T1-L0",
-      "status": "ready",
+      "status": "landed_unpromoted",
       "title": "State, consistency and event delivery",
       "depends_on": [
         "P2-NATIVE-01"
@@ -1255,7 +1255,15 @@
       "evidence_refs": [
         "plan:machine/ai_p2_tranche1_plan.json",
         "activation:feat/p2-functional-ai-closure-atomic",
-        "dependency:P2-T0:all-landed-unpromoted"
+        "dependency:P2-T0:all-landed-unpromoted",
+        "github:pr#2346",
+        "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967807",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967976",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967833"
       ],
       "masterplan_obligations": [
         {
@@ -1405,7 +1413,7 @@
     {
       "task_id": "P2-T1-SEC-01",
       "lane_id": "P2-T1-L1",
-      "status": "ready",
+      "status": "landed_unpromoted",
       "title": "Security, privacy and tenant boundaries",
       "depends_on": [
         "P2-NATIVE-01"
@@ -1433,7 +1441,15 @@
       "evidence_refs": [
         "plan:machine/ai_p2_tranche1_plan.json",
         "activation:feat/p2-functional-ai-closure-atomic",
-        "dependency:P2-T0:all-landed-unpromoted"
+        "dependency:P2-T0:all-landed-unpromoted",
+        "github:pr#2346",
+        "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967807",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967976",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967833"
       ],
       "masterplan_obligations": [
         {
@@ -1648,7 +1664,7 @@
     {
       "task_id": "P2-T1-INFER-01",
       "lane_id": "P2-T1-L2",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Inference reliability",
       "depends_on": [
         "P2-T1-SEC-01"
@@ -1671,7 +1687,15 @@
       "evidence_refs": [
         "plan:machine/ai_p2_tranche1_plan.json",
         "activation:feat/p2-functional-ai-closure-atomic",
-        "dependency:P2-T0:all-landed-unpromoted"
+        "dependency:P2-T0:all-landed-unpromoted",
+        "github:pr#2346",
+        "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967807",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967976",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967833"
       ],
       "masterplan_obligations": [
         {
@@ -1718,7 +1742,7 @@
     {
       "task_id": "P2-T1-RECOVERY-01",
       "lane_id": "P2-T1-L3",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Operational recovery slice",
       "depends_on": [
         "P2-T1-DATA-01",
@@ -1743,7 +1767,15 @@
       "evidence_refs": [
         "plan:machine/ai_p2_tranche1_plan.json",
         "activation:feat/p2-functional-ai-closure-atomic",
-        "dependency:P2-T0:all-landed-unpromoted"
+        "dependency:P2-T0:all-landed-unpromoted",
+        "github:pr#2346",
+        "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967807",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967976",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967833"
       ],
       "masterplan_obligations": [
         {
@@ -1823,7 +1855,7 @@
     {
       "task_id": "P2-T1-FUNCTIONAL-01",
       "lane_id": "P2-T1-L4",
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "title": "Functional AI acceptance slice",
       "depends_on": [
         "P2-T1-DATA-01",
@@ -1850,7 +1882,15 @@
       "evidence_refs": [
         "plan:machine/ai_p2_tranche1_plan.json",
         "activation:feat/p2-functional-ai-closure-atomic",
-        "dependency:P2-T0:all-landed-unpromoted"
+        "dependency:P2-T0:all-landed-unpromoted",
+        "github:pr#2346",
+        "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967807",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967976",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "github-actions-run:36960967833"
       ],
       "masterplan_obligations": [
         {
@@ -1931,9 +1971,9 @@
   "summary": {
     "task_count": 12,
     "in_progress_count": 0,
-    "ready_count": 2,
-    "blocked_count": 3,
-    "landed_unpromoted_count": 7,
+    "ready_count": 0,
+    "blocked_count": 0,
+    "landed_unpromoted_count": 12,
     "scheduled_volume_count": 57,
     "queued_volume_count": 257,
     "source_volume_count": 314
