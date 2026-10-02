@@ -127,9 +127,10 @@ def build_recurrent_artifact(
     )
     raw = _stable_json_bytes(model.to_dict())
 
-    destination = Path(str(output_path).strip()).expanduser()
-    if not str(destination):
+    raw_output = str(output_path).strip()
+    if not raw_output:
         raise LocalModelBuildError("output path is required")
+    destination = Path(raw_output).expanduser()
     parent = destination.parent.resolve()
     if not parent.exists() or not parent.is_dir():
         raise LocalModelBuildError(
