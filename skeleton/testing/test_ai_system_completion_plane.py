@@ -125,12 +125,19 @@ async def _finalization(
     )
 
 
-async def _functional_run(tmp_path):
-    database = tmp_path / "ai-system-completion.sqlite3"
+async def _functional_run(
+    tmp_path,
+    *,
+    database_name: str = "ai-system-completion.sqlite3",
+    request_id: str = "ai-system-completion-e2e",
+):
+    database = tmp_path / database_name
     repository = SQLiteExecutionRepository(database)
     tools = AsyncToolRuntime()
+    observed_tool_ids = []
 
-    async def read_handler(_request):
+    async def read_handler(request):
+        observed_tool_ids.append(request.tool_id)
         return "repo-evidence:README.md"
 
     await tools.register(
@@ -153,7 +160,7 @@ async def _functional_run(tmp_path):
     )
 
     request = FunctionalAIRequest(
-        request_id="ai-system-completion-e2e",
+        request_id=request_id,
         objective="Prove cross-cutting standalone AI completion.",
         prompt="Read README.md and produce a verified completion statement.",
         instructions="Use the local model and governed tool only.",
@@ -168,7 +175,7 @@ async def _functional_run(tmp_path):
         verification_hook=_verification,
         finalization_binding_hook=_finalization,
     )
-    return database, request, await runtime.execute(request)
+    return database, request, await runtime.execute(request), tuple(observed_tool_ids)
 
 
 def _learning_cycle():
@@ -225,7 +232,14 @@ def _learning_cycle():
         rolled_back_at=2200,
     )
     rolled_back_active = pipeline.active_version(spec)
-    return spec, promotion, promoted_active, rollback, rolled_back_active
+    return (
+        spec,
+        receipt,
+        promotion,
+        promoted_active,
+        rollback,
+        rolled_back_active,
+    )
 
 
 @pytest.mark.asyncio
@@ -246,7 +260,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         return original_socket(*args, **kwargs)
 
     monkeypatch.setattr(socket, "socket", guarded_socket)
-    database, request, run = await _functional_run(tmp_path)
+    database, request, run, observed_tool_ids = await _functional_run(tmp_path)
     terminal = run.execution.result
     assert terminal is not None
 
@@ -287,7 +301,28 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         for result in memory.query("completion durable memory evidence", top_k=5)
     )
 
-    spec, promotion, promoted_active, rollback, rolled_back_active = _learning_cycle()
+    (
+        spec,
+        evaluation,
+        promotion,
+        promoted_active,
+        rollback,
+        rolled_back_active,
+    ) = _learning_cycle()
+
+    (
+        _replay_database,
+        replay_request,
+        replay_run,
+        replay_observed_tool_ids,
+    ) = await _functional_run(
+        tmp_path,
+        database_name="ai-system-completion-replay.sqlite3",
+        request_id=request.request_id,
+    )
+    replay_terminal = replay_run.execution.result
+    assert replay_terminal is not None
+    assert replay_request.execution_id == request.execution_id
 
     plane = SystemCompletionPlane(
         subject_id=request.execution_id,
@@ -302,14 +337,30 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         network_attempt_count=len(network_attempts),
         provider_receipts=run.evidence.provider_receipts,
     )
+    plane.prove_request_result_binding(
+        request.to_execution_request(),
+        terminal,
+    )
     plane.prove_budget_bounds(
         max_model_turns=request.max_model_turns,
         max_tool_calls=request.max_tool_calls,
         provider_receipts=terminal.provider_receipts,
         tool_receipts=terminal.tool_receipts,
     )
+    plane.prove_tool_authority(
+        allowed_tool_ids=request.allowed_tool_ids,
+        observed_tool_ids=observed_tool_ids,
+        receipt_refs=terminal.tool_receipts,
+    )
     plane.prove_durable_recovery(terminal, recovered)
     plane.prove_replay_lineage(recovered_turns)
+    plane.prove_reproducibility(
+        primary_result_digest=run.evidence.result_digest,
+        replay_result_digest=replay_run.evidence.result_digest,
+        primary_output_digest=run.evidence.final_output_digest,
+        replay_output_digest=replay_run.evidence.final_output_digest,
+    )
+    assert replay_observed_tool_ids == observed_tool_ids
     plane.prove_governed_effects(
         tool_receipt_count=len(terminal.tool_receipts),
         mutating_tool_count=0,
@@ -317,6 +368,10 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         receipt_refs=terminal.tool_receipts,
     )
     plane.prove_independent_verification(terminal)
+    plane.prove_verification_binding(
+        terminal,
+        context_digest=request.context_digest,
+    )
     plane.prove_context_integrity(
         problems=context_ledger.verify(),
         height=context_ledger.height,
@@ -324,6 +379,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     )
     plane.prove_memory_lifecycle(
         memory_id=memory_id,
+        memory_subject_id=request.execution_id,
         recalled_ids=recalled,
         deleted=deleted,
         post_delete_recalled_ids=recalled_after_delete,
@@ -334,19 +390,22 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         expected_baseline=spec.baseline_version,
         expected_candidate=spec.candidate_version,
         active_version=promoted_active,
+        evaluation_digest=evaluation.digest,
+        evaluator_id=evaluation.evaluator_id,
     )
     plane.prove_learning_rollback(
         rollback,
         expected_baseline=spec.baseline_version,
         expected_candidate=spec.candidate_version,
         active_version=rolled_back_active,
+        promotion_receipt=promotion,
     )
 
     report = plane.report()
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 12
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 16
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -360,7 +419,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
 
 @pytest.mark.asyncio
 async def test_durable_recovery_is_exact_not_best_effort(tmp_path) -> None:
-    database, request, run = await _functional_run(tmp_path)
+    database, request, run, _observed_tool_ids = await _functional_run(tmp_path)
     terminal = run.execution.result
     assert terminal is not None
     recovered = SQLiteExecutionRepository(database).result(request.execution_id)
@@ -425,7 +484,7 @@ def test_budget_bounds_are_hard_limits() -> None:
 
 @pytest.mark.asyncio
 async def test_replay_lineage_rejects_broken_parent(tmp_path) -> None:
-    database, request, _run = await _functional_run(tmp_path)
+    database, request, _run, _observed_tool_ids = await _functional_run(tmp_path)
     repository = SQLiteExecutionRepository(database)
     turns = list(repository.turns(request.execution_id))
     assert len(turns) >= 2
@@ -447,6 +506,7 @@ def test_memory_requires_recall_and_observed_forgetting() -> None:
     )
     proof = plane.prove_memory_lifecycle(
         memory_id="m1",
+        memory_subject_id="memory-subject",
         recalled_ids=("m1",),
         deleted=True,
         post_delete_recalled_ids=("m1",),
@@ -497,11 +557,137 @@ def test_self_verified_proof_is_rejected() -> None:
         RequirementProof(
             requirement=CompletionRequirement.CONTEXT_INTEGRITY,
             subject_id="self-verified",
+            source_revision=HEAD,
             passed=True,
             producer_id="same-authority",
             verifier_id="same-authority",
             evidence_refs=("context:proof",),
         )
+
+
+
+def test_tool_authority_rejects_undeclared_tool() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="tool-authority-subject",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_tool_authority(
+        allowed_tool_ids=("repo.read",),
+        observed_tool_ids=("repo.read", "shell.exec"),
+        receipt_refs=("tool:read", "tool:shell"),
+    )
+    assert proof.passed is False
+    assert proof.details["all_calls_authorized"] is False
+
+
+def test_request_result_binding_rejects_cross_operation_result() -> None:
+    request = FunctionalAIRequest(
+        request_id="binding-test",
+        objective="Bind request to terminal result.",
+        prompt="test",
+        instructions="test",
+        context_digest=hashlib.sha256(b"binding-context").hexdigest(),
+        created_at=NOW,
+    ).to_execution_request()
+    from skeleton.contracts.ai_execution import AIExecutionResult
+
+    result = AIExecutionResult(
+        operation_id="other-operation",
+        execution_id=request.execution_id,
+        status="completed",
+        final_output="bound output",
+        usage={},
+        completed_at=NOW,
+    )
+    plane = SystemCompletionPlane(
+        subject_id=request.execution_id,
+        source_revision=HEAD,
+    )
+    proof = plane.prove_request_result_binding(request, result)
+    assert proof.passed is False
+    assert proof.details["request_operation_id"] != proof.details["result_operation_id"]
+
+
+def test_reproducibility_requires_result_and_output_equivalence() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="repro-subject",
+        source_revision=HEAD,
+    )
+    a = hashlib.sha256(b"a").hexdigest()
+    b = hashlib.sha256(b"b").hexdigest()
+    proof = plane.prove_reproducibility(
+        primary_result_digest=a,
+        replay_result_digest=b,
+        primary_output_digest=a,
+        replay_output_digest=a,
+    )
+    assert proof.passed is False
+    assert proof.details == {"result_equal": False, "output_equal": True}
+
+
+def test_verification_binding_rejects_receipt_for_other_candidate() -> None:
+    from skeleton.contracts.ai_execution import AIExecutionResult
+
+    context_digest = hashlib.sha256(b"verification-binding").hexdigest()
+    result = AIExecutionResult(
+        operation_id="binding-operation",
+        execution_id="binding-execution",
+        status="completed",
+        final_output="actual candidate",
+        verification_receipt={
+            "outcome": "passed",
+            "policy_satisfied": True,
+            "candidate_digest": hashlib.sha256(b"different candidate").hexdigest(),
+            "context_digest": context_digest,
+        },
+        evidence_refs=("evidence:binding",),
+        usage={},
+        completed_at=NOW,
+    )
+    plane = SystemCompletionPlane(
+        subject_id=result.execution_id,
+        source_revision=HEAD,
+    )
+    proof = plane.prove_verification_binding(
+        result,
+        context_digest=context_digest,
+    )
+    assert proof.passed is False
+    assert proof.details["candidate_digest"] != proof.details["receipt_candidate_digest"]
+
+
+def test_memory_lifecycle_rejects_cross_subject_memory() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="memory-owner",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_memory_lifecycle(
+        memory_id="memory-1",
+        memory_subject_id="different-owner",
+        recalled_ids=("memory-1",),
+        deleted=True,
+        post_delete_recalled_ids=(),
+    )
+    assert proof.passed is False
+    assert proof.details["subject_bound"] is False
+
+
+def test_proof_from_other_revision_cannot_enter_report() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="revision-subject",
+        source_revision=HEAD,
+    )
+    proof = RequirementProof(
+        requirement=CompletionRequirement.CONTEXT_INTEGRITY,
+        subject_id="revision-subject",
+        source_revision="c" * 40,
+        passed=True,
+        producer_id="context-ledger",
+        verifier_id="ai-system-completion:independent",
+        evidence_refs=("context:revision",),
+    )
+    with pytest.raises(CompletionPlaneError, match="source revisions"):
+        plane.add(proof)
 
 
 def test_machine_contract_matches_runtime_requirement_inventory() -> None:
@@ -525,6 +711,7 @@ def test_report_digest_is_order_independent() -> None:
     first = RequirementProof(
         requirement=CompletionRequirement.CONTEXT_INTEGRITY,
         subject_id="digest-subject",
+        source_revision=HEAD,
         passed=True,
         producer_id="context-ledger",
         verifier_id="ai-system-completion:independent",
@@ -534,6 +721,7 @@ def test_report_digest_is_order_independent() -> None:
     second = RequirementProof(
         requirement=CompletionRequirement.MEMORY_LIFECYCLE,
         subject_id="digest-subject",
+        source_revision=HEAD,
         passed=True,
         producer_id="memory-runtime",
         verifier_id="ai-system-completion:independent",
