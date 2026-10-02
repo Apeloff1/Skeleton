@@ -6,6 +6,7 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_local_model_artifact.py"
+      - "skeleton/testing/test_numpy_recurrent_lm.py"
       - ".github/workflows/p2-local-inference.yml"
   push:
     branches:
@@ -48,6 +49,7 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
+          "numpy==2.4.6"
       - name: Run credential-free local inference acceptance
         env:
           OPENAI_API_KEY: ""
@@ -57,3 +59,4 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_local_model_artifact.py
+          skeleton/testing/test_numpy_recurrent_lm.py
