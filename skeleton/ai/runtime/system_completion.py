@@ -683,6 +683,9 @@ class SystemCompletionPlane:
         migration_backfill_verified: bool,
         state_digest_backfill_verified: bool,
         replay_digest_backfill_verified: bool,
+        state_journal_verified: bool,
+        state_journal_tamper_rejected: bool,
+        state_journal_migration_seeded: bool,
         evidence_refs: Iterable[str],
     ) -> RequirementProof:
         execution_id = _text("execution_id", execution_id)
@@ -696,6 +699,9 @@ class SystemCompletionPlane:
             and migration_backfill_verified
             and state_digest_backfill_verified
             and replay_digest_backfill_verified
+            and state_journal_verified
+            and state_journal_tamper_rejected
+            and state_journal_migration_seeded
         )
         return self._proof(
             CompletionRequirement.PERSISTED_EVIDENCE_INTEGRITY,
@@ -720,6 +726,15 @@ class SystemCompletionPlane:
                 ),
                 "replay_digest_backfill_verified": bool(
                     replay_digest_backfill_verified
+                ),
+                "state_journal_verified": bool(
+                    state_journal_verified
+                ),
+                "state_journal_tamper_rejected": bool(
+                    state_journal_tamper_rejected
+                ),
+                "state_journal_migration_seeded": bool(
+                    state_journal_migration_seeded
                 ),
             },
         )
