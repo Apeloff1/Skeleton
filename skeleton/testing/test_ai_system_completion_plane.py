@@ -675,6 +675,38 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         evidence_refs=("network:boundary",),
     )
 
+    plane.prove_resource_admission(
+        execution_id=request.execution_id,
+        admitted_within_budget=True,
+        over_quota_rejected=True,
+        denial_capacity_unchanged=True,
+        usage_reconciled=True,
+        evidence_refs=("resource:admission",),
+    )
+    plane.prove_shared_pressure(
+        execution_id=request.execution_id,
+        first_worker_admitted=True,
+        second_worker_blocked=True,
+        capacity_released=True,
+        second_worker_admitted_after_release=True,
+        evidence_refs=("resource:shared-pressure",),
+    )
+    plane.prove_idempotent_retry(
+        execution_id=request.execution_id,
+        identical_retry_stable=True,
+        conflicting_retry_rejected=True,
+        no_double_reservation=True,
+        evidence_refs=("execution:idempotent-retry",),
+    )
+    plane.prove_tenant_isolation(
+        execution_id=request.execution_id,
+        owner_tenant_visible=True,
+        other_tenant_hidden=True,
+        cross_tenant_get_rejected=True,
+        subject_scope_preserved=True,
+        evidence_refs=("privacy:tenant-isolation",),
+    )
+
     plane.prove_learning_promotion(
         promotion,
         expected_baseline=spec.baseline_version,
@@ -702,7 +734,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     assert report.valid is True
     assert report.missing == ()
     assert report.failed == ()
-    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 24
+    assert len(report.proofs) == len(REQUIRED_COMPLETION_REQUIREMENTS) == 28
     assert len(report.digest) == 64
 
     payload = report.as_dict()
@@ -916,6 +948,69 @@ def test_outbound_network_boundary_rejects_peer_rebinding_gap() -> None:
         peer_rebinding_rejected=False,
         canonical_public_resolution=True,
         evidence_refs=("network:boundary",),
+    )
+    assert proof.passed is False
+
+
+def test_resource_admission_requires_capacity_preservation() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="resource-admission",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_resource_admission(
+        execution_id="resource-admission",
+        admitted_within_budget=True,
+        over_quota_rejected=True,
+        denial_capacity_unchanged=False,
+        usage_reconciled=True,
+        evidence_refs=("resource:admission",),
+    )
+    assert proof.passed is False
+
+
+def test_shared_pressure_requires_release_before_second_worker() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="shared-pressure",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_shared_pressure(
+        execution_id="shared-pressure",
+        first_worker_admitted=True,
+        second_worker_blocked=True,
+        capacity_released=False,
+        second_worker_admitted_after_release=True,
+        evidence_refs=("resource:shared-pressure",),
+    )
+    assert proof.passed is False
+
+
+def test_idempotent_retry_rejects_double_reservation() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="idempotent-retry",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_idempotent_retry(
+        execution_id="idempotent-retry",
+        identical_retry_stable=True,
+        conflicting_retry_rejected=True,
+        no_double_reservation=False,
+        evidence_refs=("execution:idempotent-retry",),
+    )
+    assert proof.passed is False
+
+
+def test_tenant_isolation_requires_cross_tenant_get_rejection() -> None:
+    plane = SystemCompletionPlane(
+        subject_id="tenant-isolation",
+        source_revision=HEAD,
+    )
+    proof = plane.prove_tenant_isolation(
+        execution_id="tenant-isolation",
+        owner_tenant_visible=True,
+        other_tenant_hidden=True,
+        cross_tenant_get_rejected=False,
+        subject_scope_preserved=True,
+        evidence_refs=("privacy:tenant-isolation",),
     )
     assert proof.passed is False
 
