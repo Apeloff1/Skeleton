@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -15,15 +16,23 @@ def _write(root: Path, rel: str, content: str) -> None:
 
 
 def _map(root: Path, scripts: list[str]) -> None:
-    groups = [
-        {
-            "key": f"G{index}",
-            "gap_id": f"gap-{index}",
-            "verifier_script": script,
-            "expected_receipt_verifier": "fixture-verifier-v1",
-        }
-        for index, script in enumerate(scripts)
-    ]
+    groups = []
+    for index, script in enumerate(scripts):
+        candidate = root / script
+        digest = (
+            hashlib.sha256(candidate.read_bytes()).hexdigest()
+            if candidate.is_file()
+            else "0" * 64
+        )
+        groups.append(
+            {
+                "key": f"G{index}",
+                "gap_id": f"gap-{index}",
+                "verifier_script": script,
+                "expected_receipt_verifier": "fixture-verifier-v1",
+                "expected_script_sha256": digest,
+            }
+        )
     payload = {
         "schema_version": 1,
         "rules": {
@@ -207,3 +216,20 @@ def test_runner_rejects_unexpected_verifier_identity(tmp_path: Path) -> None:
     assert receipt["results"][0]["receipt_error"] == (
         "verifier receipt identity mismatch"
     )
+
+
+def test_runner_rejects_verifier_script_digest_drift(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0"),
+    )
+    _map(tmp_path, ["scripts/a.py"])
+    _write(
+        tmp_path,
+        "scripts/a.py",
+        _receipt_verifier(gap_id="gap-0") + "\n# drift\n",
+    )
+
+    with pytest.raises(RunnerError, match="verifier script digest drift"):
+        run_verifiers(tmp_path, head_sha="abc123")
