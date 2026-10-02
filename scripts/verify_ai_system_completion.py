@@ -202,6 +202,7 @@ def verify(head_sha: str) -> dict[str, object]:
         "terminal_outbox_delivery_required": True,
         "persisted_terminal_evidence_integrity_required": True,
         "persisted_replay_evidence_integrity_required": True,
+        "append_only_state_journal_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -270,6 +271,9 @@ def verify(head_sha: str) -> dict[str, object]:
             "prove_idempotent_retry",
             "prove_tenant_isolation",
             "_persistence_reliability_cycle",
+            "state_history",
+            "state_journal_verified",
+            "state_journal_tamper_rejected",
             "prove_unknown_usage_fence",
             "prove_verification_receipt_identity",
             "prove_terminal_outbox_delivery",
