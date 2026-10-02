@@ -533,12 +533,22 @@ async def _import_legacy_rows_to_canonical(
             parent_message_id=parent_message_id,
             data_class="internal",
         )
+        legacy_execution_id = str(
+            row.get("engine_execution_id") or ""
+        ).strip()
         generated = {
             "text": assistant_text,
             "model": row.get("model") or "legacy-jeeves",
-            "engine_execution_id": row.get("engine_execution_id"),
+            # Historical execution IDs predate the canonical handoff contract.
+            # Preserve them as audit artifacts; never upgrade partial lineage
+            # into a canonical engine-result identity.
             "engine_evidence_refs": list(
                 row.get("engine_evidence_refs") or []
+            ),
+            "engine_artifact_refs": (
+                ["legacy-engine-execution:" + legacy_execution_id]
+                if legacy_execution_id
+                else []
             ),
         }
         thread, _assistant = await _commit_canonical_assistant_turn(
