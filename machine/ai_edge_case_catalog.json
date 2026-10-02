@@ -4383,12 +4383,28 @@
         362
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Durable memory writes require provenance by default and a source operation identity before persistence.",
+        "Memory proposals are staged without side effects; policy-denied proposals cannot mutate the canonical repository.",
+        "Restricted memory requires explicit review and governance-registration failure tombstones the write fail-closed."
+      ],
+      "tests": [
+        "skeleton/testing/test_memory_writeback.py::test_policy_denies_missing_provenance",
+        "skeleton/testing/test_memory_writeback.py::test_stage_is_side_effect_free_until_commit",
+        "skeleton/testing/test_memory_writeback.py::test_denied_proposal_never_mutates_repository",
+        "skeleton/testing/test_memory_writeback.py::test_review_hold_requires_explicit_approval",
+        "skeleton/testing/test_memory_writeback.py::test_governance_persistence_failure_tombstones_memory_fail_closed"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/memory_record.py",
+        "code:skeleton/memory/policy.py",
+        "code:skeleton/memory/writeback.py",
+        "test:skeleton/testing/test_memory_writeback.py",
+        "workflow:P0 Memory Poisoning Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6085,12 +6101,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Outbound hostname resolution fails closed if any DNS answer is non-public.",
+        "The connected numeric peer must match the immutable approved DNS snapshot."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_mixed_dns_answer_with_any_private_address_fails_closed",
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_connect_time_peer_must_match_approved_resolution_snapshot",
+        "skeleton/testing/test_security_outbound_http.py::test_get_requires_connected_peer_to_match_dns_snapshot"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6119,12 +6148,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Every redirect destination is revalidated against the outbound HTTPS policy.",
+        "Cross-origin redirects require explicit opt-in and strip caller-provided headers before the next hop."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_redirect_revalidates_and_rejects_origin_or_security_change",
+        "skeleton/testing/test_security_outbound_http.py::test_redirect_cannot_change_security_boundary_by_default",
+        "skeleton/testing/test_security_outbound_http.py::test_cross_origin_redirect_drops_all_caller_headers"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6152,12 +6194,24 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Metadata-service and local/internal hostnames are rejected before transport use.",
+        "Literal loopback, link-local, private, reserved, and unspecified addresses are rejected."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_syntax_policy_rejects_local_or_non_public_targets",
+        "skeleton/testing/test_security_outbound_http.py::test_unsafe_url_is_rejected_before_transport"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6185,12 +6239,25 @@
         172
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "IPv4, IPv6, and IPv4-mapped IPv6 destinations are normalized through ipaddress before policy.",
+        "Any mapped/private/non-global connected peer is rejected even when hostname syntax is otherwise valid."
+      ],
+      "tests": [
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_validate_resolution_set_rejects_mixed_private_values",
+        "skeleton/testing/test_outbound_url_resolution_security.py::test_connect_time_peer_can_never_be_private",
+        "skeleton/testing/test_security_outbound_http.py::test_peer_mismatch_or_private_peer_fails_before_body"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/outbound_url.py",
+        "code:skeleton/security/outbound_http.py",
+        "test:skeleton/testing/test_outbound_url_resolution_security.py",
+        "test:skeleton/testing/test_security_outbound_http.py",
+        "workflow:P0 Network Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
