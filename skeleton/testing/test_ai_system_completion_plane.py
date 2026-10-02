@@ -717,6 +717,9 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         migration_backfill_verified=True,
         state_digest_backfill_verified=True,
         replay_digest_backfill_verified=True,
+        state_journal_verified=True,
+        state_journal_tamper_rejected=True,
+        state_journal_migration_seeded=True,
         evidence_refs=("persistence:terminal-integrity",),
     )
     plane.prove_verification_receipt_identity(
