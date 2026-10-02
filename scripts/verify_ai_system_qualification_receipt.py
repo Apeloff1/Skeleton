@@ -179,9 +179,9 @@ def _contract_requirements() -> tuple[list[str], str]:
         contract.get("required_requirements"),
         require_unique=True,
     )
-    if len(required) != 24:
+    if len(required) != 28:
         raise ReceiptVerificationError(
-            "completion contract must retain exactly 24 requirements"
+            "completion contract must retain exactly 28 requirements"
         )
     return required, _digest(contract)
 
@@ -647,6 +647,86 @@ def _semantic_pass(
                     "peer_rebinding_rejected",
                     "canonical_public_resolution",
                 )
+            )
+        )
+
+    if requirement == "resource.admission_quota":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(
+                details,
+                "admitted_within_budget",
+            )
+            and _boolean(
+                details,
+                "over_quota_rejected",
+            )
+            and _boolean(
+                details,
+                "denial_capacity_unchanged",
+            )
+            and _boolean(
+                details,
+                "usage_reconciled",
+            )
+        )
+
+    if requirement == "resource.shared_pressure":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(
+                details,
+                "first_worker_admitted",
+            )
+            and _boolean(
+                details,
+                "second_worker_blocked",
+            )
+            and _boolean(
+                details,
+                "capacity_released",
+            )
+            and _boolean(
+                details,
+                "second_worker_admitted_after_release",
+            )
+        )
+
+    if requirement == "execution.idempotent_retry":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(
+                details,
+                "identical_retry_stable",
+            )
+            and _boolean(
+                details,
+                "conflicting_retry_rejected",
+            )
+            and _boolean(
+                details,
+                "no_double_reservation",
+            )
+        )
+
+    if requirement == "privacy.tenant_isolation":
+        return bool(
+            _detail_text(details, "execution_id") == expected_subject
+            and _boolean(
+                details,
+                "owner_tenant_visible",
+            )
+            and _boolean(
+                details,
+                "other_tenant_hidden",
+            )
+            and _boolean(
+                details,
+                "cross_tenant_get_rejected",
+            )
+            and _boolean(
+                details,
+                "subject_scope_preserved",
             )
         )
 
