@@ -62,7 +62,14 @@ def _now():
     return datetime(2026, 9, 23, 17, 15, tzinfo=timezone.utc)
 
 
-def _proposal(*, key: str, content: str, target=None, version=None):
+def _proposal(
+    *,
+    key: str,
+    content: str,
+    target=None,
+    version=None,
+    expires_at=None,
+):
     return MemoryWriteProposal(
         proposal_id=str(uuid4()),
         tenant_id="tenant-a",
@@ -76,6 +83,7 @@ def _proposal(*, key: str, content: str, target=None, version=None):
         source_operation_id=str(uuid4()),
         target_memory_id=target,
         expected_version=version,
+        expires_at=expires_at,
     )
 
 
@@ -749,6 +757,67 @@ def test_governed_vector_projection_acknowledges_only_after_physical_delete() ->
     assert receipts[0].target == retrieval_record["deletion_targets"][0]
     assert receipts[0].target.startswith("memory-projection-")
     assert receipts[0].record_id == retrieval_record["record_id"]
+
+@pytest.mark.asyncio
+async def test_derived_vector_retention_expires_with_source_memory() -> None:
+    repo = SQLiteMemoryRepository()
+    expiry = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    record = repo.commit(
+        _proposal(
+            key="derived-retention",
+            content="sensitive derived vector",
+            expires_at=expiry,
+        ),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    adapters = LifecycleAdapterRegistry()
+    store = VectorStore(dims=32)
+    projection = VectorStoreProjection("retention-vector", store)
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+        lifecycle_adapters=adapters,
+    )
+
+    synced = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert synced.degraded is False
+    assert store.stats()["documents"] == 1
+
+    inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(inventory) == 1
+    derived = inventory[0]
+    assert derived["owner_plane"] == "retrieval"
+    assert derived["retention_until"] == expiry.timestamp()
+    assert derived["state"] == "active"
+
+    results = await governance.execute_retention_with_adapters(
+        adapters,
+        now=expiry.timestamp() + 1,
+    )
+
+    assert len(results) == 1
+    assert store.stats()["documents"] == 0
+    final = governance.lifecycle.get(derived["record_id"])
+    assert final["state"] == "deleted"
+    receipts = governance.lifecycle.receipts(tenant_id="tenant-a")
+    assert len(receipts) == 1
+    assert receipts[0].record_id == derived["record_id"]
+
+    # The source remains canonical until its own memory lifecycle processes it.
+    current = repo.get(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        include_tombstoned=True,
+    )
+    assert current.memory_id == record.memory_id
+
 
 @pytest.mark.asyncio
 async def test_tenant_lifecycle_plan_deletes_bound_vector_projection() -> None:
