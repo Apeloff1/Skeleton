@@ -165,7 +165,8 @@ class FsJail:
             raise QuotaExceededError("jail file quota exceeded", context={"limit": self.policy.max_files})
         target.parent.mkdir(parents=True, exist_ok=True)
         # Re-validate the parent after mkdir (a racing symlink would be caught here).
-        self.resolve(self.relative(target.parent) + "/" + target.name) if target.parent != self.root else None
+        if target.parent != self.root:
+            self.resolve(self.relative(target.parent), must_exist=True)
         fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".sbx-tmp-")
         try:
             with os.fdopen(fd, "wb") as fh:
