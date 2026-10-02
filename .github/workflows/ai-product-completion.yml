@@ -26,6 +26,7 @@ on:
       - "skeleton/ai/runtime/provider_runtime.py"
       - "machine/ai_app_construction.json"
       - "skeleton/testing/test_local_provider_activation.py"
+      - "skeleton/testing/test_ai_local_adapter_invariants.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_local_model_artifact.py"
@@ -61,6 +62,7 @@ on:
       - "skeleton/ai/runtime/provider_runtime.py"
       - "machine/ai_app_construction.json"
       - "skeleton/testing/test_local_provider_activation.py"
+      - "skeleton/testing/test_ai_local_adapter_invariants.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_context_compiler.py"
@@ -126,6 +128,7 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_local_inference.py
+          skeleton/testing/test_ai_local_adapter_invariants.py
           skeleton/testing/test_local_provider_activation.py
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_server_governance_binding.py
