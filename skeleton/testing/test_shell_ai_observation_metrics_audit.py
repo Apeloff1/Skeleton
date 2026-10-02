@@ -73,6 +73,38 @@ def test_observation_redacts_blocked_patterns():
     assert "secret" not in data["safe_excerpt"].lower()
 
 
+@pytest.mark.parametrize(
+    "excerpt, leaked",
+    (
+        ("Authorization: Bearer " + "A" * 32, "A" * 32),
+        ("password=hunter2hunter2", "hunter2hunter2"),
+        ("api_key=supersecretvalue", "supersecretvalue"),
+        ("sk-" + "b" * 32, "sk-" + "b" * 32),
+        ("ghp_" + "C" * 36, "ghp_" + "C" * 36),
+    ),
+)
+def test_observation_redacts_secret_values_not_just_secret_words(
+    excerpt: str,
+    leaked: str,
+) -> None:
+    engine = ObservationPolicyEngine(
+        ObservationPolicy(exposure=ObservationExposure.REDACTED_EXCERPT)
+    )
+    data = engine.sanitize(observation(excerpt))
+    assert leaked not in data["safe_excerpt"]
+
+
+def test_observation_redaction_preserves_benign_nonsecret_output() -> None:
+    engine = ObservationPolicyEngine(
+        ObservationPolicy(
+            exposure=ObservationExposure.REDACTED_EXCERPT,
+            blocked_patterns=(),
+        )
+    )
+    excerpt = "build completed: 42 tests passed"
+    assert engine.sanitize(observation(excerpt))["safe_excerpt"] == excerpt
+
+
 def test_observation_excerpt_truncated():
     engine = ObservationPolicyEngine(
         ObservationPolicy(
