@@ -669,9 +669,13 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_credential_aware_observation_redaction_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/observation_policy.py",
+        "code:skeleton/sandbox/sanitizers.py",
+        "workflow:P0 Observation Secret Redaction"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-015",
       "completion_checkbox": false,
