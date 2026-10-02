@@ -455,3 +455,45 @@ async def test_jeeves_rejects_engine_result_with_partial_lineage(
                 # Context identity intentionally omitted.
             },
         )
+
+
+@pytest.mark.asyncio
+async def test_legacy_jeeves_engine_id_is_not_promoted_without_canonical_handoff(
+    canonical_authority,
+) -> None:
+    repository, _authority = canonical_authority
+    session_id = "legacy-engine-lineage"
+
+    imported = await jeeves_compose._import_legacy_rows_to_canonical(
+        session_id,
+        [
+            {
+                "role_user": "Legacy question",
+                "role_jeeves": "Legacy answer",
+                "client_message_id": "legacy-turn-1",
+                "model": "historical-engine",
+                "engine_execution_id": "old-execution-without-handoff",
+                "engine_evidence_refs": ["legacy:evidence:1"],
+            }
+        ],
+    )
+    assert imported == 1
+
+    tenant_id, owner_id = jeeves_compose._canonical_session_identity(
+        session_id
+    )
+    thread_id = jeeves_compose._canonical_thread_id(session_id)
+    transcript = repository.active_transcript(
+        thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    assert len(transcript) == 2
+    assistant = transcript[-1]
+    assert assistant.author_type is ConversationAuthorType.ASSISTANT
+    assert not str(assistant.ai_result_id).startswith("engine-result:")
+    assert assistant.ai_result_id.startswith("jeeves-qualified-result:")
+    assert assistant.artifact_refs == (
+        "legacy-engine-execution:old-execution-without-handoff",
+    )
+    assert assistant.citation_refs == ("legacy:evidence:1",)
