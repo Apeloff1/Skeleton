@@ -5965,12 +5965,22 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Shared workspace/rooted filesystem paths reject Windows reserved device names before filesystem I/O.",
+        "Reserved-name checks are case-insensitive and include extension aliases such as CON.txt and COM1.log."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_normalization_rejects_windows_device_ads_and_alias_paths",
+        "skeleton/testing/test_security_rooted_fs.py::test_normalization_allows_nonreserved_windows_like_names"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Windows Path Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5989,7 +5999,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-009",
@@ -6002,12 +6012,21 @@
         75
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Shared workspace/rooted filesystem paths reject NTFS alternate-data-stream syntax before filesystem I/O.",
+        "Windows trailing-dot/space aliases are rejected so path identity cannot change across platforms."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_normalization_rejects_windows_device_ads_and_alias_paths"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Windows Path Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6027,7 +6046,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-010",
