@@ -49,243 +49,353 @@
         {
           "volume_ref": "VOL-306",
           "title": "Workflow Intermediate Representation",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-306",
-          "requirements": [
-            "IR includes dependencies, inputs/outputs, authority, retries, timeouts and compensation.",
-            "Compiler/runtime share the same versioned IR contract."
-          ],
-          "gaps": [
-            "define IR schema",
-            "bind DSL/compiler"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorkflowIR",
+            "WorkflowNode",
+            "WorkflowEdge"
           ],
           "risks": [
             "authoring/runtime semantic drift",
             "invalid DAG"
           ],
-          "contracts": [
-            "WorkflowIR",
-            "WorkflowNode",
-            "WorkflowEdge"
+          "gaps": [
+            "define IR schema",
+            "bind DSL/compiler"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workflow_ir.py"
+          ],
+          "evaluations": [
+            "planned:IR roundtrip evaluation"
           ]
         },
         {
           "volume_ref": "VOL-307",
           "title": "Workflow DSL",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-307",
-          "requirements": [
-            "DSL cannot express undeclared privilege or bypass policy.",
-            "Parsing/versioning errors fail with precise diagnostics."
-          ],
-          "gaps": [
-            "define grammar",
-            "bind schema completion/tooling"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorkflowSource",
+            "DSLVersion",
+            "DSLDiagnostic"
           ],
           "risks": [
             "language injection",
             "ambiguous syntax"
           ],
-          "contracts": [
-            "WorkflowSource",
-            "DSLVersion",
-            "DSLDiagnostic"
+          "gaps": [
+            "define grammar",
+            "bind schema completion/tooling"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "docs"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workflow_dsl.py"
+          ],
+          "evaluations": [
+            "planned:parser/fuzz corpus"
           ]
         },
         {
           "volume_ref": "VOL-308",
           "title": "Workflow Compiler",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-308",
-          "requirements": [
-            "Compilation is deterministic for identical source/version.",
-            "Reject missing capabilities, cycles and invalid compensation before runtime."
-          ],
-          "gaps": [
-            "materialize compiler phases",
-            "bind capability registry"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CompiledWorkflow",
+            "WorkflowLink",
+            "CompileResult"
           ],
           "risks": [
             "compiler/runtime mismatch",
             "cycle escapes validation"
           ],
-          "contracts": [
-            "CompiledWorkflow",
-            "WorkflowLink",
-            "CompileResult"
+          "gaps": [
+            "materialize compiler phases",
+            "bind capability registry"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workflow_compiler.py"
+          ],
+          "evaluations": [
+            "planned:invalid-workflow corpus"
           ]
         },
         {
           "volume_ref": "VOL-309",
           "title": "Workflow Versioning",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-309",
-          "requirements": [
-            "In-flight operations retain the workflow version they started with unless explicit migration occurs.",
-            "Version changes declare compatibility."
-          ],
-          "gaps": [
-            "define retention policy",
-            "bind migration"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorkflowVersion",
+            "WorkflowCompatibility",
+            "WorkflowBinding"
           ],
           "risks": [
             "workflow changes mid-run",
             "unbounded old versions"
           ],
-          "contracts": [
-            "WorkflowVersion",
-            "WorkflowCompatibility",
-            "WorkflowBinding"
+          "gaps": [
+            "define retention policy",
+            "bind migration"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workflow_versioning.py"
+          ],
+          "evaluations": [
+            "planned:in-flight upgrade evaluation"
           ]
         },
         {
           "volume_ref": "VOL-310",
           "title": "Workflow Migration",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-310",
-          "requirements": [
-            "Migration declares state mapping and irreversible transformations.",
-            "Unmigratable runs remain pinned or explicitly terminated/restarted."
-          ],
-          "gaps": [
-            "define migration protocol",
-            "bind version registry"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "WorkflowMigration",
+            "StateMapping",
+            "WorkflowMigrationReceipt"
           ],
           "risks": [
             "lost in-flight state",
             "semantic change hidden"
           ],
-          "contracts": [
-            "WorkflowMigration",
-            "StateMapping",
-            "WorkflowMigrationReceipt"
+          "gaps": [
+            "define migration protocol",
+            "bind version registry"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workflow_migration.py"
+          ],
+          "evaluations": [
+            "planned:partial workflow migration drill"
           ]
         },
         {
           "volume_ref": "VOL-311",
           "title": "Semantic Task Types",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-311",
-          "requirements": [
-            "Task type drives default policy/budgets/tests but cannot grant privilege.",
-            "Unknown tasks use conservative generic classification."
-          ],
-          "gaps": [
-            "define core types",
-            "bind priority/evaluation"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "TaskType",
+            "TaskProfile",
+            "TaskClassification"
           ],
           "risks": [
             "misclassification weakens gates",
             "taxonomy explosion"
           ],
-          "contracts": [
-            "TaskType",
-            "TaskProfile",
-            "TaskClassification"
+          "gaps": [
+            "define core types",
+            "bind priority/evaluation"
+          ],
+          "implementation_paths": [
+            "machine",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_semantic_task_types.py"
+          ],
+          "evaluations": [
+            "planned:task classification corpus"
           ]
         },
         {
           "volume_ref": "VOL-312",
           "title": "Task Complexity Estimator",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-312",
-          "requirements": [
-            "Estimator exposes uncertainty and calibration.",
-            "Underestimation cannot bypass hard limits; runtime can revise estimate."
-          ],
-          "gaps": [
-            "define features/baselines",
-            "bind scheduler/budgets"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ComplexityEstimate",
+            "ComplexityFeature",
+            "EstimateRevision"
           ],
           "risks": [
             "systematic underestimate",
             "complexity score gamed"
           ],
-          "contracts": [
-            "ComplexityEstimate",
-            "ComplexityFeature",
-            "EstimateRevision"
+          "gaps": [
+            "define features/baselines",
+            "bind scheduler/budgets"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_task_complexity.py"
+          ],
+          "evaluations": [
+            "planned:estimate calibration evaluation"
           ]
         },
         {
           "volume_ref": "VOL-313",
           "title": "Task Decomposition Engine",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-313",
-          "requirements": [
-            "Subtasks preserve parent constraints/authority.",
-            "Detect over-decomposition, cycles and missing integration step."
-          ],
-          "gaps": [
-            "define decomposition heuristics",
-            "bind critical path"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "TaskDecomposition",
+            "Subtask",
+            "TaskDependency"
           ],
           "risks": [
             "constraint loss",
             "fragmentation overhead"
           ],
-          "contracts": [
-            "TaskDecomposition",
-            "Subtask",
-            "TaskDependency"
+          "gaps": [
+            "define decomposition heuristics",
+            "bind critical path"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_task_decomposition.py"
+          ],
+          "evaluations": [
+            "planned:known-project decomposition benchmark"
           ]
         },
         {
           "volume_ref": "VOL-314",
           "title": "Critical Path Analysis",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-314",
-          "requirements": [
-            "Use real dependency/state data rather than narrative estimates alone.",
-            "Recompute when task duration/dependency changes."
-          ],
-          "gaps": [
-            "bind task graph",
-            "surface blockers in roadmap"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "CriticalPath",
+            "TaskSlack",
+            "PathBlocker"
           ],
           "risks": [
             "missing dependency",
             "stale durations"
           ],
-          "contracts": [
-            "CriticalPath",
-            "TaskSlack",
-            "PathBlocker"
+          "gaps": [
+            "bind task graph",
+            "surface blockers in roadmap"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/automation"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_critical_path.py"
+          ],
+          "evaluations": [
+            "planned:DAG known-answer tests"
           ]
         },
         {
           "volume_ref": "VOL-315",
           "title": "Scheduling Algorithms",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-315",
-          "requirements": [
-            "Schedulers respect hard dependencies/leases/authority before optimization.",
-            "Algorithm choice is measurable and replaceable."
-          ],
-          "gaps": [
-            "implement baseline algorithms",
-            "bind simulator"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "Schedule",
+            "SchedulingPolicy",
+            "Assignment"
           ],
           "risks": [
             "starvation",
             "priority inversion"
           ],
-          "contracts": [
-            "Schedule",
-            "SchedulingPolicy",
-            "Assignment"
+          "gaps": [
+            "implement baseline algorithms",
+            "bind simulator"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/runtime"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_scheduling_algorithms.py"
+          ],
+          "evaluations": [
+            "planned:workload scheduler benchmark"
           ]
         },
         {
           "volume_ref": "VOL-316",
           "title": "Scheduling Simulator",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-316",
-          "requirements": [
-            "Simulation is non-authoritative and labels assumptions.",
-            "Compare throughput/latency/fairness/resource metrics across policies."
-          ],
-          "gaps": [
-            "build trace format",
-            "calibrate to production"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SchedulingSimulation",
+            "WorkloadTrace",
+            "SimulationMetric"
           ],
           "risks": [
             "simulator unrealistic",
             "optimizing synthetic metric"
           ],
-          "contracts": [
-            "SchedulingSimulation",
-            "WorkloadTrace",
-            "SimulationMetric"
+          "gaps": [
+            "build trace format",
+            "calibrate to production"
+          ],
+          "implementation_paths": [
+            "skeleton/simulation",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_scheduling_simulator.py"
+          ],
+          "evaluations": [
+            "planned:historical trace backtest"
           ]
         }
       ]
@@ -325,45 +435,65 @@
         {
           "volume_ref": "VOL-317",
           "title": "Control Theory for Autonomy",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-317",
-          "requirements": [
-            "Controllers cannot exceed policy/authority or resource bounds.",
-            "Stability/oscillation behavior is evaluated before production use."
-          ],
-          "gaps": [
-            "define safe controller candidates",
-            "bind autonomy levels"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AutonomyController",
+            "ControlSignal",
+            "ControlState"
           ],
           "risks": [
             "unstable control loop",
             "bad state estimate"
           ],
-          "contracts": [
-            "AutonomyController",
-            "ControlSignal",
-            "ControlState"
+          "gaps": [
+            "define safe controller candidates",
+            "bind autonomy levels"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "experiments"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_autonomy_control.py"
+          ],
+          "evaluations": [
+            "planned:oscillation/disturbance evaluation"
           ]
         },
         {
           "volume_ref": "VOL-319",
           "title": "Autonomy Escalation",
+          "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-319",
-          "requirements": [
-            "Escalation requires explicit eligibility and approval policy.",
-            "Escalated grants expire/revoke cleanly."
-          ],
-          "gaps": [
-            "define transition rules",
-            "bind verifier/human gates"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AutonomyEscalation",
+            "EscalationGrant",
+            "EscalationEvidence"
           ],
           "risks": [
             "self-escalation",
             "stale elevated grant"
           ],
-          "contracts": [
-            "AutonomyEscalation",
-            "EscalationGrant",
-            "EscalationEvidence"
+          "gaps": [
+            "define transition rules",
+            "bind verifier/human gates"
+          ],
+          "implementation_paths": [
+            "skeleton/security",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_autonomy_escalation.py"
+          ],
+          "evaluations": [
+            "planned:unauthorized escalation attack"
           ]
         }
       ]
@@ -410,199 +540,289 @@
         {
           "volume_ref": "VOL-330",
           "title": "Project Memory",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-330",
-          "requirements": [
-            "Project memory is isolated by project/tenant and trust class.",
-            "Memory updates preserve source and supersession lineage."
-          ],
-          "gaps": [
-            "define project memory schema",
-            "bind workspace model"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ProjectMemory",
+            "ProjectFact",
+            "ProjectMemoryRevision"
           ],
           "risks": [
             "cross-project leak",
             "stale decision retained"
           ],
-          "contracts": [
-            "ProjectMemory",
-            "ProjectFact",
-            "ProjectMemoryRevision"
+          "gaps": [
+            "define project memory schema",
+            "bind workspace model"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_project_memory.py"
+          ],
+          "evaluations": [
+            "planned:project-memory poisoning evaluation"
           ]
         },
         {
           "volume_ref": "VOL-331",
           "title": "Workspace Model",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-331",
-          "requirements": [
-            "Workspace links reference canonical underlying objects rather than duplicate them.",
-            "Membership/permission changes propagate to active operations."
-          ],
-          "gaps": [
-            "define authoritative workspace schema",
-            "bind product shell"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "Workspace",
+            "WorkspaceMember",
+            "WorkspaceResource"
           ],
           "risks": [
             "workspace becomes shadow state",
             "stale permissions"
           ],
-          "contracts": [
-            "Workspace",
-            "WorkspaceMember",
-            "WorkspaceResource"
+          "gaps": [
+            "define authoritative workspace schema",
+            "bind product shell"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/product",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_workspace_model.py"
+          ],
+          "evaluations": [
+            "planned:multi-user workspace evaluation"
           ]
         },
         {
           "volume_ref": "VOL-332",
           "title": "Resource Namespace",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-332",
-          "requirements": [
-            "Namespace resolution includes tenant/project/version scope.",
-            "Reject traversal, confusable or ambiguous resource names."
-          ],
-          "gaps": [
-            "define namespace grammar",
-            "bind resource service"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ResourceName",
+            "ResourceNamespace",
+            "ResourceRef"
           ],
           "risks": [
             "name collision",
             "path traversal"
           ],
-          "contracts": [
-            "ResourceName",
-            "ResourceNamespace",
-            "ResourceRef"
+          "gaps": [
+            "define namespace grammar",
+            "bind resource service"
+          ],
+          "implementation_paths": [
+            "skeleton/foundation",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_resource_namespace.py"
+          ],
+          "evaluations": [
+            "planned:path/confusable fuzzing"
           ]
         },
         {
           "volume_ref": "VOL-333",
           "title": "Resource Resolution Service",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-333",
-          "requirements": [
-            "Resolution checks authority and lifecycle before returning handles.",
-            "Ambiguous/latest aliases are explicit and traceable."
-          ],
-          "gaps": [
-            "define resolver interface",
-            "bind artifact/model/tool registries"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ResourceQuery",
+            "ResourceHandle",
+            "ResolutionReceipt"
           ],
           "risks": [
             "alias races",
             "cross-tenant resolution"
           ],
-          "contracts": [
-            "ResourceQuery",
-            "ResourceHandle",
-            "ResolutionReceipt"
+          "gaps": [
+            "define resolver interface",
+            "bind artifact/model/tool registries"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_resource_resolution.py"
+          ],
+          "evaluations": [
+            "planned:stale/unauthorized resolution evaluation"
           ]
         },
         {
           "volume_ref": "VOL-334",
           "title": "Artifact Dependency Graph",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-334",
-          "requirements": [
-            "Edges are typed and version-specific.",
-            "Cycles are detected/handled according to artifact class."
-          ],
-          "gaps": [
-            "populate graph from producers",
-            "bind rebuild/impact"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ArtifactNode",
+            "ArtifactDependency",
+            "ArtifactGraph"
           ],
           "risks": [
             "missing edge",
             "wrong-version dependency"
           ],
-          "contracts": [
-            "ArtifactNode",
-            "ArtifactDependency",
-            "ArtifactGraph"
+          "gaps": [
+            "populate graph from producers",
+            "bind rebuild/impact"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/artifacts",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_artifact_dependency_graph.py"
+          ],
+          "evaluations": [
+            "planned:dependency mutation evaluation"
           ]
         },
         {
           "volume_ref": "VOL-335",
           "title": "Artifact Rebuild Engine",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-335",
-          "requirements": [
-            "Rebuild only from verified inputs/producer versions.",
-            "Compare rebuilt digest/semantic output against expectations."
-          ],
-          "gaps": [
-            "define rebuild policies",
-            "bind content addressing/cache"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "RebuildPlan",
+            "RebuildStep",
+            "RebuildEvidence"
           ],
           "risks": [
             "non-reproducible producer",
             "rebuild cascades unbounded"
           ],
-          "contracts": [
-            "RebuildPlan",
-            "RebuildStep",
-            "RebuildEvidence"
+          "gaps": [
+            "define rebuild policies",
+            "bind content addressing/cache"
+          ],
+          "implementation_paths": [
+            "planned:skeleton/artifacts",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_artifact_rebuild.py"
+          ],
+          "evaluations": [
+            "planned:clean rebuild evaluation"
           ]
         },
         {
           "volume_ref": "VOL-336",
           "title": "Impact Analysis Engine",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-336",
-          "requirements": [
-            "Use architecture/trace/dependency ownership graphs.",
-            "Expose uncertainty and missing edges instead of asserting complete impact."
-          ],
-          "gaps": [
-            "unify graph sources",
-            "bind changeset budget/CI"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ImpactQuery",
+            "ImpactSet",
+            "ImpactEvidence"
           ],
           "risks": [
             "missed dependency",
             "overbroad impact slows CI"
           ],
-          "contracts": [
-            "ImpactQuery",
-            "ImpactSet",
-            "ImpactEvidence"
+          "gaps": [
+            "unify graph sources",
+            "bind changeset budget/CI"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/build",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_impact_analysis.py"
+          ],
+          "evaluations": [
+            "planned:known-change impact benchmark"
           ]
         },
         {
           "volume_ref": "VOL-337",
           "title": "Change Risk Estimator",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-337",
-          "requirements": [
-            "Estimator does not replace hard gates.",
-            "Calibrate predicted risk against observed incidents/regressions."
-          ],
-          "gaps": [
-            "define baseline model",
-            "bind safe change planner"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ChangeRisk",
+            "RiskFactor",
+            "RiskCalibration"
           ],
           "risks": [
             "false low risk",
             "metric gaming"
           ],
-          "contracts": [
-            "ChangeRisk",
-            "RiskFactor",
-            "RiskCalibration"
+          "gaps": [
+            "define baseline model",
+            "bind safe change planner"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/build",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_change_risk_estimator.py"
+          ],
+          "evaluations": [
+            "planned:historical backtest"
           ]
         },
         {
           "volume_ref": "VOL-338",
           "title": "Safe Change Planner",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-338",
-          "requirements": [
-            "Plan must satisfy ownership/compatibility/risk/budget constraints before mutation.",
-            "Prefer reversible staged changes for uncertain/high-impact work."
-          ],
-          "gaps": [
-            "bind impact/risk inputs",
-            "integrate engineering agent"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SafeChangePlan",
+            "ChangeStep",
+            "ChangeGate"
           ],
           "risks": [
             "unsafe plan",
             "missing integration step"
           ],
-          "contracts": [
-            "SafeChangePlan",
-            "ChangeStep",
-            "ChangeGate"
+          "gaps": [
+            "bind impact/risk inputs",
+            "integrate engineering agent"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/build",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_safe_change_planner.py"
+          ],
+          "evaluations": [
+            "planned:known migration planning scenarios"
           ]
         }
       ]
@@ -650,199 +870,289 @@
         {
           "volume_ref": "VOL-339",
           "title": "System Compiler Concept",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-339",
-          "requirements": [
-            "Compiler outputs are derived artifacts, never new authority.",
-            "Generation is deterministic and traceable to input contracts."
-          ],
-          "gaps": [
-            "define bounded initial targets",
-            "bind provenance/review"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SystemSource",
+            "SystemCompilePlan",
+            "SystemArtifact"
           ],
           "risks": [
             "generated architecture diverges",
             "compiler hides decisions"
           ],
-          "contracts": [
-            "SystemSource",
-            "SystemCompilePlan",
-            "SystemArtifact"
+          "gaps": [
+            "define bounded initial targets",
+            "bind provenance/review"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/build",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_system_compiler.py"
+          ],
+          "evaluations": [
+            "planned:roundtrip/generation evaluation"
           ]
         },
         {
           "volume_ref": "VOL-340",
           "title": "Code Generation from Contracts",
+          "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-340",
-          "requirements": [
-            "Generated files are clearly marked and reproducible.",
-            "Manual extension points avoid edits being overwritten."
-          ],
-          "gaps": [
-            "select generators",
-            "bind generated-file policy"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "GenerationSpec",
+            "GeneratedCode",
+            "ExtensionPoint"
           ],
           "risks": [
             "hand edits lost",
             "generator/schema mismatch"
           ],
-          "contracts": [
-            "GenerationSpec",
-            "GeneratedCode",
-            "ExtensionPoint"
+          "gaps": [
+            "select generators",
+            "bind generated-file policy"
+          ],
+          "implementation_paths": [
+            "scripts",
+            "machine"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_contract_codegen.py"
+          ],
+          "evaluations": [
+            "planned:clean regeneration evaluation"
           ]
         },
         {
           "volume_ref": "VOL-371",
           "title": "Plan Static Analyzer",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-371",
-          "requirements": [
-            "Analysis is deterministic over versioned plan IR.",
-            "Findings have location/severity/remediation."
-          ],
-          "gaps": [
-            "seed core lint rules",
-            "bind workflow compiler"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "PlanLintRule",
+            "PlanDiagnostic",
+            "PlanAnalysis"
           ],
           "risks": [
             "false negatives",
             "rule drift"
           ],
-          "contracts": [
-            "PlanLintRule",
-            "PlanDiagnostic",
-            "PlanAnalysis"
+          "gaps": [
+            "seed core lint rules",
+            "bind workflow compiler"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "scripts"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_plan_static_analyzer.py"
+          ],
+          "evaluations": [
+            "planned:plan mutation tests"
           ]
         },
         {
           "volume_ref": "VOL-372",
           "title": "Plan Simulation",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-372",
-          "requirements": [
-            "Simulation receipts are marked non-production evidence.",
-            "Include failure/timeout/resource scenarios, not only happy path."
-          ],
-          "gaps": [
-            "bind digital twin",
-            "define promotion thresholds"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "PlanSimulation",
+            "SimulatedStep",
+            "SimulationFinding"
           ],
           "risks": [
             "simulation mismatch",
             "simulated success overtrusted"
           ],
-          "contracts": [
-            "PlanSimulation",
-            "SimulatedStep",
-            "SimulationFinding"
+          "gaps": [
+            "bind digital twin",
+            "define promotion thresholds"
+          ],
+          "implementation_paths": [
+            "skeleton/simulation",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_plan_simulation.py"
+          ],
+          "evaluations": [
+            "planned:risky-plan simulation suite"
           ]
         },
         {
           "volume_ref": "VOL-373",
           "title": "Tool Composition Engine",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-373",
-          "requirements": [
-            "Composition cannot aggregate permissions into broader authority.",
-            "Data transformations between tools are schema/trust checked."
-          ],
-          "gaps": [
-            "define composition IR",
-            "bind tool SDK/workflows"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ToolComposition",
+            "ToolBinding",
+            "CompositionResult"
           ],
           "risks": [
             "authority amplification",
             "schema mismatch"
           ],
-          "contracts": [
-            "ToolComposition",
-            "ToolBinding",
-            "CompositionResult"
+          "gaps": [
+            "define composition IR",
+            "bind tool SDK/workflows"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/tools"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_tool_composition.py"
+          ],
+          "evaluations": [
+            "planned:confused-deputy composition suite"
           ]
         },
         {
           "volume_ref": "VOL-374",
           "title": "Tool Dependency Graph",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-374",
-          "requirements": [
-            "Dependencies are versioned and typed.",
-            "Planner can detect unavailable/conflicting tool chains before execution."
-          ],
-          "gaps": [
-            "populate graph",
-            "bind impact/failover"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ToolDependency",
+            "ToolGraph",
+            "ToolCompatibility"
           ],
           "risks": [
             "hidden dependency",
             "cyclic tool chain"
           ],
-          "contracts": [
-            "ToolDependency",
-            "ToolGraph",
-            "ToolCompatibility"
+          "gaps": [
+            "populate graph",
+            "bind impact/failover"
+          ],
+          "implementation_paths": [
+            "machine",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_tool_dependency_graph.py"
+          ],
+          "evaluations": [
+            "planned:dependency outage evaluation"
           ]
         },
         {
           "volume_ref": "VOL-375",
           "title": "Tool Health",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-375",
-          "requirements": [
-            "Health distinguishes transport success from semantic correctness.",
-            "Stale health cannot authorize risky operations."
-          ],
-          "gaps": [
-            "define safe probes",
-            "bind tool routing"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ToolHealth",
+            "ToolProbe",
+            "ToolHealthState"
           ],
           "risks": [
             "200-OK but wrong result",
             "probe causes side effect"
           ],
-          "contracts": [
-            "ToolHealth",
-            "ToolProbe",
-            "ToolHealthState"
+          "gaps": [
+            "define safe probes",
+            "bind tool routing"
+          ],
+          "implementation_paths": [
+            "skeleton/observability",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_tool_health.py"
+          ],
+          "evaluations": [
+            "planned:semantic failure evaluation"
           ]
         },
         {
           "volume_ref": "VOL-376",
           "title": "Tool Capability Discovery",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-376",
-          "requirements": [
-            "Discovery data is untrusted until validated/signed according to source.",
-            "Discovered capability never implies granted authority."
-          ],
-          "gaps": [
-            "define discovery trust contract",
-            "bind tool SDK"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ToolCapability",
+            "ToolManifest",
+            "ToolDiscoveryResult"
           ],
           "risks": [
             "prompt injection via metadata",
             "capability=authority confusion"
           ],
-          "contracts": [
-            "ToolCapability",
-            "ToolManifest",
-            "ToolDiscoveryResult"
+          "gaps": [
+            "define discovery trust contract",
+            "bind tool SDK"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/security"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_tool_discovery.py"
+          ],
+          "evaluations": [
+            "planned:malicious manifest evaluation"
           ]
         },
         {
           "volume_ref": "VOL-377",
           "title": "Tool Result Trust",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-377",
-          "requirements": [
-            "Tool output is data, not instructions or authority.",
-            "High-impact results require independent validation where appropriate."
-          ],
-          "gaps": [
-            "define result trust levels",
-            "bind context compiler"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ToolResultTrust",
+            "ToolEvidence",
+            "ToolValidation"
           ],
           "risks": [
             "tool output injection",
             "stale result trusted"
           ],
-          "contracts": [
-            "ToolResultTrust",
-            "ToolEvidence",
-            "ToolValidation"
+          "gaps": [
+            "define result trust levels",
+            "bind context compiler"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/security"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_tool_result_trust.py"
+          ],
+          "evaluations": [
+            "planned:malicious/incorrect tool result suite"
           ]
         }
       ]
@@ -883,67 +1193,97 @@
         {
           "volume_ref": "VOL-378",
           "title": "Side-Effect Ledger",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-378",
-          "requirements": [
-            "Ledger entries are durable before/after effects according to operation class.",
-            "Unknown outcomes remain unresolved until reconciliation."
-          ],
-          "gaps": [
-            "define effect state machine",
-            "bind tools/sagas"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SideEffect",
+            "EffectAttempt",
+            "EffectReceipt"
           ],
           "risks": [
             "effect executed twice",
             "unknown marked failed"
           ],
-          "contracts": [
-            "SideEffect",
-            "EffectAttempt",
-            "EffectReceipt"
+          "gaps": [
+            "define effect state machine",
+            "bind tools/sagas"
+          ],
+          "implementation_paths": [
+            "skeleton/persistence",
+            "skeleton/ai"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_side_effect_ledger.py"
+          ],
+          "evaluations": [
+            "planned:network-loss-after-effect evaluation"
           ]
         },
         {
           "volume_ref": "VOL-379",
           "title": "Compensation Engine",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-379",
-          "requirements": [
-            "Compensation semantics are explicit and not assumed equivalent to rollback.",
-            "Failed compensation becomes durable incident/reconciliation work."
-          ],
-          "gaps": [
-            "catalog compensable effects",
-            "bind side-effect ledger"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "Compensation",
+            "CompensationStep",
+            "CompensationResult"
           ],
           "risks": [
             "compensation duplicates harm",
             "false rollback claim"
           ],
-          "contracts": [
-            "Compensation",
-            "CompensationStep",
-            "CompensationResult"
+          "gaps": [
+            "catalog compensable effects",
+            "bind side-effect ledger"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/reliability"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_compensation_engine.py"
+          ],
+          "evaluations": [
+            "planned:compensation failure campaign"
           ]
         },
         {
           "volume_ref": "VOL-380",
           "title": "Saga Workflows",
+          "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-380",
-          "requirements": [
-            "Saga state is durable and resumable across process failure.",
-            "Each step has idempotency, timeout and compensation/reconciliation policy."
-          ],
-          "gaps": [
-            "unify transaction strategy",
-            "materialize saga runtime"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "SagaDefinition",
+            "SagaInstance",
+            "SagaTransition"
           ],
           "risks": [
             "orphan saga",
             "compensation order error"
           ],
-          "contracts": [
-            "SagaDefinition",
-            "SagaInstance",
-            "SagaTransition"
+          "gaps": [
+            "unify transaction strategy",
+            "materialize saga runtime"
+          ],
+          "implementation_paths": [
+            "skeleton/ai",
+            "skeleton/persistence"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_saga_workflows.py"
+          ],
+          "evaluations": [
+            "planned:crash-every-step saga evaluation"
           ]
         }
       ]
@@ -988,67 +1328,97 @@
         {
           "volume_ref": "VOL-203",
           "title": "Agent Performance Evidence",
+          "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-203",
-          "requirements": [
-            "Score completion, correctness, recovery, cost and human intervention separately.",
-            "Bind observations to exact agent/task/config/model identity."
-          ],
-          "gaps": [
-            "define evidence metrics",
-            "bind to evaluation harness"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AgentPerformanceRecord",
+            "AgentOutcome",
+            "AgentMetric"
           ],
           "risks": [
             "self-reported success",
             "Goodhart behavior"
           ],
-          "contracts": [
-            "AgentPerformanceRecord",
-            "AgentOutcome",
-            "AgentMetric"
+          "gaps": [
+            "define evidence metrics",
+            "bind to evaluation harness"
+          ],
+          "implementation_paths": [
+            "skeleton/eval",
+            "skeleton/ai/agents"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_agent_performance_evidence.py"
+          ],
+          "evaluations": [
+            "planned:agent baseline comparison"
           ]
         },
         {
           "volume_ref": "VOL-204",
           "title": "Agent Economics",
+          "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-204",
-          "requirements": [
-            "Attribute costs per agent/task/delegation chain.",
-            "Do not optimize cost by silently weakening authority, quality or verification."
-          ],
-          "gaps": [
-            "bind to cost governor",
-            "define delegation accounting"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "AgentCost",
+            "DelegationCost",
+            "AgentEconomicDecision"
           ],
           "risks": [
             "runaway delegation spend",
             "cheap low-quality routing"
           ],
-          "contracts": [
-            "AgentCost",
-            "DelegationCost",
-            "AgentEconomicDecision"
+          "gaps": [
+            "bind to cost governor",
+            "define delegation accounting"
+          ],
+          "implementation_paths": [
+            "skeleton/observability",
+            "skeleton/ai/agents"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_agent_economics.py"
+          ],
+          "evaluations": [
+            "planned:cost-quality tradeoff evaluation"
           ]
         },
         {
           "volume_ref": "VOL-206",
           "title": "Consensus & Disagreement",
+          "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-206",
-          "requirements": [
-            "Keep independent evidence visible before aggregation.",
-            "Escalate unresolved high-impact disagreement instead of averaging it away."
-          ],
-          "gaps": [
-            "define aggregation rules",
-            "bind reviewer independence"
+          "implementation_status": "unverified",
+          "completion_checkbox": false,
+          "signing_required": true,
+          "contracts": [
+            "ConsensusProposal",
+            "Dissent",
+            "ConsensusDecision"
           ],
           "risks": [
             "false consensus",
             "majority amplifies shared error"
           ],
-          "contracts": [
-            "ConsensusProposal",
-            "Dissent",
-            "ConsensusDecision"
+          "gaps": [
+            "define aggregation rules",
+            "bind reviewer independence"
+          ],
+          "implementation_paths": [
+            "skeleton/ai/agents",
+            "skeleton/eval"
+          ],
+          "tests": [
+            "planned:skeleton/testing/test_consensus_disagreement.py"
+          ],
+          "evaluations": [
+            "planned:correlated-agent failure evaluation"
           ]
         }
       ]
