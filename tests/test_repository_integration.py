@@ -19,11 +19,9 @@ def test_integrated_source_identities_match_the_index() -> None:
     """CI checks a committed tree; local callers stage their integration first."""
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
     ids = {
-        "AIFT-APPLICATION", "AIFT-DISTRIBUTED", "AIFT-RESEARCH", "AIFT-KNOWLEDGE",
-        "AIFT-PROVENANCE", "AIFT-TOOLS", "AIFT-SIMULATION", "AIFT-GAME",
-        "AIFT-SCHOOL", "AIFT-LEARNING", "AIFT-KERNEL", "AIFT-SWARM", "AIFT-NETWORK", "AIFT-ORGANISM", "AIFT-AUTOMATION", "AIFT-GALAXY", "AIFT-CORTEX", "AIFT-AGENTS", "AIFT-PERSISTENCE", "AIFT-RETRIEVAL", "AIFT-RELIABILITY", "AIFT-VAULT", "AIFT-MEMORY",
-        "AIFT-JEEVES", "AIFT-FOUNDATION", "AIFT-RESILIENCE", "AIFT-OBSERVABILITY",
-        "AIFT-ARCHITECTURE-LEGACY",
+        item["id"]
+        for item in manifest["mappings"]
+        if item.get("source_git_object_sha")
     }
     mappings = {item["id"]: item for item in manifest["mappings"]}
     tree = _git("write-tree")
