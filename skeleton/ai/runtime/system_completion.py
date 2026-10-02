@@ -18,7 +18,7 @@ import json
 import re
 from typing import Iterable, Mapping, Sequence
 
-from skeleton.contracts.ai_execution import AIExecutionResult, AgentTurn
+from skeleton.contracts.ai_execution import AIExecutionRequest, AIExecutionResult, AgentTurn
 from skeleton.intelligence.execution_runtime import ExecutionRunResult
 from skeleton.ai.learning.promotion import PromotionReceipt
 
@@ -34,11 +34,15 @@ class CompletionPlaneError(ValueError):
 class CompletionRequirement(str, Enum):
     LOCAL_EXECUTION = "execution.local_model"
     OFFLINE_ISOLATION = "execution.offline_isolation"
+    REQUEST_RESULT_BINDING = "execution.request_result_binding"
     BUDGET_BOUNDS = "execution.budget_bounds"
+    TOOL_AUTHORITY = "execution.tool_authority"
     DURABLE_RECOVERY = "execution.durable_recovery"
     REPLAY_LINEAGE = "execution.replay_lineage"
+    REPRODUCIBILITY = "execution.reproducibility"
     GOVERNED_EFFECTS = "execution.governed_effects"
     INDEPENDENT_VERIFICATION = "verification.independent"
+    VERIFICATION_BINDING = "verification.claim_binding"
     CONTEXT_INTEGRITY = "context.integrity"
     MEMORY_LIFECYCLE = "memory.lifecycle"
     FINALIZATION_LINEAGE = "finalization.lineage"
@@ -101,6 +105,7 @@ class RequirementProof:
 
     requirement: CompletionRequirement
     subject_id: str
+    source_revision: str
     passed: bool
     producer_id: str
     verifier_id: str
@@ -114,6 +119,12 @@ class RequirementProof:
             raise CompletionPlaneError("unknown completion requirement") from exc
         object.__setattr__(self, "requirement", requirement)
         object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id))
+        revision = _text("source_revision", self.source_revision, maximum=40)
+        if _GIT_SHA.fullmatch(revision) is None:
+            raise CompletionPlaneError(
+                "proof source_revision must be a lowercase 40-char git sha"
+            )
+        object.__setattr__(self, "source_revision", revision)
         object.__setattr__(self, "producer_id", _text("producer_id", self.producer_id))
         object.__setattr__(self, "verifier_id", _text("verifier_id", self.verifier_id))
         if self.producer_id == self.verifier_id:
@@ -136,6 +147,7 @@ class RequirementProof:
             {
                 "requirement": self.requirement.value,
                 "subject_id": self.subject_id,
+                "source_revision": self.source_revision,
                 "passed": self.passed,
                 "producer_id": self.producer_id,
                 "verifier_id": self.verifier_id,
@@ -148,6 +160,7 @@ class RequirementProof:
         return {
             "requirement": self.requirement.value,
             "subject_id": self.subject_id,
+            "source_revision": self.source_revision,
             "passed": self.passed,
             "producer_id": self.producer_id,
             "verifier_id": self.verifier_id,
@@ -179,6 +192,10 @@ class SystemCompletionReport:
                 raise CompletionPlaneError("proofs must contain RequirementProof values")
             if proof.subject_id != self.subject_id:
                 raise CompletionPlaneError("proof subject does not match report subject")
+            if proof.source_revision != self.source_revision:
+                raise CompletionPlaneError(
+                    "proof source revision does not match report source revision"
+                )
             if proof.requirement in seen:
                 raise CompletionPlaneError(
                     f"duplicate completion proof: {proof.requirement.value}"
@@ -257,6 +274,8 @@ class SystemCompletionPlane:
     def add(self, proof: RequirementProof) -> RequirementProof:
         if proof.subject_id != self.subject_id:
             raise CompletionPlaneError("cannot mix completion subjects")
+        if proof.source_revision != self.source_revision:
+            raise CompletionPlaneError("cannot mix completion source revisions")
         if proof.verifier_id != self.verifier_id:
             raise CompletionPlaneError("proof verifier is outside completion authority")
         if proof.requirement in self._proofs:
@@ -286,6 +305,7 @@ class SystemCompletionPlane:
             RequirementProof(
                 requirement=requirement,
                 subject_id=self.subject_id,
+                source_revision=self.source_revision,
                 passed=passed,
                 producer_id=producer_id,
                 verifier_id=self.verifier_id,
@@ -359,6 +379,38 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_request_result_binding(
+        self,
+        request: AIExecutionRequest,
+        result: AIExecutionResult,
+    ) -> RequirementProof:
+        if not isinstance(request, AIExecutionRequest):
+            raise CompletionPlaneError("request must be AIExecutionRequest")
+        if not isinstance(result, AIExecutionResult):
+            raise CompletionPlaneError("result must be AIExecutionResult")
+        passed = bool(
+            request.execution_id == self.subject_id
+            and result.execution_id == request.execution_id
+            and result.operation_id == request.operation_id
+            and result.status == "completed"
+        )
+        return self._proof(
+            CompletionRequirement.REQUEST_RESULT_BINDING,
+            passed=passed,
+            producer_id="cognitive-execution-runtime",
+            evidence_refs=(
+                "request-identity:" + request.identity_digest,
+                "execution-result:" + result.execution_id,
+            ),
+            details={
+                "request_execution_id": request.execution_id,
+                "result_execution_id": result.execution_id,
+                "request_operation_id": request.operation_id,
+                "result_operation_id": result.operation_id,
+                "request_identity_digest": request.identity_digest,
+            },
+        )
+
     def prove_budget_bounds(
         self,
         *,
@@ -391,6 +443,35 @@ class SystemCompletionPlane:
                 "observed_model_turns": len(providers),
                 "max_tool_calls": max_tool_calls,
                 "observed_tool_calls": len(tools),
+            },
+        )
+
+    def prove_tool_authority(
+        self,
+        *,
+        allowed_tool_ids: Sequence[str],
+        observed_tool_ids: Sequence[str],
+        receipt_refs: Sequence[str],
+    ) -> RequirementProof:
+        allowed = tuple(dict.fromkeys(_text("allowed_tool_id", item) for item in allowed_tool_ids))
+        observed = tuple(_text("observed_tool_id", item) for item in observed_tool_ids)
+        receipts = tuple(_text("tool_receipt", item) for item in receipt_refs)
+        passed = bool(
+            observed
+            and len(observed) == len(receipts)
+            and all(tool_id in allowed for tool_id in observed)
+        )
+        return self._proof(
+            CompletionRequirement.TOOL_AUTHORITY,
+            passed=passed,
+            producer_id="tool-runtime",
+            evidence_refs=receipts,
+            details={
+                "allowed_tool_ids": list(allowed),
+                "observed_tool_ids": list(observed),
+                "observed_call_count": len(observed),
+                "receipt_count": len(receipts),
+                "all_calls_authorized": all(tool_id in allowed for tool_id in observed),
             },
         )
 
@@ -475,6 +556,41 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_reproducibility(
+        self,
+        *,
+        primary_result_digest: str,
+        replay_result_digest: str,
+        primary_output_digest: str,
+        replay_output_digest: str,
+    ) -> RequirementProof:
+        digests = {
+            "primary_result_digest": primary_result_digest,
+            "replay_result_digest": replay_result_digest,
+            "primary_output_digest": primary_output_digest,
+            "replay_output_digest": replay_output_digest,
+        }
+        for name, value in digests.items():
+            if not isinstance(value, str) or _SHA256.fullmatch(value) is None:
+                raise CompletionPlaneError(f"{name} must be lowercase sha256")
+        result_equal = primary_result_digest == replay_result_digest
+        output_equal = primary_output_digest == replay_output_digest
+        return self._proof(
+            CompletionRequirement.REPRODUCIBILITY,
+            passed=result_equal and output_equal,
+            producer_id="functional-ai-runtime",
+            evidence_refs=(
+                "run-result:" + primary_result_digest,
+                "replay-result:" + replay_result_digest,
+                "run-output:" + primary_output_digest,
+                "replay-output:" + replay_output_digest,
+            ),
+            details={
+                "result_equal": result_equal,
+                "output_equal": output_equal,
+            },
+        )
+
     def prove_governed_effects(
         self,
         *,
@@ -528,6 +644,50 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_verification_binding(
+        self,
+        result: AIExecutionResult,
+        *,
+        context_digest: str,
+    ) -> RequirementProof:
+        if not isinstance(context_digest, str) or _SHA256.fullmatch(context_digest) is None:
+            raise CompletionPlaneError("context_digest must be lowercase sha256")
+        receipt = (
+            dict(result.verification_receipt)
+            if isinstance(result.verification_receipt, Mapping)
+            else {}
+        )
+        candidate_digest = (
+            None
+            if result.final_output is None
+            else hashlib.sha256(result.final_output.encode("utf-8")).hexdigest()
+        )
+        receipt_candidate_digest = receipt.get("candidate_digest")
+        receipt_context_digest = receipt.get("context_digest")
+        passed = bool(
+            candidate_digest
+            and receipt_candidate_digest == candidate_digest
+            and receipt_context_digest == context_digest
+            and receipt.get("outcome") == "passed"
+            and receipt.get("policy_satisfied") is True
+        )
+        return self._proof(
+            CompletionRequirement.VERIFICATION_BINDING,
+            passed=passed,
+            producer_id="execution-verification-stage",
+            evidence_refs=(
+                "verification-receipt:" + _digest(receipt),
+                "candidate:" + (candidate_digest or _digest(None)),
+                "context:" + context_digest,
+            ),
+            details={
+                "candidate_digest": candidate_digest,
+                "receipt_candidate_digest": receipt_candidate_digest,
+                "context_digest": context_digest,
+                "receipt_context_digest": receipt_context_digest,
+            },
+        )
+
     def prove_context_integrity(
         self,
         *,
@@ -556,14 +716,21 @@ class SystemCompletionPlane:
         self,
         *,
         memory_id: str,
+        memory_subject_id: str,
         recalled_ids: Sequence[str],
         deleted: bool,
         post_delete_recalled_ids: Sequence[str],
     ) -> RequirementProof:
         memory_id = _text("memory_id", memory_id)
+        memory_subject_id = _text("memory_subject_id", memory_subject_id)
         before = tuple(str(item) for item in recalled_ids)
         after = tuple(str(item) for item in post_delete_recalled_ids)
-        passed = memory_id in before and deleted is True and memory_id not in after
+        passed = (
+            memory_subject_id == self.subject_id
+            and memory_id in before
+            and deleted is True
+            and memory_id not in after
+        )
         return self._proof(
             CompletionRequirement.MEMORY_LIFECYCLE,
             passed=passed,
@@ -573,6 +740,8 @@ class SystemCompletionPlane:
                 "memory-lifecycle:" + _digest({"before": before, "after": after}),
             ),
             details={
+                "memory_subject_id": memory_subject_id,
+                "subject_bound": memory_subject_id == self.subject_id,
                 "recalled_before_delete": memory_id in before,
                 "delete_acknowledged": bool(deleted),
                 "absent_after_delete": memory_id not in after,
@@ -613,12 +782,19 @@ class SystemCompletionPlane:
         expected_baseline: str,
         expected_candidate: str,
         active_version: str,
+        evaluation_digest: str,
+        evaluator_id: str,
     ) -> RequirementProof:
+        evaluator_id = _text("evaluator_id", evaluator_id)
+        if not isinstance(evaluation_digest, str) or _SHA256.fullmatch(evaluation_digest) is None:
+            raise CompletionPlaneError("evaluation_digest must be lowercase sha256")
         passed = bool(
             receipt.rollback is False
             and receipt.from_version == expected_baseline
             and receipt.to_version == expected_candidate
             and active_version == expected_candidate
+            and receipt.evaluation_digest == evaluation_digest
+            and evaluator_id != "learning-promotion-pipeline"
         )
         return self._proof(
             CompletionRequirement.LEARNING_PROMOTION,
@@ -629,6 +805,9 @@ class SystemCompletionPlane:
                 "from_version": receipt.from_version,
                 "to_version": receipt.to_version,
                 "active_version": active_version,
+                "evaluation_digest": evaluation_digest,
+                "evaluator_id": evaluator_id,
+                "evaluation_bound": receipt.evaluation_digest == evaluation_digest,
                 "rollback": receipt.rollback,
             },
         )
@@ -640,6 +819,7 @@ class SystemCompletionPlane:
         expected_baseline: str,
         expected_candidate: str,
         active_version: str,
+        promotion_receipt: PromotionReceipt,
     ) -> RequirementProof:
         passed = bool(
             receipt.rollback is True
@@ -647,6 +827,8 @@ class SystemCompletionPlane:
             and receipt.to_version == expected_baseline
             and active_version == expected_baseline
             and bool(receipt.reason)
+            and promotion_receipt.rollback is False
+            and receipt.evaluation_digest == promotion_receipt.evaluation_digest
         )
         return self._proof(
             CompletionRequirement.LEARNING_ROLLBACK,
@@ -658,6 +840,11 @@ class SystemCompletionPlane:
                 "to_version": receipt.to_version,
                 "active_version": active_version,
                 "reason": receipt.reason,
+                "promotion_evaluation_digest": promotion_receipt.evaluation_digest,
+                "rollback_evaluation_digest": receipt.evaluation_digest,
+                "evaluation_lineage_preserved": (
+                    receipt.evaluation_digest == promotion_receipt.evaluation_digest
+                ),
                 "rollback": receipt.rollback,
             },
         )
