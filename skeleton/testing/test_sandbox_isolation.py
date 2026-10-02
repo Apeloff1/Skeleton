@@ -115,6 +115,29 @@ def test_argv_policy() -> None:
 
 
 @posix_only
+def test_shell_metacharacters_are_passed_as_literal_argv(jail: FsJail) -> None:
+    payload = "value;printf PWNED && echo $HOME | cat"
+    r = run_isolated(
+        [sys.executable, "-c", "import sys; print(sys.argv[1])", payload],
+        jail=jail,
+    )
+    assert r.ok, r.stderr
+    assert r.text().strip() == payload
+    assert b"PWNED\n" not in r.stdout
+
+
+@posix_only
+def test_wildcards_are_not_shell_expanded(jail: FsJail) -> None:
+    jail.write_text("visible.txt", "x")
+    r = run_isolated(
+        [sys.executable, "-c", "import sys; print(sys.argv[1])", "*.txt"],
+        jail=jail,
+    )
+    assert r.ok, r.stderr
+    assert r.text().strip() == "*.txt"
+
+
+@posix_only
 def test_process_runs_in_jail_with_clean_env(jail: FsJail, monkeypatch) -> None:
     monkeypatch.setenv("SUPER_SECRET_TOKEN", "leak")
     r = run_isolated([sys.executable, "-c", "import os,json;print(json.dumps([os.getcwd(), dict(os.environ)]))"], jail=jail)
