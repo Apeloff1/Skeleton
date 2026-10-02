@@ -27,6 +27,38 @@ def test_lease_expiry_allows_reacquire():
     assert leases.acquire("python", "b").owner == "b"
 
 
+def test_admission_lease_consume_is_atomic_and_single_use():
+    from skeleton.shells.admission_lease import AdmissionLeaseConflict, AdmissionLeases
+
+    now = [0.0]
+    leases = AdmissionLeases(clock=lambda: now[0])
+    lease = leases.acquire(
+        "effect-fingerprint",
+        principal="worker",
+        command="python",
+        ttl_seconds=5,
+    )
+    assert leases.consume(lease) == lease
+    with pytest.raises(AdmissionLeaseConflict, match="stale or expired"):
+        leases.consume(lease)
+
+
+def test_admission_lease_consume_rejects_expired_token():
+    from skeleton.shells.admission_lease import AdmissionLeaseConflict, AdmissionLeases
+
+    now = [0.0]
+    leases = AdmissionLeases(clock=lambda: now[0])
+    lease = leases.acquire(
+        "effect-fingerprint",
+        principal="worker",
+        command="python",
+        ttl_seconds=1,
+    )
+    now[0] = 2.0
+    with pytest.raises(AdmissionLeaseConflict, match="stale or expired"):
+        leases.consume(lease)
+
+
 def test_lease_renew_requires_current_lease():
     now = [0.0]
     leases = LeaseRegistry(clock=lambda: now[0])
