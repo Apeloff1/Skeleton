@@ -395,6 +395,47 @@ async def test_retry_fence_binds_full_turn_semantics(tmp_path) -> None:
     assert len(calls) == 1
 
 
+
+@pytest.mark.asyncio
+async def test_retry_rejects_runtime_policy_or_compiler_identity_drift(tmp_path) -> None:
+    product, conversations, functional, calls = _runtime(tmp_path)
+    thread = _create_thread(product)
+    request = CanonicalAITurnRequest(
+        message="First canonical turn.",
+        idempotency_key="runtime-fence",
+        expected_thread_version=thread.version,
+        created_at=NOW,
+    )
+    await product.respond(
+        thread.thread_id,
+        tenant_id=TENANT,
+        owner_id=OWNER,
+        request=request,
+    )
+
+    drifted = CanonicalConversationAIRuntime(
+        conversations,
+        functional,
+        instruction_policy=InstructionPolicy(
+            policy_id="product.canonical.local",
+            version="2",
+            instructions="A materially changed product policy.",
+        ),
+    )
+    with pytest.raises(Exception, match="runtime policy/compiler identity changed"):
+        await drifted.respond(
+            thread.thread_id,
+            tenant_id=TENANT,
+            owner_id=OWNER,
+            request=CanonicalAITurnRequest(
+                message=request.message,
+                idempotency_key=request.idempotency_key,
+                expected_thread_version=thread.version,
+                created_at=NOW + timedelta(minutes=10),
+            ),
+        )
+    assert len(calls) == 1
+
 @pytest.mark.asyncio
 async def test_durable_cancel_interrupts_running_local_inference(tmp_path) -> None:
     entered = threading.Event()
@@ -483,8 +524,11 @@ async def test_durable_cancel_interrupts_running_local_inference(tmp_path) -> No
         tenant_id=TENANT,
         owner_id=OWNER,
     )
-    assert len(transcript) == 1
+    assert len(transcript) == 2
     assert transcript[0].author_type is ConversationAuthorType.USER
+    assert transcript[1].author_type is ConversationAuthorType.SYSTEM_DERIVED
+    assert transcript[1].operation_id == cancelled.result.operation_id
+    assert "cancelled" in (transcript[1].content or "").lower()
 
     stored = functional.repository.result(cancelled.execution_id)
     assert stored is not None
@@ -493,7 +537,7 @@ async def test_durable_cancel_interrupts_running_local_inference(tmp_path) -> No
 
 
 def test_reserved_product_identity_attachment_prefix_is_rejected() -> None:
-    with pytest.raises(ValueError, match="reserved product turn identity"):
+    with pytest.raises(ValueError, match="reserved product identity"):
         CanonicalAITurnRequest(
             message="Do something.",
             idempotency_key="reserved-prefix",
