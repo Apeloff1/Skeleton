@@ -184,20 +184,22 @@ class EngineTextRequest:
 
 @dataclass(frozen=True, slots=True)
 class EngineTextResponse:
+    # Preserve the historical compatibility constructor while carrying the
+    # complete canonical engine lineage for callers that need to persist it.
     text: str
-    operation_id: str
     execution_id: str
-    context_id: str
-    context_digest: str
-    context_source_snapshot: tuple[tuple[str, str], ...]
-    context_compiler_version: str
     verification: str | None
     evidence_refs: tuple[str, ...]
-    provider_receipts: tuple[str, ...]
-    tool_receipts: tuple[str, ...]
-    memory_refs: tuple[str, ...]
-    artifact_refs: tuple[str, ...]
     usage: Mapping[str, object]
+    operation_id: str | None = None
+    context_id: str | None = None
+    context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = ()
+    context_compiler_version: str | None = None
+    provider_receipts: tuple[str, ...] = ()
+    tool_receipts: tuple[str, ...] = ()
+    memory_refs: tuple[str, ...] = ()
+    artifact_refs: tuple[str, ...] = ()
 
 
 def _policy(request: EngineTextRequest) -> InstructionPolicy:
