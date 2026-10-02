@@ -484,6 +484,7 @@ async def test_engine_text_recovers_existing_execution_before_recompiling_change
             idempotency_key="stable-recovery",
             tenant_id="default",
             actor_id="backend-ai",
+            data_class="public",
             capability="assistant.compat",
             evidence=(
                 {
