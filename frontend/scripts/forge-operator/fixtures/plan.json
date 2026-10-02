@@ -1,0 +1,33 @@
+{
+ "era": "soulslike",
+ "seed": "7facd4753164ff1f",
+ "tensor_fp": "4830b90bbe5a0808",
+ "oracle_index": 16,
+ "oracle_text": "Very doubtful: that forge wire has a type mismatch.",
+ "briefing": "Jeeves / soulslike: Very doubtful: that forge wire has a type mismatch. Drop loot-weighted. Scavenge a barrel before the first fight. Extract is late \u2014 value the cores. Authored cortex/loot.",
+ "room_bias": "loot",
+ "spawn_weapon": false,
+ "extract_late": true,
+ "enemy_mix": {
+  "trash": 2,
+  "elite": 2,
+  "boss": 0
+ },
+ "recipes": [
+  "kinetic_basic",
+  "kinetic_heavy"
+ ],
+ "notes": [
+  "bias=loot",
+  "mix trash=2 elite=2 boss=0",
+  "armed=0 late_extract=1",
+  "philosophy=loss_forward",
+  "adapt=none slack=0.00",
+  "thermal_span=90.7s",
+  "authored=cortex",
+  "left-veto dropped boss thermal_span=90.7s"
+ ],
+ "adapt": "none",
+ "slack": 0.0,
+ "authored": "cortex"
+}

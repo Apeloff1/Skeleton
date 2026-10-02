@@ -1,0 +1,824 @@
+{
+ "run": {
+  "run_id": "9660a238d161",
+  "pipeline": "gameforge",
+  "succeeded": false,
+  "stages": [
+   {
+    "name": "ingest",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.0,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "detect",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.0,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "tensor",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.0,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "lattice",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.0,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "oracle",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.0,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "forge",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.083,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "jeeves",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.017,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "sim",
+    "status": "SUCCEEDED",
+    "attempts": 1,
+    "duration_s": 0.02,
+    "error": null,
+    "gate_failure": null
+   },
+   {
+    "name": "emit",
+    "status": "FAILED",
+    "attempts": 1,
+    "duration_s": 0.002,
+    "error": "RuntimeError: playtest unavailable: missing-godot-binary",
+    "gate_failure": null
+   }
+  ],
+  "duration_s": 0.122
+ },
+ "succeeded": false,
+ "era": "boomer_shooter",
+ "generation": null,
+ "reference": null,
+ "citation": null,
+ "stored_prose": 0,
+ "mass": 0.75,
+ "complete": false,
+ "tensor": {
+  "era": "boomer_shooter",
+  "axes": {
+   "risk": 0.7,
+   "tempo": 0.95,
+   "lethality": 0.85,
+   "opacity": 0.25,
+   "scarcity": 0.4,
+   "agency": 0.9,
+   "spectacle": 0.8,
+   "intimacy": 0.15,
+   "grind": 0.25,
+   "authorial": 0.35
+  },
+  "dominant": [
+   {
+    "axis": "tempo",
+    "value": 0.95
+   },
+   {
+    "axis": "agency",
+    "value": 0.9
+   },
+   {
+    "axis": "lethality",
+    "value": 0.85
+   }
+  ],
+  "fingerprint": "65ace38374f9ef1a"
+ },
+ "lattice": {
+  "era": "boomer_shooter",
+  "faces": {
+   "combat": 0.1138,
+   "heat": 0.0587,
+   "loot": 0.0375,
+   "forge": 0.0792,
+   "extract": 0.1669,
+   "narrative": 0.1181,
+   "ai": 0.0534,
+   "world": 0.0412,
+   "economy": 0.0597,
+   "ui": 0.1281,
+   "audio": 0.1016,
+   "meta": 0.0418
+  },
+  "hottest": [
+   {
+    "face": "extract",
+    "p": 0.1669
+   },
+   {
+    "face": "ui",
+    "p": 0.1281
+   },
+   {
+    "face": "narrative",
+    "p": 0.1181
+   }
+  ],
+  "vertices": 20,
+  "edges": 30
+ },
+ "oracle": {
+  "index": 16,
+  "text": "Very doubtful: that forge wire has a type mismatch.",
+  "faces": [
+   "combat",
+   "heat",
+   "loot"
+  ],
+  "weight": 0.0434,
+  "seed": "da9b26222013"
+ },
+ "helix": {
+  "turns": 8,
+  "twist": 12.8,
+  "writhe": 3.6,
+  "linking_number": 16.4,
+  "supercoiling": 0.2813,
+  "nicked": 0,
+  "Tm": 50.75,
+  "pairs": [
+   {
+    "turn": 1,
+    "stage": "ingest",
+    "watson": "CGGCGGCTAACTTGGG",
+    "crick": "AATTCCGGGGGGGGCG",
+    "operator": "boomer shooter arena boomer_shooter",
+    "system": "ingested",
+    "gc": 0.719,
+    "complementarity": 0.312
+   },
+   {
+    "turn": 2,
+    "stage": "detect",
+    "watson": "CGGCGGCTAACTTGGG",
+    "crick": "TCCAACAGCTCTCGTC",
+    "operator": "boomer shooter arena boomer_shooter",
+    "system": "boomer_shooter",
+    "gc": 0.625,
+    "complementarity": 0.312
+   }
+  ]
+ },
+ "ledger": {
+  "height": 8,
+  "head": "510f0eaed16aca0326a0df7f3e7c7dffde32dc97706f7206e29ff615afab4d4b",
+  "valid": true
+ },
+ "snowball": {
+  "mass": 0.75,
+  "complete": false,
+  "done": {
+   "ingest": 0.05,
+   "detect": 0.06,
+   "tensor": 0.08,
+   "lattice": 0.06,
+   "oracle": 0.06,
+   "forge": 0.18,
+   "jeeves": 0.1,
+   "sim": 0.16
+  },
+  "missing": [
+   "emit",
+   "seal"
+  ],
+  "log": [
+   "ingest",
+   "detect",
+   "tensor",
+   "lattice",
+   "oracle",
+   "forge",
+   "jeeves",
+   "sim"
+  ]
+ },
+ "forge": {
+  "blueprint_id": "bp-a416bd9356da",
+  "file_count": 24,
+  "primary_dps": 121.8,
+  "verification": {
+   "accepted": true,
+   "score": 0.9019,
+   "reason": "accepted",
+   "project_issues": [],
+   "blocking_issues": [],
+   "weakest_path": "scripts/autoloads/game_state.gd",
+   "thresholds": {
+    "project_accept_at": 0.7,
+    "gdscript_accept_at": 0.7
+   },
+   "summary": {
+    "files_checked": 13,
+    "failed_files": 0,
+    "warned_files": 4,
+    "passed_files": 9,
+    "project_issues": 0,
+    "blocking_issues": 0
+   },
+   "file_reports": [
+    {
+     "path": "scripts/autoloads/game_state.gd",
+     "score": 0.8,
+     "issues": [
+      "no function or class definition",
+      "code ignores the request's named concepts",
+      "file body weakly reflects its role"
+     ],
+     "hard_issues": [],
+     "soft_issues": [
+      "file body weakly reflects its role"
+     ],
+     "subscores": {
+      "syntax": 1.0,
+      "safety": 1.0,
+      "structure": 0.8,
+      "grounding": 0.0,
+      "size": 1.0
+     }
+    },
+    {
+     "path": "scripts/extract/extract_zone.gd",
+     "score": 0.8,
+     "issues": [
+      "no function or class definition",
+      "code ignores the request's named concepts",
+      "file body weakly reflects its role"
+     ],
+     "hard_issues": [],
+     "soft_issues": [
+      "file body weakly reflects its role"
+     ],
+     "subscores": {
+      "syntax": 1.0,
+      "safety": 1.0,
+      "structure": 0.8,
+      "grounding": 0.0,
+      "size": 1.0
+     }
+    },
+    {
+     "path": "scripts/ui/hud.gd",
+     "score": 0.8,
+     "issues": [
+      "no function or class definition",
+      "code ignores the request's named concepts",
+      "file body weakly reflects its role"
+     ],
+     "hard_issues": [],
+     "soft_issues": [
+      "file body weakly reflects its role"
+     ],
+     "subscores": {
+      "syntax": 1.0,
+      "safety": 1.0,
+      "structure": 0.8,
+      "grounding": 0.0,
+      "size": 1.0
+     }
+    },
+    {
+     "path": "scripts/world/door.gd",
+     "score": 0.8,
+     "issues": [
+      "no function or class definition",
+      "code ignores the request's named concepts",
+      "file body weakly reflects its role"
+     ],
+     "hard_issues": [],
+     "soft_issues": [
+      "file body weakly reflects its role"
+     ],
+     "subscores": {
+      "syntax": 1.0,
+      "safety": 1.0,
+      "structure": 0.8,
+      "grounding": 0.0,
+      "size": 1.0
+     }
+    }
+   ],
+   "quality": {
+    "accepted": true,
+    "reason": "accepted",
+    "score": 0.9019,
+    "weakest_path": "scripts/autoloads/game_state.gd",
+    "thresholds": {
+     "project_accept_at": 0.7,
+     "gdscript_accept_at": 0.7
+    },
+    "summary": {
+     "files_checked": 13,
+     "failed_files": 0,
+     "warned_files": 4,
+     "passed_files": 9,
+     "project_issues": 0,
+     "blocking_issues": 0
+    },
+    "issues": [
+     {
+      "path": "scripts/autoloads/game_state.gd",
+      "message": "file body weakly reflects its role",
+      "severity": "soft"
+     },
+     {
+      "path": "scripts/extract/extract_zone.gd",
+      "message": "file body weakly reflects its role",
+      "severity": "soft"
+     },
+     {
+      "path": "scripts/ui/hud.gd",
+      "message": "file body weakly reflects its role",
+      "severity": "soft"
+     },
+     {
+      "path": "scripts/world/door.gd",
+      "message": "file body weakly reflects its role",
+      "severity": "soft"
+     }
+    ],
+    "signals": [
+     {
+      "path": "scripts/autoloads/game_state.gd",
+      "score": 0.8,
+      "subscores": {
+       "syntax": 1.0,
+       "safety": 1.0,
+       "structure": 0.8,
+       "grounding": 0.0,
+       "size": 1.0
+      }
+     },
+     {
+      "path": "scripts/extract/extract_zone.gd",
+      "score": 0.8,
+      "subscores": {
+       "syntax": 1.0,
+       "safety": 1.0,
+       "structure": 0.8,
+       "grounding": 0.0,
+       "size": 1.0
+      }
+     },
+     {
+      "path": "scripts/ui/hud.gd",
+      "score": 0.8,
+      "subscores": {
+       "syntax": 1.0,
+       "safety": 1.0,
+       "structure": 0.8,
+       "grounding": 0.0,
+       "size": 1.0
+      }
+     },
+     {
+      "path": "scripts/world/door.gd",
+      "score": 0.8,
+      "subscores": {
+       "syntax": 1.0,
+       "safety": 1.0,
+       "structure": 0.8,
+       "grounding": 0.0,
+       "size": 1.0
+      }
+     }
+    ],
+    "metadata": {
+     "kind": "forge",
+     "files_checked": 13
+    }
+   },
+   "policy_gate": {
+    "surface": "forge",
+    "score": 0.9019,
+    "threshold": 0.7,
+    "passed": true,
+    "margin": 0.2019
+   }
+  },
+  "verify_loop": {
+   "accepted": true,
+   "trace": {
+    "rounds": 1,
+    "history": [
+     0.9019
+    ],
+    "stopped_reason": "accepted",
+    "forced_rounds": 0
+   },
+   "code_verdict": {
+    "path": "scripts/autoloads/game_state.gd",
+    "confidence": 0.68,
+    "accepted_as_code": false,
+    "issues": [
+     "no function or class definition",
+     "code ignores the request's named concepts"
+    ],
+    "advisory": true
+   },
+   "stopped_reason": "accepted",
+   "rounds_detail": [
+    {
+     "accepted": true,
+     "forge": {
+      "accepted": true,
+      "score": 0.9019,
+      "reason": "accepted",
+      "project_issues": [],
+      "blocking_issues": [],
+      "weakest_path": "scripts/autoloads/game_state.gd",
+      "thresholds": {
+       "project_accept_at": 0.7,
+       "gdscript_accept_at": 0.7
+      },
+      "summary": {
+       "files_checked": 13,
+       "failed_files": 0,
+       "warned_files": 4,
+       "passed_files": 9,
+       "project_issues": 0,
+       "blocking_issues": 0
+      },
+      "file_reports": [
+       {
+        "path": "scripts/autoloads/game_state.gd",
+        "score": 0.8,
+        "issues": [
+         "no function or class definition",
+         "code ignores the request's named concepts",
+         "file body weakly reflects its role"
+        ],
+        "hard_issues": [],
+        "soft_issues": [
+         "file body weakly reflects its role"
+        ],
+        "subscores": {
+         "syntax": 1.0,
+         "safety": 1.0,
+         "structure": 0.8,
+         "grounding": 0.0,
+         "size": 1.0
+        }
+       },
+       {
+        "path": "scripts/extract/extract_zone.gd",
+        "score": 0.8,
+        "issues": [
+         "no function or class definition",
+         "code ignores the request's named concepts",
+         "file body weakly reflects its role"
+        ],
+        "hard_issues": [],
+        "soft_issues": [
+         "file body weakly reflects its role"
+        ],
+        "subscores": {
+         "syntax": 1.0,
+         "safety": 1.0,
+         "structure": 0.8,
+         "grounding": 0.0,
+         "size": 1.0
+        }
+       }
+      ],
+      "policy_gate": {
+       "surface": "forge",
+       "score": 0.9019,
+       "threshold": 0.7,
+       "passed": true,
+       "margin": 0.2019
+      }
+     },
+     "code": {
+      "path": "scripts/autoloads/game_state.gd",
+      "confidence": 0.0,
+      "issues": [
+       "no function or class definition",
+       "code ignores the request's named concepts"
+      ]
+     },
+     "confidence": 0.9019
+    }
+   ],
+   "threshold": 0.7,
+   "repair_mode": "apply"
+  },
+  "repair": null,
+  "composition": null
+ },
+ "jeeves": {
+  "era": "boomer_shooter",
+  "world": {
+   "era": "boomer_shooter",
+   "heat_ratio": 0.92,
+   "collapse_ratio": 0.0,
+   "cores": 0,
+   "has_weapon": true,
+   "dps": 121.8,
+   "alive": true
+  },
+  "advice": [
+   {
+    "text": "Heat critical (92%). Vent or swap to kinetic \u2014 era boomer_shooter punishes overheat.",
+    "priority": 3,
+    "axis": "heat",
+    "action": "vent"
+   }
+  ],
+  "next": {
+   "text": "Heat critical (92%). Vent or swap to kinetic \u2014 era boomer_shooter punishes overheat.",
+   "priority": 3,
+   "axis": "heat",
+   "action": "vent"
+  },
+  "briefing": "Jeeves / boomer_shooter: Very doubtful: that forge wire has a type mismatch. Drop combat-weighted. You spawn with a kit. Extract is late \u2014 value the cores. Authored cortex/combat.",
+  "build_plan": {
+   "era": "boomer_shooter",
+   "seed": "d45808236836943c",
+   "tensor_fp": "65ace38374f9ef1a",
+   "oracle_index": 16,
+   "oracle_text": "Very doubtful: that forge wire has a type mismatch.",
+   "briefing": "Jeeves / boomer_shooter: Very doubtful: that forge wire has a type mismatch. Drop combat-weighted. You spawn with a kit. Extract is late \u2014 value the cores. Authored cortex/combat.",
+   "room_bias": "combat",
+   "spawn_weapon": true,
+   "extract_late": true,
+   "enemy_mix": {
+    "trash": 4,
+    "elite": 2,
+    "boss": 0
+   },
+   "recipes": [
+    "kinetic_basic"
+   ],
+   "notes": [
+    "bias=combat",
+    "mix trash=4 elite=2 boss=0",
+    "armed=1 late_extract=1",
+    "philosophy=movement_gun_poetry",
+    "adapt=none slack=0.00",
+    "thermal_span=15.9s",
+    "authored=cortex",
+    "left-veto thermal_span=15.9s/140.0s"
+   ],
+   "adapt": "none",
+   "slack": 0.0,
+   "authored": "cortex"
+  }
+ },
+ "G": 1.0,
+ "law": "ok",
+ "sim": {
+  "era": "boomer_shooter",
+  "primary_dps": 121.8,
+  "passed": true,
+  "collapse_max": 200.0,
+  "encounters": [
+   {
+    "enemy_id": "trash",
+    "mode": "ideal",
+    "target_ttk": 0.4,
+    "measured_ttk": 0.3998,
+    "error": 0.0004,
+    "shots": 3,
+    "vents": 0,
+    "overheat": false,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 0.0
+   },
+   {
+    "enemy_id": "trash",
+    "mode": "thermal",
+    "target_ttk": 0.4,
+    "measured_ttk": 0.3833,
+    "error": 0.0417,
+    "shots": 3,
+    "vents": 0,
+    "overheat": false,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 15.3
+   },
+   {
+    "enemy_id": "elite",
+    "mode": "ideal",
+    "target_ttk": 2.0,
+    "measured_ttk": 2.0,
+    "error": 0.0,
+    "shots": 12,
+    "vents": 0,
+    "overheat": false,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 0.0
+   },
+   {
+    "enemy_id": "elite",
+    "mode": "thermal",
+    "target_ttk": 2.0,
+    "measured_ttk": 2.0333,
+    "error": 0.0167,
+    "shots": 12,
+    "vents": 0,
+    "overheat": false,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 56.25
+   },
+   {
+    "enemy_id": "boss",
+    "mode": "ideal",
+    "target_ttk": 25.0,
+    "measured_ttk": 25.0,
+    "error": 0.0,
+    "shots": 150,
+    "vents": 0,
+    "overheat": false,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 0.0
+   },
+   {
+    "enemy_id": "boss",
+    "mode": "thermal",
+    "target_ttk": 25.0,
+    "measured_ttk": 93.9333,
+    "error": 2.7573,
+    "shots": 150,
+    "vents": 33,
+    "overheat": true,
+    "collapsed": false,
+    "killed": true,
+    "heat_end": 84.75
+   }
+  ],
+  "notes": [
+   "compiler identity holds; thermal \u2265 ideal",
+   "walk extracted thermal=20.94s ideal=20.94s hops=4 heat_peak=56.3"
+  ],
+  "walk": {
+   "extracted": true,
+   "collapsed": false,
+   "passed": true,
+   "t": 20.9398,
+   "bound": 18.1398,
+   "mode": "thermal",
+   "heat_peak": 56.25,
+   "vents": 0,
+   "hops": 4,
+   "fights": 3,
+   "cores": 4,
+   "required_cores": 1,
+   "path": [
+    "r00",
+    "r01",
+    "r02",
+    "r12",
+    "r13"
+   ],
+   "notes": [
+    "extracted t=20.94s hops=4 cores=4/1"
+   ],
+   "steps": [
+    {
+     "t": 0.0,
+     "room": "r00",
+     "action": "enter",
+     "detail": "spawn"
+    },
+    {
+     "t": 3.3591,
+     "room": "r01",
+     "action": "enter",
+     "detail": "combat"
+    },
+    {
+     "t": 3.7424,
+     "room": "r01",
+     "action": "fight",
+     "detail": "trash thermal=0.383 heat=15.3 vents=0"
+    },
+    {
+     "t": 7.1015,
+     "room": "r02",
+     "action": "enter",
+     "detail": "combat"
+    },
+    {
+     "t": 7.4848,
+     "room": "r02",
+     "action": "fight",
+     "detail": "trash thermal=0.383 heat=15.3 vents=0"
+    },
+    {
+     "t": 15.5474,
+     "room": "r12",
+     "action": "enter",
+     "detail": "combat"
+    }
+   ],
+   "collapse_max": 200.0,
+   "ideal": {
+    "t": 20.9398,
+    "extracted": true,
+    "passed": true,
+    "hops": 4,
+    "fights": 3
+   }
+  }
+ },
+ "project": null,
+ "playtest": null,
+ "build_plan": {
+  "era": "boomer_shooter",
+  "seed": "d45808236836943c",
+  "tensor_fp": "65ace38374f9ef1a",
+  "oracle_index": 16,
+  "oracle_text": "Very doubtful: that forge wire has a type mismatch.",
+  "briefing": "Jeeves / boomer_shooter: Very doubtful: that forge wire has a type mismatch. Drop combat-weighted. You spawn with a kit. Extract is late \u2014 value the cores. Authored cortex/combat.",
+  "room_bias": "combat",
+  "spawn_weapon": true,
+  "extract_late": true,
+  "enemy_mix": {
+   "trash": 4,
+   "elite": 2,
+   "boss": 0
+  },
+  "recipes": [
+   "kinetic_basic"
+  ],
+  "notes": [
+   "bias=combat",
+   "mix trash=4 elite=2 boss=0",
+   "armed=1 late_extract=1",
+   "philosophy=movement_gun_poetry",
+   "adapt=none slack=0.00",
+   "thermal_span=15.9s",
+   "authored=cortex",
+   "left-veto thermal_span=15.9s/140.0s"
+  ],
+  "adapt": "none",
+  "slack": 0.0,
+  "authored": "cortex"
+ },
+ "postprocessed": false,
+ "postprocess_error": "ImportError",
+ "file_names": [
+  "data/build_plan.json",
+  "data/hardware.json",
+  "data/rooms.json",
+  "export_presets.cfg",
+  "project.godot",
+  "scenes/door.tscn",
+  "scenes/enemy.tscn",
+  "scenes/extract.tscn",
+  "scenes/heat_zone.tscn",
+  "scenes/levels/run_level.tscn",
+  "scenes/player.tscn",
+  "scripts/autoloads/event_bus.gd",
+  "scripts/autoloads/forge_manager.gd",
+  "scripts/autoloads/game_state.gd",
+  "scripts/autoloads/heat_system.gd",
+  "scripts/autoloads/input_bind.gd",
+  "scripts/autoloads/jeeves.gd",
+  "scripts/combat/enemy.gd",
+  "scripts/extract/extract_zone.gd",
+  "scripts/player/player_controller.gd",
+  "scripts/ui/hud.gd",
+  "scripts/world/door.gd",
+  "scripts/world/heat_zone.gd",
+  "scripts/world/world_map.gd"
+ ]
+}

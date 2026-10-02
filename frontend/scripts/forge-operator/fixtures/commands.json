@@ -1,0 +1,194 @@
+{
+ "BLEND ERA arcade_golden_age soulslike 0.35": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "BLEND",
+   "result": {
+    "era": "arcade_golden_age~soulslike@0.35",
+    "blend": [
+     "arcade_golden_age",
+     "soulslike",
+     0.35
+    ],
+    "tensor": {
+     "risk": 0.698,
+     "tempo": 0.7555,
+     "lethality": 0.6725,
+     "opacity": 0.31,
+     "scarcity": 0.4575,
+     "agency": 0.535,
+     "spectacle": 0.675,
+     "intimacy": 0.205,
+     "grind": 0.4275,
+     "authorial": 0.4425
+    }
+   }
+  }
+ },
+ "SET AXIS risk 0.9": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "SET",
+   "result": {
+    "axis": "risk",
+    "value": 0.9
+   }
+  }
+ },
+ "ROLL ORACLE": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "ROLL",
+   "result": {
+    "index": 9,
+    "text": "The authorial grain wants one more room. Decline.",
+    "faces": [
+     "extract",
+     "ui",
+     "audio"
+    ],
+    "weight": 0.0678,
+    "seed": "7a88798316fd"
+   }
+  }
+ },
+ "BIND GENERATION 16bit": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "BIND",
+   "result": {
+    "generation": "16bit",
+    "label": "16-Bit",
+    "viewport": [
+     320,
+     224
+    ]
+   }
+  }
+ },
+ "BIND ARCHETYPE auto": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "BIND",
+   "result": {
+    "archetype": "auto",
+    "composed": true
+   }
+  }
+ },
+ "COMPOSE craft gear and stash loot before the storm collapses the map": {
+  "status": 200,
+  "body": {
+   "ok": true,
+   "verb": "COMPOSE",
+   "result": {
+    "vision_chars": 60,
+    "features": [
+     "crafting",
+     "collapse",
+     "persistence"
+    ],
+    "matches": {
+     "crafting": [
+      "craft",
+      "gear",
+      "loot"
+     ],
+     "collapse": [
+      "storm",
+      "collapses"
+     ],
+     "persistence": [
+      "stash"
+     ]
+    },
+    "fallback": false,
+    "components": [
+     {
+      "instance_id": "operator",
+      "kind": "player",
+      "feature": "player"
+     },
+     {
+      "instance_id": "forge",
+      "kind": "weapon_forge",
+      "feature": "crafting"
+     },
+     {
+      "instance_id": "collapse",
+      "kind": "collapse",
+      "feature": "collapse"
+     },
+     {
+      "instance_id": "vault",
+      "kind": "state_store",
+      "feature": "persistence"
+     }
+    ],
+    "wires": [
+     {
+      "from": [
+       "operator",
+       "intent"
+      ],
+      "to": [
+       "collapse",
+       "tick"
+      ]
+     },
+     {
+      "from": [
+       "operator",
+       "state"
+      ],
+      "to": [
+       "vault",
+       "write"
+      ]
+     }
+    ],
+    "blueprint_id": "bp-ded12c6fa8e2",
+    "summary": "3 systems: crafting, collapse, persistence"
+   }
+  }
+ },
+ "BIND ARCHETYPE dragon": {
+  "status": 400,
+  "body": {
+   "error": {
+    "type": "CockpitError",
+    "code": "CTX.COCKPIT",
+    "message": "unknown archetype",
+    "context": {
+     "archetype": "dragon",
+     "known": [
+      "auto",
+      "combat_loop",
+      "extraction",
+      "pipeline",
+      "vision"
+     ]
+    }
+   }
+  }
+ },
+ "FLY away": {
+  "status": 400,
+  "body": {
+   "error": {
+    "type": "CockpitError",
+    "code": "CTX.COCKPIT",
+    "message": "unknown command",
+    "context": {
+     "verb": "FLY",
+     "line": "FLY away"
+    }
+   }
+  }
+ }
+}

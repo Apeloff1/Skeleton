@@ -1,0 +1,6 @@
+{
+ "status": 422,
+ "body": {
+  "detail": "playtest must be one of auto, off, require"
+ }
+}
