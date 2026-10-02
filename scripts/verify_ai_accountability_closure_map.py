@@ -165,6 +165,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         workflow = str(group.get("workflow") or "")
         workflow_name = str(group.get("workflow_name") or "")
         verifier_script = group.get("verifier_script")
+        expected_receipt_verifier = str(
+            group.get("expected_receipt_verifier") or ""
+        ).strip()
         stage = group.get("stage")
 
         if not key or key in group_keys:
@@ -214,6 +217,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         errors.extend(
             _workflow_exact_head_errors(root, workflow, workflow_name)
         )
+        if not expected_receipt_verifier:
+            errors.append(f"{key}: expected_receipt_verifier is required")
         if not isinstance(verifier_script, str) or not verifier_script:
             errors.append(f"{key}: verifier_script is required")
         else:
@@ -285,6 +290,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 "workflow": workflow,
                 "workflow_name": workflow_name,
                 "verifier_script": verifier_script,
+                "expected_receipt_verifier": expected_receipt_verifier,
                 "verifier_binding_token": (
                     group.get("verifier_binding_token") or gap_id
                 ),
