@@ -159,11 +159,11 @@
       ],
       "evidence_rollup": {
         "task_count": 6,
-        "queue_done_count": 3,
-        "implementation_signed_count": 3,
-        "verification_signed_count": 3,
+        "queue_done_count": 6,
+        "implementation_signed_count": 6,
+        "verification_signed_count": 6,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -319,11 +319,11 @@
       ],
       "evidence_rollup": {
         "task_count": 6,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 6,
+        "implementation_signed_count": 6,
+        "verification_signed_count": 6,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -505,11 +505,11 @@
       ],
       "evidence_rollup": {
         "task_count": 6,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 6,
+        "implementation_signed_count": 6,
+        "verification_signed_count": 6,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -717,11 +717,11 @@
       ],
       "evidence_rollup": {
         "task_count": 12,
-        "queue_done_count": 6,
-        "implementation_signed_count": 6,
-        "verification_signed_count": 6,
+        "queue_done_count": 12,
+        "implementation_signed_count": 12,
+        "verification_signed_count": 12,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -924,11 +924,11 @@
       ],
       "evidence_rollup": {
         "task_count": 15,
-        "queue_done_count": 3,
-        "implementation_signed_count": 3,
-        "verification_signed_count": 3,
+        "queue_done_count": 15,
+        "implementation_signed_count": 15,
+        "verification_signed_count": 15,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -1130,11 +1130,11 @@
       ],
       "evidence_rollup": {
         "task_count": 9,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 9,
+        "implementation_signed_count": 9,
+        "verification_signed_count": 9,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -1333,11 +1333,11 @@
       ],
       "evidence_rollup": {
         "task_count": 9,
-        "queue_done_count": 1,
-        "implementation_signed_count": 1,
-        "verification_signed_count": 1,
+        "queue_done_count": 9,
+        "implementation_signed_count": 9,
+        "verification_signed_count": 9,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -1526,11 +1526,11 @@
       ],
       "evidence_rollup": {
         "task_count": 9,
-        "queue_done_count": 3,
-        "implementation_signed_count": 3,
-        "verification_signed_count": 3,
+        "queue_done_count": 9,
+        "implementation_signed_count": 9,
+        "verification_signed_count": 9,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -1731,11 +1731,11 @@
       ],
       "evidence_rollup": {
         "task_count": 9,
-        "queue_done_count": 3,
-        "implementation_signed_count": 3,
-        "verification_signed_count": 3,
+        "queue_done_count": 9,
+        "implementation_signed_count": 9,
+        "verification_signed_count": 9,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -1925,11 +1925,11 @@
       ],
       "evidence_rollup": {
         "task_count": 12,
-        "queue_done_count": 3,
-        "implementation_signed_count": 3,
-        "verification_signed_count": 3,
+        "queue_done_count": 12,
+        "implementation_signed_count": 12,
+        "verification_signed_count": 12,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -2127,11 +2127,11 @@
       ],
       "evidence_rollup": {
         "task_count": 12,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 12,
+        "implementation_signed_count": 12,
+        "verification_signed_count": 12,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -2394,11 +2394,11 @@
       ],
       "evidence_rollup": {
         "task_count": 24,
-        "queue_done_count": 1,
-        "implementation_signed_count": 1,
-        "verification_signed_count": 1,
+        "queue_done_count": 24,
+        "implementation_signed_count": 24,
+        "verification_signed_count": 24,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -2802,11 +2802,11 @@
       ],
       "evidence_rollup": {
         "task_count": 3,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -3002,11 +3002,11 @@
       ],
       "evidence_rollup": {
         "task_count": 3,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -3570,11 +3570,11 @@
       ],
       "evidence_rollup": {
         "task_count": 3,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 3,
+        "implementation_signed_count": 3,
+        "verification_signed_count": 3,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
@@ -4543,11 +4543,11 @@
       ],
       "evidence_rollup": {
         "task_count": 6,
-        "queue_done_count": 0,
-        "implementation_signed_count": 0,
-        "verification_signed_count": 0,
+        "queue_done_count": 6,
+        "implementation_signed_count": 6,
+        "verification_signed_count": 6,
         "package_evidence_count": 0,
-        "state": "evidence_pending"
+        "state": "signed_tasks_verified"
       },
       "completion_rule": "package rollup derives from signed atomic accountability plus required package evidence; manual package status is not completion authority"
     },
