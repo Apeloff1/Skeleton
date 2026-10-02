@@ -12,6 +12,7 @@ from typing import Iterable, Iterator
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _DRIVE = re.compile(r"^[A-Za-z]:")
+_ENCODED_PATH_META = re.compile(r"%(?:00|25|2e|2f|3a|5c)", re.IGNORECASE)
 _WINDOWS_DEVICE = re.compile(
     r"^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$",
     re.IGNORECASE,
@@ -39,6 +40,10 @@ def normalize_relative_path(value: str | os.PathLike[str]) -> str:
         raise WorkspacePathError("path must be text")
     if not raw:
         raise WorkspacePathError("path cannot be empty")
+    if _ENCODED_PATH_META.search(raw):
+        raise WorkspacePathError(
+            "workspace path contains encoded path metacharacters"
+        )
     text = raw.replace("\\", "/")
     if text.startswith("/") or _DRIVE.match(text):
         raise WorkspacePathError("workspace path must be relative")
