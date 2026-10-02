@@ -32,7 +32,11 @@ from skeleton.ai.learning.promotion import (
     PromotionReceipt,
 )
 from skeleton.ai.runtime.context.ledger import ContextLedger
-from skeleton.ai.runtime.functional_ai import FunctionalAIRequest, FunctionalAIRun, FunctionalAIRuntime
+from skeleton.ai.runtime.functional_ai import (
+    FunctionalAIRequest,
+    FunctionalAIRun,
+    FunctionalAIRuntime,
+)
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
     LocalInferenceEngine,
