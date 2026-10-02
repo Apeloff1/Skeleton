@@ -791,7 +791,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
@@ -899,7 +899,7 @@
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W20",
       "dependency_refs": [],
-      "status": "planned",
+      "status": "evidence_pending",
       "priority_class": "P0",
       "provenance": [
         "machine/ai_edge_case_priority_queue.json",
