@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import json
 
@@ -209,6 +210,99 @@ async def test_independent_verifier_rejects_semantically_forged_rehashed_proof(
         in error
         for error in verdict["errors"]
     )
+
+
+@pytest.mark.asyncio
+async def test_independent_verifier_semantically_challenges_all_28_proofs(
+    tmp_path,
+) -> None:
+    _receipt, path = await _write_receipt(tmp_path)
+    baseline = json.loads(path.read_text(encoding="utf-8"))
+
+    mutations = {
+        "execution.local_model":
+            ("subject_bound", False),
+        "execution.offline_isolation":
+            ("network_attempt_count", 1),
+        "execution.request_result_binding":
+            ("result_operation_id", "different-operation"),
+        "execution.budget_bounds":
+            ("observed_model_turns", 999),
+        "execution.stop_semantics":
+            ("deadline_fenced", False),
+        "execution.tool_authority":
+            ("all_calls_authorized", False),
+        "execution.durable_recovery":
+            ("exact_match", False),
+        "execution.staged_finalization_recovery":
+            ("intent_cleared", False),
+        "execution.replay_lineage":
+            ("parent_linked", False),
+        "execution.reproducibility":
+            ("result_equal", False),
+        "execution.governed_effects":
+            ("verified_postcondition_count", 1),
+        "verification.independent":
+            ("policy_satisfied", False),
+        "verification.claim_binding":
+            ("receipt_context_digest", "0" * 64),
+        "context.integrity":
+            ("problem_count", 1),
+        "memory.lifecycle":
+            ("absent_after_delete", False),
+        "finalization.lineage":
+            ("artifact_ref_count", 0),
+        "learning.promotion":
+            ("failed_evaluation_rejected", False),
+        "learning.rollback":
+            ("rollback_without_promotion_rejected", False),
+        "security.sandbox_filesystem":
+            ("traversal_rejected", False),
+        "security.sandbox_process":
+            ("network_fail_closed", False),
+        "security.injection_sanitization":
+            ("duplicate_json_rejected", False),
+        "privacy.provider_fallback":
+            ("all_within_boundary", False),
+        "memory.poisoning_resistance":
+            ("conflicting_replay_rejected", False),
+        "security.outbound_network_boundary":
+            ("peer_rebinding_rejected", False),
+        "resource.admission_quota":
+            ("over_quota_rejected", False),
+        "resource.shared_pressure":
+            ("second_worker_blocked", False),
+        "execution.idempotent_retry":
+            ("no_double_reservation", False),
+        "privacy.tenant_isolation":
+            ("cross_tenant_get_rejected", False),
+    }
+    assert set(mutations) == set(
+        baseline["report"]["required"]
+    )
+
+    for requirement, (field, value) in mutations.items():
+        payload = deepcopy(baseline)
+        target = next(
+            proof
+            for proof in payload["report"]["proofs"]
+            if proof["requirement"] == requirement
+        )
+        assert target["passed"] is True
+        target["details"][field] = value
+        _rehash_receipt(payload)
+        path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        verdict = verify_receipt(path, expected_head=HEAD)
+
+        assert verdict["valid"] is False, requirement
+        assert any(
+            f"proof semantic pass mismatch: {requirement}" in error
+            for error in verdict["errors"]
+        ), (requirement, verdict)
 
 
 @pytest.mark.asyncio
