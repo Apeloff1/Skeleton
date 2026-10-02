@@ -14,6 +14,7 @@ import unicodedata
 from types import MappingProxyType
 from typing import Iterable, Mapping
 
+from skeleton.security.text_identity import require_authority_identifier
 from skeleton.shells.ai.manifest import AIToolManifest
 
 MCP_PROTOCOL_REVISION = "2026-07-28"
@@ -51,6 +52,11 @@ class MCPToolDescriptor:
     def __post_init__(self) -> None:
         if not self.name or len(self.name) > 128:
             raise ValueError("invalid MCP tool name")
+        require_authority_identifier(
+            self.name,
+            field="MCP tool name",
+            max_length=128,
+        )
         _validate_curated_description(self.description, self.description_origin)
         input_schema = dict(self.input_schema)
         output_schema = dict(self.output_schema)
@@ -109,6 +115,22 @@ class MCPRequestEnvelope:
             raise ValueError("invalid MCP method")
         if len(self.name) > 128:
             raise ValueError("invalid MCP tool name")
+        require_authority_identifier(
+            self.request_id,
+            field="MCP request_id",
+            max_length=160,
+        )
+        require_authority_identifier(
+            self.method,
+            field="MCP method",
+            max_length=128,
+        )
+        if self.name:
+            require_authority_identifier(
+                self.name,
+                field="MCP tool name",
+                max_length=128,
+            )
         arguments = dict(self.arguments)
         metadata = dict(self.metadata)
         if len(metadata) > 64:
