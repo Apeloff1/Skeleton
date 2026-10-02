@@ -2139,12 +2139,27 @@
         165
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Tool capabilities are registered by trusted host code and are not created from model output.",
+        "Execution requires an active scoped host ToolGrant matching tool, risk, arguments, expiry, and call budget.",
+        "Execution remains bound to exact action, call, user, run, trace, policy, isolation, and evidence."
+      ],
+      "tests": [
+        "skeleton/testing/test_jeeves_epistemic_tool_gate.py::test_exact_intent_requires_both_epistemic_permit_and_host_grant",
+        "skeleton/testing/test_jeeves_epistemic_tool_gate.py::test_missing_host_grant_still_denies_after_epistemic_authorization",
+        "skeleton/testing/test_jeeves_epistemic_tool_gate.py::test_argument_substitution_is_rejected_after_token_is_burned",
+        "skeleton/testing/test_privileged_tool_transaction.py::test_privileged_transaction_binds_approval_to_exact_request"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/jeeves/agent/tools.py",
+        "code:skeleton/jeeves/agent/epistemic_tool_gate.py",
+        "test:skeleton/testing/test_jeeves_epistemic_tool_gate.py",
+        "test:skeleton/testing/test_privileged_tool_transaction.py",
+        "workflow:P0 Capability Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "design_review",
