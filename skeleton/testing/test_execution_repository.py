@@ -637,7 +637,11 @@ def test_staged_finalization_is_idempotent_and_rejects_changed_terminal_payload(
             now=_now(),
         )
 
-def _verification_receipt(*, receipt_id: str | None = None, verifier_id: str = "verify:test") -> VerificationReceipt:
+def _verification_receipt(
+    *,
+    receipt_id: str | None = None,
+    verifier_id: str = "verify:test",
+) -> VerificationReceipt:
     return VerificationReceipt(
         receipt_id=receipt_id or str(uuid4()),
         claim_id=str(uuid4()),
