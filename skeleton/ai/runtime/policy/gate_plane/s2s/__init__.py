@@ -8,7 +8,27 @@ changes to ``skeleton/api/server.py``.
 
 from __future__ import annotations
 
+from skeleton.gate_plane.s2s.authz import (
+    AuthzReason,
+    PolicyDecision,
+    PolicyError,
+    PolicyTable,
+    Principal,
+    RoutePattern,
+    RoutePolicy,
+    default_gate_plane_policies,
+)
 from skeleton.gate_plane.s2s.clock import Clock, ManualClock, SystemClock, system_clock
+from skeleton.gate_plane.s2s.gate import (
+    S2S_GATE_LAYER,
+    S2SAuthGate,
+    S2SAuthMiddleware,
+    S2SDecision,
+    S2SOutcome,
+    extract_token,
+    install_s2s_gate,
+    stack_with_s2s,
+)
 from skeleton.gate_plane.s2s.keyring import (
     KeyRing,
     KeyRingError,
@@ -35,6 +55,22 @@ from skeleton.gate_plane.s2s.tokens import (
 )
 
 __all__ = [
+    "AuthzReason",
+    "PolicyDecision",
+    "PolicyError",
+    "PolicyTable",
+    "Principal",
+    "RoutePattern",
+    "RoutePolicy",
+    "S2SAuthGate",
+    "S2SAuthMiddleware",
+    "S2SDecision",
+    "S2SOutcome",
+    "S2S_GATE_LAYER",
+    "default_gate_plane_policies",
+    "extract_token",
+    "install_s2s_gate",
+    "stack_with_s2s",
     "Clock",
     "KeyRing",
     "KeyRingError",
