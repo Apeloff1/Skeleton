@@ -281,9 +281,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_context_non_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-001",
       "completion_checkbox": false,
@@ -310,9 +315,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_tool_output_non_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-002",
       "completion_checkbox": false,
@@ -376,9 +386,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_registry_backed_approval_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-030",
       "completion_checkbox": false,
