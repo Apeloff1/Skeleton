@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 from uuid import NAMESPACE_URL, uuid5
 
@@ -214,6 +215,34 @@ class FunctionalAIRuntime:
         self.runtime = CognitiveExecutionRuntime(
             repository,
             local_model,
+            tools,
+            verification_hook=verification_hook,
+            finalization_binding_hook=finalization_binding_hook,
+        )
+
+    @classmethod
+    def from_local_model_manifest(
+        cls,
+        repository: SQLiteExecutionRepository,
+        manifest_path: str | Path,
+        tools: AsyncToolRuntime,
+        *,
+        verification_hook: VerificationHook,
+        finalization_binding_hook: FinalizationHook | None = None,
+        cache_size: int = 0,
+        default_seed: int = 0,
+        rehash_artifacts_each_run: bool = False,
+    ) -> "FunctionalAIRuntime":
+        from skeleton.ai.runtime.inference.deployment import load_local_model_adapter
+
+        return cls(
+            repository,
+            load_local_model_adapter(
+                manifest_path,
+                cache_size=cache_size,
+                default_seed=default_seed,
+                rehash_artifacts_each_run=rehash_artifacts_each_run,
+            ),
             tools,
             verification_hook=verification_hook,
             finalization_binding_hook=finalization_binding_hook,

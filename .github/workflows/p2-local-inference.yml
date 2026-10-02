@@ -6,6 +6,8 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "scripts/qualify_local_model_runtime.py"
       - ".github/workflows/p2-local-inference.yml"
   push:
     branches:
@@ -15,6 +17,8 @@ on:
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "scripts/qualify_local_model_runtime.py"
       - ".github/workflows/p2-local-inference.yml"
   workflow_dispatch:
 
@@ -58,3 +62,4 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_llama_cpp_local_inference.py
+          skeleton/testing/test_local_model_deployment.py

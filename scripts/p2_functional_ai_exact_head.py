@@ -35,6 +35,9 @@ _REQUIRED_SURFACE_KEYS = {
     "llama_cpp_test",
     "vs001_test",
     "exact_head_receipt",
+    "local_model_deployment",
+    "local_model_deployment_test",
+    "local_model_qualifier",
 }
 
 
@@ -171,6 +174,8 @@ def build_receipt(
         "prompt_argv_forbidden",
         "shell_execution_forbidden",
         "exact_head_receipt_required",
+        "deployment_manifest_bootstrap_required",
+        "operator_local_model_qualification_required",
     ):
         if requirements.get(required) is not True:
             raise ExactHeadReceiptError(f"closure requirement {required} must be true")

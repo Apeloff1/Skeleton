@@ -13,11 +13,13 @@ on:
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
+      - "skeleton/testing/test_local_model_deployment.py"
       - "skeleton/testing/test_vs001_functional_ai.py"
       - "scripts/check_p1_terminal_closure_manifest.py"
       - "scripts/check_p2_tranche1_activated.py"
       - "scripts/check_p2_functional_ai_closure.py"
       - "scripts/p2_functional_ai_exact_head.py"
+      - "scripts/qualify_local_model_runtime.py"
       - "tests/test_p2_functional_ai_exact_head.py"
       - "tests/test_p2_functional_ai_closure.py"
       - ".github/workflows/p2-functional-ai-acceptance.yml"
@@ -34,6 +36,7 @@ on:
       - "skeleton/ai/runtime/functional_ai.py"
       - "scripts/check_p2_functional_ai_closure.py"
       - "scripts/p2_functional_ai_exact_head.py"
+      - "scripts/qualify_local_model_runtime.py"
       - "tests/test_p2_functional_ai_exact_head.py"
       - ".github/workflows/p2-functional-ai-acceptance.yml"
   workflow_dispatch:
@@ -86,6 +89,7 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_llama_cpp_local_inference.py
+          skeleton/testing/test_local_model_deployment.py
           skeleton/testing/test_vs001_functional_ai.py
           tests/test_p2_functional_ai_closure.py
           tests/test_p2_functional_ai_exact_head.py

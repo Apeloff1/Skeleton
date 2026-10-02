@@ -37,6 +37,9 @@ REQUIRED_EXECUTABLE_SURFACES = {
     "llama_cpp_test",
     "vs001_test",
     "exact_head_receipt",
+    "local_model_deployment",
+    "local_model_deployment_test",
+    "local_model_qualifier",
 }
 REQUIRED_EXACT_HEAD_POLICY = {
     "mode": "ephemeral_ci_receipt",
@@ -168,6 +171,19 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             if marker not in text:
                 errors.append(f"llama.cpp local runtime missing marker {marker}")
 
+    deployment_path = root / "skeleton/ai/runtime/inference/deployment.py"
+    if deployment_path.is_file():
+        text = deployment_path.read_text(encoding="utf-8")
+        for marker in (
+            "class LocalModelDeployment",
+            "load_local_model_adapter",
+            "qualify_local_model_deployment",
+            "executable_sha256",
+            "model_sha256",
+        ):
+            if marker not in text:
+                errors.append(f"local model deployment missing marker {marker}")
+
     functional_path = root / "skeleton/ai/runtime/functional_ai.py"
     if functional_path.is_file():
         text = functional_path.read_text(encoding="utf-8")
@@ -176,6 +192,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "CognitiveExecutionRuntime",
             "SQLiteExecutionRepository",
             "provider:local:",
+            "from_local_model_manifest",
         ):
             if marker not in text:
                 errors.append(f"VS-001 binding missing marker {marker}")
@@ -228,6 +245,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "prompt_argv_forbidden",
             "shell_execution_forbidden",
             "exact_head_receipt_required",
+            "deployment_manifest_bootstrap_required",
+            "operator_local_model_qualification_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:
