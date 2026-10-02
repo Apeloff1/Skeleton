@@ -78,15 +78,20 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_context_trust_invariants_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Context Trust Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-018",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 3,
@@ -318,15 +323,20 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_context_trust_invariants_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Context Trust Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 11,
