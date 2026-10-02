@@ -322,6 +322,7 @@ def test_mcp_gateway_discovery_hides_tools_from_unknown_principal():
     assert response.ok
     assert response.result["protocolRevision"] == MCP_PROTOCOL_REVISION
     assert response.result["tools"] == []
+    assert response.result["cacheScope"] == "private"
 
 
 def test_mcp_gateway_discovery_exposes_only_authorized_tools():
@@ -335,6 +336,7 @@ def test_mcp_gateway_discovery_exposes_only_authorized_tools():
     gateway = MCPAIShellGateway(surface(), auth)
     response = gateway.list_tools(principal="alice")
     assert [item["name"] for item in response.result["tools"]] == ["python"]
+    assert response.result["cacheScope"] == "private"
 
 
 def test_mcp_gateway_discovery_respects_denylist():
@@ -348,6 +350,16 @@ def test_mcp_gateway_discovery_respects_denylist():
     gateway = MCPAIShellGateway(surface(), auth)
     response = gateway.list_tools(principal="alice")
     assert response.result["tools"] == []
+    assert response.result["cacheScope"] == "private"
+
+
+def test_mcp_surface_filter_digest_is_scoped_to_visible_tools():
+    tools = surface()
+    full = tools.list_tools()
+    hidden = tools.list_tools(allowed_names=(), cache_scope="private")
+    assert full.digest != hidden.digest
+    assert hidden.tools == ()
+    assert hidden.cache_scope == "private"
 
 
 def test_mcp_task_create_is_pending():

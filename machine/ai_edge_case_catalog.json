@@ -8629,12 +8629,21 @@
       "status": "catalogued",
       "requirements": [
         "Externally exposed MCP discovery is filtered through the requesting principal's authorization policy.",
-        "Unknown or denied principals receive no tool descriptors, so tool existence is not a privilege oracle."
+        "Unknown or denied principals receive no tool descriptors, so tool existence is not a privilege oracle.",
+        "Tool discovery is scoped to a registered principal's authorization policy rather than the global tool manifest.",
+        "Unknown principals discover an empty capability set and denied tools are omitted from discovery results.",
+        "Principal-scoped discovery responses use private cache semantics and a digest derived only from visible descriptors.",
+        "Execution authorization still revalidates the principal/tool pair independently of discovery."
       ],
       "tests": [
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_hides_tools_from_unknown_principal",
         "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_exposes_only_authorized_tools",
-        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_respects_denylist"
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_discovery_respects_denylist",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_list_tools_is_response_only",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_unknown_principal_discovers_no_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_denied_tool_is_hidden_from_discovery",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_surface_filter_digest_is_scoped_to_visible_tools",
+        "skeleton/testing/test_shell_ai_mcp_2026.py::test_mcp_gateway_prepares_structured_action_only"
       ],
       "properties": [],
       "chaos_cases": [],
@@ -8644,7 +8653,10 @@
         "code:skeleton/shells/ai/mcp.py",
         "code:skeleton/shells/ai/mcp_gateway.py",
         "test:skeleton/testing/test_shell_ai_mcp_2026.py",
-        "workflow:P0 Tool Discovery Authority"
+        "workflow:P0 Tool Discovery Authority",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell",
+        "workflow:P0 Capability Discovery Boundary"
       ],
       "criticality": "critical",
       "recommended_test_modes": [
