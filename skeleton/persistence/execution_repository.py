@@ -169,6 +169,28 @@ class SQLiteExecutionRepository:
                     UNIQUE(namespace, operation_id, execution_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS ai_execution_state_journal (
+                    namespace TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    parent_digest TEXT,
+                    event_digest TEXT NOT NULL,
+                    event_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, execution_id, sequence),
+                    UNIQUE(namespace, event_digest),
+                    FOREIGN KEY(namespace, execution_id)
+                        REFERENCES ai_execution_state(namespace, execution_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_ai_execution_state_journal
+                ON ai_execution_state_journal(
+                    namespace,
+                    execution_id,
+                    sequence
+                );
+
                 CREATE TABLE IF NOT EXISTS ai_execution_turn (
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
@@ -316,6 +338,27 @@ class SQLiteExecutionRepository:
                         row["namespace"],
                         row["execution_id"],
                     ),
+                )
+
+            for row in self._connection.execute(
+                """
+                SELECT state.*
+                FROM ai_execution_state AS state
+                WHERE state.namespace = ?
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM ai_execution_state_journal AS journal
+                    WHERE journal.namespace = state.namespace
+                      AND journal.execution_id = state.execution_id
+                  )
+                """,
+                (self.namespace,),
+            ).fetchall():
+                execution = self._execution_from_row(row)
+                self._append_state_event(
+                    "migration_snapshot",
+                    previous=None,
+                    updated=execution,
                 )
 
             turn_columns = {
@@ -473,21 +516,237 @@ class SQLiteExecutionRepository:
         )
 
     @staticmethod
-    def _execution_state_digest(execution: AIExecution) -> str:
+    def _execution_state_material(
+        execution: AIExecution,
+    ) -> dict[str, Any]:
+        return {
+            "operation_id": execution.operation_id,
+            "execution_id": execution.execution_id,
+            "identity_digest": execution.request.identity_digest,
+            "state": execution.state.value,
+            "version": execution.version,
+            "latest_turn_index": execution.latest_turn_index,
+            "checkpoint_version": execution.checkpoint_version,
+            "cancellation_requested":
+                execution.cancellation_requested,
+            "updated_at": execution.updated_at.isoformat(),
+        }
+
+    @classmethod
+    def _execution_state_digest(cls, execution: AIExecution) -> str:
         return execution_payload_digest(
-            {
-                "operation_id": execution.operation_id,
-                "execution_id": execution.execution_id,
-                "identity_digest": execution.request.identity_digest,
-                "state": execution.state.value,
-                "version": execution.version,
-                "latest_turn_index": execution.latest_turn_index,
-                "checkpoint_version": execution.checkpoint_version,
-                "cancellation_requested":
-                    execution.cancellation_requested,
-                "updated_at": execution.updated_at.isoformat(),
-            }
+            cls._execution_state_material(execution)
         )
+
+    def _append_state_event(
+        self,
+        mutation: str,
+        *,
+        previous: AIExecution | None,
+        updated: AIExecution,
+    ) -> dict[str, Any]:
+        normalized_mutation = str(mutation).strip()
+        if not normalized_mutation:
+            raise ExecutionRepositoryError(
+                "state journal mutation must not be empty"
+            )
+        last = self._connection.execute(
+            """
+            SELECT sequence, event_digest
+            FROM ai_execution_state_journal
+            WHERE namespace = ? AND execution_id = ?
+            ORDER BY sequence DESC
+            LIMIT 1
+            """,
+            (self.namespace, updated.execution_id),
+        ).fetchone()
+        if previous is None:
+            if last is not None:
+                raise ExecutionRepositoryConflict(
+                    "state journal genesis already exists"
+                )
+            sequence = 1
+            parent_digest = None
+        else:
+            if last is None:
+                raise ExecutionRepositoryCorruption(
+                    "state journal is missing prior event"
+                )
+            sequence = int(last["sequence"]) + 1
+            parent_digest = str(last["event_digest"])
+        event = {
+            "schema_version": 1,
+            "operation_id": updated.operation_id,
+            "execution_id": updated.execution_id,
+            "sequence": sequence,
+            "mutation": normalized_mutation,
+            "from_state": (
+                None if previous is None else previous.state.value
+            ),
+            "from_version": (
+                None if previous is None else previous.version
+            ),
+            "state_snapshot":
+                self._execution_state_material(updated),
+            "state_digest":
+                self._execution_state_digest(updated),
+            "parent_digest": parent_digest,
+            "created_at": updated.updated_at.isoformat(),
+        }
+        event_digest = execution_payload_digest(event)
+        self._connection.execute(
+            """
+            INSERT INTO ai_execution_state_journal(
+                namespace, execution_id, sequence, parent_digest,
+                event_digest, event_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                self.namespace,
+                updated.execution_id,
+                sequence,
+                parent_digest,
+                event_digest,
+                _json_dump(event),
+                updated.updated_at.isoformat(),
+            ),
+        )
+        return {**event, "event_digest": event_digest}
+
+    def state_history(
+        self,
+        execution_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM ai_execution_state_journal
+                WHERE namespace = ? AND execution_id = ?
+                ORDER BY sequence ASC
+                """,
+                (self.namespace, str(execution_id)),
+            ).fetchall()
+            if not rows:
+                raise ExecutionRepositoryCorruption(
+                    "execution state journal is missing"
+                )
+
+            history: list[dict[str, Any]] = []
+            parent_digest: str | None = None
+            previous_event: dict[str, Any] | None = None
+            for expected_sequence, row in enumerate(rows, start=1):
+                event = _json_object(
+                    row["event_json"],
+                    "state journal event_json",
+                )
+                if int(row["sequence"]) != expected_sequence:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal sequence is not contiguous"
+                    )
+                if event.get("sequence") != expected_sequence:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal payload sequence mismatch"
+                    )
+                if event.get("execution_id") != execution_id:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal execution mismatch"
+                    )
+                if row["parent_digest"] != parent_digest:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal stored parent mismatch"
+                    )
+                if event.get("parent_digest") != parent_digest:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal payload parent mismatch"
+                    )
+                calculated_event_digest = execution_payload_digest(event)
+                if calculated_event_digest != row["event_digest"]:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal event digest mismatch"
+                    )
+
+                snapshot = event.get("state_snapshot")
+                if not isinstance(snapshot, dict):
+                    raise ExecutionRepositoryCorruption(
+                        "state journal snapshot must be an object"
+                    )
+                required_snapshot = {
+                    "operation_id",
+                    "execution_id",
+                    "identity_digest",
+                    "state",
+                    "version",
+                    "latest_turn_index",
+                    "checkpoint_version",
+                    "cancellation_requested",
+                    "updated_at",
+                }
+                if set(snapshot) != required_snapshot:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal snapshot shape mismatch"
+                    )
+                calculated_state_digest = execution_payload_digest(
+                    snapshot
+                )
+                if event.get("state_digest") != calculated_state_digest:
+                    raise ExecutionRepositoryCorruption(
+                        "state journal state digest mismatch"
+                    )
+
+                if previous_event is None:
+                    if event.get("mutation") not in {
+                        "create",
+                        "migration_snapshot",
+                    }:
+                        raise ExecutionRepositoryCorruption(
+                            "state journal has invalid genesis mutation"
+                        )
+                    if (
+                        event.get("from_state") is not None
+                        or event.get("from_version") is not None
+                    ):
+                        raise ExecutionRepositoryCorruption(
+                            "state journal genesis has prior state"
+                        )
+                else:
+                    previous_snapshot = previous_event["state_snapshot"]
+                    if event.get("from_state") != previous_snapshot["state"]:
+                        raise ExecutionRepositoryCorruption(
+                            "state journal from_state mismatch"
+                        )
+                    if (
+                        event.get("from_version")
+                        != previous_snapshot["version"]
+                    ):
+                        raise ExecutionRepositoryCorruption(
+                            "state journal from_version mismatch"
+                        )
+
+                material = dict(event)
+                history.append(
+                    {
+                        **material,
+                        "event_digest": str(row["event_digest"]),
+                    }
+                )
+                parent_digest = str(row["event_digest"])
+                previous_event = event
+
+            current = self.get(execution_id)
+            current_material = self._execution_state_material(current)
+            tail = history[-1]
+            if tail["state_snapshot"] != current_material:
+                raise ExecutionRepositoryCorruption(
+                    "state journal tail diverges from current state"
+                )
+            if (
+                tail["state_digest"]
+                != self._execution_state_digest(current)
+            ):
+                raise ExecutionRepositoryCorruption(
+                    "state journal tail digest mismatch"
+                )
+            return tuple(history)
 
     def _execution_from_row(self, row: sqlite3.Row) -> AIExecution:
         try:
@@ -792,6 +1051,11 @@ class SQLiteExecutionRepository:
                         instant.isoformat(),
                     ),
                 )
+                self._append_state_event(
+                    "create",
+                    previous=None,
+                    updated=initial,
+                )
                 self._connection.execute("COMMIT")
                 return initial
             except sqlite3.IntegrityError as exc:
@@ -855,6 +1119,11 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution version changed during transition"
                     )
+                self._append_state_event(
+                    "transition",
+                    previous=current,
+                    updated=updated,
+                )
                 self._connection.execute("COMMIT")
                 return updated
             except Exception:
@@ -909,6 +1178,11 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution version changed during cancellation request"
                     )
+                self._append_state_event(
+                    "cancellation_requested",
+                    previous=current,
+                    updated=updated,
+                )
                 self._connection.execute("COMMIT")
                 return updated
             except Exception:
@@ -1006,6 +1280,11 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution changed during turn append"
                     )
+                self._append_state_event(
+                    "turn_append",
+                    previous=current,
+                    updated=updated,
+                )
                 self._connection.execute("COMMIT")
                 return updated
             except sqlite3.IntegrityError as exc:
@@ -1111,6 +1390,11 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution changed during checkpoint compare-and-set"
                     )
+                self._append_state_event(
+                    "checkpoint",
+                    previous=current,
+                    updated=updated,
+                )
                 self._connection.execute("COMMIT")
                 return checkpoint
             except sqlite3.IntegrityError as exc:
@@ -1534,6 +1818,11 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution changed during atomic finalization"
                     )
+                self._append_state_event(
+                    "finalization",
+                    previous=current,
+                    updated=updated,
+                )
                 self._connection.execute(
                     """
                     DELETE FROM ai_execution_finalization_intent
