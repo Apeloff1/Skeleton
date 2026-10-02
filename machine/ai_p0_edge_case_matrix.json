@@ -839,12 +839,15 @@
         "terminal result binds route/provider/tool/verification/usage/memory/artifact/stream evidence",
         "VS-001 edge-case families are executable"
       ],
-      "edge_coverage_status": "test_implemented",
+      "edge_coverage_status": "evidence_passing",
       "evidence": [
         "code:skeleton/ai/runtime/inference/local.py",
         "code:skeleton/ai/runtime/functional_ai.py",
         "test:skeleton/testing/test_local_inference.py",
-        "test:skeleton/testing/test_vs001_functional_ai.py"
+        "test:skeleton/testing/test_vs001_functional_ai.py",
+        "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+        "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success"
       ],
       "accepted_risks": []
     }
