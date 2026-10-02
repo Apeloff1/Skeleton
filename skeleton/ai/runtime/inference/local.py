@@ -569,6 +569,19 @@ class LocalModelAdapter(ProviderAdapter):
     def available(self) -> bool:
         return True
 
+    @property
+    def runtime_digest(self) -> str | None:
+        value = getattr(self.engine.model, "runtime_digest", None)
+        if value is None:
+            return None
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(ch not in "0123456789abcdef" for ch in value)
+        ):
+            raise ValueError("local runtime digest must be lowercase sha256")
+        return value
+
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         if not isinstance(request, ProviderRequest):
             raise TypeError("request must be ProviderRequest")

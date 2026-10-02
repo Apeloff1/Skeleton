@@ -565,12 +565,20 @@ class LlamaCppModel:
             self._assert_artifacts_stable()
             raw = stdout_bytes.decode("utf-8", errors="strict")
             text, tool_calls, structured, finish_reason = self._parse_output(raw, request)
-            response_id = "local:llama:" + _digest({
+            response_digest = _digest({
                 "runtime": self.runtime_digest,
                 "model": self.model_digest,
                 "request": request.digest,
                 "stdout": hashlib.sha256(stdout_bytes).hexdigest(),
             })[:32]
+            response_id = (
+                "local:llama:"
+                + self.runtime_digest
+                + ":"
+                + self.model_digest
+                + ":"
+                + response_digest
+            )
             return LocalInferenceResult(
                 text=text,
                 model_id=self.model_id,

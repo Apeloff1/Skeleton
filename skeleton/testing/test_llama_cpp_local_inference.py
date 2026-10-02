@@ -291,6 +291,15 @@ async def test_vs001_crosses_real_local_process_boundary_and_recovers(
     assert run.evidence.local_model_digest == hashlib.sha256(
         Path(config.model_path).read_bytes()
     ).hexdigest()
+    expected_runtime_digest = hashlib.sha256(
+        Path(config.executable).read_bytes()
+    ).hexdigest()
+    assert run.evidence.local_runtime_digest == expected_runtime_digest
+    assert all(
+        expected_runtime_digest in ref
+        and run.evidence.local_model_digest in ref
+        for ref in run.evidence.provider_receipts
+    )
     assert run.evidence.tool_receipt_count == 1
     assert len(run.evidence.provider_receipts) == 2
     assert len(observed) == 1

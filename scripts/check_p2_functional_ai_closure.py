@@ -196,6 +196,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "SQLiteExecutionRepository",
             "provider:local:",
             "from_local_model_manifest",
+            "local_runtime_digest",
         ):
             if marker not in text:
                 errors.append(f"VS-001 binding missing marker {marker}")
@@ -252,6 +253,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "operator_local_model_qualification_required",
             "gguf_format_validation_required",
             "nonzero_tensor_model_required",
+            "runtime_identity_bound_to_execution_evidence_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:

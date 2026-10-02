@@ -138,6 +138,7 @@ class FunctionalAIEvidence:
     status: str
     local_model_id: str
     local_model_digest: str
+    local_runtime_digest: str | None
     final_output_digest: str
     tool_receipt_count: int
     provider_receipts: tuple[str, ...]
@@ -160,6 +161,10 @@ class FunctionalAIEvidence:
             value = getattr(self, name)
             if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
                 raise ValueError(f"{name} must be lowercase sha256")
+        if self.local_runtime_digest is not None:
+            value = self.local_runtime_digest
+            if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise ValueError("local_runtime_digest must be lowercase sha256")
         if not all(ref.startswith("provider:local:") for ref in self.provider_receipts):
             raise ValueError("VS-001 provider receipts must all be local")
 
@@ -172,6 +177,7 @@ class FunctionalAIEvidence:
             "status": self.status,
             "local_model_id": self.local_model_id,
             "local_model_digest": self.local_model_digest,
+            "local_runtime_digest": self.local_runtime_digest,
             "final_output_digest": self.final_output_digest,
             "tool_receipt_count": self.tool_receipt_count,
             "provider_receipts": list(self.provider_receipts),
@@ -281,6 +287,7 @@ class FunctionalAIRuntime:
             status=terminal.status,
             local_model_id=self.local_model.model,
             local_model_digest=self.local_model.engine.model.model_digest,
+            local_runtime_digest=self.local_model.runtime_digest,
             final_output_digest=hashlib.sha256(
                 terminal.final_output.encode("utf-8")
             ).hexdigest(),

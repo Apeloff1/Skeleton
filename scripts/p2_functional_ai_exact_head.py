@@ -178,6 +178,7 @@ def build_receipt(
         "operator_local_model_qualification_required",
         "gguf_format_validation_required",
         "nonzero_tensor_model_required",
+        "runtime_identity_bound_to_execution_evidence_required",
     ):
         if requirements.get(required) is not True:
             raise ExactHeadReceiptError(f"closure requirement {required} must be true")
