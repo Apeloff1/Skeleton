@@ -115,7 +115,7 @@ class FunctionalAIRequest:
             tool_policy={
                 "tenant_id": self.tenant_id.strip(),
                 "data_class": self.data_class,
-                "purpose": "functional-ai-tool-execution",
+                "purpose": "tool-execution",
                 "allowed_tool_ids": list(self.allowed_tool_ids),
             },
             resource_budget={

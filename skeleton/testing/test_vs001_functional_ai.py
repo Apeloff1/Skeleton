@@ -95,10 +95,15 @@ async def test_vs001_local_model_tool_persist_reconnect_end_to_end(
     tmp_path,
     monkeypatch,
 ) -> None:
-    def blocked_socket(*args, **kwargs):
-        raise AssertionError("VS-001 local execution attempted network I/O")
+    original_socket = socket.socket
 
-    monkeypatch.setattr(socket, "socket", blocked_socket)
+    def guarded_socket(*args, **kwargs):
+        family = args[0] if args else kwargs.get("family", socket.AF_INET)
+        if family in {socket.AF_INET, socket.AF_INET6}:
+            raise AssertionError("VS-001 local execution attempted network I/O")
+        return original_socket(*args, **kwargs)
+
+    monkeypatch.setattr(socket, "socket", guarded_socket)
 
     database = tmp_path / "vs001.sqlite3"
     repo = SQLiteExecutionRepository(database)

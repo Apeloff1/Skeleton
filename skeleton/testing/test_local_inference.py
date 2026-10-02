@@ -40,10 +40,15 @@ def test_reference_model_learns_and_round_trips_identity() -> None:
 
 @pytest.mark.asyncio
 async def test_local_adapter_executes_without_network_or_credentials(monkeypatch) -> None:
-    def blocked_socket(*args, **kwargs):
-        raise AssertionError("local model path attempted network I/O")
+    original_socket = socket.socket
 
-    monkeypatch.setattr(socket, "socket", blocked_socket)
+    def guarded_socket(*args, **kwargs):
+        family = args[0] if args else kwargs.get("family", socket.AF_INET)
+        if family in {socket.AF_INET, socket.AF_INET6}:
+            raise AssertionError("local model path attempted network I/O")
+        return original_socket(*args, **kwargs)
+
+    monkeypatch.setattr(socket, "socket", guarded_socket)
     engine = LocalInferenceEngine(_math_model())
     adapter = LocalModelAdapter(engine, default_seed=7)
 
