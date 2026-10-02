@@ -110,6 +110,13 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
             if not gap_id:
                 raise RunnerError(f"{key}: accountability gap_id is required")
             rel, script = _safe_script(root, group.get("verifier_script"))
+            expected_receipt_verifier = str(
+                group.get("expected_receipt_verifier") or ""
+            ).strip()
+            if not expected_receipt_verifier:
+                raise RunnerError(
+                    f"{key}: expected_receipt_verifier is required"
+                )
             if rel in seen:
                 raise RunnerError(
                     f"verifier script is reused by multiple groups: {rel}"
@@ -166,6 +173,8 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
             if receipt is not None:
                 if receipt.get("head_sha") != head:
                     receipt_error = "verifier receipt is not exact-head"
+                elif receipt.get("verifier") != expected_receipt_verifier:
+                    receipt_error = "verifier receipt identity mismatch"
                 elif receipt.get("valid") is not True or receipt.get("errors"):
                     receipt_error = "verifier receipt reports invalid evidence"
                 elif (
@@ -182,6 +191,7 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
                 "key": key,
                 "gap_id": gap_id,
                 "verifier_script": rel,
+                "expected_receipt_verifier": expected_receipt_verifier,
                 "script_digest": hashlib.sha256(script.read_bytes()).hexdigest(),
                 "returncode": returncode,
                 "passed": passed,
