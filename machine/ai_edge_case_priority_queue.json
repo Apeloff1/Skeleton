@@ -377,7 +377,7 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "disposition": "implemented_strict_json_parser_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/jeeves/planning/serialization.py",
         "test:tests/test_duplicate_key_is_not_json.py",
