@@ -263,12 +263,15 @@ def _terminal_response(
     binding,
     operation_id: str,
     execution_id: str,
+    turn_id: str,
 ) -> EngineTextResponse:
     if (
         terminal.operation_id != operation_id
         or terminal.execution_id != execution_id
         or binding.operation_id != operation_id
         or binding.execution_id != execution_id
+        or binding.turn_id != turn_id
+        or binding.trace_id != "engine-text:" + operation_id
         or binding.tenant_id != request.tenant_id
         or binding.actor_id != request.actor_id
         or binding.capability != request.capability
@@ -592,6 +595,7 @@ async def execute_engine_text(
             binding=binding,
             operation_id=operation_id,
             execution_id=execution_id,
+            turn_id=turn_id,
         )
 
     if (
