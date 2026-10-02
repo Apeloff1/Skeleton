@@ -26,7 +26,11 @@
     "security.injection_sanitization",
     "privacy.provider_fallback",
     "memory.poisoning_resistance",
-    "security.outbound_network_boundary"
+    "security.outbound_network_boundary",
+    "resource.admission_quota",
+    "resource.shared_pressure",
+    "execution.idempotent_retry",
+    "privacy.tenant_isolation"
   ],
   "authority": {
     "producer_must_differ_from_verifier": true,
@@ -50,7 +54,11 @@
     "provider_privacy_fallback_qualification_required": true,
     "memory_poisoning_resistance_required": true,
     "outbound_network_boundary_qualification_required": true,
-    "qualification_semantic_reverification_required": true
+    "qualification_semantic_reverification_required": true,
+    "resource_admission_qualification_required": true,
+    "shared_pressure_qualification_required": true,
+    "idempotent_retry_qualification_required": true,
+    "tenant_isolation_qualification_required": true
   },
   "runtime_binding": "skeleton/ai/runtime/system_completion.py",
   "acceptance_bindings": [
@@ -82,7 +90,7 @@
       "acceptance": "skeleton/testing/test_vs005_self_improvement.py"
     }
   ],
-  "completion_rule": "valid iff all 24 non-compensable requirements pass for one subject and exact git revision; execution, crash recovery, sandboxing, provider privacy, governed memory, outbound networking, verification, learning, and receipt evidence must remain causally bound, and an independent verifier must recompute both cryptographic digests and requirement semantics from strict duplicate-free JSON",
+  "completion_rule": "valid iff all 28 non-compensable requirements pass for one subject and exact git revision; execution, crash recovery, sandboxing, provider privacy, governed memory, outbound networking, resource admission, shared pressure, retry idempotency, tenant isolation, verification, learning, and receipt evidence must remain causally bound and independently reverified for both digest integrity and proof semantics",
   "qualification_binding": "skeleton/ai/evaluation/system_qualification.py",
   "qualification_cli": "scripts/run_ai_system_completion_qualification.py",
   "qualification_receipt_verifier": "scripts/verify_ai_system_qualification_receipt.py",
@@ -105,6 +113,13 @@
     "skeleton/testing/test_security_outbound_http.py",
     ".github/workflows/p0-provider-fallback-privacy.yml",
     ".github/workflows/p0-memory-poisoning-evidence.yml",
-    ".github/workflows/p0-network-boundary-evidence.yml"
+    ".github/workflows/p0-network-boundary-evidence.yml",
+    "skeleton/intelligence/admission.py",
+    "skeleton/intelligence/admission_runtime.py",
+    "skeleton/intelligence/quota.py",
+    "skeleton/intelligence/shared_pressure.py",
+    "skeleton/persistence/memory_repository.py",
+    "skeleton/testing/test_admission_runtime.py",
+    "skeleton/testing/test_execution_repository.py"
   ]
 }
