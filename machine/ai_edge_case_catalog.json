@@ -8145,12 +8145,28 @@
         139
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Context compaction never upgrades evidence trust and always emits DERIVED_UNTRUSTED for compacted eligible evidence.",
+        "Trusted-control and mandatory context cannot be compacted.",
+        "Compacted segments retain source identity, content digest provenance, tenant, purpose, data class, retention class, and derived_from lineage."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_downgrades_authorized_user_data_to_derived_untrusted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_never_upgrades_untrusted_retrieval_evidence",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_trusted_control_cannot_be_compacted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_mandatory_control_cannot_be_compacted",
+        "skeleton/testing/test_context_compaction_trust_geometry.py::test_compaction_identity_remains_bound_to_source_segment"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compaction.py",
+        "mirror:skeleton/ai/runtime/context/compaction.py",
+        "code:skeleton/contracts/context.py",
+        "test:skeleton/testing/test_context_compaction_trust_geometry.py",
+        "workflow:P0 Compaction Trust Geometry"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
