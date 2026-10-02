@@ -54,8 +54,18 @@ parser.add_argument("-f")
 parser.add_argument("-n")
 parser.add_argument("--seed")
 parser.add_argument("--temp")
+parser.add_argument("--json-schema-file")
 args, unknown = parser.parse_known_args()
 prompt = Path(args.f).read_text(encoding="utf-8")
+if "[Skeleton local tool protocol]" in prompt:
+    if not args.json_schema_file:
+        print("missing governed JSON schema", file=sys.stderr)
+        raise SystemExit(93)
+    schema = json.loads(Path(args.json_schema_file).read_text(encoding="utf-8"))
+    enum = schema["properties"]["tool_calls"]["items"]["properties"]["tool_id"]["enum"]
+    if enum != ["repo.read"]:
+        print("wrong governed tool enum", file=sys.stderr)
+        raise SystemExit(94)
 if any("sensitive-prompt" in item for item in sys.argv):
     print("prompt leaked into argv", file=sys.stderr)
     raise SystemExit(92)
@@ -71,7 +81,10 @@ if "UNKNOWN_TOOL_REQUEST" in prompt:
     }))
     raise SystemExit(0)
 if "Tool results from the previous provider turn" in prompt:
-    print("The local subprocess model completed VS-001 from the governed receipt.")
+    print(json.dumps({
+        "skeleton_local_response": 1,
+        "text": "The local subprocess model completed VS-001 from the governed receipt.",
+    }, sort_keys=True))
     raise SystemExit(0)
 if "[Skeleton local tool protocol]" in prompt:
     print(json.dumps({
@@ -356,6 +369,12 @@ def test_llama_cpp_rejects_zero_tensor_gguf(tmp_path: Path) -> None:
         "--threads=64",
         "--batch-size=512",
         "--gpu-layers=99",
+        "--grammar=root ::= \"x\"",
+        "--grammar-file=/tmp/grammar.gbnf",
+        "--json-schema={}",
+        "--json-schema-file=/tmp/schema.json",
+        "-j{}",
+        "-jf/tmp/schema.json",
         "-m/tmp/other.gguf",
         "-n999",
         "-c4096",

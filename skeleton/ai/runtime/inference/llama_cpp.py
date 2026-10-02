@@ -76,8 +76,23 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
+    "--grammar",
+    "--grammar-file",
+    "--json-schema",
+    "--json-schema-file",
 }
-_MANAGED_SHORT_FLAGS = ("-m", "-p", "-f", "-n", "-c", "-t", "-b", "-ngl")
+_MANAGED_SHORT_FLAGS = (
+    "-m",
+    "-p",
+    "-f",
+    "-n",
+    "-c",
+    "-t",
+    "-b",
+    "-ngl",
+    "-j",
+    "-jf",
+)
 _REMOTE_ACQUISITION_FLAGS = {
     "--hf-repo",
     "--hf-file",
@@ -387,7 +402,62 @@ class LlamaCppModel:
         )
         return prompt + contract
 
-    def _command(self, prompt_file: Path, request: LocalInferenceRequest) -> list[str]:
+    def _tool_response_schema(self, request: LocalInferenceRequest) -> dict[str, Any]:
+        allowed_tool_ids = sorted(
+            {
+                str(item.get("tool_id", "")).strip()
+                for item in request.tools
+                if str(item.get("tool_id", "")).strip()
+            }
+        )
+        if not allowed_tool_ids:
+            raise LlamaCppRuntimeError(
+                "tool response schema requires at least one declared tool_id"
+            )
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["skeleton_local_response"],
+            "properties": {
+                "skeleton_local_response": {"const": 1},
+                "text": {"type": "string", "minLength": 1},
+                "structured_output": {"type": "object"},
+                "tool_calls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["call_id", "tool_id", "arguments"],
+                        "properties": {
+                            "call_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                            },
+                            "tool_id": {
+                                "type": "string",
+                                "enum": allowed_tool_ids,
+                            },
+                            "arguments": {"type": "object"},
+                        },
+                    },
+                },
+            },
+            "anyOf": [
+                {"required": ["text"]},
+                {"required": ["structured_output"]},
+                {"required": ["tool_calls"]},
+            ],
+        }
+
+    def _command(
+        self,
+        prompt_file: Path,
+        request: LocalInferenceRequest,
+        *,
+        schema_file: Path | None = None,
+    ) -> list[str]:
         command = [
             self._runtime.path, "-m", self._model.path, "-f", str(prompt_file),
             "-n", str(request.max_output_tokens), "--seed", str(request.seed),
@@ -401,6 +471,8 @@ class LlamaCppModel:
             command.extend(("-b", str(self.config.batch_size)))
         if self.config.gpu_layers is not None:
             command.extend(("-ngl", str(self.config.gpu_layers)))
+        if schema_file is not None:
+            command.extend(("--json-schema-file", str(schema_file)))
         command.extend(self.config.extra_args)
         return command
 
@@ -512,7 +584,22 @@ class LlamaCppModel:
                 os.chmod(prompt_file, 0o600)
             except OSError:
                 pass
-            command = self._command(prompt_file, request)
+            schema_file: Path | None = None
+            if request.tools:
+                schema_file = temp_dir / "tool-response.schema.json"
+                schema_file.write_text(
+                    _stable_json(self._tool_response_schema(request)),
+                    encoding="utf-8",
+                )
+                try:
+                    os.chmod(schema_file, 0o600)
+                except OSError:
+                    pass
+            command = self._command(
+                prompt_file,
+                request,
+                schema_file=schema_file,
+            )
             if any(request.prompt in arg for arg in command):
                 raise LlamaCppRuntimeError("prompt text leaked into process argv")
 

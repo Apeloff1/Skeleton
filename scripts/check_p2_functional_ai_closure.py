@@ -167,6 +167,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "prompt_file",
             "LocalToolCall",
             "max_output_bytes",
+            "_tool_response_schema",
+            "--json-schema-file",
             "class GgufHeader",
             "inspect_gguf",
             "unsupported GGUF version",
@@ -254,6 +256,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "gguf_format_validation_required",
             "nonzero_tensor_model_required",
             "runtime_identity_bound_to_execution_evidence_required",
+            "governed_tool_generation_schema_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:
