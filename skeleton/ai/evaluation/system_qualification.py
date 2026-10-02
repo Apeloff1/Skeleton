@@ -280,6 +280,9 @@ class PersistenceReliabilityCycle:
     migration_backfill_verified: bool
     state_digest_backfill_verified: bool
     replay_digest_backfill_verified: bool
+    state_journal_verified: bool
+    state_journal_tamper_rejected: bool
+    state_journal_migration_seeded: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -1699,6 +1702,58 @@ def _persistence_reliability_cycle(
         expected_execution_version=execution.version,
         now=QUALIFICATION_TIME,
     )
+    state_history = repository.state_history(request.execution_id)
+    state_journal_verified = bool(
+        len(state_history) >= 8
+        and state_history[0]["mutation"] == "create"
+        and state_history[-1]["mutation"] == "finalization"
+        and state_history[-1]["state_snapshot"]["state"]
+        == ExecutionState.COMPLETED.value
+    )
+
+    journal_row = repository._connection.execute(
+        """
+        SELECT sequence, event_json
+        FROM ai_execution_state_journal
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (repository.namespace, request.execution_id),
+    ).fetchone()
+    if journal_row is None:
+        raise RuntimeError(
+            "qualification expected a state-journal transition event"
+        )
+    original_event_json = str(journal_row["event_json"])
+    repository._connection.execute(
+        """
+        UPDATE ai_execution_state_journal
+        SET event_json = replace(
+            event_json,
+            '"mutation":"transition"',
+            '"mutation":"forged-transition"'
+        )
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (repository.namespace, request.execution_id),
+    )
+    state_journal_tamper_rejected = False
+    try:
+        repository.state_history(request.execution_id)
+    except ExecutionRepositoryCorruption:
+        state_journal_tamper_rejected = True
+    repository._connection.execute(
+        """
+        UPDATE ai_execution_state_journal
+        SET event_json = ?
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (
+            original_event_json,
+            repository.namespace,
+            request.execution_id,
+        ),
+    )
+    repository.state_history(request.execution_id)
 
     receipt_id = str(
         uuid5(
@@ -2247,6 +2302,13 @@ def _persistence_reliability_cycle(
         (migrated.namespace, request.execution_id),
     ).fetchone()
     migrated_execution = migrated.get(request.execution_id)
+    migrated_history = migrated.state_history(request.execution_id)
+    state_journal_migration_seeded = bool(
+        len(migrated_history) == 1
+        and migrated_history[0]["mutation"] == "migration_snapshot"
+        and migrated_history[0]["state_digest"]
+        == state_row["state_digest"]
+    )
     state_digest_backfill_verified = bool(
         state_row is not None
         and isinstance(state_row["state_digest"], str)
@@ -2313,6 +2375,13 @@ def _persistence_reliability_cycle(
         ),
         replay_digest_backfill_verified=(
             replay_digest_backfill_verified
+        ),
+        state_journal_verified=state_journal_verified,
+        state_journal_tamper_rejected=(
+            state_journal_tamper_rejected
+        ),
+        state_journal_migration_seeded=(
+            state_journal_migration_seeded
         ),
     )
 
@@ -2483,6 +2552,13 @@ async def qualify_system_completion(
         replay_digest_backfill_verified=(
             persistence.replay_digest_backfill_verified
         ),
+        state_journal_verified=persistence.state_journal_verified,
+        state_journal_tamper_rejected=(
+            persistence.state_journal_tamper_rejected
+        ),
+        state_journal_migration_seeded=(
+            persistence.state_journal_migration_seeded
+        ),
         evidence_refs=(
             "persistence-integrity:"
             + _digest(
@@ -2503,6 +2579,12 @@ async def qualify_system_completion(
                         persistence.state_digest_backfill_verified,
                     "replay_digest_backfill_verified":
                         persistence.replay_digest_backfill_verified,
+                    "state_journal_verified":
+                        persistence.state_journal_verified,
+                    "state_journal_tamper_rejected":
+                        persistence.state_journal_tamper_rejected,
+                    "state_journal_migration_seeded":
+                        persistence.state_journal_migration_seeded,
                 }
             ),
         ),
