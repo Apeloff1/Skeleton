@@ -4713,12 +4713,23 @@
         118
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Mandatory trusted policy cannot be displaced by higher-priority untrusted evidence under context pressure.",
+        "If mandatory control cannot fit the provider input budget, compilation fails before provider execution instead of trimming policy."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_cannot_be_displaced_by_high_priority_evidence",
+        "skeleton/testing/test_context_compiler.py::test_mandatory_policy_fails_before_provider_when_it_cannot_fit"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Context Trust Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -4736,7 +4747,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-AI-014",
@@ -8056,12 +8067,24 @@
         139
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Context compaction preserves evidence lineage and never promotes weaker evidence into trusted control.",
+        "Trusted control is not eligible for lossy compaction; compacted evidence is marked derived-untrusted."
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compiler.py::test_compaction_preserves_evidence_lineage_and_hard_token_bound",
+        "skeleton/testing/test_context_compiler.py::test_compaction_refuses_trusted_control",
+        "skeleton/testing/test_context_compiler.py::test_compacted_conversation_becomes_derived_summary"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Context Trust Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -8082,7 +8105,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "OBSCURE-019",
