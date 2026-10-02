@@ -19,10 +19,16 @@ on:
       - "docker-compose.yml"
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
       - "backend/tests/test_engine_client.py"
       - "backend/routes/ai.py"
+      - "backend/routes/jeeves_compose.py"
       - "frontend/src/product/conversationClient.ts"
       - "backend/tests/test_ai_chat_local_engine_e2e.py"
+      - "backend/tests/test_jeeves_ai_completion.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_engine_chat.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
@@ -57,10 +63,16 @@ on:
       - "docker-compose.yml"
       - "skeleton/ai/runtime/api/engine_routes.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
       - "backend/tests/test_engine_client.py"
       - "backend/routes/ai.py"
+      - "backend/routes/jeeves_compose.py"
       - "frontend/src/product/conversationClient.ts"
       - "backend/tests/test_ai_chat_local_engine_e2e.py"
+      - "backend/tests/test_jeeves_ai_completion.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_engine_chat.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/ai/runtime/provider_runtime.py"
@@ -115,8 +127,16 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
           "httpx>=0.27,<1"
-      - name: Compile canonical product and local inference runtimes
-        run: python -m compileall -q skeleton/ai/runtime/product skeleton/ai/runtime/inference
+      - name: Compile canonical product and compatibility runtimes
+        run: >-
+          python -m compileall -q
+          skeleton/ai/runtime/product
+          skeleton/ai/runtime/inference
+          backend/core/engine_client.py
+          backend/core/engine_text.py
+          backend/core/engine_chat.py
+          backend/routes/ai.py
+          backend/routes/jeeves_compose.py
       - name: Verify canonical provider mirror and bootstrap contract
         run: |
           cmp skeleton/provider_runtime.py skeleton/ai/runtime/provider_runtime.py
@@ -138,7 +158,10 @@ jobs:
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_server_governance_binding.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_text.py
+          backend/tests/test_engine_chat.py
           backend/tests/test_ai_chat_local_engine_e2e.py
+          backend/tests/test_jeeves_ai_completion.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_local_model_artifact.py
