@@ -7,6 +7,11 @@ import threading
 from types import MappingProxyType
 from typing import Mapping
 
+from skeleton.security.text_identity import (
+    TextIdentityError,
+    require_security_identifier,
+)
+
 
 @dataclass(frozen=True)
 class MCPPrincipalPolicy:
@@ -17,20 +22,31 @@ class MCPPrincipalPolicy:
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if not self.principal or len(self.principal) > 256:
-            raise ValueError("invalid MCP principal")
-        allowed = frozenset(self.allowed_tools)
-        denied = frozenset(self.denied_tools)
+        principal = require_security_identifier(
+            self.principal,
+            field="MCP principal",
+            max_length=256,
+        )
+        allowed = frozenset(
+            require_security_identifier(tool, field="MCP tool", max_length=256)
+            for tool in self.allowed_tools
+        )
+        denied = frozenset(
+            require_security_identifier(tool, field="MCP tool", max_length=256)
+            for tool in self.denied_tools
+        )
         if allowed & denied:
             raise ValueError("MCP tool cannot be both allowed and denied")
         if self.max_timeout_seconds <= 0:
             raise ValueError("MCP max timeout must be positive")
         metadata = dict(self.metadata)
+        object.__setattr__(self, "principal", principal)
         object.__setattr__(self, "allowed_tools", allowed)
         object.__setattr__(self, "denied_tools", denied)
         object.__setattr__(self, "metadata", MappingProxyType(metadata))
 
     def allows(self, tool: str) -> bool:
+        tool = require_security_identifier(tool, field="MCP tool", max_length=256)
         if tool in self.denied_tools:
             return False
         return not self.allowed_tools or tool in self.allowed_tools
@@ -77,6 +93,20 @@ class MCPAuthorization:
         *,
         timeout_seconds: float | None = None,
     ) -> MCPAuthorizationDecision:
+        try:
+            principal = require_security_identifier(
+                principal,
+                field="MCP principal",
+                max_length=256,
+            )
+            tool = require_security_identifier(tool, field="MCP tool", max_length=256)
+        except TextIdentityError as exc:
+            return MCPAuthorizationDecision(
+                False,
+                f"invalid authority identity: {exc}",
+                principal,
+                tool,
+            )
         with self._lock:
             policy = self._items.get(principal)
         if policy is None:
