@@ -9,13 +9,23 @@ import time
 from typing import Callable
 import uuid
 
+from skeleton.shells.admission_lease import (
+    AdmissionLease,
+    AdmissionLeaseConflict,
+    AdmissionLeases,
+)
 from skeleton.shells.arguments import ArgumentPolicySet
 from skeleton.shells.audit import AuditEvent, AuditSink, NullAuditSink
 from skeleton.shells.capabilities import CapabilityGrant, ShellCapability
 from skeleton.shells.circuit import CircuitRegistry
 from skeleton.shells.environment import EnvironmentPolicy
 from skeleton.shells.hooks import ExecutionMetadata, HookRegistry
-from skeleton.shells.provenance import command_fingerprint, digest_arguments, digest_environment_keys
+from skeleton.shells.provenance import (
+    command_fingerprint,
+    digest_arguments,
+    digest_environment_keys,
+    digest_mapping,
+)
 from skeleton.shells.receipts import ExecutionReceipt, ReceiptChain
 from skeleton.shells.retry import RetryPolicy
 from skeleton.shells.runner import ShellCommand, ShellResult, ShellRunner
@@ -84,6 +94,7 @@ class ShellExecutor:
         circuits: CircuitRegistry | None = None,
         hooks: HookRegistry | None = None,
         config: ExecutorConfig | None = None,
+        admission_leases: AdmissionLeases | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -98,6 +109,7 @@ class ShellExecutor:
         self.circuits = circuits or CircuitRegistry()
         self.hooks = hooks or HookRegistry()
         self.config = config or ExecutorConfig()
+        self.admission_leases = admission_leases
         self._clock = clock
         self._sleeper = sleeper
 
@@ -129,6 +141,57 @@ class ShellExecutor:
         if self.workspace is not None:
             cwd = self.workspace.resolve(command.command, cwd)
         return replace(command, args=tuple(args), env=dict(env), cwd=cwd)
+
+    @staticmethod
+    def _prepared_fingerprint(command: ShellCommand) -> str:
+        base = command_fingerprint(
+            command.command,
+            command.args,
+            cwd=command.cwd,
+            env_keys=tuple(command.env),
+        )
+        return digest_mapping(
+            {
+                "command_fingerprint": base,
+                "environment": dict(sorted(command.env.items())),
+            }
+        )
+
+    def execution_fingerprint(
+        self,
+        command: ShellCommand,
+        *,
+        retry: RetryPolicy | None = None,
+    ) -> str:
+        """Return the exact prepared effect identity used for admission."""
+        prepared = self._prepare(command, retry or RetryPolicy.none())
+        return self._prepared_fingerprint(prepared)
+
+    def _commit_admission(
+        self,
+        lease: AdmissionLease | None,
+        *,
+        prepared: ShellCommand,
+        fingerprint: str,
+    ) -> AdmissionLease | None:
+        registry = self.admission_leases
+        if registry is None:
+            if lease is not None:
+                raise AdmissionLeaseConflict(
+                    "admission lease supplied without configured registry"
+                )
+            return None
+        if lease is None:
+            raise AdmissionLeaseConflict("admission lease required")
+        if (
+            lease.key != fingerprint
+            or lease.principal != self.grant.principal
+            or lease.command != prepared.command
+        ):
+            raise AdmissionLeaseConflict(
+                "admission lease does not match prepared execution"
+            )
+        return registry.consume(lease)
 
     @staticmethod
     def _receipt(
@@ -168,19 +231,16 @@ class ShellExecutor:
         session: ShellSession | None = None,
         correlation_id: str | None = None,
         circuit_key: str | None = None,
+        admission_lease: AdmissionLease | None = None,
     ) -> ExecutionOutcome:
         retry_policy = retry or RetryPolicy.none()
         prepared = self._prepare(command, retry_policy)
         correlation = correlation_id or uuid.uuid4().hex
-        fingerprint = command_fingerprint(
-            prepared.command,
-            prepared.args,
-            cwd=prepared.cwd,
-            env_keys=tuple(prepared.env),
-        )
+        fingerprint = self._prepared_fingerprint(prepared)
         circuit = self.circuits.get(circuit_key or prepared.command)
         attempt = 1
         receipts: list[ExecutionReceipt] = []
+        admission_committed = self.admission_leases is None
 
         while True:
             circuit.allow(command=prepared.command)
@@ -194,6 +254,13 @@ class ShellExecutor:
                 session_id=None if session is None else session.session_id,
             )
             self.hooks.run_pre(metadata)
+            if not admission_committed:
+                self._commit_admission(
+                    admission_lease,
+                    prepared=prepared,
+                    fingerprint=fingerprint,
+                )
+                admission_committed = True
             self.telemetry.started(prepared.command)
             self.audit.emit(
                 AuditEvent.create(
