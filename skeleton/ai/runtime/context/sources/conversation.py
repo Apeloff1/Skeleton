@@ -58,6 +58,10 @@ def conversation_message_segment(
         provenance.append("ai-result:" + message.ai_result_id)
     provenance.extend("attachment:" + ref for ref in message.attachment_refs)
     provenance.extend("tool-receipt:" + ref for ref in message.tool_receipt_refs)
+    provenance.extend(
+        "provider-receipt:" + ref
+        for ref in message.provider_receipt_refs
+    )
     provenance.extend("citation:" + ref for ref in message.citation_refs)
     provenance.extend("artifact:" + ref for ref in message.artifact_refs)
 
