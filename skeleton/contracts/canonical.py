@@ -21,6 +21,24 @@ class CanonicalContractError(ValueError):
     """Raised when a canonical envelope violates its contract."""
 
 
+def canonical_json_bytes(value: Any) -> bytes:
+    """Return one strict deterministic JSON byte representation.
+
+    The representation is the only byte form used for contract digests and
+    signing inputs. Non-JSON values and non-finite numbers fail closed.
+    """
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise CanonicalContractError("value is not strict canonical JSON") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class Identity:
     repository: str
@@ -45,17 +63,13 @@ def evidence_ref_identity(evidence: EvidenceRef) -> str:
     """Hash canonical evidence-ref metadata without inventing a second ID field."""
     if not isinstance(evidence, EvidenceRef):
         raise CanonicalContractError("evidence must be EvidenceRef")
-    raw = json.dumps(
+    raw = canonical_json_bytes(
         {
             "source": evidence.source,
             "digest": evidence.digest,
             "category": evidence.category,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
+        }
+    )
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -73,11 +87,7 @@ class CanonicalEnvelope:
             raise CanonicalContractError("unsupported schema version")
         if not self.kind:
             raise CanonicalContractError("missing envelope kind")
-        raw = json.dumps(
-            self.payload,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        raw = canonical_json_bytes(self.payload)
         if len(raw) > MAX_PAYLOAD_BYTES:
             raise CanonicalContractError("payload exceeds byte budget")
         return {
@@ -90,10 +100,10 @@ class CanonicalEnvelope:
         }
 
     @property
+    def canonical_bytes(self) -> bytes:
+        """Bytes that are safe to hash, sign, attest, or compare."""
+        return canonical_json_bytes(self.canonical_payload())
+
+    @property
     def digest(self) -> str:
-        raw = json.dumps(
-            self.canonical_payload(),
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
+        return hashlib.sha256(self.canonical_bytes).hexdigest()
