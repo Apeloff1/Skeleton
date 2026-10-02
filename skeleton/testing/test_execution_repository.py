@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,7 @@ from skeleton.contracts.ai_execution import (
     AIExecutionResult,
     AgentTurn,
     ExecutionState,
+    execution_payload_digest,
 )
 from skeleton.contracts.verification import (
     VerificationLevel,
@@ -262,7 +264,7 @@ def test_state_journal_hash_chain_tracks_mutations() -> None:
     assert history[-1]["state_snapshot"]["cancellation_requested"] is True
 
 
-def test_state_journal_rejects_digest_preserving_row_tamper() -> None:
+def test_state_journal_rejects_rehashed_semantic_forgery() -> None:
     repo = SQLiteExecutionRepository()
     current = repo.create(_request(), now=_now())
     repo.transition(
@@ -272,22 +274,35 @@ def test_state_journal_rejects_digest_preserving_row_tamper() -> None:
         now=_now() + timedelta(seconds=1),
     )
 
-    repo._connection.execute(
+    row = repo._connection.execute(
         """
-        UPDATE ai_execution_state_journal
-        SET event_json = replace(
-            event_json,
-            '"mutation":"transition"',
-            '"mutation":"forged-transition"'
-        )
+        SELECT event_json
+        FROM ai_execution_state_journal
         WHERE namespace = ? AND execution_id = ? AND sequence = 2
         """,
         (repo.namespace, "exec-1"),
+    ).fetchone()
+    assert row is not None
+    event = json.loads(row["event_json"])
+    event["mutation"] = "checkpoint"
+    forged_digest = execution_payload_digest(event)
+    repo._connection.execute(
+        """
+        UPDATE ai_execution_state_journal
+        SET event_json = ?, event_digest = ?
+        WHERE namespace = ? AND execution_id = ? AND sequence = 2
+        """,
+        (
+            json.dumps(event, sort_keys=True, separators=(",", ":")),
+            forged_digest,
+            repo.namespace,
+            "exec-1",
+        ),
     )
 
     with pytest.raises(
         ExecutionRepositoryCorruption,
-        match="state journal event digest mismatch",
+        match="state journal mutation semantics mismatch",
     ):
         repo.state_history("exec-1")
 
