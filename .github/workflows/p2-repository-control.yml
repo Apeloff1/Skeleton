@@ -1,0 +1,84 @@
+name: P2 Repository Control
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/p2-traceability-spine
+      - feat/p2-repository-engineering-control
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/repository_control.json"
+      - "machine/repository_graph_contract.json"
+      - "machine/repository_engineering_policy.json"
+      - "machine/maintenance_ownership.json"
+      - "machine/backlog_registry.json"
+      - "machine/priority_policy.json"
+      - "machine/work_package_control.json"
+      - "machine/anti_pattern_registry.json"
+      - "machine/build_order_control.json"
+      - "machine/definition_of_done.json"
+      - "machine/technical_debt_ledger.json"
+      - "machine/roadmap_control.json"
+      - "machine/completion_model.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_build_queue.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_master_build_sequence.json"
+      - "machine/ai_engineering_task_matrix.json"
+      - "machine/ai_engineering_pass.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_full_edge_case_matrix.json"
+      - "machine/architecture.json"
+      - "machine/master_traceability.json"
+      - "scripts/check_p2_repository_control.py"
+      - "tests/test_p2_repository_control.py"
+      - "docs/plan/P2_REPOSITORY_CONTROL.md"
+      - ".github/workflows/p2-repository-control.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-repository-control
+    paths:
+      - "machine/**"
+      - "scripts/check_p2_repository_control.py"
+      - "tests/test_p2_repository_control.py"
+      - "docs/plan/P2_REPOSITORY_CONTROL.md"
+      - ".github/workflows/p2-repository-control.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-repository-control-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-repository-control:
+    name: Validate P2 repository control
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Validate repository control
+        run: python scripts/check_p2_repository_control.py --json
+
+      - name: Run repository-control regressions
+        run: python -m unittest -v tests.test_p2_repository_control
