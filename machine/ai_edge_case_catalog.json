@@ -5978,12 +5978,24 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Rooted filesystem rejects regular files with multiple hard links so an in-root name cannot alias an out-of-root inode.",
+        "Read, snapshot, overwrite, and remove operations fail closed on hardlinked targets, and link count participates in read identity checks."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_read_rejects_hardlink_alias_to_outside_inode",
+        "skeleton/testing/test_security_rooted_fs.py::test_snapshot_rejects_hardlink_alias",
+        "skeleton/testing/test_security_rooted_fs.py::test_write_rejects_existing_hardlink_without_mutating_source",
+        "skeleton/testing/test_security_rooted_fs.py::test_remove_rejects_hardlink_without_unlinking_alias"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Hardlink Alias Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",

@@ -976,9 +976,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_inode_hardlink_rejection_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Hardlink Alias Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-003",
       "completion_checkbox": false,
