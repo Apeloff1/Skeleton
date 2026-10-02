@@ -22,6 +22,14 @@ from .post_training import (
     VerifierCalibration,
     VerifierProgram,
 )
+from .data import (
+    ContentAddressedCache,
+    DataIngestionEngine,
+    DocumentIntelligence,
+    LicensePolicyRegistry,
+    LineageGraph,
+    SyntheticDataFactory,
+)
 from .lifecycle import (
     LifecycleTransition,
     ModelLifecycleRegistry,
@@ -48,6 +56,12 @@ __all__ = [
     "PreferenceWeightedPostTrainer",
     "VerifierCalibration",
     "VerifierProgram",
+    "ContentAddressedCache",
+    "DataIngestionEngine",
+    "DocumentIntelligence",
+    "LicensePolicyRegistry",
+    "LineageGraph",
+    "SyntheticDataFactory",
     "LifecycleTransition",
     "ModelLifecycleRegistry",
     "ModelLifecycleState",
