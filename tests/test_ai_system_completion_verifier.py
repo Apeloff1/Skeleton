@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 18
+    assert receipt["requirement_count"] == 24
     assert receipt["binding_count"] >= 9
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
@@ -47,6 +47,11 @@ def test_contract_declares_non_compensable_authority() -> None:
         "strict_json_receipt_verification": True,
         "staged_finalization_crash_recovery_required": True,
         "negative_learning_gate_qualification_required": True,
+        "sandbox_boundary_qualification_required": True,
+        "injection_sanitization_qualification_required": True,
+        "provider_privacy_fallback_qualification_required": True,
+        "memory_poisoning_resistance_required": True,
+        "outbound_network_boundary_qualification_required": True,
     }
 
 
@@ -81,5 +86,16 @@ def test_required_runtime_and_acceptance_files_are_digest_bound() -> None:
         "tests/test_ai_system_qualification.py",
         "scripts/verify_ai_system_qualification_receipt.py",
         "tests/test_ai_system_qualification_receipt_verifier.py",
+        "skeleton/ai/runtime/sandbox/fs.py",
+        "skeleton/ai/runtime/sandbox/process.py",
+        "skeleton/ai/runtime/sandbox/injection.py",
+        "skeleton/ai/runtime/sandbox/sanitizers.py",
+        "skeleton/ai/shell/provider_router.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/security/outbound_url.py",
+        "skeleton/security/outbound_http.py",
+        ".github/workflows/p0-provider-fallback-privacy.yml",
+        ".github/workflows/p0-memory-poisoning-evidence.yml",
+        ".github/workflows/p0-network-boundary-evidence.yml",
     }
     assert all(len(value) == 64 for value in digests.values())
