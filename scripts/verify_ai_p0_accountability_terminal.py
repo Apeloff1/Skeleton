@@ -279,12 +279,19 @@ def verify_terminal(
         expected_receipt_verifier = str(
             (group or {}).get("expected_receipt_verifier") or ""
         )
+        expected_script_sha256 = str(
+            (group or {}).get("expected_script_sha256") or ""
+        )
         if result.get("passed") is not True:
             errors.append(f"{key}: fresh independent verifier did not pass")
         if not expected_receipt_verifier:
             errors.append(f"{key}: expected receipt verifier is missing")
         elif result.get("receipt_verifier") != expected_receipt_verifier:
             errors.append(f"{key}: fresh verifier receipt identity mismatch")
+        if not expected_script_sha256:
+            errors.append(f"{key}: expected verifier script digest is missing")
+        elif result.get("script_digest") != expected_script_sha256:
+            errors.append(f"{key}: fresh verifier script digest mismatch")
         if result.get("receipt_head_sha") != head:
             errors.append(f"{result.get('key')}: child verifier receipt is not exact-head")
         if not result.get("receipt_digest"):
