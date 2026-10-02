@@ -5748,12 +5748,25 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Rooted filesystem operations reject symlinks in roots, parent components, and target entries.",
+        "Descriptor-relative reads, writes, directory creation, enumeration, and removal remain bound to the originally opened directory even if pathnames are swapped concurrently."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_existing_symlink_file_is_never_read",
+        "skeleton/testing/test_security_rooted_fs.py::test_symlink_parent_is_never_traversed_for_write",
+        "skeleton/testing/test_security_rooted_fs.py::test_mkdir_rejects_symlink_component",
+        "skeleton/testing/test_security_rooted_fs.py::test_list_files_rejects_symlink_entries",
+        "skeleton/testing/test_security_rooted_fs.py::test_remove_file_rejects_symlink_without_touching_target"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Filesystem Race Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -5768,7 +5781,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-003",
@@ -6276,12 +6289,25 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Security-owned writes use same-directory exclusive staging plus descriptor-relative atomic replacement.",
+        "Temporary-directory cleanup is symlink-safe and fails closed if the rooted path identity changes during the operation.",
+        "Concurrent pathname swaps cannot redirect streamed writes outside the pinned filesystem capability."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_stream_write_cannot_escape_after_parent_path_swap",
+        "skeleton/testing/test_security_rooted_fs.py::test_failed_stream_does_not_leave_temp_files",
+        "skeleton/testing/test_security_rooted_fs.py::test_temporary_directory_fails_closed_on_root_path_swap",
+        "skeleton/testing/test_security_rooted_fs.py::test_temporary_directory_cleanup_is_recursive"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Filesystem Race Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6296,7 +6322,7 @@
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "id": "EDGE-SEC-018",
