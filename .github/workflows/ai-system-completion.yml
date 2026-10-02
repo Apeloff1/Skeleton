@@ -10,13 +10,16 @@ on:
       - "skeleton/ai/runtime/context/**"
       - "skeleton/ai/runtime/memory/**"
       - "skeleton/ai/learning/**"
+      - "skeleton/ai/evaluation/system_qualification.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_system_completion_plane.py"
       - "skeleton/testing/test_vs001_functional_ai.py"
       - "skeleton/testing/test_vs005_self_improvement.py"
       - "tests/test_ai_system_completion_verifier.py"
+      - "tests/test_ai_system_qualification.py"
       - "machine/ai_system_completion_contract.json"
       - "scripts/verify_ai_system_completion.py"
+      - "scripts/run_ai_system_completion_qualification.py"
       - ".github/workflows/ai-system-completion.yml"
   push:
     branches:
@@ -27,13 +30,16 @@ on:
       - "skeleton/ai/runtime/context/**"
       - "skeleton/ai/runtime/memory/**"
       - "skeleton/ai/learning/**"
+      - "skeleton/ai/evaluation/system_qualification.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_system_completion_plane.py"
       - "skeleton/testing/test_vs001_functional_ai.py"
       - "skeleton/testing/test_vs005_self_improvement.py"
       - "tests/test_ai_system_completion_verifier.py"
+      - "tests/test_ai_system_qualification.py"
       - "machine/ai_system_completion_contract.json"
       - "scripts/verify_ai_system_completion.py"
+      - "scripts/run_ai_system_completion_qualification.py"
       - ".github/workflows/ai-system-completion.yml"
   workflow_dispatch:
 
