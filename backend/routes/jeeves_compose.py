@@ -30,7 +30,6 @@ from gameforge.jeeves import artifacts as ART
 from gameforge.jeeves.chat_contract import (
     ChatReq,
     HistoryMessage,
-    conversation_prompt,
     retrieval_query,
 )
 
@@ -122,26 +121,36 @@ async def _generate_text(
     needs_reasoning: bool,
     conversation_context: str = "",
     *,
+    conversation_history: List[HistoryMessage] | None = None,
+    project_context: str = "",
     engine_tenant_id: str = "default",
     engine_actor_id: str = "jeeves-compose",
     engine_capability: str = "assistant.compat",
     engine_data_class: str = "internal",
 ) -> Dict:
-    """Use canonical local model when active; otherwise retain bounded fallback."""
+    """Use canonical inference while keeping history/evidence trust-separated."""
 
     tier = free_tier.decide(needs_reasoning)
     local_model_active = await _local_engine_provider_active()
-    ctx = "\n".join(f"[{i+1}] {(r.get('payload') or {}).get('extract') or (r.get('payload') or {}).get('content') or ''}"[:300]
-                    for i, r in enumerate(recalled[:5]))
     if tier in ("local", "free") and not local_model_active:
         head = ""
         if recalled:
-            p = recalled[0].get("payload") or {}
-            head = (p.get("extract") or p.get("content") or p.get("description") or "").strip()
-        text = (f"{head[:700]}" if head
-                else "I couldn't find relevant material in the available knowledge base. "
-                     "This response is using local extraction rather than generative reasoning. "
-                     "Try a more specific question or add relevant project details.")
+            payload = recalled[0].get("payload") or {}
+            head = (
+                payload.get("extract")
+                or payload.get("content")
+                or payload.get("description")
+                or ""
+            ).strip()
+        text = (
+            head[:700]
+            if head
+            else (
+                "I couldn't find relevant material in the available knowledge base. "
+                "This response is using local extraction rather than generative reasoning. "
+                "Try a more specific question or add relevant project details."
+            )
+        )
         return {
             "text": text,
             "tier": tier,
@@ -150,22 +159,17 @@ async def _generate_text(
             "engine_verification": None,
             "engine_evidence_refs": [],
         }
-    # Generative escalation is engine-owned. Product routes never activate
-    # provider SDKs or credentials directly.
-    prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
+
     execution_scope = _ENGINE_EXECUTION_SCOPE.get()
     engine_session_id = None
+    turn_idempotency_key = None
     if execution_scope is not None:
-        identity = hashlib.sha256(
-            (
-                execution_scope
-                + "\x1f"
-                + query
-                + "\x1f"
-                + prompt
-            ).encode("utf-8")
+        scope_digest = hashlib.sha256(
+            execution_scope.encode("utf-8")
         ).hexdigest()
-        engine_session_id = "jeeves-" + identity[:24]
+        engine_session_id = "jeeves-" + scope_digest[:24]
+        turn_idempotency_key = "jeeves-turn:" + scope_digest
+
     try:
         chat = EngineChat(
             session_id=engine_session_id,
@@ -174,9 +178,60 @@ async def _generate_text(
             actor_id=engine_actor_id,
             capability=engine_capability,
             data_class=engine_data_class,
+            turn_idempotency_key=turn_idempotency_key,
         ).with_max_tokens(8_192)
+
+        for item in conversation_history or ():
+            chat.add_history_message(item.role, item.content)
+
+        # Legacy positional conversation_context is retained as compatibility
+        # input, but it is evidence now—not provider prompt authority.
+        bounded_project_context = (
+            project_context.strip()
+            or conversation_context.strip()
+        )
+        if bounded_project_context:
+            context_digest = hashlib.sha256(
+                bounded_project_context.encode("utf-8")
+            ).hexdigest()
+            chat.add_evidence(
+                "jeeves-project-context:" + context_digest[:32],
+                bounded_project_context,
+                kind="artifact",
+            )
+
+        for index, item in enumerate(recalled[:5], start=1):
+            payload = item.get("payload") or {}
+            content = (
+                payload.get("extract")
+                or payload.get("content")
+                or payload.get("description")
+                or ""
+            )
+            text = str(content).strip()
+            if not text:
+                continue
+            bounded = text[:4000]
+            source_hint = str(
+                item.get("path")
+                or item.get("id")
+                or ("result-" + str(index))
+            )
+            source_digest = hashlib.sha256(
+                (
+                    source_hint
+                    + "\x1f"
+                    + bounded
+                ).encode("utf-8")
+            ).hexdigest()
+            chat.add_evidence(
+                "jeeves-retrieval:" + source_digest[:32],
+                f"[{index}] {bounded}",
+                kind="retrieval_evidence",
+            )
+
         response = await chat.send_message(
-            UserMessage(text=prompt)
+            UserMessage(text=query)
         )
         return {
             "text": response.text,
@@ -1096,31 +1151,17 @@ async def chat(req: ChatReq):
         execution_scope
     )
     try:
-        if req.context or effective_history:
-            gen = await _generate_text(
-                req.message,
-                recalled,
-                needs_reasoning,
-                conversation_prompt(
-                    req.message,
-                    req.context,
-                    effective_history,
-                ),
-                engine_tenant_id=canonical_turn[3],
-                engine_actor_id=canonical_turn[4],
-                engine_capability="assistant.chat",
-                engine_data_class=canonical_turn[1].data_class,
-            )
-        else:
-            gen = await _generate_text(
-                req.message,
-                recalled,
-                needs_reasoning,
-                engine_tenant_id=canonical_turn[3],
-                engine_actor_id=canonical_turn[4],
-                engine_capability="assistant.chat",
-                engine_data_class=canonical_turn[1].data_class,
-            )
+        gen = await _generate_text(
+            req.message,
+            recalled,
+            needs_reasoning,
+            conversation_history=effective_history,
+            project_context=req.context,
+            engine_tenant_id=canonical_turn[3],
+            engine_actor_id=canonical_turn[4],
+            engine_capability="assistant.chat",
+            engine_data_class=canonical_turn[1].data_class,
+        )
     finally:
         _ENGINE_EXECUTION_SCOPE.reset(execution_scope_token)
 
