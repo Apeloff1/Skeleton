@@ -33,6 +33,12 @@ QUALIFICATION_CLI_PATH = (
     ROOT / "scripts" / "run_ai_system_completion_qualification.py"
 )
 QUALIFICATION_TEST_PATH = ROOT / "tests" / "test_ai_system_qualification.py"
+QUALIFICATION_RECEIPT_VERIFIER_PATH = (
+    ROOT / "scripts" / "verify_ai_system_qualification_receipt.py"
+)
+QUALIFICATION_RECEIPT_VERIFIER_TEST_PATH = (
+    ROOT / "tests" / "test_ai_system_qualification_receipt_verifier.py"
+)
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -98,6 +104,8 @@ def verify(head_sha: str) -> dict[str, object]:
         QUALIFICATION_PATH,
         QUALIFICATION_CLI_PATH,
         QUALIFICATION_TEST_PATH,
+        QUALIFICATION_RECEIPT_VERIFIER_PATH,
+        QUALIFICATION_RECEIPT_VERIFIER_TEST_PATH,
     )
     missing_files = [str(path.relative_to(ROOT)) for path in required_files if not path.is_file()]
     if missing_files:
@@ -142,6 +150,8 @@ def verify(head_sha: str) -> dict[str, object]:
         "learning_evaluation_lineage_required": True,
         "evidence_source_execution_binding": True,
         "learning_result_binding_required": True,
+        "qualification_receipt_rehash_required": True,
+        "strict_json_receipt_verification": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
@@ -185,6 +195,24 @@ def verify(head_sha: str) -> dict[str, object]:
                 "qualification runner wiring incomplete: " + ", ".join(absent)
             )
 
+    if QUALIFICATION_RECEIPT_VERIFIER_PATH.is_file():
+        receipt_verifier_required = (
+            "object_pairs_hook=_reject_duplicate_pairs",
+            "proof digest mismatch",
+            "system-completion report digest mismatch",
+            "qualification receipt digest mismatch",
+            "canonical requirement order",
+        )
+        absent = _contains_all(
+            QUALIFICATION_RECEIPT_VERIFIER_PATH,
+            receipt_verifier_required,
+        )
+        if absent:
+            errors.append(
+                "qualification receipt verifier wiring incomplete: "
+                + ", ".join(absent)
+            )
+
     if QUALIFICATION_CLI_PATH.is_file():
         qualification_cli_required = (
             "qualify_system_completion",
@@ -207,7 +235,9 @@ def verify(head_sha: str) -> dict[str, object]:
             "test_ai_system_completion_verifier.py",
             "verify_ai_system_completion.py",
             "run_ai_system_completion_qualification.py",
+            "verify_ai_system_qualification_receipt.py",
             ".ai-system-runtime-qualification.json",
+            ".ai-system-runtime-qualification-verification.json",
             "github.event.pull_request.head.sha || github.sha",
         )
         absent = _contains_all(WORKFLOW_PATH, workflow_required)
