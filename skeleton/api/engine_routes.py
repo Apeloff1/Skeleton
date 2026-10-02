@@ -314,6 +314,55 @@ def _raise_engine_error(exc: Exception) -> None:
     raise exc
 
 
+@router.get("/providers")
+def provider_status(
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    """Return non-secret runtime-provider identity to trusted app clients."""
+
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine provider status authority denied",
+        ) from exc
+    if "engine:read" not in grant.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine provider status requires engine:read",
+        )
+    if coordinator is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine execution coordinator unavailable",
+        )
+    registry = getattr(coordinator, "provider_registry", None)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine provider registry unavailable",
+        )
+    try:
+        statuses = registry.statuses()
+        active = str(registry.active_id)
+        available = bool(registry.available)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine provider status unavailable",
+        ) from exc
+    return {
+        "active": active,
+        "available": available,
+        "providers": statuses,
+    }
+
+
 @router.post("/executions", status_code=status.HTTP_202_ACCEPTED)
 async def submit_execution(
     body: EngineSubmitBody,
