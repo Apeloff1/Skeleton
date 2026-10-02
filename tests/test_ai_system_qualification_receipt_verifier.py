@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -11,6 +12,82 @@ from skeleton.ai.evaluation.system_qualification import (
 
 
 HEAD = "e" * 40
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value)).hexdigest()
+
+
+def _rehash_receipt(payload: dict[str, object]) -> None:
+    report = payload["report"]
+    assert isinstance(report, dict)
+    proofs = report["proofs"]
+    assert isinstance(proofs, list)
+    for proof in proofs:
+        assert isinstance(proof, dict)
+        proof["digest"] = _digest(
+            {
+                key: proof[key]
+                for key in (
+                    "requirement",
+                    "subject_id",
+                    "source_revision",
+                    "passed",
+                    "producer_id",
+                    "verifier_id",
+                    "evidence_refs",
+                    "details",
+                )
+            }
+        )
+    report["digest"] = _digest(
+        {
+            "schema_version": report["schema_version"],
+            "subject_id": report["subject_id"],
+            "source_revision": report["source_revision"],
+            "required": report["required"],
+            "proof_digests": [
+                proof["digest"] for proof in proofs
+            ],
+            "missing": report["missing"],
+            "failed": report["failed"],
+            "valid": report["valid"],
+        }
+    )
+    payload["digest"] = _digest(
+        {
+            "schema_version": payload["schema_version"],
+            "source_revision": payload["source_revision"],
+            "subject_id": payload["subject_id"],
+            "report_digest": report["digest"],
+            "primary_result_digest":
+                payload["primary_result_digest"],
+            "replay_result_digest":
+                payload["replay_result_digest"],
+            "primary_output_digest":
+                payload["primary_output_digest"],
+            "replay_output_digest":
+                payload["replay_output_digest"],
+            "network_attempt_count":
+                payload["network_attempt_count"],
+            "observed_tool_ids":
+                payload["observed_tool_ids"],
+            "replay_observed_tool_ids":
+                payload["replay_observed_tool_ids"],
+            "validity_checks": payload["validity_checks"],
+            "valid": payload["valid"],
+        }
+    )
 
 
 async def _write_receipt(tmp_path):
@@ -102,6 +179,36 @@ async def test_independent_verifier_rejects_forged_receipt_digest(
 
     assert verdict["valid"] is False
     assert "qualification receipt digest mismatch" in verdict["errors"]
+
+
+@pytest.mark.asyncio
+async def test_independent_verifier_rejects_semantically_forged_rehashed_proof(
+    tmp_path,
+) -> None:
+    _receipt, path = await _write_receipt(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    proofs = payload["report"]["proofs"]
+    target = next(
+        proof
+        for proof in proofs
+        if proof["requirement"] == "security.sandbox_filesystem"
+    )
+    target["details"]["safe_roundtrip"] = False
+    target["passed"] = True
+    _rehash_receipt(payload)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    verdict = verify_receipt(path, expected_head=HEAD)
+
+    assert verdict["valid"] is False
+    assert any(
+        "proof semantic pass mismatch: security.sandbox_filesystem"
+        in error
+        for error in verdict["errors"]
+    )
 
 
 @pytest.mark.asyncio
