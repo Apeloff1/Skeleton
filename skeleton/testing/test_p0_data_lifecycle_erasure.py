@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import pytest
 
+from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
 from skeleton.memory.core import Chunk
+from skeleton.memory.projection import MemoryProjectionCoordinator, VectorStoreProjection
 from skeleton.memory.vector import VectorStore
+from skeleton.persistence.memory_repository import SQLiteMemoryRepository
 from skeleton.reliability.backup_restore import BackupManager
 
 
@@ -119,3 +124,100 @@ def test_backup_identity_rejects_noncanonical_paths(tmp_path, backup_id: str) ->
     manager = BackupManager(tmp_path / "state")
     with pytest.raises(ValueError, match="invalid backup_id"):
         manager.verify(backup_id)
+
+
+def _memory_proposal(content: str) -> MemoryWriteProposal:
+    now = datetime(2026, 10, 3, 0, 0, tzinfo=timezone.utc)
+    return MemoryWriteProposal(
+        proposal_id=str(uuid4()),
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        kind=MemoryKind.SEMANTIC,
+        idempotency_key=str(uuid4()),
+        proposed_at=now,
+        content=content,
+        provenance_refs=("conversation:source",),
+        source_operation_id=str(uuid4()),
+    )
+
+
+def test_canonical_tombstone_purges_all_vector_entries_for_source() -> None:
+    now = datetime(2026, 10, 3, 0, 0, tzinfo=timezone.utc)
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(_memory_proposal("canonical source"), now=now)
+    store = VectorStore(dims=16)
+    projection = VectorStoreProjection("vector", store)
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    store.add(
+        Chunk("derived fragment", chunk_id="derived-fragment"),
+        source_id=record.memory_id,
+    )
+    assert store.stats()["documents"] == 2
+
+    repo.tombstone(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=record.version,
+        now=now,
+    )
+    report = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+
+    assert report.degraded is False
+    assert store.stats()["documents"] == 0
+    assert store.purge_source(record.memory_id) == 0
+
+
+def test_backup_delete_state_fails_closed_before_live_delete_on_missing_backup(
+    tmp_path,
+) -> None:
+    root = tmp_path / "state"
+    root.mkdir()
+    live = root / "secrets.json"
+    live.write_text('{"token":"retain-until-preflight-succeeds"}', encoding="utf-8")
+    manager = BackupManager(root)
+    entry = manager.backup("first")
+    (manager.backup_dir / f"{entry['backup_id']}.json").unlink()
+
+    with pytest.raises(RuntimeError, match="indexed backup is missing"):
+        manager.delete_state("secrets.json")
+
+    assert live.exists()
+
+
+def test_backup_delete_state_purges_history_before_live_source(tmp_path) -> None:
+    root = tmp_path / "state"
+    root.mkdir()
+    live = root / "secrets.json"
+    live.write_text('{"token":"one"}', encoding="utf-8")
+    manager = BackupManager(root)
+    first = manager.backup("first")
+    live.write_text('{"token":"two"}', encoding="utf-8")
+    second = manager.backup("second")
+
+    result = manager.delete_state("secrets.json")
+
+    assert result["live_deleted"] is True
+    assert result["purged_backups"] == 2
+    assert not live.exists()
+    for backup_id in (first["backup_id"], second["backup_id"]):
+        blob = json.loads(
+            (manager.backup_dir / f"{backup_id}.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert "secrets.json" not in blob["files"]
+        assert "secrets.json" not in blob["checksums"]
