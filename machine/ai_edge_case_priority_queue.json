@@ -318,9 +318,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_policy_retention_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/context/compiler.py",
+        "code:skeleton/context/compaction.py",
+        "test:skeleton/testing/test_context_compiler.py",
+        "workflow:P0 Policy Context Retention"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-013",
       "completion_checkbox": false,
