@@ -3,48 +3,74 @@
 ## Purpose
 
 The standalone AI/SI completion program has a system-level closure plane in
-addition to atomic accountability and vertical-suite checks. Its job is to
-prevent a false-positive completion verdict when many subsystems are green but
-one cross-cutting lifecycle is still broken.
+addition to atomic accountability and vertical-suite checks. Its purpose is to
+prevent false completion claims when individual subsystems pass but the
+assembled lifecycle, security boundary, persistence path, or learning path is
+still broken.
 
-Completion is **non-compensable**. All eighteen requirements must have one
-passing, independently witnessed proof for the same execution subject and exact
-Git revision. Extra green evidence cannot compensate for a missing or failed
-proof.
-
-## Required cross-cutting proofs
-
-| Requirement | What must be observed |
-| --- | --- |
-| `execution.local_model` | A completed transaction uses only local provider receipts and publishes a terminal output/stream identity. |
-| `execution.offline_isolation` | Qualification performs zero AF_INET/AF_INET6 network attempts and every provider receipt remains local. |
-| `execution.request_result_binding` | Terminal execution/operation identities exactly match the canonical request identity. |
-| `execution.budget_bounds` | Observed provider and tool calls remain within hard request budgets. |
-| `execution.stop_semantics` | An expired deadline and a durable cancellation both terminate before provider/tool work and cannot publish user-visible success. |
-| `execution.tool_authority` | Every observed tool invocation is declared by the request and has a corresponding receipt. |
-| `execution.durable_recovery` | A separately reopened repository yields the exact terminal result, not a best-effort reconstruction. |\n| `execution.staged_finalization_recovery` | A staged terminal intent survives repository close/reopen, finalizes to the exact result, and is cleared after recovery. |
-| `execution.replay_lineage` | Recovered turns are contiguous, subject/operation-bound, uniquely identified, parent-linked, and checkpoint-bound. |
-| `execution.reproducibility` | A fresh repository/run of the same deterministic local request reproduces result and final-output digests. |
-| `execution.governed_effects` | Every mutating tool receipt has a matching observed postcondition; read-only traffic cannot counterfeit mutable-effect proof. |
-| `verification.independent` | Terminal output carries a passing, policy-satisfied independent verification receipt plus evidence refs. |
-| `verification.claim_binding` | The verification receipt candidate/context digests exactly match the published final output and request context. |
-| `context.integrity` | The context ledger has a non-genesis head and verifies its complete hash chain. |
-| `memory.lifecycle` | Subject-bound memory is written, retrieved, explicitly deleted, and absent after deletion. |
-| `finalization.lineage` | Completed output retains terminal stream identity plus durable memory and artifact references. |
-| `learning.promotion` | A candidate is promoted only through a bound external evaluation and becomes active. |
-| `learning.rollback` | The promoted candidate rolls back to baseline while retaining the same evaluation lineage. |
+Completion is **non-compensable**. All twenty-four requirements must have one
+passing, independently witnessed proof for the same execution subject and the
+same exact Git revision. Extra green evidence cannot compensate for a missing
+or failed proof.
 
 The canonical inventory is
 `machine/ai_system_completion_contract.json`. The executable proof model is
 `skeleton/ai/runtime/system_completion.py`.
 
+## Twenty-four required proofs
+
+### Execution and recovery
+
+| Requirement | Required observation |
+| --- | --- |
+| `execution.local_model` | A completed transaction uses only local provider receipts and publishes terminal output and stream identity. |
+| `execution.offline_isolation` | Qualification performs zero external socket attempts and all provider receipts remain local. |
+| `execution.request_result_binding` | Terminal execution and operation identities match the canonical request. |
+| `execution.budget_bounds` | Model-turn and tool-call usage remains inside hard request budgets. |
+| `execution.stop_semantics` | Deadline and durable cancellation both stop before provider/tool work and cannot publish success. |
+| `execution.tool_authority` | Every observed tool call was declared by the request and has a receipt. |
+| `execution.durable_recovery` | Reopening SQLite yields the exact terminal result. |
+| `execution.staged_finalization_recovery` | A staged terminal intent survives close/reopen, finalizes exactly once, and clears its intent. |
+| `execution.replay_lineage` | Recovered turns remain contiguous, subject/operation-bound, unique, parent-linked, and checkpoint-bound. |
+| `execution.reproducibility` | A fresh repository run reproduces terminal-result and final-output digests. |
+| `execution.governed_effects` | Every mutable effect has a matching observed postcondition. |
+
+### Verification, context, and durable state
+
+| Requirement | Required observation |
+| --- | --- |
+| `verification.independent` | Terminal output carries a passing independent verification receipt and evidence references. |
+| `verification.claim_binding` | Candidate and context digests in the verification receipt exactly match the published output and request context. |
+| `context.integrity` | The context ledger has a non-genesis head and a valid complete hash chain. |
+| `memory.lifecycle` | Subject-bound memory is written, recalled, deleted, and absent after deletion. |
+| `finalization.lineage` | Terminal output retains stream identity plus durable memory and artifact references. |
+
+### Hostile-environment security
+
+| Requirement | Required observation |
+| --- | --- |
+| `security.sandbox_filesystem` | Filesystem jail permits safe round-trip I/O while rejecting traversal and preserving outside state. |
+| `security.sandbox_process` | Subprocess execution has a scrubbed environment, rejects shell-string execution, stays bounded, and fails closed on network isolation. |
+| `security.injection_sanitization` | Prompt and shell attacks are detected, secrets are redacted, and duplicate-key JSON is rejected. |
+| `privacy.provider_fallback` | Provider routing cannot cross the request privacy boundary even when the permitted provider is unhealthy. |
+| `memory.poisoning_resistance` | Governed memory accepts a valid provenance-bound write while rejecting missing provenance and conflicting proposal replay. |
+| `security.outbound_network_boundary` | Private targets, mixed public/private DNS answers, and peer rebinding are rejected while canonical public resolution succeeds. |
+
+### Learning lifecycle
+
+| Requirement | Required observation |
+| --- | --- |
+| `learning.promotion` | Promotion is bound to the qualified result and an external evaluation; failed or cross-experiment evaluation is rejected. |
+| `learning.rollback` | Rollback restores baseline under the same evaluation lineage and rollback without prior promotion is rejected. |
+
 ## Authority model
 
-The completion plane is intentionally non-executing. It cannot grant tool
-authority, write memory, modify model state, promote a candidate, or fabricate
-missing evidence. It validates evidence emitted by the runtime planes.
+The completion plane is non-executing. It cannot grant tool authority, mutate
+memory, alter model state, promote a candidate, or fabricate missing evidence.
+It consumes observations from the owning planes and produces a fail-closed
+report.
 
-Every proof is bound into its digest with:
+Every proof digest binds:
 
 - requirement identity;
 - execution subject;
@@ -55,114 +81,99 @@ Every proof is bound into its digest with:
 - observed details;
 - pass/fail state.
 
-A report is invalid if a proof is absent, failed, duplicated, self-verified,
-from another execution subject, or from another source revision. Request/result,
-verification candidate/context, memory ownership, and learning evaluation
-lineage are also fail-closed.
+The report rejects missing, failed, duplicate, self-verified, cross-subject, or
+cross-revision proofs. Applicable source objects must themselves belong to the
+same execution; merely relabeling evidence does not satisfy completion.
 
 ## Causal closure graph
 
-The eighteen proofs are not a bag of independent booleans. They form one
-causal chain:
+The twenty-four proofs form one causal chain rather than a bag of booleans:
 
-`request identity -> local/offline execution -> budget + stop fences ->
-declared tool authority -> receipts/effects -> persisted terminal result ->
-recovered turn/checkpoint lineage -> deterministic fresh replay -> independent
-verification bound to exact candidate/context -> context/memory/finalization
-lineage -> externally evaluated promotion -> rollback to evaluated baseline`.
+`request identity -> local/offline execution -> budgets + stop fences -> tool
+authority -> effects/postconditions -> durable terminal state -> crash recovery
+-> replay lineage -> deterministic fresh replay -> independent exact-claim
+verification -> context/memory/finalization lineage -> hostile-environment
+sandbox/privacy/network checks -> result-bound learning promotion -> rollback`.
 
-This prevents evidence from different commits, executions, candidates, memory
-owners, or learning experiments from being stitched into a synthetic completion
+Evidence from another commit, execution, provider boundary, memory owner,
+candidate, or learning experiment cannot be stitched into a valid completion
 claim.
 
 ## Executable qualification
 
-`skeleton/ai/evaluation/system_qualification.py` is the canonical executable
-qualifier. It runs the assembled AI rather than only inspecting configuration.
-
-One qualification run:
-
-1. starts `FunctionalAIRuntime` with a credential-free local model and governed
-   `repo.read` tool;
-2. runs under a socket guard that rejects/counts external network attempts;
-3. independently verifies the final output and binds the verification receipt to
-   the exact candidate/context digests;
-4. binds memory/artifact lineage during finalization;
-5. checks hard model-turn/tool-call budgets and declared-tool authority;
-6. independently exercises an already-expired deadline and a durable
-   cancellation request, requiring both to stop before provider/tool work;
-7. reopens SQLite and compares the full terminal result exactly;\n8. stages a second terminal intent, closes SQLite to simulate a crash, reopens it, finalizes the staged result, and requires the intent to clear;
-8. validates recovered turn parentage, sequence, operation identity, and
-   checkpoint lineage;
-9. reruns the same request in a fresh SQLite repository and requires identical
-   terminal-result and final-output digests;
-10. appends and verifies a context-ledger block;
-11. writes, retrieves, deletes, and re-queries subject-bound memory;
-12. performs deterministic feedback assignment and external evaluation;
-13. promotes the evaluated candidate and verifies active-version transition;
-14. executes rollback and verifies baseline restoration under the same
-   evaluation digest;
-15. submits all eighteen proofs to `SystemCompletionPlane`;
-16. emits a canonical `SystemQualificationReceipt` containing the report,
-   run/replay digests, observed tool trace, network-attempt count, and receipt
-   digest.
-
+`skeleton/ai/evaluation/system_qualification.py` runs the assembled system.
 The CLI entry point is
 `scripts/run_ai_system_completion_qualification.py`.
 
-## Adversarial qualification
+A qualification run performs all of the following on one exact source revision:
 
-The acceptance suite also proves that the following remain terminal blockers:
+1. executes `FunctionalAIRuntime` with a credential-free local model and
+   governed `repo.read`;
+2. denies and counts external socket attempts;
+3. binds verification to the exact candidate and context;
+4. binds deterministic memory/artifact lineage at finalization;
+5. enforces hard model/tool budgets and declared tool authority;
+6. exercises already-expired deadline and durable-cancellation paths;
+7. reopens SQLite and compares the terminal result exactly;
+8. stages a second terminal intent, simulates restart, finalizes it, and proves
+   the durable intent is cleared;
+9. validates turn ancestry, operation identity, and checkpoint lineage;
+10. reruns the same request in a fresh repository and compares output/result
+    digests and tool traces;
+11. verifies a context-ledger block;
+12. performs memory write, recall, delete, and absence;
+13. exercises the filesystem jail against traversal;
+14. executes a bounded sandbox subprocess with environment scrubbing and
+    fail-closed network policy;
+15. attacks prompt/shell sanitization, secret redaction, and strict JSON;
+16. forces provider routing under a local-only privacy boundary while the local
+    provider is unhealthy;
+17. performs governed-memory success, missing-provenance rejection, and
+    conflicting-replay rejection;
+18. exercises private-target, mixed-DNS, and peer-rebinding network defenses;
+19. runs evaluation, promotion, and negative promotion gates;
+20. rolls back and proves evaluation lineage is preserved;
+21. submits all twenty-four proofs to `SystemCompletionPlane`;
+22. emits one canonical machine-readable qualification receipt.
 
-- network escape attempts;
-- request/result substitution;
-- model/tool budget overflow;
-- deadline or cancellation leakage into provider/tool work;
-- undeclared tool use or receipt-count mismatch;
-- tampered durable recovery;
-- broken turn parentage/checkpoint lineage;
-- nondeterministic rerun output/result;
-- mutable effects without observed postconditions;
-- verification receipt for a different candidate/context;
-- self-verification;
-- source-revision mixing;
-- cross-subject memory evidence;
-- missing or duplicate requirements;
-- failed memory forgetting;
-- promotion/rollback lineage divergence.
+## Independent receipt verification
+
+`scripts/verify_ai_system_qualification_receipt.py` is a separate verifier.
+It does not trust the qualifier's stored `valid` flags or digests.
+
+It reparses the emitted receipt with duplicate-key rejection, recomputes every
+proof digest, recomputes the system-completion report digest, recomputes the
+top-level qualification digest, and independently evaluates the **semantics of
+all twenty-four proof types** from serialized evidence.
+
+This means a proof cannot survive by changing its details, setting
+`passed=true`, and recomputing every nested digest. A semantically
+contradictory but cryptographically self-consistent receipt still fails.
 
 ## Exact-head CI
 
 The **AI System Completion** workflow checks out the exact pull-request head and
-runs three layers of evidence:
+runs:
 
-1. integrated/adversarial pytest acceptance plus VS-001 and VS-005 regressions;
-2. the executable qualifier, which writes
-   `.ai-system-runtime-qualification.json`;
-3. the independent structural verifier, which writes
-   `.ai-system-completion.json`.
+1. assembled completion and adversarial acceptance;
+2. VS-001 standalone-AI regression;
+3. VS-005 self-improvement regression;
+4. sandbox isolation and injection/sanitization regressions;
+5. provider privacy-fallback regressions;
+6. governed-memory writeback regressions;
+7. outbound URL/HTTP security regressions;
+8. executable twenty-four-plane qualification;
+9. independent cryptographic and semantic receipt verification;
+10. structural contract/runtime/workflow verification.
 
-CI independently asserts that the executable receipt:
-
-- is bound to the exact PR head;
-- is valid with no missing/failed requirements;
-- contains exactly eighteen proofs;
-- has one subject and one source revision across all proofs;
-- reports zero network attempts;
-- reproduces result/output digests and tool trace on a fresh run;
-- carries canonical report/proof/receipt digests.
-
-The structural verifier separately checks machine-contract/runtime inventory
-parity, authority controls, acceptance/qualifier bindings, workflow wiring, and
-source-file digests.
+CI requires all twenty-four proofs on one subject and exact revision, zero
+network attempts during the local qualification, deterministic fresh replay,
+complete crash recovery, hostile-environment security closure, and valid
+independent verifier receipts.
 
 ## Relationship to atomic P0-P2 work
 
-This plane does **not** rewrite the 42-task accountability ledger and does not
-turn task counts into a system-completion claim. Atomic accountability remains
-implementation custody; this plane answers whether the assembled standalone AI
-demonstrates the required complete-system lifecycle.
-
-The observable-effect hardening lane remains the source of truth for mutable
-postcondition enforcement. System completion consumes that contract at the
-assembled boundary and refuses closure when effect evidence is incomplete.
+This plane does not rewrite task ledgers and does not turn task counts into a
+system-completion claim. Atomic accountability remains implementation custody.
+The completion plane answers whether the assembled standalone AI demonstrates
+the complete cross-cutting lifecycle on the exact integrated code under test.
