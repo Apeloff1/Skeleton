@@ -5816,12 +5816,22 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Workspace filesystem paths reject encoded separators, dot segments, drive separators, NULs, and encoded percent signs before normalization.",
+        "Double-encoded traversal cannot become meaningful after a later decode because encoded percent is rejected at the boundary."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py::test_normalization_rejects_encoded_path_metacharacters",
+        "skeleton/testing/test_security_rooted_fs.py::test_normalization_allows_literal_percent_when_not_an_escape"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/workspace_txn/pathing.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Decoded Path Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
