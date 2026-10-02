@@ -411,9 +411,35 @@ class LlamaCppModel:
             '{"skeleton_local_response":1,"tool_calls":'
             '[{"call_id":"stable-id","tool_id":"allowed-id","arguments":{}}]}.\n'
             "Never invent a tool_id. Otherwise answer normally.\n"
-            "Allowed tools: " + _stable_json(allowed)
+            + (
+                "If final structured output is requested, place it under "
+                "structured_output and match the supplied schema.\n"
+                if request.structured_output_schema is not None
+                else ""
+            )
+            + "Allowed tools: " + _stable_json(allowed)
         )
         return prompt + contract
+
+    def _normalized_structured_output_schema(
+        self,
+        request: LocalInferenceRequest,
+    ) -> dict[str, Any] | None:
+        if request.structured_output_schema is None:
+            return None
+        try:
+            schema = validate_json_schema(
+                request.structured_output_schema
+            )
+        except ToolContractError as exc:
+            raise LlamaCppRuntimeError(
+                f"invalid structured output schema: {exc}"
+            ) from exc
+        if schema.get("type") not in {None, "object"}:
+            raise LlamaCppRuntimeError(
+                "local structured output schema must describe an object"
+            )
+        return schema
 
     def _tool_response_schema(self, request: LocalInferenceRequest) -> dict[str, Any]:
         allowed_tool_ids = sorted(
@@ -427,6 +453,9 @@ class LlamaCppModel:
             raise LlamaCppRuntimeError(
                 "tool response schema requires at least one declared tool_id"
             )
+        structured_schema = self._normalized_structured_output_schema(
+            request
+        )
         return {
             "type": "object",
             "additionalProperties": False,
@@ -436,10 +465,8 @@ class LlamaCppModel:
                 "text": {"type": "string", "minLength": 1},
                 "structured_output": (
                     {"type": "object"}
-                    if request.structured_output_schema is None
-                    else validate_json_schema(
-                        request.structured_output_schema
-                    )
+                    if structured_schema is None
+                    else structured_schema
                 ),
                 "tool_calls": {
                     "type": "array",
@@ -476,21 +503,7 @@ class LlamaCppModel:
     ) -> dict[str, Any] | None:
         if request.tools:
             return self._tool_response_schema(request)
-        if request.structured_output_schema is None:
-            return None
-        try:
-            schema = validate_json_schema(
-                request.structured_output_schema
-            )
-        except ToolContractError as exc:
-            raise LlamaCppRuntimeError(
-                f"invalid structured output schema: {exc}"
-            ) from exc
-        if schema.get("type") not in {None, "object"}:
-            raise LlamaCppRuntimeError(
-                "local structured output schema must describe an object"
-            )
-        return schema
+        return self._normalized_structured_output_schema(request)
 
     def _command(
         self,
