@@ -17,6 +17,7 @@ from skeleton.ai.runtime.inference import (
     LocalToolCall,
     ReferenceNGramModel,
 )
+from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.provider_runtime import ProviderRequest
 
 
@@ -156,7 +157,22 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
         )
     )
     response = await adapter.generate(
-        ProviderRequest(instructions="Use allowed tools.", prompt="read")
+        ProviderRequest(
+            instructions="Use allowed tools.",
+            prompt="read",
+            tools=(
+                ProviderToolDefinition(
+                    tool_id="repo.read",
+                    description="Read a repository file",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                        "additionalProperties": False,
+                    },
+                ),
+            ),
+        )
     )
     assert response.provider == "local"
     assert response.finish_reason.value == "tool_calls"
