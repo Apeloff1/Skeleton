@@ -50,6 +50,12 @@ class CompletionRequirement(str, Enum):
     FINALIZATION_LINEAGE = "finalization.lineage"
     LEARNING_PROMOTION = "learning.promotion"
     LEARNING_ROLLBACK = "learning.rollback"
+    SANDBOX_FILESYSTEM = "security.sandbox_filesystem"
+    SANDBOX_PROCESS = "security.sandbox_process"
+    INJECTION_SANITIZATION = "security.injection_sanitization"
+    PROVIDER_FALLBACK_PRIVACY = "privacy.provider_fallback"
+    MEMORY_POISONING_RESISTANCE = "memory.poisoning_resistance"
+    OUTBOUND_NETWORK_BOUNDARY = "security.outbound_network_boundary"
 
 
 REQUIRED_COMPLETION_REQUIREMENTS: tuple[CompletionRequirement, ...] = tuple(
@@ -976,6 +982,220 @@ class SystemCompletionPlane:
                 "memory_ref_count": len(memory_refs),
                 "artifact_ref_count": len(artifact_refs),
                 "stream_terminal_bound": result.stream_terminal_event is not None,
+            },
+        )
+
+    def prove_sandbox_filesystem(
+        self,
+        *,
+        execution_id: str,
+        safe_roundtrip: bool,
+        traversal_rejected: bool,
+        outside_untouched: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and safe_roundtrip
+            and traversal_rejected
+            and outside_untouched
+        )
+        return self._proof(
+            CompletionRequirement.SANDBOX_FILESYSTEM,
+            passed=passed,
+            producer_id="sandbox-filesystem",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "safe_roundtrip": bool(safe_roundtrip),
+                "traversal_rejected": bool(traversal_rejected),
+                "outside_untouched": bool(outside_untouched),
+            },
+        )
+
+    def prove_sandbox_process(
+        self,
+        *,
+        execution_id: str,
+        clean_environment: bool,
+        shell_string_rejected: bool,
+        bounded_execution: bool,
+        network_fail_closed: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and clean_environment
+            and shell_string_rejected
+            and bounded_execution
+            and network_fail_closed
+        )
+        return self._proof(
+            CompletionRequirement.SANDBOX_PROCESS,
+            passed=passed,
+            producer_id="sandbox-process",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "clean_environment": bool(clean_environment),
+                "shell_string_rejected": bool(shell_string_rejected),
+                "bounded_execution": bool(bounded_execution),
+                "network_fail_closed": bool(network_fail_closed),
+            },
+        )
+
+    def prove_injection_sanitization(
+        self,
+        *,
+        execution_id: str,
+        prompt_attack_blocked: bool,
+        shell_attack_blocked: bool,
+        secret_redacted: bool,
+        duplicate_json_rejected: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and prompt_attack_blocked
+            and shell_attack_blocked
+            and secret_redacted
+            and duplicate_json_rejected
+        )
+        return self._proof(
+            CompletionRequirement.INJECTION_SANITIZATION,
+            passed=passed,
+            producer_id="sandbox-sanitization",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "prompt_attack_blocked": bool(prompt_attack_blocked),
+                "shell_attack_blocked": bool(shell_attack_blocked),
+                "secret_redacted": bool(secret_redacted),
+                "duplicate_json_rejected": bool(duplicate_json_rejected),
+            },
+        )
+
+    def prove_provider_fallback_privacy(
+        self,
+        *,
+        execution_id: str,
+        required_boundary: str,
+        routed_boundaries: Sequence[str],
+        routed_model_ids: Sequence[str],
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        boundary = _text("required_boundary", required_boundary)
+        boundaries = tuple(
+            _text("routed_boundary", item) for item in routed_boundaries
+        )
+        models = tuple(_text("routed_model_id", item) for item in routed_model_ids)
+        rank = {"local": 0, "private_remote": 1, "external": 2}
+        allowed_rank = rank.get(boundary)
+        all_within = bool(
+            allowed_rank is not None
+            and boundaries
+            and len(boundaries) == len(models)
+            and all(
+                item in rank and rank[item] <= allowed_rank
+                for item in boundaries
+            )
+        )
+        passed = bool(
+            execution_id == self.subject_id
+            and all_within
+        )
+        return self._proof(
+            CompletionRequirement.PROVIDER_FALLBACK_PRIVACY,
+            passed=passed,
+            producer_id="provider-router",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "required_boundary": boundary,
+                "routed_boundaries": list(boundaries),
+                "routed_model_ids": list(models),
+                "all_within_boundary": all_within,
+            },
+        )
+
+    def prove_memory_poisoning_resistance(
+        self,
+        *,
+        execution_id: str,
+        valid_write_committed: bool,
+        missing_provenance_denied: bool,
+        conflicting_replay_rejected: bool,
+        committed_subject_id: str,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        committed_subject_id = _text(
+            "committed_subject_id",
+            committed_subject_id,
+        )
+        passed = bool(
+            execution_id == self.subject_id
+            and committed_subject_id == self.subject_id
+            and valid_write_committed
+            and missing_provenance_denied
+            and conflicting_replay_rejected
+        )
+        return self._proof(
+            CompletionRequirement.MEMORY_POISONING_RESISTANCE,
+            passed=passed,
+            producer_id="governed-memory-writer",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "committed_subject_id": committed_subject_id,
+                "memory_subject_bound": committed_subject_id == self.subject_id,
+                "valid_write_committed": bool(valid_write_committed),
+                "missing_provenance_denied": bool(missing_provenance_denied),
+                "conflicting_replay_rejected": bool(conflicting_replay_rejected),
+            },
+        )
+
+    def prove_outbound_network_boundary(
+        self,
+        *,
+        execution_id: str,
+        private_target_rejected: bool,
+        mixed_dns_rejected: bool,
+        peer_rebinding_rejected: bool,
+        canonical_public_resolution: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and private_target_rejected
+            and mixed_dns_rejected
+            and peer_rebinding_rejected
+            and canonical_public_resolution
+        )
+        return self._proof(
+            CompletionRequirement.OUTBOUND_NETWORK_BOUNDARY,
+            passed=passed,
+            producer_id="outbound-network-policy",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "private_target_rejected": bool(private_target_rejected),
+                "mixed_dns_rejected": bool(mixed_dns_rejected),
+                "peer_rebinding_rejected": bool(peer_rebinding_rejected),
+                "canonical_public_resolution": bool(
+                    canonical_public_resolution
+                ),
             },
         )
 
