@@ -1199,6 +1199,143 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_resource_admission(
+        self,
+        *,
+        execution_id: str,
+        admitted_within_budget: bool,
+        over_quota_rejected: bool,
+        denial_capacity_unchanged: bool,
+        usage_reconciled: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and admitted_within_budget
+            and over_quota_rejected
+            and denial_capacity_unchanged
+            and usage_reconciled
+        )
+        return self._proof(
+            CompletionRequirement.RESOURCE_ADMISSION,
+            passed=passed,
+            producer_id="admission-runtime",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "admitted_within_budget": bool(admitted_within_budget),
+                "over_quota_rejected": bool(over_quota_rejected),
+                "denial_capacity_unchanged": bool(
+                    denial_capacity_unchanged
+                ),
+                "usage_reconciled": bool(usage_reconciled),
+            },
+        )
+
+    def prove_shared_pressure(
+        self,
+        *,
+        execution_id: str,
+        first_worker_admitted: bool,
+        second_worker_blocked: bool,
+        capacity_released: bool,
+        second_worker_admitted_after_release: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and first_worker_admitted
+            and second_worker_blocked
+            and capacity_released
+            and second_worker_admitted_after_release
+        )
+        return self._proof(
+            CompletionRequirement.SHARED_PRESSURE,
+            passed=passed,
+            producer_id="shared-pressure-ledger",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "first_worker_admitted": bool(first_worker_admitted),
+                "second_worker_blocked": bool(second_worker_blocked),
+                "capacity_released": bool(capacity_released),
+                "second_worker_admitted_after_release": bool(
+                    second_worker_admitted_after_release
+                ),
+            },
+        )
+
+    def prove_idempotent_retry(
+        self,
+        *,
+        execution_id: str,
+        identical_retry_stable: bool,
+        conflicting_retry_rejected: bool,
+        no_double_reservation: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and identical_retry_stable
+            and conflicting_retry_rejected
+            and no_double_reservation
+        )
+        return self._proof(
+            CompletionRequirement.IDEMPOTENT_RETRY,
+            passed=passed,
+            producer_id="admission-runtime",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "identical_retry_stable": bool(identical_retry_stable),
+                "conflicting_retry_rejected": bool(
+                    conflicting_retry_rejected
+                ),
+                "no_double_reservation": bool(no_double_reservation),
+            },
+        )
+
+    def prove_tenant_isolation(
+        self,
+        *,
+        execution_id: str,
+        owner_tenant_visible: bool,
+        other_tenant_hidden: bool,
+        cross_tenant_get_rejected: bool,
+        subject_scope_preserved: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and owner_tenant_visible
+            and other_tenant_hidden
+            and cross_tenant_get_rejected
+            and subject_scope_preserved
+        )
+        return self._proof(
+            CompletionRequirement.TENANT_ISOLATION,
+            passed=passed,
+            producer_id="memory-repository",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "owner_tenant_visible": bool(owner_tenant_visible),
+                "other_tenant_hidden": bool(other_tenant_hidden),
+                "cross_tenant_get_rejected": bool(
+                    cross_tenant_get_rejected
+                ),
+                "subject_scope_preserved": bool(subject_scope_preserved),
+            },
+        )
+
     def prove_learning_promotion(
         self,
         receipt: PromotionReceipt,
