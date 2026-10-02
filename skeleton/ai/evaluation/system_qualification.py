@@ -23,11 +23,16 @@ import socket
 import threading
 from typing import Mapping
 
-from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.contracts.ai_execution import (
+    AIExecutionRequest,
+    AIExecutionResult,
+    ExecutionState,
+)
 from skeleton.ai.learning.promotion import (
     EvaluationReceipt,
     ExperimentSpec,
     FeedbackLedger,
+    FeedbackPromotionError,
     FeedbackPromotionPipeline,
     PromotionReceipt,
 )
@@ -126,6 +131,9 @@ class LearningCycle:
     promoted_active: str
     rollback: PromotionReceipt
     rolled_back_active: str
+    failed_evaluation_rejected: bool
+    cross_experiment_rejected: bool
+    rollback_without_promotion_rejected: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,6 +496,69 @@ async def _stop_semantics_results(
     return deadline_run.result, cancellation_run.result
 
 
+def _staged_finalization_recovery(
+    workdir: Path,
+    request: FunctionalAIRequest,
+    terminal: AIExecutionResult,
+) -> tuple[str, AIExecutionResult | None, bool]:
+    database_path = workdir / "system-qualification-staged-recovery.sqlite3"
+    if database_path.exists():
+        database_path.unlink()
+
+    repository = SQLiteExecutionRepository(database_path)
+    execution_request = request.to_execution_request()
+    execution = repository.create(
+        execution_request,
+        now=QUALIFICATION_TIME,
+    )
+    for state in (
+        ExecutionState.LOADING,
+        ExecutionState.ASSEMBLING_CONTEXT,
+        ExecutionState.ROUTING,
+        ExecutionState.PROVIDER_PENDING,
+        ExecutionState.PROVIDER_COMPLETED,
+    ):
+        execution = repository.transition(
+            execution_request.execution_id,
+            state,
+            expected_version=execution.version,
+            now=QUALIFICATION_TIME,
+        )
+
+    intent = repository.stage_finalization(
+        terminal,
+        expected_execution_version=execution.version,
+        now=QUALIFICATION_TIME,
+    )
+    intent_digest = intent.intent_digest
+    repository.close()
+
+    recovered_repository = SQLiteExecutionRepository(database_path)
+    recovered_intent = recovered_repository.finalization_intent(
+        execution_request.execution_id
+    )
+    if (
+        recovered_intent is None
+        or recovered_intent.intent_digest != intent_digest
+    ):
+        raise RuntimeError("staged finalization intent did not survive reopen")
+    recovered_repository.finalize_staged(
+        execution_request.execution_id,
+        now=QUALIFICATION_TIME,
+    )
+    recovered_result = recovered_repository.result(
+        execution_request.execution_id
+    )
+    intent_cleared = (
+        recovered_repository.finalization_intent(
+            execution_request.execution_id
+        )
+        is None
+    )
+    recovered_repository.close()
+    return intent_digest, recovered_result, intent_cleared
+
+
 def _learning_cycle(
     subject_id: str,
     result_digest: str,
@@ -528,6 +599,66 @@ def _learning_cycle(
         raise RuntimeError("qualification could not establish both learning variants")
 
     selected = (by_variant["baseline"], by_variant["candidate"])
+
+    failed_evaluation = EvaluationReceipt(
+        experiment_id=spec.experiment_id,
+        baseline_version=spec.baseline_version,
+        candidate_version=spec.candidate_version,
+        evaluator_id="system-qualification:negative-evaluator-v1",
+        passed=False,
+        event_ids=tuple(event.event_id for event in selected),
+        metric_delta=0.35,
+        evaluated_at=1_900,
+        evidence_ref="eval:system-qualification:expected-failure",
+    )
+    negative_pipeline = FeedbackPromotionPipeline()
+    try:
+        negative_pipeline.promote(
+            spec,
+            selected,
+            failed_evaluation,
+            promoted_at=1_950,
+        )
+    except FeedbackPromotionError:
+        failed_evaluation_rejected = True
+    else:
+        failed_evaluation_rejected = False
+
+    cross_experiment = EvaluationReceipt(
+        experiment_id="system-qualification-cross-experiment",
+        baseline_version=spec.baseline_version,
+        candidate_version=spec.candidate_version,
+        evaluator_id="system-qualification:negative-evaluator-v1",
+        passed=True,
+        event_ids=tuple(event.event_id for event in selected),
+        metric_delta=0.35,
+        evaluated_at=1_960,
+        evidence_ref="eval:system-qualification:cross-experiment",
+    )
+    try:
+        negative_pipeline.promote(
+            spec,
+            selected,
+            cross_experiment,
+            promoted_at=1_970,
+        )
+    except FeedbackPromotionError:
+        cross_experiment_rejected = True
+    else:
+        cross_experiment_rejected = False
+
+    rollback_probe = FeedbackPromotionPipeline()
+    try:
+        rollback_probe.rollback(
+            spec,
+            reason="must reject rollback before promotion",
+            rolled_back_at=1_980,
+        )
+    except FeedbackPromotionError:
+        rollback_without_promotion_rejected = True
+    else:
+        rollback_without_promotion_rejected = False
+
     evaluation = EvaluationReceipt(
         experiment_id=spec.experiment_id,
         baseline_version=spec.baseline_version,
@@ -559,6 +690,11 @@ def _learning_cycle(
         promoted_active=promoted_active,
         rollback=rollback,
         rolled_back_active=pipeline.active_version(spec),
+        failed_evaluation_rejected=failed_evaluation_rejected,
+        cross_experiment_rejected=cross_experiment_rejected,
+        rollback_without_promotion_rejected=(
+            rollback_without_promotion_rejected
+        ),
     )
 
 
@@ -593,6 +729,15 @@ async def qualify_system_completion(
     recovered_repository = SQLiteExecutionRepository(primary.database_path)
     recovered = recovered_repository.result(primary.request.execution_id)
     recovered_turns = recovered_repository.turns(primary.request.execution_id)
+    (
+        staged_intent_digest,
+        staged_recovered_result,
+        staged_intent_cleared,
+    ) = _staged_finalization_recovery(
+        root,
+        primary.request,
+        terminal,
+    )
 
     context_ledger = ContextLedger()
     context_ledger.append(
@@ -679,6 +824,12 @@ async def qualify_system_completion(
         receipt_refs=terminal.tool_receipts,
     )
     plane.prove_durable_recovery(terminal, recovered)
+    plane.prove_staged_finalization_recovery(
+        staged_result=terminal,
+        recovered_result=staged_recovered_result,
+        staged_intent_digest=staged_intent_digest,
+        intent_cleared=staged_intent_cleared,
+    )
     plane.prove_replay_lineage(recovered_turns)
     plane.prove_reproducibility(
         primary_execution_id=primary.request.execution_id,
@@ -722,6 +873,12 @@ async def qualify_system_completion(
         evaluation_digest=learning.evaluation.digest,
         evaluator_id=learning.evaluation.evaluator_id,
         bound_result_digest=primary.run.evidence.result_digest,
+        failed_evaluation_rejected=(
+            learning.failed_evaluation_rejected
+        ),
+        cross_experiment_rejected=(
+            learning.cross_experiment_rejected
+        ),
     )
     plane.prove_learning_rollback(
         learning.rollback,
@@ -730,6 +887,9 @@ async def qualify_system_completion(
         active_version=learning.rolled_back_active,
         promotion_receipt=learning.promotion,
         bound_result_digest=primary.run.evidence.result_digest,
+        rollback_without_promotion_rejected=(
+            learning.rollback_without_promotion_rejected
+        ),
     )
 
     report = plane.report()
