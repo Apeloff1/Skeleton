@@ -256,6 +256,23 @@ class EngineTextResponse:
     artifact_refs: tuple[str, ...] = ()
 
 
+_DATA_CLASS_ORDER = (
+    "public",
+    "internal",
+    "confidential",
+    "restricted",
+)
+
+
+def _effective_data_class(request: EngineTextRequest) -> str:
+    # EngineText's canonical instruction policy is internal by default; all
+    # history/evidence/prompt segments inherit request.data_class.
+    return max(
+        ("internal", request.data_class),
+        key=_DATA_CLASS_ORDER.index,
+    )
+
+
 def _terminal_response(
     *,
     request: EngineTextRequest,
@@ -277,7 +294,7 @@ def _terminal_response(
         or binding.capability != request.capability
         or binding.idempotency_key != request.idempotency_key
         or binding.purpose != request.purpose
-        or binding.data_class != request.data_class
+        or binding.data_class != _effective_data_class(request)
     ):
         raise EngineTextError(
             "canonical engine terminal/handoff identity diverged from request"
