@@ -12,6 +12,21 @@ from .native import (
     NativeTrainingResult,
     TrainingEvaluation,
     TrainingTopology,
+ )
+from .post_training import (
+    CurriculumEngine,
+    CurriculumStage,
+    DeterministicRLEnvironment,
+    PreferencePair,
+    PreferenceWeightedPostTrainer,
+    VerifierCalibration,
+    VerifierProgram,
+)
+from .lifecycle import (
+    LifecycleTransition,
+    ModelLifecycleRegistry,
+    ModelLifecycleState,
+    ProviderMigrationDecision,
 )
 
 __all__ = [
@@ -26,4 +41,15 @@ __all__ = [
     "NativeTrainingResult",
     "TrainingEvaluation",
     "TrainingTopology",
+    "CurriculumEngine",
+    "CurriculumStage",
+    "DeterministicRLEnvironment",
+    "PreferencePair",
+    "PreferenceWeightedPostTrainer",
+    "VerifierCalibration",
+    "VerifierProgram",
+    "LifecycleTransition",
+    "ModelLifecycleRegistry",
+    "ModelLifecycleState",
+    "ProviderMigrationDecision",
 ]
