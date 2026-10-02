@@ -182,9 +182,11 @@ class CanonicalAITurnRequest:
             if not isinstance(raw, str) or not raw.strip():
                 raise ValueError("attachment_refs must contain non-empty strings")
             value = raw.strip()
-            if value.startswith("product-turn-sha256:"):
+            if value.startswith(
+                ("product-turn-sha256:", "product-runtime-sha256:")
+            ):
                 raise ValueError(
-                    "attachment_refs cannot use reserved product turn identity prefix"
+                    "attachment_refs cannot use reserved product identity prefix"
                 )
             if value not in attachments:
                 attachments.append(value)
@@ -382,6 +384,21 @@ class CanonicalConversationAIRuntime:
         self._active_tasks: dict[str, asyncio.Task[ExecutionRunResult]] = {}
         self._active_tasks_lock = asyncio.Lock()
 
+    @property
+    def runtime_identity_digest(self) -> str:
+        return _json_digest(
+            {
+                "schema_version": "skeleton.product.canonical-runtime.v1",
+                "instruction_policy": self.instruction_policy.identity,
+                "context_budget": self.context_budget.as_dict(),
+                "context_compiler_version": self.context_compiler.compiler_version,
+            }
+        )
+
+    @property
+    def runtime_identity_ref(self) -> str:
+        return "product-runtime-sha256:" + self.runtime_identity_digest
+
     def create_thread(
         self,
         *,
@@ -488,6 +505,7 @@ class CanonicalConversationAIRuntime:
             attachment_refs=(
                 *request.attachment_refs,
                 request.identity_ref,
+                self.runtime_identity_ref,
             ),
             data_class=thread.data_class,
         )
@@ -498,8 +516,8 @@ class CanonicalConversationAIRuntime:
             expected_thread_version=thread.version,
         )
 
-    @staticmethod
     def _assert_request_binding(
+        self,
         user_message: ConversationMessage,
         request: CanonicalAITurnRequest,
     ) -> None:
@@ -515,6 +533,20 @@ class CanonicalConversationAIRuntime:
         if identity_refs[0] != request.identity_ref:
             raise ConversationConflict(
                 "idempotency_key was reused with different turn semantics"
+            )
+
+        runtime_refs = tuple(
+            ref
+            for ref in user_message.attachment_refs
+            if ref.startswith("product-runtime-sha256:")
+        )
+        if len(runtime_refs) != 1:
+            raise ConversationRepositoryCorruption(
+                "canonical user turn is missing unique runtime identity"
+            )
+        if runtime_refs[0] != self.runtime_identity_ref:
+            raise ConversationConflict(
+                "canonical turn runtime policy/compiler identity changed"
             )
 
     async def _run_or_join_execution(
@@ -939,6 +971,84 @@ class CanonicalConversationAIRuntime:
         )
 
 
+    def _commit_cancel_marker(
+        self,
+        *,
+        thread_id: str,
+        tenant_id: str,
+        owner_id: str,
+        user_message: ConversationMessage,
+        idempotency_key: str,
+        operation_id: str,
+        terminal,
+        now: datetime,
+    ) -> ConversationMessage:
+        thread = self.conversations.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        _, existing_assistant = self._find_messages(
+            thread,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing_assistant is not None:
+            raise ConversationConflict(
+                "assistant response committed while cancellation was finalizing"
+            )
+
+        cancel_key = idempotency_key + ":cancelled"
+        recent = self.conversations.list_messages(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            after_sequence=max(0, thread.message_sequence - 499),
+            limit=500,
+        )
+        existing = next(
+            (
+                item
+                for item in recent
+                if item.author_type is ConversationAuthorType.SYSTEM_DERIVED
+                and item.idempotency_key == cancel_key
+            ),
+            None,
+        )
+        if existing is not None:
+            return existing
+
+        marker = ConversationMessage(
+            message_id=str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "skeleton-canonical-product-cancel:"
+                    + thread_id
+                    + ":"
+                    + user_message.message_id,
+                )
+            ),
+            thread_id=thread_id,
+            branch_id=user_message.branch_id,
+            sequence=thread.message_sequence + 1,
+            author_type=ConversationAuthorType.SYSTEM_DERIVED,
+            created_at=now,
+            idempotency_key=cancel_key,
+            content="Execution cancelled before an assistant response was committed.",
+            parent_message_id=user_message.message_id,
+            operation_id=operation_id,
+            ai_result_id="functional-ai-result:" + _json_digest(terminal.as_dict()),
+            data_class=thread.data_class,
+        )
+        _updated, committed = self.conversations.append_message(
+            marker,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            expected_thread_version=thread.version,
+        )
+        return committed
+
     async def cancel_turn(
         self,
         thread_id: str,
@@ -1015,6 +1125,16 @@ class CanonicalConversationAIRuntime:
             raise CanonicalProductRuntimeError(
                 "cancellation did not materialize a terminal cancelled result"
             )
+        self._commit_cancel_marker(
+            thread_id=thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            user_message=user_message,
+            idempotency_key=idempotency_key,
+            operation_id=result.result.operation_id,
+            terminal=result.result,
+            now=instant,
+        )
         return result
 
 
