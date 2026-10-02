@@ -200,19 +200,20 @@
         "platform_test",
         "e2e"
       ],
-      "status": "evidence_pending",
-      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "status": "passing",
+      "disposition": "exact_head_ci_passed",
       "evidence": [
         "code:skeleton/shells/workspace_txn/pathing.py",
         "test:skeleton/testing/test_security_rooted_fs.py",
-        "workflow:P0 Windows Path Security"
+        "workflow:P0 Windows Path Security",
+        "workflow:P0 Windows Path Security@37057177364:success"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-008",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "evidence_pending"
+      "accountability_status": "passing"
     },
     {
       "rank": 7,
@@ -235,19 +236,20 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "evidence_pending",
-      "disposition": "implemented_fail_closed_pending_exact_head_ci",
+      "status": "passing",
+      "disposition": "exact_head_ci_passed",
       "evidence": [
         "code:skeleton/shells/workspace_txn/pathing.py",
         "test:skeleton/testing/test_security_rooted_fs.py",
-        "workflow:P0 Windows Path Security"
+        "workflow:P0 Windows Path Security",
+        "workflow:P0 Windows Path Security@37057177364:success"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-009",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "evidence_pending"
+      "accountability_status": "passing"
     },
     {
       "rank": 8,
