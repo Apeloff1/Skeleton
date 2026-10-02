@@ -126,6 +126,10 @@ def verify(head_sha: str) -> dict[str, object]:
         "duplicate_proofs_forbidden": True,
         "missing_proofs_fail_closed": True,
         "failed_proofs_non_compensable": True,
+        "proof_source_revision_binding": True,
+        "cross_execution_evidence_mixing_forbidden": True,
+        "verification_candidate_context_binding": True,
+        "learning_evaluation_lineage_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
