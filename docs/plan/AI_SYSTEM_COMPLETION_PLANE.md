@@ -7,7 +7,7 @@ addition to atomic accountability and vertical-suite checks. The plane exists
 to prevent a common false-positive: declaring the AI complete because many
 subsystems are green while a cross-cutting lifecycle is still broken.
 
-A completion verdict is therefore **non-compensable**. Sixteen requirements must
+A completion verdict is therefore **non-compensable**. Seventeen requirements must
 each have one passing, independently witnessed proof for the same subject and
 the same exact Git revision. Extra green evidence cannot cancel a missing or
 failed requirement.
@@ -21,6 +21,7 @@ failed requirement.
 | `execution.request_result_binding` | The terminal result is bound to the exact execution and operation identity requested. |
 | `execution.request_result_binding` | The terminal execution/operation identities match the canonical request identity; cross-operation results cannot be substituted. |
 | `execution.budget_bounds` | Observed provider/tool calls remain within the request's hard model-turn and tool-call budgets. |
+| `execution.stop_semantics` | Expired deadlines and durable cancellation requests terminate without provider/tool work or user-visible success. |
 | `execution.tool_authority` | Every observed tool invocation is declared by the request and has a corresponding receipt. |
 | `execution.tool_authority` | Every observed tool call belongs to the request's declared tool authority and has a receipt. |
 | `execution.durable_recovery` | A separately reopened execution repository yields the exact terminal result, not a best-effort reconstruction. |
@@ -75,25 +76,26 @@ qualification rather than mocking all planes independently. In one scenario it:
 5. proves the observed tool call is inside declared authority and every observed
    call has a receipt;
 6. checks observed model/tool usage against hard request budgets;
-7. binds the verification receipt to the actual candidate digest and context;
-8. binds memory/artifact lineage during terminal finalization;
-9. reopens the SQLite execution repository and compares the full terminal
+7. independently exercises an already-expired deadline and a durable cancellation request, requiring both to fail closed before provider/tool work;
+8. binds the verification receipt to the actual candidate digest and context;
+9. binds memory/artifact lineage during terminal finalization;
+10. reopens the SQLite execution repository and compares the full terminal
    payload exactly;
-10. validates recovered turn parentage, sequence continuity, operation identity,
+11. validates recovered turn parentage, sequence continuity, operation identity,
     and checkpoint lineage;
-11. re-executes the deterministic local transaction and requires equivalent
+12. re-executes the deterministic local transaction and requires equivalent
     result/output digests;
-12. appends and verifies a context-ledger block;
-13. writes, retrieves, deletes, and re-queries subject-bound memory;
-14. builds deterministic feedback assignments, evaluates a candidate, promotes
+13. appends and verifies a context-ledger block;
+14. writes, retrieves, deletes, and re-queries subject-bound memory;
+15. builds deterministic feedback assignments, evaluates a candidate, promotes
     it, and verifies the active version;
-15. executes a rollback and verifies restoration of the baseline while retaining
+16. executes a rollback and verifies restoration of the baseline while retaining
     evaluation lineage;
-16. submits all sixteen independently witnessed proofs to the completion plane
+17. submits all seventeen independently witnessed proofs to the completion plane
     and requires one terminal valid report.
 
 Adversarial tests prove that tampered recovery, cross-operation result binding,
-undeclared tool use, broken replay parentage, replay divergence, budget overrun,
+undeclared tool use, broken replay parentage, replay divergence, budget overrun, deadline/cancellation stop failure,
 network attempts, verification/candidate mismatch, self-verification, missing
 requirements, mutable-effect/postcondition mismatch, source-revision drift,
 duplicate proofs, and failed forgetting remain terminal blockers.
@@ -131,7 +133,7 @@ The verifier cross-checks:
 - workflow exact-head wiring;
 - digest bindings for the contract, runtime, tests, and workflow.
 
-The CI receipt must identify the exact Git head, contain all sixteen
+The CI receipt must identify the exact Git head, contain all seventeen
 requirements, carry source digests, have no errors, and have a canonical receipt
 digest.
 
