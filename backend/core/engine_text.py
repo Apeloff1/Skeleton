@@ -185,9 +185,18 @@ class EngineTextRequest:
 @dataclass(frozen=True, slots=True)
 class EngineTextResponse:
     text: str
+    operation_id: str
     execution_id: str
+    context_id: str
+    context_digest: str
+    context_source_snapshot: tuple[tuple[str, str], ...]
+    context_compiler_version: str
     verification: str | None
     evidence_refs: tuple[str, ...]
+    provider_receipts: tuple[str, ...]
+    tool_receipts: tuple[str, ...]
+    memory_refs: tuple[str, ...]
+    artifact_refs: tuple[str, ...]
     usage: Mapping[str, object]
 
 
@@ -394,11 +403,27 @@ async def execute_engine_text(
         terminal: EngineTerminalResult = await active_client.execute(command)
     except EngineClientError as exc:
         raise EngineTextError("canonical engine text execution failed") from exc
+    if (
+        terminal.operation_id != operation_id
+        or terminal.execution_id != execution_id
+    ):
+        raise EngineTextError(
+            "canonical engine terminal identity diverged from compiled request"
+        )
     return EngineTextResponse(
         text=terminal.final_output,
+        operation_id=terminal.operation_id,
         execution_id=terminal.execution_id,
+        context_id=envelope.context_id,
+        context_digest=envelope.context_digest,
+        context_source_snapshot=envelope.source_snapshot,
+        context_compiler_version=envelope.compiler_version,
         verification=terminal.verification,
         evidence_refs=terminal.evidence_refs,
+        provider_receipts=terminal.provider_receipts,
+        tool_receipts=terminal.tool_receipts,
+        memory_refs=terminal.memory_refs,
+        artifact_refs=terminal.artifact_refs,
         usage=dict(terminal.usage),
     )
 
