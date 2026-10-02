@@ -263,6 +263,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "governed_tool_generation_schema_required",
             "live_startup_local_model_qualification_required",
             "provider_deadline_cancellation_required",
+            "cooperative_local_provider_cancellation_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:

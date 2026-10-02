@@ -570,6 +570,10 @@ class LocalModelAdapter(ProviderAdapter):
         return True
 
     @property
+    def supports_cooperative_cancellation(self) -> bool:
+        return True
+
+    @property
     def runtime_digest(self) -> str | None:
         value = getattr(self.engine.model, "runtime_digest", None)
         if value is None:

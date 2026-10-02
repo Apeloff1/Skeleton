@@ -1104,7 +1104,14 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        if deadline is None:
+        cooperative_cancellation = bool(
+            getattr(
+                self.provider,
+                "supports_cooperative_cancellation",
+                False,
+            )
+        )
+        if deadline is None and not cooperative_cancellation:
             response = await self.provider.generate(provider_request)
         else:
             logical_now = (
@@ -1112,8 +1119,12 @@ class CognitiveExecutionRuntime:
                 if now is None
                 else now.astimezone(timezone.utc)
             )
-            remaining_seconds = (deadline - logical_now).total_seconds()
-            if remaining_seconds <= 0:
+            deadline_budget = (
+                None
+                if deadline is None
+                else (deadline - logical_now).total_seconds()
+            )
+            if deadline_budget is not None and deadline_budget <= 0:
                 return self._finalize_non_success(
                     execution,
                     payload,
@@ -1121,25 +1132,87 @@ class CognitiveExecutionRuntime:
                     error_code="execution_deadline_exceeded",
                     now=now,
                 )
+
+            provider_task = asyncio.create_task(
+                self.provider.generate(provider_request)
+            )
+            loop = asyncio.get_running_loop()
+            started_wait = loop.time()
             try:
-                response = await asyncio.wait_for(
-                    self.provider.generate(provider_request),
-                    timeout=remaining_seconds,
-                )
-            except TimeoutError:
-                durable_timeout = self.repository.get(
-                    execution.execution_id
-                )
-                timeout_payload = self._checkpoint_payload(
-                    execution.execution_id
-                )
-                return self._finalize_non_success(
-                    durable_timeout,
-                    timeout_payload,
-                    status="failed",
-                    error_code="execution_deadline_exceeded",
-                    now=now,
-                )
+                while True:
+                    remaining = None
+                    if deadline_budget is not None:
+                        remaining = (
+                            deadline_budget
+                            - (loop.time() - started_wait)
+                        )
+                        if remaining <= 0:
+                            provider_task.cancel()
+                            try:
+                                await provider_task
+                            except asyncio.CancelledError:
+                                pass
+                            durable_timeout = self.repository.get(
+                                execution.execution_id
+                            )
+                            timeout_payload = self._checkpoint_payload(
+                                execution.execution_id
+                            )
+                            return self._finalize_non_success(
+                                durable_timeout,
+                                timeout_payload,
+                                status="failed",
+                                error_code="execution_deadline_exceeded",
+                                now=now,
+                            )
+
+                    poll_seconds = (
+                        0.05
+                        if cooperative_cancellation
+                        else remaining
+                    )
+                    if remaining is not None:
+                        poll_seconds = min(
+                            remaining,
+                            0.05
+                            if cooperative_cancellation
+                            else remaining,
+                        )
+                    done, _ = await asyncio.wait(
+                        {provider_task},
+                        timeout=poll_seconds,
+                    )
+                    if provider_task in done:
+                        response = await provider_task
+                        break
+
+                    if cooperative_cancellation:
+                        durable_poll = self.repository.get(
+                            execution.execution_id
+                        )
+                        if durable_poll.cancellation_requested:
+                            provider_task.cancel()
+                            try:
+                                await provider_task
+                            except asyncio.CancelledError:
+                                pass
+                            cancel_payload = self._checkpoint_payload(
+                                execution.execution_id
+                            )
+                            return self._finalize_non_success(
+                                durable_poll,
+                                cancel_payload,
+                                status="cancelled",
+                                error_code="cancellation_requested",
+                                now=now,
+                            )
+            except asyncio.CancelledError:
+                provider_task.cancel()
+                try:
+                    await provider_task
+                except asyncio.CancelledError:
+                    pass
+                raise
 
         # Provider I/O may outlive a concurrent cancellation request (or the
         # execution deadline). Never transition using the stale pre-call

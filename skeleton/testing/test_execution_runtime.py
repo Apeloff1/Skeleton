@@ -820,6 +820,55 @@ async def test_cancellation_during_provider_io_fences_late_result() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cooperative_provider_cancellation_aborts_inflight_provider() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    started = asyncio.Event()
+    provider_cancelled = asyncio.Event()
+
+    class CooperativeProvider:
+        provider_id = "local"
+        model = "local-model"
+        supports_cooperative_cancellation = True
+
+        async def generate(self, _request):
+            started.set()
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                provider_cancelled.set()
+                raise
+
+    runtime = _runtime(repo, CooperativeProvider(), tools)
+    task = asyncio.create_task(
+        runtime.start(
+            _request(),
+            instructions="Answer.",
+            prompt="Cancel the in-flight local model.",
+            context_digest="e" * 64,
+            now=_now(),
+        )
+    )
+
+    await started.wait()
+    current = repo.get("exec-1")
+    repo.request_cancel(
+        "exec-1",
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = await asyncio.wait_for(task, timeout=1.0)
+
+    assert provider_cancelled.is_set()
+    assert result.state is ExecutionState.CANCELLED
+    assert result.result is not None
+    assert result.result.status == "cancelled"
+    assert result.result.final_output is None
+    assert result.result.provider_receipts == ()
+    assert result.result.usage["error_code"] == "cancellation_requested"
+
+
+@pytest.mark.asyncio
 async def test_expired_deadline_fails_before_provider_io() -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()
