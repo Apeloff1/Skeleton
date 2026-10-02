@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 24
+    assert receipt["requirement_count"] == 28
     assert receipt["binding_count"] >= 9
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
@@ -53,6 +53,10 @@ def test_contract_declares_non_compensable_authority() -> None:
         "memory_poisoning_resistance_required": True,
         "outbound_network_boundary_qualification_required": True,
         "qualification_semantic_reverification_required": True,
+        "resource_admission_qualification_required": True,
+        "shared_pressure_qualification_required": True,
+        "idempotent_retry_qualification_required": True,
+        "tenant_isolation_qualification_required": True,
     }
 
 
@@ -98,5 +102,12 @@ def test_required_runtime_and_acceptance_files_are_digest_bound() -> None:
         ".github/workflows/p0-provider-fallback-privacy.yml",
         ".github/workflows/p0-memory-poisoning-evidence.yml",
         ".github/workflows/p0-network-boundary-evidence.yml",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota.py",
+        "skeleton/intelligence/shared_pressure.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_execution_repository.py",
     }
     assert all(len(value) == 64 for value in digests.values())
