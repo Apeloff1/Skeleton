@@ -17,7 +17,7 @@ def test_system_completion_verifier_accepts_canonical_contract() -> None:
     assert receipt["errors"] == []
     assert receipt["head_sha"] == HEAD
     assert receipt["verifier"] == "independent-ai-system-completion-v1"
-    assert receipt["requirement_count"] == 16
+    assert receipt["requirement_count"] == 17
     assert receipt["binding_count"] >= 4
     assert len(receipt["receipt_digest"]) == 64
     assert receipt["requirements"] == receipt["runtime_requirements"]
