@@ -8,7 +8,7 @@ prevent false completion claims when individual subsystems pass but the
 assembled lifecycle, security boundary, persistence path, or learning path is
 still broken.
 
-Completion is **non-compensable**. All twenty-four requirements must have one
+Completion is **non-compensable**. All twenty-eight requirements must have one
 passing, independently witnessed proof for the same execution subject and the
 same exact Git revision. Extra green evidence cannot compensate for a missing
 or failed proof.
@@ -17,7 +17,7 @@ The canonical inventory is
 `machine/ai_system_completion_contract.json`. The executable proof model is
 `skeleton/ai/runtime/system_completion.py`.
 
-## Twenty-four required proofs
+## Twenty-eight required proofs
 
 ### Execution and recovery
 
@@ -56,6 +56,15 @@ The canonical inventory is
 | `memory.poisoning_resistance` | Governed memory accepts a valid provenance-bound write while rejecting missing provenance and conflicting proposal replay. |
 | `security.outbound_network_boundary` | Private targets, mixed public/private DNS answers, and peer rebinding are rejected while canonical public resolution succeeds. |
 
+### Resource, retry, and tenant boundaries
+
+| Requirement | Required observation |
+| --- | --- |
+| `resource.admission_quota` | Work inside budget is admitted, over-quota work is rejected without consuming capacity, and actual usage reconciles against the reserved quota. |
+| `resource.shared_pressure` | Two independent workers cannot overbook one shared concurrency scope, and capacity becomes available only after the first lease completes. |
+| `execution.idempotent_retry` | Identical admission retry returns the same lease without double reservation, while conflicting retry inputs fail closed. |
+| `privacy.tenant_isolation` | Durable memory is visible only inside the owning tenant/subject authority scope and cross-tenant lookup fails closed. |
+
 ### Learning lifecycle
 
 | Requirement | Required observation |
@@ -87,7 +96,7 @@ same execution; merely relabeling evidence does not satisfy completion.
 
 ## Causal closure graph
 
-The twenty-four proofs form one causal chain rather than a bag of booleans:
+The twenty-eight proofs form one causal chain rather than a bag of booleans:
 
 `request identity -> local/offline execution -> budgets + stop fences -> tool
 authority -> effects/postconditions -> durable terminal state -> crash recovery
@@ -131,10 +140,14 @@ A qualification run performs all of the following on one exact source revision:
 17. performs governed-memory success, missing-provenance rejection, and
     conflicting-replay rejection;
 18. exercises private-target, mixed-DNS, and peer-rebinding network defenses;
-19. runs evaluation, promotion, and negative promotion gates;
-20. rolls back and proves evaluation lineage is preserved;
-21. submits all twenty-four proofs to `SystemCompletionPlane`;
-22. emits one canonical machine-readable qualification receipt.
+19. admits in-budget work, rejects tenant over-quota work, and reconciles actual usage;
+20. proves two workers cannot overbook one shared-pressure scope;
+21. proves identical retry is idempotent while conflicting retry is rejected;
+22. writes tenant-scoped durable memory and proves cross-tenant invisibility;
+23. runs evaluation, promotion, and negative promotion gates;
+24. rolls back and proves evaluation lineage is preserved;
+25. submits all twenty-eight proofs to `SystemCompletionPlane`;
+26. emits one canonical machine-readable qualification receipt.
 
 ## Independent receipt verification
 
@@ -144,7 +157,7 @@ It does not trust the qualifier's stored `valid` flags or digests.
 It reparses the emitted receipt with duplicate-key rejection, recomputes every
 proof digest, recomputes the system-completion report digest, recomputes the
 top-level qualification digest, and independently evaluates the **semantics of
-all twenty-four proof types** from serialized evidence.
+all twenty-eight proof types** from serialized evidence.
 
 This means a proof cannot survive by changing its details, setting
 `passed=true`, and recomputing every nested digest. A semantically
@@ -162,11 +175,12 @@ runs:
 5. provider privacy-fallback regressions;
 6. governed-memory writeback regressions;
 7. outbound URL/HTTP security regressions;
-8. executable twenty-four-plane qualification;
-9. independent cryptographic and semantic receipt verification;
-10. structural contract/runtime/workflow verification.
+8. admission/quota/shared-pressure and execution-repository regressions;
+9. executable twenty-eight-plane qualification;
+10. independent cryptographic and semantic receipt verification;
+11. structural contract/runtime/workflow verification.
 
-CI requires all twenty-four proofs on one subject and exact revision, zero
+CI requires all twenty-eight proofs on one subject and exact revision, zero
 network attempts during the local qualification, deterministic fresh replay,
 complete crash recovery, hostile-environment security closure, and valid
 independent verifier receipts.
