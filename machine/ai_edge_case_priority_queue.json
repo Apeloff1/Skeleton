@@ -376,15 +376,19 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_strict_json_parser_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/jeeves/planning/serialization.py",
+        "test:tests/test_duplicate_key_is_not_json.py",
+        "workflow:P0 Duplicate JSON Key Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "evidence_pending"
     },
     {
       "rank": 13,
