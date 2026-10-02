@@ -41,6 +41,8 @@ def test_contract_declares_non_compensable_authority() -> None:
         "cross_execution_evidence_mixing_forbidden": True,
         "verification_candidate_context_binding": True,
         "learning_evaluation_lineage_required": True,
+        "evidence_source_execution_binding": True,
+        "learning_result_binding_required": True,
     }
 
 
