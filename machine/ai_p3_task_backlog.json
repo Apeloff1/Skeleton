@@ -1020,7 +1020,10 @@
       "evidence_refs": [
         "source:machine/ai_p2_functional_ai_closure.json",
         "source:machine/ai_p2_execution_map.json#/first_tranche/queued_volume_refs",
-        "source:machine/ai_master_plan.json"
+        "source:machine/ai_master_plan.json",
+        "implementation:skeleton/ai/planning/construction_authority.py",
+        "test:skeleton/testing/test_p3_construction_authority.py",
+        "workflow:.github/workflows/p3-construction-authority.yml"
       ],
       "masterplan_obligations": [
         {
