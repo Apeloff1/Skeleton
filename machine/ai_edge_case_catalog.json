@@ -6319,12 +6319,25 @@
         173
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Child processes do not inherit the ambient parent environment by default.",
+        "Only explicitly allowlisted inherited/requested keys can reach a child, with bounded values and total size."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_environment_is_not_implicitly_inherited",
+        "skeleton/testing/test_shell_runner.py::test_explicit_allowlisted_environment_is_forwarded",
+        "skeleton/testing/test_shell_runner.py::test_rejects_unapproved_environment_key"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6386,12 +6399,25 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Host execution is argv-only with shell=False; shell metacharacters remain literal arguments instead of being reparsed by a command shell.",
+        "NUL and argument-count/byte limits are enforced before process launch."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_shell_metacharacters_remain_literal_argv",
+        "skeleton/testing/test_shell_runner.py::test_rejects_nul_argument",
+        "skeleton/testing/test_shell_runner.py::test_rejects_argument_count_over_policy"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6420,12 +6446,25 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Executable authority is registered as an absolute resolved file path and never resolved through ambient PATH.",
+        "Executable inode/metadata identity is pinned at policy construction and mutation/replacement before launch fails closed."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_runner.py::test_rejects_relative_executable_path",
+        "skeleton/testing/test_shell_runner.py::test_rejects_executable_replaced_after_policy_construction",
+        "skeleton/testing/test_shell_runner.py::test_rejects_in_place_executable_mutation_after_policy_construction"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/environment.py",
+        "code:skeleton/shells/registry.py",
+        "code:skeleton/shells/runner.py",
+        "test:skeleton/testing/test_shell_runner.py",
+        "workflow:P0 Process Boundary Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
