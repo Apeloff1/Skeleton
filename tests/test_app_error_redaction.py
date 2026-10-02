@@ -24,7 +24,7 @@ def test_error_boundary_does_not_post_raw_stacks() -> None:
 
 
 def test_error_state_hides_details_outside_dev() -> None:
-    source = (FRONTEND / "components" / "ui" / "ErrorState.tsx").read_text(encoding="utf-8")
+    source = (FRONTEND / "components" / "primitives" / "ErrorState.tsx").read_text(encoding="utf-8")
     assert "isDevErrorDetails" in source
     assert "safeErrorDetails" in source
     assert "error.stack || error.message" not in source
