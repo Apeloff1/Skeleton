@@ -171,6 +171,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "max_output_bytes",
             "_tool_response_schema",
             "--json-schema-file",
+            "validate_json_value",
+            "structured_output_schema",
             "class GgufHeader",
             "inspect_gguf",
             "unsupported GGUF version",
@@ -264,6 +266,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "live_startup_local_model_qualification_required",
             "provider_deadline_cancellation_required",
             "cooperative_local_provider_cancellation_required",
+            "local_structured_output_schema_parity_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:

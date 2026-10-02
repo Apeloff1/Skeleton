@@ -185,6 +185,7 @@ def build_receipt(
         "live_startup_local_model_qualification_required",
         "provider_deadline_cancellation_required",
         "cooperative_local_provider_cancellation_required",
+        "local_structured_output_schema_parity_required",
     ):
         if requirements.get(required) is not True:
             raise ExactHeadReceiptError(f"closure requirement {required} must be true")

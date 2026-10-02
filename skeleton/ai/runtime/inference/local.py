@@ -88,6 +88,7 @@ class LocalInferenceRequest:
     seed: int = 0
     stop: tuple[str, ...] = ()
     tools: tuple[Mapping[str, Any], ...] = ()
+    structured_output_schema: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.prompt, str) or not self.prompt.strip():
@@ -116,6 +117,14 @@ class LocalInferenceRequest:
             tuple(dict.fromkeys(item for item in self.stop if isinstance(item, str) and item)),
         )
         object.__setattr__(self, "tools", tuple(dict(item) for item in self.tools))
+        if self.structured_output_schema is not None:
+            if not isinstance(self.structured_output_schema, Mapping):
+                raise TypeError("structured_output_schema must be an object")
+            schema = dict(self.structured_output_schema)
+            encoded = _stable_json(schema)
+            if len(encoded.encode("utf-8")) > 512 * 1024:
+                raise ValueError("structured_output_schema exceeds size limit")
+            object.__setattr__(self, "structured_output_schema", schema)
 
     @property
     def rendered_input(self) -> str:
@@ -138,6 +147,7 @@ class LocalInferenceRequest:
                 "seed": self.seed,
                 "stop": self.stop,
                 "tools": self.tools,
+                "structured_output_schema": self.structured_output_schema,
             }
         )
 
@@ -607,6 +617,11 @@ class LocalModelAdapter(ProviderAdapter):
             max_output_tokens=max_tokens,
             seed=self.default_seed ^ derived_seed,
             tools=tuple(item.as_dict() for item in request.tools),
+            structured_output_schema=(
+                None
+                if request.structured_output_schema is None
+                else dict(request.structured_output_schema)
+            ),
         )
         result = await self.engine.generate(local_request)
         tool_calls = tuple(

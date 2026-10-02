@@ -20,6 +20,7 @@ from skeleton.ai.runtime.inference.llama_cpp import (
 )
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.provider_runtime import ProviderRequest
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -73,6 +74,19 @@ if "SLOW_REQUEST" in prompt:
     time.sleep(2.0)
 if "OVERFLOW_REQUEST" in prompt:
     print("x" * 8192)
+    raise SystemExit(0)
+if "INVALID_STRUCTURED_REQUEST" in prompt:
+    print(json.dumps({"answer": 7}, sort_keys=True))
+    raise SystemExit(0)
+if "STRUCTURED_REQUEST" in prompt:
+    if not args.json_schema_file:
+        print("missing structured output schema", file=sys.stderr)
+        raise SystemExit(95)
+    schema = json.loads(Path(args.json_schema_file).read_text(encoding="utf-8"))
+    if schema.get("required") != ["answer", "score"]:
+        print("wrong structured output schema", file=sys.stderr)
+        raise SystemExit(96)
+    print(json.dumps({"answer": "offline", "score": 1}, sort_keys=True))
     raise SystemExit(0)
 if "UNKNOWN_TOOL_REQUEST" in prompt:
     print(json.dumps({
@@ -172,6 +186,51 @@ async def test_llama_cpp_preserves_governed_tool_call_contract(tmp_path: Path) -
     assert len(result.tool_calls) == 1
     assert result.tool_calls[0].tool_id == "repo.read"
     assert dict(result.tool_calls[0].arguments) == {"path": "README.md"}
+
+
+@pytest.mark.asyncio
+async def test_llama_cpp_enforces_and_returns_structured_output(tmp_path: Path) -> None:
+    adapter = build_llama_cpp_adapter(_config(tmp_path))
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answer", "score"],
+        "properties": {
+            "answer": {"type": "string"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 1},
+        },
+    }
+    response = await adapter.generate(
+        ProviderRequest(
+            instructions="Return governed structured output.",
+            prompt="STRUCTURED_REQUEST",
+            structured_output_schema=schema,
+            max_output_tokens=32,
+        )
+    )
+    assert response.provider == "local"
+    assert response.text is None
+    assert response.structured_output == {"answer": "offline", "score": 1}
+
+
+@pytest.mark.asyncio
+async def test_llama_cpp_rejects_structured_output_schema_violation(
+    tmp_path: Path,
+) -> None:
+    backend = LlamaCppModel(_config(tmp_path))
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answer"],
+        "properties": {"answer": {"type": "string"}},
+    }
+    with pytest.raises(LlamaCppRuntimeError, match="structured output validation failed"):
+        await LocalInferenceEngine(backend).generate(
+            LocalInferenceRequest(
+                prompt="INVALID_STRUCTURED_REQUEST",
+                structured_output_schema=schema,
+            )
+        )
 
 
 @pytest.mark.asyncio

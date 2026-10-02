@@ -25,6 +25,12 @@ import threading
 import time
 from typing import Any, Mapping
 
+from skeleton.skills.tool_contract import (
+    ToolContractError,
+    validate_json_schema,
+    validate_json_value,
+)
+
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -381,7 +387,14 @@ class LlamaCppModel:
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
         if not request.tools:
-            return prompt
+            if request.structured_output_schema is None:
+                return prompt
+            return (
+                prompt
+                + "\n\n[Skeleton local structured-output protocol]\n"
+                + "Output exactly one JSON object matching the supplied schema. "
+                + "Do not include markdown fences or prose outside the JSON object."
+            )
         allowed: list[dict[str, Any]] = []
         for item in request.tools:
             tool_id = str(item.get("tool_id", "")).strip()
@@ -421,7 +434,13 @@ class LlamaCppModel:
             "properties": {
                 "skeleton_local_response": {"const": 1},
                 "text": {"type": "string", "minLength": 1},
-                "structured_output": {"type": "object"},
+                "structured_output": (
+                    {"type": "object"}
+                    if request.structured_output_schema is None
+                    else validate_json_schema(
+                        request.structured_output_schema
+                    )
+                ),
                 "tool_calls": {
                     "type": "array",
                     "minItems": 1,
@@ -450,6 +469,28 @@ class LlamaCppModel:
                 {"required": ["tool_calls"]},
             ],
         }
+
+    def _generation_schema(
+        self,
+        request: LocalInferenceRequest,
+    ) -> dict[str, Any] | None:
+        if request.tools:
+            return self._tool_response_schema(request)
+        if request.structured_output_schema is None:
+            return None
+        try:
+            schema = validate_json_schema(
+                request.structured_output_schema
+            )
+        except ToolContractError as exc:
+            raise LlamaCppRuntimeError(
+                f"invalid structured output schema: {exc}"
+            ) from exc
+        if schema.get("type") not in {None, "object"}:
+            raise LlamaCppRuntimeError(
+                "local structured output schema must describe an object"
+            )
+        return schema
 
     def _command(
         self,
@@ -558,9 +599,45 @@ class LlamaCppModel:
                 structured = payload.get("structured_output")
                 if structured is not None and not isinstance(structured, dict):
                     raise LlamaCppRuntimeError("structured_output must be an object")
+                if (
+                    structured is not None
+                    and request.structured_output_schema is not None
+                ):
+                    try:
+                        validate_json_value(
+                            request.structured_output_schema,
+                            structured,
+                            path="structured_output",
+                        )
+                    except ToolContractError as exc:
+                        raise LlamaCppRuntimeError(
+                            f"structured output validation failed: {exc}"
+                        ) from exc
                 if not calls and payload_text is None and structured is None:
                     raise LlamaCppRuntimeError("local response envelope contains no output")
                 return payload_text, tuple(calls), structured, "tool_calls" if calls else "completed"
+        if request.structured_output_schema is not None:
+            try:
+                structured_payload = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise LlamaCppRuntimeError(
+                    "local structured output is not valid JSON"
+                ) from exc
+            if not isinstance(structured_payload, dict):
+                raise LlamaCppRuntimeError(
+                    "local structured output must be a JSON object"
+                )
+            try:
+                validate_json_value(
+                    request.structured_output_schema,
+                    structured_payload,
+                    path="structured_output",
+                )
+            except ToolContractError as exc:
+                raise LlamaCppRuntimeError(
+                    f"structured output validation failed: {exc}"
+                ) from exc
+            return None, (), structured_payload, "completed"
         return text, (), None, "completed"
 
     def infer(self, request: LocalInferenceRequest, cancel: threading.Event) -> LocalInferenceResult:
@@ -585,10 +662,11 @@ class LlamaCppModel:
             except OSError:
                 pass
             schema_file: Path | None = None
-            if request.tools:
-                schema_file = temp_dir / "tool-response.schema.json"
+            generation_schema = self._generation_schema(request)
+            if generation_schema is not None:
+                schema_file = temp_dir / "response.schema.json"
                 schema_file.write_text(
-                    _stable_json(self._tool_response_schema(request)),
+                    _stable_json(generation_schema),
                     encoding="utf-8",
                 )
                 try:

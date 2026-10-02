@@ -78,7 +78,8 @@
     "governed_tool_generation_schema_required": true,
     "live_startup_local_model_qualification_required": true,
     "provider_deadline_cancellation_required": true,
-    "cooperative_local_provider_cancellation_required": true
+    "cooperative_local_provider_cancellation_required": true,
+    "local_structured_output_schema_parity_required": true
   },
   "deferred_scope": {
     "queued_volume_count": 257,
@@ -131,6 +132,7 @@
     "tool_generation_constraint": "llama.cpp --json-schema-file generated per request; tool_id is enum-constrained to declared governed tools while AsyncToolRuntime remains final argument-schema authority",
     "activation_gate": "FunctionalAIRuntime.from_local_model_manifest performs a live offline inference qualification against the exact digest-pinned runtime and model before constructing the execution runtime",
     "provider_deadline_enforcement": "CognitiveExecutionRuntime bounds provider I/O with asyncio.wait_for using the logical execution deadline and durably finalizes timeout as execution_deadline_exceeded",
-    "cancellation_enforcement": "LocalModelAdapter advertises cooperative cancellation; CognitiveExecutionRuntime polls durable cancellation authority and cancels the in-flight local provider coroutine, which propagates into LocalInferenceEngine and terminates the subprocess"
+    "cancellation_enforcement": "LocalModelAdapter advertises cooperative cancellation; CognitiveExecutionRuntime polls durable cancellation authority and cancels the in-flight local provider coroutine, which propagates into LocalInferenceEngine and terminates the subprocess",
+    "structured_output_enforcement": "LocalModelAdapter preserves ProviderRequest.structured_output_schema; llama.cpp receives the canonical schema through --json-schema-file and parsed output is independently validated with validate_json_value before ProviderResponse exposure"
   }
 }
