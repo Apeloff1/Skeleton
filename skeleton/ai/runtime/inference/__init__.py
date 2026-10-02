@@ -1,6 +1,6 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
-from .local import (
+from .artifact import (\n    LoadedLocalModel,\n    LocalModelArtifactError,\n    LocalModelArtifactReceipt,\n    load_local_model_artifact,\n    local_model_adapter_from_env,\n)\nfrom .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -14,7 +14,7 @@ from .local import (
 )
 
 __all__ = [
-    "CallableLocalModel",
+    "CallableLocalModel",\n    "LoadedLocalModel",\n    "LocalModelArtifactError",\n    "LocalModelArtifactReceipt",\n    "load_local_model_artifact",\n    "local_model_adapter_from_env",
     "LocalInferenceCancelled",
     "LocalInferenceEngine",
     "LocalInferenceRequest",
