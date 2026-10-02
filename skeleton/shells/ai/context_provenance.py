@@ -61,12 +61,7 @@ class ContextItem:
 
     @property
     def instruction_authority(self) -> bool:
-        """Whether this item may be interpreted as an instruction source.
-
-        Repository, user, observation, and tool data remain data even when
-        their source is otherwise trusted. Untrusted material never carries
-        instruction authority.
-        """
+        """Whether this context item may be interpreted as an instruction source."""
         return (
             self.trust in {ContextTrust.SYSTEM, ContextTrust.TRUSTED}
             and self.kind in {

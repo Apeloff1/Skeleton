@@ -154,9 +154,7 @@ def test_context_planner_labels_untrusted_data_when_allowed():
     observed = {}
     wrapper = ContextAwareAIPlanner(
         planner(observed),
-        context_policy=ContextPolicyEngine(
-            ContextPolicy(allow_untrusted=True)
-        ),
+        context_policy=ContextPolicyEngine(ContextPolicy(allow_untrusted=True)),
     )
     bundle = ContextBundle(
         (
@@ -193,9 +191,7 @@ def test_explicitly_allowed_untrusted_context_remains_data_not_intent():
     observed = {}
     wrapper = ContextAwareAIPlanner(
         planner(observed),
-        context_policy=ContextPolicyEngine(
-            ContextPolicy(allow_untrusted=True)
-        ),
+        context_policy=ContextPolicyEngine(ContextPolicy(allow_untrusted=True)),
     )
     bundle = ContextBundle(
         (

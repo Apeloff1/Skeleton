@@ -10,12 +10,34 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 import json
+import unicodedata
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterable, Mapping
 
+from skeleton.security.text_identity import require_authority_identifier
 from skeleton.shells.ai.manifest import AIToolManifest
 
 MCP_PROTOCOL_REVISION = "2026-07-28"
+_TRUSTED_DESCRIPTION_ORIGIN = "repository_command_catalog"
+_BIDI_OVERRIDE_CLASSES = frozenset({"RLE", "LRE", "RLO", "LRO", "PDF", "RLI", "LRI", "FSI", "PDI"})
+
+
+def _validate_curated_description(value: str, origin: str) -> str:
+    if origin != _TRUSTED_DESCRIPTION_ORIGIN:
+        raise ValueError("MCP tool description must come from curated repository catalog")
+    if not isinstance(value, str) or len(value) > 4096:
+        raise ValueError("invalid MCP tool description")
+    if unicodedata.normalize("NFKC", value) != value:
+        raise ValueError("MCP tool description must be compatibility-normalized")
+    for char in value:
+        category = unicodedata.category(char)
+        if unicodedata.bidirectional(char) in _BIDI_OVERRIDE_CLASSES:
+            raise ValueError("MCP tool description contains bidi controls")
+        if category in {"Cf", "Cs"}:
+            raise ValueError("MCP tool description contains invisible controls")
+        if category == "Cc" and char not in {"\n", "\r", "\t"}:
+            raise ValueError("MCP tool description contains control characters")
+    return value
 
 
 @dataclass(frozen=True)
@@ -25,12 +47,17 @@ class MCPToolDescriptor:
     input_schema: Mapping[str, object]
     output_schema: Mapping[str, object]
     annotations: Mapping[str, object] = field(default_factory=dict)
+    description_origin: str = _TRUSTED_DESCRIPTION_ORIGIN
 
     def __post_init__(self) -> None:
         if not self.name or len(self.name) > 128:
             raise ValueError("invalid MCP tool name")
-        if len(self.description) > 4096:
-            raise ValueError("MCP tool description too long")
+        require_authority_identifier(
+            self.name,
+            field="MCP tool name",
+            max_length=128,
+        )
+        _validate_curated_description(self.description, self.description_origin)
         input_schema = dict(self.input_schema)
         output_schema = dict(self.output_schema)
         annotations = dict(self.annotations)
@@ -46,6 +73,8 @@ class MCPToolDescriptor:
         return {
             "name": self.name,
             "description": self.description,
+            "descriptionOrigin": self.description_origin,
+            "descriptionInstructionAuthority": False,
             "inputSchema": dict(self.input_schema),
             "outputSchema": dict(self.output_schema),
             "annotations": dict(self.annotations),
@@ -86,6 +115,22 @@ class MCPRequestEnvelope:
             raise ValueError("invalid MCP method")
         if len(self.name) > 128:
             raise ValueError("invalid MCP tool name")
+        require_authority_identifier(
+            self.request_id,
+            field="MCP request_id",
+            max_length=160,
+        )
+        require_authority_identifier(
+            self.method,
+            field="MCP method",
+            max_length=128,
+        )
+        if self.name:
+            require_authority_identifier(
+                self.name,
+                field="MCP tool name",
+                max_length=128,
+            )
         arguments = dict(self.arguments)
         metadata = dict(self.metadata)
         if len(metadata) > 64:
@@ -219,13 +264,26 @@ class MCPToolSurface:
                         "approvalRecommended": bool(
                             tool.get("human_approval_recommended", True)
                         ),
+                        "descriptionInstructionAuthority": False,
                     },
+                    description_origin=str(tool.get("description_origin", "")),
                 )
             )
         return tuple(result)
 
-    def list_tools(self) -> MCPToolList:
+    def list_tools(
+        self,
+        *,
+        allowed_names: Iterable[str] | None = None,
+        cache_scope: str | None = None,
+    ) -> MCPToolList:
         tools = self.descriptors()
+        if allowed_names is not None:
+            allowed = frozenset(allowed_names)
+            tools = tuple(item for item in tools if item.name in allowed)
+        effective_cache_scope = self.cache_scope if cache_scope is None else cache_scope
+        if effective_cache_scope not in {"public", "private", "no-store"}:
+            raise ValueError("invalid MCP cache scope")
         raw = json.dumps(
             [item.to_dict() for item in tools],
             sort_keys=True,
@@ -235,6 +293,6 @@ class MCPToolSurface:
             MCP_PROTOCOL_REVISION,
             tools,
             self.ttl_ms,
-            self.cache_scope,
+            effective_cache_scope,
             hashlib.sha256(raw).hexdigest(),
         )
