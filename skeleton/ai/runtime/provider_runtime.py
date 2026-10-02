@@ -2781,6 +2781,46 @@ class ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
+        secondary_values = {
+            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
+            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
+            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
+        }
+        configured_secondary = any(secondary_values.values())
+        verification_model = os.getenv(
+            "AI_VERIFICATION_MODEL",
+            "",
+        ).strip()
+
+        # Provider-independent assembled mode.  Do not instantiate an external
+        # adapter at all when local is active: this keeps credentials, failover
+        # and network transport outside the reachable runtime graph.
+        if active == "local":
+            if configured_secondary:
+                raise ProviderUnavailableError(
+                    "secondary external provider configuration is not allowed "
+                    "when AI_PROVIDER=local"
+                )
+            if verification_model:
+                raise ProviderUnavailableError(
+                    "external semantic verifier configuration is not allowed "
+                    "when AI_PROVIDER=local"
+                )
+            try:
+                from skeleton.ai.runtime.inference.artifact import (
+                    LocalModelArtifactError,
+                    local_model_adapter_from_env,
+                )
+                local_adapter = local_model_adapter_from_env()
+            except LocalModelArtifactError as exc:
+                raise ProviderUnavailableError(
+                    "local AI model artifact is unavailable or invalid"
+                ) from exc
+            return cls(
+                [local_adapter],
+                active="local",
+            )
+
         adapter = OpenAIProviderAdapter(
             timeout_seconds=timeout,
             max_retries=retries,
@@ -2789,12 +2829,6 @@ class ProviderRegistry:
         adapters: list[ProviderAdapter] = [adapter]
         fallback_ids: tuple[str, ...] = ()
 
-        secondary_values = {
-            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
-            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
-            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
-        }
-        configured_secondary = any(secondary_values.values())
         if configured_secondary:
             missing = [
                 key for key, value in secondary_values.items() if not value
@@ -2832,10 +2866,6 @@ class ProviderRegistry:
             else:
                 fallback_ids = (secondary.provider_id,)
 
-        verification_model = os.getenv(
-            "AI_VERIFICATION_MODEL",
-            "",
-        ).strip()
         verification_adapter = None
         if verification_model and verification_model != adapter.model:
             verification_adapter = OpenAIProviderAdapter(
