@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 import logging
 import re
 import time
@@ -24,6 +25,7 @@ from core.engine_client import (
     EngineClient,
     EngineClientError,
     EngineExecutionFailed,
+    EngineNotFoundError,
     EngineUnavailableError,
     command_from_context,
 )
@@ -298,6 +300,36 @@ def _chat_memory_write_intent(
             else {"expires_at": expires_at}
         ),
     }
+
+
+def _chat_request_identity_ref(request: AIChatRequest) -> str:
+    """Bind retry identity to all user-controlled execution semantics."""
+
+    context_digest = (
+        None
+        if request.context is None
+        else hashlib.sha256(request.context.encode("utf-8")).hexdigest()
+    )
+    memory_policy = (
+        None
+        if request.memory_policy is None
+        else request.memory_policy.model_dump(mode="json")
+    )
+    payload = {
+        "schema_version": "backend.ai.chat-request.v1",
+        "message": request.message,
+        "idempotency_key": request.idempotency_key,
+        "context_sha256": context_digest,
+        "memory_policy": memory_policy,
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return "chat-request-sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def _chat_identity(user: dict) -> tuple[str, str]:
@@ -719,6 +751,7 @@ async def ai_chat(
         )
 
     tenant_id, owner_id = _chat_identity(user)
+    retrying_incomplete_turn = False
     try:
         existing_transcript = await conversation_authority.active_transcript(
             request.thread_id,
@@ -729,19 +762,24 @@ async def ai_chat(
             existing_transcript
             and existing_transcript[-1].author_type
             is ConversationAuthorType.USER
-            and existing_transcript[-1].idempotency_key
-            != request.idempotency_key
         ):
-            raise ConversationConflict(
-                "previous canonical turn is incomplete; retry after it completes"
-            )
+            if (
+                existing_transcript[-1].idempotency_key
+                != request.idempotency_key
+            ):
+                raise ConversationConflict(
+                    "previous canonical turn is incomplete; retry after it completes"
+                )
+            retrying_incomplete_turn = True
 
-        context_attachment_refs: tuple[str, ...] = ()
+        context_refs: list[str] = []
         if request.context:
-            context_attachment_refs = (
+            context_refs.append(
                 "ephemeral-context-sha256:"
-                + hashlib.sha256(request.context.encode("utf-8")).hexdigest(),
+                + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
             )
+        context_refs.append(_chat_request_identity_ref(request))
+        context_attachment_refs = tuple(context_refs)
         thread, user_message = await conversation_authority.append_user_message(
             request.thread_id,
             tenant_id=tenant_id,
@@ -868,39 +906,55 @@ async def ai_chat(
 
     if engine_client is not None:
         engine_started = time.monotonic()
-        engine_started_at = datetime.now(timezone.utc)
-        engine_deadline = engine_started_at + timedelta(
-            seconds=engine_client.config.execution_timeout_s
-        )
         try:
-            command = command_from_context(
-                context=context_envelope,
-                actor_id=owner_id,
-                capability="assistant.chat",
-                idempotency_key=request.idempotency_key,
-                instructions=system_prompt,
-                prompt=user_prompt,
-                objective=(
-                    "Respond to canonical chat turn "
-                    + user_message.message_id
-                ),
-                verification_profile="assistant_proposal",
-                history=history,
-                service_principal=engine_client.config.service_principal,
-                created_at=engine_started_at,
-                deadline=engine_deadline,
-                trace_id="chat:" + operation_id,
-                max_model_turns=4,
-                max_tool_calls=1,
-                max_repeat_tool_batches=1,
-                context_seed_refs=(
-                    "conversation:" + thread.thread_id,
-                    "conversation-message:" + user_message.message_id,
-                    *context_attachment_refs,
-                ),
-                memory_write_intent=memory_write_intent,
-            )
-            engine_result = await engine_client.execute(command)
+            engine_result = None
+            if retrying_incomplete_turn:
+                try:
+                    engine_result = await engine_client.wait_for_terminal(
+                        execution_id=execution_id,
+                        actor_id=owner_id,
+                        tenant_id=tenant_id,
+                        trace_id="chat:" + operation_id,
+                    )
+                except EngineNotFoundError:
+                    # User state may have committed before the engine submit.
+                    # Only this proven-not-found case is allowed to construct a
+                    # fresh command for the same canonical turn.
+                    engine_result = None
+
+            if engine_result is None:
+                engine_started_at = datetime.now(timezone.utc)
+                engine_deadline = engine_started_at + timedelta(
+                    seconds=engine_client.config.execution_timeout_s
+                )
+                command = command_from_context(
+                    context=context_envelope,
+                    actor_id=owner_id,
+                    capability="assistant.chat",
+                    idempotency_key=request.idempotency_key,
+                    instructions=system_prompt,
+                    prompt=user_prompt,
+                    objective=(
+                        "Respond to canonical chat turn "
+                        + user_message.message_id
+                    ),
+                    verification_profile="assistant_proposal",
+                    history=history,
+                    service_principal=engine_client.config.service_principal,
+                    created_at=engine_started_at,
+                    deadline=engine_deadline,
+                    trace_id="chat:" + operation_id,
+                    max_model_turns=4,
+                    max_tool_calls=1,
+                    max_repeat_tool_batches=1,
+                    context_seed_refs=(
+                        "conversation:" + thread.thread_id,
+                        "conversation-message:" + user_message.message_id,
+                        *context_attachment_refs,
+                    ),
+                    memory_write_intent=memory_write_intent,
+                )
+                engine_result = await engine_client.execute(command)
         except EngineExecutionFailed as exc:
             logger.warning(
                 "canonical engine execution failed operation=%s execution=%s code=%s",
