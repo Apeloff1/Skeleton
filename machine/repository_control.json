@@ -1,0 +1,216 @@
+{
+  "schema_version": "skeleton.p2.repository_control.v1",
+  "control_version": "0.1.0",
+  "status": "active_stacked",
+  "purpose": "Masterplan-bound repository engineering control plane for P2-REPO-01, composing existing repository-machine, backlog, workspace, build, trace and accountability authorities.",
+  "task_ref": "P2-REPO-01",
+  "parent_lane": "P2-TRACE-01",
+  "masterplan_bindings": [
+    {
+      "volume_ref": "VOL-021",
+      "title": "Code Intelligence",
+      "accountability_id": "ACC-VOL-021",
+      "required_gap_texts": [
+        "complete cross-language graph extraction",
+        "connect ownership/test mapping to change planner"
+      ]
+    },
+    {
+      "volume_ref": "VOL-022",
+      "title": "Autonomous Repository Engineering",
+      "accountability_id": "ACC-VOL-022",
+      "required_gap_texts": [
+        "transactional workspace layer incomplete",
+        "independent reviewer/verifier routing needs full integration"
+      ]
+    },
+    {
+      "volume_ref": "VOL-092",
+      "title": "Repository Maintenance",
+      "accountability_id": "ACC-VOL-092",
+      "required_gap_texts": [
+        "define maintenance ownership registry",
+        "bind deletion to reachability/retention checks"
+      ]
+    },
+    {
+      "volume_ref": "VOL-093",
+      "title": "Backlog Control",
+      "accountability_id": "ACC-VOL-093",
+      "required_gap_texts": [
+        "establish canonical backlog IDs",
+        "bind backlog to gap/risk closure"
+      ]
+    },
+    {
+      "volume_ref": "VOL-094",
+      "title": "Priority Engine",
+      "accountability_id": "ACC-VOL-094",
+      "required_gap_texts": [
+        "define priority factor schema",
+        "add anti-starvation constraints"
+      ]
+    },
+    {
+      "volume_ref": "VOL-095",
+      "title": "Build Work Packages",
+      "accountability_id": "ACC-VOL-095",
+      "required_gap_texts": [
+        "bind all packages to exact requirements",
+        "materialize package evidence rollup"
+      ]
+    },
+    {
+      "volume_ref": "VOL-108",
+      "title": "Anti-Patterns",
+      "accountability_id": "ACC-VOL-108",
+      "required_gap_texts": [
+        "seed registry from historical failures",
+        "bind detectable patterns to CI"
+      ]
+    },
+    {
+      "volume_ref": "VOL-109",
+      "title": "Build Order",
+      "accountability_id": "ACC-VOL-109",
+      "required_gap_texts": [
+        "bind every AIQ task into construction DAG",
+        "materialize cycle/blocked-state reporting"
+      ]
+    },
+    {
+      "volume_ref": "VOL-110",
+      "title": "Definition of Done",
+      "accountability_id": "ACC-VOL-110",
+      "required_gap_texts": [
+        "unify maturity and DoD rules",
+        "bind change-impact triggers to DoD"
+      ]
+    },
+    {
+      "volume_ref": "VOL-115",
+      "title": "Technical Debt Ledger",
+      "accountability_id": "ACC-VOL-115",
+      "required_gap_texts": [
+        "establish debt IDs and ownership",
+        "bind debt to risk/backlog/ADR"
+      ]
+    },
+    {
+      "volume_ref": "VOL-118",
+      "title": "Roadmap Control",
+      "accountability_id": "ACC-VOL-118",
+      "required_gap_texts": [
+        "bind roadmap to build DAG",
+        "materialize revision lineage"
+      ]
+    },
+    {
+      "volume_ref": "VOL-119",
+      "title": "Completion Model",
+      "accountability_id": "ACC-VOL-119",
+      "required_gap_texts": [
+        "implement canonical rollup function",
+        "bind UI progress to derived completion only"
+      ]
+    }
+  ],
+  "authorities": [
+    {
+      "volume_ref": "VOL-021",
+      "path": "machine/repository_graph_contract.json"
+    },
+    {
+      "volume_ref": "VOL-022",
+      "path": "machine/repository_engineering_policy.json"
+    },
+    {
+      "volume_ref": "VOL-092",
+      "path": "machine/maintenance_ownership.json"
+    },
+    {
+      "volume_ref": "VOL-093",
+      "path": "machine/backlog_registry.json"
+    },
+    {
+      "volume_ref": "VOL-094",
+      "path": "machine/priority_policy.json"
+    },
+    {
+      "volume_ref": "VOL-095",
+      "path": "machine/work_package_control.json"
+    },
+    {
+      "volume_ref": "VOL-108",
+      "path": "machine/anti_pattern_registry.json"
+    },
+    {
+      "volume_ref": "VOL-109",
+      "path": "machine/build_order_control.json"
+    },
+    {
+      "volume_ref": "VOL-110",
+      "path": "machine/definition_of_done.json"
+    },
+    {
+      "volume_ref": "VOL-115",
+      "path": "machine/technical_debt_ledger.json"
+    },
+    {
+      "volume_ref": "VOL-118",
+      "path": "machine/roadmap_control.json"
+    },
+    {
+      "volume_ref": "VOL-119",
+      "path": "machine/completion_model.json"
+    }
+  ],
+  "composition": {
+    "repository_machine": [
+      "skeleton/repo_machine",
+      "skeleton/repo_intelligence"
+    ],
+    "backlog": [
+      "skeleton/automation/backlog_engine.py",
+      "skeleton/automation/backlog_index.py"
+    ],
+    "transactional_mutation": [
+      "skeleton/shells/workspace_txn",
+      "skeleton/shells/leases.py"
+    ],
+    "traceability": [
+      "machine/master_traceability.json",
+      "scripts/check_p2_traceability.py"
+    ],
+    "build_authority": [
+      "machine/ai_master_build_sequence.json",
+      "machine/ai_build_queue.json",
+      "machine/ai_engineering_task_matrix.json"
+    ],
+    "accountability": [
+      "machine/ai_build_accountability.json"
+    ],
+    "hard_risk": [
+      "machine/ai_edge_case_priority_queue.json"
+    ]
+  },
+  "invariants": [
+    "No repository mutation bypasses inspect→plan→lease→edit→build→test→review→verify.",
+    "Hard blockers are non-compensable and cannot be outranked by soft priority signals.",
+    "Every canonical AIQ task belongs to the build DAG and every work package retains exact engineering/acceptance requirements.",
+    "Deletion requires owner, reachability, retention, protected-artifact disposition and rollback/restore evidence.",
+    "Backlog deduplication never erases source provenance or closure obligations.",
+    "Completion derives from signed atomic accountability and required evidence; manual percentages are never authority.",
+    "Roadmap and repository control cannot expand the top-level masterplan beyond VOL-420 without ADR.",
+    "Landed repository-control files do not promote or sign the owning masterplan volumes."
+  ],
+  "expected_counts": {
+    "primary_volume_count": 12,
+    "canonical_backlog_item_count": 88,
+    "work_package_count": 31,
+    "aiq_task_count": 42,
+    "build_wave_count": 8,
+    "debt_item_count": 24,
+    "roadmap_item_count": 15
+  }
+}
