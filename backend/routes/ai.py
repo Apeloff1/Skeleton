@@ -408,6 +408,24 @@ def _active_model() -> str:
     return "engine-routed" if _engine_configured() else "unavailable"
 
 
+def _engine_runtime_provider(
+    provider_receipts: tuple[str, ...] | list[str],
+) -> str | None:
+    """Return one provider id only when all receipts agree."""
+
+    providers: set[str] = set()
+    for raw in provider_receipts:
+        if not isinstance(raw, str):
+            continue
+        prefix, separator, remainder = raw.partition(":")
+        if prefix != "provider" or not separator:
+            continue
+        provider_id, separator, _identity = remainder.partition(":")
+        if separator and provider_id:
+            providers.add(provider_id)
+    return next(iter(providers)) if len(providers) == 1 else None
+
+
 def _extract_code_blocks(text: str) -> list[dict[str, str]]:
     blocks: list[dict[str, str]] = []
     for match in re.finditer(r"```([^\n`]*)\n(.*?)```", text, flags=re.DOTALL):
@@ -610,6 +628,9 @@ async def call_llm(
         "engine_evidence_refs": list(
             getattr(result, "evidence_refs", ())
         ),
+        "engine_provider_receipts": list(
+            getattr(result, "provider_receipts", ())
+        ),
         "engine_tool_receipts": list(
             getattr(result, "tool_receipts", ())
         ),
@@ -757,6 +778,12 @@ async def ai_chat(
             "provider": "replayed",
             "model": _active_model(),
             "provider_request_id": None,
+            "engine_provider_receipts": list(
+                existing_assistant.provider_receipt_refs
+            ),
+            "engine_runtime_provider": _engine_runtime_provider(
+                existing_assistant.provider_receipt_refs
+            ),
             "latency_ms": 0.0,
             "replayed": True,
             "operation_id": existing_assistant.operation_id,
@@ -950,6 +977,9 @@ async def ai_chat(
             "engine_evidence_refs": list(
                 getattr(engine_result, "evidence_refs", ())
             ),
+            "engine_provider_receipts": list(
+                getattr(engine_result, "provider_receipts", ())
+            ),
             "engine_tool_receipts": list(
                 getattr(engine_result, "tool_receipts", ())
             ),
@@ -1032,6 +1062,9 @@ async def ai_chat(
                 tool_receipt_refs=tuple(
                     result.get("engine_tool_receipts") or ()
                 ),
+                provider_receipt_refs=tuple(
+                    result.get("engine_provider_receipts") or ()
+                ),
                 memory_refs=tuple(
                     result.get("engine_memory_refs") or ()
                 ),
@@ -1056,6 +1089,13 @@ async def ai_chat(
         "engine_execution_id": result.get("engine_execution_id"),
         "engine_verification": result.get("engine_verification"),
         "engine_evidence_refs": result.get("engine_evidence_refs", []),
+        "engine_provider_receipts": result.get(
+            "engine_provider_receipts",
+            [],
+        ),
+        "engine_runtime_provider": _engine_runtime_provider(
+            result.get("engine_provider_receipts", [])
+        ),
         "engine_tool_receipts": result.get("engine_tool_receipts", []),
         "engine_memory_refs": result.get("engine_memory_refs", []),
         "engine_artifact_refs": result.get("engine_artifact_refs", []),
