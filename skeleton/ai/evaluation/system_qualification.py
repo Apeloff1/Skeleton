@@ -23,6 +23,7 @@ import socket
 import threading
 from typing import Mapping
 
+from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.ai.learning.promotion import (
     EvaluationReceipt,
     ExperimentSpec,
@@ -43,6 +44,7 @@ from skeleton.ai.runtime.inference import (
 from skeleton.ai.runtime.memory.core import Chunk, InMemoryTFIDFStore
 from skeleton.ai.runtime.system_completion import SystemCompletionPlane, SystemCompletionReport
 from skeleton.intelligence.execution_runtime import (
+    CognitiveExecutionRuntime,
     ExecutionFinalizationBindings,
     ExecutionVerificationDecision,
 )
@@ -342,6 +344,102 @@ async def _run_once(
     )
 
 
+
+def _stop_request(kind: str, *, deadline: bool) -> AIExecutionRequest:
+    stop_policy: dict[str, object] = {"max_repeat_tool_batches": 1}
+    if deadline:
+        stop_policy["deadline"] = QUALIFICATION_TIME.isoformat()
+    return AIExecutionRequest(
+        operation_id=f"system-qualification-stop-operation-{kind}",
+        execution_id=f"system-qualification-stop-execution-{kind}",
+        objective="Prove standalone AI stop semantics fail closed.",
+        context_policy={
+            "tenant_id": "default",
+            "data_class": "internal",
+            "capability": "vs001.functional_ai",
+        },
+        tool_policy={
+            "tenant_id": "default",
+            "data_class": "internal",
+            "purpose": "tool-execution",
+            "allowed_tool_ids": [],
+        },
+        resource_budget={
+            "max_model_turns": 1,
+            "max_tool_calls": 1,
+        },
+        stop_policy=stop_policy,
+        created_at=QUALIFICATION_TIME,
+    )
+
+
+async def _stop_semantics_results(
+    workdir: Path,
+):
+    context_digest = hashlib.sha256(
+        b"system-qualification-stop-context-v1"
+    ).hexdigest()
+
+    deadline_repository = SQLiteExecutionRepository(
+        workdir / "system-qualification-deadline.sqlite3"
+    )
+    deadline_runtime = CognitiveExecutionRuntime(
+        deadline_repository,
+        _local_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    deadline_request = _stop_request("deadline", deadline=True)
+    deadline_run = await deadline_runtime.start(
+        deadline_request,
+        instructions="Do not execute after the deadline.",
+        prompt="This qualification request is already at its deadline.",
+        context_digest=context_digest,
+        now=QUALIFICATION_TIME,
+    )
+    if deadline_run.result is None:
+        raise RuntimeError("deadline qualification did not terminate")
+
+    cancellation_repository = SQLiteExecutionRepository(
+        workdir / "system-qualification-cancellation.sqlite3"
+    )
+    cancellation_runtime = CognitiveExecutionRuntime(
+        cancellation_repository,
+        _local_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    cancellation_request = _stop_request("cancellation", deadline=False)
+    execution = cancellation_repository.create(
+        cancellation_request,
+        now=QUALIFICATION_TIME,
+    )
+    payload = cancellation_runtime._initial_payload(
+        cancellation_request,
+        instructions="Stop before any provider or tool work.",
+        prompt="Cancellation qualification.",
+        context_digest=context_digest,
+        history=(),
+    )
+    execution, _checkpoint_ref = cancellation_runtime._checkpoint(
+        execution,
+        payload,
+        now=QUALIFICATION_TIME,
+    )
+    cancellation_repository.request_cancel(
+        cancellation_request.execution_id,
+        expected_version=execution.version,
+        now=QUALIFICATION_TIME,
+    )
+    cancellation_run = await cancellation_runtime.resume(
+        cancellation_request.execution_id,
+        now=QUALIFICATION_TIME,
+    )
+    if cancellation_run.result is None:
+        raise RuntimeError("cancellation qualification did not terminate")
+
+    return deadline_run.result, cancellation_run.result
+
 def _learning_cycle() -> LearningCycle:
     spec = ExperimentSpec(
         experiment_id="system-qualification-learning",
@@ -415,7 +513,7 @@ async def qualify_system_completion(
     *,
     source_revision: str,
 ) -> SystemQualificationReceipt:
-    """Execute and independently qualify the 16-plane completion chain."""
+    """Execute and independently qualify the 17-plane completion chain."""
 
     root = Path(workdir)
     root.mkdir(parents=True, exist_ok=True)
@@ -428,6 +526,9 @@ async def qualify_system_completion(
         replay = await _run_once(
             root,
             database_name="system-qualification-replay.sqlite3",
+        )
+        deadline_result, cancellation_result = await _stop_semantics_results(
+            root
         )
 
     terminal = primary.run.execution.result
@@ -507,6 +608,10 @@ async def qualify_system_completion(
         max_tool_calls=primary.request.max_tool_calls,
         provider_receipts=terminal.provider_receipts,
         tool_receipts=terminal.tool_receipts,
+    )
+    plane.prove_stop_semantics(
+        deadline_result=deadline_result,
+        cancellation_result=cancellation_result,
     )
     plane.prove_tool_authority(
         allowed_tool_ids=primary.request.allowed_tool_ids,
