@@ -18,14 +18,23 @@ permissions:
   actions: read
   contents: read
 
+# Queue instead of preempting: each source-run completion used to cancel the
+# in-flight qualification for the same branch, and the cancellations fanned out
+# into a self-sustaining storm. One active run plus the latest pending run is
+# enough because every run re-qualifies the complete exact-head catalog.
 concurrency:
   group: p2-ci-qualification-${{ github.event_name }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   qualify:
     name: Qualify exact-head P2 CI evidence
-    if: github.event.workflow_run.head_repository.full_name == github.repository
+    # Cancelled/skipped source runs carry no CI verdict; qualifying them only
+    # re-triggers this workflow without producing evidence.
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.conclusion != 'cancelled'
+      && github.event.workflow_run.conclusion != 'skipped'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
