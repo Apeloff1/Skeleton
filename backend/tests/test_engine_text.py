@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 
@@ -447,7 +448,12 @@ async def test_engine_text_recovers_existing_execution_before_recompiling_change
             return SimpleNamespace(
                 operation_id=self.operation_id,
                 execution_id=execution_id,
-                turn_id="turn-original",
+                turn_id=str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        "backend-engine-text-turn:" + self.operation_id,
+                    )
+                ),
                 tenant_id=tenant_id,
                 actor_id=actor_id,
                 context_id="context-original",
