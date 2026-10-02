@@ -38,6 +38,8 @@ _REQUIRED_SURFACE_KEYS = {
     "local_model_deployment",
     "local_model_deployment_test",
     "local_model_qualifier",
+    "cognitive_execution_runtime",
+    "cognitive_execution_runtime_test",
 }
 
 
@@ -181,6 +183,7 @@ def build_receipt(
         "runtime_identity_bound_to_execution_evidence_required",
         "governed_tool_generation_schema_required",
         "live_startup_local_model_qualification_required",
+        "provider_deadline_cancellation_required",
     ):
         if requirements.get(required) is not True:
             raise ExactHeadReceiptError(f"closure requirement {required} must be true")

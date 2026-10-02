@@ -51,7 +51,9 @@
     "exact_head_receipt": "scripts/p2_functional_ai_exact_head.py",
     "local_model_deployment": "skeleton/ai/runtime/inference/deployment.py",
     "local_model_deployment_test": "skeleton/testing/test_local_model_deployment.py",
-    "local_model_qualifier": "scripts/qualify_local_model_runtime.py"
+    "local_model_qualifier": "scripts/qualify_local_model_runtime.py",
+    "cognitive_execution_runtime": "skeleton/intelligence/execution_runtime.py",
+    "cognitive_execution_runtime_test": "skeleton/testing/test_execution_runtime.py"
   },
   "requirements": {
     "hosted_provider_credentials_required": false,
@@ -74,7 +76,8 @@
     "nonzero_tensor_model_required": true,
     "runtime_identity_bound_to_execution_evidence_required": true,
     "governed_tool_generation_schema_required": true,
-    "live_startup_local_model_qualification_required": true
+    "live_startup_local_model_qualification_required": true,
+    "provider_deadline_cancellation_required": true
   },
   "deferred_scope": {
     "queued_volume_count": 257,
@@ -125,6 +128,7 @@
     "model_format_admission": "GGUF magic + version 2/3 + positive tensor count before process launch",
     "execution_evidence": "FunctionalAIEvidence.local_runtime_digest plus durable provider receipt response IDs bind runtime binary SHA-256 and model SHA-256 to every llama.cpp turn",
     "tool_generation_constraint": "llama.cpp --json-schema-file generated per request; tool_id is enum-constrained to declared governed tools while AsyncToolRuntime remains final argument-schema authority",
-    "activation_gate": "FunctionalAIRuntime.from_local_model_manifest performs a live offline inference qualification against the exact digest-pinned runtime and model before constructing the execution runtime"
+    "activation_gate": "FunctionalAIRuntime.from_local_model_manifest performs a live offline inference qualification against the exact digest-pinned runtime and model before constructing the execution runtime",
+    "provider_deadline_enforcement": "CognitiveExecutionRuntime bounds provider I/O with asyncio.wait_for using the logical execution deadline and durably finalizes timeout as execution_deadline_exceeded"
   }
 }

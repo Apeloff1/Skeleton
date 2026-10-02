@@ -847,6 +847,56 @@ async def test_expired_deadline_fails_before_provider_io() -> None:
 
 
 @pytest.mark.asyncio
+async def test_deadline_during_provider_io_cancels_provider_and_fails_durably() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider_cancelled = asyncio.Event()
+
+    class SlowProvider:
+        provider_id = "fake"
+        model = "fake-model"
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            self.requests.append(request)
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                provider_cancelled.set()
+                raise
+
+    provider = SlowProvider()
+    runtime = _runtime(repo, provider, tools)
+    deadline = _now() + timedelta(milliseconds=50)
+    request = _request(
+        stop_policy={
+            "max_repeat_tool_batches": 1,
+            "deadline": deadline.isoformat(),
+        }
+    )
+
+    result = await runtime.start(
+        request,
+        instructions="Answer.",
+        prompt="Respect the bounded provider deadline.",
+        context_digest="d" * 64,
+        now=_now(),
+    )
+
+    assert result.state is ExecutionState.FAILED
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.final_output is None
+    assert result.result.usage["error_code"] == "execution_deadline_exceeded"
+    assert len(provider.requests) == 1
+    assert provider.requests[0].deadline == deadline
+    assert provider_cancelled.is_set()
+    assert repo.result("exec-1") is not None
+
+
+@pytest.mark.asyncio
 async def test_tool_handler_outage_becomes_durable_execution_failure() -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()

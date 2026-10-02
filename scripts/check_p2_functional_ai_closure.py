@@ -40,6 +40,8 @@ REQUIRED_EXECUTABLE_SURFACES = {
     "local_model_deployment",
     "local_model_deployment_test",
     "local_model_qualifier",
+    "cognitive_execution_runtime",
+    "cognitive_execution_runtime_test",
 }
 REQUIRED_EXACT_HEAD_POLICY = {
     "mode": "ephemeral_ci_receipt",
@@ -260,6 +262,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "runtime_identity_bound_to_execution_evidence_required",
             "governed_tool_generation_schema_required",
             "live_startup_local_model_qualification_required",
+            "provider_deadline_cancellation_required",
         )
         for key in false_required:
             if requirements.get(key) is not False:
