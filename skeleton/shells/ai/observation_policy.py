@@ -55,6 +55,7 @@ class ObservationPolicyEngine:
                 "ok": observation.ok,
                 "stdout_digest": observation.stdout_digest,
                 "stderr_digest": observation.stderr_digest,
+                "instruction_authority": False,
             }
         if self.policy.exposure is ObservationExposure.METADATA_ONLY:
             data["safe_excerpt"] = ""
