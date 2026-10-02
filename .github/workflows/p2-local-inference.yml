@@ -7,6 +7,7 @@ on:
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_numpy_recurrent_lm.py"
+      - "skeleton/testing/test_local_model_builder.py"
       - ".github/workflows/p2-local-inference.yml"
   push:
     branches:
@@ -60,3 +61,4 @@ jobs:
           skeleton/testing/test_local_inference.py
           skeleton/testing/test_local_model_artifact.py
           skeleton/testing/test_numpy_recurrent_lm.py
+          skeleton/testing/test_local_model_builder.py
