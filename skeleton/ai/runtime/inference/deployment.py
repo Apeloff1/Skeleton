@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 import hashlib
 import json
@@ -18,7 +17,12 @@ from .llama_cpp import (
     build_llama_cpp_adapter,
     inspect_gguf,
 )
-from .local import LocalInferenceEngine, LocalInferenceRequest, LocalModelAdapter
+from .local import (
+    LocalInferenceEngine,
+    LocalInferenceRequest,
+    LocalInferenceResult,
+    LocalModelAdapter,
+)
 
 
 SCHEMA = "skeleton.local_model.deployment.v1"
@@ -302,7 +306,7 @@ def _qualification_request(
 def _qualification_receipt(
     deployment: LocalModelDeployment,
     model: LlamaCppModel,
-    result: object,
+    result: LocalInferenceResult,
     *,
     prompt: str,
 ) -> dict[str, Any]:
@@ -360,12 +364,17 @@ async def qualify_local_model_deployment(
     model = LlamaCppModel(
         deployment.llama_cpp_config(rehash_artifacts_each_run=True)
     )
-    result = await LocalInferenceEngine(model, cache_size=0).generate(
-        _qualification_request(
-            prompt=prompt,
-            max_output_tokens=max_output_tokens,
+    try:
+        result = await LocalInferenceEngine(model, cache_size=0).generate(
+            _qualification_request(
+                prompt=prompt,
+                max_output_tokens=max_output_tokens,
+            )
         )
-    )
+    except (LlamaCppRuntimeError, OSError, TimeoutError) as exc:
+        raise LocalModelDeploymentError(
+            f"local model qualification execution failed: {exc}"
+        ) from exc
     return _qualification_receipt(
         deployment,
         model,
@@ -384,13 +393,18 @@ def qualify_local_model_deployment_sync(
     model = LlamaCppModel(
         deployment.llama_cpp_config(rehash_artifacts_each_run=True)
     )
-    result = model.infer(
-        _qualification_request(
-            prompt=prompt,
-            max_output_tokens=max_output_tokens,
-        ),
-        threading.Event(),
-    )
+    try:
+        result = model.infer(
+            _qualification_request(
+                prompt=prompt,
+                max_output_tokens=max_output_tokens,
+            ),
+            threading.Event(),
+        )
+    except (LlamaCppRuntimeError, OSError, TimeoutError) as exc:
+        raise LocalModelDeploymentError(
+            f"local model qualification execution failed: {exc}"
+        ) from exc
     return _qualification_receipt(
         deployment,
         model,

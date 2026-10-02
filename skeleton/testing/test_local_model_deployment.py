@@ -269,7 +269,10 @@ def test_manifest_bootstrap_fails_when_live_qualification_cannot_execute(
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload["executable_sha256"] = _sha(runtime)
     manifest.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(Exception):
+    with pytest.raises(
+        LocalModelDeploymentError,
+        match="qualification execution failed",
+    ):
         FunctionalAIRuntime.from_local_model_manifest(
             SQLiteExecutionRepository(),
             manifest,
