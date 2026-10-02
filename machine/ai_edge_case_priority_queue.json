@@ -182,9 +182,16 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_closed_backup_erasure_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/reliability/backup_restore.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/reliability/backup_restore.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-010",
       "completion_checkbox": false,
@@ -599,9 +606,16 @@
       "recommended_test_modes": [
         "regression"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_source_propagated_vector_erasure_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/vector.py",
+        "code:skeleton/memory/projection.py",
+        "mirror:skeleton/ai/runtime/memory/vector.py",
+        "mirror:skeleton/ai/runtime/memory/projection.py",
+        "test:skeleton/testing/test_p0_data_lifecycle_erasure.py",
+        "workflow:P0 Data Lifecycle Erasure"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-009",
       "completion_checkbox": false,
