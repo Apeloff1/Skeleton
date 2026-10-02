@@ -71,6 +71,10 @@ No completion checkbox. No implementation signature. No verification signature. 
 | Bind hold journal | `skeleton/persistence/spine_bind_hold_journal.py` | refusal rewrite fails closed |
 | Bind hold read | `skeleton/persistence/spine_bind_hold_read.py` | applied row fails closed |
 | Bind hold chain | `skeleton/persistence/spine_bind_hold_chain.py` | rewritten refusal fails closed |
+| Bind hold release | `skeleton/persistence/spine_bind_hold_release.py` | refusal does not release the hold |
+| Bind hold ticket | `skeleton/persistence/spine_bind_hold_ticket.py` | refusal does not consume a ticket |
+| Bind hold fence | `skeleton/persistence/spine_bind_hold_fence.py` | refusal epoch unchanged |
+| Bind hold release journal | `skeleton/persistence/spine_bind_hold_release_journal.py` | release proof rewrite fails closed |
 | Bind hold verify | `skeleton/persistence/spine_bind_hold_verify.py` | durable refusal identity/digest verification grants no apply authority |
 | Bind snapshot | `skeleton/persistence/spine_bind_snapshot.py` | dark evidence is digest-bound |
 | Bind recovery | `skeleton/persistence/spine_bind_recovery.py` | recovery plan cannot self-activate |
@@ -182,7 +186,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 - CI live claim: 0% until complete authenticated exact-head receipt
 - Merge: 0%
 - Bind card sealed: 100%
-- Bind hold refusal: 100%; active holds only, latest hold identity bound, durable refusal digest reconstructable, repeated refusals append-safe, and the exact-head bind hold refusal contracts passed in State Recovery run 1920; refusal row ordering is sealed by an independent identity digest over `(refusal_id, refusal_digest)`
+- Bind hold refusal: 100%; active holds only, latest hold identity bound, durable refusal digest reconstructable, repeated refusals append-safe, and the exact-head bind hold refusal contracts passed in State Recovery run 1920; refusal row ordering is sealed by an independent identity digest over `(refusal_id, refusal_digest)`. Release, ticket, and fence reads do not release a hold, do not consume a ticket, and do not move the epoch.
 
 ## Next, in order
 
@@ -197,7 +201,7 @@ AI-tree mirrors under `skeleton/ai/runtime/persistence` are byte copies.
 
 ## Implement
 
-Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 143, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
+Check out `feat/p2-runtime-spine`. Import `SpineManifest` from `skeleton.persistence`. Call `card()`. Expect `count` 147, `apply_landed` false, `poison_apply_landed` true, `completion_checkbox` false. Do not merge from this file.
 
 ```bash
 python -m pytest -q skeleton/testing/test_spine_manifest.py
