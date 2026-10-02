@@ -1,6 +1,6 @@
 {
   "schema_version": "skeleton.backlog_registry.v1",
-  "registry_version": "0.2.0",
+  "registry_version": "0.3.0",
   "status": "active",
   "purpose": "Canonical deduplicated backlog IDs preserving P2 task, edge-case and masterplan-gap provenance.",
   "masterplan_binding": {
@@ -158,7 +158,7 @@
       "dependency_refs": [
         "BL-P2-P2-NATIVE-01"
       ],
-      "status": "ready",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
@@ -176,7 +176,7 @@
       "dependency_refs": [
         "BL-P2-P2-NATIVE-01"
       ],
-      "status": "ready",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
@@ -194,7 +194,7 @@
       "dependency_refs": [
         "BL-P2-P2-T1-SEC-01"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
@@ -213,7 +213,7 @@
         "BL-P2-P2-T1-DATA-01",
         "BL-P2-P2-T1-SEC-01"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
@@ -234,7 +234,7 @@
         "BL-P2-P2-T1-INFER-01",
         "BL-P2-P2-T1-RECOVERY-01"
       ],
-      "status": "blocked",
+      "status": "landed_unpromoted",
       "priority_class": "phase",
       "provenance": [
         "machine/ai_p2_task_backlog.json"
