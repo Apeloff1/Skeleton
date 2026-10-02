@@ -3262,12 +3262,26 @@
         275
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "All contract digests and signing inputs use one strict deterministic UTF-8 JSON byte representation.",
+        "Canonical signing bytes reject NaN, Infinity, and non-JSON values before hashing.",
+        "Canonical and AI-runtime contract mirrors remain byte-identical."
+      ],
+      "tests": [
+        "skeleton/testing/test_canonical_contract_security.py::test_canonical_bytes_ignore_mapping_insertion_order",
+        "skeleton/testing/test_canonical_contract_security.py::test_canonical_bytes_normalize_constraints",
+        "skeleton/testing/test_canonical_contract_security.py::test_non_finite_numbers_fail_before_digest",
+        "skeleton/testing/test_canonical_contract_security.py::test_non_json_values_fail_before_digest"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/contracts/canonical.py",
+        "mirror:skeleton/ai/runtime/contracts/canonical.py",
+        "test:skeleton/testing/test_canonical_contract_security.py",
+        "workflow:P0 Canonical Signing Bytes"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "property",
