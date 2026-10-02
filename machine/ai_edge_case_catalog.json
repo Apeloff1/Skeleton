@@ -5740,12 +5740,25 @@
         337
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Single-use approval validation and consumption occur in one registry critical section.",
+        "Concurrent consumers cannot both authorize from the same approval identity.",
+        "Approval remains bound to exact principal, intent fingerprint, and proposal fingerprint."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_consume_is_atomic_against_concurrent_reuse",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_mismatch_fails",
+        "skeleton/testing/test_shell_ai_approval_budget_toolguards.py::test_ai_approval_consume_invalidates"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/approval.py",
+        "mirror:skeleton/ai/shell/approval.py",
+        "test:skeleton/testing/test_shell_ai_approval_budget_toolguards.py",
+        "workflow:P0 Approval TOCTOU Security"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
