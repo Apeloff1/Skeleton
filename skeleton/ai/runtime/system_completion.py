@@ -40,14 +40,17 @@ class CompletionRequirement(str, Enum):
     TOOL_AUTHORITY = "execution.tool_authority"
     DURABLE_RECOVERY = "execution.durable_recovery"
     STAGED_FINALIZATION_RECOVERY = "execution.staged_finalization_recovery"
+    PERSISTED_EVIDENCE_INTEGRITY = "persistence.terminal_evidence_integrity"
     REPLAY_LINEAGE = "execution.replay_lineage"
     REPRODUCIBILITY = "execution.reproducibility"
     GOVERNED_EFFECTS = "execution.governed_effects"
     INDEPENDENT_VERIFICATION = "verification.independent"
     VERIFICATION_BINDING = "verification.claim_binding"
+    VERIFICATION_RECEIPT_IDENTITY = "verification.receipt_identity"
     CONTEXT_INTEGRITY = "context.integrity"
     MEMORY_LIFECYCLE = "memory.lifecycle"
     FINALIZATION_LINEAGE = "finalization.lineage"
+    TERMINAL_OUTBOX_DELIVERY = "finalization.outbox_delivery"
     LEARNING_PROMOTION = "learning.promotion"
     LEARNING_ROLLBACK = "learning.rollback"
     SANDBOX_FILESYSTEM = "security.sandbox_filesystem"
@@ -57,6 +60,7 @@ class CompletionRequirement(str, Enum):
     MEMORY_POISONING_RESISTANCE = "memory.poisoning_resistance"
     OUTBOUND_NETWORK_BOUNDARY = "security.outbound_network_boundary"
     RESOURCE_ADMISSION = "resource.admission_quota"
+    UNKNOWN_USAGE_FENCE = "resource.unknown_usage_fence"
     SHARED_PRESSURE = "resource.shared_pressure"
     IDEMPOTENT_RETRY = "execution.idempotent_retry"
     TENANT_ISOLATION = "privacy.tenant_isolation"
@@ -667,6 +671,38 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_persisted_evidence_integrity(
+        self,
+        *,
+        execution_id: str,
+        result_tamper_rejected: bool,
+        outbox_tamper_rejected: bool,
+        migration_backfill_verified: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and result_tamper_rejected
+            and outbox_tamper_rejected
+            and migration_backfill_verified
+        )
+        return self._proof(
+            CompletionRequirement.PERSISTED_EVIDENCE_INTEGRITY,
+            passed=passed,
+            producer_id="execution-repository",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "result_tamper_rejected": bool(result_tamper_rejected),
+                "outbox_tamper_rejected": bool(outbox_tamper_rejected),
+                "migration_backfill_verified": bool(
+                    migration_backfill_verified
+                ),
+            },
+        )
+
     def prove_replay_lineage(
         self,
         turns: Sequence[AgentTurn],
@@ -888,6 +924,47 @@ class SystemCompletionPlane:
             },
         )
 
+    def prove_verification_receipt_identity(
+        self,
+        *,
+        execution_id: str,
+        identical_replay_stable: bool,
+        conflicting_replay_rejected: bool,
+        digest_tamper_rejected: bool,
+        execution_binding_preserved: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and identical_replay_stable
+            and conflicting_replay_rejected
+            and digest_tamper_rejected
+            and execution_binding_preserved
+        )
+        return self._proof(
+            CompletionRequirement.VERIFICATION_RECEIPT_IDENTITY,
+            passed=passed,
+            producer_id="execution-repository",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "identical_replay_stable": bool(
+                    identical_replay_stable
+                ),
+                "conflicting_replay_rejected": bool(
+                    conflicting_replay_rejected
+                ),
+                "digest_tamper_rejected": bool(
+                    digest_tamper_rejected
+                ),
+                "execution_binding_preserved": bool(
+                    execution_binding_preserved
+                ),
+            },
+        )
+
     def prove_context_integrity(
         self,
         *,
@@ -986,6 +1063,47 @@ class SystemCompletionPlane:
                 "memory_ref_count": len(memory_refs),
                 "artifact_ref_count": len(artifact_refs),
                 "stream_terminal_bound": result.stream_terminal_event is not None,
+            },
+        )
+
+    def prove_terminal_outbox_delivery(
+        self,
+        *,
+        execution_id: str,
+        one_pending_terminal_event: bool,
+        acknowledgement_persistent: bool,
+        acknowledgement_retry_stable: bool,
+        no_pending_after_ack: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and one_pending_terminal_event
+            and acknowledgement_persistent
+            and acknowledgement_retry_stable
+            and no_pending_after_ack
+        )
+        return self._proof(
+            CompletionRequirement.TERMINAL_OUTBOX_DELIVERY,
+            passed=passed,
+            producer_id="execution-repository",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "one_pending_terminal_event": bool(
+                    one_pending_terminal_event
+                ),
+                "acknowledgement_persistent": bool(
+                    acknowledgement_persistent
+                ),
+                "acknowledgement_retry_stable": bool(
+                    acknowledgement_retry_stable
+                ),
+                "no_pending_after_ack": bool(
+                    no_pending_after_ack
+                ),
             },
         )
 
@@ -1235,6 +1353,52 @@ class SystemCompletionPlane:
                     denial_capacity_unchanged
                 ),
                 "usage_reconciled": bool(usage_reconciled),
+            },
+        )
+
+    def prove_unknown_usage_fence(
+        self,
+        *,
+        execution_id: str,
+        unknown_usage_recorded: bool,
+        completion_blocked_while_unknown: bool,
+        release_blocked_while_unknown: bool,
+        conservative_resolution_required: bool,
+        completion_succeeds_after_resolution: bool,
+        evidence_refs: Iterable[str],
+    ) -> RequirementProof:
+        execution_id = _text("execution_id", execution_id)
+        passed = bool(
+            execution_id == self.subject_id
+            and unknown_usage_recorded
+            and completion_blocked_while_unknown
+            and release_blocked_while_unknown
+            and conservative_resolution_required
+            and completion_succeeds_after_resolution
+        )
+        return self._proof(
+            CompletionRequirement.UNKNOWN_USAGE_FENCE,
+            passed=passed,
+            producer_id="admission-runtime",
+            evidence_refs=evidence_refs,
+            details={
+                "execution_id": execution_id,
+                "subject_bound": execution_id == self.subject_id,
+                "unknown_usage_recorded": bool(
+                    unknown_usage_recorded
+                ),
+                "completion_blocked_while_unknown": bool(
+                    completion_blocked_while_unknown
+                ),
+                "release_blocked_while_unknown": bool(
+                    release_blocked_while_unknown
+                ),
+                "conservative_resolution_required": bool(
+                    conservative_resolution_required
+                ),
+                "completion_succeeds_after_resolution": bool(
+                    completion_succeeds_after_resolution
+                ),
             },
         )
 
