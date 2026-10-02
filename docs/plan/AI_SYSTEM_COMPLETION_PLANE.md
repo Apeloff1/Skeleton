@@ -7,7 +7,7 @@ addition to atomic accountability and vertical-suite checks.  The plane exists
 to prevent a common false-positive: declaring the AI complete because many
 subsystems are green while a cross-cutting lifecycle is still broken.
 
-A completion verdict is therefore **non-compensable**.  Nine requirements must
+A completion verdict is therefore **non-compensable**.  Twelve requirements must
 each have one passing, independently witnessed proof for the same subject and
 the same exact Git revision.  Extra green evidence cannot cancel a missing or
 failed requirement.
@@ -17,7 +17,10 @@ failed requirement.
 | Requirement | What must be observed |
 | --- | --- |
 | `execution.local_model` | A completed transaction using only local provider receipts, with a terminal output and stream identity. |
+| `execution.offline_isolation` | The local transaction performs no external network I/O and all provider receipts remain local. |
+| `execution.budget_bounds` | Observed provider/tool calls remain within the request's hard model-turn and tool-call budgets. |
 | `execution.durable_recovery` | A separately reopened execution repository yields the exact terminal result, not a best-effort reconstruction. |
+| `execution.replay_lineage` | Recovered turns remain contiguous, subject/operation-bound, uniquely identified, parent-linked, and checkpoint-bound. |
 | `execution.governed_effects` | Every mutating tool receipt has a matching observed postcondition; read-only traffic remains valid with zero mutable postconditions. |
 | `verification.independent` | The terminal result carries a passing policy-satisfied verification receipt and external evidence references. |
 | `context.integrity` | The context ledger has a non-genesis head and verifies its complete hash chain without link/hash errors. |
@@ -61,11 +64,13 @@ qualification rather than mocking all planes independently.  In one scenario it:
 4. reopens the SQLite execution repository and compares the full terminal
    payload exactly;
 5. appends and verifies a context-ledger block;
-6. writes, retrieves, deletes, and re-queries memory;
-7. builds deterministic feedback assignments, evaluates a candidate, promotes
+6. proves zero external-network attempts and checks observed model/tool usage against hard request budgets;
+7. validates recovered turn parentage, sequence continuity, operation identity, and checkpoint lineage;
+8. writes, retrieves, deletes, and re-queries memory;
+9. builds deterministic feedback assignments, evaluates a candidate, promotes
    it, and verifies the active version;
-8. executes a rollback and verifies restoration of the baseline;
-9. submits all nine independently witnessed proofs to the completion plane and
+10. executes a rollback and verifies restoration of the baseline;
+11. submits all twelve independently witnessed proofs to the completion plane and
    requires one terminal valid report.
 
 Adversarial tests also prove that tampered recovery, missing requirements,
@@ -88,7 +93,7 @@ The verifier cross-checks:
 - workflow exact-head wiring;
 - digest bindings for the contract, runtime, tests, and workflow.
 
-The CI receipt must identify the exact Git head, contain all nine requirements,
+The CI receipt must identify the exact Git head, contain all twelve requirements,
 carry source digests, have no errors, and have a canonical receipt digest.
 
 ## Relationship to atomic P0-P2 work
