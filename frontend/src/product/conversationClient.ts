@@ -364,7 +364,7 @@ export async function getConversationTurn(
     api.get<ConversationTurn>(
       '/api/ai/chat/turns/'
         + encodeURIComponent(threadId)
-        + '/'
+        + '?idempotency_key='
         + encodeURIComponent(idempotencyKey),
       {
         signal: input.signal,
@@ -394,10 +394,9 @@ export async function cancelConversationTurn(
     api.post<ConversationTurn>(
       '/api/ai/chat/turns/'
         + encodeURIComponent(threadId)
-        + '/'
-        + encodeURIComponent(idempotencyKey)
         + '/cancel',
       {
+        idempotency_key: idempotencyKey,
         reason: input.reason || 'user_cancelled',
       },
       {
