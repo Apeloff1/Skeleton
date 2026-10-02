@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-from typing import Mapping
 from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.ai.runtime.functional_ai import (
@@ -577,6 +576,12 @@ class CanonicalConversationAIRuntime:
             result_digest=_json_digest(terminal.as_dict()),
         )
 
+    @staticmethod
+    def _missing_committed_context() -> str:
+        raise ConversationRepositoryCorruption(
+            "committed assistant message has no canonical context identity"
+        )
+
     def _response_from_committed(
         self,
         *,
@@ -703,7 +708,11 @@ class CanonicalConversationAIRuntime:
                 ),
                 prompt=user_message.content or "canonical conversation turn",
                 instructions=self.instruction_policy.instructions,
-                context_digest=assistant_message.context_digest or ("0" * 64),
+                context_digest=(
+                    assistant_message.context_digest
+                    if assistant_message.context_digest is not None
+                    else self._missing_committed_context()
+                ),
                 allowed_tool_ids=request.allowed_tool_ids,
                 data_class=thread.data_class,
                 tenant_id=tenant_id,
@@ -798,7 +807,7 @@ class CanonicalConversationAIRuntime:
             branch_id=user_message.branch_id,
             sequence=thread.message_sequence + 1,
             author_type=ConversationAuthorType.ASSISTANT,
-            created_at=request.created_at,
+            created_at=terminal.completed_at,
             idempotency_key=request.idempotency_key + ":assistant",
             content=terminal.final_output,
             parent_message_id=user_message.message_id,
