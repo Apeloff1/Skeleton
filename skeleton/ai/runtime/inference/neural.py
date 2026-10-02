@@ -37,6 +37,11 @@ _UNK = "<|unk|>"
 _MAX_VOCAB = 65_536
 _MAX_HIDDEN = 4_096
 _MAX_SEQUENCE_TOKENS = 8_192
+_MAX_PARAMETER_BYTES = 96 * 1024 * 1024
+_MAX_TRAINING_DOCUMENTS = 4_096
+_MAX_TRAINING_TOKENS = 2_000_000
+_MAX_TRAINING_WORK = 2_000_000_000
+_MAX_INFERENCE_WORK = 300_000_000
 
 
 def _stable_json(value: object) -> str:
@@ -88,6 +93,17 @@ def _require_float(
             f"{field} must be in [{minimum}, {maximum}]"
         )
     return numeric
+
+
+def _parameter_bytes(vocab_size: int, hidden_size: int) -> int:
+    floats = (
+        (vocab_size * hidden_size)
+        + (hidden_size * hidden_size)
+        + hidden_size
+        + (hidden_size * vocab_size)
+        + vocab_size
+    )
+    return floats * 4
 
 
 def _matrix(
@@ -170,6 +186,10 @@ class NumpyRecurrentLM:
             )
 
         vocab_size = len(normalized_vocab)
+        if _parameter_bytes(vocab_size, hidden) > _MAX_PARAMETER_BYTES:
+            raise ValueError(
+                "recurrent model parameter memory exceeds hard bound"
+            )
         self.model_id = normalized_id
         self.hidden_size = hidden
         self.vocab = normalized_vocab
@@ -311,6 +331,10 @@ class NumpyRecurrentLM:
 
         if not corpus:
             raise ValueError("training corpus must be non-empty")
+        if len(corpus) > _MAX_TRAINING_DOCUMENTS:
+            raise ValueError(
+                "training corpus document count exceeds hard bound"
+            )
         hidden = _require_int(
             hidden_size,
             "hidden_size",
@@ -352,6 +376,7 @@ class NumpyRecurrentLM:
 
         tokenized: list[tuple[str, ...]] = []
         counts: Counter[str] = Counter()
+        total_training_tokens = 0
         for index, document in enumerate(corpus):
             if not isinstance(document, str) or not document.strip():
                 raise ValueError(
@@ -361,6 +386,11 @@ class NumpyRecurrentLM:
             if not tokens:
                 raise ValueError(
                     f"training document {index} produced no tokens"
+                )
+            total_training_tokens += len(tokens)
+            if total_training_tokens > _MAX_TRAINING_TOKENS:
+                raise ValueError(
+                    "training corpus token count exceeds hard bound"
                 )
             tokenized.append(tokens)
             counts.update(tokens)
@@ -397,8 +427,30 @@ class NumpyRecurrentLM:
                 "training corpus produced no next-token examples"
             )
 
-        rng = np.random.default_rng(seed)
         vocab_size = len(vocab)
+        if _parameter_bytes(vocab_size, hidden) > _MAX_PARAMETER_BYTES:
+            raise ValueError(
+                "training configuration exceeds parameter memory bound"
+            )
+        training_steps = sum(
+            max(0, len(sequence) - 1)
+            for sequence in sequences
+        )
+        approximate_work = (
+            training_steps
+            * rounds
+            * (
+                (hidden * hidden)
+                + (hidden * vocab_size)
+            )
+            * 4
+        )
+        if approximate_work > _MAX_TRAINING_WORK:
+            raise ValueError(
+                "training configuration exceeds compute bound"
+            )
+
+        rng = np.random.default_rng(seed)
         scale = np.float32(1.0 / math.sqrt(hidden))
         embedding = rng.normal(
             0.0,
@@ -571,9 +623,35 @@ class NumpyRecurrentLM:
             raise TypeError("cancel must be threading.Event")
 
         started = time.perf_counter()
+        context_step_cost = max(
+            1,
+            self.hidden_size * self.hidden_size,
+        )
+        generation_step_cost = max(
+            1,
+            context_step_cost
+            + (self.hidden_size * self.vocab_size),
+        )
+        generation_limit = min(
+            request.max_output_tokens,
+            max(
+                1,
+                (_MAX_INFERENCE_WORK // 2)
+                // generation_step_cost,
+            ),
+        )
+        remaining_work = max(
+            1,
+            _MAX_INFERENCE_WORK
+            - (generation_limit * generation_step_cost),
+        )
+        context_limit = min(
+            _MAX_SEQUENCE_TOKENS,
+            max(1, remaining_work // context_step_cost),
+        )
         input_tokens = list(
             _tokenize(request.rendered_input)
-        )[-_MAX_SEQUENCE_TOKENS:]
+        )[-context_limit:]
         hidden = np.zeros(
             self.hidden_size,
             dtype=np.float32,
@@ -596,7 +674,7 @@ class NumpyRecurrentLM:
         generated: list[str] = []
         finish_reason = "length"
 
-        for _ in range(request.max_output_tokens):
+        for _ in range(generation_limit):
             if cancel.is_set():
                 raise LocalInferenceCancelled(
                     "local recurrent inference cancelled"
@@ -634,6 +712,12 @@ class NumpyRecurrentLM:
             ):
                 finish_reason = "completed"
                 break
+
+        if (
+            finish_reason == "length"
+            and generation_limit < request.max_output_tokens
+        ):
+            finish_reason = "length"
 
         text = _detokenize(generated)
         if not text:
