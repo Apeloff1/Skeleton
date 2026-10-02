@@ -1,5 +1,12 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
+from .llama_cpp import (
+    ArtifactIdentity,
+    LlamaCppConfig,
+    LlamaCppModel,
+    LlamaCppRuntimeError,
+    build_llama_cpp_adapter,
+)
 from .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -14,6 +21,11 @@ from .local import (
 )
 
 __all__ = [
+    "ArtifactIdentity",
+    "LlamaCppConfig",
+    "LlamaCppModel",
+    "LlamaCppRuntimeError",
+    "build_llama_cpp_adapter",
     "CallableLocalModel",
     "LocalInferenceCancelled",
     "LocalInferenceEngine",
