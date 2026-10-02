@@ -7,6 +7,24 @@ from .artifact import (
     load_local_model_artifact,
     local_model_adapter_from_env,
 )
+from .deployment import (
+    LocalModelDeployment,
+    LocalModelDeploymentError,
+    QUALIFICATION_SCHEMA,
+    SCHEMA as LOCAL_MODEL_DEPLOYMENT_SCHEMA,
+    load_local_model_adapter,
+    qualify_local_model_deployment,
+    qualify_local_model_deployment_sync,
+)
+from .llama_cpp import (
+    ArtifactIdentity,
+    GgufHeader,
+    LlamaCppConfig,
+    LlamaCppModel,
+    LlamaCppRuntimeError,
+    build_llama_cpp_adapter,
+    inspect_gguf,
+)
 from .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -21,8 +39,11 @@ from .local import (
 )
 
 __all__ = [
+    "ArtifactIdentity",
     "CallableLocalModel",
+    "GgufHeader",
     "LoadedLocalModel",
+    "LOCAL_MODEL_DEPLOYMENT_SCHEMA",
     "LocalInferenceCancelled",
     "LocalInferenceEngine",
     "LocalInferenceRequest",
@@ -32,11 +53,22 @@ __all__ = [
     "LocalModelArtifactError",
     "LocalModelArtifactReceipt",
     "LocalModelBackend",
+    "LocalModelDeployment",
+    "LocalModelDeploymentError",
     "LocalToolCall",
+    "LlamaCppConfig",
+    "LlamaCppModel",
+    "LlamaCppRuntimeError",
     "NumpyRecurrentLM",
+    "QUALIFICATION_SCHEMA",
     "ReferenceNGramModel",
+    "build_llama_cpp_adapter",
+    "inspect_gguf",
+    "load_local_model_adapter",
     "load_local_model_artifact",
     "local_model_adapter_from_env",
+    "qualify_local_model_deployment",
+    "qualify_local_model_deployment_sync",
 ]
 
 
