@@ -5022,12 +5022,25 @@
         228
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Model/provider capabilities declare an explicit data privacy boundary.",
+        "Fallback routing accepts a maximum privacy boundary and excludes providers outside that boundary before health/trust scoring.",
+        "A degraded local/private provider cannot cause silent fallback to a broader external boundary."
+      ],
+      "tests": [
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_router_local_boundary_never_falls_back_external",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_router_private_boundary_excludes_external",
+        "skeleton/testing/test_shell_ai_observation_metrics_audit.py::test_provider_route_serializes_privacy_boundary"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/model_port.py",
+        "code:skeleton/shells/ai/provider_router.py",
+        "test:skeleton/testing/test_shell_ai_observation_metrics_audit.py",
+        "workflow:P0 Provider Fallback Privacy"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "fault_injection",
