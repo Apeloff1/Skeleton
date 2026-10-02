@@ -17,6 +17,17 @@ SPEC.loader.exec_module(M)
 
 
 class RepositoryReviewRoutingTests(unittest.TestCase):
+    def test_review_identities_do_not_coerce_non_text_values(self) -> None:
+        with self.assertRaises(TypeError):
+            M.ReviewRoute(True, "reviewer-b", "verifier-c")
+        with self.assertRaises(TypeError):
+            M.ReviewVerdict(
+                123,
+                "approve",
+                ("run://1",),
+                "2026-10-01T00:00:00Z",
+            )
+
     def test_routes_distinct_reviewer_and_verifier(self) -> None:
         route = M.route_independent_review(
             "builder-a",
