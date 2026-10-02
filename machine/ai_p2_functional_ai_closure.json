@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.p2.functional_ai_closure.v1",
   "closure_id": "P2-FUNCTIONAL-AI-FRONTIER",
-  "status": "candidate",
+  "status": "closed",
   "claim_scope": "provider_independent_functional_ai_frontier",
   "claim": "P2 functional closure requires executable credential-free local model inference, governed model-tool-model execution, durable terminal state/reconnect, independent verification, and mapped state/security/recovery controls. It does not claim the remaining queued P2 capability volumes are implemented.",
   "source_scope": {
@@ -60,7 +60,13 @@
     "rule": "Queued P2 breadth remains explicit and must not be erased or represented as completed by this bounded functional frontier."
   },
   "evidence_refs": [
-    "branch:feat/p2-functional-ai-closure-atomic",
-    "workflow:P2 Functional AI Acceptance:pending-exact-head"
+    "github:pr#2346",
+    "git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f",
+    "workflow:P2 Functional AI Acceptance@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967807",
+    "workflow:P2 Local Inference@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967976",
+    "workflow:P2 VS-001 Functional AI@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:success",
+    "github-actions-run:36960967833"
   ]
 }
