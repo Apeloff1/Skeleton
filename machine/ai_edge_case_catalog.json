@@ -6774,12 +6774,21 @@
         350
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Derived retrieval/vector projections inherit source-memory retention deadlines.",
+        "Retention expiry physically removes the derived projection before lifecycle deletion is acknowledged."
+      ],
+      "tests": [
+        "skeleton/testing/test_memory_projection.py::test_derived_vector_retention_expires_with_source_memory"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/memory/projection.py",
+        "test:skeleton/testing/test_memory_projection.py",
+        "workflow:P0 Derived Retention Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "regression"
