@@ -10,6 +10,11 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import Iterable, Iterator
 
+from skeleton.security.decoded_path import (
+    DecodedPathError,
+    reject_decoded_path_ambiguity,
+)
+
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _DRIVE = re.compile(r"^[A-Za-z]:")
 
@@ -24,6 +29,10 @@ def normalize_relative_path(value: str | os.PathLike[str]) -> str:
         raise WorkspacePathError("path must be text")
     if not raw:
         raise WorkspacePathError("path cannot be empty")
+    try:
+        reject_decoded_path_ambiguity(raw)
+    except DecodedPathError as exc:
+        raise WorkspacePathError(str(exc)) from exc
     text = raw.replace("\\", "/")
     if text.startswith("/") or _DRIVE.match(text):
         raise WorkspacePathError("workspace path must be relative")
