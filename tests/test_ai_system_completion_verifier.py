@@ -61,6 +61,7 @@ def test_contract_declares_non_compensable_authority() -> None:
         "verification_receipt_identity_required": True,
         "terminal_outbox_delivery_required": True,
         "persisted_terminal_evidence_integrity_required": True,
+        "persisted_replay_evidence_integrity_required": True,
     }
 
 
