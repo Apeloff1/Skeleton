@@ -8,7 +8,7 @@ prevent false completion claims when individual subsystems pass but the
 assembled lifecycle, security boundary, persistence path, or learning path is
 still broken.
 
-Completion is **non-compensable**. All twenty-eight requirements must have one
+Completion is **non-compensable**. All thirty-two requirements must have one
 passing, independently witnessed proof for the same execution subject and the
 same exact Git revision. Extra green evidence cannot compensate for a missing
 or failed proof.
@@ -17,7 +17,7 @@ The canonical inventory is
 `machine/ai_system_completion_contract.json`. The executable proof model is
 `skeleton/ai/runtime/system_completion.py`.
 
-## Twenty-eight required proofs
+## Thirty-two required proofs
 
 ### Execution and recovery
 
@@ -44,6 +44,15 @@ The canonical inventory is
 | `context.integrity` | The context ledger has a non-genesis head and a valid complete hash chain. |
 | `memory.lifecycle` | Subject-bound memory is written, recalled, deleted, and absent after deletion. |
 | `finalization.lineage` | Terminal output retains stream identity plus durable memory and artifact references. |
+
+### Persistence, delivery, and accounting integrity
+
+| Requirement | Required observation |
+| --- | --- |
+| `persistence.terminal_evidence_integrity` | Terminal result and outbox payload carry independent persisted digests, contract-valid tampering fails closed, and legacy stores backfill digests safely. |
+| `verification.receipt_identity` | Identical verification-receipt replay is stable, conflicting identity replay is rejected, persisted receipt tampering is detected, and execution/result binding remains intact. |
+| `finalization.outbox_delivery` | Exactly one terminal event is pending, acknowledgement survives reopen, retry acknowledgement is stable, and no event remains pending after acknowledgement. |
+| `resource.unknown_usage_fence` | Unknown actual usage is recorded durably; completion and release are blocked until conservative usage resolution is supplied. |
 
 ### Hostile-environment security
 
@@ -96,7 +105,7 @@ same execution; merely relabeling evidence does not satisfy completion.
 
 ## Causal closure graph
 
-The twenty-eight proofs form one causal chain rather than a bag of booleans:
+The thirty-two proofs form one causal chain rather than a bag of booleans:
 
 `request identity -> local/offline execution -> budgets + stop fences -> tool
 authority -> effects/postconditions -> durable terminal state -> crash recovery
@@ -126,7 +135,13 @@ A qualification run performs all of the following on one exact source revision:
 7. reopens SQLite and compares the terminal result exactly;
 8. stages a second terminal intent, simulates restart, finalizes it, and proves
    the durable intent is cleared;
-9. validates turn ancestry, operation identity, and checkpoint lineage;
+9. integrity-binds terminal result/outbox rows, rejects contract-valid persisted
+   payload tampering, and verifies legacy digest backfill;
+10. proves verification-receipt identity is retry-stable and conflict/tamper
+    fail-closed;
+11. acknowledges the durable terminal outbox, reopens persistence, and proves
+    acknowledgement retry stability;
+12. validates turn ancestry, operation identity, and checkpoint lineage;
 10. reruns the same request in a fresh repository and compares output/result
     digests and tool traces;
 11. verifies a context-ledger block;
@@ -140,14 +155,16 @@ A qualification run performs all of the following on one exact source revision:
 17. performs governed-memory success, missing-provenance rejection, and
     conflicting-replay rejection;
 18. exercises private-target, mixed-DNS, and peer-rebinding network defenses;
-19. admits in-budget work, rejects tenant over-quota work, and reconciles actual usage;
-20. proves two workers cannot overbook one shared-pressure scope;
-21. proves identical retry is idempotent while conflicting retry is rejected;
-22. writes tenant-scoped durable memory and proves cross-tenant invisibility;
-23. runs evaluation, promotion, and negative promotion gates;
-24. rolls back and proves evaluation lineage is preserved;
-25. submits all twenty-eight proofs to `SystemCompletionPlane`;
-26. emits one canonical machine-readable qualification receipt.
+23. admits in-budget work, rejects tenant over-quota work, and reconciles actual usage;
+24. records deliberately unknown usage and proves completion/release remain
+    fenced until conservative resolution;
+25. proves two workers cannot overbook one shared-pressure scope;
+26. proves identical retry is idempotent while conflicting retry is rejected;
+27. writes tenant-scoped durable memory and proves cross-tenant invisibility;
+28. runs evaluation, promotion, and negative promotion gates;
+29. rolls back and proves evaluation lineage is preserved;
+30. submits all thirty-two proofs to `SystemCompletionPlane`;
+31. emits one canonical machine-readable qualification receipt.
 
 ## Independent receipt verification
 
@@ -157,7 +174,7 @@ It does not trust the qualifier's stored `valid` flags or digests.
 It reparses the emitted receipt with duplicate-key rejection, recomputes every
 proof digest, recomputes the system-completion report digest, recomputes the
 top-level qualification digest, and independently evaluates the **semantics of
-all twenty-eight proof types** from serialized evidence.
+all thirty-two proof types** from serialized evidence.
 
 This means a proof cannot survive by changing its details, setting
 `passed=true`, and recomputing every nested digest. A semantically
@@ -176,11 +193,11 @@ runs:
 6. governed-memory writeback regressions;
 7. outbound URL/HTTP security regressions;
 8. admission/quota/shared-pressure and execution-repository regressions;
-9. executable twenty-eight-plane qualification;
+9. executable thirty-two-plane qualification;
 10. independent cryptographic and semantic receipt verification;
 11. structural contract/runtime/workflow verification.
 
-CI requires all twenty-eight proofs on one subject and exact revision, zero
+CI requires all thirty-two proofs on one subject and exact revision, zero
 network attempts during the local qualification, deterministic fresh replay,
 complete crash recovery, hostile-environment security closure, and valid
 independent verifier receipts.
