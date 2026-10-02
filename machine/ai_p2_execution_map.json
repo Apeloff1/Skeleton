@@ -352,8 +352,8 @@
     ]
   },
   "first_tranche": {
-    "name": "P2-T0 Control, architecture, traceability, repository engineering",
-    "scheduled_volume_count": 42,
+    "name": "P2-T0/T1 Capability Expansion",
+    "scheduled_volume_count": 57,
     "scheduled_volume_refs": [
       "VOL-002",
       "VOL-003",
@@ -396,19 +396,29 @@
       "VOL-089",
       "VOL-090",
       "VOL-032",
-      "VOL-033"
-    ],
-    "queued_volume_count": 272,
-    "queued_volume_refs": [
-      "VOL-001",
+      "VOL-033",
       "VOL-005",
-      "VOL-006",
       "VOL-007",
-      "VOL-019",
-      "VOL-020",
       "VOL-026",
       "VOL-027",
       "VOL-039",
+      "VOL-091",
+      "VOL-096",
+      "VOL-097",
+      "VOL-104",
+      "VOL-132",
+      "VOL-134",
+      "VOL-167",
+      "VOL-169",
+      "VOL-172",
+      "VOL-175"
+    ],
+    "queued_volume_count": 257,
+    "queued_volume_refs": [
+      "VOL-001",
+      "VOL-006",
+      "VOL-019",
+      "VOL-020",
       "VOL-071",
       "VOL-072",
       "VOL-073",
@@ -417,25 +427,19 @@
       "VOL-086",
       "VOL-087",
       "VOL-088",
-      "VOL-091",
-      "VOL-096",
-      "VOL-097",
       "VOL-098",
       "VOL-099",
       "VOL-100",
       "VOL-101",
       "VOL-102",
       "VOL-103",
-      "VOL-104",
       "VOL-105",
       "VOL-106",
       "VOL-107",
       "VOL-111",
       "VOL-114",
       "VOL-121",
-      "VOL-132",
       "VOL-133",
-      "VOL-134",
       "VOL-135",
       "VOL-136",
       "VOL-137",
@@ -466,13 +470,9 @@
       "VOL-162",
       "VOL-163",
       "VOL-166",
-      "VOL-167",
-      "VOL-169",
       "VOL-171",
-      "VOL-172",
       "VOL-173",
       "VOL-174",
-      "VOL-175",
       "VOL-176",
       "VOL-177",
       "VOL-178",
@@ -733,6 +733,50 @@
       "sequence": 6,
       "depends_on": [
         "P2-L4"
+      ]
+    },
+    {
+      "id": "P2-T1-L0",
+      "name": "State, consistency and event delivery",
+      "sequence": 7,
+      "depends_on": [
+        "P2-L6"
+      ]
+    },
+    {
+      "id": "P2-T1-L1",
+      "name": "Security, privacy and tenant boundaries",
+      "sequence": 8,
+      "depends_on": [
+        "P2-L6"
+      ]
+    },
+    {
+      "id": "P2-T1-L2",
+      "name": "Inference reliability",
+      "sequence": 9,
+      "depends_on": [
+        "P2-T1-L1"
+      ]
+    },
+    {
+      "id": "P2-T1-L3",
+      "name": "Operational recovery slice",
+      "sequence": 10,
+      "depends_on": [
+        "P2-T1-L0",
+        "P2-T1-L1"
+      ]
+    },
+    {
+      "id": "P2-T1-L4",
+      "name": "Functional AI acceptance slice",
+      "sequence": 11,
+      "depends_on": [
+        "P2-T1-L0",
+        "P2-T1-L1",
+        "P2-T1-L2",
+        "P2-T1-L3"
       ]
     }
   ],

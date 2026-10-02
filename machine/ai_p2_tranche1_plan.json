@@ -1,10 +1,10 @@
 {
   "schema_version": "skeleton.p2.tranche_plan.v1",
-  "plan_version": "0.1.0",
-  "status": "prepared_non_owning",
+  "plan_version": "0.2.0",
+  "status": "activated",
   "tranche_id": "P2-T1",
   "title": "Runtime Trust, Recovery and Functional Acceptance",
-  "purpose": "Prepare the next P2 expansion from the still-queued masterplan scope without transferring ownership or bypassing the P2-T0 landing fence.",
+  "purpose": "Activated P2-T1 runtime trust, local inference, recovery, and functional-AI acceptance scope after the complete T0 implementation set landed without maturity promotion.",
   "authority": {
     "master_plan": "machine/ai_master_plan.json",
     "p2_execution_map": "machine/ai_p2_execution_map.json",
@@ -13,8 +13,8 @@
     "human_plan": "docs/plan/P2_TRANCHE1_RUNTIME_TRUST.md"
   },
   "activation": {
-    "mode": "explicit_followup_only",
-    "ownership_effect_before_activation": "none",
+    "mode": "applied",
+    "ownership_effect": "15 volumes transferred from the canonical P2 queue into five T1 task owners",
     "required_first_tranche_task_status": "landed_unpromoted",
     "required_first_tranche_task_ids": [
       "P2-CTRL-01",
@@ -25,7 +25,13 @@
       "P2-DOC-01",
       "P2-NATIVE-01"
     ],
-    "rule": "This prepared plan cannot add task ownership or remove refs from the queued set. Activation requires a separate reviewed change after every P2-T0 task is landed_unpromoted."
+    "activation_partition": {
+      "scheduled_before": 42,
+      "scheduled_after": 57,
+      "queued_before": 272,
+      "queued_after": 257
+    },
+    "rule": "Activation preserves all 314 P2 source volumes, unique ownership, and false completion/sign-off fields."
   },
   "selection": {
     "selected_volume_count": 15,

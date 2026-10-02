@@ -1,0 +1,51 @@
+name: P2 T1 Activated Runtime Trust
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_p2_tranche1_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "scripts/check_p2_tranche1_activated.py"
+      - "tests/test_p2_tranche1_activated.py"
+      - ".github/workflows/p2-tranche1-activated.yml"
+  push:
+    branches:
+      - main
+      - feat/p2-functional-ai-closure-atomic
+    paths:
+      - "machine/ai_p2_tranche1_plan.json"
+      - "machine/ai_p2_execution_map.json"
+      - "machine/ai_p2_task_backlog.json"
+      - "scripts/check_p2_tranche1_activated.py"
+      - "tests/test_p2_tranche1_activated.py"
+      - ".github/workflows/p2-tranche1-activated.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-t1-activated-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Validate activated T1
+        run: python scripts/check_p2_tranche1_activated.py --json
+      - name: Run activation regressions
+        run: python -m pytest -q tests/test_p2_tranche1_activated.py
