@@ -37206,7 +37206,7 @@
         "roadmap_id": "ROADMAP-P2-T1-DATA-01",
         "task_id": "P2-T1-DATA-01",
         "lane_id": "P2-T1-L0",
-        "status": "ready",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-NATIVE-01"
         ],
@@ -37222,7 +37222,7 @@
         "roadmap_id": "ROADMAP-P2-T1-SEC-01",
         "task_id": "P2-T1-SEC-01",
         "lane_id": "P2-T1-L1",
-        "status": "ready",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-NATIVE-01"
         ],
@@ -37240,7 +37240,7 @@
         "roadmap_id": "ROADMAP-P2-T1-INFER-01",
         "task_id": "P2-T1-INFER-01",
         "lane_id": "P2-T1-L2",
-        "status": "blocked",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-T1-SEC-01"
         ],
@@ -37253,7 +37253,7 @@
         "roadmap_id": "ROADMAP-P2-T1-RECOVERY-01",
         "task_id": "P2-T1-RECOVERY-01",
         "lane_id": "P2-T1-L3",
-        "status": "blocked",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-T1-DATA-01",
           "P2-T1-SEC-01"
@@ -37268,7 +37268,7 @@
         "roadmap_id": "ROADMAP-P2-T1-FUNCTIONAL-01",
         "task_id": "P2-T1-FUNCTIONAL-01",
         "lane_id": "P2-T1-L4",
-        "status": "blocked",
+        "status": "landed_unpromoted",
         "depends_on": [
           "P2-T1-DATA-01",
           "P2-T1-SEC-01",
@@ -37379,43 +37379,43 @@
       },
       {
         "task_id": "P2-T1-DATA-01",
-        "declared_status": "ready",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "not_started"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-T1-SEC-01",
-        "declared_status": "ready",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "not_started"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-T1-INFER-01",
-        "declared_status": "blocked",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "blocked"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-T1-RECOVERY-01",
-        "declared_status": "blocked",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "blocked"
+        "derived_state": "evidence_pending"
       },
       {
         "task_id": "P2-T1-FUNCTIONAL-01",
-        "declared_status": "blocked",
+        "declared_status": "landed_unpromoted",
         "implementation_signed": false,
         "verification_signed": false,
         "completion_checkbox": false,
-        "derived_state": "blocked"
+        "derived_state": "evidence_pending"
       }
     ],
     "derivation_engine": "skeleton/repo_machine/completion.py",
