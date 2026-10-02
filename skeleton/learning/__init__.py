@@ -79,4 +79,27 @@ __all__ = [
     "FeedbackPromotionError",
     "FeedbackPromotionPipeline",
     "PromotionReceipt",
+    "LocalTrainer",
+    "ModelArtifact",
+    "ModelDevelopmentRegistry",
+    "ModelProgramError",
+    "ModelPromotionReceipt",
+    "ReferenceNGramTrainer",
+    "TrainingDataset",
+    "TrainingReceipt",
+    "TrainingSpec",
+    "corpus_digest",
 ]
+
+from .model_program import (
+    LocalTrainer,
+    ModelArtifact,
+    ModelDevelopmentRegistry,
+    ModelProgramError,
+    ModelPromotionReceipt,
+    ReferenceNGramTrainer,
+    TrainingDataset,
+    TrainingReceipt,
+    TrainingSpec,
+    corpus_digest,
+)
