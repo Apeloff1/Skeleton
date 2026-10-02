@@ -620,17 +620,18 @@ class VectorStoreProjection:
         if record.state is not MemoryState.ACTIVE:
             self.delete(record.memory_id)
             return
-        self.store.delete(record.memory_id)
+        self.store.purge_source(record.memory_id)
         self.store.add(
             Chunk(
                 text=_materialized_content(record),
                 chunk_id=record.memory_id,
                 metadata=_projection_metadata(record),
-            )
+            ),
+            source_id=record.memory_id,
         )
 
     def delete(self, memory_id: str) -> None:
-        self.store.delete(memory_id)
+        self.store.purge_source(memory_id)
 
 
 class CAGStoreProjection:
