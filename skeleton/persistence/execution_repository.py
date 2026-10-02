@@ -157,6 +157,7 @@ class SQLiteExecutionRepository:
                     execution_id TEXT NOT NULL,
                     operation_id TEXT NOT NULL,
                     identity_digest TEXT NOT NULL,
+                    state_digest TEXT NOT NULL,
                     request_json TEXT NOT NULL,
                     state TEXT NOT NULL,
                     version INTEGER NOT NULL,
@@ -264,6 +265,59 @@ class SQLiteExecutionRepository:
                 ON ai_execution_outbox(namespace, published_at, created_at);
                 """
             )
+            state_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_state)"
+                )
+            }
+            if "state_digest" not in state_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_state "
+                    "ADD COLUMN state_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT * FROM ai_execution_state
+                WHERE state_digest IS NULL OR state_digest = ''
+                """
+            ).fetchall():
+                request_payload = _json_object(
+                    row["request_json"],
+                    "request_json",
+                )
+                request = self._request_from_dict(request_payload)
+                if request.identity_digest != row["identity_digest"]:
+                    raise ExecutionRepositoryCorruption(
+                        "persisted execution identity digest mismatch"
+                    )
+                execution = AIExecution(
+                    request=request,
+                    state=ExecutionState(row["state"]),
+                    version=int(row["version"]),
+                    latest_turn_index=int(row["latest_turn_index"]),
+                    checkpoint_version=int(row["checkpoint_version"]),
+                    cancellation_requested=bool(
+                        row["cancellation_requested"]
+                    ),
+                    updated_at=_parse_time(
+                        row["updated_at"],
+                        "updated_at",
+                    ),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_state
+                    SET state_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (
+                        self._execution_state_digest(execution),
+                        row["namespace"],
+                        row["execution_id"],
+                    ),
+                )
+
             turn_columns = {
                 str(row["name"])
                 for row in self._connection.execute(
@@ -418,6 +472,23 @@ class SQLiteExecutionRepository:
             created_at=_parse_time(payload["created_at"], "created_at"),
         )
 
+    @staticmethod
+    def _execution_state_digest(execution: AIExecution) -> str:
+        return execution_payload_digest(
+            {
+                "operation_id": execution.operation_id,
+                "execution_id": execution.execution_id,
+                "identity_digest": execution.request.identity_digest,
+                "state": execution.state.value,
+                "version": execution.version,
+                "latest_turn_index": execution.latest_turn_index,
+                "checkpoint_version": execution.checkpoint_version,
+                "cancellation_requested":
+                    execution.cancellation_requested,
+                "updated_at": execution.updated_at.isoformat(),
+            }
+        )
+
     def _execution_from_row(self, row: sqlite3.Row) -> AIExecution:
         try:
             request_payload = _json_object(row["request_json"], "request_json")
@@ -426,7 +497,14 @@ class SQLiteExecutionRepository:
                 raise ExecutionRepositoryCorruption(
                     "persisted execution identity digest mismatch"
                 )
-            return AIExecution(
+            if (
+                request.execution_id != row["execution_id"]
+                or request.operation_id != row["operation_id"]
+            ):
+                raise ExecutionRepositoryCorruption(
+                    "persisted execution request identity mismatch"
+                )
+            execution = AIExecution(
                 request=request,
                 state=ExecutionState(row["state"]),
                 version=int(row["version"]),
@@ -435,6 +513,12 @@ class SQLiteExecutionRepository:
                 cancellation_requested=bool(row["cancellation_requested"]),
                 updated_at=_parse_time(row["updated_at"], "updated_at"),
             )
+            digest = self._execution_state_digest(execution)
+            if digest != row["state_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted execution state digest mismatch"
+                )
+            return execution
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
@@ -684,26 +768,32 @@ class SQLiteExecutionRepository:
                     self._connection.execute("COMMIT")
                     return current
 
+                initial = AIExecution(
+                    request=request,
+                    updated_at=instant,
+                )
                 self._connection.execute(
                     """
                     INSERT INTO ai_execution_state(
                         namespace, execution_id, operation_id, identity_digest,
-                        request_json, state, version, latest_turn_index,
-                        checkpoint_version, cancellation_requested, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, 1, -1, 0, 0, ?)
+                        state_digest, request_json, state, version,
+                        latest_turn_index, checkpoint_version,
+                        cancellation_requested, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, -1, 0, 0, ?)
                     """,
                     (
                         self.namespace,
                         request.execution_id,
                         request.operation_id,
                         request.identity_digest,
+                        self._execution_state_digest(initial),
                         _json_dump(request.as_dict()),
                         ExecutionState.CREATED.value,
                         instant.isoformat(),
                     ),
                 )
                 self._connection.execute("COMMIT")
-                return AIExecution(request=request, updated_at=instant)
+                return initial
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(
@@ -747,13 +837,15 @@ class SQLiteExecutionRepository:
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET state = ?, version = ?, updated_at = ?
+                    SET state = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         updated.state.value,
                         updated.version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -788,15 +880,26 @@ class SQLiteExecutionRepository:
                 if current.terminal:
                     self._connection.execute("COMMIT")
                     return current
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=current.version + 1,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=True,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET cancellation_requested = 1, version = ?, updated_at = ?
+                    SET cancellation_requested = 1, version = ?,
+                        updated_at = ?, state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
-                        current.version + 1,
+                        updated.version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -807,15 +910,7 @@ class SQLiteExecutionRepository:
                         "execution version changed during cancellation request"
                     )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=current.state,
-                    version=current.version + 1,
-                    latest_turn_index=current.latest_turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=True,
-                    updated_at=instant,
-                )
+                return updated
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -881,16 +976,27 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 next_version = current.version + 1
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=next_version,
+                    latest_turn_index=turn.turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET latest_turn_index = ?, version = ?, updated_at = ?
+                    SET latest_turn_index = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         turn.turn_index,
                         next_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         turn.execution_id,
                         current.version,
@@ -901,15 +1007,7 @@ class SQLiteExecutionRepository:
                         "execution changed during turn append"
                     )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=current.state,
-                    version=next_version,
-                    latest_turn_index=turn.turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=current.cancellation_requested,
-                    updated_at=instant,
-                )
+                return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(
@@ -981,10 +1079,20 @@ class SQLiteExecutionRepository:
                         instant.isoformat(),
                     ),
                 )
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=next_execution_version,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=next_checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET checkpoint_version = ?, version = ?, updated_at = ?
+                    SET checkpoint_version = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ?
                       AND version = ? AND checkpoint_version = ?
                     """,
@@ -992,6 +1100,7 @@ class SQLiteExecutionRepository:
                         next_checkpoint_version,
                         next_execution_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -1337,6 +1446,15 @@ class SQLiteExecutionRepository:
                     )
                 next_state = target.state
                 next_version = target.version
+                updated = AIExecution(
+                    request=current.request,
+                    state=next_state,
+                    version=next_version,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
 
                 self._connection.execute(
                     """
@@ -1398,13 +1516,15 @@ class SQLiteExecutionRepository:
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET state = ?, version = ?, updated_at = ?
+                    SET state = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         next_state.value,
                         next_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         result.execution_id,
                         current.version,
@@ -1422,15 +1542,7 @@ class SQLiteExecutionRepository:
                     (self.namespace, result.execution_id),
                 )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=next_state,
-                    version=next_version,
-                    latest_turn_index=current.latest_turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=current.cancellation_requested,
-                    updated_at=instant,
-                )
+                return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(
