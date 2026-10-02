@@ -34,6 +34,7 @@ from skeleton.ai.runtime.system_completion import (
     REQUIRED_COMPLETION_REQUIREMENTS,
     RequirementProof,
     SystemCompletionPlane,
+    completion_learning_experiment_id,
 )
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
@@ -266,9 +267,12 @@ async def _stop_semantics_results(tmp_path):
     assert cancellation_run.result is not None
     return deadline_run.result, cancellation_run.result
 
-def _learning_cycle():
+def _learning_cycle(subject_id: str, result_digest: str):
     spec = ExperimentSpec(
-        experiment_id="system-completion-learning",
+        experiment_id=completion_learning_experiment_id(
+            subject_id,
+            result_digest,
+        ),
         baseline_version="baseline-v1",
         candidate_version="candidate-v2",
         assignment_salt="system-completion-salt",
@@ -396,7 +400,10 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         promoted_active,
         rollback,
         rolled_back_active,
-    ) = _learning_cycle()
+    ) = _learning_cycle(
+        request.execution_id,
+        run.evidence.result_digest,
+    )
 
     (
         _replay_database,
@@ -422,6 +429,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         provider_receipts=run.evidence.provider_receipts,
     )
     plane.prove_offline_isolation(
+        execution_id=request.execution_id,
         network_attempt_count=len(network_attempts),
         provider_receipts=run.evidence.provider_receipts,
     )
@@ -430,6 +438,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         terminal,
     )
     plane.prove_budget_bounds(
+        execution_id=request.execution_id,
         max_model_turns=request.max_model_turns,
         max_tool_calls=request.max_tool_calls,
         provider_receipts=terminal.provider_receipts,
@@ -441,6 +450,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         cancellation_result=cancellation_result,
     )
     plane.prove_tool_authority(
+        execution_id=request.execution_id,
         allowed_tool_ids=request.allowed_tool_ids,
         observed_tool_ids=observed_tool_ids,
         receipt_refs=terminal.tool_receipts,
@@ -448,6 +458,8 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     plane.prove_durable_recovery(terminal, recovered)
     plane.prove_replay_lineage(recovered_turns)
     plane.prove_reproducibility(
+        primary_execution_id=request.execution_id,
+        replay_execution_id=replay_request.execution_id,
         primary_result_digest=run.evidence.result_digest,
         replay_result_digest=replay_run.evidence.result_digest,
         primary_output_digest=run.evidence.final_output_digest,
@@ -455,6 +467,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
     )
     assert replay_observed_tool_ids == observed_tool_ids
     plane.prove_governed_effects(
+        execution_id=request.execution_id,
         tool_receipt_count=len(terminal.tool_receipts),
         mutating_tool_count=0,
         verified_postcondition_count=0,
@@ -466,6 +479,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         context_digest=request.context_digest,
     )
     plane.prove_context_integrity(
+        context_subject_id=request.execution_id,
         problems=context_ledger.verify(),
         height=context_ledger.height,
         head_hash=context_ledger.head.hash,
@@ -485,6 +499,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         active_version=promoted_active,
         evaluation_digest=evaluation.digest,
         evaluator_id=evaluation.evaluator_id,
+        bound_result_digest=run.evidence.result_digest,
     )
     plane.prove_learning_rollback(
         rollback,
@@ -492,6 +507,7 @@ async def test_system_completion_plane_composes_real_runtime_planes(
         expected_candidate=spec.candidate_version,
         active_version=rolled_back_active,
         promotion_receipt=promotion,
+        bound_result_digest=run.evidence.result_digest,
     )
 
     report = plane.report()
@@ -535,6 +551,7 @@ def test_mutating_effect_without_matching_postcondition_fails_closed() -> None:
         source_revision=HEAD,
     )
     proof = plane.prove_governed_effects(
+        execution_id="effect-subject",
         tool_receipt_count=3,
         mutating_tool_count=2,
         verified_postcondition_count=1,
@@ -550,6 +567,7 @@ def test_offline_isolation_fails_on_any_network_attempt() -> None:
         source_revision=HEAD,
     )
     proof = plane.prove_offline_isolation(
+        execution_id="offline-subject",
         network_attempt_count=1,
         provider_receipts=("provider:local:receipt",),
     )
@@ -563,6 +581,7 @@ def test_budget_bounds_are_hard_limits() -> None:
         source_revision=HEAD,
     )
     proof = plane.prove_budget_bounds(
+        execution_id="budget-subject",
         max_model_turns=1,
         max_tool_calls=1,
         provider_receipts=(
@@ -614,6 +633,7 @@ def test_missing_requirement_cannot_be_compensated_by_other_green_proofs() -> No
         source_revision=HEAD,
     )
     plane.prove_governed_effects(
+        execution_id="partial-subject",
         tool_receipt_count=1,
         mutating_tool_count=0,
         verified_postcondition_count=0,
@@ -631,6 +651,7 @@ def test_duplicate_requirement_is_rejected() -> None:
         source_revision=HEAD,
     )
     plane.prove_governed_effects(
+        execution_id="duplicate-subject",
         tool_receipt_count=0,
         mutating_tool_count=0,
         verified_postcondition_count=0,
@@ -638,6 +659,7 @@ def test_duplicate_requirement_is_rejected() -> None:
     )
     with pytest.raises(CompletionPlaneError, match="already proved"):
         plane.prove_governed_effects(
+            execution_id="duplicate-subject",
             tool_receipt_count=0,
             mutating_tool_count=0,
             verified_postcondition_count=0,
@@ -688,6 +710,7 @@ def test_tool_authority_rejects_undeclared_tool() -> None:
         source_revision=HEAD,
     )
     proof = plane.prove_tool_authority(
+        execution_id="tool-authority-subject",
         allowed_tool_ids=("repo.read",),
         observed_tool_ids=("repo.read", "shell.exec"),
         receipt_refs=("tool:read", "tool:shell"),
@@ -732,6 +755,8 @@ def test_reproducibility_requires_result_and_output_equivalence() -> None:
     a = hashlib.sha256(b"a").hexdigest()
     b = hashlib.sha256(b"b").hexdigest()
     proof = plane.prove_reproducibility(
+        primary_execution_id="repro-subject",
+        replay_execution_id="repro-subject",
         primary_result_digest=a,
         replay_result_digest=b,
         primary_output_digest=a,
