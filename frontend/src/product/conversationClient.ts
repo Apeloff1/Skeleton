@@ -37,6 +37,7 @@ export type ConversationMessage = {
   ai_result_id?: string | null;
   attachment_refs: string[];
   tool_receipt_refs: string[];
+  provider_receipt_refs: string[];
   citation_refs: string[];
   artifact_refs: string[];
   data_class: 'public' | 'internal' | 'confidential' | 'restricted';
