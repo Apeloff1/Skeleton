@@ -56,6 +56,10 @@ class CompletionRequirement(str, Enum):
     PROVIDER_FALLBACK_PRIVACY = "privacy.provider_fallback"
     MEMORY_POISONING_RESISTANCE = "memory.poisoning_resistance"
     OUTBOUND_NETWORK_BOUNDARY = "security.outbound_network_boundary"
+    RESOURCE_ADMISSION = "resource.admission_quota"
+    SHARED_PRESSURE = "resource.shared_pressure"
+    IDEMPOTENT_RETRY = "execution.idempotent_retry"
+    TENANT_ISOLATION = "privacy.tenant_isolation"
 
 
 REQUIRED_COMPLETION_REQUIREMENTS: tuple[CompletionRequirement, ...] = tuple(
