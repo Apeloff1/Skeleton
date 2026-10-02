@@ -56,6 +56,7 @@ class EngineTextRequest:
     instruction_policy_id: str | None = None
     instruction_policy_version: str | None = None
     history: tuple[Mapping[str, str], ...] = ()
+    evidence: tuple[Mapping[str, str], ...] = ()
     tenant_id: str = "default"
     actor_id: str = "backend-ai"
     capability: str = "assistant.compat"
@@ -181,6 +182,58 @@ class EngineTextRequest:
                 raise EngineTextError("history exceeds maximum turn count")
         object.__setattr__(self, "history", tuple(normalized_history))
 
+        normalized_evidence: list[dict[str, str]] = []
+        seen_evidence_ids: set[str] = set()
+        total_evidence_chars = 0
+        for index, item in enumerate(self.evidence):
+            if not isinstance(item, Mapping):
+                raise EngineTextError(
+                    f"evidence[{index}] must be an object"
+                )
+            source_id = _text(
+                item.get("source_id"),
+                f"evidence[{index}].source_id",
+                maximum=512,
+            )
+            if source_id in seen_evidence_ids:
+                raise EngineTextError(
+                    "evidence source_id values must be unique"
+                )
+            seen_evidence_ids.add(source_id)
+            content = _text(
+                item.get("content"),
+                f"evidence[{index}].content",
+                maximum=200_000,
+            )
+            kind = str(
+                item.get("kind") or "retrieval_evidence"
+            ).strip().lower()
+            if kind not in {"retrieval_evidence", "artifact"}:
+                raise EngineTextError(
+                    f"evidence[{index}].kind is unsupported"
+                )
+            total_evidence_chars += len(content)
+            if total_evidence_chars > 1_000_000:
+                raise EngineTextError(
+                    "evidence exceeds maximum aggregate size"
+                )
+            normalized_evidence.append(
+                {
+                    "source_id": source_id,
+                    "content": content,
+                    "kind": kind,
+                }
+            )
+            if len(normalized_evidence) > 256:
+                raise EngineTextError(
+                    "evidence exceeds maximum segment count"
+                )
+        object.__setattr__(
+            self,
+            "evidence",
+            tuple(normalized_evidence),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class EngineTextResponse:
@@ -267,6 +320,33 @@ def _context_segments(
                 created_at=created_at,
                 provenance=("backend-engine-text",),
                 retention_class="ephemeral-engine-history",
+            )
+        )
+    for index, item in enumerate(request.evidence):
+        kind = (
+            ContextKind.ARTIFACT
+            if item["kind"] == "artifact"
+            else ContextKind.RETRIEVAL_EVIDENCE
+        )
+        segments.append(
+            ContextSegment.from_content(
+                segment_id=_stable_uuid(
+                    "backend-engine-evidence",
+                    operation_id + ":" + str(index) + ":" + item["source_id"],
+                ),
+                kind=kind,
+                source_type="backend-engine-evidence",
+                source_id=item["source_id"],
+                content=item["content"],
+                trust_level=ContextTrust.DERIVED_UNTRUSTED,
+                data_class=request.data_class,
+                tenant_id=request.tenant_id,
+                purpose=request.purpose,
+                priority=700,
+                relevance=0.9,
+                created_at=created_at,
+                provenance=("backend-engine-text", "product-evidence"),
+                retention_class="ephemeral-engine-evidence",
             )
         )
     segments.append(
