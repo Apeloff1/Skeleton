@@ -582,9 +582,13 @@
       "recommended_test_modes": [
         "regression"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_derived_retention_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/memory/projection.py",
+        "test:skeleton/testing/test_memory_projection.py",
+        "workflow:P0 Derived Retention Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-DATA-009",
       "completion_checkbox": false,
