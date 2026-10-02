@@ -130,8 +130,21 @@ def _safe_relative(value: str | os.PathLike[str], limits: FilesystemLimits) -> s
     return normalized
 
 
-def _stat_identity(info: os.stat_result) -> tuple[int, int, int, int]:
-    return (info.st_dev, info.st_ino, stat.S_IFMT(info.st_mode), info.st_size)
+def _stat_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        stat.S_IFMT(info.st_mode),
+        info.st_size,
+        info.st_nlink,
+    )
+
+
+def _reject_regular_hardlink(info: os.stat_result, *, operation: str) -> None:
+    if stat.S_ISREG(info.st_mode) and info.st_nlink != 1:
+        raise FilesystemPathError(
+            f"{operation} target must not have hardlink aliases"
+        )
 
 
 def _regular_file(info: os.stat_result) -> bool:
@@ -387,6 +400,7 @@ class RootedFilesystem:
             raise FilesystemPathError("unable to inspect file") from exc
         if stat.S_ISLNK(info.st_mode):
             raise FilesystemPathError("symlink files are forbidden")
+        _reject_regular_hardlink(info, operation="snapshot")
         return FileSnapshot(
             path=relative,
             size=info.st_size,
@@ -435,6 +449,7 @@ class RootedFilesystem:
                 raise FilesystemPathError("read target must not be a symlink")
             if not _regular_file(before):
                 raise FilesystemPathError("read target must be a regular file")
+            _reject_regular_hardlink(before, operation="read")
             if before.st_size > limit:
                 raise FilesystemQuotaError("file exceeds read byte bound")
 
@@ -450,6 +465,7 @@ class RootedFilesystem:
             except OSError as exc:
                 raise FilesystemPathError("file cannot be opened safely") from exc
             after = os.fstat(fd)
+            _reject_regular_hardlink(after, operation="read")
             if _stat_identity(before) != _stat_identity(after):
                 raise FilesystemRaceError("file identity changed before read")
             chunks: list[bytes] = []
@@ -513,6 +529,8 @@ class RootedFilesystem:
                 raise FilesystemPathError(
                     "write target must be absent or a regular file"
                 )
+            if existing is not None:
+                _reject_regular_hardlink(existing, operation="write")
 
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
             if hasattr(os, "O_NOFOLLOW"):
@@ -945,6 +963,7 @@ class RootedFilesystem:
                 raise FilesystemPathError(
                     "remove target must be a regular file"
                 )
+            _reject_regular_hardlink(before, operation="remove")
             try:
                 os.unlink(
                     name,
