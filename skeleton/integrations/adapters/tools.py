@@ -287,7 +287,8 @@ class ToolExecutor:
         limit = self.config.max_output_chars
         if len(text) <= limit:
             return text
-        return text[: limit - 32] + f"...[truncated {len(text) - limit + 32} chars]"
+        marker = f"...[truncated {len(text)} chars]"
+        return text[: limit - len(marker)] + marker
 
     async def invoke(
         self,
