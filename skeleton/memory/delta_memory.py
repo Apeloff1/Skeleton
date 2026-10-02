@@ -38,8 +38,12 @@ not touch OmniFabric, SagaRegistry, Diet, Court, or API lifespan.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import os
+import tempfile
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
@@ -100,6 +104,20 @@ class DeltaMemoryStats:
 
 
 @runtime_checkable
+class DeltaMetricsSink(Protocol):
+    """Duck-typed metrics port; ``observability.MetricsRegistry`` satisfies it."""
+
+    def counter(self, name: str, value: float = 1.0,
+                labels: Optional[Dict[str, str]] = None) -> None: ...
+
+    def gauge(self, name: str, value: float,
+              labels: Optional[Dict[str, str]] = None) -> None: ...
+
+    def observe(self, name: str, value: float,
+                labels: Optional[Dict[str, str]] = None) -> None: ...
+
+
+@runtime_checkable
 class DeltaSnapshotPort(Protocol):
     """Persistence port for compacted snapshots (hex adapter boundary)."""
 
@@ -127,30 +145,173 @@ class InMemoryDeltaSnapshotStore:
         return dict(self._data)
 
 
-class JsonFileDeltaSnapshotStore:
-    """Atomic JSON-file snapshot store (best-effort load; hard fail on save)."""
+SNAPSHOT_FILE_VERSION = 2
 
-    def __init__(self, path: Path | str) -> None:
+
+def _snapshot_digest(snapshot: Mapping[str, Any]) -> str:
+    blob = json.dumps(snapshot, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+class DeltaSnapshotCorrupt(ValueError):
+    """A snapshot file failed structural or checksum validation."""
+
+
+class JsonFileDeltaSnapshotStore:
+    """Crash-safe JSON-file snapshot store.
+
+    Save: unique temp file in the target directory, ``fsync``, previous good
+    file preserved as ``<name>.bak`` (hard link, no window where neither
+    exists), atomic ``os.replace``, best-effort directory ``fsync``. Saves are
+    serialized per store instance.
+
+    Load: validates structure, version and the SHA-256 checksum (v2 files;
+    v1 files without a checksum still load). A corrupt primary is moved
+    aside to ``<name>.corrupt-<ns>`` (never silently overwritten, so it can
+    be inspected) and the ``.bak`` is used instead. Returns ``{}`` only when
+    nothing valid exists — the #2022 contract.
+
+    ``strict=True`` refuses non-JSON values on save instead of stringifying
+    them (``default=str`` stays the default for back-compat).
+    """
+
+    def __init__(
+        self,
+        path: Path | str,
+        *,
+        strict: bool = False,
+        keep_backup: bool = True,
+        fsync: bool = True,
+    ) -> None:
         self.path = Path(path)
+        self.strict = bool(strict)
+        self.keep_backup = bool(keep_backup)
+        self.fsync = bool(fsync)
         self.saves = 0
+        self.recoveries = 0
+        self.quarantined: List[Path] = []
+        self.last_error: Optional[str] = None
+        self._lock = threading.Lock()
+
+    @property
+    def backup_path(self) -> Path:
+        return self.path.with_name(self.path.name + ".bak")
 
     def save_snapshot(self, snapshot: Mapping[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        payload = {"snapshot": dict(snapshot), "version": 1}
-        tmp.write_text(json.dumps(payload, default=str, sort_keys=True), encoding="utf-8")
-        tmp.replace(self.path)
-        self.saves += 1
+        snap = dict(snapshot)
+        dumps_kw: Dict[str, Any] = {"sort_keys": True}
+        if not self.strict:
+            dumps_kw["default"] = str
+        else:
+            dumps_kw["allow_nan"] = False
+        # Serialize before touching disk so a bad value never leaves debris.
+        body = json.dumps(snap, **dumps_kw)
+        normalized = json.loads(body)
+        payload = json.dumps(
+            {
+                "version": SNAPSHOT_FILE_VERSION,
+                "sha256": _snapshot_digest(normalized),
+                "snapshot": normalized,
+            },
+            sort_keys=True,
+        )
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = _mkstemp_for(self.path)
+            tmp = Path(tmp_name)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(payload)
+                    fh.flush()
+                    if self.fsync:
+                        os.fsync(fh.fileno())
+                if self.keep_backup and self.path.exists():
+                    self._preserve_backup()
+                os.replace(tmp, self.path)
+            except BaseException:
+                tmp.unlink(missing_ok=True)
+                raise
+            if self.fsync:
+                _fsync_dir(self.path.parent)
+            self.saves += 1
 
     def load_snapshot(self) -> Dict[str, Any]:
-        if not self.path.exists():
+        with self._lock:
+            if self.path.exists():
+                try:
+                    return _read_snapshot_file(self.path)
+                except (OSError, DeltaSnapshotCorrupt) as exc:
+                    self.last_error = f"{self.path.name}: {exc}"
+                    self._quarantine(self.path)
+            bak = self.backup_path
+            if self.keep_backup and bak.exists():
+                try:
+                    snap = _read_snapshot_file(bak)
+                except (OSError, DeltaSnapshotCorrupt) as exc:
+                    self.last_error = f"{bak.name}: {exc}"
+                    self._quarantine(bak)
+                    return {}
+                self.recoveries += 1
+                return snap
             return {}
+
+    def _preserve_backup(self) -> None:
+        bak = self.backup_path
+        link_tmp = bak.with_name(f"{bak.name}.{os.getpid()}.{time.time_ns()}")
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
-        snap = raw.get("snapshot", raw) if isinstance(raw, dict) else {}
-        return dict(snap) if isinstance(snap, dict) else {}
+            os.link(self.path, link_tmp)
+        except OSError:
+            # Filesystems without hard links: copy (primary stays in place).
+            link_tmp.write_bytes(self.path.read_bytes())
+        os.replace(link_tmp, bak)
+
+    def _quarantine(self, target: Path) -> None:
+        dest = target.with_name(f"{target.name}.corrupt-{time.time_ns()}")
+        try:
+            os.replace(target, dest)
+        except OSError:
+            return
+        self.quarantined.append(dest)
+
+
+def _mkstemp_for(path: Path) -> Tuple[int, str]:
+    return tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+
+
+def _fsync_dir(directory: Path) -> None:
+    try:
+        fd = os.open(str(directory), os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _read_snapshot_file(path: Path) -> Dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DeltaSnapshotCorrupt(f"unparseable: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise DeltaSnapshotCorrupt("top-level payload is not an object")
+    if "snapshot" not in raw:
+        # Legacy bare map written by external tooling (#2022 accepted it).
+        return dict(raw)
+    snap = raw["snapshot"]
+    if not isinstance(snap, dict):
+        raise DeltaSnapshotCorrupt("snapshot is not an object")
+    version = raw.get("version", 1)
+    if not isinstance(version, int) or version < 1 or version > SNAPSHOT_FILE_VERSION:
+        raise DeltaSnapshotCorrupt(f"unsupported version {version!r}")
+    if version >= 2:
+        expected = raw.get("sha256")
+        if not isinstance(expected, str) or expected != _snapshot_digest(snap):
+            raise DeltaSnapshotCorrupt("checksum mismatch")
+    return dict(snap)
 
 
 class DeltaMemory:
@@ -168,6 +329,9 @@ class DeltaMemory:
         *,
         on_compact: Optional[Callable[[Mapping[str, Any]], None]] = None,
         json_values: bool = False,
+        metrics: Optional[DeltaMetricsSink] = None,
+        metrics_prefix: str = "delta_memory",
+        metrics_labels: Optional[Dict[str, str]] = None,
     ) -> None:
         if window_cap < 1:
             raise ValueError("window_cap must be >= 1")
@@ -181,6 +345,10 @@ class DeltaMemory:
         self._deletes = 0
         self._on_compact = on_compact
         self._lock = threading.RLock()
+        self._metrics = metrics
+        self._metrics_prefix = str(metrics_prefix)
+        self._metrics_labels = dict(metrics_labels) if metrics_labels else None
+        self.metrics_errors = 0
 
     # -- core RS surface -------------------------------------------------
 
@@ -190,6 +358,7 @@ class DeltaMemory:
         with self._lock:
             self._window.append((str(key), value))
             self._writes += 1
+            self._emit("counter", "writes", 1.0)
             if len(self._window) >= self.window_cap:
                 self._compact_locked()
 
@@ -198,6 +367,7 @@ class DeltaMemory:
         key = str(key)
         with self._lock:
             self._reads += 1
+            self._emit("counter", "reads", 1.0)
             for k, v in reversed(self._window):
                 if k == key:
                     return None if v is _TOMBSTONE else self._egress(v)
@@ -214,6 +384,7 @@ class DeltaMemory:
         key = str(key)
         with self._lock:
             self._reads += 1
+            self._emit("counter", "reads", 1.0)
             for k, v in reversed(self._window):
                 if k == key:
                     if v is _TOMBSTONE:
@@ -264,6 +435,7 @@ class DeltaMemory:
             existed = self._visible_locked(key)
             self._window.append((key, _TOMBSTONE))
             self._deletes += 1
+            self._emit("counter", "deletes", 1.0)
             if len(self._window) >= self.window_cap:
                 self._compact_locked()
             return existed
@@ -289,6 +461,7 @@ class DeltaMemory:
             for key, value in items:
                 self._window.append((str(key), value))
                 self._writes += 1
+                self._emit("counter", "writes", 1.0)
                 n += 1
                 if len(self._window) >= self.window_cap:
                     self._compact_locked()
@@ -389,7 +562,27 @@ class DeltaMemory:
     def _egress(self, value: Any) -> Any:
         return copy.deepcopy(value) if self.json_values else value
 
+    def publish_metrics(self) -> Dict[str, Any]:
+        """Push current stats as gauges to the metrics sink; returns stats."""
+        st = self.stats()
+        with self._lock:
+            for name in ("window_len", "snapshot_keys", "pending_tombstones"):
+                self._emit("gauge", name, float(st[name]))
+        return st
+
+    def _emit(self, kind: str, name: str, value: float) -> None:
+        sink = self._metrics
+        if sink is None:
+            return
+        try:
+            getattr(sink, kind)(
+                f"{self._metrics_prefix}_{name}", value, self._metrics_labels
+            )
+        except Exception:  # metrics must never break the data path
+            self.metrics_errors += 1
+
     def _compact_locked(self) -> None:
+        drained = len(self._window)
         for k, v in self._window:
             if v is _TOMBSTONE:
                 self._snapshot.pop(k, None)
@@ -397,6 +590,9 @@ class DeltaMemory:
                 self._snapshot[k] = v
         self._window.clear()
         self.compactions += 1
+        self._emit("counter", "compactions", 1.0)
+        self._emit("observe", "compaction_deltas", float(drained))
+        self._emit("gauge", "snapshot_keys", float(len(self._snapshot)))
         if self._on_compact is not None:
             self._on_compact(self._egress(dict(self._snapshot)))
 
@@ -433,6 +629,12 @@ class PersistingDeltaMemory:
 
     Pending window deltas stay in-process until compact (auto or manual).
     On construction, loads any prior snapshot from the port.
+
+    Save failures are fail-loud: the exception propagates to the caller of
+    the write that triggered compaction, in-memory state stays consistent,
+    ``persist_failures`` / ``last_persist_error`` record it, and the store is
+    marked dirty so the next ``flush()`` re-persists the full snapshot even
+    when the window is empty.
     """
 
     def __init__(
@@ -441,11 +643,22 @@ class PersistingDeltaMemory:
         *,
         window_cap: int = DEFAULT_WINDOW_CAP,
         restore: bool = True,
+        json_values: bool = False,
+        metrics: Optional[DeltaMetricsSink] = None,
+        metrics_prefix: str = "delta_memory",
+        metrics_labels: Optional[Dict[str, str]] = None,
     ) -> None:
         self._port = port
+        self.persist_failures = 0
+        self.last_persist_error: Optional[str] = None
+        self._dirty = False
         self._inner = DeltaMemory(
             window_cap=window_cap,
             on_compact=self._persist_snapshot,
+            json_values=json_values,
+            metrics=metrics,
+            metrics_prefix=metrics_prefix,
+            metrics_labels=metrics_labels,
         )
         if restore:
             loaded = port.load_snapshot()
@@ -456,14 +669,36 @@ class PersistingDeltaMemory:
     def inner(self) -> DeltaMemory:
         return self._inner
 
+    @property
+    def dirty(self) -> bool:
+        """True when the last snapshot save failed and has not been retried."""
+        return self._dirty
+
     def _persist_snapshot(self, snapshot: Mapping[str, Any]) -> None:
-        self._port.save_snapshot(snapshot)
+        try:
+            self._port.save_snapshot(snapshot)
+        except Exception as exc:
+            self.persist_failures += 1
+            self.last_persist_error = f"{type(exc).__name__}: {exc}"
+            self._dirty = True
+            self._inner._emit("counter", "persist_failures", 1.0)
+            raise
+        self._dirty = False
 
     def write(self, key: str, value: Any) -> None:
         self._inner.write(key, value)
 
+    def write_many(self, items: Iterable[Tuple[str, Any]]) -> int:
+        return self._inner.write_many(items)
+
     def read(self, key: str) -> Optional[Any]:
         return self._inner.read(key)
+
+    def lookup(self, key: str) -> Tuple[bool, Any]:
+        return self._inner.lookup(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._inner.get(key, default)
 
     def delete(self, key: str) -> bool:
         return self._inner.delete(key)
@@ -472,17 +707,44 @@ class PersistingDeltaMemory:
         return self._inner.compact()
 
     def flush(self) -> int:
-        """Force compact + persist. Returns compacted delta count."""
-        return self._inner.compact()
+        """Force compact + persist. Returns compacted delta count.
+
+        With an empty window, re-saves the snapshot only if a previous save
+        failed (``dirty``), so a transient I/O error is recoverable.
+        """
+        n = self._inner.compact()
+        if n == 0 and self._dirty:
+            with self._inner._lock:
+                self._persist_snapshot(self._inner._egress(dict(self._inner._snapshot)))
+        return n
 
     def stats(self) -> Dict[str, Any]:
-        return self._inner.stats()
+        st = self._inner.stats()
+        st["persist_failures"] = self.persist_failures
+        st["dirty"] = self._dirty
+        return st
+
+    def publish_metrics(self) -> Dict[str, Any]:
+        self._inner.publish_metrics()
+        return self.stats()
 
     def materialize(self) -> Dict[str, Any]:
         return self._inner.materialize()
 
+    def keys(self) -> List[str]:
+        return self._inner.keys()
+
+    def items(self) -> List[Tuple[str, Any]]:
+        return self._inner.items()
+
     def has(self, key: str) -> bool:
         return self._inner.has(key)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._inner
+
+    def __len__(self) -> int:
+        return len(self._inner)
 
 
 def build_delta_memory(
@@ -501,9 +763,12 @@ __all__ = [
     "DEFAULT_WINDOW_CAP",
     "DeltaMemory",
     "DeltaMemoryStats",
+    "DeltaMetricsSink",
+    "DeltaSnapshotCorrupt",
     "DeltaSnapshotPort",
     "InMemoryDeltaSnapshotStore",
     "JsonFileDeltaSnapshotStore",
     "PersistingDeltaMemory",
+    "SNAPSHOT_FILE_VERSION",
     "build_delta_memory",
 ]
