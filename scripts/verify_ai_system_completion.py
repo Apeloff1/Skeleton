@@ -201,6 +201,7 @@ def verify(head_sha: str) -> dict[str, object]:
         "verification_receipt_identity_required": True,
         "terminal_outbox_delivery_required": True,
         "persisted_terminal_evidence_integrity_required": True,
+        "persisted_replay_evidence_integrity_required": True,
     }
     if not isinstance(authority, dict):
         errors.append("contract authority must be an object")
