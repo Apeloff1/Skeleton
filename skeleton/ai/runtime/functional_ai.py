@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Awaitable, Callable, Mapping
 from uuid import NAMESPACE_URL, uuid5
 
@@ -219,6 +220,7 @@ class FunctionalAIRuntime:
         self.local_model = local_model
         self.tools = tools
         self.startup_qualification_receipt: Mapping[str, object] | None = None
+        self._bound_qualification_digest: str | None = None
         self._bound_model_id=self.local_model.model
         self._bound_model_digest=self.local_model.engine.model.model_digest
         self._bound_runtime_digest=self.local_model.runtime_digest
@@ -247,9 +249,34 @@ class FunctionalAIRuntime:
     def _assert_startup_qualification_identity(self) -> None:
         receipt=self.startup_qualification_receipt
         if receipt is None:
+            if self._bound_qualification_digest is not None:
+                raise RuntimeError("VS-001 startup qualification receipt disappeared")
             return
+        payload=dict(receipt)
+        receipt_digest=payload.pop("receipt_digest",None)
+        if (
+            not isinstance(receipt_digest,str)
+            or len(receipt_digest)!=64
+            or any(ch not in "0123456789abcdef" for ch in receipt_digest)
+        ):
+            raise RuntimeError("VS-001 startup qualification digest is invalid")
+        if _digest(payload)!=receipt_digest:
+            raise RuntimeError("VS-001 startup qualification receipt was mutated")
+        if (
+            self._bound_qualification_digest is not None
+            and receipt_digest!=self._bound_qualification_digest
+        ):
+            raise RuntimeError("VS-001 startup qualification receipt identity drift")
+        if receipt.get("schema_version")!="skeleton.local_model.qualification.v1":
+            raise RuntimeError("VS-001 startup qualification schema drift")
+        if receipt.get("status")!="qualified":
+            raise RuntimeError("VS-001 startup qualification status drift")
         if receipt.get("provider")!="local":
             raise RuntimeError("VS-001 startup qualification provider drift")
+        if receipt.get("network_required") is not False:
+            raise RuntimeError("VS-001 startup qualification network policy drift")
+        if receipt.get("hosted_provider_credentials_required") is not False:
+            raise RuntimeError("VS-001 startup qualification credential policy drift")
         if receipt.get("model_id")!=self._bound_model_id:
             raise RuntimeError("VS-001 startup qualification model_id drift")
         if receipt.get("model_sha256")!=self._bound_model_digest:
@@ -291,7 +318,12 @@ class FunctionalAIRuntime:
             verification_hook=verification_hook,
             finalization_binding_hook=finalization_binding_hook,
         )
-        runtime.startup_qualification_receipt = qualification
+        qualification_copy=dict(qualification)
+        digest=qualification_copy.get("receipt_digest")
+        if not isinstance(digest,str):
+            raise RuntimeError("VS-001 startup qualification receipt is unsigned")
+        runtime._bound_qualification_digest=digest
+        runtime.startup_qualification_receipt=MappingProxyType(qualification_copy)
         runtime._assert_startup_qualification_identity()
         return runtime
 
