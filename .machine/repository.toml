@@ -49,7 +49,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/"]
+prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/sandbox/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -463,7 +463,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "skeleton/ecs/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
