@@ -7616,7 +7616,8 @@
         ".github/workflows",
         "machine",
         "skeleton/release/qualification.py",
-        ".github/workflows/p1-release-evidence-bundle.yml"
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        "Dockerfile"
       ],
       "risk_context": [
         "tested/source artifact mismatch",
@@ -7654,7 +7655,8 @@
         ".github/workflows",
         "machine",
         "skeleton/release/qualification.py",
-        ".github/workflows/p1-release-evidence-bundle.yml"
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        "Dockerfile"
       ],
       "risk_context": [
         "tested/source artifact mismatch",
@@ -7692,7 +7694,8 @@
         ".github/workflows",
         "machine",
         "skeleton/release/qualification.py",
-        ".github/workflows/p1-release-evidence-bundle.yml"
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        "Dockerfile"
       ],
       "risk_context": [
         "tested/source artifact mismatch",
