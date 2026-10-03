@@ -13,14 +13,27 @@ from .continual_learning import (
     run_continual_learning_round,
     save_continual_learning_state,
 )
+from .curriculum import (
+    CapabilityAssessment,
+    CapabilityObjective,
+    CurriculumError,
+    CurriculumPlan,
+    CurriculumPolicy,
+    CurriculumRoundResult,
+    plan_capability_curriculum,
+    run_curriculum_learning_round,
+)
 from .developmental_eval import (
     DevelopmentalCaseResult,
     DevelopmentalComparisonReport,
+    DevelopmentalModelCaseScore,
+    DevelopmentalModelScoreReport,
     DevelopmentalEvalCase,
     DevelopmentalEvalSuite,
     DevelopmentalEvaluationError,
     evaluate_local_candidate_developmentally,
     evaluate_training_receipt_developmentally,
+    score_local_model_developmentally,
 )
 from .artifact import (
     LoadedLocalModel,
@@ -103,6 +116,17 @@ from .local import (
 )
 
 __all__ = [
+    "score_local_model_developmentally",
+    "DevelopmentalModelScoreReport",
+    "DevelopmentalModelCaseScore",
+    "run_curriculum_learning_round",
+    "plan_capability_curriculum",
+    "CurriculumRoundResult",
+    "CurriculumPolicy",
+    "CurriculumPlan",
+    "CurriculumError",
+    "CapabilityObjective",
+    "CapabilityAssessment",
     "save_continual_learning_state",
     "run_continual_learning_round",
     "rollback_developmental_champion",
