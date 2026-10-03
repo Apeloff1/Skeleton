@@ -389,6 +389,20 @@ def qualify_learning_candidate(
         evaluation_manifest.get("training_plan_digest"),
         "evaluation manifest training plan digest",
     )
+    manifest_architecture = _text(
+        evaluation_manifest.get("model_architecture"),
+        "evaluation manifest model_architecture",
+        maximum=128,
+    )
+    receipt_architecture = _text(
+        training_receipt.get("model_architecture"),
+        "training receipt model_architecture",
+        maximum=128,
+    )
+    if manifest_architecture != receipt_architecture:
+        raise LearningQualificationError(
+            "training evaluation manifest model architecture drift"
+        )
     manifest_allocation = evaluation_manifest.get("method_allocation_digest")
     if manifest_allocation is not None:
         manifest_allocation = _sha(
