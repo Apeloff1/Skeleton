@@ -9,9 +9,10 @@ on:
       - "ARM64 Ubuntu Validation"
       - "Repository Hygiene Gate"
     types: [completed]
+    branches: ["*", "**"]
 
 concurrency:
-  group: autonomous-build-feedback-${{ github.event.workflow_run.head_sha }}
+  group: autonomous-build-feedback-${{ github.event_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 permissions:
