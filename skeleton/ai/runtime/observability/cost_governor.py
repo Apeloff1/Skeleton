@@ -26,6 +26,7 @@ from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
     AdmissionError,
     AdmissionRequest,
+    ResourceBudget,
     UsageEstimate,
 )
 from skeleton.intelligence.admission_runtime import (
@@ -128,6 +129,96 @@ def _usage_payload(usage: UsageEstimate) -> dict[str, int | float]:
         field: getattr(usage, field)
         for field in _USAGE_FIELDS
     }
+
+
+def _usage_from_payload(value: object) -> UsageEstimate:
+    if not isinstance(value, dict):
+        raise CostGovernorError("usage journal payload is invalid")
+    try:
+        return UsageEstimate(
+            input_tokens=int(value["input_tokens"]),
+            output_tokens=int(value["output_tokens"]),
+            cost_usd=float(value["cost_usd"]),
+            wall_seconds=float(value["wall_seconds"]),
+            provider_attempts=int(value["provider_attempts"]),
+            tool_calls=int(value["tool_calls"]),
+            artifact_bytes=int(value["artifact_bytes"]),
+            storage_bytes=int(value["storage_bytes"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "usage journal payload is invalid"
+        ) from exc
+
+
+def _budget_from_payload(value: object) -> ResourceBudget:
+    if not isinstance(value, dict):
+        raise CostGovernorError("budget journal payload is invalid")
+    try:
+        return ResourceBudget(
+            max_input_tokens=int(value["max_input_tokens"]),
+            max_output_tokens=int(value["max_output_tokens"]),
+            max_cost_usd=float(value["max_cost_usd"]),
+            max_wall_seconds=float(value["max_wall_seconds"]),
+            max_provider_attempts=int(value["max_provider_attempts"]),
+            max_tool_calls=int(value["max_tool_calls"]),
+            max_artifact_bytes=int(value["max_artifact_bytes"]),
+            max_storage_bytes=int(value["max_storage_bytes"]),
+            max_concurrency=int(value["max_concurrency"]),
+            max_queue_depth=int(value["max_queue_depth"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "budget journal payload is invalid"
+        ) from exc
+
+
+def _effective_terminal_actual(
+    reported: UsageEstimate,
+    completion: QuotaCompletion,
+) -> UsageEstimate:
+    observed = completion.actual
+    return UsageEstimate(
+        input_tokens=max(reported.input_tokens, observed.input_tokens),
+        output_tokens=max(reported.output_tokens, observed.output_tokens),
+        cost_usd=max(reported.cost_usd, observed.cost_usd),
+        wall_seconds=reported.wall_seconds,
+        provider_attempts=reported.provider_attempts,
+        tool_calls=max(reported.tool_calls, observed.tool_calls),
+        artifact_bytes=max(
+            reported.artifact_bytes,
+            observed.artifact_bytes,
+        ),
+        storage_bytes=max(
+            reported.storage_bytes,
+            observed.storage_bytes,
+        ),
+    )
+
+
+def _budget_overrun_dimensions(
+    budget: ResourceBudget,
+    actual: UsageEstimate,
+) -> tuple[str, ...]:
+    limits: dict[str, int | float] = {
+        "input_tokens": budget.max_input_tokens,
+        "output_tokens": budget.max_output_tokens,
+        "cost_usd": budget.max_cost_usd,
+        "wall_seconds": budget.max_wall_seconds,
+        "provider_attempts": budget.max_provider_attempts,
+        "tool_calls": budget.max_tool_calls,
+        "artifact_bytes": budget.max_artifact_bytes,
+        "storage_bytes": budget.max_storage_bytes,
+    }
+    exceeded: list[str] = []
+    for field, limit in limits.items():
+        value = getattr(actual, field)
+        if field in {"cost_usd", "wall_seconds"}:
+            if float(value) > float(limit) + 1e-12:
+                exceeded.append(field)
+        elif int(value) > int(limit):
+            exceeded.append(field)
+    return tuple(exceeded)
 
 
 def _request_digest(request: AdmissionRequest) -> str:
