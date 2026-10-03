@@ -172,3 +172,42 @@ def test_plain_builder_keeps_legacy_default_and_can_opt_into_gated(
     assert legacy["schema"] == "skeleton.numpy_recurrent_lm.v1"
     assert gated["model_architecture"] == "gated_recurrent"
     assert gated["schema"] == "skeleton.numpy_gated_recurrent_lm.v1"
+
+
+
+@pytest.mark.parametrize("backend_name", ["gated", "elman"])
+def test_gradient_accumulation_averages_micro_batches(
+    backend_name: str,
+) -> None:
+    pytest.importorskip("numpy")
+    if backend_name == "gated":
+        from skeleton.ai.runtime.inference.gated_neural import (
+            NumpyGatedRecurrentLM as Backend,
+        )
+    else:
+        from skeleton.ai.runtime.inference.neural import (
+            NumpyRecurrentLM as Backend,
+        )
+
+    kwargs = {
+        "model_id": "accumulation-average",
+        "hidden_size": 8,
+        "epochs": 1,
+        "learning_rate": 0.03,
+        "max_vocab": 32,
+        "max_document_tokens": 32,
+        "seed": 41,
+        "temperature": 0.7,
+        "shuffle_each_epoch": False,
+        "gradient_accumulation_steps": 2,
+    }
+    document = "alpha beta gamma delta"
+    single = Backend.train((document,), **kwargs)
+    duplicated = Backend.train((document, document), **kwargs)
+
+    # Both duplicated examples are evaluated against the same pre-update
+    # parameters. Averaging their identical gradients must therefore produce
+    # the same update as the one-example short final micro-batch.
+    assert duplicated.model_digest == single.model_digest
+    assert duplicated.training_optimizer_steps == 1
+    assert single.training_optimizer_steps == 1
