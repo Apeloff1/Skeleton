@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
+import json
 import socket
 import threading
 
@@ -307,4 +308,99 @@ async def test_vs001_rejects_identity_drift_before_new_execution(tmp_path) -> No
     )
     with pytest.raises(RuntimeError,match="identity changed after binding"):
         await runtime.execute(request)
+
+def _qualification_payload(runtime:FunctionalAIRuntime)->dict[str,object]:
+    payload={
+        "schema_version":"skeleton.local_model.qualification.v1",
+        "status":"qualified",
+        "provider":"local",
+        "network_required":False,
+        "hosted_provider_credentials_required":False,
+        "model_id":runtime.local_model.model,
+        "model_sha256":runtime.local_model.engine.model.model_digest,
+        "executable_sha256":runtime.local_model.runtime_digest,
+    }
+    encoded=json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",",":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    payload["receipt_digest"]=hashlib.sha256(encoded).hexdigest()
+    return payload
+
+
+def test_vs001_rejects_mutated_startup_qualification_receipt() -> None:
+    runtime=FunctionalAIRuntime(
+        SQLiteExecutionRepository(),
+        _local_tool_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    receipt=_qualification_payload(runtime)
+    runtime._bound_qualification_digest=receipt["receipt_digest"]
+    runtime.startup_qualification_receipt=receipt
+    receipt["network_required"]=True
+
+    with pytest.raises(RuntimeError,match="receipt was mutated"):
+        runtime._assert_startup_qualification_identity()
+
+
+def test_vs001_rejects_reissued_qualification_receipt_identity() -> None:
+    runtime=FunctionalAIRuntime(
+        SQLiteExecutionRepository(),
+        _local_tool_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    original=_qualification_payload(runtime)
+    runtime._bound_qualification_digest=original["receipt_digest"]
+    runtime.startup_qualification_receipt=original
+
+    replacement=dict(original)
+    replacement["status"]="qualified"
+    replacement["probe_nonce"]="different-qualification"
+    unsigned=dict(replacement)
+    unsigned.pop("receipt_digest",None)
+    replacement["receipt_digest"]=hashlib.sha256(
+        json.dumps(
+            unsigned,
+            sort_keys=True,
+            separators=(",",":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime.startup_qualification_receipt=replacement
+
+    with pytest.raises(RuntimeError,match="receipt identity drift"):
+        runtime._assert_startup_qualification_identity()
+
+
+def test_vs001_rejects_startup_qualification_network_or_credentials() -> None:
+    runtime=FunctionalAIRuntime(
+        SQLiteExecutionRepository(),
+        _local_tool_model(),
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    for field in ("network_required","hosted_provider_credentials_required"):
+        receipt=_qualification_payload(runtime)
+        receipt[field]=True
+        unsigned=dict(receipt)
+        unsigned.pop("receipt_digest",None)
+        receipt["receipt_digest"]=hashlib.sha256(
+            json.dumps(
+                unsigned,
+                sort_keys=True,
+                separators=(",",":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        runtime._bound_qualification_digest=receipt["receipt_digest"]
+        runtime.startup_qualification_receipt=receipt
+        with pytest.raises(RuntimeError,match="policy drift"):
+            runtime._assert_startup_qualification_identity()
 
