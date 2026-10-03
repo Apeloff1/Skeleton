@@ -246,6 +246,84 @@ def test_candidate_artifact_cannot_overwrite_active_model(
         )
 
 
+def test_candidate_artifact_can_use_adaptive_method_allocation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.inference.training_allocation import (
+        MethodValidationObservation,
+        TrainingAllocationPolicy,
+        allocate_training_methods,
+    )
+    from skeleton.ai.runtime.inference.training_methods import TrainingMethod
+    import hashlib
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+    digest = lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest()
+    allocation = allocate_training_methods(
+        (
+            MethodValidationObservation(
+                method=TrainingMethod.SUPERVISED_INSTRUCTION,
+                evaluation_class="mirror_validation",
+                validation_gain=0.5,
+                compute_units=1.0,
+                evaluation_digest=digest("adaptive-eval"),
+                plan_digest=digest("prior-plan"),
+                sample_count=4,
+            ),
+        ),
+        available_methods=(
+            TrainingMethod.SUPERVISED_INSTRUCTION,
+            TrainingMethod.CAUSAL_LANGUAGE_MODELING,
+            TrainingMethod.SELF_SUPERVISED_SPAN,
+            TrainingMethod.DENOISING_AUTOENCODING,
+        ),
+        policy=TrainingAllocationPolicy(
+            max_repeat_per_method=3,
+            max_total_repeats=6,
+        ),
+    )
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+    output = tmp_path / "adaptive-candidate.json"
+
+    receipt = build_learning_candidate_artifact(
+        candidate,
+        output_path=output,
+        model_id="adaptive-reverse-learning",
+        hidden_size=8,
+        epochs=1,
+        learning_rate=0.03,
+        max_vocab=48,
+        max_document_tokens=64,
+        seed=21,
+        temperature=0.7,
+        method_allocation=allocation,
+    )
+
+    assert output.is_file()
+    assert (
+        receipt["method_allocation"]["allocation_digest"]
+        == allocation.allocation_digest
+    )
+    assert (
+        receipt["evaluation_manifest"]["method_allocation_digest"]
+        == allocation.allocation_digest
+    )
+    configured = {
+        item["method"]: item["repeat"]
+        for item in receipt["training_plan"]["methods"]
+    }
+    assert configured == {
+        item.method.value: item.repeat
+        for item in allocation.method_weights
+    }
+
+
 def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     tmp_path: Path,
     monkeypatch,
