@@ -67,7 +67,8 @@ def analyze_impact(
         for path in changed_paths
         if str(path).strip()
     }))
-    zones = tuple(sorted({_zone_for_path(model, path) for path in paths}))
+    exact = {item.path: item.zone for item in model.files}
+    zones = tuple(sorted({_zone_for_path(model, path, exact) for path in paths}))
     reverse: dict[str, set[str]] = defaultdict(set)
     for edge in model.edges:
         reverse[edge.target].add(edge.source)
