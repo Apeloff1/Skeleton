@@ -209,6 +209,23 @@ def load_local_model_artifact(path: str | Path) -> LoadedLocalModel:
             raise LocalModelArtifactError(
                 "NumPy recurrent local-model artifact is invalid"
             ) from exc
+    elif (
+        payload.get("schema_version")
+        == "skeleton.numpy_gated_recurrent_lm.v1"
+    ):
+        schema = "skeleton.numpy_gated_recurrent_lm.v1"
+        try:
+            from .gated_neural import NumpyGatedRecurrentLM
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise LocalModelArtifactError(
+                "NumPy gated recurrent backend is not materialized"
+            ) from exc
+        try:
+            model = NumpyGatedRecurrentLM.from_dict(payload)
+        except Exception as exc:
+            raise LocalModelArtifactError(
+                "NumPy gated recurrent artifact is invalid"
+            ) from exc
     else:
         raise LocalModelArtifactError(
             "unsupported local model artifact schema"
