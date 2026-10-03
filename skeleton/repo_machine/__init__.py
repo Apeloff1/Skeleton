@@ -7,7 +7,7 @@ from .builder import RepositoryModelBuilder, build_repository_model
 from .catalog import CapabilityRecord, RepositoryCatalog, build_catalog
 from .context import context_for_intent
 from .contracts import SubsystemContract, derive_contracts
-from .execution_plan import ExecutionPlan, ExecutionState, PlanStep, advance_execution, build_execution_plan
+from .execution_plan import ExecutionPlan, ExecutionState, PlanStep, advance_execution, build_execution_plan, replan_execution
 from .governance import GovernanceViolation, validate_governance
 from .growth import GrowthRecommendation, growth_recommendations
 from .health import HealthReport, repository_health
@@ -45,6 +45,6 @@ __all__ = [
     "context_for_intent", "derive_contracts", "derive_work_candidates", "derive_zone_budgets",
     "evaluate_change_policy", "generate_workspace", "growth_recommendations", "placement_for_path",
     "propose_reorganization", "reachable_files", "repository_health", "save_manifest",
-    "select_steward_plan", "shard_index", "structural_hotspots", "structural_metrics",
+    "replan_execution", "select_steward_plan", "shard_index", "structural_hotspots", "structural_metrics",
     "validate_governance",
 ]
