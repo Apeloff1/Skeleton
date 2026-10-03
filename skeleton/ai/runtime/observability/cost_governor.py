@@ -38,6 +38,8 @@ from skeleton.intelligence.admission_runtime import (
 )
 from skeleton.intelligence.quota import (
     QuotaCompletion,
+    QuotaConflict,
+    QuotaError,
     QuotaReservation,
     QuotaUsageEvent,
     TenantQuota,
@@ -152,6 +154,29 @@ def _fallback_reason_allowed(reason: str, allowed: tuple[str, ...]) -> bool:
         reason == prefix or reason.startswith(prefix)
         for prefix in allowed
     )
+
+
+def _validated_evidence_refs(
+    values: Iterable[EvidenceRef],
+) -> tuple[EvidenceRef, ...]:
+    if isinstance(values, (str, bytes)):
+        raise CostGovernorError(
+            "evidence_refs must contain EvidenceRef values"
+        )
+    refs = tuple(values)
+    if not refs:
+        raise CostGovernorError("evidence_refs must be non-empty")
+    normalized: dict[tuple[str, str, str], EvidenceRef] = {}
+    for item in refs:
+        if not isinstance(item, EvidenceRef):
+            raise CostGovernorError(
+                "evidence_refs must contain EvidenceRef values"
+            )
+        source = _token("evidence source", item.source)
+        digest = _sha256("evidence digest", item.digest)
+        category = _token("evidence category", item.category)
+        normalized[(source, digest, category)] = item
+    return tuple(normalized[key] for key in sorted(normalized))
 
 
 def _strictly_cheaper(
@@ -735,6 +760,7 @@ class CostGovernor:
         operation = _token("operation_id", operation_id)
         if not isinstance(actual, UsageEstimate):
             raise TypeError("actual must be UsageEstimate")
+        refs = _validated_evidence_refs(evidence_refs)
         with self._lock:
             active = self._active.get(operation)
             if active is None:
@@ -764,7 +790,7 @@ class CostGovernor:
                 reservation=quota_reservation,
                 completion=quota_completion,
                 snapshot=snapshot,
-                evidence_refs=evidence_refs,
+                evidence_refs=refs,
             )
             reasons = list(accounting.reasons)
             if quota_completion.overrun:
@@ -802,6 +828,8 @@ class CostGovernor:
             except (
                 AdmissionRuntimeConflict,
                 AdmissionRuntimeError,
+                QuotaConflict,
+                QuotaError,
             ) as exc:
                 raise CostGovernorError(str(exc)) from exc
             decision = CostDecision(
