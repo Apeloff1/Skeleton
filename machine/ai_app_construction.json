@@ -1205,7 +1205,9 @@
       "evidence": [
         "skeleton/eval",
         "skeleton/intelligence/eval_framework.py",
-        "eval/fixtures"
+        "eval/fixtures",
+        "skeleton/eval/firewall.py",
+        "skeleton/ai/evaluation/firewall.py"
       ],
       "required_interfaces": [
         "eval case",
@@ -1217,7 +1219,13 @@
         "scenario harness",
         "golden journey evidence",
         "regression budget",
-        "flakiness record"
+        "flakiness record",
+        "EvaluationSet",
+        "EvaluatorIdentity",
+        "EvaluationQueryReceipt",
+        "PromotionEvidence",
+        "promotion holdout query budget",
+        "training-exclusion assertion"
       ],
       "construction": [
         "version datasets",
@@ -1227,7 +1235,11 @@
         "version evals by capability/runtime/model/routing policy",
         "run deterministic scenario harness without live secrets",
         "compare releases against approved baselines",
-        "quarantine flaky cases only with owner and expiry"
+        "quarantine flaky cases only with owner and expiry",
+        "classify development, regression, promotion-holdout and production-observation evaluation separately",
+        "require promotion holdouts to be training-excluded and query-budgeted",
+        "bind promotion-relevant queries to immutable evaluator and evaluation-set identities",
+        "reject contaminated holdouts, evaluator identity drift and exhausted adaptive holdout queries"
       ],
       "acceptance": [
         "deterministic smoke eval",
@@ -1237,7 +1249,12 @@
         "baseline regression detection",
         "scenario determinism",
         "golden journey evidence binding",
-        "flakiness quarantine enforcement"
+        "flakiness quarantine enforcement",
+        "promotion holdout training-exclusion test",
+        "holdout query-budget exhaustion test",
+        "contaminated holdout denial",
+        "evaluator identity drift denial",
+        "promotion evidence binds exact query receipt digests"
       ],
       "failure_mode": "block promotion when required regression/evidence gates fail"
     },
@@ -1266,7 +1283,9 @@
         "skeleton/ai/runtime/product/qualification.py",
         "skeleton/ai/runtime/product/model_program_bridge.py",
         "skeleton/intelligence/adaptive.py",
-        "skeleton/intelligence/experiment_tracker.py"
+        "skeleton/intelligence/experiment_tracker.py",
+        "skeleton/learning/mirror_room",
+        "skeleton/ai/learning/mirror_room"
       ],
       "required_interfaces": [
         "feedback event",
@@ -1290,7 +1309,13 @@
         "Mirror/firewall/lifecycle qualification bundle",
         "canonical model-program TrainingReceipt and ModelArtifact bridge",
         "independently verified ModelPromotionReceipt",
-        "promotion receipt"
+        "promotion receipt",
+        "MirrorRoomSpec",
+        "MirrorRunReceipt",
+        "MirrorPromotionEvidence",
+        "sealed holdout identity",
+        "split-integrity receipt",
+        "deterministic replay receipt"
       ],
       "construction": [
         "capture explicit/implicit feedback",
@@ -1318,7 +1343,13 @@
         "emit ModelPromotionReceipt only after qualification with a verifier distinct from trainer, Mirror verifier and firewall evaluator",
         "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
-        "require eval before behavior change"
+        "require eval before behavior change",
+        "run generated behavior candidates only inside a hermetic Mirror Room with bounded steps, tokens, cost, no network, no filesystem writes, no subprocesses and no external side effects",
+        "keep TRAIN-selected learning champion separate from VALIDATION-qualified promotion candidate so validation cannot choose the next adaptive parent",
+        "reject exact and near-duplicate cross-split contamination before learning and seal holdout identity before promotion qualification",
+        "use paired baseline/candidate seeds, family-wise validation correction, worst-case guardrails and bounded validation-candidate budgets",
+        "require a verifier independent of candidate generator and sandbox executor before emitting MirrorPromotionEvidence",
+        "keep MirrorPromotionEvidence non-authoritative and bind rollback to the exact production baseline candidate"
       ],
       "acceptance": [
         "experiment isolation",
@@ -1346,7 +1377,15 @@
         "lifecycle validation handoff carries evidence but no production authority",
         "canonical model-program bridge preserves exact model/artifact/training/corpus identity",
         "model promotion verifier is independent of trainer and evaluation authorities",
-        "promotion gate"
+        "promotion gate",
+        "Mirror Room generator/executor/verifier independence",
+        "hermetic sandbox side-effect denial and deterministic replay",
+        "train/validation/holdout split contamination rejection",
+        "validation cannot select the adaptive training parent",
+        "sealed holdout qualification and exact rollback-baseline binding",
+        "100-attempt adversarial ratchet and cumulative retained attack gauntlet",
+        "high-end content delivery and independent quality-judge evidence",
+        "Mirror Room observability cannot acquire learning authority"
       ],
       "failure_mode": "retain baseline behavior"
     },
