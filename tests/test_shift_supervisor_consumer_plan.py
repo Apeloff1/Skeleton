@@ -189,3 +189,18 @@ def test_normalize_worker_status_restores_canonical_plan_ids(tmp_path):
     assert worker["metadata"]["worked_on"] == ["idle-task-1"]
     assert worker["metadata"]["last_task_id"] == "idle-task-1"
     assert worker["overtime_task_ids"] == ["idle-task-1"]
+
+def test_core_consumer_plan_module_delegates_to_canonical_cli():
+    """The compatibility module must remain executable for workflow callers."""
+    import runpy
+    from unittest.mock import patch
+
+    with patch(
+        "skeleton.automation.shift_supervisor.consumer_plan.main",
+        return_value=0,
+    ) as canonical_main:
+        with pytest.raises(SystemExit) as exc:
+            runpy.run_module("core.shift_supervisor.consumer_plan", run_name="__main__")
+
+    assert exc.value.code == 0
+    canonical_main.assert_called_once_with()
