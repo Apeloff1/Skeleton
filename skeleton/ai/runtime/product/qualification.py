@@ -178,6 +178,85 @@ class LearningQualificationBundle:
             raise LearningQualificationError(
                 "qualification cannot self-modify production"
             )
+        for name in (
+            "binding_digest",
+            "candidate_model_digest",
+            "baseline_model_digest",
+            "candidate_artifact_sha256",
+            "training_plan_digest",
+            "mirror_evidence_digest",
+            "firewall_evidence_digest",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _sha(getattr(self, name), name),
+            )
+        object.__setattr__(
+            self,
+            "mirror_verifier_id",
+            _text(self.mirror_verifier_id, "mirror_verifier_id"),
+        )
+        object.__setattr__(
+            self,
+            "firewall_evaluator_identity",
+            _text(
+                self.firewall_evaluator_identity,
+                "firewall_evaluator_identity",
+            ),
+        )
+        refs = tuple(
+            _text(item, "lifecycle_evidence_ref", maximum=2048)
+            for item in self.lifecycle_evidence_refs
+        )
+        if len(refs) < 4:
+            raise LearningQualificationError(
+                "qualification requires at least four lifecycle evidence refs"
+            )
+        if len(refs) != len(set(refs)):
+            raise LearningQualificationError(
+                "qualification lifecycle evidence refs must be unique"
+            )
+        object.__setattr__(self, "lifecycle_evidence_refs", refs)
+        for name in (
+            "camera_coverage_digest",
+            "method_allocation_digest",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, _sha(value, name))
+        expected = _digest(
+            {
+                "schema_version": "skeleton.learning_qualification.v1",
+                "binding_digest": self.binding_digest,
+                "candidate_model_digest": self.candidate_model_digest,
+                "baseline_model_digest": self.baseline_model_digest,
+                "candidate_artifact_sha256": self.candidate_artifact_sha256,
+                "training_plan_digest": self.training_plan_digest,
+                "mirror_evidence_digest": self.mirror_evidence_digest,
+                "firewall_evidence_digest": self.firewall_evidence_digest,
+                "mirror_verifier_id": self.mirror_verifier_id,
+                "firewall_evaluator_identity": (
+                    self.firewall_evaluator_identity
+                ),
+                "lifecycle_evidence_refs": list(
+                    self.lifecycle_evidence_refs
+                ),
+                "camera_coverage_digest": self.camera_coverage_digest,
+                "method_allocation_digest": self.method_allocation_digest,
+                "production_authority": False,
+                "direct_self_modify": False,
+            }
+        )
+        actual = _sha(
+            self.qualification_digest,
+            "qualification_digest",
+        )
+        if actual != expected:
+            raise LearningQualificationError(
+                "qualification digest does not match evidence payload"
+            )
+        object.__setattr__(self, "qualification_digest", actual)
 
     def lifecycle_validation_kwargs(
         self,
