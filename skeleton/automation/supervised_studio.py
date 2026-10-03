@@ -35,6 +35,8 @@ from .studio_registry import STUDIO, STUDIO_SIZE, registry_fingerprint, select_c
 from .studio_capabilities import validate_capabilities
 from .studio_invariants import require_subset
 from .studio_outcomes import OutcomeReceipt
+from .studio_artifact_custody import ArtifactCustody
+from .studio_promotion import PromotionEvidence, require_promotable
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
@@ -559,7 +561,9 @@ def propose(
                 # symlink/ancestor replacement races between planning and application.
                 for path in task.paths:
                     _canonical_path(path)
-                candidate_sha = hashlib.sha256(reviewed.patch.encode("utf-8")).hexdigest()
+                candidate_custody = ArtifactCustody.from_bytes("candidate_patch", reviewed.patch.encode("utf-8"))
+                candidate_sha = candidate_custody.sha256
+                candidate_custody.verify(candidate.read_bytes())
                 if hashlib.sha256(candidate.read_bytes()).hexdigest() != candidate_sha:
                     raise RuntimeError("candidate patch changed after review")
                 try:
@@ -595,6 +599,12 @@ def propose(
                         _git("clean", "-fd", "--", *new_paths, check=False)
                     journal_path.unlink(missing_ok=True)
                     continue
+                require_promotable(PromotionEvidence(
+                    validation_passed=True,
+                    review_passed=True,
+                    receipt_bound=bool(state_payload["_shift_supervisor"].get("allocation")),
+                    worktree_clean=not bool(_git("status", "--porcelain=v1", "--untracked-files=all").replace(applied_before_validation, "").strip()),
+                ))
                 transaction["phase"] = "validated"
                 transaction["applied_diff_sha256"] = candidate_diff_sha
                 _write_transaction(journal_path, transaction)
