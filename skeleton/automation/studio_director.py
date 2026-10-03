@@ -89,6 +89,28 @@ class AuditLog:
         path.parent.mkdir(parents=True, exist_ok=True)
         self._sequence = 0
         self._previous_hash = "0" * 64
+        if path.exists():
+            if path.is_symlink():
+                raise ValueError("audit log must not be a symlink")
+            if path.stat().st_size > 10_000_000:
+                raise ValueError("audit log exceeds 10 MB safety bound")
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            if rows:
+                if any(str(row.get("run_id", "")) != run_id for row in rows):
+                    raise ValueError("existing audit log belongs to a different run id")
+                previous = "0" * 64
+                for index, row in enumerate(rows, start=1):
+                    if row.get("sequence") != index or row.get("previous_record_sha256") != previous:
+                        raise ValueError("existing audit log chain is invalid")
+                    claimed = str(row.get("record_sha256", ""))
+                    payload = dict(row)
+                    payload.pop("record_sha256", None)
+                    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+                    if claimed != hashlib.sha256(canonical.encode("utf-8")).hexdigest():
+                        raise ValueError("existing audit log record hash is invalid")
+                    previous = claimed
+                self._sequence = len(rows)
+                self._previous_hash = previous
 
     def emit(self, event: str, **fields: object) -> None:
         self._sequence += 1
