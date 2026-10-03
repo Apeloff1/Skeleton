@@ -566,3 +566,46 @@ def test_hand_constructed_command_cannot_bypass_payload_contract() -> None:
 
     with pytest.raises(CreatorCommandError):
         validate_creator_command(forged)
+
+
+def test_top_level_creator_cli_emits_canonical_command(capsys) -> None:
+    from skeleton.__main__ import main
+
+    exit_code = main(
+        [
+            "creator",
+            "create",
+            "project-alpha",
+            json.dumps(_payload("create")),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    output = json.loads(captured.out)
+    assert output["schema"] == COMMAND_SCHEMA
+    assert output["schema_version"] == COMMAND_VERSION
+    assert output["operation"] == "create"
+    assert output["project_id"] == "project-alpha"
+    assert output["payload"] == _payload("create")
+    assert len(output["digest"]) == 64
+
+
+def test_top_level_creator_cli_fails_closed_on_invalid_operation(capsys) -> None:
+    from skeleton.__main__ import main
+
+    exit_code = main(
+        [
+            "creator",
+            "destroy",
+            "project-alpha",
+            "{}",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    output = json.loads(captured.out)
+    assert output["ok"] is False
+    assert output["error"] == "CRE.COMMAND_SURFACE"
+    assert output["context"]["reason"] == "unknown_operation"
