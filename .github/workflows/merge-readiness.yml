@@ -232,6 +232,7 @@ jobs:
           skeleton/testing/test_runner_v2_runtime.py
           skeleton/testing/test_runner_v2_transaction_report.py
           skeleton/testing/test_runner_v2_engine.py
+          tests/test_required_checks_policy.py
           tests/test_repo_machine.py
           tests/test_repo_machine_advanced.py
           tests/test_repo_machine_growth.py

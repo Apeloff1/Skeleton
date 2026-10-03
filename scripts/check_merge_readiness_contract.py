@@ -29,6 +29,7 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_runtime.py",
     "skeleton/testing/test_runner_v2_transaction_report.py",
     "skeleton/testing/test_runner_v2_engine.py",
+    "tests/test_required_checks_policy.py",
 )
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"

@@ -75,7 +75,9 @@ def load_policy(path: Path) -> dict[str, Any]:
     _require_str(data, "branch", "policy")
     checks = data.get("required_status_checks")
     if not isinstance(checks, list) or len(checks) != 1:
-        raise PolicyError("required_status_checks must contain exactly one deterministic aggregate check")
+        raise PolicyError(
+            "required_status_checks must contain exactly one deterministic aggregate check"
+        )
     for index, check in enumerate(checks):
         where = f"required_status_checks[{index}]"
         if not isinstance(check, dict):
@@ -103,11 +105,18 @@ def load_policy(path: Path) -> dict[str, Any]:
     for key in PROTECTION_KEYS:
         if key not in protection:
             raise PolicyError(f"protection.{key} is required")
-    if protection.get("allow_force_pushes") is not False or protection.get("allow_deletions") is not False:
-        raise PolicyError("protection must forbid force-pushes and deletions on the protected branch")
+    if (
+        protection.get("allow_force_pushes") is not False
+        or protection.get("allow_deletions") is not False
+    ):
+        raise PolicyError(
+            "protection must forbid force-pushes and deletions on the protected branch"
+        )
     for key in ("documentation", "name_references", "stale_check_names"):
         value = data.get(key, [])
-        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) and item for item in value
+        ):
             raise PolicyError(f"{key} must be a list of non-empty strings")
     _require_str(data, "protection_script", "policy")
     _require_str(data, "contract_checker", "policy")
@@ -119,7 +128,9 @@ def parse_jobs(text: str) -> dict[str, dict[str, str | None]]:
 
     lines = text.splitlines()
     try:
-        start = next(i for i, line in enumerate(lines) if re.match(r"^jobs:\s*(?:#.*)?$", line))
+        start = next(
+            i for i, line in enumerate(lines) if re.match(r"^jobs:\s*(?:#.*)?$", line)
+        )
     except StopIteration:
         return {}
     jobs: dict[str, dict[str, str | None]] = {}
@@ -175,7 +186,9 @@ def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
         failures.append(f"{where}: workflow name must be {check['workflow_name']!r}")
     for trigger in ("pull_request:", "push:"):
         if re.search(rf"^  {trigger}", text, re.MULTILINE) is None:
-            failures.append(f"{where}: required aggregate must run on {trigger.rstrip(':')}")
+            failures.append(
+                f"{where}: required aggregate must run on {trigger.rstrip(':')}"
+            )
     jobs = parse_jobs(text)
     aggregate = jobs.get(check["job_id"])
     if aggregate is None:
@@ -186,29 +199,43 @@ def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
             f"{where}: job {check['job_id']!r} must be named {check['context']!r} (found {aggregate['name']!r})"
         )
     block = aggregate["block"] or ""
-    needs_match = re.search(r"^    needs:\s*\n((?:      - .+\n?)+)", block, re.MULTILINE)
+    needs_match = re.search(
+        r"^    needs:\s*\n((?:      - .+\n?)+)", block, re.MULTILINE
+    )
     declared = (
-        [item.strip()[2:].strip() for item in needs_match.group(1).splitlines() if item.strip()]
+        [
+            item.strip()[2:].strip()
+            for item in needs_match.group(1).splitlines()
+            if item.strip()
+        ]
         if needs_match
         else []
     )
     expected = [lane["job_id"] for lane in policy["aggregate_lanes"]]
     if sorted(declared) != sorted(expected):
-        failures.append(f"{where}: aggregate needs {sorted(declared)} must equal policy lanes {sorted(expected)}")
+        failures.append(
+            f"{where}: aggregate needs {sorted(declared)} must equal policy lanes {sorted(expected)}"
+        )
     for lane in policy["aggregate_lanes"]:
         job = jobs.get(lane["job_id"])
         if job is None:
             failures.append(f"{where}: lane job {lane['job_id']!r} missing")
             continue
         if job["name"] != lane["name"]:
-            failures.append(f"{where}: lane {lane['job_id']!r} must be named {lane['name']!r} (found {job['name']!r})")
+            failures.append(
+                f"{where}: lane {lane['job_id']!r} must be named {lane['name']!r} (found {job['name']!r})"
+            )
         binding = f"{lane['result_env']}: ${{{{ needs.{lane['job_id']}.result }}}}"
         if binding not in block:
             failures.append(f"{where}: aggregate missing result binding {binding!r}")
         if f'os.environ["{lane["result_env"]}"]' not in block:
-            failures.append(f"{where}: aggregate summary never evaluates {lane['result_env']}")
+            failures.append(
+                f"{where}: aggregate summary never evaluates {lane['result_env']}"
+            )
         if "continue-on-error: true" in (job["block"] or ""):
-            failures.append(f"{where}: lane {lane['job_id']!r} must not hide failures with continue-on-error")
+            failures.append(
+                f"{where}: lane {lane['job_id']!r} must not hide failures with continue-on-error"
+            )
     return failures
 
 
@@ -249,7 +276,14 @@ def check_protection_script(policy: dict[str, Any], root: Path) -> list[str]:
         failures.append(f"{relative}: required_app_id must be {check['app_id']}")
     if f'.context == "{check["context"]}" and .app_id == {check["app_id"]}' not in text:
         failures.append(f"{relative}: --verify must match the exact context and app id")
-    if re.search(rf'^branch="\$\{{BRANCH:-{re.escape(policy["branch"])}\}}"', text, re.MULTILINE) is None:
+    if (
+        re.search(
+            rf'^branch="\$\{{BRANCH:-{re.escape(policy["branch"])}\}}"',
+            text,
+            re.MULTILINE,
+        )
+        is None
+    ):
         failures.append(f"{relative}: default branch must be {policy['branch']!r}")
     payload_match = re.search(r"^payload='(\{.*?\})'$", text, re.MULTILINE | re.DOTALL)
     if payload_match is None:
@@ -269,23 +303,35 @@ def check_protection_script(policy: dict[str, Any], root: Path) -> list[str]:
         "contexts": status.get("contexts"),
         "strict": status.get("strict"),
         "enforce_admins": payload.get("enforce_admins"),
-        "required_approving_review_count": reviews.get("required_approving_review_count"),
+        "required_approving_review_count": reviews.get(
+            "required_approving_review_count"
+        ),
         "dismiss_stale_reviews": reviews.get("dismiss_stale_reviews"),
-        "required_conversation_resolution": payload.get("required_conversation_resolution"),
+        "required_conversation_resolution": payload.get(
+            "required_conversation_resolution"
+        ),
         "allow_force_pushes": payload.get("allow_force_pushes"),
         "allow_deletions": payload.get("allow_deletions"),
     }
-    wanted = {"checks": expected_checks, "contexts": [], **{k: protection[k] for k in PROTECTION_KEYS}}
+    wanted = {
+        "checks": expected_checks,
+        "contexts": [],
+        **{k: protection[k] for k in PROTECTION_KEYS},
+    }
     for key, value in wanted.items():
         if observed[key] != value:
-            failures.append(f"{relative}: payload {key} is {observed[key]!r}, policy requires {value!r}")
+            failures.append(
+                f"{relative}: payload {key} is {observed[key]!r}, policy requires {value!r}"
+            )
     return failures
 
 
 def check_contract_checker(policy: dict[str, Any], root: Path) -> list[str]:
     relative = policy["contract_checker"]
     path = root / relative
-    spec = importlib.util.spec_from_file_location("_merge_readiness_contract_for_policy", path)
+    spec = importlib.util.spec_from_file_location(
+        "_merge_readiness_contract_for_policy", path
+    )
     if spec is None or spec.loader is None:
         return [f"{relative}: cannot load"]
     module = importlib.util.module_from_spec(spec)
@@ -296,7 +342,9 @@ def check_contract_checker(policy: dict[str, Any], root: Path) -> list[str]:
     declared = tuple(getattr(module, "REQUIRED_NEEDS", ()))
     expected = tuple(lane["job_id"] for lane in policy["aggregate_lanes"])
     if sorted(declared) != sorted(expected):
-        return [f"{relative}: REQUIRED_NEEDS {declared} must equal policy lanes {expected}"]
+        return [
+            f"{relative}: REQUIRED_NEEDS {declared} must equal policy lanes {expected}"
+        ]
     return []
 
 
@@ -308,37 +356,63 @@ def check_docs(policy: dict[str, Any], root: Path) -> list[str]:
         if text is None:
             continue
         if f"**{context}**" not in text and f"**`{context}`**" not in text:
-            failures.append(f"{relative}: must name the required check as **{context}**")
+            failures.append(
+                f"{relative}: must name the required check as **{context}**"
+            )
         for lane in policy["aggregate_lanes"]:
             if lane["name"] not in text:
-                failures.append(f"{relative}: must document required lane {lane['name']!r}")
+                failures.append(
+                    f"{relative}: must document required lane {lane['name']!r}"
+                )
         if ".github/ci/required-checks.json" not in text:
-            failures.append(f"{relative}: must point at .github/ci/required-checks.json as the source of truth")
+            failures.append(
+                f"{relative}: must point at .github/ci/required-checks.json as the source of truth"
+            )
     for relative in sorted({*policy["documentation"], *policy["name_references"]}):
         text = _read(root, relative, failures)
         if text is None:
             continue
         for stale in policy["stale_check_names"]:
             if stale in text:
-                failures.append(f"{relative}: references stale required check name {stale!r}; use {context!r}")
+                failures.append(
+                    f"{relative}: references stale required check name {stale!r}; use {context!r}"
+                )
     return failures
 
 
 def run(root: Path, policy_path: Path) -> tuple[list[str], dict[str, Any] | None]:
     try:
-        policy = load_policy(policy_path if policy_path.is_absolute() else root / policy_path)
+        policy = load_policy(
+            policy_path if policy_path.is_absolute() else root / policy_path
+        )
     except PolicyError as exc:
         return [f"policy: {exc}"], None
     failures: list[str] = []
-    for checker in (check_workflow, check_unique_context, check_protection_script, check_contract_checker, check_docs):
+    for checker in (
+        check_workflow,
+        check_unique_context,
+        check_protection_script,
+        check_contract_checker,
+        check_docs,
+    ):
         failures.extend(checker(policy, root))
     return failures, policy
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--root", type=Path, default=ROOT, help="repository root (default: this checkout)")
-    parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY, help="policy path relative to --root")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=ROOT,
+        help="repository root (default: this checkout)",
+    )
+    parser.add_argument(
+        "--policy",
+        type=Path,
+        default=DEFAULT_POLICY,
+        help="policy path relative to --root",
+    )
     args = parser.parse_args(argv)
     failures, policy = run(args.root.resolve(), args.policy)
     if failures:
