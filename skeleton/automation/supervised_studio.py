@@ -391,6 +391,8 @@ def propose(
         raise ValueError("cohort_size must be 3-50")
 
     run_id = os.environ.get("GITHUB_RUN_ID") or seed
+    journal_path = _transaction_journal_path(patch_path)
+    _recover_interrupted_transaction(journal_path)
     audit = AuditLog(audit_path, run_id)
     cohort = select_cohort(seed, size=cohort_size)
     audit.emit(
@@ -538,6 +540,17 @@ def propose(
                 if before_apply.strip():
                     raise RuntimeError("Studio worktree is dirty before candidate application")
                 new_paths = [path for path in task.paths if not Path(path).exists()]
+                transaction = {
+                    "schema": "autonomous-studio.transaction.v1",
+                    "run_id": run_id,
+                    "task": plan_id,
+                    "phase": "prepared",
+                    "base_commit_sha": base_commit_sha,
+                    "candidate_sha256": hashlib.sha256(reviewed.patch.encode("utf-8")).hexdigest(),
+                    "authorized_paths": list(task.paths),
+                    "new_paths": new_paths,
+                }
+                _write_transaction(journal_path, transaction)
                 # Revalidate every authorized path immediately before mutation to close
                 # symlink/ancestor replacement races between planning and application.
                 for path in task.paths:
@@ -547,12 +560,16 @@ def propose(
                     raise RuntimeError("candidate patch changed after review")
                 try:
                     subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                    transaction["phase"] = "applied"
+                    _write_transaction(journal_path, transaction)
                     applied_before_validation = _git("diff", "--no-ext-diff", "--binary")
                     candidate_diff_sha = hashlib.sha256(applied_before_validation.encode("utf-8")).hexdigest()
                     applied_paths = set(_changed_paths(applied_before_validation)) if applied_before_validation else set()
                     if not applied_paths.issubset(set(task.paths)):
                         raise RuntimeError("applied candidate escaped authorized paths")
                     validation_commands = _discover_validation_commands(task.paths)
+                    transaction["phase"] = "validating"
+                    _write_transaction(journal_path, transaction)
                     validation_ok, validation_output = _run_validation_commands(validation_commands)
                     applied_after_validation = _git("diff", "--no-ext-diff", "--binary")
                     if applied_after_validation != applied_before_validation:
@@ -573,6 +590,9 @@ def propose(
                     _git("reset", "--hard", "HEAD", check=False)
                     _git("clean", "-fd", "--", *[path for path in task.paths if not Path(path).exists()], check=False)
                     continue
+                transaction["phase"] = "validated"
+                transaction["applied_diff_sha256"] = candidate_diff_sha
+                _write_transaction(journal_path, transaction)
                 accepted += 1
                 audit.emit(
                     "patch_accepted",
@@ -593,6 +613,9 @@ def propose(
                     applied_diff_sha256=candidate_diff_sha,
                     paths=list(task.paths),
                 )
+                transaction["phase"] = "committed"
+                _write_transaction(journal_path, transaction)
+                journal_path.unlink(missing_ok=True)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                 audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
     except BaseException:
