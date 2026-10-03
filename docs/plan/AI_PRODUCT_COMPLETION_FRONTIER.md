@@ -431,6 +431,35 @@ artifact without mutating or erasing the lineage. None of these transitions has
 production authority; Mirror, firewall, lifecycle validation and governed model
 promotion still remain downstream.
 
+### 25. Dependency-aware autonomous capability curriculum
+
+The developmental plane can now score one exact local model directly against
+bounded capability suites. Absolute score receipts bind the suite, model,
+artifact, per-case output digests, token work and weighted mastery score without
+needing a comparison candidate.
+
+Capability objectives add explicit mastery thresholds, priorities, training
+method hints and prerequisite capability IDs. The curriculum planner evaluates
+the active developmental champion, resolves the dependency graph, blocks skills
+whose prerequisites are not yet mastered, ranks eligible deficits by
+priority-weighted mastery gap, and selects a bounded set of next targets.
+
+Selected target suites are merged into the acquisition suite. Already-mastered
+capabilities become retention evidence so the next continual-learning round must
+improve the selected targets without excessive regression on prior capabilities.
+During bootstrap, when no mastered retention inventory exists yet, the
+development acquisition suite doubles as a non-promotion stability witness.
+
+A curriculum round therefore executes:
+
+`score champion -> resolve prerequisites -> rank mastery gaps -> select target
+-> choose hinted training methods -> continual replay training -> acquisition /
+retention gate -> rescore capability map`
+
+When every declared capability meets its threshold, the planner produces no
+target, performs no training, and writes no challenger artifact. Curriculum
+state has no production or promotion authority.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -478,7 +507,10 @@ promotion still remain downstream.
   candidate training;
 - restart-safe continual learning with deterministic experience replay;
 - acquisition/retention gating with catastrophic-forgetting rejection;
-- authenticated developmental champion rollback with append-only history.
+- authenticated developmental champion rollback with append-only history;
+- absolute developmental capability scoring on the active local champion;
+- dependency-aware autonomous target selection from measured mastery gaps;
+- no-op completion when all declared capabilities satisfy thresholds.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
