@@ -56,6 +56,8 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_DURABLE_UNKNOWN_PREFIX = "unknown:"
+_RECOVERED_UNKNOWN_REASON = "durable-recovered-unknown-usage"
 _USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -705,13 +707,64 @@ class AdmissionRuntime:
                     "durable quota reservation does not match lease"
                 )
 
+            unresolved_reader = getattr(
+                self.quota_ledger,
+                "unresolved_usage",
+                None,
+            )
+            if not callable(unresolved_reader):
+                raise AdmissionRuntimeError(
+                    "quota ledger does not support unresolved usage recovery"
+                )
+            try:
+                unresolved = unresolved_reader(
+                    reservation.reservation_id
+                )
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_unknown_usage_unavailable"
+                ) from exc
+
+            restored_unknown: dict[str, UnknownUsageMarker] = {}
+            for event in unresolved:
+                if (
+                    event.reservation_id != reservation.reservation_id
+                    or event.operation_id != request.operation_id
+                    or event.tenant_id != request.tenant_id
+                    or not event.category.startswith(
+                        _DURABLE_UNKNOWN_PREFIX
+                    )
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage marker identity mismatch"
+                    )
+                category = event.category[
+                    len(_DURABLE_UNKNOWN_PREFIX):
+                ]
+                if category not in _USAGE_CATEGORIES:
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage category is invalid"
+                    )
+                restored_unknown[event.event_id] = UnknownUsageMarker(
+                    event_id=event.event_id,
+                    operation_id=request.operation_id,
+                    category=category,
+                    reason=_RECOVERED_UNKNOWN_REASON,
+                    recorded_at=event.recorded_at,
+                )
+
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
                 request_fingerprint=fingerprint,
-                unknown_usage={},
+                unknown_usage=restored_unknown,
                 shared_pressure_lease=shared_lease,
             )
             self.metrics_registry.inc("admission.reattached_total")
+            if restored_unknown:
+                self.metrics_registry.inc(
+                    "admission.unknown_usage_reattached_total",
+                    len(restored_unknown),
+                )
             return lease
 
     def settle_shared_pressure_recovery(
@@ -984,13 +1037,28 @@ class AdmissionRuntime:
 
             existing = active.unknown_usage.get(event)
             if existing is not None:
+                recovered_reason = (
+                    existing.reason == _RECOVERED_UNKNOWN_REASON
+                )
                 if (
                     existing.category != normalized_category
-                    or existing.reason != normalized_reason
+                    or (
+                        not recovered_reason
+                        and existing.reason != normalized_reason
+                    )
                 ):
                     raise AdmissionRuntimeConflict(
                         "unknown usage event replayed with different inputs"
                     )
+                if recovered_reason:
+                    existing = UnknownUsageMarker(
+                        event_id=existing.event_id,
+                        operation_id=existing.operation_id,
+                        category=existing.category,
+                        reason=normalized_reason,
+                        recorded_at=existing.recorded_at,
+                    )
+                    active.unknown_usage[event] = existing
                 return existing
             marker = UnknownUsageMarker(
                 event_id=event,
