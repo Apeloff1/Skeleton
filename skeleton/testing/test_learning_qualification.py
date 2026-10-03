@@ -171,12 +171,14 @@ def _qualification_fixture():
             "camera_coverage_digests": [camera],
         },
         "method_allocation": {"allocation_digest": allocation},
+        "model_architecture": "gated_recurrent",
         "promotion_state": "candidate_only",
         "evaluation_manifest": {
             "candidate_model_digest": candidate_model,
             "candidate_artifact_sha256": artifact,
             "training_plan_digest": plan,
             "method_allocation_digest": allocation,
+            "model_architecture": "gated_recurrent",
             "baseline": {"model_digest": baseline_model},
             "promotion_authority": False,
         },
@@ -446,3 +448,24 @@ def test_allocation_rejects_duplicate_validation_receipt_replay() -> None:
         match="duplicate validation observation evidence",
     ):
         allocate_training_methods((observation, observation))
+
+
+def test_qualification_rejects_model_architecture_drift() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    receipt = {
+        **receipt,
+        "evaluation_manifest": {
+            **receipt["evaluation_manifest"],
+            "model_architecture": "elman_recurrent",
+        },
+    }
+    with pytest.raises(
+        LearningQualificationError,
+        match="model architecture drift",
+    ):
+        qualify_learning_candidate(
+            training_receipt=receipt,
+            binding=binding,
+            mirror_promotion_evidence=mirror,
+            firewall_promotion_evidence=firewall,
+        )
