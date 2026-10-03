@@ -776,3 +776,54 @@ def test_history_module_has_no_filesystem_process_network_or_engine_authority() 
             assert node.module.split(".")[0] not in forbidden_modules
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             assert node.func.id not in forbidden_calls
+
+
+def test_snapshot_inventory_order_is_canonical() -> None:
+    a = _a()
+    b = _b()
+    history = create_generated_history(a)
+    history, _ = record_generated_transition(
+        history,
+        a,
+        b,
+        label="Rename scene",
+    )
+    assert len(history.snapshots) == 2
+
+    with pytest.raises(GeneratedHistoryError) as caught:
+        validate_generated_history(
+            replace(
+                history,
+                snapshots=tuple(reversed(history.snapshots)),
+            )
+        )
+    assert caught.value.context["reason"] == "snapshot_integrity"
+
+
+def test_transition_inventory_order_is_canonical() -> None:
+    a = _a()
+    b = _b()
+    c = _c()
+    history = create_generated_history(a)
+    history, _ = record_generated_transition(
+        history,
+        a,
+        b,
+        label="Rename scene",
+    )
+    history, _ = record_generated_transition(
+        history,
+        b,
+        c,
+        label="Tune cooldown",
+    )
+    assert len(history.transitions) == 2
+
+    with pytest.raises(GeneratedHistoryError) as caught:
+        validate_generated_history(
+            replace(
+                history,
+                transitions=tuple(reversed(history.transitions)),
+            )
+        )
+    assert caught.value.context["reason"] == "transition_integrity"
