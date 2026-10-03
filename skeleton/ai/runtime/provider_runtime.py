@@ -14,6 +14,7 @@ from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import base64
 import hashlib
@@ -1024,14 +1025,115 @@ def _extract_provider_structured_output(
     )
 
 
+def _billing_decimal(
+    value: object,
+    *,
+    field: str,
+) -> tuple[Decimal, str] | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    raw = str(value).strip()
+    if not raw:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    try:
+        parsed = Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        ) from exc
+    if not parsed.is_finite() or parsed < 0:
+        raise ProviderProtocolViolationError(
+            f"model provider {field} is invalid"
+        )
+    return parsed, raw
+
+
+def _provider_billing_metadata(
+    response: object,
+    usage: object | None,
+) -> tuple[str | None, str | None]:
+    """Return one non-conflicting explicit billed USD amount, if supplied."""
+
+    candidates: list[tuple[Decimal, str, str]] = []
+
+    def add_usd(value: object, field: str) -> None:
+        parsed = _billing_decimal(value, field=field)
+        if parsed is not None:
+            number, raw = parsed
+            candidates.append((number, raw, "USD"))
+
+    def add_billed(
+        owner: object | None,
+        *,
+        field_prefix: str,
+    ) -> None:
+        if owner is None:
+            return
+        raw_cost = _provider_field(owner, "billed_cost", None)
+        if raw_cost is None:
+            return
+        currency = _provider_field(owner, "currency", None)
+        if not isinstance(currency, str) or not currency.strip():
+            raise ProviderProtocolViolationError(
+                "model provider billed cost is missing currency"
+            )
+        normalized_currency = currency.strip().upper()
+        if normalized_currency != "USD":
+            raise ProviderProtocolViolationError(
+                "model provider billed cost currency is unsupported"
+            )
+        parsed = _billing_decimal(
+            raw_cost,
+            field=f"{field_prefix} billed cost",
+        )
+        assert parsed is not None
+        number, raw = parsed
+        candidates.append((number, raw, normalized_currency))
+
+    if usage is not None:
+        add_usd(
+            _provider_field(usage, "cost_usd", None),
+            "usage cost_usd",
+        )
+        add_billed(usage, field_prefix="usage")
+
+    add_usd(
+        _provider_field(response, "cost_usd", None),
+        "response cost_usd",
+    )
+    add_billed(response, field_prefix="response")
+
+    if not candidates:
+        return None, None
+
+    expected = candidates[0][0]
+    if any(number != expected for number, _raw, _currency in candidates[1:]):
+        raise ProviderProtocolViolationError(
+            "model provider returned conflicting billed cost metadata"
+        )
+
+    # Preserve decimal text rather than binary-float round-tripping.
+    return candidates[0][1], "USD"
+
+
 def _normalized_provider_usage(
     response: object,
     *,
     estimated_cost_usd: float,
 ) -> ProviderUsage:
     usage = _provider_field(response, "usage", None)
+    billed_cost, billed_currency = _provider_billing_metadata(
+        response,
+        usage,
+    )
     if usage is None:
-        source = "estimate"
+        source = "provider" if billed_cost is not None else "estimate"
         input_tokens = output_tokens = cached_tokens = reasoning_tokens = total = None
     else:
         source = "provider"
@@ -1073,8 +1175,12 @@ def _normalized_provider_usage(
             reasoning_tokens=token(reasoning_tokens),
             total_tokens=token(total),
             estimated_cost=estimated,
-            billed_cost=None,
-            currency="USD" if estimated is not None else None,
+            billed_cost=billed_cost,
+            currency=(
+                billed_currency
+                if billed_currency is not None
+                else ("USD" if estimated is not None else None)
+            ),
             usage_source=source,
         )
     except ProviderProtocolError as exc:
@@ -1592,23 +1698,42 @@ def _actual_provider_usage(
     estimate: UsageEstimate,
     wall_seconds: float,
     attempts_used: int = 1,
+    normalized_usage: ProviderUsage | None = None,
 ) -> UsageEstimate:
     usage = (
         response.get("usage")
         if isinstance(response, Mapping)
         else getattr(response, "usage", None)
     )
-    if isinstance(usage, Mapping):
+    if normalized_usage is not None:
+        input_value = normalized_usage.input_tokens
+        output_value = normalized_usage.output_tokens
+        if normalized_usage.billed_cost is not None:
+            if normalized_usage.currency != "USD":
+                raise ProviderProtocolViolationError(
+                    "normalized billed cost must use USD"
+                )
+            billed = _billing_decimal(
+                normalized_usage.billed_cost,
+                field="normalized billed cost",
+            )
+            assert billed is not None
+            actual_cost = float(billed[0])
+        else:
+            actual_cost = estimate.cost_usd
+    elif isinstance(usage, Mapping):
         input_value = usage.get("input_tokens")
         output_value = usage.get("output_tokens")
+        actual_cost = estimate.cost_usd
     else:
         input_value = getattr(usage, "input_tokens", None)
         output_value = getattr(usage, "output_tokens", None)
+        actual_cost = estimate.cost_usd
 
     return UsageEstimate(
         input_tokens=_usage_int(input_value, estimate.input_tokens),
         output_tokens=_usage_int(output_value, estimate.output_tokens),
-        cost_usd=estimate.cost_usd,
+        cost_usd=actual_cost,
         wall_seconds=max(0.0, float(wall_seconds)),
         provider_attempts=max(1, int(attempts_used)),
         tool_calls=estimate.tool_calls,
@@ -2090,6 +2215,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             response,
             estimate=estimate,
             wall_seconds=latency_seconds,
+            normalized_usage=usage,
         )
         try:
             _finalize_provider_usage(
@@ -2836,6 +2962,7 @@ class OpenAISyncProviderAdapter:
                         estimate=estimate,
                         wall_seconds=latency_seconds,
                         attempts_used=attempts_used,
+                        normalized_usage=usage,
                     )
                     try:
                         _finalize_provider_usage(
