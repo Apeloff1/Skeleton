@@ -4,6 +4,26 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.generated_history import (
+    HISTORY_SCHEMA,
+    HISTORY_VERSION,
+    GeneratedHistoryError,
+    GeneratedStateHistory,
+    MAX_HISTORY_ENTRIES,
+    MAX_SERIALIZED_BYTES as HISTORY_MAX_SERIALIZED_BYTES,
+    MAX_SNAPSHOTS,
+    StateTransition,
+    StoredSnapshot,
+    create_generated_history,
+    current_generated_snapshot,
+    parse_generated_history,
+    record_generated_transition,
+    redo_generated_state,
+    serialize_generated_history,
+    undo_generated_state,
+    validate_generated_history,
+)
+
 from skeleton.forge.creator.semantic_diff import (
     CHANGE_ACTIONS,
     IGNORED_ATTRIBUTES,
@@ -104,6 +124,23 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "validate_generated_history",
+    "undo_generated_state",
+    "serialize_generated_history",
+    "redo_generated_state",
+    "record_generated_transition",
+    "parse_generated_history",
+    "current_generated_snapshot",
+    "create_generated_history",
+    "StoredSnapshot",
+    "StateTransition",
+    "MAX_SNAPSHOTS",
+    "HISTORY_MAX_SERIALIZED_BYTES",
+    "MAX_HISTORY_ENTRIES",
+    "GeneratedStateHistory",
+    "GeneratedHistoryError",
+    "HISTORY_VERSION",
+    "HISTORY_SCHEMA",
     "validate_semantic_diff",
     "serialize_semantic_diff",
     "semantic_diff",
