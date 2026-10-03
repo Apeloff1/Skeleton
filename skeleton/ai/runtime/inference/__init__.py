@@ -42,6 +42,11 @@ from .training_allocation import (
     allocate_training_methods,
     observe_mirror_validation,
 )
+from .visual_learning import (
+    VisualLearningError,
+    VisualTrainingObservation,
+    extract_visual_training_observation,
+)
 from .training_methods import (
     DEFAULT_TEXT_METHODS,
     CompiledTrainingDocument,
@@ -68,6 +73,9 @@ from .local import (
 )
 
 __all__ = [
+    "extract_visual_training_observation",
+    "VisualTrainingObservation",
+    "VisualLearningError",
     "compatible_training_methods",
     "observe_mirror_validation",
     "allocate_training_methods",
