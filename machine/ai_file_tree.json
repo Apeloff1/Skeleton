@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.3",
+  "tree_version": "1.6.4",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "cf301feec9ebaf2ca1fcd4c406ca838e50a3cbe9",
+      "source_git_object_sha": "622035f4666dddf0ed77647158d368cd4915ba9c",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -819,7 +819,16 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_learning_tree_exactly_mirrored_with_p3t2_training_control_checkpoint_recovery_observability_eval_post_training_controls",
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149"
+      ]
     },
     {
       "id": "AIFT-RESILIENCE",
@@ -6033,6 +6042,21 @@
       "policy": "Current-main data authority remains skeleton/data with exact AI-runtime mirrors; candidate carries implementation evidence only and no closure authority.",
       "implementation_head_sha": "11bcbbbcae7dd3de03d565414ed4cc7d72e8c6e1",
       "evidence_rule": "The recorded implementation head identifies the tree-bearing replay commit; exact PR-head CI is supplied separately by the candidate gate and must not be self-embedded."
+    },
+    "p3t2_training_candidate": {
+      "implementation_head_sha": "5cbaf3980d703c5c9fb4edf1acded65cdf5d48d2",
+      "source_tree_sha": "622035f4666dddf0ed77647158d368cd4915ba9c",
+      "task_id": "P3T2-TRAINING-01",
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149"
+      ],
+      "policy": "Training candidate extends the canonical skeleton/learning authority, remains exactly mirrored under skeleton/ai/learning, and carries no completion/promotion authority."
     }
   }
 }
