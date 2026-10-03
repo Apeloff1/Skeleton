@@ -40,26 +40,30 @@ def build_context_shards(model: RepositoryModel) -> tuple[ContextShard, ...]:
     for item in work:
         by_zone_work.setdefault(item.zone, []).append(item.as_dict())
 
+    # Build relationship indexes once; shard construction should be proportional
+    # to the relationships belonging to each zone, not the whole repository.
+    capabilities_by_zone: dict[str, list[dict[str, object]]] = {}
+    for item in catalog.capabilities:
+        capabilities_by_zone.setdefault(item.zone, []).append(item.as_dict())
+
+    outbound_by_zone: dict[str, list[dict[str, object]]] = {}
+    inbound_by_zone: dict[str, list[dict[str, object]]] = {}
+    for edge in model.edges:
+        edge_data = edge.as_dict()
+        outbound_by_zone.setdefault(edge.source, []).append(edge_data)
+        inbound_by_zone.setdefault(edge.target, []).append(edge_data)
+
     shards: list[ContextShard] = []
     for subsystem in model.subsystems:
-        capabilities = [
-            item.as_dict()
-            for item in catalog.by_zone(subsystem.name)
-        ]
+        capabilities = capabilities_by_zone.get(subsystem.name, [])
         payload = {
             "subsystem": subsystem.as_dict(),
             "contract": contracts.get(subsystem.name, {}),
             "capabilities": capabilities[:100],
             "work": by_zone_work.get(subsystem.name, [])[:32],
             "topology": {
-                "outbound": [
-                    edge.as_dict() for edge in model.edges
-                    if edge.source == subsystem.name
-                ],
-                "inbound": [
-                    edge.as_dict() for edge in model.edges
-                    if edge.target == subsystem.name
-                ],
+                "outbound": outbound_by_zone.get(subsystem.name, []),
+                "inbound": inbound_by_zone.get(subsystem.name, []),
             },
         }
         shards.append(ContextShard(
