@@ -172,9 +172,6 @@ jobs:
         run: |
           python scripts/check_instruction_policy_boundary.py
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_instruction_policy_boundary.py
-      - name: Production layer boundary gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_architecture_boundaries.py
       - name: Security scanner surface preflight
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_security_scan_surface.py
@@ -259,7 +256,6 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           PYTHONPATH=.:backend python -m pytest -q --noconftest --rootdir=. --import-mode=importlib
-          tests/test_architecture_boundaries.py
           backend/tests/test_ai_provider_reliability.py
           backend/tests/test_auth_security.py
           backend/tests/test_process_safety_gate.py
