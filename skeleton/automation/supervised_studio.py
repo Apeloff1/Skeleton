@@ -485,10 +485,25 @@ def propose(
                 if before_apply.strip():
                     raise RuntimeError("Studio worktree is dirty before candidate application")
                 new_paths = [path for path in task.paths if not Path(path).exists()]
+                # Revalidate every authorized path immediately before mutation to close
+                # symlink/ancestor replacement races between planning and application.
+                for path in task.paths:
+                    _canonical_path(path)
+                candidate_sha = hashlib.sha256(reviewed.patch.encode("utf-8")).hexdigest()
+                if hashlib.sha256(candidate.read_bytes()).hexdigest() != candidate_sha:
+                    raise RuntimeError("candidate patch changed after review")
                 try:
                     subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                    applied_before_validation = _git("diff", "--no-ext-diff", "--binary")
+                    applied_paths = set(_changed_paths(applied_before_validation)) if applied_before_validation else set()
+                    if not applied_paths.issubset(set(task.paths)):
+                        raise RuntimeError("applied candidate escaped authorized paths")
                     validation_commands = _discover_validation_commands(task.paths)
                     validation_ok, validation_output = _run_validation_commands(validation_commands)
+                    applied_after_validation = _git("diff", "--no-ext-diff", "--binary")
+                    if applied_after_validation != applied_before_validation:
+                        validation_ok = False
+                        validation_output = (*validation_output, "validation mutated repository state")
                 except BaseException:
                     _git("reset", "--hard", "HEAD", check=False)
                     if new_paths:
