@@ -556,6 +556,12 @@ def advance_campaign(
             if attempts > 1:
                 state.task_cooldowns[key] = min(8, 2 ** min(3, attempts - 1))
 
+    update_task_age(
+        state,
+        plan_items=plan_items,
+        team=str(supervisor.get("team", "")),
+        attempted_task_ids=attempted_task_ids,
+    )
     update_lane_health(
         state,
         plan_items=plan_items,
