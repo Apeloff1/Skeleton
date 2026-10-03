@@ -211,6 +211,57 @@ def select_frontier(
     result["frontier_sha256"] = frontier_digest(result)
     return result
 
+
+def allocate_supervisor_state(
+    repo_state: dict[str, Any],
+    campaign: CampaignState,
+    *,
+    limit: int = 8,
+) -> dict[str, Any]:
+    supervisor = repo_state.get("_shift_supervisor")
+    if not isinstance(supervisor, dict) or supervisor.get("status") != "loaded":
+        raise ValueError("loaded canonical supervisor state is required for allocation")
+    generation = str(supervisor.get("generation_id", ""))
+    plan_digest = str(supervisor.get("plan_digest_sha256", ""))
+    if not generation or len(plan_digest) != 64:
+        raise ValueError("canonical supervisor identity is malformed")
+    frontier = select_frontier(
+        repo_state.get("_shift_supervisor_all_plan_items", []),
+        team=str(supervisor.get("team", "")),
+        cooldowns=campaign.task_cooldowns,
+        attempts=campaign.task_attempts,
+        limit=limit,
+    )
+    selected = frontier["selected"]
+    selected_ids = {str(item.get("id", "")) for item in selected}
+    executable = supervisor.get("plan_items", [])
+    if not isinstance(executable, list):
+        raise ValueError("canonical executable plan is malformed")
+    authorized = [
+        dict(item) for item in executable
+        if isinstance(item, Mapping) and str(item.get("id", "")) in selected_ids
+    ]
+    authorized_ids = {str(item.get("id", "")) for item in authorized}
+    if authorized_ids != selected_ids:
+        unavailable = sorted(selected_ids - authorized_ids)
+        raise ValueError(f"frontier selected non-executable canonical items: {unavailable}")
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": campaign.campaign_id,
+        "campaign_epoch": campaign.epoch,
+        "generation_id": generation,
+        "plan_digest_sha256": plan_digest,
+        "frontier_sha256": frontier["frontier_sha256"],
+        "authorized_plan_ids": sorted(authorized_ids),
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    supervisor["plan_items"] = authorized
+    supervisor["allocation"] = allocation
+    repo_state["_shift_supervisor"] = supervisor
+    return allocation
+
 def acquire_lease(state: CampaignState, *, owner: str, expected_epoch: int | None = None) -> CampaignState:
     owner = str(owner).strip()
     if not owner or len(owner) > 160 or any(ord(ch) < 32 for ch in owner):
