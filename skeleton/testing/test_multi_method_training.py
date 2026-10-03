@@ -13,6 +13,7 @@ from skeleton.ai.runtime.inference.training_methods import (
     TrainingMethod,
     TrainingMethodError,
     compile_training_plan,
+    compatible_training_methods,
 )
 
 
@@ -315,3 +316,20 @@ def test_training_example_rejects_noncanonical_camera_view_identity() -> None:
             response="A stable object.",
             camera_view_refs=("camera-view:mutable-alias",),
         )
+
+
+def test_compatible_methods_exclude_missing_signal_families() -> None:
+    minimal = TrainingExample(
+        example_id="compat-minimal",
+        prompt="Q",
+        response="A",
+    )
+    compatible = set(compatible_training_methods((minimal,)))
+
+    assert TrainingMethod.SUPERVISED_INSTRUCTION in compatible
+    assert TrainingMethod.DENOISING_AUTOENCODING in compatible
+    assert TrainingMethod.IMITATION in compatible
+    assert TrainingMethod.PREFERENCE not in compatible
+    assert TrainingMethod.CONTRASTIVE not in compatible
+    assert TrainingMethod.MULTIVIEW_GROUNDING not in compatible
+    assert TrainingMethod.REINFORCEMENT_TRACE not in compatible
