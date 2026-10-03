@@ -32,7 +32,7 @@ class Policy:
     name: str
     rules: List[Rule] = field(default_factory=list)
     combinator: str = "any"
-    default: str = "allow"
+    default: str = "deny"
 
 
 @dataclass
@@ -61,7 +61,13 @@ class PolicyEngine:
         self._policies: Dict[str, Policy] = {}
         self._decisions: List[Decision] = []
 
-    def define(self, name: str, combinator: str = "any", default: str = "allow") -> Policy:
+    def define(self, name: str, combinator: str = "any", default: str = "deny") -> Policy:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("policy name must be non-empty")
+        if combinator not in {"any", "all"}:
+            raise ValueError("policy combinator must be 'any' or 'all'")
+        if default not in {"allow", "deny", "audit"}:
+            raise ValueError("policy default must be allow, deny, or audit")
         p = Policy(name=name, combinator=combinator, default=default)
         self._policies[name] = p
         return p
@@ -69,6 +75,8 @@ class PolicyEngine:
     def add_rule(self, policy: str, name: str,
                  condition: Callable[[Dict[str, Any]], bool],
                  effect: str = "deny", reason: str = "") -> Rule:
+        if effect not in {"allow", "deny", "audit"}:
+            raise ValueError("rule effect must be allow, deny, or audit")
         rule = Rule(name=name, condition=condition, effect=effect, reason=reason)
         self._policies[policy].rules.append(rule)
         return rule
@@ -76,7 +84,14 @@ class PolicyEngine:
     def evaluate(self, policy: str, context: Dict[str, Any]) -> Decision:
         p = self._policies.get(policy)
         if not p:
-            decision = Decision(True, "allow", None, policy, "unknown policy — default allow", time.time_ns())
+            decision = Decision(
+                False,
+                "deny",
+                None,
+                policy,
+                "unknown policy — fail-safe deny",
+                time.time_ns(),
+            )
             self._decisions.append(decision)
             return decision
         if p.combinator == "any":
