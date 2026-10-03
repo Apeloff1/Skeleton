@@ -421,7 +421,34 @@ def _chat_client(
     monkeypatch.setattr(route, "_canon_context", lambda query: [])
     monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
     monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
-    monkeypatch.setattr(route, "_generate_text", generate)
+
+    async def generate_adapter(
+        query,
+        recalled,
+        needs_reasoning,
+        *,
+        conversation_history=None,
+        project_context="",
+        **_engine_scope,
+    ):
+        # Legacy local test doubles consume one display string. Adapt only at
+        # the test boundary while preserving the production split between
+        # trusted canonical history, project evidence, and the current query.
+        context_parts = []
+        if project_context:
+            context_parts.append(project_context)
+        context_parts.extend(
+            item.content
+            for item in (conversation_history or ())
+        )
+        return await generate(
+            query,
+            recalled,
+            needs_reasoning,
+            "\n".join(context_parts),
+        )
+
+    monkeypatch.setattr(route, "_generate_text", generate_adapter)
     app = FastAPI()
     app.include_router(route.router)
     return TestClient(app)
@@ -1049,7 +1076,7 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
     context = captured["contexts"][0]
     assert "prior question" in context
     assert "prior answer" in context
-    assert context.count("resume question") == 1
+    assert context.count("resume question") == 0
 
     messages = canonical.messages[seeded_thread.thread_id]
     assert [message.author_type.value for message in messages] == [
@@ -1177,12 +1204,28 @@ def test_jeeves_engine_identity_is_scoped_to_canonical_turn(
         def with_max_tokens(self, *_args, **_kwargs):
             return self
 
+        def add_history_message(self, _role, _content):
+            return self
+
+        def add_evidence(self, _evidence_id, _content, *, kind):
+            del kind
+            return self
+
         async def send_message(self, _message):
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation",
                 execution_id="engine-execution",
+                context_id="engine-context",
+                context_digest="b" * 64,
+                context_source_snapshot=(),
+                context_compiler_version="test-context-v1",
                 verification="verified",
                 evidence_refs=(),
+                provider_receipts=(),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route, "EngineChat", CaptureChat)
