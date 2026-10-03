@@ -5928,12 +5928,12 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 160,
+    "governed_mapping_count": 162,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
-      "B1-core-runtime": 57,
       "B3-owner-sensitive": 8,
+      "B1-core-runtime": 59,
       "B2-domain-build": 13,
       "B4-research-quarantine": 54,
       "B3-compat-convergence": 28
