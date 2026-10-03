@@ -135,7 +135,8 @@ SURFACES: dict[str, tuple[str, ...]] = {
     "skeleton/testing/test_mirror_room_observability.py": (
         "test_observatory_projects_baseline_challenger_and_detail_lift",
         "test_observatory_rejected_attempt_cannot_move_visible_baseline",
-        "test_visual_observatory_is_real_route_and_not_mock_dashboard",
+        "test_observatory_file_tree_binds_landed_product_routes",
+        "test_machine_product_tree_manifest_is_fail_closed",
     ),
     ".github/workflows/mirror-room-core.yml": (
         "Verify canonical and AI mirrors",
