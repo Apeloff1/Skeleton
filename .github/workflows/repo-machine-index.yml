@@ -46,6 +46,16 @@ jobs:
           files = state.get("files", [])
           if not isinstance(files, list):
               raise SystemExit("machine index has no file inventory")
+          paths = [item.get("path") for item in files if isinstance(item, dict)]
+          if len(paths) != len(files) or len(paths) != len(set(paths)):
+              raise SystemExit("machine index contains invalid or duplicate file paths")
+          if any(path == ".machine" or path.startswith(".machine/") for path in paths):
+              raise SystemExit("machine index must never index its own generated artifacts")
+          metadata = state.get("metadata", {})
+          if not isinstance(metadata, dict) or metadata.get("file_count") != len(files):
+              raise SystemExit("machine index metadata/file inventory count mismatch")
+          if paths != sorted(paths):
+              raise SystemExit("machine index file inventory is not deterministic")
           print(f"Machine index contains {len(files)} files.")
           PY
 
