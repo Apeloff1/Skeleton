@@ -22,7 +22,7 @@ oversized_generic_lines = 2400
 
 [[zone]]
 name = "repository-machine"
-prefixes = [".machine/", "machine/", "skeleton/repo_machine/"]
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
