@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MACHINE = ROOT / "machine" / "ai_master_plan.json"
+EXECUTION_FRONTIER = ROOT / "machine" / "ai_execution_frontier_20260924.json"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
@@ -70,6 +71,30 @@ def validate(data: dict) -> list[str]:
     errors: list[str] = []
     if data.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
+    execution_frontier = data.get("execution_frontier")
+    if not isinstance(execution_frontier, dict):
+        errors.append("execution_frontier must be an object")
+    elif not EXECUTION_FRONTIER.is_file():
+        errors.append("execution_frontier machine contract is missing")
+    else:
+        try:
+            canonical_frontier = json.loads(
+                EXECUTION_FRONTIER.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"cannot parse execution_frontier machine contract: {exc}")
+        else:
+            if execution_frontier.get("machine_contract") != (
+                "machine/ai_execution_frontier_20260924.json"
+            ):
+                errors.append("execution_frontier machine contract path drifted")
+            if execution_frontier.get("frontier_id") != canonical_frontier.get("frontier_id"):
+                errors.append("execution_frontier frontier_id drifted")
+            if execution_frontier.get("queue_snapshot") != canonical_frontier.get("queue_snapshot"):
+                errors.append(
+                    "execution_frontier queue_snapshot disagrees with canonical frontier"
+                )
+
     engineering = data.get("engineering_pass")
     if not isinstance(engineering, dict):
         errors.append("engineering_pass must be an object")
