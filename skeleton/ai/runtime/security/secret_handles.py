@@ -167,9 +167,58 @@ class SecretUseReceipt:
         )
 
 
+def evaluate_secret_use(
+    *,
+    receipt_id: str,
+    secret_ref: SecretRef,
+    grant: SecretGrant,
+    consumer_id: str,
+    scope: str,
+    operation_id: str,
+    now_ns: int,
+) -> SecretUseReceipt:
+    """Evaluate a handle use without resolving or exposing secret material."""
+
+    if not isinstance(secret_ref, SecretRef):
+        raise TypeError("secret_ref must be SecretRef")
+    if not isinstance(grant, SecretGrant):
+        raise TypeError("grant must be SecretGrant")
+    consumer = _token("consumer_id", consumer_id)
+    requested_scope = _token("scope", scope)
+    operation = _token("operation_id", operation_id)
+    if isinstance(now_ns, bool) or not isinstance(now_ns, int) or now_ns < 0:
+        raise SecretSecurityError("now_ns must be a non-negative integer")
+
+    allowed = False
+    if grant.handle_id != secret_ref.handle_id:
+        reason = "handle-mismatch"
+    elif grant.consumer_id != consumer:
+        reason = "consumer-mismatch"
+    elif now_ns >= grant.expires_at_ns:
+        reason = "grant-expired"
+    elif requested_scope not in grant.scopes:
+        reason = "scope-denied"
+    else:
+        allowed = True
+        reason = "allowed"
+
+    return SecretUseReceipt(
+        receipt_id=receipt_id,
+        grant_id=grant.grant_id,
+        handle_id=secret_ref.handle_id,
+        consumer_id=consumer,
+        scope=requested_scope,
+        operation_id=operation,
+        allowed=allowed,
+        reason_code=reason,
+        used_at_ns=now_ns,
+    )
+
+
 __all__ = [
     "SecretGrant",
     "SecretRef",
     "SecretSecurityError",
     "SecretUseReceipt",
+    "evaluate_secret_use",
 ]
