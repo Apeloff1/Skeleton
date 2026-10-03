@@ -26,6 +26,7 @@ from .studio_director import (
     _build_and_review,
     _call_json,
     _canonical_path,
+    _changed_paths,
     _git,
     _repo_manifest,
     _discover_validation_commands,
