@@ -278,6 +278,22 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     assert receipt["learning_candidate_digest"] == candidate.identity_digest
     assert receipt["learning_pair_count"] == 1
     assert receipt["promotion_state"] == "candidate_only"
+    assert receipt["training_mode"] == "multi_method"
+    assert receipt["training_plan"]["plan_digest"]
+    materialized = set(receipt["training_plan"]["materialized_methods"])
+    assert {
+        "causal_language_modeling",
+        "supervised_instruction",
+        "self_supervised_span",
+        "curriculum",
+        "adversarial_robustness",
+        "denoising_autoencoding",
+        "sequence_to_sequence",
+        "imitation",
+        "active_learning",
+    } <= materialized
+    assert "preference" in receipt["training_plan"]["skipped_methods"]
+    assert "reinforcement_trace" in receipt["training_plan"]["skipped_methods"]
     assert receipt["qualification"]["status"] == "executable_candidate"
     assert receipt["qualification"]["model_digest"] == receipt["model_digest"]
     assert len(receipt["qualification"]["prompt_sha256"]) == 64
@@ -286,6 +302,10 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     manifest = receipt["evaluation_manifest"]
     assert manifest["candidate_artifact_sha256"] == receipt["artifact_sha256"]
     assert manifest["candidate_model_digest"] == receipt["model_digest"]
+    assert (
+        manifest["training_plan_digest"]
+        == receipt["training_plan"]["plan_digest"]
+    )
     assert (
         manifest["qualification_receipt_digest"]
         == receipt["qualification"]["receipt_digest"]
