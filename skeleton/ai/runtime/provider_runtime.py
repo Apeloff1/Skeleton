@@ -2802,6 +2802,7 @@ class OpenAISyncProviderAdapter:
         started = time.perf_counter()
         last_error: BaseException | None = None
         attempts_used = 0
+        dispatched = False
         try:
             for _attempt in range(self.max_retries + 1):
                 attempts_used += 1
@@ -2810,6 +2811,7 @@ class OpenAISyncProviderAdapter:
                         request,
                         self.timeout_seconds,
                     )
+                    dispatched = True
                     with urllib.request.urlopen(
                         outbound,
                         timeout=timeout_seconds,
@@ -2836,12 +2838,17 @@ class OpenAISyncProviderAdapter:
                         attempts_used=attempts_used,
                     )
                     try:
-                        self.admission_runtime.complete(
-                            lease.operation_id,
+                        _finalize_provider_usage(
+                            self.admission_runtime,
+                            lease,
                             actual,
                         )
                     except AdmissionRuntimeError as exc:
-                        _release_provider_lease(self.admission_runtime, lease)
+                        _quarantine_provider_usage(
+                            self.admission_runtime,
+                            lease,
+                            reason="provider-usage-reconciliation-failed",
+                        )
                         raise ProviderPolicyError(
                             "model provider usage reconciliation failed"
                         ) from exc
@@ -2888,10 +2895,24 @@ class OpenAISyncProviderAdapter:
                     last_error = exc
                     continue
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
-        _release_provider_lease(self.admission_runtime, lease)
+        if dispatched:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-dispatch-or-response-ambiguous",
+            )
+        else:
+            _release_provider_lease(self.admission_runtime, lease)
         raise ProviderInvocationError("model provider request failed") from last_error
 
 
