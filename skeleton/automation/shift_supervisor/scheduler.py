@@ -216,6 +216,7 @@ class SupervisorScheduler:
             metadata = dict(item.metadata)
             metadata["completed_by_worker"] = worker.worker_id
             metadata["completion_source"] = "validated-studio-worker-snapshot"
+            metadata["completion_shift_key"] = str(worker.metadata.get("shift_key", ""))[:200]
             item.metadata = metadata
             self.manager.store.update_item(item)
 
