@@ -40,6 +40,18 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_json(value).encode("utf-8")).hexdigest()
 
 
+def _sha(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise CameraViewError(f"{field} must be sha256 text")
+    result = value.strip().lower()
+    if (
+        len(result) != 64
+        or any(ch not in "0123456789abcdef" for ch in result)
+    ):
+        raise CameraViewError(f"{field} must be lowercase sha256")
+    return result
+
+
 def _finite(
     value: object,
     field: str,
@@ -275,6 +287,8 @@ class CameraCoveragePlan:
     coverage_digest: str
 
     def __post_init__(self) -> None:
+        policy_digest = _sha(self.policy_digest, "policy_digest")
+        object.__setattr__(self, "policy_digest", policy_digest)
         if not self.views:
             raise CameraViewError(
                 "camera coverage plan requires views"
@@ -288,6 +302,18 @@ class CameraCoveragePlan:
             raise CameraViewError(
                 "camera coverage contains duplicate views"
             )
+        actual = _sha(self.coverage_digest, "coverage_digest")
+        expected = _digest(
+            {
+                "policy_digest": policy_digest,
+                "view_refs": refs,
+            }
+        )
+        if actual != expected:
+            raise CameraViewError(
+                "coverage_digest does not match camera coverage payload"
+            )
+        object.__setattr__(self, "coverage_digest", actual)
 
     @property
     def references(self) -> tuple[str, ...]:
@@ -301,6 +327,101 @@ class CameraCoveragePlan:
             "view_count": len(self.views),
             "view_refs": list(self.references),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class CameraCoverageSelection:
+    """Authenticated subset of views from one exact coverage plan."""
+
+    coverage_digest: str
+    policy_digest: str
+    view_refs: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "coverage_digest",
+            _sha(self.coverage_digest, "coverage_digest"),
+        )
+        object.__setattr__(
+            self,
+            "policy_digest",
+            _sha(self.policy_digest, "policy_digest"),
+        )
+        refs = tuple(self.view_refs)
+        if not refs:
+            raise CameraViewError(
+                "camera coverage selection requires at least one view"
+            )
+        if len(refs) > _MAX_VIEWS:
+            raise CameraViewError(
+                "camera coverage selection exceeds hard view bound"
+            )
+        if len(refs) != len(set(refs)):
+            raise CameraViewError(
+                "camera coverage selection contains duplicate views"
+            )
+        for ref in refs:
+            if (
+                not isinstance(ref, str)
+                or not ref.startswith("camera-view-sha256:")
+            ):
+                raise CameraViewError(
+                    "selection view must use camera-view-sha256 identity"
+                )
+            _sha(ref.split(":", 1)[1], "camera view digest")
+        object.__setattr__(self, "view_refs", refs)
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "schema_version": "skeleton.camera_coverage_selection.v1",
+                "coverage_digest": self.coverage_digest,
+                "policy_digest": self.policy_digest,
+                "view_refs": list(self.view_refs),
+            }
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.camera_coverage_selection.v1",
+            "coverage_digest": self.coverage_digest,
+            "policy_digest": self.policy_digest,
+            "selection_digest": self.digest,
+            "view_count": len(self.view_refs),
+            "view_refs": list(self.view_refs),
+        }
+
+
+def bind_camera_subset(
+    plan: CameraCoveragePlan,
+    views: Sequence[CameraView | str],
+) -> CameraCoverageSelection:
+    """Prove a requested training subset belongs to one exact coverage plan."""
+
+    if not isinstance(plan, CameraCoveragePlan):
+        raise TypeError("plan must be CameraCoveragePlan")
+    rows = tuple(views)
+    if not rows:
+        raise CameraViewError(
+            "camera subset requires at least one view"
+        )
+    refs = tuple(
+        item.reference if isinstance(item, CameraView) else str(item).strip()
+        for item in rows
+    )
+    inventory = set(plan.references)
+    unknown = tuple(ref for ref in refs if ref not in inventory)
+    if unknown:
+        raise CameraViewError(
+            "camera subset contains view outside coverage plan"
+        )
+    return CameraCoverageSelection(
+        coverage_digest=plan.coverage_digest,
+        policy_digest=plan.policy_digest,
+        view_refs=refs,
+    )
 
 
 def build_camera_coverage(
@@ -423,8 +544,10 @@ def stratified_camera_subset(
 __all__ = [
     "CameraCoveragePlan",
     "CameraCoveragePolicy",
+    "CameraCoverageSelection",
     "CameraView",
     "CameraViewError",
+    "bind_camera_subset",
     "build_camera_coverage",
     "stratified_camera_subset",
 ]
