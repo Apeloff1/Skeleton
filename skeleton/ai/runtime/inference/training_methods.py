@@ -816,6 +816,94 @@ def _normalized_methods(
     return tuple(result)
 
 
+def compatible_training_methods(
+    examples: Sequence[TrainingExample],
+) -> tuple[TrainingMethod, ...]:
+    """Return methods that can materialize from the supplied signal inventory."""
+
+    rows = tuple(examples)
+    if not rows:
+        raise TrainingMethodError("training examples must be non-empty")
+    if any(not isinstance(item, TrainingExample) for item in rows):
+        raise TypeError("examples must contain TrainingExample values")
+
+    result: list[TrainingMethod] = []
+    for method in TrainingMethod:
+        supported = False
+        for example in rows:
+            if method in {
+                TrainingMethod.CAUSAL_LANGUAGE_MODELING,
+                TrainingMethod.SUPERVISED_INSTRUCTION,
+                TrainingMethod.SELF_SUPERVISED_SPAN,
+                TrainingMethod.CURRICULUM,
+                TrainingMethod.ADVERSARIAL_ROBUSTNESS,
+                TrainingMethod.DENOISING_AUTOENCODING,
+                TrainingMethod.SEQUENCE_TO_SEQUENCE,
+                TrainingMethod.IMITATION,
+                TrainingMethod.ACTIVE_LEARNING,
+            }:
+                supported = True
+            elif (
+                method is TrainingMethod.PREFERENCE
+                and example.rejected_response is not None
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.DISTILLATION
+                and example.teacher_response is not None
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.CONTRASTIVE
+                and example.positive_text is not None
+                and example.negative_text is not None
+            ):
+                supported = True
+            elif method is TrainingMethod.REPLAY and example.replay:
+                supported = True
+            elif (
+                method is TrainingMethod.MULTIVIEW_GROUNDING
+                and bool(example.camera_view_refs)
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.REWARD_MODELING
+                and example.reward is not None
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.REINFORCEMENT_TRACE
+                and example.trajectory is not None
+                and example.reward is not None
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.RETRIEVAL_AUGMENTED
+                and example.retrieval_context is not None
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.PSEUDO_LABEL
+                and (
+                    example.pseudo_label is not None
+                    or example.teacher_response is not None
+                )
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.MULTITASK
+                and (
+                    example.task_id is not None
+                    or bool(example.tags)
+                )
+            ):
+                supported = True
+            if supported:
+                result.append(method)
+                break
+    return tuple(result)
+
+
 def compile_training_plan(
     examples: Sequence[TrainingExample],
     *,
@@ -980,4 +1068,5 @@ __all__ = [
     "TrainingMethod",
     "TrainingMethodError",
     "compile_training_plan",
+    "compatible_training_methods",
 ]
