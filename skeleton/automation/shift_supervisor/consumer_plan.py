@@ -6,6 +6,8 @@ import gzip
 import hashlib
 import json
 import re
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -65,21 +67,22 @@ def _issue_rows(state: Mapping[str, Any]) -> tuple[str, list[Mapping[str, Any]]]
 
 def _canonical_issue(state: Mapping[str, Any]) -> tuple[str, Mapping[str, Any], list[Mapping[str, Any]]]:
     issue_key, issues = _issue_rows(state)
-    canonical = next((item for item in issues if str(item.get("title", "")) == PLAN_TITLE), None)
-    if canonical is None:
+    canonical = [item for item in issues if str(item.get("title", "")) == PLAN_TITLE]
+    if not canonical:
         raise CanonicalPlanError("canonical supervisor plan issue is missing")
-    return issue_key, canonical, issues
+    if len(canonical) != 1:
+        raise CanonicalPlanError("repository snapshot contains multiple canonical supervisor plan issues")
+    return issue_key, canonical[0], issues
 
 
 def _executable_team_items(raw_plan: object, team: str) -> list[dict[str, Any]]:
     if not isinstance(raw_plan, list):
         raise CanonicalPlanError("canonical plan state has no plan_items list")
     rows = [item for item in raw_plan if isinstance(item, Mapping)]
-    by_id = {
-        str(item.get("id", "")).strip(): item
-        for item in rows
-        if str(item.get("id", "")).strip()
-    }
+    ids = [str(item.get("id", "")).strip() for item in rows if str(item.get("id", "")).strip()]
+    if len(ids) != len(set(ids)):
+        raise CanonicalPlanError("canonical plan contains duplicate plan item ids")
+    by_id = {str(item.get("id", "")).strip(): item for item in rows if str(item.get("id", "")).strip()}
     executable: list[dict[str, Any]] = []
     for item in rows:
         if item.get("target_team") != team or str(item.get("status", "queued")).lower() != "queued":
@@ -233,6 +236,21 @@ def _summary(team: str, state: Mapping[str, Any], *, error: str | None = None) -
     return "\n".join(lines) + "\n"
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def prepare_state(
     state_path: Path,
     *,
@@ -257,12 +275,10 @@ def prepare_state(
         summary_path.write_text(_summary(team, {}, error=str(exc)), encoding="utf-8")
         raise CanonicalPlanError(str(exc)) from exc
 
-    state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding="utf-8")
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(_summary(team, state), encoding="utf-8")
+    _atomic_write_text(state_path, json.dumps(state, sort_keys=True, indent=2) + "\n")
+    _atomic_write_text(summary_path, _summary(team, state))
     if plan_map_path is not None:
-        plan_map_path.parent.mkdir(parents=True, exist_ok=True)
-        plan_map_path.write_text(json.dumps(plan_map, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        _atomic_write_text(plan_map_path, json.dumps(plan_map, sort_keys=True, indent=2) + "\n")
 
 
 def normalize_worker_status(status_path: Path, plan_map_path: Path) -> None:
