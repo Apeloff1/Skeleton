@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -49,8 +51,35 @@ def _repo(tmp_path, monkeypatch):
     return state
 
 
+def _bind_allocation(state: Path) -> Path:
+    payload = json.loads(state.read_text(encoding="utf-8"))
+    supervisor = payload["_shift_supervisor"]
+    items = supervisor["plan_items"]
+    plan_digest = hashlib.sha256(
+        json.dumps(items, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign-smoke",
+        "campaign_epoch": 1,
+        "allocation_nonce": "a" * 24,
+        "generation_id": supervisor["generation_id"],
+        "plan_digest_sha256": plan_digest,
+        "frontier_sha256": "b" * 64,
+        "authorized_plan_ids": [item["id"] for item in items],
+        "lane_assignments": {item["id"]: "night-lane-00001" for item in items},
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    supervisor["plan_digest_sha256"] = plan_digest
+    supervisor["allocation"] = allocation
+    state.write_text(json.dumps(payload), encoding="utf-8")
+    return state
+
+
 def test_supervised_night_smoke_preserves_canonical_plan_id(tmp_path, monkeypatch):
-    state = _repo(tmp_path, monkeypatch)
+    state = _bind_allocation(_repo(tmp_path, monkeypatch))
     responses = [
         json.dumps(
             {
@@ -234,7 +263,7 @@ def test_supervised_night_requires_plan_generation(tmp_path, monkeypatch):
 
 
 def test_supervised_night_records_plan_generation(tmp_path, monkeypatch):
-    state = _repo(tmp_path, monkeypatch)
+    state = _bind_allocation(_repo(tmp_path, monkeypatch))
     original = state.read_bytes()
     responses = [
         json.dumps(
@@ -735,10 +764,12 @@ def test_canonical_items_rejects_allocation_authorization_mismatch(tmp_path):
         "schema": "autonomous-studio.frontier-allocation.v1",
         "campaign_id": "campaign",
         "campaign_epoch": 1,
+        "allocation_nonce": "a" * 24,
         "generation_id": "gen",
         "plan_digest_sha256": "a" * 64,
         "frontier_sha256": "b" * 64,
         "authorized_plan_ids": ["different"],
+        "lane_assignments": {"different": "night-lane-00001"},
     }
     allocation["allocation_sha256"] = hashlib.sha256(
         json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
@@ -883,3 +914,22 @@ def test_aggregate_build_is_bound_to_accepted_receipts():
     assert "accepted_receipts.append((plan_id, candidate_diff_sha))" in source
     assert "composition_digest(tuple(accepted_receipts))" in source
     assert '"aggregate_build_composed"' in source
+
+def test_promotion_allows_only_validated_candidate_dirty_paths(monkeypatch, tmp_path):
+    from skeleton.automation.studio_director import PlannedTask
+
+    task = PlannedTask(
+        title="Candidate",
+        objective="Validate one bounded path.",
+        division="qa_verification",
+        paths=("docs/example.md",),
+    )
+    dirty = {"docs/example.md"}
+    supervised_studio.require_subset(dirty, task.paths, "validated worktree")
+    evidence = supervised_studio.PromotionEvidence(
+        validation_passed=True,
+        review_passed=True,
+        receipt_bound=True,
+        worktree_clean=dirty == {"docs/example.md"},
+    )
+    supervised_studio.require_promotable(evidence)

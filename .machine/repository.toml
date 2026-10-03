@@ -48,6 +48,24 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "ecs-script-runtime"
+prefixes = ["skeleton/ecs/"]
+owner = "simulation-runtime"
+criticality = "high"
+purpose = "Blueprint-to-ECS adapter and policy-instrumented game-logic scripting layered on the canonical deterministic simulation ECS."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "execution-sandbox"
+prefixes = ["skeleton/sandbox/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Process and filesystem containment, sanitization, and injection enforcement for untrusted tools, generated code and model input."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "security"
 prefixes = ["skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"

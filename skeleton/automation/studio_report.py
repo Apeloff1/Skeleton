@@ -10,9 +10,24 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 
+MAX_AUDIT_BYTES = 10_000_000
+
+
 def load_records(path: Path) -> tuple[dict[str, object], ...]:
+    if path.is_symlink():
+        raise ValueError("audit path symlink is forbidden")
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise ValueError("audit path is unreadable") from exc
+    if size > MAX_AUDIT_BYTES:
+        raise ValueError("audit exceeds 10 MB safety bound")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError("audit path is unreadable text") from exc
     records: list[dict[str, object]] = []
-    for line_number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, raw in enumerate(text.splitlines(), start=1):
         if not raw.strip():
             continue
         try:

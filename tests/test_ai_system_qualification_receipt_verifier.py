@@ -255,7 +255,7 @@ async def test_independent_verifier_semantically_challenges_all_32_proofs(
         "memory.lifecycle":
             ("absent_after_delete", False),
         "finalization.lineage":
-            ("artifact_ref_count", 0),
+            ("stream_terminal_bound", False),
         "finalization.outbox_delivery":
             ("acknowledgement_persistent", False),
         "learning.promotion":

@@ -379,7 +379,7 @@ def test_verifier_can_reject_reviewed_patch_before_it_reaches_ci(tmp_path, monke
         json.dumps({"approve": False, "reasons": ["acceptance evidence is insufficient"], "required_checks": ["missing contract"]}),
         json.dumps(
             {
-                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\\n--- a/docs/smoke.txt\\n+++ b/docs/smoke.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n",
+                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+new\n",
                 "summary": "repair one",
                 "tests": ["smoke"],
             }
@@ -388,7 +388,7 @@ def test_verifier_can_reject_reviewed_patch_before_it_reaches_ci(tmp_path, monke
         json.dumps({"approve": False, "reasons": ["acceptance evidence is still insufficient"], "required_checks": ["missing contract"]}),
         json.dumps(
             {
-                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\\n--- a/docs/smoke.txt\\n+++ b/docs/smoke.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n",
+                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+new\n",
                 "summary": "repair two",
                 "tests": ["smoke"],
             }
