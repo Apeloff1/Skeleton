@@ -447,6 +447,7 @@ async def test_approval_required_suspends_before_effect_and_resumes_once(
     await tools.register(
         _manifest("repo.write", approval_required=True),
         handler,
+        postcondition=lambda _request, _result_ref: True,
     )
     provider = FakeProvider(
         [

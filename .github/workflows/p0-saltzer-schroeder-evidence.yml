@@ -18,6 +18,11 @@ on:
       - ".github/workflows/p0-saltzer-schroeder-evidence.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-saltzer-schroeder-evidence-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

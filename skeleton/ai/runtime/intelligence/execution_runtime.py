@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -1031,80 +1032,187 @@ class CognitiveExecutionRuntime:
                 )
             source_snapshot.append((str(item[0]), str(item[1])))
 
-        response = await self.provider.generate(
-            ProviderRequest(
-                instructions=instructions,
-                prompt=prompt,
-                history=_history_from_payload(payload),
-                max_output_tokens=(
-                    int(execution.request.resource_budget["max_output_tokens"])
-                    if isinstance(
-                        execution.request.resource_budget.get("max_output_tokens"),
-                        int,
-                    )
-                    and not isinstance(
-                        execution.request.resource_budget.get("max_output_tokens"),
-                        bool,
-                    )
-                    else None
-                ),
-                data_class=str(
-                    context_policy.get(
-                        "data_class",
-                        "internal",
-                    )
-                ),
-                purpose=str(
-                    context_policy.get(
-                        "provider_purpose",
-                        "model-inference",
-                    )
-                ),
-                tenant_id=tenant_id,
-                operation_id=execution.operation_id,
-                admission_operation_id=_stable_uuid(
-                    "skeleton-provider-admission",
-                    execution.execution_id + ":" + turn_id,
-                ),
-                execution_id=execution.execution_id,
-                turn_id=turn_id,
-                context_id=(
-                    None
-                    if context_policy.get("context_id") is None
-                    else str(context_policy["context_id"])
-                ),
-                context_digest=str(context_digest),
-                context_source_snapshot=tuple(source_snapshot),
-                context_compiler_version=(
-                    None
-                    if context_policy.get("compiler_version") is None
-                    else str(context_policy["compiler_version"])
-                ),
-                model=(
-                    None
-                    if context_policy.get("provider_model") is None
-                    else str(context_policy["provider_model"])
-                ),
-                estimated_cost_usd=float(
-                    context_policy.get("estimated_cost_usd", 0.0)
-                ),
-                resource_budget=provider_budget,
-                structured_output_schema=structured_output_schema,
-                tools=tools,
-                tool_choice=str(
-                    context_policy.get(
-                        "tool_choice",
-                        "auto" if tools else "none",
-                    )
-                ),
-                specific_tool_id=(
-                    None
-                    if context_policy.get("specific_tool_id") is None
-                    else str(context_policy["specific_tool_id"])
-                ),
-                deadline=deadline,
+        provider_request = ProviderRequest(
+            instructions=instructions,
+            prompt=prompt,
+            history=_history_from_payload(payload),
+            max_output_tokens=(
+                int(execution.request.resource_budget["max_output_tokens"])
+                if isinstance(
+                    execution.request.resource_budget.get("max_output_tokens"),
+                    int,
+                )
+                and not isinstance(
+                    execution.request.resource_budget.get("max_output_tokens"),
+                    bool,
+                )
+                else None
+            ),
+            data_class=str(
+                context_policy.get(
+                    "data_class",
+                    "internal",
+                )
+            ),
+            purpose=str(
+                context_policy.get(
+                    "provider_purpose",
+                    "model-inference",
+                )
+            ),
+            tenant_id=tenant_id,
+            operation_id=execution.operation_id,
+            admission_operation_id=_stable_uuid(
+                "skeleton-provider-admission",
+                execution.execution_id + ":" + turn_id,
+            ),
+            execution_id=execution.execution_id,
+            turn_id=turn_id,
+            context_id=(
+                None
+                if context_policy.get("context_id") is None
+                else str(context_policy["context_id"])
+            ),
+            context_digest=str(context_digest),
+            context_source_snapshot=tuple(source_snapshot),
+            context_compiler_version=(
+                None
+                if context_policy.get("compiler_version") is None
+                else str(context_policy["compiler_version"])
+            ),
+            model=(
+                None
+                if context_policy.get("provider_model") is None
+                else str(context_policy["provider_model"])
+            ),
+            estimated_cost_usd=float(
+                context_policy.get("estimated_cost_usd", 0.0)
+            ),
+            resource_budget=provider_budget,
+            structured_output_schema=structured_output_schema,
+            tools=tools,
+            tool_choice=str(
+                context_policy.get(
+                    "tool_choice",
+                    "auto" if tools else "none",
+                )
+            ),
+            specific_tool_id=(
+                None
+                if context_policy.get("specific_tool_id") is None
+                else str(context_policy["specific_tool_id"])
+            ),
+            deadline=deadline,
+        )
+        cooperative_cancellation = bool(
+            getattr(
+                self.provider,
+                "supports_cooperative_cancellation",
+                False,
             )
         )
+        if deadline is None and not cooperative_cancellation:
+            response = await self.provider.generate(provider_request)
+        else:
+            logical_now = (
+                datetime.now(timezone.utc)
+                if now is None
+                else now.astimezone(timezone.utc)
+            )
+            deadline_budget = (
+                None
+                if deadline is None
+                else (deadline - logical_now).total_seconds()
+            )
+            if deadline_budget is not None and deadline_budget <= 0:
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="execution_deadline_exceeded",
+                    now=now,
+                )
+
+            provider_task = asyncio.create_task(
+                self.provider.generate(provider_request)
+            )
+            loop = asyncio.get_running_loop()
+            started_wait = loop.time()
+            try:
+                while True:
+                    remaining = None
+                    if deadline_budget is not None:
+                        remaining = (
+                            deadline_budget
+                            - (loop.time() - started_wait)
+                        )
+                        if remaining <= 0:
+                            provider_task.cancel()
+                            try:
+                                await provider_task
+                            except asyncio.CancelledError:
+                                pass
+                            durable_timeout = self.repository.get(
+                                execution.execution_id
+                            )
+                            timeout_payload = self._checkpoint_payload(
+                                execution.execution_id
+                            )
+                            return self._finalize_non_success(
+                                durable_timeout,
+                                timeout_payload,
+                                status="failed",
+                                error_code="execution_deadline_exceeded",
+                                now=now,
+                            )
+
+                    poll_seconds = (
+                        0.05
+                        if cooperative_cancellation
+                        else remaining
+                    )
+                    if remaining is not None:
+                        poll_seconds = min(
+                            remaining,
+                            0.05
+                            if cooperative_cancellation
+                            else remaining,
+                        )
+                    done, _ = await asyncio.wait(
+                        {provider_task},
+                        timeout=poll_seconds,
+                    )
+                    if provider_task in done:
+                        response = await provider_task
+                        break
+
+                    if cooperative_cancellation:
+                        durable_poll = self.repository.get(
+                            execution.execution_id
+                        )
+                        if durable_poll.cancellation_requested:
+                            provider_task.cancel()
+                            try:
+                                await provider_task
+                            except asyncio.CancelledError:
+                                pass
+                            cancel_payload = self._checkpoint_payload(
+                                execution.execution_id
+                            )
+                            return self._finalize_non_success(
+                                durable_poll,
+                                cancel_payload,
+                                status="cancelled",
+                                error_code="cancellation_requested",
+                                now=now,
+                            )
+            except asyncio.CancelledError:
+                provider_task.cancel()
+                try:
+                    await provider_task
+                except asyncio.CancelledError:
+                    pass
+                raise
 
         # Provider I/O may outlive a concurrent cancellation request (or the
         # execution deadline). Never transition using the stale pre-call
@@ -2222,6 +2330,91 @@ class CognitiveExecutionRuntime:
             externally_observable,
         )
 
+    def _external_verification_effect_guard(
+        self,
+        execution: AIExecution,
+        payload: Mapping[str, object],
+    ) -> ExecutionVerificationDecision | None:
+        """Fail closed when an external verifier would bypass effect proof.
+
+        A custom verification hook may independently judge model output, but it
+        must not turn an unverified side effect into a publishable success.
+        Every non-read-only tool receipt therefore needs a positively observed
+        postcondition before control reaches the external hook.
+        """
+        raw_rows = payload.get("tool_verification_evidence", [])
+        if not isinstance(raw_rows, list):
+            raise CognitiveExecutionError(
+                "tool verification evidence checkpoint is corrupt"
+            )
+
+        effect_rank = {
+            "read_only": 1,
+            "reversible": 2,
+            "irreversible": 3,
+        }
+        strongest_effect: str | None = None
+        missing: list[str] = []
+        observed: list[str] = []
+        externally_observable = False
+
+        for raw in raw_rows:
+            if not isinstance(raw, Mapping):
+                raise CognitiveExecutionError(
+                    "tool verification evidence entry is corrupt"
+                )
+            effect = str(raw.get("effect") or "").strip().lower()
+            if effect not in effect_rank:
+                raise CognitiveExecutionError(
+                    "tool verification evidence effect is invalid"
+                )
+            if (
+                strongest_effect is None
+                or effect_rank[effect] > effect_rank[strongest_effect]
+            ):
+                strongest_effect = effect
+
+            side_effect = str(
+                raw.get("side_effect_class") or "none"
+            ).strip().lower()
+            if side_effect != "none":
+                externally_observable = True
+
+            if effect == "read_only":
+                continue
+            receipt_id = str(raw.get("receipt_id") or "").strip()
+            if not receipt_id:
+                raise CognitiveExecutionError(
+                    "effect verification evidence is missing receipt identity"
+                )
+            if raw.get("postcondition_observed") is True:
+                observed.append(receipt_id)
+            else:
+                missing.append(receipt_id)
+
+        if not missing:
+            return None
+
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "schema_version": "skeleton.execution.effect_guard.v1",
+                "outcome": "failed",
+                "policy_satisfied": False,
+                "verifier_id": "execution-runtime:effect-postcondition-guard",
+                "verification_profile": "external_hook_effect_guard",
+                "claim_kind": ClaimKind.ACTION_OUTCOME.value,
+                "disposition": "block",
+                "action_effect": strongest_effect,
+                "externally_observable_action": externally_observable,
+                "required_modes": ["postcondition"],
+                "postcondition_receipt_ids": sorted(observed),
+                "missing_postcondition_receipt_ids": sorted(missing),
+                "execution_id": execution.execution_id,
+            },
+            disposition="block",
+        )
+
     async def _verify_candidate(
         self,
         execution: AIExecution,
@@ -2231,6 +2424,13 @@ class CognitiveExecutionRuntime:
         now: datetime | None,
     ) -> ExecutionVerificationDecision:
         if self.verification_hook is not None:
+            effect_guard = self._external_verification_effect_guard(
+                execution,
+                self._checkpoint_payload(execution.execution_id),
+            )
+            if effect_guard is not None:
+                return effect_guard
+
             decision = await _await_maybe(
                 self.verification_hook(
                     execution.request,

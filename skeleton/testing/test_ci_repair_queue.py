@@ -6,6 +6,6 @@ def test_retryable_failure_becomes_head_bound_task():
 def test_security_failure_not_auto_repaired():
  e=extract(run_id=1,job_id=2,gate="Workflow Input Security",head_sha="a"*40,log="ERROR x")
  assert task_from(e) is None
-def test_dedupe(): 
+def test_dedupe():
  e=extract(run_id=1,job_id=2,gate="CI/CD",head_sha="a"*40,log="ERROR x");t=task_from(e)
  assert len(dedupe((t,t)))==1
