@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -54,6 +55,13 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
     raw = supervisor.get("plan_items")
     if not isinstance(raw, list):
         raise ValueError("canonical supervisor snapshot has no plan_items")
+    expected_digest = str(supervisor.get("plan_digest_sha256", "")).strip()
+    if expected_digest:
+        actual_digest = hashlib.sha256(
+            json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
+        if actual_digest != expected_digest:
+            raise ValueError("canonical supervisor plan digest mismatch")
     items = [
         item
         for item in raw
