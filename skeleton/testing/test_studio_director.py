@@ -517,3 +517,31 @@ def test_audit_log_builds_hash_chained_records(tmp_path) -> None:
         payload.pop("record_sha256")
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
         assert claimed == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def test_audit_log_resumes_verified_chain(tmp_path) -> None:
+    path = tmp_path / "audit.jsonl"
+    first = AuditLog(path, "resume-run")
+    first.emit("run_started")
+    second = AuditLog(path, "resume-run")
+    second.emit("checkpoint")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [row["sequence"] for row in rows] == [1, 2]
+    assert rows[1]["previous_record_sha256"] == rows[0]["record_sha256"]
+
+
+def test_audit_log_refuses_cross_run_append(tmp_path) -> None:
+    path = tmp_path / "audit.jsonl"
+    AuditLog(path, "run-a").emit("run_started")
+    with pytest.raises(ValueError, match="different run id"):
+        AuditLog(path, "run-b")
+
+
+def test_audit_log_refuses_tampered_history(tmp_path) -> None:
+    path = tmp_path / "audit.jsonl"
+    AuditLog(path, "run-a").emit("run_started")
+    row = json.loads(path.read_text(encoding="utf-8"))
+    row["event"] = "tampered"
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="record hash is invalid"):
+        AuditLog(path, "run-a")
