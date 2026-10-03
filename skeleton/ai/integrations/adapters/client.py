@@ -421,4 +421,3 @@ async def _aclose(iterator: Any) -> None:
         await closer()
     except Exception:  # noqa: BLE001
         pass
-
