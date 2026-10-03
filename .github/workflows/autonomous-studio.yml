@@ -384,8 +384,9 @@ jobs:
           cp "$RUNNER_TEMP/studio-audit.jsonl" .studio/audit/latest.jsonl
           cp "$RUNNER_TEMP/studio-report.md" .studio/audit/latest.md
           cp "$RUNNER_TEMP/studio.patch.sha256" .studio/audit/latest.patch.sha256
+          cp "$RUNNER_TEMP/studio-execution-receipt.json" .studio/audit/latest.execution-receipt.json
           git add -u
-          git add .studio/audit/latest.jsonl .studio/audit/latest.md .studio/audit/latest.patch.sha256
+          git add .studio/audit/latest.jsonl .studio/audit/latest.md .studio/audit/latest.patch.sha256 .studio/audit/latest.execution-receipt.json
           git diff --cached --check
           if git diff --cached --name-only | grep -q '^\.studio-tmp/'; then
             echo '::error::temporary proposal files must never be committed'
@@ -425,6 +426,7 @@ jobs:
             echo '- API key present during generated-code validation: no'
             echo '- GitHub token exported during generated-code validation: no'
             echo '- Published worktree restored from sealed pre-test patch: yes'
+            echo '- Canonical plan and final patch bound by execution receipt: yes'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize Autonomous Studio run
