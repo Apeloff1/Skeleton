@@ -2285,6 +2285,47 @@ class CostGovernor:
                 raise CostGovernorError(str(exc)) from exc
         journal.clear_admission_intent(request.operation_id)
 
+    def _assert_no_unjournaled_authority(
+        self,
+        request: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> None:
+        """Refuse to adopt durable authority without Cost Governor evidence."""
+
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "authority preflight requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support authority preflight"
+            )
+        try:
+            quota_state = reader(
+                request.tenant_id,
+                request.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "authority preflight quota lookup failed"
+            ) from exc
+        if quota_state is not None:
+            raise CostGovernorConflict(
+                "unjournaled durable quota authority already exists"
+            )
+
+        pressure = self._shared_pressure_for_recovery(
+            request,
+            now_wall=now_wall,
+        )
+        if pressure is not None:
+            raise CostGovernorConflict(
+                "unjournaled shared pressure authority already exists"
+            )
+
     def _recover_admission_intent(
         self,
         request: AdmissionRequest,
@@ -2508,6 +2549,11 @@ class CostGovernor:
                     if recovered is not None:
                         return recovered
                     admission_intent = None
+
+                self._assert_no_unjournaled_authority(
+                    request,
+                    now_wall=now_wall,
+                )
 
             decision_sink = None
             if self._journal is not None:
