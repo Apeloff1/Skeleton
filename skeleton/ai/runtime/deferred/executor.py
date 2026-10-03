@@ -544,17 +544,20 @@ class DeferredExecutor:
         raise KeyError("unknown operation id")
 
     def snapshot(self) -> dict[str, object]:
-        rows = []
-        for operation_id in sorted(
-            set(self._success) | set(self._failure)
-        ):
-            receipt = self.receipt(operation_id)
-            rows.append(
-                {
-                    "receipt": receipt.as_dict(),
-                    "receipt_digest": receipt.digest,
-                }
-            )
+        with self._lock:
+            operation_ids=sorted(set(self._success) | set(self._failure))
+            receipts=[
+                self._success.get(operation_id)
+                or self._failure[operation_id]
+                for operation_id in operation_ids
+            ]
+        rows=[
+            {
+                "receipt": receipt.as_dict(),
+                "receipt_digest": receipt.digest,
+            }
+            for receipt in receipts
+        ]
         payload = {
             "schema_version": 1,
             "operations": rows,
