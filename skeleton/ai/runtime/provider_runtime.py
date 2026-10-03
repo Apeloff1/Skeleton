@@ -2018,6 +2018,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         )
 
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             messages: list[dict[str, str]] = [
@@ -2051,6 +2052,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 self.timeout_seconds,
             )
             try:
+                dispatched = True
                 response = await asyncio.wait_for(
                     client.responses.create(**kwargs),
                     timeout=timeout_seconds,
@@ -2073,7 +2075,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 )
             )
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2083,9 +2092,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             wall_seconds=latency_seconds,
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "model provider usage reconciliation failed"
             ) from exc
