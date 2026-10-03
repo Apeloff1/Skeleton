@@ -521,6 +521,70 @@ class AdmissionRuntime:
                 "durable lease estimate does not match request"
             )
 
+        remaining = lease.decision.remaining
+        required_remaining = {
+            "input_tokens": max(
+                0,
+                request.budget.max_input_tokens
+                - request.estimate.input_tokens,
+            ),
+            "output_tokens": max(
+                0,
+                request.budget.max_output_tokens
+                - request.estimate.output_tokens,
+            ),
+            "cost_usd": max(
+                0.0,
+                request.budget.max_cost_usd
+                - request.estimate.cost_usd,
+            ),
+            "wall_seconds": max(
+                0.0,
+                request.budget.max_wall_seconds
+                - request.estimate.wall_seconds,
+            ),
+            "provider_attempts": max(
+                0,
+                request.budget.max_provider_attempts
+                - request.estimate.provider_attempts,
+            ),
+            "tool_calls": max(
+                0,
+                request.budget.max_tool_calls
+                - request.estimate.tool_calls,
+            ),
+            "artifact_bytes": max(
+                0,
+                request.budget.max_artifact_bytes
+                - request.estimate.artifact_bytes,
+            ),
+            "storage_bytes": max(
+                0,
+                request.budget.max_storage_bytes
+                - request.estimate.storage_bytes,
+            ),
+        }
+        for field, expected in required_remaining.items():
+            if field not in remaining or remaining[field] != expected:
+                raise AdmissionRuntimeConflict(
+                    "durable lease remaining budget does not match request"
+                )
+        concurrency = remaining.get("concurrency")
+        queue_depth = remaining.get("queue_depth")
+        if (
+            isinstance(concurrency, bool)
+            or not isinstance(concurrency, int)
+            or concurrency < 0
+            or concurrency > request.budget.max_concurrency
+            or isinstance(queue_depth, bool)
+            or not isinstance(queue_depth, int)
+            or queue_depth < 0
+            or queue_depth > request.budget.max_queue_depth
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease pressure remainder is invalid"
+            )
+
         reservation = lease.quota_reservation
         if (
             reservation.operation_id != request.operation_id
@@ -528,6 +592,26 @@ class AdmissionRuntime:
         ):
             raise AdmissionRuntimeConflict(
                 "durable quota reservation identity does not match request"
+            )
+        if lease.lease_id != _lease_id(
+            lease.decision,
+            reservation,
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease id does not match decision and reservation"
+            )
+        expected_quota = reservation.estimate
+        if (
+            expected_quota.operations != 1
+            or expected_quota.input_tokens != request.estimate.input_tokens
+            or expected_quota.output_tokens != request.estimate.output_tokens
+            or expected_quota.cost_usd != request.estimate.cost_usd
+            or expected_quota.tool_calls != request.estimate.tool_calls
+            or expected_quota.artifact_bytes != request.estimate.artifact_bytes
+            or expected_quota.storage_bytes != request.estimate.storage_bytes
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota estimate does not match request"
             )
 
         finder = getattr(
