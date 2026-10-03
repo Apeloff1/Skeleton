@@ -847,3 +847,91 @@ def test_deferred_executor_rejects_stale_authority_evidence_before_effect() -> N
 
     assert calls==[]
 
+def test_deferred_executor_rejects_non_string_json_keys() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+
+    with pytest.raises(TypeError,match="JSON object keys must be strings"):
+        DeferredExecutor.digest_payload({1:"value"})
+
+
+def test_deferred_executor_rejects_oversized_payload_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+        max_payload_bytes=32,
+        max_result_bytes=128,
+    )
+    payload={"value":"x"*64}
+    invocation=_invocation(record,"large-payload",payload)
+
+    with pytest.raises(RuntimeError,match="payload byte limit exceeded"):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
+
+
+def test_deferred_executor_records_oversized_result_as_terminal_failure() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"value":"x"*128},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+        max_payload_bytes=128,
+        max_result_bytes=32,
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"large-result",payload)
+
+    with pytest.raises(DeferredExecutionError) as exc:
+        executor.execute(invocation,payload)
+
+    assert exc.value.receipt.error_type=="RuntimeError"
+    assert calls==[{"value":1}]
+    assert executor.receipt("large-result")==exc.value.receipt
+
+
+def test_deferred_executor_rejects_invalid_byte_limits() -> None:
+    registry=build_registry()
+    _enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+
+    with pytest.raises(ValueError,match="max_payload_bytes"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+            max_payload_bytes=0,
+        )
+    with pytest.raises(ValueError,match="max_result_bytes"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+            max_result_bytes=True,
+        )
+
