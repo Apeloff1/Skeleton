@@ -174,12 +174,14 @@ def select_frontier(
     team: str,
     cooldowns: Mapping[str, int] | None = None,
     attempts: Mapping[str, int] | None = None,
+    lane_health: Mapping[str, Mapping[str, Any]] | None = None,
     limit: int = 8,
 ) -> dict[str, Any]:
     if not 1 <= limit <= 32:
         raise ValueError("frontier limit must be between 1 and 32")
     cooldowns = cooldowns or {}
     attempts = attempts or {}
+    lane_health = lane_health or {}
     if not isinstance(plan_items, list):
         raise ValueError("canonical plan items must be a list")
     rows = {
@@ -223,6 +225,10 @@ def select_frontier(
             if dep not in rows or str(rows[dep].get("status", "")).lower() != "done"
         ]
         cooldown = max(0, int(cooldowns.get(item_id, 0)))
+        lane = assignments.get(item_id, "")
+        if str(lane_health.get(lane, {}).get("status", "")) == "quarantined":
+            deferred.append({"id": item_id, "reason": "lane_quarantined", "lane": lane})
+            continue
         if unresolved:
             deferred.append({"id": item_id, "reason": "dependencies", "dependencies": unresolved})
             continue
@@ -289,6 +295,7 @@ def allocate_supervisor_state(
         team=str(supervisor.get("team", "")),
         cooldowns=campaign.task_cooldowns,
         attempts=campaign.task_attempts,
+        lane_health=campaign.lane_health,
         limit=limit,
     )
     selected = frontier["selected"]
@@ -588,6 +595,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             team=str(supervisor.get("team", "")),
             cooldowns=state.task_cooldowns,
             attempts=state.task_attempts,
+            lane_health=state.lane_health,
             limit=args.frontier_limit,
         )
         Path(args.frontier).write_text(json.dumps(frontier, sort_keys=True, indent=2) + "\n", encoding="utf-8")
