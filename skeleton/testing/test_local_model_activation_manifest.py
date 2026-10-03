@@ -21,6 +21,10 @@ from skeleton.ai.runtime.product.activation import (
 from skeleton.ai.runtime.product.qualification import (
     LearningQualificationBundle,
 )
+from skeleton.ai.runtime.product.lifecycle import (
+    ModelLifecycleState,
+    ModelLifecycleTransitionReceipt,
+)
 from skeleton.learning.model_program import ModelPromotionReceipt
 
 
@@ -136,6 +140,27 @@ def _promotion(
     )
 
 
+def _lifecycle_promotion(
+    *,
+    promotion: ModelPromotionReceipt,
+    artifact_digest: str,
+) -> ModelLifecycleTransitionReceipt:
+    return ModelLifecycleTransitionReceipt(
+        sequence=3,
+        model_id=promotion.model_id,
+        model_digest=promotion.model_digest,
+        artifact_digest=artifact_digest,
+        from_state=ModelLifecycleState.VALIDATED,
+        to_state=ModelLifecycleState.PROMOTED,
+        authority_id=promotion.verifier_id,
+        evidence_refs=(
+            "model-promotion-receipt-sha256:" + promotion.digest,
+            *promotion.evaluation_refs,
+        ),
+        prior_transition_digest=_sha("validated-transition"),
+    )
+
+
 def test_activation_manifest_binds_candidate_baseline_and_promotion(
     tmp_path: Path,
 ) -> None:
@@ -169,6 +194,10 @@ def test_activation_manifest_binds_candidate_baseline_and_promotion(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=_lifecycle_promotion(
+            promotion=promotion,
+            artifact_digest=candidate_sha,
+        ),
         model_program_bridge_digest=bridge_digest,
         operator_authorization_ref="operator-approval:local-model:v2",
         cache_size=7,
@@ -218,6 +247,10 @@ def test_written_activation_requires_exact_deployment_digest(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=_lifecycle_promotion(
+            promotion=promotion,
+            artifact_digest=candidate_sha,
+        ),
         model_program_bridge_digest=bridge_digest,
         operator_authorization_ref="operator-approval:test",
     )
@@ -275,6 +308,10 @@ def test_activation_rejects_candidate_artifact_tamper(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=_lifecycle_promotion(
+            promotion=promotion,
+            artifact_digest=candidate_sha,
+        ),
         model_program_bridge_digest=bridge_digest,
         operator_authorization_ref="operator-approval:tamper",
     )
@@ -372,6 +409,10 @@ def test_activation_manifest_executes_authenticated_rollback_target(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=_lifecycle_promotion(
+            promotion=promotion,
+            artifact_digest=candidate_sha,
+        ),
         model_program_bridge_digest=bridge_digest,
         operator_authorization_ref="operator-approval:rollback",
         cache_size=0,
@@ -425,6 +466,10 @@ def test_environment_can_select_digest_pinned_rollback(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=_lifecycle_promotion(
+            promotion=promotion,
+            artifact_digest=candidate_sha,
+        ),
         model_program_bridge_digest=bridge_digest,
         operator_authorization_ref="operator-approval:env-rollback",
         cache_size=0,
