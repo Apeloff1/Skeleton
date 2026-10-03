@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.2",
+  "tree_version": "1.6.3",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "41a2a9b54e37ce50322ed444b453c3d026500bd3",
+      "source_git_object_sha": "e2abcdcc7b6d578433eb2a1670c3b6eab48a221e",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "779b9d94b91c06cf8037449fb80217ad73caab2c",
+      "source_git_object_sha": "43089eae50fa1dedda736c45cdf9ebdba72b49bb",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -352,7 +352,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "c966370b80a04e46f13a553c32d655a0c48df427",
+      "source_git_object_sha": "8f62d6938c25b374310940e98a87867f3e6487dd",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -386,7 +386,7 @@
       "source": "skeleton/vault",
       "destination": "skeleton/ai/runtime/vault",
       "kind": "tree",
-      "source_git_object_sha": "4ab17d6d08267ed36154459f6d7ee7b9ca18a077",
+      "source_git_object_sha": "3bc2239ceba7abcb5749836861c90f30e7949403",
       "role": "data governance lifecycle and audit authority",
       "work_package_refs": [
         "WP-W00",
@@ -5960,12 +5960,12 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 162,
+    "governed_mapping_count": 163,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
       "B3-owner-sensitive": 8,
-      "B1-core-runtime": 59,
+      "B1-core-runtime": 60,
       "B2-domain-build": 13,
       "B4-research-quarantine": 54,
       "B3-compat-convergence": 28
@@ -6013,6 +6013,25 @@
       "base_storage_head_sha": "eff5e6952834c8cd86a57eed5975b476a9302b88",
       "refreshed_source_tree_sha": "d1f46cc03da625048f00cc653856b030fa2eed79",
       "policy": "Persisted compensation payloads are recoverable only while a saga is compensating and are returned in reverse applied-effect order; canonical and AI-runtime storage mirrors remain byte-identical."
+    },
+    "p3t2_storage_file_tree_reconciliation": {
+      "source_main_sha": "a64d9b75524a5a8143fe24c2bf22e4b5a5e617cd",
+      "status": "candidate_pending_exact_head_ci",
+      "refreshed_mapping_ids": [
+        "AIFT-CONTRACTS",
+        "AIFT-PERSISTENCE",
+        "AIFT-ENGINE-API",
+        "AIFT-VAULT"
+      ],
+      "governed_mapping_count": 163,
+      "batch_counts": {
+        "B3-owner-sensitive": 8,
+        "B1-core-runtime": 60,
+        "B2-domain-build": 13,
+        "B4-research-quarantine": 54,
+        "B3-compat-convergence": 28
+      },
+      "policy": "Refresh exact Git object identities and aggregate mapping counts after P3T2 storage and subsequent current-main merges; this metadata repair grants no cutover, completion, promotion, implementation signoff, or independent verification authority."
     }
   }
 }
