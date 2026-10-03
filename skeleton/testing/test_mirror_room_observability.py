@@ -140,4 +140,13 @@ def test_observatory_file_tree_binds_landed_product_routes() -> None:
     assert "interface MirrorRoomObservatoryPayload" in types
     assert "production_authority: false" in types
     assert "get_default_observatory().snapshot()" in api_route
+    route_registry = (ROOT / "frontend/utils/routeRegistry.ts").read_text(
+        encoding="utf-8"
+    )
+    dashboard = (ROOT / "frontend/app/dashboard.tsx").read_text(
+        encoding="utf-8"
+    )
+    assert "path: '/mirror-room'" in route_registry
+    assert "Mirror Room Observatory" in dashboard
+    assert "router.push('/mirror-room'" in dashboard
 
