@@ -44,6 +44,12 @@ from .multiview import (
     build_camera_coverage,
     stratified_camera_subset,
 )
+from .training_optimizer import (
+    TrainingOptimizationError,
+    TrainingOptimizationPolicy,
+    TrainingOptimizationResult,
+    optimize_training_mix,
+)
 from .training_allocation import (
     AdaptiveMethodAllocation,
     MethodAllocationScore,
@@ -84,6 +90,10 @@ from .local import (
 )
 
 __all__ = [
+    "optimize_training_mix",
+    "TrainingOptimizationResult",
+    "TrainingOptimizationPolicy",
+    "TrainingOptimizationError",
     "evaluate_training_receipt_developmentally",
     "evaluate_local_candidate_developmentally",
     "DevelopmentalEvaluationError",
