@@ -329,6 +329,7 @@ class NumpyRecurrentLM:
         early_stopping_patience: int = 0,
         min_relative_improvement: float = 0.0,
         shuffle_each_epoch: bool = True,
+        gradient_accumulation_steps: int = 1,
     ) -> "NumpyRecurrentLM":
         """Train a bounded Elman RNN with deterministic truncated BPTT."""
 
@@ -392,6 +393,12 @@ class NumpyRecurrentLM:
         )
         if not isinstance(shuffle_each_epoch, bool):
             raise TypeError("shuffle_each_epoch must be boolean")
+        accumulation_steps = _require_int(
+            gradient_accumulation_steps,
+            "gradient_accumulation_steps",
+            minimum=1,
+            maximum=64,
+        )
 
         tokenized: list[tuple[str, ...]] = []
         counts: Counter[str] = Counter()
