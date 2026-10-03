@@ -279,3 +279,61 @@ def test_repeated_task_attempts_receive_bounded_backoff():
         attempted_task_ids=[], policy=policy,
     )
     assert state.task_cooldowns["task"] == 1
+
+
+def test_frontier_prefers_task_that_unblocks_more_work():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "root", "target_team": "night", "status": "queued", "priority": 20, "dependencies": []},
+        {"id": "leaf", "target_team": "night", "status": "queued", "priority": 90, "dependencies": []},
+        {"id": "child-1", "target_team": "night", "status": "queued", "dependencies": ["root"]},
+        {"id": "child-2", "target_team": "night", "status": "queued", "dependencies": ["root"]},
+    ]
+    result = select_frontier(plan, team="night", limit=1)
+    assert result["selected"][0]["id"] == "root"
+
+
+def test_frontier_defers_unresolved_and_cooled_tasks():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "done", "target_team": "night", "status": "done", "dependencies": []},
+        {"id": "blocked", "target_team": "night", "status": "queued", "dependencies": ["missing"]},
+        {"id": "cool", "target_team": "night", "status": "queued", "dependencies": []},
+        {"id": "ready", "target_team": "night", "status": "queued", "dependencies": ["done"]},
+    ]
+    result = select_frontier(plan, team="night", cooldowns={"cool": 2}, limit=8)
+    assert [item["id"] for item in result["selected"]] == ["ready"]
+    reasons = {row["id"]: row["reason"] for row in result["deferred"]}
+    assert reasons == {"blocked": "dependencies", "cool": "cooldown"}
+
+
+def test_frontier_penalizes_repeated_attempts_on_tie():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "a", "target_team": "night", "status": "queued", "priority": 50, "dependencies": []},
+        {"id": "b", "target_team": "night", "status": "queued", "priority": 50, "dependencies": []},
+    ]
+    result = select_frontier(plan, team="night", attempts={"a": 3}, limit=1)
+    assert result["selected"][0]["id"] == "b"
+
+
+def test_frontier_is_deterministic_under_input_reordering():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "b", "target_team": "night", "status": "queued", "priority": 50, "dependencies": []},
+        {"id": "a", "target_team": "night", "status": "queued", "priority": 50, "dependencies": []},
+    ]
+    first = select_frontier(plan, team="night", limit=2)
+    second = select_frontier(list(reversed(plan)), team="night", limit=2)
+    assert [x["id"] for x in first["selected"]] == [x["id"] for x in second["selected"]]
+
+
+def test_frontier_rejects_unbounded_limit():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    with pytest.raises(ValueError, match="frontier limit"):
+        select_frontier([], team="night", limit=33)
