@@ -11,6 +11,7 @@ on:
       - 'tests/test_shift_supervisor_planning_harness.py'
       - 'tests/test_shift_supervisor_peak_loop.py'
       - 'tests/test_shift_supervisor_scheduler.py'
+      - 'tests/test_shift_supervisor_consumer_plan.py'
       - '.github/workflows/autonomous-studio.yml'
       - '.github/workflows/autonomous-studio-smoke.yml'
   workflow_dispatch:
@@ -79,6 +80,7 @@ jobs:
             tests/test_shift_supervisor_planning_harness.py \
             tests/test_shift_supervisor_peak_loop.py \
             tests/test_shift_supervisor_scheduler.py \
+            tests/test_shift_supervisor_consumer_plan.py \
             -q --tb=short --maxfail=1
 
       - name: Run 1,000-worker SMB planning stress contract
