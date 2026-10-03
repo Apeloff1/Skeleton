@@ -481,9 +481,17 @@ def propose(
                 if checked.returncode != 0:
                     audit.emit("patch_rejected_by_git", task=plan_id, error=checked.stderr[-2000:])
                     continue
-                subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
-                validation_commands = _discover_validation_commands(task.paths)
-                validation_ok, validation_output = _run_validation_commands(validation_commands)
+                before_apply = _git("status", "--porcelain=v1", "--untracked-files=all")
+                if before_apply.strip():
+                    raise RuntimeError("Studio worktree is dirty before candidate application")
+                try:
+                    subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                    validation_commands = _discover_validation_commands(task.paths)
+                    validation_ok, validation_output = _run_validation_commands(validation_commands)
+                except BaseException:
+                    _git("reset", "--hard", "HEAD", check=False)
+                    _git("clean", "-fd", "--", *[path for path in task.paths if not Path(path).exists()], check=False)
+                    raise
                 if not validation_ok:
                     audit.emit(
                         "patch_rejected_by_validation",
@@ -492,6 +500,7 @@ def propose(
                         output=list(validation_output),
                     )
                     _git("reset", "--hard", "HEAD", check=False)
+                    _git("clean", "-fd", "--", *[path for path in task.paths if not Path(path).exists()], check=False)
                     continue
                 accepted += 1
                 audit.emit(
@@ -507,7 +516,7 @@ def propose(
                     review_reasons=reviewed.review_reasons,
                     verification_reasons=reviewed.verification_reasons,
                     required_checks=reviewed.required_checks,
-                    executed_validation=list(validation_commands),
+                    executed_validation=[list(command) for command in validation_commands],
                     validation_output=list(validation_output),
                     paths=list(task.paths),
                 )
