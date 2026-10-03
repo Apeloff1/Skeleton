@@ -31,7 +31,16 @@ from .studio_registry import STUDIO, STUDIO_SIZE, registry_fingerprint, select_c
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
-    data = json.loads(state_path.read_text(encoding="utf-8"))
+    try:
+        raw_state = state_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError("canonical supervisor snapshot is unreadable") from exc
+    if len(raw_state) > 5_000_000:
+        raise ValueError("canonical supervisor snapshot exceeds 5 MB safety bound")
+    try:
+        data = json.loads(raw_state)
+    except json.JSONDecodeError as exc:
+        raise ValueError("canonical supervisor snapshot is invalid JSON") from exc
     if not isinstance(data, Mapping):
         raise ValueError("repository state must be an object")
     supervisor = data.get("_shift_supervisor")
