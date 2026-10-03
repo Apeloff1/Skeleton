@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
@@ -9,6 +10,7 @@ import unittest
 from skeleton.repo_machine.builder import RepositoryModelBuilder
 from skeleton.repo_machine.config import load_machine_config
 from skeleton.repo_machine.planner import derive_work_candidates
+from skeleton.repo_machine.workgraph import WorkGraph, WorkNode
 
 
 CONFIG = """
@@ -135,6 +137,81 @@ class RepoMachineTests(unittest.TestCase):
             missing = [item for item in work if item.lane == "regression"]
             self.assertTrue(missing)
             self.assertEqual(missing[0].zone, "alpha")
+
+    def test_planner_normalizes_windows_style_finding_paths(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            (root / "alpha" / "big.py").write_text(
+                "\n".join(f"x{i} = {i}" for i in range(20)),
+                encoding="utf-8",
+            )
+            model = RepositoryModelBuilder(root).build()
+            target = next(
+                finding
+                for finding in model.findings
+                if finding.code == "organization.oversized-module"
+                and finding.path == "alpha/big.py"
+            )
+            windows_target = replace(target, path="alpha\\big.py")
+            adjusted = replace(
+                model,
+                findings=tuple(
+                    windows_target if finding is target else finding
+                    for finding in model.findings
+                ),
+            )
+
+            work = derive_work_candidates(adjusted)
+
+            candidate = next(item for item in work if item.identity == windows_target.identity)
+            self.assertEqual(candidate.path, "alpha\\big.py")
+            self.assertGreaterEqual(candidate.impact_score, 0)
+
+    def test_workgraph_frontier_is_ordered_and_dependency_closed(self) -> None:
+        root = WorkNode(
+            identity="root",
+            lane="architecture",
+            zone="alpha",
+            priority=100,
+            objective="root",
+            conflict_keys=("zone:alpha",),
+            prerequisites=(),
+            evidence=(),
+            strategic_score=30,
+        )
+        child = WorkNode(
+            identity="child",
+            lane="regression",
+            zone="beta",
+            priority=90,
+            objective="child",
+            conflict_keys=("zone:beta",),
+            prerequisites=("root",),
+            evidence=(),
+            strategic_score=100,
+        )
+        peer = WorkNode(
+            identity="peer",
+            lane="regression",
+            zone="tests",
+            priority=80,
+            objective="peer",
+            conflict_keys=("zone:tests",),
+            prerequisites=(),
+            evidence=(),
+            strategic_score=70,
+        )
+        graph = WorkGraph((child, peer, root))
+
+        self.assertEqual(
+            tuple(node.identity for node in graph.frontier()),
+            ("peer", "root"),
+        )
+        self.assertEqual(
+            tuple(node.identity for node in graph.frontier(("root",))),
+            ("child", "peer"),
+        )
 
     def test_central_tests_are_linked_by_import_with_bounded_evidence(self) -> None:
         with self.fixture() as temp:
