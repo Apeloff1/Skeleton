@@ -213,9 +213,27 @@ def extract_visual_training_observation(
 
     try:
         with Image.open(BytesIO(payload)) as opened:
+            source_width, source_height = opened.size
+            if (
+                source_width < 1
+                or source_height < 1
+                or source_width * source_height > _MAX_PIXELS
+            ):
+                raise VisualLearningError(
+                    "decoded image dimensions exceed visual bounds"
+                )
             opened.verify()
         with Image.open(BytesIO(payload)) as opened:
-            image = ImageOps.exif_transpose(opened).convert("RGB")
+            source_width, source_height = opened.size
+            if (
+                source_width < 1
+                or source_height < 1
+                or source_width * source_height > _MAX_PIXELS
+            ):
+                raise VisualLearningError(
+                    "decoded image dimensions exceed visual bounds"
+                )
+            image = ImageOps.exif_transpose(opened)
             width, height = image.size
             if (
                 width < 1
@@ -225,11 +243,28 @@ def extract_visual_training_observation(
                 raise VisualLearningError(
                     "decoded image dimensions exceed visual bounds"
                 )
+            metadata = dict(asset.sanitized_metadata)
+            declared_width = metadata.get("width")
+            declared_height = metadata.get("height")
+            if declared_width is not None and declared_width != width:
+                raise VisualLearningError(
+                    "decoded width differs from sanitized metadata"
+                )
+            if declared_height is not None and declared_height != height:
+                raise VisualLearningError(
+                    "decoded height differs from sanitized metadata"
+                )
+            image = image.convert("RGB")
             # Bound compute while retaining the full image field of view.
             image.thumbnail((512, 512))
             width_small, height_small = image.size
             pixels = list(image.getdata())
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except (
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+        Image.DecompressionBombError,
+    ) as exc:
         raise VisualLearningError("image payload cannot be decoded safely") from exc
 
     count = len(pixels)
