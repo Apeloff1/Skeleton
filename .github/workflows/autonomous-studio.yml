@@ -243,15 +243,12 @@ jobs:
           audit = Path(os.environ['RUNNER_TEMP']) / 'studio-audit.jsonl'
           if audit.is_file():
               rc = int(os.environ['VALIDATION_RC'])
-              event = {
-                  'ts': datetime.now(timezone.utc).isoformat(),
-                  'run_id': os.environ.get('GITHUB_RUN_ID', ''),
-                  'event': 'validation_passed' if rc == 0 else 'validation_failed',
-                  'stage': 'credential_free_validation',
-                  'status': 'passed' if rc == 0 else 'failed_closed',
-              }
-              with audit.open('a', encoding='utf-8') as handle:
-                  handle.write(json.dumps(event, sort_keys=True) + '\n')
+              from skeleton.automation.studio_director import AuditLog
+              AuditLog(audit, os.environ.get('GITHUB_RUN_ID', '')).emit(
+                  'validation_passed' if rc == 0 else 'validation_failed',
+                  stage='credential_free_validation',
+                  status='passed' if rc == 0 else 'failed_closed',
+              )
           PY
             if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
               python -m skeleton.automation.studio_report \
