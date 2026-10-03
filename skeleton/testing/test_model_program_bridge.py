@@ -234,3 +234,19 @@ def test_reverse_training_registers_in_canonical_model_registry(
     )
     assert promotion.model_digest == artifact.model_digest
     assert promotion.training_receipt_digest == receipt.digest
+
+
+def test_bridge_rejects_architecture_schema_mismatch(tmp_path) -> None:
+    receipt = _product_receipt(tmp_path)
+    receipt["model_architecture"] = "elman_recurrent"
+
+    with pytest.raises(
+        ModelProgramBridgeError,
+        match="architecture differs from artifact schema",
+    ):
+        bridge_product_training_to_model_program(
+            receipt,
+            run_id="reverse-run-architecture-drift",
+            trainer_id="skeleton.reverse-multimethod-trainer.v1",
+            code_revision="test-revision",
+        )
