@@ -1,0 +1,11 @@
+[tools]
+python = "3.11.16"
+node = "24.20.0"
+uv = "0.12.15"
+
+[tasks.bootstrap]
+description = "Install pinned Skeleton toolchains and verify host capabilities"
+run = [
+  "mise install",
+  "mise exec -- python scripts/verify_toolchain_bootstrap.py",
+]
