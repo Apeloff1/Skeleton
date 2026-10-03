@@ -481,3 +481,69 @@ def test_allocation_receipt_binds_lane_assignment():
     allocation = allocate_supervisor_state(repo, CampaignState(campaign_id="c"), limit=1)
     assert set(allocation["lane_assignments"]) == {"a"}
     assert len(allocation["lane_assignments"]["a"]) == 16
+
+
+def test_scheduler_rejects_duplicate_ids_before_lane_allocation():
+    from skeleton.automation.completion_campaign import validate_lane_invariants
+
+    plan = [
+        {"id": "dup", "target_team": "night", "dependencies": []},
+        {"id": "dup", "target_team": "night", "dependencies": []},
+    ]
+    with pytest.raises(ValueError, match="duplicated"):
+        validate_lane_invariants(plan, "night")
+
+
+def test_task_aging_increases_for_skipped_work_and_resets_attempted():
+    from skeleton.automation.completion_campaign import update_task_age
+
+    plan = [
+        {"id": "a", "target_team": "night", "status": "queued"},
+        {"id": "b", "target_team": "night", "status": "queued"},
+    ]
+    state = CampaignState(task_age={"a": 4, "b": 7})
+    update_task_age(state, plan_items=plan, team="night", attempted_task_ids=["a"])
+    assert state.task_age == {"a": 0, "b": 8}
+
+
+def test_task_aging_is_bounded():
+    from skeleton.automation.completion_campaign import update_task_age
+
+    state = CampaignState(task_age={"a": 1000})
+    update_task_age(
+        state,
+        plan_items=[{"id": "a", "target_team": "night", "status": "queued"}],
+        team="night",
+        attempted_task_ids=[],
+    )
+    assert state.task_age["a"] == 1000
+
+
+def test_age_breaks_frontier_tie_before_priority():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "old", "target_team": "night", "status": "queued", "priority": 10, "dependencies": []},
+        {"id": "new", "target_team": "night", "status": "queued", "priority": 100, "dependencies": []},
+    ]
+    result = select_frontier(plan, team="night", task_age={"old": 20, "new": 0}, limit=1)
+    assert result["selected"][0]["id"] == "old"
+
+
+def test_allocation_nonce_changes_across_campaign_epoch():
+    from skeleton.automation.completion_campaign import allocate_supervisor_state
+
+    items = [{"id": "a", "target_team": "night", "status": "queued", "dependencies": []}]
+    digest = hashlib.sha256(json.dumps(items, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    def make_repo():
+        return {
+            "_shift_supervisor_all_plan_items": items,
+            "_shift_supervisor": {
+                "status": "loaded", "team": "night", "generation_id": "g",
+                "plan_digest_sha256": digest, "plan_items": items,
+            },
+        }
+    first = allocate_supervisor_state(make_repo(), CampaignState(campaign_id="c", epoch=1), limit=1)
+    second = allocate_supervisor_state(make_repo(), CampaignState(campaign_id="c", epoch=2), limit=1)
+    assert first["allocation_nonce"] != second["allocation_nonce"]
+    assert first["allocation_sha256"] != second["allocation_sha256"]
