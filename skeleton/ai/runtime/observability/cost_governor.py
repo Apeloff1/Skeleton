@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
 from pathlib import Path
 import sqlite3
 import threading
@@ -24,8 +25,10 @@ from skeleton.ai.runtime.observability.budget_accounting import (
 )
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
+    AdmissionDecision,
     AdmissionError,
     AdmissionRequest,
+    AdmissionStatus,
     ResourceBudget,
     UsageEstimate,
 )
@@ -697,6 +700,112 @@ def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class _RuntimeLeaseJournal:
+    lease_id: str
+    decision_id: str
+    reason_code: str
+    remaining: tuple[tuple[str, int | float], ...]
+    admitted_at: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "lease_id": self.lease_id,
+            "decision_id": self.decision_id,
+            "reason_code": self.reason_code,
+            "remaining": dict(self.remaining),
+            "admitted_at": self.admitted_at,
+        }
+
+
+def _runtime_lease_journal(
+    lease: AdmissionLease,
+) -> _RuntimeLeaseJournal:
+    if not isinstance(lease, AdmissionLease):
+        raise TypeError("runtime_lease must be AdmissionLease")
+    remaining: list[tuple[str, int | float]] = []
+    for key, value in sorted(lease.decision.remaining.items()):
+        clean_key = _token("remaining key", key)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) < 0
+        ):
+            raise CostGovernorError(
+                "runtime lease remaining budget is invalid"
+            )
+        remaining.append((clean_key, value))
+    admitted_at = float(lease.admitted_at)
+    if not math.isfinite(admitted_at) or admitted_at < 0:
+        raise CostGovernorError("runtime lease admitted_at is invalid")
+    return _RuntimeLeaseJournal(
+        lease_id=_token("lease_id", lease.lease_id),
+        decision_id=_token(
+            "admission_decision_id",
+            lease.decision.decision_id,
+        ),
+        reason_code=_token(
+            "admission_reason_code",
+            lease.decision.reason_code,
+        ),
+        remaining=tuple(remaining),
+        admitted_at=admitted_at,
+    )
+
+
+def _runtime_lease_journal_from_payload(
+    value: object,
+) -> _RuntimeLeaseJournal:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        )
+    remaining_raw = value.get("remaining")
+    if not isinstance(remaining_raw, dict):
+        raise CostGovernorError(
+            "runtime lease remaining payload is invalid"
+        )
+    remaining: list[tuple[str, int | float]] = []
+    for key, item in sorted(remaining_raw.items()):
+        clean_key = _token("remaining key", key)
+        if (
+            isinstance(item, bool)
+            or not isinstance(item, (int, float))
+            or not math.isfinite(float(item))
+            or float(item) < 0
+        ):
+            raise CostGovernorError(
+                "runtime lease remaining payload is invalid"
+            )
+        remaining.append((clean_key, item))
+    try:
+        admitted_at = float(value["admitted_at"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        ) from exc
+    if not math.isfinite(admitted_at) or admitted_at < 0:
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        )
+    try:
+        lease_id = value["lease_id"]
+        decision_id = value["decision_id"]
+        reason_code = value["reason_code"]
+    except KeyError as exc:
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        ) from exc
+    return _RuntimeLeaseJournal(
+        lease_id=_token("lease_id", lease_id),
+        decision_id=_token("admission_decision_id", decision_id),
+        reason_code=_token("admission_reason_code", reason_code),
+        remaining=tuple(remaining),
+        admitted_at=admitted_at,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class _CostCompletionIntent:
     actual: UsageEstimate
     budget: ResourceBudget
@@ -737,6 +846,7 @@ class _CostJournalRecord:
     terminal: CostDecision | None
     evidence_digest: str | None
     completion_intent: _CostCompletionIntent | None
+    runtime_lease: _RuntimeLeaseJournal | None
 
 
 class _SqliteCostGovernorJournal:
@@ -753,6 +863,7 @@ class _SqliteCostGovernorJournal:
         terminal_json TEXT,
         evidence_digest TEXT,
         completion_intent_json TEXT,
+        runtime_lease_json TEXT,
         CHECK (
             state IN (
                 'active',
@@ -779,6 +890,13 @@ class _SqliteCostGovernorJournal:
                     """
                     ALTER TABLE cost_governor_journal
                     ADD COLUMN completion_intent_json TEXT
+                    """
+                )
+            if "runtime_lease_json" not in columns:
+                conn.execute(
+                    """
+                    ALTER TABLE cost_governor_journal
+                    ADD COLUMN runtime_lease_json TEXT
                     """
                 )
 
@@ -840,6 +958,16 @@ class _SqliteCostGovernorJournal:
                     cls._decode_json(
                         row["completion_intent_json"],
                         "completion_intent",
+                    )
+                )
+            ),
+            runtime_lease=(
+                None
+                if row["runtime_lease_json"] is None
+                else _runtime_lease_journal_from_payload(
+                    cls._decode_json(
+                        row["runtime_lease_json"],
+                        "runtime_lease",
                     )
                 )
             ),
@@ -972,6 +1100,7 @@ class _SqliteCostGovernorJournal:
         requested_request_digest: str,
         reservation: CostReservation,
         quota_reservation: QuotaReservation,
+        runtime_lease: AdmissionLease,
     ) -> _CostJournalRecord:
         requested = _sha256(
             "requested_request_digest",
@@ -979,6 +1108,10 @@ class _SqliteCostGovernorJournal:
         )
         reservation_json = _canonical_json_text(reservation.as_dict())
         quota_json = _canonical_json_text(quota_reservation.as_dict())
+        runtime_lease_record = _runtime_lease_journal(runtime_lease)
+        runtime_lease_json = _canonical_json_text(
+            runtime_lease_record.as_dict()
+        )
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -996,8 +1129,9 @@ class _SqliteCostGovernorJournal:
                             operation_id, tenant_id,
                             requested_request_digest,
                             reservation_json, quota_reservation_json,
-                            state, terminal_json, evidence_digest
-                        ) VALUES (?, ?, ?, ?, ?, 'active', NULL, NULL)
+                            state, terminal_json, evidence_digest,
+                            runtime_lease_json
+                        ) VALUES (?, ?, ?, ?, ?, 'active', NULL, NULL, ?)
                         """,
                         (
                             reservation.operation_id,
@@ -1005,6 +1139,7 @@ class _SqliteCostGovernorJournal:
                             requested,
                             reservation_json,
                             quota_json,
+                            runtime_lease_json,
                         ),
                     )
                 else:
@@ -1017,6 +1152,7 @@ class _SqliteCostGovernorJournal:
                         existing.requested_request_digest != requested
                         or existing.reservation != reservation
                         or existing.quota_reservation != quota_reservation
+                        or existing.runtime_lease != runtime_lease_record
                     ):
                         raise CostGovernorConflict(
                             "active cost journal replayed with different inputs"
@@ -1304,6 +1440,93 @@ class CostGovernor:
             estimate=fallback.estimate,
         )
 
+    @staticmethod
+    def _selected_request_for_replay(
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        record: _CostJournalRecord,
+    ) -> AdmissionRequest:
+        receipt = record.reservation
+        if receipt.fallback_used:
+            if fallback is None:
+                raise CostGovernorConflict(
+                    "durable fallback reservation requires original fallback"
+                )
+            if fallback.fallback_id != receipt.fallback_id:
+                raise CostGovernorConflict(
+                    "durable fallback identity does not match replay"
+                )
+            selected = CostGovernor._fallback_request(
+                request,
+                fallback,
+            )
+        else:
+            selected = request
+
+        if (
+            selected.capability != receipt.selected_capability
+            or _request_digest(selected)
+            != receipt.selected_request_digest
+        ):
+            raise CostGovernorConflict(
+                "durable selected request does not match replay"
+            )
+        return selected
+
+    @staticmethod
+    def _lease_from_journal(
+        selected: AdmissionRequest,
+        record: _CostJournalRecord,
+    ) -> AdmissionLease:
+        metadata = record.runtime_lease
+        if metadata is None:
+            raise CostGovernorError(
+                "legacy active cost journal lacks runtime lease recovery metadata"
+            )
+        receipt = record.reservation
+        if (
+            metadata.lease_id != receipt.lease_id
+            or metadata.decision_id != receipt.admission_decision_id
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal identity does not match reservation receipt"
+            )
+
+        remaining = dict(metadata.remaining)
+        required_remaining = {
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "wall_seconds",
+            "provider_attempts",
+            "tool_calls",
+            "artifact_bytes",
+            "storage_bytes",
+            "concurrency",
+            "queue_depth",
+        }
+        if not required_remaining.issubset(remaining):
+            raise CostGovernorError(
+                "runtime lease journal is missing remaining-budget fields"
+            )
+
+        decision = AdmissionDecision(
+            decision_id=metadata.decision_id,
+            status=AdmissionStatus.ADMIT,
+            operation_id=selected.operation_id,
+            tenant_id=selected.tenant_id,
+            capability=selected.capability,
+            reason_code=metadata.reason_code,
+            estimated=selected.estimate,
+            remaining=remaining,
+        )
+        return AdmissionLease(
+            lease_id=metadata.lease_id,
+            decision=decision,
+            quota_reservation=record.quota_reservation,
+            admitted_at=metadata.admitted_at,
+        )
+
     def reserve(
         self,
         request: AdmissionRequest,
@@ -1349,6 +1572,31 @@ class CostGovernor:
                         raise CostGovernorConflict(
                             "operation already has terminal cost journal state"
                         )
+
+                    selected = self._selected_request_for_replay(
+                        request,
+                        fallback,
+                        persisted,
+                    )
+                    lease = self._lease_from_journal(
+                        selected,
+                        persisted,
+                    )
+                    try:
+                        self.runtime.reattach(selected, lease)
+                    except AdmissionRuntimeConflict as exc:
+                        raise CostGovernorConflict(str(exc)) from exc
+                    except AdmissionRuntimeError as exc:
+                        raise CostGovernorError(str(exc)) from exc
+                    receipt = persisted.reservation
+                    self._active[request.operation_id] = (
+                        _ActiveCostReservation(
+                            requested_request_digest=requested_digest,
+                            receipt=receipt,
+                            budget=request.budget,
+                        )
+                    )
+                    return receipt
 
             try:
                 lease = self.runtime.admit(
@@ -1421,6 +1669,7 @@ class CostGovernor:
                         requested_request_digest=requested_digest,
                         reservation=receipt,
                         quota_reservation=quota_reservation,
+                        runtime_lease=lease,
                     )
                 except Exception:
                     if persisted is None:
