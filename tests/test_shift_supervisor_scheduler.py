@@ -133,6 +133,7 @@ def test_validated_worker_snapshot_retires_matching_canonical_plan_item():
                 "overtime_minutes": 0,
                 "metadata": {
                     "last_task_id": "night-task-1",
+                    "shift_key": "night-0042:validated-1",
                     "worked_on": ["night-task-1", "idle-task-1", "unknown-task"],
                 },
             }
@@ -150,6 +151,7 @@ def test_validated_worker_snapshot_retires_matching_canonical_plan_item():
     assert items["night-task-1"]["status"] == "done"
     assert items["night-task-1"]["owner"] == "night-0042"
     assert items["night-task-1"]["metadata"]["completion_source"] == "validated-studio-worker-snapshot"
+    assert items["night-task-1"]["metadata"]["completion_shift_key"] == "night-0042:validated-1"
     assert items["idle-task-1"]["status"] == "queued"
     assert items["idle-task-1"]["owner"] is None
 
