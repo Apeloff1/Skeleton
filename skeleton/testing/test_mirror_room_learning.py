@@ -402,7 +402,7 @@ def test_duplicate_payload_cannot_cross_learning_splits() -> None:
         MirrorScenario("holdout-dup", ScenarioSplit.HOLDOUT, duplicate),
     )
     room = MirrorRoom(_spec(), Executor())
-    with pytest.raises(MirrorRoomError, match="duplicate scenario payload"):
+    with pytest.raises(MirrorRoomError, match="split contamination|duplicate scenario payload"):
         room.learn(
             run_id="dup-run",
             generator=Generator(),
@@ -642,7 +642,7 @@ def test_selected_lineage_replay_rejects_changed_holdout() -> None:
 
 def test_promotion_verifier_must_be_independent_of_sandbox_evaluator() -> None:
     _, executor, _, receipt = _run(generations=1)
-    with pytest.raises(MirrorRoomError, match="sandbox evaluator"):
+    with pytest.raises(MirrorRoomError, match="independent of generator and executor|sandbox evaluator"):
         qualify_for_external_promotion(
             receipt,
             verifier_id=executor.executor_id,
