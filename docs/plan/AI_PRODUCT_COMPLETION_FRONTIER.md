@@ -514,9 +514,14 @@ that was activated and therefore the exact authenticated pre-promotion baseline.
 
 The lifecycle registry is an evidence/state authority, not an execution plane.
 It cannot write an activation manifest, edit `AI_LOCAL_MODEL_PATH`, select an
-environment target, invoke the provider, or mutate model weights. This preserves
-the separation between learning, evaluation, lifecycle approval and deployment
-while making their order executable and replay-verifiable.
+environment target, invoke the provider, or mutate model weights. Its compact
+state can optionally be persisted atomically without copying model weights:
+candidate/training/qualification/promotion/activation identities plus the
+digest-chained transition history are self-digested and revalidated on restart.
+Tampering, duplicate JSON keys, invalid state ordering, oversized state, or a
+broken prior-transition digest fails closed. This preserves the separation
+between learning, evaluation, lifecycle approval and deployment while making
+their order executable, restart-safe and replay-verifiable.
 
 The reverse end-to-end acceptance additionally boots the promoted candidate via
 the real `ProviderRegistry.from_env()` local-provider path and generates a
@@ -579,6 +584,7 @@ external credentials or network transport.
 - architecture identity preserved through evaluation, qualification and the
   canonical model-program bridge;
 - digest-chained candidate -> validated -> promoted -> activated -> rollback lifecycle;
+- restart-replayable lifecycle state with tamper denial and exact history restoration;
 - promoted candidate bootstrap through the real local ProviderRegistry environment path.
 
 This frontier closes the product-edge seam by using existing authorities more
