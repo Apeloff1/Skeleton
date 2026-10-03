@@ -38,6 +38,7 @@ on:
       - "skeleton/testing/test_ai_local_adapter_invariants.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
+      - "skeleton/testing/test_ai_product_learning_handoff.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
@@ -83,6 +84,7 @@ on:
       - "skeleton/testing/test_ai_local_adapter_invariants.py"
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
+      - "skeleton/testing/test_ai_product_learning_handoff.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
@@ -172,5 +174,6 @@ jobs:
           backend/tests/test_jeeves_local_engine_selection.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
+          skeleton/testing/test_ai_product_learning_handoff.py
           skeleton/testing/test_local_model_artifact.py
           skeleton/testing/test_vs001_functional_ai.py
