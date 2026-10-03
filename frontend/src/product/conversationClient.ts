@@ -35,8 +35,14 @@ export type ConversationMessage = {
   causal_user_message_id?: string | null;
   operation_id?: string | null;
   ai_result_id?: string | null;
+  context_id?: string | null;
+  context_digest?: string | null;
+  context_source_snapshot?: [string, string][];
+  context_compiler_version?: string | null;
   attachment_refs: string[];
   tool_receipt_refs: string[];
+  provider_receipt_refs: string[];
+  memory_refs?: string[];
   citation_refs: string[];
   artifact_refs: string[];
   data_class: 'public' | 'internal' | 'confidential' | 'restricted';
@@ -258,4 +264,202 @@ export async function requestConversationDeletion(
     'Could not request conversation deletion.',
   );
   return data.thread;
+}
+
+
+export type ConversationTurnMemoryPolicy = {
+  persist_verified_response?: boolean;
+  kind?: 'episodic' | 'semantic' | 'procedural' | 'preference';
+  namespace?: string;
+  expires_at?: string | null;
+};
+
+export type ConversationTurn = {
+  success: boolean;
+  accepted?: boolean;
+  terminal?: boolean;
+  state?: string;
+  cancellation_requested?: boolean;
+  failure_code?: string | null;
+  response?: string | null;
+  ai_generated?: boolean;
+  provider?: string | null;
+  model?: string | null;
+  replayed?: boolean;
+  operation_id?: string | null;
+  engine_execution_id?: string | null;
+  ai_result_id?: string | null;
+  engine_runtime_provider?: string | null;
+  engine_provider_receipts?: string[];
+  engine_tool_receipts?: string[];
+  engine_memory_refs?: string[];
+  engine_evidence_refs?: string[];
+  engine_artifact_refs?: string[];
+  thread?: ConversationThread;
+  user_message?: ConversationMessage;
+  assistant_message?: ConversationMessage;
+  terminal_message?: ConversationMessage;
+  context?: {
+    context_id?: string;
+    context_digest?: string;
+    source_snapshot?: [string, string][];
+    context_source_snapshot?: [string, string][];
+    compiler_version?: string;
+    context_compiler_version?: string;
+    handoff_digest?: string;
+    [key: string]: unknown;
+  };
+  timestamp?: string;
+};
+
+export async function startConversationTurn(
+  thread: ConversationThread,
+  input: {
+    message: string;
+    idempotencyKey: string;
+    context?: string;
+    memoryPolicy?: ConversationTurnMemoryPolicy;
+    signal?: AbortSignal;
+    deferred?: boolean;
+  },
+): Promise<ConversationTurn> {
+  const data = await requireData(
+    api.post<ConversationTurn>(
+      '/api/ai/chat',
+      {
+        message: input.message,
+        thread_id: thread.thread_id,
+        idempotency_key: input.idempotencyKey,
+        expected_thread_version: thread.version,
+        context: input.context,
+        memory_policy: input.memoryPolicy,
+        response_mode: input.deferred === false ? 'wait' : 'deferred',
+      },
+      {
+        signal: input.signal,
+        // The body also carries this key; the transport header makes retries
+        // explicitly idempotent at generic HTTP/circuit-breaker layers too.
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: input.deferred === false ? 120_000 : 20_000,
+      },
+    ),
+    'Could not start conversation turn.',
+  );
+  if (
+    data.engine_execution_id
+    && data.user_message
+    && data.user_message.thread_id !== thread.thread_id
+  ) {
+    throw new Error('Conversation turn returned a foreign thread identity.');
+  }
+  return data;
+}
+
+export async function getConversationTurn(
+  threadId: string,
+  idempotencyKey: string,
+  input: { signal?: AbortSignal } = {},
+): Promise<ConversationTurn> {
+  const data = await requireData(
+    api.get<ConversationTurn>(
+      '/api/ai/chat/turns/'
+        + encodeURIComponent(threadId)
+        + '?idempotency_key='
+        + encodeURIComponent(idempotencyKey),
+      {
+        signal: input.signal,
+        timeoutMs: 20_000,
+      },
+    ),
+    'Could not load conversation turn.',
+  );
+  if (
+    data.user_message
+    && data.user_message.thread_id !== threadId
+  ) {
+    throw new Error('Conversation turn status returned a foreign thread identity.');
+  }
+  return data;
+}
+
+export async function cancelConversationTurn(
+  threadId: string,
+  idempotencyKey: string,
+  input: {
+    reason?: string;
+    signal?: AbortSignal;
+  } = {},
+): Promise<ConversationTurn> {
+  return requireData(
+    api.post<ConversationTurn>(
+      '/api/ai/chat/turns/'
+        + encodeURIComponent(threadId)
+        + '/cancel',
+      {
+        idempotency_key: idempotencyKey,
+        reason: input.reason || 'user_cancelled',
+      },
+      {
+        signal: input.signal,
+        idempotencyKey: idempotencyKey + ':cancel',
+        timeoutMs: 20_000,
+      },
+    ),
+    'Could not cancel conversation turn.',
+  );
+}
+
+function waitForConversationTurnPoll(
+  ms: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('aborted'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new Error('aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+export async function followConversationTurn(
+  threadId: string,
+  idempotencyKey: string,
+  input: {
+    signal?: AbortSignal;
+    pollMs?: number;
+    timeoutMs?: number;
+    onUpdate?: (turn: ConversationTurn) => void;
+  } = {},
+): Promise<ConversationTurn> {
+  const pollMs = Math.max(100, Math.min(10_000, Math.floor(input.pollMs ?? 500)));
+  const timeoutMs = Math.max(
+    pollMs,
+    Math.min(24 * 60 * 60 * 1000, Math.floor(input.timeoutMs ?? 120_000)),
+  );
+  const startedAt = Date.now();
+
+  while (true) {
+    if (input.signal?.aborted) throw new Error('aborted');
+    const turn = await getConversationTurn(
+      threadId,
+      idempotencyKey,
+      { signal: input.signal },
+    );
+    input.onUpdate?.(turn);
+    if (turn.terminal) return turn;
+    if (Date.now() - startedAt >= timeoutMs) {
+      throw new Error('Conversation turn did not reach terminal state in time.');
+    }
+    await waitForConversationTurnPoll(pollMs, input.signal);
+  }
 }
