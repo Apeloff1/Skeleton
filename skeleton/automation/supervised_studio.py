@@ -30,6 +30,7 @@ from .studio_director import (
     _repo_manifest,
     _discover_validation_commands,
     _run_validation_commands,
+    repair_from_validation,
 )
 from .studio_registry import STUDIO, STUDIO_SIZE, registry_fingerprint, select_cohort
 from .studio_capabilities import validate_capabilities
@@ -589,7 +590,7 @@ def propose(
                     raise
                 if not validation_ok:
                     audit.emit(
-                        "patch_rejected_by_validation",
+                        "patch_failed_initial_validation",
                         task=plan_id,
                         commands=list(validation_commands),
                         output=list(validation_output),
@@ -597,8 +598,61 @@ def propose(
                     _git("reset", "--hard", "HEAD", check=False)
                     if new_paths:
                         _git("clean", "-fd", "--", *new_paths, check=False)
-                    journal_path.unlink(missing_ok=True)
-                    continue
+                    repaired = None
+                    prior_patch = reviewed.patch
+                    for empirical_attempt in range(2):
+                        repaired = repair_from_validation(
+                            reasoner,
+                            task,
+                            seed=f"{seed}:{plan_id}:validation:{empirical_attempt}",
+                            prior_patch=prior_patch,
+                            validation_output=validation_output,
+                        )
+                        if repaired is None:
+                            break
+                        prior_patch = repaired.patch
+                        candidate.write_text(repaired.patch, encoding="utf-8")
+                        checked = subprocess.run(
+                            ["git", "apply", "--check", str(candidate)],
+                            capture_output=True, text=True, timeout=20,
+                        )
+                        if checked.returncode != 0:
+                            validation_output = (f"git apply --check failed: {checked.stderr[-2000:]}",)
+                            continue
+                        subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                        repaired_diff = _git("diff", "--no-ext-diff", "--binary")
+                        repaired_paths = set(_changed_paths(repaired_diff)) if repaired_diff else set()
+                        require_subset(repaired_paths, task.paths, "empirical repair")
+                        validation_commands = _discover_validation_commands(task.paths)
+                        validation_ok, validation_output = _run_validation_commands(validation_commands)
+                        after_repair_validation = _git("diff", "--no-ext-diff", "--binary")
+                        if after_repair_validation != repaired_diff:
+                            validation_ok = False
+                            validation_output = (*validation_output, "validation mutated repository state")
+                        if validation_ok:
+                            reviewed = repaired
+                            applied_before_validation = repaired_diff
+                            candidate_diff_sha = hashlib.sha256(repaired_diff.encode("utf-8")).hexdigest()
+                            candidate_sha = hashlib.sha256(repaired.patch.encode("utf-8")).hexdigest()
+                            audit.emit(
+                                "patch_repaired_by_empirical_validation",
+                                task=plan_id,
+                                attempt=empirical_attempt + 1,
+                                commands=list(validation_commands),
+                            )
+                            break
+                        _git("reset", "--hard", "HEAD", check=False)
+                        if new_paths:
+                            _git("clean", "-fd", "--", *new_paths, check=False)
+                    if not validation_ok:
+                        audit.emit(
+                            "patch_rejected_by_validation",
+                            task=plan_id,
+                            commands=list(validation_commands),
+                            output=list(validation_output),
+                        )
+                        journal_path.unlink(missing_ok=True)
+                        continue
                 require_promotable(PromotionEvidence(
                     validation_passed=True,
                     review_passed=True,
