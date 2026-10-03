@@ -493,9 +493,13 @@
         "recovery_drill",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-005",
       "completion_checkbox": false,
@@ -523,9 +527,13 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-006",
       "completion_checkbox": false,
@@ -553,9 +561,13 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-007",
       "completion_checkbox": false,
