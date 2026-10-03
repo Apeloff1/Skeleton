@@ -7,6 +7,13 @@ from .canonical import (
     CanonicalConversationAIRuntime,
     CanonicalProductRuntimeError,
 )
+from .learning import (
+    CanonicalLearningCandidate,
+    CanonicalLearningHandoffError,
+    CanonicalLearningPair,
+    build_learning_candidate,
+    build_learning_candidate_artifact,
+)
 
 __all__ = [
     "CANONICAL_PRODUCT_CONTEXT_BUDGET",
@@ -20,11 +27,3 @@ __all__ = [
     "build_learning_candidate",
     "build_learning_candidate_artifact",
 ]
-
-from .learning import (
-    CanonicalLearningCandidate,
-    CanonicalLearningHandoffError,
-    CanonicalLearningPair,
-    build_learning_candidate,
-    build_learning_candidate_artifact,
-)
