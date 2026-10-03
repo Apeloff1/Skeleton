@@ -906,10 +906,21 @@ class AdmissionRuntime:
 
             existing = active.unknown_usage.get(event)
             if existing is not None:
-                if (
-                    existing.category != normalized_category
-                    or existing.reason != normalized_reason
-                ):
+                if existing.category != normalized_category:
+                    raise AdmissionRuntimeConflict(
+                        "unknown usage event replayed with different inputs"
+                    )
+                if existing.reason == "durable-unknown-usage-recovered":
+                    restored = UnknownUsageMarker(
+                        event_id=existing.event_id,
+                        operation_id=existing.operation_id,
+                        category=existing.category,
+                        reason=normalized_reason,
+                        recorded_at=existing.recorded_at,
+                    )
+                    active.unknown_usage[event] = restored
+                    return restored
+                if existing.reason != normalized_reason:
                     raise AdmissionRuntimeConflict(
                         "unknown usage event replayed with different inputs"
                     )
