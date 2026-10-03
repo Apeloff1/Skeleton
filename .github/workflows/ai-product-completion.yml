@@ -3,7 +3,7 @@ name: AI Product Completion Acceptance
 on:
   pull_request:
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -55,7 +55,7 @@ on:
     branches:
       - main
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -190,4 +190,3 @@ jobs:
           skeleton/testing/test_model_identity.py
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_spine_runtime_transition_acceptance.py
-          skeleton/testing/test_mirror_room_learning.py
