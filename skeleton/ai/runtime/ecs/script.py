@@ -112,7 +112,7 @@ class ScriptInstance:
         self.script = script
         self.budget = script.limits.budget(clock)
         self.globals = build_globals(self.budget, api)
-        self._run(lambda: exec(script.code, self.globals))  # noqa: S102 - instrumented, policy-validated code
+        self._run(FunctionType(script.code, self.globals))
 
     def has(self, function: str) -> bool:
         return isinstance(self.globals.get(function), FunctionType) and function in self.script.functions
