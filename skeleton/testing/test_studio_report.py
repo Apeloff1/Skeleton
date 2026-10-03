@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.automation.studio_report import render_report, verify_audit_chain
+from skeleton.automation.studio_report import load_records, render_report, verify_audit_chain
 
 
 def test_report_explains_planned_accepted_and_rejected_work() -> None:
@@ -138,3 +138,22 @@ def test_audit_chain_rejects_reordered_records():
         rows.append(row)
     with pytest.raises(ValueError, match="sequence is discontinuous"):
         verify_audit_chain(list(reversed(rows)))
+
+
+def test_load_records_rejects_symlink(tmp_path):
+    target = tmp_path / "real.jsonl"
+    target.write_text("{}\n", encoding="utf-8")
+    link = tmp_path / "audit.jsonl"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this platform")
+    with pytest.raises(ValueError, match="symlink"):
+        load_records(link)
+
+
+def test_load_records_rejects_oversized_audit(tmp_path):
+    path = tmp_path / "audit.jsonl"
+    path.write_bytes(b"x" * 10_000_001)
+    with pytest.raises(ValueError, match="exceeds 10 MB"):
+        load_records(path)
