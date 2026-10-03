@@ -496,6 +496,7 @@ jobs:
             --repo-state .studio-tmp/repo-state.json \
             --frontier "$RUNNER_TEMP/campaign/frontier.json" \
             --frontier-limit 8 \
+            --advance \
             "${args[@]}" > "$RUNNER_TEMP/campaign/result.json"
           python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/result.json")); h=open(os.environ["GITHUB_OUTPUT"],"a"); h.write("status="+d["status"]+"\nterminal_reason="+d.get("terminal_reason","")+"\n"); h.close()'
 
