@@ -2408,8 +2408,8 @@
     {
       "volume_id": "VOL-278",
       "title": "Bootstrap Recovery",
-      "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.DiagnosticCheck",
+      "plane": "platform_control",
+      "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
       "source_gaps": [
         "define minimal trust root",
         "materialize offline recovery"
@@ -2419,7 +2419,7 @@
         "untrusted repair artifact"
       ],
       "implementation_paths": [
-        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/platform_control.py",
         "skeleton/testing/test_ai_deferred_165_runtime.py"
       ],
       "evidence_required": [
@@ -2434,8 +2434,8 @@
     {
       "volume_id": "VOL-279",
       "title": "Crash Diagnostics",
-      "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.DiagnosticCheck",
+      "plane": "platform_control",
+      "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
       "source_gaps": [
         "define crash schema",
         "bind support bundle"
@@ -2445,7 +2445,7 @@
         "diagnostics missing root cause"
       ],
       "implementation_paths": [
-        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/platform_control.py",
         "skeleton/testing/test_ai_deferred_165_runtime.py"
       ],
       "evidence_required": [
@@ -2486,8 +2486,8 @@
     {
       "volume_id": "VOL-281",
       "title": "Doctor Command",
-      "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.DiagnosticCheck",
+      "plane": "platform_control",
+      "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
       "source_gaps": [
         "define check registry",
         "bind findings to repair plans"
@@ -2497,7 +2497,7 @@
         "false healthy result"
       ],
       "implementation_paths": [
-        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/platform_control.py",
         "skeleton/testing/test_ai_deferred_165_runtime.py"
       ],
       "evidence_required": [
@@ -2512,8 +2512,8 @@
     {
       "volume_id": "VOL-282",
       "title": "Self-Diagnosis",
-      "plane": "operations_experience",
-      "handler": "skeleton.ai.runtime.deferred.operations_experience.DiagnosticCheck",
+      "plane": "platform_control",
+      "handler": "skeleton.ai.runtime.deferred.platform_control.DiagnosticCheck",
       "source_gaps": [
         "define diagnostic API",
         "bind independent health checks"
@@ -2523,7 +2523,7 @@
         "diagnosis loop"
       ],
       "implementation_paths": [
-        "skeleton/ai/runtime/deferred/operations_experience.py",
+        "skeleton/ai/runtime/deferred/platform_control.py",
         "skeleton/testing/test_ai_deferred_165_runtime.py"
       ],
       "evidence_required": [
