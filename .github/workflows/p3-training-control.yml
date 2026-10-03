@@ -1,0 +1,38 @@
+name: P3 Training Control
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/data.py"
+      - "skeleton/ai/runtime/learning_foundation/training.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - ".github/workflows/p3-training-control.yml"
+  push:
+    branches: [main, feat/p3-learning-multimodal-t2]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: p3-training-control-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - run: python -m pytest -q skeleton/testing/test_p3_data_foundation.py skeleton/testing/test_p3_training_control.py
