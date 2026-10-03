@@ -34,12 +34,15 @@ class CapabilityRecord:
 @dataclass(frozen=True, slots=True)
 class RepositoryCatalog:
     capabilities: tuple[CapabilityRecord, ...]
+    _by_zone: dict[str, tuple[CapabilityRecord, ...]] | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {"capabilities": [item.as_dict() for item in self.capabilities]}
 
     def by_zone(self, zone: str) -> tuple[CapabilityRecord, ...]:
-        return tuple(item for item in self.capabilities if item.zone == zone)
+        if self._by_zone is None:
+            return tuple(item for item in self.capabilities if item.zone == zone)
+        return self._by_zone.get(zone, ())
 
     def workflows(self) -> tuple[CapabilityRecord, ...]:
         return tuple(item for item in self.capabilities if item.kind == "workflow")
@@ -107,7 +110,14 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
             dependencies=dependencies,
         ))
 
-    return RepositoryCatalog(tuple(sorted(
+    ordered = tuple(sorted(
         capabilities,
         key=lambda item: (item.zone, item.kind, item.path),
-    )))
+    ))
+    by_zone: dict[str, list[CapabilityRecord]] = {}
+    for item in ordered:
+        by_zone.setdefault(item.zone, []).append(item)
+    return RepositoryCatalog(
+        ordered,
+        {zone: tuple(items) for zone, items in by_zone.items()},
+    )
