@@ -236,7 +236,19 @@ def test_qualification_binds_training_mirror_firewall_for_lifecycle() -> None:
         qualified.method_allocation_digest
         == binding.method_allocation_digest
     )
-    assert len(qualified.lifecycle_evidence_refs) == 6
+    assert len(qualified.lifecycle_evidence_refs) >= 6
+    assert any(
+        ref.startswith("learning-binding-sha256:")
+        for ref in qualified.lifecycle_evidence_refs
+    )
+    assert any(
+        ref.startswith("training-plan-sha256:")
+        for ref in qualified.lifecycle_evidence_refs
+    )
+    assert any(
+        ref.startswith("evaluation-holdout:")
+        for ref in qualified.lifecycle_evidence_refs
+    )
     assert any(
         ref.startswith("mirror-room-evidence-sha256:")
         for ref in qualified.lifecycle_evidence_refs
