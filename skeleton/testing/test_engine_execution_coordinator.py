@@ -407,7 +407,10 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
 
     await coordinator.ensure_started(command)
     await coordinator.ensure_started(command)
-    await asyncio.sleep(0)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
     assert len(provider.requests) == 1
 
     gate.set()
@@ -834,6 +837,10 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
                     total_tokens=12,
                     usage_source="provider",
                 ),
+                context_id=handoff.context_id,
+                context_digest=handoff.context_digest,
+                context_source_snapshot=handoff.source_snapshot,
+                context_compiler_version=handoff.compiler_version,
             )
         ]
     )
