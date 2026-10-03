@@ -341,3 +341,49 @@ def test_atomic_recovery_snapshot_returns_reservation_and_unknown_markers(
         )
         is None
     )
+
+
+def test_first_post_restart_marker_replay_restores_reason_once(
+    tmp_path,
+) -> None:
+    path = tmp_path / "quota.sqlite3"
+    operation = "op-reason-replay"
+    event_id = "provider-reason-replay"
+    request = _request(operation)
+    first = _governor(path)
+    first.reserve(request, now_wall=10.0)
+    first.mark_usage_unknown(
+        operation,
+        event_id,
+        "provider",
+        "original provider usage reason",
+        now_wall=10.5,
+    )
+
+    restarted = _governor(path)
+    restarted.reserve(request, now_wall=20.0)
+
+    replay = restarted.mark_usage_unknown(
+        operation,
+        event_id,
+        "provider",
+        "original provider usage reason",
+        now_wall=20.5,
+    )
+    assert replay.reason == "original provider usage reason"
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="unknown usage event replayed with different inputs",
+    ):
+        restarted.mark_usage_unknown(
+            operation,
+            event_id,
+            "provider",
+            "different reason after replay identity restored",
+            now_wall=21.0,
+        )
+
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
+        "unknown_usage_events"
+    ] == 1
