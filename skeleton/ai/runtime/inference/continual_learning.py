@@ -22,7 +22,6 @@ from typing import Mapping, Sequence
 
 from .artifact import LocalModelArtifactError, load_local_model_artifact
 from .developmental_eval import (
-    DevelopmentalComparisonReport,
     DevelopmentalEvalSuite,
     DevelopmentalEvaluationError,
     evaluate_local_candidate_developmentally,
@@ -36,7 +35,6 @@ from .training_methods import (
 )
 from .training_optimizer import (
     TrainingOptimizationPolicy,
-    TrainingOptimizationResult,
     TrainingOptimizationError,
     optimize_training_mix,
 )
