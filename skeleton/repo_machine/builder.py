@@ -353,8 +353,13 @@ class RepositoryModelBuilder:
             dependents[edge.target].add(edge.source)
 
         subsystems: list[SubsystemRecord] = []
+        # Group records once instead of rescanning the complete repository for
+        # every zone. This keeps machine topology construction close to O(files).
+        members_by_zone: dict[str, list[FileRecord]] = defaultdict(list)
+        for record in records:
+            members_by_zone[record.zone].append(record)
         for zone in zones:
-            members = [record for record in records if record.zone == zone]
+            members = members_by_zone.get(zone, [])
             rule = zone_rules.get(zone)
             owner = rule.owner if rule else self.config.default_owner
             criticality = rule.criticality if rule else "medium"
