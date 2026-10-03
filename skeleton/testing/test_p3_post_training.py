@@ -11,6 +11,7 @@ from skeleton.ai.runtime.training import (
     PostTrainingExperiment,
     PostTrainingLedger,
     RLEnvironmentSpec,
+    RLStepReceipt,
 )
 
 
@@ -118,3 +119,105 @@ def test_environment_version_identity_detects_reward_logic_drift(tmp_path):
     )
     with pytest.raises(ValueError,match="immutable"):
         ledger.register_environment(drifted)
+
+def test_rl_environment_requires_reset_after_terminal_action():
+    spec=RLEnvironmentSpec(
+        environment_id="terminal-env",
+        version="1",
+        state_schema_digest=_digest("terminal-state"),
+        action_schema_digest=_digest("terminal-action"),
+        reward_logic_digest=_digest("terminal-reward"),
+    )
+    env=DeterministicRLEnvironment(
+        spec,
+        rewards={"continue":0.0,"finish":1.0},
+        terminal_actions=("finish",),
+    )
+    env.reset(episode_id="episode-terminal",seed=3)
+    terminal=env.step("finish")
+    assert terminal.terminal is True
+
+    with pytest.raises(RuntimeError,match="episode is terminal"):
+        env.step("continue")
+
+    env.reset(episode_id="episode-new",seed=3)
+    assert env.step("continue").step==1
+
+
+def test_rl_ledger_rejects_orphan_and_forked_trajectory_steps(tmp_path):
+    spec=RLEnvironmentSpec(
+        environment_id="chain-env",
+        version="1",
+        state_schema_digest=_digest("chain-state"),
+        action_schema_digest=_digest("chain-action"),
+        reward_logic_digest=_digest("chain-reward"),
+    )
+    ledger=PostTrainingLedger(tmp_path/"chain.sqlite3")
+    ledger.register_environment(spec)
+    env=DeterministicRLEnvironment(
+        spec,
+        rewards={"continue":0.0},
+    )
+    env.reset(episode_id="episode-chain",seed=5)
+    first=env.step("continue")
+    ledger.record_step(first)
+
+    orphan=RLStepReceipt(
+        environment_digest=spec.digest,
+        episode_id="episode-chain",
+        step=3,
+        action="continue",
+        reward=0.0,
+        terminal=False,
+        state_digest=first.next_state_digest,
+        next_state_digest=_digest("orphan-next"),
+    )
+    with pytest.raises(ValueError,match="step must be contiguous"):
+        ledger.record_step(orphan)
+
+    fork=RLStepReceipt(
+        environment_digest=spec.digest,
+        episode_id="episode-chain",
+        step=2,
+        action="continue",
+        reward=0.0,
+        terminal=False,
+        state_digest=_digest("wrong-parent"),
+        next_state_digest=_digest("fork-next"),
+    )
+    with pytest.raises(ValueError,match="state chain"):
+        ledger.record_step(fork)
+
+
+def test_rl_ledger_rejects_evidence_after_terminal_receipt(tmp_path):
+    spec=RLEnvironmentSpec(
+        environment_id="ledger-terminal",
+        version="1",
+        state_schema_digest=_digest("ledger-terminal-state"),
+        action_schema_digest=_digest("ledger-terminal-action"),
+        reward_logic_digest=_digest("ledger-terminal-reward"),
+    )
+    ledger=PostTrainingLedger(tmp_path/"terminal.sqlite3")
+    ledger.register_environment(spec)
+    env=DeterministicRLEnvironment(
+        spec,
+        rewards={"finish":1.0},
+        terminal_actions=("finish",),
+    )
+    env.reset(episode_id="episode-ledger-terminal",seed=11)
+    terminal=env.step("finish")
+    ledger.record_step(terminal)
+
+    after=RLStepReceipt(
+        environment_digest=spec.digest,
+        episode_id=terminal.episode_id,
+        step=terminal.step+1,
+        action="finish",
+        reward=1.0,
+        terminal=True,
+        state_digest=terminal.next_state_digest,
+        next_state_digest=_digest("after-terminal"),
+    )
+    with pytest.raises(ValueError,match="already terminal"):
+        ledger.record_step(after)
+
