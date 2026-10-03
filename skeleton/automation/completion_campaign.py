@@ -327,6 +327,7 @@ def allocate_supervisor_state(
     supervisor = repo_state.get("_shift_supervisor")
     if not isinstance(supervisor, dict) or supervisor.get("status") != "loaded":
         raise ValueError("loaded canonical supervisor state is required for allocation")
+    validate_lane_invariants(repo_state.get("_shift_supervisor_all_plan_items", []), str(supervisor.get("team", "")))
     generation = str(supervisor.get("generation_id", ""))
     plan_digest = str(supervisor.get("plan_digest_sha256", ""))
     if not generation or len(plan_digest) != 64:
@@ -357,10 +358,14 @@ def allocate_supervisor_state(
     if authorized_ids != selected_ids:
         unavailable = sorted(selected_ids - authorized_ids)
         raise ValueError(f"frontier selected non-executable canonical items: {unavailable}")
+    allocation_nonce = hashlib.sha256(
+        f"{campaign.campaign_id}:{campaign.epoch}:{generation}:{frontier['frontier_sha256']}".encode()
+    ).hexdigest()[:24]
     allocation = {
         "schema": "autonomous-studio.frontier-allocation.v1",
         "campaign_id": campaign.campaign_id,
         "campaign_epoch": campaign.epoch,
+        "allocation_nonce": allocation_nonce,
         "generation_id": generation,
         "plan_digest_sha256": plan_digest,
         "frontier_sha256": frontier["frontier_sha256"],
@@ -370,6 +375,7 @@ def allocate_supervisor_state(
     allocation["allocation_sha256"] = hashlib.sha256(
         json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
+    campaign.last_allocation_sha256 = allocation["allocation_sha256"]
     supervisor["plan_items"] = authorized
     supervisor["allocation"] = allocation
     repo_state["_shift_supervisor"] = supervisor
