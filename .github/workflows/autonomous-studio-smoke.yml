@@ -8,6 +8,7 @@ on:
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
       - 'skeleton/testing/test_supervised_studio.py'
+      - 'skeleton/testing/test_completion_campaign.py'
       - 'core/shift_supervisor/**'
       - 'tests/test_shift_supervisor_planning_harness.py'
       - 'tests/test_shift_supervisor_peak_loop.py'
@@ -72,6 +73,7 @@ jobs:
             skeleton/testing/test_studio_registry.py \
             skeleton/testing/test_studio_director.py \
             skeleton/testing/test_studio_report.py \
+            skeleton/testing/test_completion_campaign.py \
             skeleton/testing/test_studio_pipeline_smoke.py \
             skeleton/testing/test_supervised_studio.py \
             -q --tb=short --maxfail=1
