@@ -133,3 +133,38 @@ def test_campaign_history_is_bounded():
             policy=policy,
         )
     assert len(state.history) == 64
+
+
+def test_campaign_rejects_unbounded_attempt_batch():
+    with pytest.raises(ValueError, match="exceeds 32"):
+        advance_campaign(
+            CampaignState(),
+            supervisor=supervisor(),
+            validated_patch=True,
+            validation_failed=False,
+            attempted_task_ids=[f"task-{i}" for i in range(33)],
+        )
+
+
+def test_campaign_rejects_unbounded_task_identity():
+    with pytest.raises(ValueError, match="exceeds 160"):
+        advance_campaign(
+            CampaignState(),
+            supervisor=supervisor(),
+            validated_patch=True,
+            validation_failed=False,
+            attempted_task_ids=["x" * 161],
+        )
+
+
+def test_campaign_task_accounting_is_bounded():
+    state = CampaignState(task_attempts={f"old-{i}": 1 for i in range(512)})
+    state = advance_campaign(
+        state,
+        supervisor=supervisor(),
+        validated_patch=True,
+        validation_failed=False,
+        attempted_task_ids=["new-task"],
+        policy=CampaignPolicy(max_stagnant_cycles=20),
+    )
+    assert len(state.task_attempts) == 512
