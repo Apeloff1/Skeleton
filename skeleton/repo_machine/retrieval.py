@@ -104,10 +104,16 @@ class RepositoryRetrievalIndex:
         candidates: set[str] = set()
         for term in terms:
             candidates.update(self._postings.get(term, ()))
+
+        # Fuzzy fallback is bounded by the smaller side of the comparison.
+        # Avoid rescanning every posting for every query term.
         if not candidates:
-            for indexed_term, paths in self._postings.items():
-                if any(term in indexed_term or indexed_term in term for term in terms):
-                    candidates.update(paths)
+            for term in sorted(terms, key=len):
+                for indexed_term in self._postings:
+                    if indexed_term.startswith(term) or term.startswith(indexed_term):
+                        candidates.update(self._postings[indexed_term])
+                if candidates:
+                    break
 
         hits: list[SearchHit] = []
         query_lower = query.casefold()
