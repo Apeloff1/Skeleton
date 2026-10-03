@@ -648,13 +648,13 @@ def test_validation_discovery_finds_related_test(monkeypatch):
         lambda *args, **kwargs: "skeleton/foo.py\nskeleton/testing/test_foo.py\n",
     )
     commands = studio_director._discover_validation_commands(["skeleton/foo.py"])
-    assert any("test_foo.py" in command for command in commands)
+    assert any("skeleton/testing/test_foo.py" in command for command in commands)
     assert any("compileall" in command for command in commands)
 
 
 def test_validation_executor_rejects_non_allowlisted_command():
     with pytest.raises(ValueError, match="not allowlisted"):
-        studio_director._run_validation_commands(["bash -c 'echo nope'"])
+        studio_director._run_validation_commands([("bash", "-c", "echo nope")])
 
 
 def test_related_context_prioritizes_matching_modules(tmp_path, monkeypatch):
