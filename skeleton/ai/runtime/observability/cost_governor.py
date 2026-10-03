@@ -697,6 +697,36 @@ def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class _CostCompletionIntent:
+    actual: UsageEstimate
+    budget: ResourceBudget
+    evidence_digest: str
+
+
+def _completion_intent_from_payload(
+    value: object,
+) -> _CostCompletionIntent:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        )
+    try:
+        evidence = _sha256(
+            "completion intent evidence_digest",
+            value["evidence_digest"],
+        )
+        return _CostCompletionIntent(
+            actual=_usage_from_payload(value["actual"]),
+            budget=_budget_from_payload(value["budget"]),
+            evidence_digest=evidence,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        ) from exc
+
+
+@dataclass(frozen=True, slots=True)
 class _CostJournalRecord:
     operation_id: str
     tenant_id: str
@@ -706,6 +736,7 @@ class _CostJournalRecord:
     state: str
     terminal: CostDecision | None
     evidence_digest: str | None
+    completion_intent: _CostCompletionIntent | None
 
 
 class _SqliteCostGovernorJournal:
@@ -721,6 +752,7 @@ class _SqliteCostGovernorJournal:
         state TEXT NOT NULL,
         terminal_json TEXT,
         evidence_digest TEXT,
+        completion_intent_json TEXT,
         CHECK (
             state IN (
                 'active',
@@ -736,6 +768,19 @@ class _SqliteCostGovernorJournal:
         self.path = Path(path)
         with self._connect() as conn:
             conn.execute(self._SCHEMA)
+            columns = {
+                str(row["name"])
+                for row in conn.execute(
+                    "PRAGMA table_info(cost_governor_journal)"
+                ).fetchall()
+            }
+            if "completion_intent_json" not in columns:
+                conn.execute(
+                    """
+                    ALTER TABLE cost_governor_journal
+                    ADD COLUMN completion_intent_json TEXT
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.path), isolation_level=None)
@@ -787,6 +832,16 @@ class _SqliteCostGovernorJournal:
                 None
                 if row["evidence_digest"] is None
                 else str(row["evidence_digest"])
+            ),
+            completion_intent=(
+                None
+                if row["completion_intent_json"] is None
+                else _completion_intent_from_payload(
+                    cls._decode_json(
+                        row["completion_intent_json"],
+                        "completion_intent",
+                    )
+                )
             ),
         )
 
@@ -969,6 +1024,114 @@ class _SqliteCostGovernorJournal:
         loaded = self.load(reservation.operation_id)
         if loaded is None:
             raise CostGovernorError("cost journal active write was lost")
+        return loaded
+
+    def record_completion_intent(
+        self,
+        operation_id: str,
+        *,
+        actual: UsageEstimate,
+        budget: ResourceBudget,
+        evidence_digest: str,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        if not isinstance(actual, UsageEstimate):
+            raise TypeError("actual must be UsageEstimate")
+        if not isinstance(budget, ResourceBudget):
+            raise TypeError("budget must be ResourceBudget")
+        evidence = _sha256("evidence_digest", evidence_digest)
+        payload = _canonical_json_text(
+            {
+                "actual": _usage_payload(actual),
+                "budget": budget.as_dict(),
+                "evidence_digest": evidence,
+            }
+        )
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "completion intent requires active cost journal"
+                    )
+                existing = self._record(row)
+                if existing.state != "active":
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot accept completion intent"
+                    )
+                requested = _CostCompletionIntent(
+                    actual=actual,
+                    budget=budget,
+                    evidence_digest=evidence,
+                )
+                if existing.completion_intent is None:
+                    conn.execute(
+                        """
+                        UPDATE cost_governor_journal
+                        SET completion_intent_json = ?
+                        WHERE operation_id = ?
+                        """,
+                        (payload, operation),
+                    )
+                elif existing.completion_intent != requested:
+                    raise CostGovernorConflict(
+                        "completion intent replayed with different inputs"
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("completion intent write was lost")
+        return loaded
+
+    def clear_completion_intent(
+        self,
+        operation_id: str,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "completion intent clear requires cost journal"
+                    )
+                existing = self._record(row)
+                if existing.terminal is not None:
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot clear completion intent"
+                    )
+                conn.execute(
+                    """
+                    UPDATE cost_governor_journal
+                    SET completion_intent_json = NULL
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("completion intent clear was lost")
         return loaded
 
     def record_terminal(
