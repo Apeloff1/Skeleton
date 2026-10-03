@@ -397,3 +397,87 @@ def test_allocation_fails_if_frontier_is_not_canonical_executable():
     }
     with pytest.raises(ValueError, match="non-executable"):
         allocate_supervisor_state(repo, CampaignState(), limit=1)
+
+
+def test_dependency_components_partition_independent_graphs():
+    from skeleton.automation.completion_campaign import dependency_components
+
+    plan = [
+        {"id": "a", "target_team": "night", "dependencies": []},
+        {"id": "b", "target_team": "night", "dependencies": ["a"]},
+        {"id": "x", "target_team": "night", "dependencies": []},
+        {"id": "y", "target_team": "night", "dependencies": ["x"]},
+    ]
+    assert dependency_components(plan, "night") == [["a", "b"], ["x", "y"]]
+
+
+def test_lane_ids_are_stable_under_input_order():
+    from skeleton.automation.completion_campaign import lane_assignments
+
+    plan = [
+        {"id": "b", "target_team": "night", "dependencies": ["a"]},
+        {"id": "a", "target_team": "night", "dependencies": []},
+        {"id": "x", "target_team": "night", "dependencies": []},
+    ]
+    assert lane_assignments(plan, "night") == lane_assignments(list(reversed(plan)), "night")
+
+
+def test_frontier_diversifies_across_independent_lanes():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "a", "target_team": "night", "status": "queued", "priority": 100, "dependencies": []},
+        {"id": "b", "target_team": "night", "status": "queued", "priority": 99, "dependencies": ["a"]},
+        {"id": "x", "target_team": "night", "status": "queued", "priority": 10, "dependencies": []},
+    ]
+    result = select_frontier(plan, team="night", limit=2)
+    assert {item["id"] for item in result["selected"]} == {"a", "x"}
+
+
+def test_lane_health_quarantines_repeatedly_failing_component():
+    from skeleton.automation.completion_campaign import lane_assignments, update_lane_health
+
+    plan = [{"id": "a", "target_team": "night", "status": "queued", "dependencies": []}]
+    state = CampaignState()
+    for _ in range(3):
+        update_lane_health(state, plan_items=plan, attempted_task_ids=["a"], validation_failed=True)
+    lane = lane_assignments(plan, "night")["a"]
+    assert state.lane_health[lane]["status"] == "quarantined"
+    assert state.lane_health[lane]["failures"] == 3
+
+
+def test_quarantined_lane_does_not_starve_healthy_lane():
+    from skeleton.automation.completion_campaign import lane_assignments, select_frontier
+
+    plan = [
+        {"id": "bad", "target_team": "night", "status": "queued", "dependencies": []},
+        {"id": "good", "target_team": "night", "status": "queued", "dependencies": []},
+    ]
+    lanes = lane_assignments(plan, "night")
+    result = select_frontier(
+        plan,
+        team="night",
+        lane_health={lanes["bad"]: {"status": "quarantined"}},
+        limit=2,
+    )
+    assert [item["id"] for item in result["selected"]] == ["good"]
+    assert any(row["id"] == "bad" and row["reason"] == "lane_quarantined" for row in result["deferred"])
+
+
+def test_allocation_receipt_binds_lane_assignment():
+    from skeleton.automation.completion_campaign import allocate_supervisor_state
+
+    items = [{"id": "a", "target_team": "night", "status": "queued", "dependencies": []}]
+    digest = hashlib.sha256(
+        json.dumps(items, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    repo = {
+        "_shift_supervisor_all_plan_items": items,
+        "_shift_supervisor": {
+            "status": "loaded", "team": "night", "generation_id": "g",
+            "plan_digest_sha256": digest, "plan_items": items,
+        },
+    }
+    allocation = allocate_supervisor_state(repo, CampaignState(campaign_id="c"), limit=1)
+    assert set(allocation["lane_assignments"]) == {"a"}
+    assert len(allocation["lane_assignments"]["a"]) == 16
