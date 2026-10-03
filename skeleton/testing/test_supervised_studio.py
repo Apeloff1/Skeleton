@@ -572,3 +572,85 @@ def test_execution_receipt_is_deterministic_and_patch_bound():
 
     changed = supervised_studio._execution_receipt(**{**kwargs, "patch": "different"})
     assert changed["receipt_sha256"] != first["receipt_sha256"]
+
+
+def test_replay_key_binds_generation_plan_registry_and_seed():
+    first = supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert len(first) == 64
+    assert first == supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-2",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="b" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-2",
+    )
+
+
+def test_verify_execution_receipt_rejects_mutation():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "plan-1",
+            PlannedTask(
+                title="Receipt",
+                objective="Bind execution.",
+                division="qa_verification",
+                paths=("docs/example.md",),
+            ),
+        )],
+        patch="patch",
+        accepted=1,
+    )
+    supervised_studio.verify_execution_receipt(receipt)
+    receipt["patch_chars"] = 999
+    with pytest.raises(ValueError, match="digest mismatch"):
+        supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_execution_receipt_contains_replay_key():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "plan-1",
+            PlannedTask(
+                title="Receipt",
+                objective="Bind execution.",
+                division="qa_verification",
+                paths=("docs/example.md",),
+            ),
+        )],
+        patch="patch",
+        accepted=1,
+    )
+    assert receipt["replay_key_sha256"] == supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+    )
