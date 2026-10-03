@@ -212,6 +212,7 @@ def _execution_receipt(
             generation_id=generation_id,
             plan_digest=plan_digest,
             seed=seed,
+            base_commit_sha=base_commit_sha,
         ),
         "tasks": task_payload,
         "accepted_tasks": accepted,
@@ -223,12 +224,13 @@ def _execution_receipt(
     return receipt
 
 
-def _replay_key(*, generation_id: str, plan_digest: str, seed: str) -> str:
+def _replay_key(*, generation_id: str, plan_digest: str, seed: str, base_commit_sha: str = "") -> str:
     payload = {
         "generation_id": generation_id,
         "plan_digest_sha256": plan_digest,
         "registry_fingerprint": registry_fingerprint(),
         "seed": seed,
+        "base_commit_sha": base_commit_sha,
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -329,7 +331,12 @@ def propose(
         base_commit_sha = _git("rev-parse", "HEAD").strip()
         if len(base_commit_sha) != 40 or any(ch not in "0123456789abcdef" for ch in base_commit_sha):
             raise ValueError("repository base commit identity is malformed")
-        replay_key = _replay_key(generation_id=generation_id, plan_digest=plan_digest, seed=seed)
+        replay_key = _replay_key(
+            generation_id=generation_id,
+            plan_digest=plan_digest,
+            seed=seed,
+            base_commit_sha=base_commit_sha,
+        )
         prior_receipt: Mapping[str, Any] | None = None
         if prior_receipt_path is not None and prior_receipt_path.is_file():
             raw_prior = prior_receipt_path.read_text(encoding="utf-8")
