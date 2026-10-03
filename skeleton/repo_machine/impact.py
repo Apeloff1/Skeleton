@@ -19,6 +19,8 @@ class ImpactReport:
     critical_zones: tuple[str, ...]
     risk_score: int
     reasons: tuple[str, ...]
+    change_class: str
+    recommended_depth: int
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -30,6 +32,8 @@ class ImpactReport:
             "critical_zones": list(self.critical_zones),
             "risk_score": self.risk_score,
             "reasons": list(self.reasons),
+            "change_class": self.change_class,
+            "recommended_depth": self.recommended_depth,
         }
 
 
@@ -122,6 +126,18 @@ def analyze_impact(
         score += min(15, len(paths) * 2)
         reasons.append("change modifies configuration")
     score = min(score, 100)
+    if any(path.startswith('.github/') for path in paths):
+        change_class = 'control-plane'
+        recommended_depth = min(transitive_depth, 4)
+    elif any(PurePosixPath(path).suffix.casefold() in {'.py', '.js', '.ts', '.tsx', '.go', '.rs', '.java'} for path in paths):
+        change_class = 'code'
+        recommended_depth = min(transitive_depth, 3)
+    elif paths and all(PurePosixPath(path).suffix.casefold() in {'.md', '.rst', '.txt'} for path in paths):
+        change_class = 'documentation'
+        recommended_depth = 1
+    else:
+        change_class = 'configuration'
+        recommended_depth = min(transitive_depth, 2)
 
     return ImpactReport(
         changed_paths=paths,
@@ -132,4 +148,6 @@ def analyze_impact(
         critical_zones=critical,
         risk_score=score,
         reasons=tuple(reasons),
+        change_class=change_class,
+        recommended_depth=recommended_depth,
     )
