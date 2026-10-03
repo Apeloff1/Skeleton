@@ -184,6 +184,9 @@ def consume_plan(
     team_items = _executable_team_items(durable.get("plan_items", []), team)
     if not team_items:
         if progress["terminal"]:
+            state["_shift_supervisor_all_plan_items"] = [
+                dict(item) for item in durable.get("plan_items", []) if isinstance(item, Mapping)
+            ][:512]
             state["_shift_supervisor"] = {
                 "source": "canonical-plan-issue",
                 "status": "complete",
@@ -218,6 +221,9 @@ def consume_plan(
     plan_digest = hashlib.sha256(
         json.dumps(team_items[:32], sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     ).hexdigest()
+    state["_shift_supervisor_all_plan_items"] = [
+        dict(item) for item in durable.get("plan_items", []) if isinstance(item, Mapping)
+    ][:512]
     state["_shift_supervisor"] = {
         "source": "canonical-plan-issue",
         "status": "loaded",
