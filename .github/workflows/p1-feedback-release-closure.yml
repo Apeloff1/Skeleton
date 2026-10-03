@@ -6,6 +6,12 @@ on:
       - main
     paths:
       - "skeleton/learning/promotion.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_learning.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "machine/ai_file_tree.json"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
       - "skeleton/release/__init__.py"
@@ -22,6 +28,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/learning/promotion.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_learning.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "machine/ai_file_tree.json"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
       - "skeleton/release/__init__.py"
@@ -72,6 +84,21 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_feedback_promotion.py
+
+      - name: Run Mirror Room learning contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_learning.py
+
+      - name: Run adversarial Mirror Room ratchet contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_adversarial.py
+
+      - name: Run high-end Mirror Room content delivery contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_content_delivery.py
 
       - name: Run release SLO promotion contracts
         run: >-

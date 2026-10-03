@@ -1,0 +1,111 @@
+"""Mirror Room: bounded offline learning without production self-mutation."""
+
+from .adaptation import (
+    DeterministicCoordinateLearner,
+    NumericDimension,
+)
+from .adversarial import (
+    ADVERSARIAL_ATTEMPTS_REQUIRED,
+    AdversarialAttemptReceipt,
+    AdversarialCampaignReceipt,
+    AdversarialChallengeContext,
+    AdversarialDeliveryEvidence,
+    AdversarialMirrorRoom,
+    AdversarialRatchetPolicy,
+    AdversarialScenarioGenerator,
+    AdversarialStandard,
+    FixedAdversarialSuite,
+    qualify_adversarial_delivery,
+)
+from .content_quality import (
+    ContentQualityDimension,
+    HighEndContentConstitution,
+    HighEndContentDeliveryDossier,
+    IndependentQualityJudgeReceipt,
+    QualityJudgePanelReceipt,
+    QUALITY_TAG_PREFIX,
+    qualify_high_end_content_delivery,
+)
+from .contracts import (
+    EpisodeOutcome,
+    HardExample,
+    LearningFeedback,
+    MirrorBudget,
+    MirrorCandidate,
+    MirrorMetricPolicy,
+    MirrorRoomError,
+    MirrorRoomSpec,
+    MirrorScenario,
+    SandboxPolicy,
+    ScenarioSplit,
+)
+from .engine import (
+    CandidateEvaluation,
+    CandidateGenerator,
+    GenerationRecord,
+    MirrorRoom,
+    MirrorRunReceipt,
+)
+from .memory import TrainingLearningArchive, TrainingLesson
+from .evaluation import (
+    ComparisonReport,
+    MetricComparison,
+    PairedEvaluator,
+    ScenarioComparison,
+)
+from .promotion import MirrorPromotionEvidence, qualify_for_external_promotion
+from .replay import MirrorRunReplayReceipt, verify_selected_lineage
+from .sandbox import EpisodeReceipt, MirrorSandbox, SandboxExecutor, SandboxUsage
+
+__all__ = [
+    "ADVERSARIAL_ATTEMPTS_REQUIRED",
+    "AdversarialAttemptReceipt",
+    "AdversarialCampaignReceipt",
+    "AdversarialChallengeContext",
+    "AdversarialDeliveryEvidence",
+    "AdversarialMirrorRoom",
+    "AdversarialRatchetPolicy",
+    "AdversarialScenarioGenerator",
+    "AdversarialStandard",
+    "CandidateEvaluation",
+    "CandidateGenerator",
+    "ComparisonReport",
+    "ContentQualityDimension",
+    "DeterministicCoordinateLearner",
+    "EpisodeOutcome",
+    "EpisodeReceipt",
+    "FixedAdversarialSuite",
+    "GenerationRecord",
+    "HardExample",
+    "HighEndContentConstitution",
+    "HighEndContentDeliveryDossier",
+    "IndependentQualityJudgeReceipt",
+    "LearningFeedback",
+    "MetricComparison",
+    "MirrorBudget",
+    "MirrorCandidate",
+    "MirrorMetricPolicy",
+    "NumericDimension",
+    "MirrorPromotionEvidence",
+    "MirrorRoom",
+    "MirrorRoomError",
+    "MirrorRoomSpec",
+    "MirrorRunReceipt",
+    "MirrorRunReplayReceipt",
+    "MirrorSandbox",
+    "MirrorScenario",
+    "PairedEvaluator",
+    "QUALITY_TAG_PREFIX",
+    "QualityJudgePanelReceipt",
+    "SandboxExecutor",
+    "SandboxPolicy",
+    "SandboxUsage",
+    "ScenarioComparison",
+    "ScenarioSplit",
+    "TrainingLearningArchive",
+    "TrainingLesson",
+    "qualify_adversarial_delivery",
+    "qualify_for_external_promotion",
+    "qualify_high_end_content_delivery",
+    "verify_selected_lineage",
+]
