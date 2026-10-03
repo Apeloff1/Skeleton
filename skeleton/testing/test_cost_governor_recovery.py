@@ -359,3 +359,45 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         match="completed accounting cannot be recovered",
     ):
         restarted.recover_released(operation)
+
+    completed = restarted.recover_completed(
+        operation,
+        evidence_refs=_refs("completion-wins"),
+    )
+    assert completed.state == "completed"
+    assert completed.accepted is True
+
+
+def test_restart_journal_conflict_never_releases_preexisting_reservation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "quota.sqlite3"
+    operation = "op-replay-journal-conflict"
+    request = _request(operation)
+    first = _governor(path)
+    first.reserve(request, now_wall=10.0)
+
+    restarted = _governor(path)
+    assert restarted._journal is not None
+
+    def reject_replay(**_kwargs):
+        raise CostGovernorConflict("simulated journal replay conflict")
+
+    monkeypatch.setattr(
+        restarted._journal,
+        "record_active",
+        reject_replay,
+    )
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="simulated journal replay conflict",
+    ):
+        restarted.reserve(request, now_wall=20.0)
+
+    # The reservation predated this restart attempt, so a metadata disagreement
+    # must not refund/delete it.
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["reserved"]["cost_usd"] == pytest.approx(2.0)
