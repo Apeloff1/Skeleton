@@ -987,6 +987,10 @@ async def ai_chat(
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
+        existing_turn_user, existing_turn_assistant = _chat_turn_messages(
+            existing_transcript,
+            request.idempotency_key,
+        )
         if (
             existing_transcript
             and existing_transcript[-1].author_type
@@ -999,7 +1003,10 @@ async def ai_chat(
                 raise ConversationConflict(
                     "previous canonical turn is incomplete; retry after it completes"
                 )
-            retrying_incomplete_turn = True
+        retrying_incomplete_turn = (
+            existing_turn_user is not None
+            and existing_turn_assistant is None
+        )
 
         context_refs: list[str] = []
         if request.context:
@@ -1010,12 +1017,13 @@ async def ai_chat(
         context_refs.append(_chat_request_identity_ref(request))
         context_attachment_refs = tuple(context_refs)
 
-        # Preserve the canonical active lineage.  On an idempotent retry of an
-        # already-persisted incomplete user turn, reuse its original parent
-        # rather than accidentally making the turn its own parent or rebinding
-        # the idempotency identity after deployment.
-        if retrying_incomplete_turn:
-            parent_message_id = existing_transcript[-1].parent_message_id
+        # Preserve the canonical active lineage for every replay of an existing
+        # turn, whether the assistant already committed or the turn is still
+        # incomplete. Reconstructing the same idempotency key beneath the
+        # current transcript tip would silently change its causal identity and
+        # correctly trip the repository's idempotency fence.
+        if existing_turn_user is not None:
+            parent_message_id = existing_turn_user.parent_message_id
         else:
             parent_message_id = (
                 existing_transcript[-1].message_id
