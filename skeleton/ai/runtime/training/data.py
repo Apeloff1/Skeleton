@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import sqlite3
 import threading
@@ -323,6 +324,10 @@ class DataQualityRule:
             raise ValueError("quality rule identifiers must be non-empty")
         if self.operator not in {"<", "<=", "==", ">=", ">"}:
             raise ValueError("unsupported quality operator")
+        if not math.isfinite(float(self.threshold)):
+            raise ValueError("quality threshold must be finite")
+        if not isinstance(self.critical, bool):
+            raise ValueError("quality rule critical flag must be boolean")
 
     def evaluate(self, metrics: Mapping[str, float]) -> bool:
         if self.metric not in metrics:
@@ -357,7 +362,30 @@ class DataQualityReport:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dataset_digest", _require_digest(self.dataset_digest, field="dataset_digest"))
-        object.__setattr__(self, "metrics", {str(k): float(v) for k,v in self.metrics.items()})
+        rules=tuple(self.rules)
+        if not rules:
+            raise ValueError("quality report requires at least one rule")
+        rule_ids=[rule.rule_id for rule in rules]
+        if len(rule_ids)!=len(set(rule_ids)):
+            raise ValueError("quality rule ids must be unique")
+        values={str(k): float(v) for k,v in self.metrics.items()}
+        if any(not math.isfinite(value) for value in values.values()):
+            raise ValueError("quality metrics must be finite")
+
+        expected_passed=[]
+        expected_failed=[]
+        for rule in rules:
+            (expected_passed if rule.evaluate(values) else expected_failed).append(rule.rule_id)
+
+        passed=tuple(self.passed_rule_ids)
+        failed=tuple(self.failed_rule_ids)
+        if passed!=tuple(expected_passed) or failed!=tuple(expected_failed):
+            raise ValueError("quality report outcome does not match rules and metrics")
+
+        object.__setattr__(self, "rules", rules)
+        object.__setattr__(self, "metrics", values)
+        object.__setattr__(self, "passed_rule_ids", passed)
+        object.__setattr__(self, "failed_rule_ids", failed)
 
     @classmethod
     def evaluate(
@@ -494,7 +522,10 @@ class DatasetRegistry:
         ).fetchone()
         if row is None:
             raise KeyError(digest)
-        return DatasetManifest.from_dict(json.loads(row[0]))
+        manifest=DatasetManifest.from_dict(json.loads(row[0]))
+        if manifest.digest!=digest:
+            raise ValueError("stored dataset manifest digest does not match registry key")
+        return manifest
 
     def record_lineage(self, receipt: LineageReceipt) -> str:
         if not isinstance(receipt, LineageReceipt):
@@ -530,29 +561,37 @@ class DatasetRegistry:
     def latest_quality(self, dataset_digest: str) -> DataQualityReport | None:
         digest=_require_digest(dataset_digest, field="dataset_digest")
         row=self._db.execute(
-            "SELECT report_json FROM quality_report WHERE dataset_digest=? ORDER BY rowid DESC LIMIT 1",
+            "SELECT report_digest,report_json,passed FROM quality_report "
+            "WHERE dataset_digest=? ORDER BY rowid DESC LIMIT 1",
             (digest,),
         ).fetchone()
         if row is None:
             return None
-        payload=json.loads(row[0])
+        payload=json.loads(row[1])
         rules=tuple(
             DataQualityRule(
                 rule_id=str(item["rule_id"]),
                 metric=str(item["metric"]),
                 operator=str(item["operator"]),
-                threshold=float(item["threshold"]),
-                critical=bool(item["critical"]),
+                threshold=item["threshold"],
+                critical=item["critical"],
             )
             for item in payload["rules"]
         )
-        return DataQualityReport(
+        report=DataQualityReport(
             dataset_digest=str(payload["dataset_digest"]),
             rules=rules,
-            metrics={str(k):float(v) for k,v in payload["metrics"].items()},
+            metrics=payload["metrics"],
             passed_rule_ids=tuple(map(str,payload["passed_rule_ids"])),
             failed_rule_ids=tuple(map(str,payload["failed_rule_ids"])),
         )
+        if report.dataset_digest!=digest:
+            raise ValueError("stored quality report dataset identity drift")
+        if report.digest!=str(row[0]):
+            raise ValueError("stored quality report digest mismatch")
+        if (1 if report.passed else 0)!=int(row[2]):
+            raise ValueError("stored quality report pass flag mismatch")
+        return report
 
     def require_training_ready(self, dataset_digest: str) -> DatasetManifest:
         manifest=self.dataset(dataset_digest)

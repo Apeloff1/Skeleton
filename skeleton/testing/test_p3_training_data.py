@@ -183,3 +183,78 @@ def test_manifest_digest_detects_serialized_tampering(tmp_path):
     payload["classification"]="public"
     with pytest.raises(ValueError,match="digest mismatch"):
         DatasetManifest.from_dict(payload)
+
+def test_quality_report_cannot_forge_passing_outcome():
+    rule=DataQualityRule(
+        "validity",
+        "valid_fraction",
+        ">=",
+        0.99,
+        critical=True,
+    )
+    with pytest.raises(ValueError,match="outcome does not match"):
+        DataQualityReport(
+            dataset_digest=_digest("dataset"),
+            rules=(rule,),
+            metrics={"valid_fraction":0.1},
+            passed_rule_ids=("validity",),
+            failed_rule_ids=(),
+        )
+
+
+def test_empty_quality_policy_cannot_make_dataset_training_ready(tmp_path):
+    registry,manifest=_ready_registry(tmp_path)
+    with pytest.raises(ValueError,match="requires at least one rule"):
+        DataQualityReport(
+            dataset_digest=manifest.digest,
+            rules=(),
+            metrics={},
+            passed_rule_ids=(),
+            failed_rule_ids=(),
+        )
+
+
+def test_quality_report_rejects_nonfinite_metric():
+    rule=DataQualityRule("finite","score",">=",0.0)
+    with pytest.raises(ValueError,match="metrics must be finite"):
+        DataQualityReport.evaluate(
+            _digest("dataset"),
+            (rule,),
+            {"score":float("nan")},
+        )
+
+
+def test_latest_quality_detects_persisted_pass_flag_tampering(tmp_path):
+    registry,manifest=_ready_registry(tmp_path)
+    report=DataQualityReport.evaluate(
+        manifest.digest,
+        (DataQualityRule("validity","valid_fraction",">=",0.99),),
+        {"valid_fraction":1.0},
+    )
+    registry.record_quality(report)
+    registry._db.execute(
+        "UPDATE quality_report SET passed=0 WHERE report_digest=?",
+        (report.digest,),
+    )
+    registry._db.commit()
+
+    with pytest.raises(ValueError,match="pass flag mismatch"):
+        registry.latest_quality(manifest.digest)
+
+
+def test_dataset_read_detects_registry_key_payload_tampering(tmp_path):
+    registry,manifest=_ready_registry(tmp_path)
+    payload=manifest.as_dict()
+    payload["dataset_id"]="tampered-id"
+    payload.pop("dataset_digest",None)
+    from skeleton.ai.runtime.training.data import _sha256
+    payload["dataset_digest"]=_sha256({k:v for k,v in payload.items() if k!="dataset_digest"})
+    registry._db.execute(
+        "UPDATE dataset_manifest SET manifest_json=? WHERE dataset_digest=?",
+        (json.dumps(payload,sort_keys=True,separators=(",",":")),manifest.digest),
+    )
+    registry._db.commit()
+
+    with pytest.raises(ValueError,match="does not match registry key"):
+        registry.dataset(manifest.digest)
+
