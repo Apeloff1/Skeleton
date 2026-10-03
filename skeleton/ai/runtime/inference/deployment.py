@@ -188,6 +188,10 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(
                 f"invalid llama.cpp deployment config: {exc}"
             ) from exc
+        if _sha256_file(executable) != executable_digest:
+            raise LocalModelDeploymentError("runtime executable digest mismatch")
+        if _sha256_file(model) != model_digest:
+            raise LocalModelDeploymentError("model artifact digest mismatch")
         try:
             gguf = inspect_gguf(model)
         except LlamaCppRuntimeError as exc:

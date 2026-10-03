@@ -297,7 +297,7 @@ def test_decode_durable_state_rejects_expansion_bomb():
 
     expanded = b"x" * 5_000_001
     encoded = base64.b64encode(gzip.compress(expanded)).decode("ascii")
-    body = f"<!-- shift-supervisor-state:gz:v1:{encoded} -->"
+    body = f"<!-- SHIFT_SUPERVISOR_STATE\ngz:v1:{encoded}\n-->"
     with pytest.raises(CanonicalPlanError, match="expanded state exceeds"):
         decode_durable_state(body)
 

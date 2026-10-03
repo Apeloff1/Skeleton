@@ -308,8 +308,11 @@ def _repo_manifest(limit: int = 500) -> str:
 def _related_repository_context(paths: Iterable[str], *, limit: int = 24) -> tuple[str, ...]:
     seeds = tuple(dict.fromkeys(str(path) for path in paths))
     terms: set[str] = set()
+    seed_stems: set[str] = set()
     for path in seeds:
         stem = PurePosixPath(path).stem
+        if stem:
+            seed_stems.add(stem)
         if len(stem) >= 4:
             terms.add(stem)
         for part in PurePosixPath(path).parts[-3:-1]:
@@ -320,7 +323,14 @@ def _related_repository_context(paths: Iterable[str], *, limit: int = 24) -> tup
         path = raw.strip()
         if not path or path in seeds or path.startswith((".git/", ".studio/", ".github/")):
             continue
+        name = PurePosixPath(path).name
+        exact_test_match = any(
+            name == f"test_{stem}.py" or name == f"{stem}_test.py"
+            for stem in seed_stems
+        )
         score = sum(1 for term in terms if term.lower() in path.lower())
+        if exact_test_match:
+            score += 4
         if score:
             candidates.append((-score, path))
     evidence: list[str] = []
@@ -358,7 +368,17 @@ def _discover_validation_commands(paths: Iterable[str]) -> tuple[tuple[str, ...]
             path = raw.strip()
             name = PurePosixPath(path).name
             if path.endswith(".py") and ("/test" in path or name.startswith("test_")):
-                if any(stem in name or stem in path for stem in stems if len(stem) >= 4):
+                exact_match = any(
+                    name == f"test_{stem}.py" or name == f"{stem}_test.py"
+                    for stem in stems
+                    if stem
+                )
+                fuzzy_match = any(
+                    stem in name or stem in path
+                    for stem in stems
+                    if len(stem) >= 4
+                )
+                if exact_match or fuzzy_match:
                     sibling_tests.append(_canonical_path(path))
         if sibling_tests:
             commands.append(("python", "-m", "pytest", "-q", *sorted(set(sibling_tests))[:8]))

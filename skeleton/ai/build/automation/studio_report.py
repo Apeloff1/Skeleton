@@ -5,13 +5,29 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import json
+import hashlib
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 
+MAX_AUDIT_BYTES = 10_000_000
+
+
 def load_records(path: Path) -> tuple[dict[str, object], ...]:
+    if path.is_symlink():
+        raise ValueError("audit path symlink is forbidden")
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise ValueError("audit path is unreadable") from exc
+    if size > MAX_AUDIT_BYTES:
+        raise ValueError("audit exceeds 10 MB safety bound")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError("audit path is unreadable text") from exc
     records: list[dict[str, object]] = []
-    for line_number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, raw in enumerate(text.splitlines(), start=1):
         if not raw.strip():
             continue
         try:
@@ -28,14 +44,38 @@ def _as_list(value: object) -> list[object]:
     return value if isinstance(value, list) else []
 
 
+def verify_audit_chain(records: Sequence[Mapping[str, object]]) -> None:
+    previous = "0" * 64
+    for index, row in enumerate(records, start=1):
+        if row.get("sequence") != index:
+            raise ValueError(f"audit sequence is discontinuous at record {index}")
+        if row.get("previous_record_sha256") != previous:
+            raise ValueError(f"audit hash chain is broken at record {index}")
+        claimed = str(row.get("record_sha256", ""))
+        payload = dict(row)
+        payload.pop("record_sha256", None)
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        if claimed != actual:
+            raise ValueError(f"audit record hash mismatch at record {index}")
+        previous = claimed
+
+
 def render_report(records: Iterable[Mapping[str, object]]) -> str:
     rows = tuple(records)
     if not rows:
         return "# Autonomous Studio Report\n\nNo audit records were emitted."
 
+    if all("record_sha256" in row for row in rows):
+        verify_audit_chain(rows)
     events = Counter(str(row.get("event", "unknown")) for row in rows)
     first = rows[0]
     last = rows[-1]
+    run_ids = {str(row.get("run_id", "")).strip() for row in rows if str(row.get("run_id", "")).strip()}
+    if len(run_ids) > 1:
+        raise ValueError("audit log contains records from multiple run ids")
+    terminal_events = {"run_finished", "run_failed_closed", "run_blocked_by_operator", "shift_skipped_queue_pressure"}
+    terminal = [row for row in rows if str(row.get("event", "")) in terminal_events]
     cohort = _as_list(first.get("cohort"))
     plan_rows = [
         task
@@ -63,6 +103,15 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
         f"- Planned tasks: **{len(plan_rows)}**",
         f"- Accepted patches: **{len(accepted)}**",
         f"- Rejected/failed-closed tasks or runs: **{len(rejected)}**",
+        f"- Terminal controller records: **{len(terminal)}**",
+        "",
+        "## Controller integrity",
+        "",
+        (
+            "- Audit lifecycle: **complete**"
+            if len(terminal) == 1
+            else f"- Audit lifecycle: **incomplete/ambiguous** ({len(terminal)} terminal records)"
+        ),
         "",
         "## Planned work",
         "",

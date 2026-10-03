@@ -407,7 +407,10 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
 
     await coordinator.ensure_started(command)
     await coordinator.ensure_started(command)
-    await asyncio.sleep(0)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
     assert len(provider.requests) == 1
 
     gate.set()
@@ -761,7 +764,11 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         effects.append(tool_request.approval_ref)
         return "artifact:approved-write"
 
-    await tools.register(_approval_tool_manifest(), handler)
+    await tools.register(
+        _approval_tool_manifest(),
+        handler,
+        postcondition=lambda _request, result_ref: result_ref == "artifact:approved-write",
+    )
     first_provider = SequenceProvider([_approval_tool_response("call-write")])
     coordinator = EngineExecutionCoordinator(
         service,
@@ -818,6 +825,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     await restarted_tools.register(
         _approval_tool_manifest(),
         restarted_handler,
+        postcondition=lambda _request, result_ref: result_ref == "artifact:approved-write",
     )
     final_provider = SequenceProvider(
         [

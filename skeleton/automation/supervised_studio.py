@@ -26,6 +26,7 @@ from .studio_director import (
     _build_and_review,
     _call_json,
     _canonical_path,
+    _changed_paths,
     _git,
     _repo_manifest,
     _discover_validation_commands,
@@ -635,6 +636,7 @@ def propose(
                         if validation_ok:
                             reviewed = repaired
                             applied_before_validation = repaired_diff
+                            applied_paths = repaired_paths
                             candidate_diff_sha = hashlib.sha256(repaired_diff.encode("utf-8")).hexdigest()
                             candidate_sha = hashlib.sha256(repaired.patch.encode("utf-8")).hexdigest()
                             audit.emit(
@@ -656,11 +658,23 @@ def propose(
                         )
                         journal_path.unlink(missing_ok=True)
                         continue
+                validated_dirty = {
+                    path.strip()
+                    for path in (
+                        _git("diff", "--name-only", "--no-ext-diff").splitlines()
+                        + _git("ls-files", "--others", "--exclude-standard").splitlines()
+                    )
+                    if path.strip()
+                }
+                require_subset(validated_dirty, task.paths, "validated worktree")
+                expected_dirty = set(applied_paths) | {
+                    path for path in new_paths if Path(path).exists()
+                }
                 require_promotable(PromotionEvidence(
                     validation_passed=True,
                     review_passed=True,
                     receipt_bound=bool(state_payload["_shift_supervisor"].get("allocation")),
-                    worktree_clean=not bool(_git("status", "--porcelain=v1", "--untracked-files=all").replace(applied_before_validation, "").strip()),
+                    worktree_clean=validated_dirty == expected_dirty,
                 ))
                 transaction["phase"] = "validated"
                 transaction["applied_diff_sha256"] = candidate_diff_sha

@@ -145,7 +145,25 @@ def test_offline_studio_pipeline_fails_closed_on_reviewer_rejection(tmp_path: Pa
             "approve": False,
             "reasons": ["Deliberate rejection for fail-closed smoke coverage."],
         },
+        {
+            "patch": _safe_patch(),
+            "summary": "Bounded repair attempt one.",
+            "tests": ["studio focused suite"],
+        },
+        {
+            "approve": False,
+            "reasons": ["Deliberate second rejection."],
+        },
+        {
+            "patch": _safe_patch(),
+            "summary": "Bounded repair attempt two.",
+            "tests": ["studio focused suite"],
+        },
+        {
+            "approve": False,
+            "reasons": ["Deliberate terminal rejection."],
+        },
     )
 
     assert _build_and_review(reasoner, task, seed="smoke-reject") is None
-    assert reasoner.calls == 3
+    assert reasoner.calls == 7
