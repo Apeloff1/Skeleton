@@ -254,6 +254,75 @@ def load_local_model_artifact(path: str | Path) -> LoadedLocalModel:
 def local_model_adapter_from_env() -> LocalModelAdapter:
     """Construct the engine-owned local adapter from explicit environment state."""
 
+    activation_path = os.getenv(
+        "AI_LOCAL_ACTIVATION_MANIFEST",
+        "",
+    ).strip()
+    activation_digest = os.getenv(
+        "AI_LOCAL_ACTIVATION_DIGEST",
+        "",
+    ).strip()
+    if activation_path or activation_digest:
+        if not activation_path or not activation_digest:
+            raise LocalModelArtifactError(
+                "AI_LOCAL_ACTIVATION_MANIFEST and "
+                "AI_LOCAL_ACTIVATION_DIGEST must be configured together"
+            )
+        try:
+            from skeleton.ai.runtime.product.activation import (
+                LocalModelActivationError,
+                local_model_adapter_from_activation_manifest,
+            )
+
+            adapter = local_model_adapter_from_activation_manifest(
+                activation_path,
+                expected_manifest_digest=activation_digest,
+            )
+        except LocalModelActivationError as exc:
+            raise LocalModelArtifactError(
+                "promoted local model activation manifest is invalid"
+            ) from exc
+
+        manifest = adapter.activation_manifest
+        direct_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
+        if direct_path:
+            try:
+                direct = Path(direct_path).expanduser().resolve(strict=True)
+            except OSError as exc:
+                raise LocalModelArtifactError(
+                    "AI_LOCAL_MODEL_PATH is unavailable"
+                ) from exc
+            if str(direct) != manifest.candidate_path:
+                raise LocalModelArtifactError(
+                    "AI_LOCAL_MODEL_PATH conflicts with activation manifest"
+                )
+
+        cache_raw = os.getenv("AI_LOCAL_MODEL_CACHE_SIZE")
+        if cache_raw is not None and cache_raw.strip():
+            cache_size = _bounded_int_env(
+                "AI_LOCAL_MODEL_CACHE_SIZE",
+                manifest.cache_size,
+                minimum=0,
+                maximum=16_384,
+            )
+            if cache_size != manifest.cache_size:
+                raise LocalModelArtifactError(
+                    "AI_LOCAL_MODEL_CACHE_SIZE conflicts with activation manifest"
+                )
+        seed_raw = os.getenv("AI_LOCAL_MODEL_SEED")
+        if seed_raw is not None and seed_raw.strip():
+            seed = _bounded_int_env(
+                "AI_LOCAL_MODEL_SEED",
+                manifest.default_seed,
+                minimum=-(2**63),
+                maximum=(2**63) - 1,
+            )
+            if seed != manifest.default_seed:
+                raise LocalModelArtifactError(
+                    "AI_LOCAL_MODEL_SEED conflicts with activation manifest"
+                )
+        return adapter
+
     path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
     if not path:
         raise LocalModelArtifactError(
@@ -279,9 +348,8 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
         ),
         default_seed=default_seed,
     )
-    # The adapter is intentionally dependency-light; attach the immutable
-    # activation receipt for diagnostics/evidence without changing its provider
-    # protocol surface.
+    # Direct path activation remains the compatibility/operator bootstrap path.
+    # Governed learning promotion uses the digest-pinned activation manifest.
     adapter.artifact_receipt = loaded.receipt
     return adapter
 
