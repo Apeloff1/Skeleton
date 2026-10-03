@@ -195,8 +195,11 @@ def _canonical_path(value: object) -> str:
     if raw.startswith(_DENIED_PREFIXES):
         raise ValueError(f"denied repository path: {raw}")
     path_obj = Path(raw)
-    if path_obj.exists() and path_obj.is_symlink():
-        raise ValueError(f"symlink repository path is not allowed: {raw}")
+    cursor = Path()
+    for part in PurePosixPath(raw).parts:
+        cursor = cursor / part
+        if cursor.exists() and cursor.is_symlink():
+            raise ValueError(f"symlink repository path component is not allowed: {cursor.as_posix()}")
     if PurePosixPath(raw).name.lower() in _DENIED_BASENAMES:
         raise ValueError(f"denied repository file: {raw}")
     if not raw.startswith(_ALLOWED_ROOTS):
@@ -247,6 +250,10 @@ def _changed_paths(patch: str) -> tuple[str, ...]:
         raise ValueError("patch exceeds per-task size limit")
     if "\x00" in patch:
         raise ValueError("binary patch content is not allowed")
+    if "\r" in patch:
+        raise ValueError("carriage returns are not allowed in patches")
+    if patch.count("diff --git ") > MAX_TASK_PATHS:
+        raise ValueError("patch exceeds per-task file-count limit")
 
     matches = list(_DIFF_PATH.finditer(patch))
     if not matches:
@@ -257,7 +264,9 @@ def _changed_paths(patch: str) -> tuple[str, ...]:
         block_end = matches[index + 1].start() if index + 1 < len(matches) else len(patch)
         block = patch[match.start() : block_end]
         metadata = _FORBIDDEN_DIFF_METADATA.search(block)
-        is_new = "new file mode " in block
+        is_new = "new file mode 100644" in block
+        if "new file mode " in block and not is_new:
+            raise ValueError("new files must use regular non-executable mode 100644")
         if metadata and not is_new:
             raise ValueError("file deletion/rename/copy/mode/binary metadata is disabled")
 
@@ -275,7 +284,7 @@ def _changed_paths(patch: str) -> tuple[str, ...]:
         if is_new:
             if old_path != "/dev/null" or new_path != after or before != after:
                 raise ValueError("new-file diff headers disagree")
-            if Path(after).exists():
+            if Path(after).exists() or Path(after).is_symlink():
                 raise ValueError("new-file patch targets an existing path")
             if not after.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml")):
                 raise ValueError("new-file extension is not allowed")
@@ -360,7 +369,7 @@ def _read_context(paths: Iterable[str]) -> tuple[str, ...]:
                 content = "[unreadable text file]"
             evidence.append(f"FILE {path}\n{content[:MAX_FILE_CONTEXT_CHARS]}")
         else:
-            evidence.append(f"FILE {path}\n[missing: new files are not enabled in studio v1]")
+            evidence.append(f"FILE {path}\n[missing: authorized additive file candidate]")
     return tuple(evidence)
 
 
