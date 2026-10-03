@@ -361,7 +361,11 @@ def _verified(
     candidate: str,
     context_digest: str,
 ) -> ExecutionVerificationDecision:
-    assert candidate == "Assembled local engine answer."
+    # Individual end-to-end tests assert the expected local output. The shared
+    # verification fixture should validate whatever candidate that scenario
+    # produced rather than hard-coding the first scenario's answer and turning
+    # legitimate deferred/cancellation flows into engine_execution_exception.
+    assert candidate.strip()
     return ExecutionVerificationDecision(
         passed=True,
         receipt={
