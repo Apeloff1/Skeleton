@@ -1069,3 +1069,51 @@ def test_deferred_executor_baseexception_releases_inflight_reservation() -> None
     assert outcome.result=={"ok":True}
     assert calls==[{"value":1},{"value":1}]
 
+def test_deferred_invocation_bounds_operation_identity() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    payload={"value":1}
+
+    with pytest.raises(ValueError,match="at most 256"):
+        DeferredInvocation(
+            operation_id="x"*257,
+            volume_id=record.spec.volume_id,
+            spec_digest=record.spec.digest,
+            authority_digest=DeferredExecutor.authority_digest(record),
+            payload_digest=DeferredExecutor.digest_payload(payload),
+        )
+
+    with pytest.raises(ValueError,match="control characters"):
+        DeferredInvocation(
+            operation_id="bad\noperation",
+            volume_id=record.spec.volume_id,
+            spec_digest=record.spec.digest,
+            authority_digest=DeferredExecutor.authority_digest(record),
+            payload_digest=DeferredExecutor.digest_payload(payload),
+        )
+
+
+def test_execution_outcome_rejects_result_receipt_mismatch() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"answer":42},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    outcome=executor.execute(
+        executor.prepare("VOL-160","outcome-bound",payload),
+        payload,
+    )
+
+    from skeleton.ai.runtime.deferred import ExecutionOutcome
+
+    with pytest.raises(ValueError,match="result digest mismatch"):
+        ExecutionOutcome(receipt=outcome.receipt,result={"answer":43})
+
