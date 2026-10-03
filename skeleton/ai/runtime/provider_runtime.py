@@ -1661,6 +1661,85 @@ def _release_provider_lease(
         pass
 
 
+def _provider_usage_event_id(
+    lease: AdmissionLease,
+    kind: str,
+) -> str:
+    material = (lease.lease_id + "\x1f" + kind).encode("utf-8")
+    return (
+        "provider-"
+        + kind
+        + "-"
+        + hashlib.sha256(material).hexdigest()[:24]
+    )
+
+
+def _meter_provider_actual_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    actual: UsageEstimate,
+) -> None:
+    """Persist an idempotent provider charge before terminal reconciliation."""
+
+    if lease.quota_reservation is None:
+        return
+    try:
+        runtime.record_usage_event(
+            lease.operation_id,
+            _provider_usage_event_id(lease, "actual"),
+            "provider",
+            actual,
+        )
+    except AdmissionError:
+        # Completion still reconciles known actual usage and records overrun.
+        runtime.metrics_registry.inc(
+            "provider.actual_usage_meter_rejected_total"
+        )
+    except AdmissionRuntimeError:
+        runtime.metrics_registry.inc(
+            "provider.actual_usage_meter_error_total"
+        )
+
+
+def _finalize_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    actual: UsageEstimate,
+) -> None:
+    _meter_provider_actual_usage(runtime, lease, actual)
+    runtime.complete(lease.operation_id, actual)
+
+
+def _quarantine_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    *,
+    reason: str,
+) -> bool:
+    """Fence ambiguous post-dispatch spend instead of treating it as zero."""
+
+    if lease.quota_reservation is None:
+        _release_provider_lease(runtime, lease)
+        return False
+
+    try:
+        runtime.mark_usage_unknown(
+            lease.operation_id,
+            _provider_usage_event_id(lease, "unknown"),
+            "provider",
+            reason,
+        )
+        runtime.metrics_registry.inc(
+            "provider.unknown_usage_quarantined_total"
+        )
+    except AdmissionRuntimeError:
+        # Never release durable reservation state after ambiguous dispatch.
+        runtime.metrics_registry.inc(
+            "provider.unknown_usage_marker_error_total"
+        )
+    return True
+
+
 def _media_operation_id(
     provider_id: str,
     purpose: str,
