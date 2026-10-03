@@ -144,6 +144,7 @@ def test_budget_exhaustion_is_reported_even_when_independent_gates_pass() -> Non
         burn_rate=rate,
         safety_gate_passed=True,
         reliability_gate_passed=True,
+        budget_exhausted=False,
     )
 
     assert decision.status == "exhausted"
@@ -227,3 +228,49 @@ def test_budget_decision_cannot_claim_override_or_authority() -> None:
         BudgetDecision(**common, reliability_override=True)
     with pytest.raises(ErrorBudgetPolicyError, match="promotion authority"):
         BudgetDecision(**common, promotion_authority=True)
+
+
+def test_budget_decision_rejects_forged_status_or_reasons() -> None:
+    common = dict(
+        budget_digest="a" * 64,
+        burn_rate_digest="b" * 64,
+        safety_gate_passed=True,
+        reliability_gate_passed=True,
+        budget_exhausted=False,
+    )
+
+    with pytest.raises(
+        ErrorBudgetPolicyError,
+        match="status does not match",
+    ):
+        BudgetDecision(
+            **common,
+            status="exhausted",
+            blocking_reasons=(),
+        )
+
+    with pytest.raises(
+        ErrorBudgetPolicyError,
+        match="blocking reasons do not match",
+    ):
+        BudgetDecision(
+            **common,
+            status="healthy",
+            blocking_reasons=("error-budget-exhausted",),
+        )
+
+
+def test_budget_decision_rejects_hidden_failed_gate() -> None:
+    with pytest.raises(
+        ErrorBudgetPolicyError,
+        match="blocking reasons do not match",
+    ):
+        BudgetDecision(
+            budget_digest="a" * 64,
+            burn_rate_digest="b" * 64,
+            status="blocked",
+            blocking_reasons=(),
+            safety_gate_passed=False,
+            reliability_gate_passed=True,
+            budget_exhausted=False,
+        )
