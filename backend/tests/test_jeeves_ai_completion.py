@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import pytest
 from fastapi import HTTPException
@@ -258,6 +258,18 @@ async def test_jeeves_persists_full_engine_context_and_receipt_lineage(
     user_message = turn[2]
     digest = "a" * 64
     source_digest = "b" * 64
+    operation_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:engine-lineage:operation")
+    )
+    execution_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:engine-lineage:execution")
+    )
+    context_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:engine-lineage:context")
+    )
+    segment_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:engine-lineage:segment")
+    )
 
     thread, assistant = await jeeves_compose._commit_canonical_assistant_turn(
         authority=turn[0],
@@ -270,12 +282,12 @@ async def test_jeeves_persists_full_engine_context_and_receipt_lineage(
         generated={
             "text": "Verified engine answer",
             "model": "skeleton-engine",
-            "engine_operation_id": "operation-engine-lineage",
-            "engine_execution_id": "execution-engine-lineage",
-            "engine_context_id": "context-engine-lineage",
+            "engine_operation_id": operation_id,
+            "engine_execution_id": execution_id,
+            "engine_context_id": context_id,
             "engine_context_digest": digest,
             "engine_context_source_snapshot": [
-                ["segment-engine-lineage", source_digest],
+                [segment_id, source_digest],
             ],
             "engine_context_compiler_version": "compiler-engine-lineage",
             "engine_tenant_id": turn[3],
@@ -290,12 +302,12 @@ async def test_jeeves_persists_full_engine_context_and_receipt_lineage(
         },
     )
 
-    assert assistant.operation_id == "operation-engine-lineage"
-    assert assistant.ai_result_id == "engine-result:execution-engine-lineage"
-    assert assistant.context_id == "context-engine-lineage"
+    assert assistant.operation_id == operation_id
+    assert assistant.ai_result_id == "engine-result:" + execution_id
+    assert assistant.context_id == context_id
     assert assistant.context_digest == digest
     assert assistant.context_source_snapshot == (
-        ("segment-engine-lineage", source_digest),
+        (segment_id, source_digest),
     )
     assert assistant.context_compiler_version == "compiler-engine-lineage"
     assert assistant.provider_receipt_refs == ("provider:local:receipt",)
@@ -340,6 +352,18 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
     )
 
     attempts = 0
+    retry_operation_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:retry:operation")
+    )
+    retry_execution_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:retry:execution")
+    )
+    retry_context_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:retry:context")
+    )
+    retry_segment_id = str(
+        uuid5(NAMESPACE_URL, "test:jeeves:retry:segment")
+    )
 
     async def generate(
         query,
@@ -359,12 +383,12 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
             "text": "Recovered answer",
             "tier": "paid",
             "model": "skeleton-engine",
-            "engine_operation_id": "operation-retry",
-            "engine_execution_id": "execution-retry",
-            "engine_context_id": "context-retry",
+            "engine_operation_id": retry_operation_id,
+            "engine_execution_id": retry_execution_id,
+            "engine_context_id": retry_context_id,
             "engine_context_digest": "c" * 64,
             "engine_context_source_snapshot": [
-                ["segment-retry", "d" * 64],
+                [retry_segment_id, "d" * 64],
             ],
             "engine_context_compiler_version": "compiler-retry",
             "engine_tenant_id": engine_identity["engine_tenant_id"],
@@ -401,7 +425,7 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
     recovered = await jeeves_compose.chat(request)
     assert recovered["ok"] is True
     assert recovered["reply"] == "Recovered answer"
-    assert recovered["engine_execution_id"] == "execution-retry"
+    assert recovered["engine_execution_id"] == retry_execution_id
 
     transcript = repository.active_transcript(
         thread_id,
@@ -413,7 +437,7 @@ async def test_jeeves_engine_failure_stays_retryable_without_fake_success(
         "assistant",
     ]
     assert transcript[1].parent_message_id == transcript[0].message_id
-    assert transcript[1].operation_id == "operation-retry"
+    assert transcript[1].operation_id == retry_operation_id
     assert transcript[1].provider_receipt_refs == (
         "provider:local:retry",
     )
