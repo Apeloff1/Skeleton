@@ -53,15 +53,33 @@ class EngineChatResponse(str):
         cls,
         text: str,
         *,
+        operation_id: str,
         execution_id: str,
+        context_id: str,
+        context_digest: str,
+        context_source_snapshot: tuple[tuple[str, str], ...],
+        context_compiler_version: str,
         verification: str | None,
         evidence_refs: tuple[str, ...],
+        provider_receipts: tuple[str, ...],
+        tool_receipts: tuple[str, ...],
+        memory_refs: tuple[str, ...],
+        artifact_refs: tuple[str, ...],
         usage: Any,
     ):
         obj = str.__new__(cls, text)
+        obj.operation_id = operation_id
         obj.execution_id = execution_id
+        obj.context_id = context_id
+        obj.context_digest = context_digest
+        obj.context_source_snapshot = context_source_snapshot
+        obj.context_compiler_version = context_compiler_version
         obj.verification = verification
         obj.evidence_refs = evidence_refs
+        obj.provider_receipts = provider_receipts
+        obj.tool_receipts = tool_receipts
+        obj.memory_refs = memory_refs
+        obj.artifact_refs = artifact_refs
         obj.usage = usage
         return obj
 
@@ -90,6 +108,7 @@ class EngineChat:
         verification_profile: str = "assistant_proposal",
         data_class: str = "internal",
         purpose: str = "model-inference",
+        turn_idempotency_key: str | None = None,
         engine_executor=None,
         **_: Any,
     ) -> None:
@@ -141,6 +160,18 @@ class EngineChat:
         ).strip()
         self.data_class = str(data_class).strip().lower()
         self.purpose = str(purpose).strip()
+        if turn_idempotency_key is None:
+            self._turn_idempotency_key = None
+        else:
+            normalized_turn_key = str(turn_idempotency_key).strip()
+            if (
+                not normalized_turn_key
+                or len(normalized_turn_key) > 1024
+            ):
+                raise ValueError(
+                    "turn_idempotency_key must be 1..1024 characters"
+                )
+            self._turn_idempotency_key = normalized_turn_key
         self._engine_executor = engine_executor or execute_engine_text
         if not callable(self._engine_executor):
             raise TypeError("engine_executor must be callable")
@@ -170,6 +201,7 @@ class EngineChat:
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
+        self._evidence: list[dict[str, str]] = []
         self._queued_prompt: str | None = None
 
     def with_model(self, provider: str, model: str) -> "EngineChat":
@@ -248,6 +280,69 @@ class EngineChat:
             "engine chat role must be system, user, or assistant"
         )
 
+    def add_history_message(
+        self,
+        role: str,
+        content: str,
+    ) -> "EngineChat":
+        """Add canonical prior conversation without queuing a new prompt."""
+
+        normalized_role = str(role).strip().lower()
+        text = str(content).strip()
+        if normalized_role not in {"user", "assistant"}:
+            raise ValueError(
+                "engine chat history role must be user or assistant"
+            )
+        if not text:
+            raise ValueError(
+                "engine chat history content must be non-empty"
+            )
+        self._history.append(
+            {"role": normalized_role, "content": text}
+        )
+        if len(self._history) > 1024:
+            raise ValueError(
+                "engine chat history exceeds maximum turn count"
+            )
+        return self
+
+    def add_evidence(
+        self,
+        source_id: str,
+        content: str,
+        *,
+        kind: str = "retrieval_evidence",
+    ) -> "EngineChat":
+        """Attach product evidence as untrusted canonical context, not prompt."""
+
+        source = str(source_id).strip()
+        text = str(content).strip()
+        normalized_kind = str(kind).strip().lower()
+        if not source or not text:
+            raise ValueError(
+                "engine chat evidence source/content must be non-empty"
+            )
+        if normalized_kind not in {"retrieval_evidence", "artifact"}:
+            raise ValueError(
+                "engine chat evidence kind is unsupported"
+            )
+        if any(item["source_id"] == source for item in self._evidence):
+            raise ValueError(
+                "engine chat evidence source_id must be unique"
+            )
+        self._evidence.append(
+            {
+                "source_id": source,
+                "content": text,
+                "kind": normalized_kind,
+            }
+        )
+        if len(self._evidence) > 256:
+            raise ValueError(
+                "engine chat evidence exceeds maximum segment count"
+            )
+        return self
+
     @staticmethod
     def _prompt_text(message: Any) -> str:
         if isinstance(message, str):
@@ -262,6 +357,13 @@ class EngineChat:
         return str(text)
 
     def _idempotency_key(self, prompt: str) -> str:
+        if self._turn_idempotency_key is not None:
+            return (
+                "engine-chat-explicit:"
+                + hashlib.sha256(
+                    self._turn_idempotency_key.encode("utf-8")
+                ).hexdigest()
+            )
         policy = self.instruction_policy
         instructions = (
             self.system_message.strip()
@@ -273,6 +375,7 @@ class EngineChat:
                 "turn_index": len(self._history),
                 "prompt": prompt,
                 "history": self._history,
+                "evidence": self._evidence,
                 "instruction_policy_id": (
                     None if policy is None else policy.policy_id
                 ),
@@ -319,6 +422,7 @@ class EngineChat:
                 None if policy is None else policy.version
             ),
             history=tuple(self._history),
+            evidence=tuple(self._evidence),
             tenant_id=self.tenant_id,
             actor_id=self.actor_id,
             capability=self.capability,
@@ -338,9 +442,18 @@ class EngineChat:
         )
         return EngineChatResponse(
             response.text,
+            operation_id=response.operation_id,
             execution_id=response.execution_id,
+            context_id=response.context_id,
+            context_digest=response.context_digest,
+            context_source_snapshot=tuple(response.context_source_snapshot),
+            context_compiler_version=response.context_compiler_version,
             verification=response.verification,
             evidence_refs=tuple(response.evidence_refs),
+            provider_receipts=tuple(response.provider_receipts),
+            tool_receipts=tuple(response.tool_receipts),
+            memory_refs=tuple(response.memory_refs),
+            artifact_refs=tuple(response.artifact_refs),
             usage=response.usage,
         )
 
