@@ -335,13 +335,13 @@ def _related_repository_context(paths: Iterable[str], *, limit: int = 24) -> tup
     return tuple(evidence)
 
 
-def _discover_validation_commands(paths: Iterable[str]) -> tuple[str, ...]:
-    commands: list[str] = []
-    canonical = tuple(dict.fromkeys(str(path) for path in paths))
+def _discover_validation_commands(paths: Iterable[str]) -> tuple[tuple[str, ...], ...]:
+    canonical = tuple(dict.fromkeys(_canonical_path(str(path)) for path in paths))
     py_paths = [path for path in canonical if path.endswith(".py")]
     test_paths = [path for path in py_paths if "/test" in path or PurePosixPath(path).name.startswith("test_")]
+    commands: list[tuple[str, ...]] = []
     if test_paths:
-        commands.append("python -m pytest -q " + " ".join(test_paths[:8]))
+        commands.append(("python", "-m", "pytest", "-q", *test_paths[:8]))
     else:
         sibling_tests: list[str] = []
         stems = {PurePosixPath(path).stem for path in py_paths}
@@ -350,11 +350,11 @@ def _discover_validation_commands(paths: Iterable[str]) -> tuple[str, ...]:
             name = PurePosixPath(path).name
             if path.endswith(".py") and ("/test" in path or name.startswith("test_")):
                 if any(stem in name or stem in path for stem in stems if len(stem) >= 4):
-                    sibling_tests.append(path)
+                    sibling_tests.append(_canonical_path(path))
         if sibling_tests:
-            commands.append("python -m pytest -q " + " ".join(sorted(sibling_tests)[:8]))
+            commands.append(("python", "-m", "pytest", "-q", *sorted(set(sibling_tests))[:8]))
     if py_paths:
-        commands.append("python -m compileall -q " + " ".join(py_paths[:8]))
+        commands.append(("python", "-m", "compileall", "-q", *py_paths[:8]))
     return tuple(commands[:3])
 
 
@@ -582,14 +582,16 @@ def _plan(
     return tasks
 
 
-def _run_validation_commands(commands: Sequence[str]) -> tuple[bool, tuple[str, ...]]:
+def _run_validation_commands(commands: Sequence[Sequence[str]]) -> tuple[bool, tuple[str, ...]]:
     outputs: list[str] = []
     allowed_prefixes = (("python", "-m", "pytest"), ("python", "-m", "compileall"))
-    for command in commands[:3]:
-        import shlex
-        argv = tuple(shlex.split(command))
-        if not any(argv[: len(prefix)] == prefix for prefix in allowed_prefixes):
-            raise ValueError(f"validation command is not allowlisted: {command}")
+    for raw_command in commands[:3]:
+        argv = tuple(str(part) for part in raw_command)
+        if not argv or len(argv) > 16 or not any(argv[: len(prefix)] == prefix for prefix in allowed_prefixes):
+            raise ValueError("validation command is not allowlisted")
+        if any(not part or "\x00" in part or any(ord(ch) < 32 for ch in part) for part in argv):
+            raise ValueError("validation argument is malformed")
+        display = " ".join(repr(part) for part in argv)
         try:
             completed = subprocess.run(
                 argv,
@@ -599,10 +601,10 @@ def _run_validation_commands(commands: Sequence[str]) -> tuple[bool, tuple[str, 
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
         except subprocess.TimeoutExpired:
-            outputs.append(f"$ {command}\nTIMEOUT")
+            outputs.append(f"$ {display}\nTIMEOUT")
             return False, tuple(outputs)
-        output = (completed.stdout + "\n" + completed.stderr)[-12000:]
-        outputs.append(f"$ {command}\nexit={completed.returncode}\n{output}")
+        output = ((completed.stdout or "") + "\n" + (completed.stderr or ""))[-12000:]
+        outputs.append(f"$ {display}\nexit={completed.returncode}\n{output}")
         if completed.returncode != 0:
             return False, tuple(outputs)
     return True, tuple(outputs)
