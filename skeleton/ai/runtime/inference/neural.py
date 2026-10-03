@@ -326,6 +326,9 @@ class NumpyRecurrentLM:
         max_document_tokens: int = 1_024,
         seed: int = 0,
         temperature: float = 0.8,
+        early_stopping_patience: int = 0,
+        min_relative_improvement: float = 0.0,
+        shuffle_each_epoch: bool = True,
     ) -> "NumpyRecurrentLM":
         """Train a bounded Elman RNN with deterministic truncated BPTT."""
 
@@ -373,6 +376,22 @@ class NumpyRecurrentLM:
         )
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise TypeError("seed must be an integer")
+        if (
+            isinstance(early_stopping_patience, bool)
+            or not isinstance(early_stopping_patience, int)
+            or not 0 <= early_stopping_patience <= 100
+        ):
+            raise ValueError(
+                "early_stopping_patience must be in [0, 100]"
+            )
+        min_improvement = _require_float(
+            min_relative_improvement,
+            "min_relative_improvement",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        if not isinstance(shuffle_each_epoch, bool):
+            raise TypeError("shuffle_each_epoch must be boolean")
 
         tokenized: list[tuple[str, ...]] = []
         counts: Counter[str] = Counter()
@@ -471,8 +490,24 @@ class NumpyRecurrentLM:
         output_bias = np.zeros(vocab_size, dtype=np.float32)
 
         order = np.arange(len(sequences), dtype=np.int64)
+        d_recurrent = np.zeros_like(recurrent)
+        d_recurrent_bias = np.zeros_like(recurrent_bias)
+        d_output = np.zeros_like(output)
+        d_output_bias = np.zeros_like(output_bias)
+        dh_next = np.zeros(hidden, dtype=np.float32)
+
+        loss_history: list[float] = []
+        best_loss = math.inf
+        stale_epochs = 0
+        epochs_completed = 0
+        stopped_early = False
+
         for _epoch in range(rounds):
-            rng.shuffle(order)
+            if shuffle_each_epoch:
+                rng.shuffle(order)
+            epoch_loss = 0.0
+            epoch_targets = 0
+
             for sequence_index in order:
                 sequence = sequences[int(sequence_index)]
                 inputs = sequence[:-1]
@@ -482,7 +517,7 @@ class NumpyRecurrentLM:
                 ]
                 probabilities: list[np.ndarray] = []
 
-                for token_id in inputs:
+                for position, token_id in enumerate(inputs):
                     previous = states[-1]
                     hidden_state = np.tanh(
                         embedding[int(token_id)]
@@ -499,17 +534,21 @@ class NumpyRecurrentLM:
                     probability = (
                         exp / max(float(exp.sum()), 1e-12)
                     ).astype(np.float32)
+                    target_probability = max(
+                        float(probability[int(targets[position])]),
+                        1e-12,
+                    )
+                    epoch_loss -= math.log(target_probability)
+                    epoch_targets += 1
                     states.append(hidden_state)
                     probabilities.append(probability)
 
-                d_embedding = np.zeros_like(embedding)
-                d_recurrent = np.zeros_like(recurrent)
-                d_recurrent_bias = np.zeros_like(
-                    recurrent_bias
-                )
-                d_output = np.zeros_like(output)
-                d_output_bias = np.zeros_like(output_bias)
-                dh_next = np.zeros(hidden, dtype=np.float32)
+                d_recurrent.fill(0.0)
+                d_recurrent_bias.fill(0.0)
+                d_output.fill(0.0)
+                d_output_bias.fill(0.0)
+                dh_next.fill(0.0)
+                d_embedding_rows: dict[int, np.ndarray] = {}
 
                 for position in range(
                     len(inputs) - 1,
@@ -529,13 +568,20 @@ class NumpyRecurrentLM:
                         (np.float32(1.0) - state * state)
                         * dh
                     ).astype(np.float32)
-                    d_embedding[int(inputs[position])] += dtanh
+                    token_index = int(inputs[position])
+                    prior_embedding_gradient = d_embedding_rows.get(
+                        token_index
+                    )
+                    if prior_embedding_gradient is None:
+                        d_embedding_rows[token_index] = dtanh.copy()
+                    else:
+                        prior_embedding_gradient += dtanh
                     d_recurrent += np.outer(
                         previous,
                         dtanh,
                     ).astype(np.float32)
                     d_recurrent_bias += dtanh
-                    dh_next = (
+                    dh_next[:] = (
                         dtanh @ recurrent.T
                     ).astype(np.float32)
 
@@ -543,7 +589,6 @@ class NumpyRecurrentLM:
                     1.0 / max(1, len(inputs))
                 )
                 for gradient in (
-                    d_embedding,
                     d_recurrent,
                     d_recurrent_bias,
                     d_output,
@@ -556,8 +601,18 @@ class NumpyRecurrentLM:
                         5.0,
                         out=gradient,
                     )
+                for token_index, gradient in d_embedding_rows.items():
+                    gradient *= normalizer
+                    np.clip(
+                        gradient,
+                        -5.0,
+                        5.0,
+                        out=gradient,
+                    )
+                    embedding[token_index] -= (
+                        np.float32(rate) * gradient
+                    )
 
-                embedding -= np.float32(rate) * d_embedding
                 recurrent -= np.float32(rate) * d_recurrent
                 recurrent_bias -= (
                     np.float32(rate) * d_recurrent_bias
@@ -565,7 +620,29 @@ class NumpyRecurrentLM:
                 output -= np.float32(rate) * d_output
                 output_bias -= np.float32(rate) * d_output_bias
 
-        return cls(
+            epochs_completed += 1
+            average_loss = (
+                epoch_loss / max(1, epoch_targets)
+            )
+            loss_history.append(float(average_loss))
+
+            if early_stopping_patience:
+                if math.isinf(best_loss):
+                    best_loss = average_loss
+                    stale_epochs = 0
+                else:
+                    required = best_loss * min_improvement
+                    improvement = best_loss - average_loss
+                    if improvement > required:
+                        best_loss = average_loss
+                        stale_epochs = 0
+                    else:
+                        stale_epochs += 1
+                        if stale_epochs >= early_stopping_patience:
+                            stopped_early = True
+                            break
+
+        model = cls(
             model_id=model_id,
             vocab=vocab,
             hidden_size=hidden,
@@ -576,6 +653,12 @@ class NumpyRecurrentLM:
             output_bias=output_bias,
             temperature=temp,
         )
+        model.training_epochs_completed = epochs_completed
+        model.training_loss_history = tuple(loss_history)
+        model.training_stopped_early = stopped_early
+        model.training_examples = len(sequences)
+        model.training_tokens = total_training_tokens
+        return model
 
     def _token_id(self, token: str) -> int:
         return self._token_to_id.get(token, 0)
