@@ -325,3 +325,82 @@ def test_lifecycle_deployment_authority_is_independent(
             activation,
             deployment_authority_id=promotion.verifier_id,
         )
+
+
+
+def test_lifecycle_state_survives_restart_and_can_roll_back(
+    tmp_path: Path,
+) -> None:
+    bridged, qualification, promotion, activation = _fixture(tmp_path)
+    state_path = tmp_path / "model-lifecycle.json"
+    registry = ModelLifecycleRegistry(state_path)
+    registry.register_candidate(
+        bridged,
+        authority_id="training-registration-authority",
+    )
+    registry.validate(
+        bridged.artifact.model_digest,
+        qualification,
+        verifier_id="lifecycle-validation-verifier",
+    )
+    registry.promote(bridged.artifact.model_digest, promotion)
+    registry.activate(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="deployment-authority",
+    )
+    before = registry.snapshot(bridged.artifact.model_digest)
+    history_before = tuple(
+        item.digest
+        for item in registry.history(bridged.artifact.model_digest)
+    )
+    state_digest = registry.state_digest()
+
+    reopened = ModelLifecycleRegistry(state_path)
+    restored = reopened.snapshot(bridged.artifact.model_digest)
+    assert restored.state is ModelLifecycleState.ACTIVATED
+    assert restored.digest == before.digest
+    assert reopened.state_digest() == state_digest
+    assert tuple(
+        item.digest
+        for item in reopened.history(bridged.artifact.model_digest)
+    ) == history_before
+    assert reopened.verify_history(bridged.artifact.model_digest) is True
+
+    reopened.rollback(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="deployment-authority",
+    )
+    after = ModelLifecycleRegistry(state_path)
+    assert (
+        after.snapshot(bridged.artifact.model_digest).state
+        is ModelLifecycleState.ROLLED_BACK
+    )
+    assert len(after.history(bridged.artifact.model_digest)) == 5
+    assert after.verify_history(bridged.artifact.model_digest) is True
+
+
+def test_lifecycle_state_tamper_fails_closed(
+    tmp_path: Path,
+) -> None:
+    bridged, _qualification, _promotion, _activation = _fixture(tmp_path)
+    state_path = tmp_path / "model-lifecycle.json"
+    registry = ModelLifecycleRegistry(state_path)
+    registry.register_candidate(
+        bridged,
+        authority_id="training-registration-authority",
+    )
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    payload["records"][0]["trainer_id"] = "forged-training-authority"
+    state_path.write_text(
+        json.dumps(payload, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="state digest mismatch",
+    ):
+        ModelLifecycleRegistry(state_path)
