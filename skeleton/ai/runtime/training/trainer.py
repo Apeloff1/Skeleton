@@ -13,6 +13,7 @@ from .control import (
     TrainingCheckpoint,
     TrainingRepository,
     TrainingRunManifest,
+    TrainingStateError,
     TrainingTelemetry,
 )
 from .data import DatasetRegistry
@@ -47,6 +48,33 @@ class LocalTrainingArtifact:
 class ReferenceLocalTrainer:
     """Train the executable local n-gram model under the durable control plane."""
 
+    @staticmethod
+    def _enforce_execution_boundary(
+        manifest: TrainingRunManifest,
+        corpus: Sequence[str],
+    ) -> tuple[int, int]:
+        """Fail closed before mutating run state when local execution exceeds authority."""
+        if manifest.world_size != 1 or manifest.parallelism != "single":
+            raise TrainingStateError(
+                "reference local trainer only supports world_size=1 and parallelism=single"
+            )
+
+        token_count=sum(len(item.split()) for item in corpus)
+        corpus_bytes=len("\n".join(corpus).encode("utf-8"))
+        observed={
+            "max_steps": float(token_count),
+            "max_documents": float(len(corpus)),
+            "max_corpus_bytes": float(corpus_bytes),
+        }
+        for budget_name, actual in observed.items():
+            limit=manifest.resource_budget.get(budget_name)
+            if limit is not None and actual > float(limit):
+                raise TrainingStateError(
+                    f"training budget exceeded: {budget_name} "
+                    f"(actual={actual:g}, limit={float(limit):g})"
+                )
+        return token_count, corpus_bytes
+
     def __init__(
         self,
         datasets: DatasetRegistry,
@@ -75,6 +103,7 @@ class ReferenceLocalTrainer:
         actual_corpus_digest=corpus_digest(corpus)
         if split.digest!=actual_corpus_digest:
             raise ValueError("training corpus bytes do not match registered split digest")
+        token_count,_=self._enforce_execution_boundary(manifest,corpus)
 
         try:
             registered=self.runs.manifest(manifest.run_id)
@@ -106,7 +135,7 @@ class ReferenceLocalTrainer:
             order=order,
             model_id=f"skeleton-local-trained:{manifest.run_id}",
         )
-        step=sum(len(item.split()) for item in corpus)
+        step=token_count
         checkpoint=TrainingCheckpoint(
             run_id=manifest.run_id,
             manifest_digest=manifest.digest,
