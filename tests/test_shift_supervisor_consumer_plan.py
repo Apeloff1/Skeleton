@@ -204,3 +204,63 @@ def test_core_consumer_plan_module_delegates_to_canonical_cli():
 
     assert exc.value.code == 0
     canonical_main.assert_called_once_with()
+
+
+def test_consumer_rejects_duplicate_canonical_plan_issues():
+    state = _state()
+    state["issues"].append(dict(state["issues"][0]))
+    with pytest.raises(CanonicalPlanError, match="multiple canonical"):
+        consume_plan(
+            state,
+            team="night",
+            now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+        )
+
+
+def test_consumer_rejects_duplicate_plan_item_ids():
+    state = _state()
+    state["issues"][0]["body"] = _body(
+        [
+            {
+                "id": "duplicate",
+                "title": "First",
+                "description": "First task.",
+                "target_team": "night",
+                "status": "queued",
+            },
+            {
+                "id": "duplicate",
+                "title": "Second",
+                "description": "Second task.",
+                "target_team": "night",
+                "status": "queued",
+            },
+        ]
+    )
+    with pytest.raises(CanonicalPlanError, match="duplicate plan item ids"):
+        consume_plan(
+            state,
+            team="night",
+            now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+        )
+
+
+def test_prepare_state_replaces_state_atomically(tmp_path):
+    from skeleton.automation.shift_supervisor.consumer_plan import prepare_state
+
+    state_path = tmp_path / "repo-state.json"
+    summary_path = tmp_path / "summary.md"
+    state_path.write_text(json.dumps(_state()), encoding="utf-8")
+
+    prepare_state(
+        state_path,
+        team="night",
+        summary_path=summary_path,
+        now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+    )
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    assert payload["_shift_supervisor"]["status"] == "loaded"
+    assert payload["_shift_supervisor"]["team"] == "night"
+    assert summary_path.read_text(encoding="utf-8").startswith("## Shift supervisor")
+    assert list(tmp_path.glob(".repo-state.json.*.tmp")) == []
