@@ -129,6 +129,7 @@ jobs:
         run: node scripts/verify-image-size-security.js
 
       - name: Verify static frontend production dependency boundary
+        id: runtime-boundary
         working-directory: frontend
         run: node scripts/verify-production-dependency-boundary.js
 
@@ -181,6 +182,7 @@ jobs:
         if: always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          FRONTEND_RUNTIME_BOUNDARY_VERIFIED: ${{ steps.runtime-boundary.outcome }}
           YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
