@@ -243,30 +243,40 @@ class GovernedContentStore:
                     raise StorageContractError(
                         "logical identity/version cannot be rebound to different content"
                     )
-            else:
-                self._db.execute(
+                current = self._db.execute(
                     """
-                    INSERT INTO governed_object(
-                        tenant_id, logical_id, version, trust_context, payload
-                    ) VALUES (?, ?, ?, ?, ?)
+                    SELECT algorithm, digest
+                    FROM governed_digest
+                    WHERE tenant_id = ? AND logical_id = ? AND version = ?
+                      AND is_current = 1
                     """,
-                    (tenant, logical, checked_version, trust, raw),
+                    (tenant, logical, checked_version),
+                ).fetchone()
+                if current is None:
+                    raise StorageContractError(
+                        "existing governed object is missing its current digest"
+                    )
+                return AddressedObject(
+                    tenant_id=tenant,
+                    logical_id=logical,
+                    version=checked_version,
+                    trust_context=trust,
+                    digest=ContentDigest(current["algorithm"], current["digest"]),
+                    size_bytes=len(raw),
                 )
             self._db.execute(
                 """
-                UPDATE governed_digest
-                SET is_current = 0
-                WHERE tenant_id = ? AND logical_id = ? AND version = ?
+                INSERT INTO governed_object(
+                    tenant_id, logical_id, version, trust_context, payload
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (tenant, logical, checked_version),
+                (tenant, logical, checked_version, trust, raw),
             )
             self._db.execute(
                 """
                 INSERT INTO governed_digest(
                     tenant_id, logical_id, version, algorithm, digest, is_current
                 ) VALUES (?, ?, ?, ?, ?, 1)
-                ON CONFLICT(tenant_id, logical_id, version, algorithm)
-                DO UPDATE SET digest = excluded.digest, is_current = 1
                 """,
                 (tenant, logical, checked_version, algorithm, digest_value),
             )
@@ -543,12 +553,15 @@ class GovernedContentCache:
         generation: int,
     ) -> bytes | None:
         checked_generation = _generation(generation)
-        current, authoritative_payload = self._authoritative_key(
-            tenant_id=tenant_id,
-            namespace=namespace,
-            logical_id=logical_id,
-            version=version,
-        )
+        try:
+            current, authoritative_payload = self._authoritative_key(
+                tenant_id=tenant_id,
+                namespace=namespace,
+                logical_id=logical_id,
+                version=version,
+            )
+        except KeyError:
+            return None
         if current.trust_context != _text(
             trust_context,
             "trust_context",
