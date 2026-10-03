@@ -283,3 +283,19 @@ def test_consumer_binds_loaded_plan_to_sha256_digest():
         ).encode("utf-8")
     ).hexdigest()
     assert supervisor["plan_digest_sha256"] == expected
+
+
+def test_decode_durable_state_rejects_oversized_issue_body():
+    with pytest.raises(CanonicalPlanError, match="issue body exceeds"):
+        decode_durable_state("x" * 2_000_001)
+
+
+def test_decode_durable_state_rejects_expansion_bomb():
+    import base64
+    import gzip
+
+    expanded = b"x" * 5_000_001
+    encoded = base64.b64encode(gzip.compress(expanded)).decode("ascii")
+    body = f"<!-- shift-supervisor-state:gz:v1:{encoded} -->"
+    with pytest.raises(CanonicalPlanError, match="expanded state exceeds"):
+        decode_durable_state(body)
