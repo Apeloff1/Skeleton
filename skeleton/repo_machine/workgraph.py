@@ -1,4 +1,4 @@
-"""Conflict-aware work graph derived from dependency and impact intelligence."""
+"""Conflict-aware work graph with explicit dependency and readiness gates."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,18 +19,17 @@ class WorkNode:
     prerequisites: tuple[str, ...]
     evidence: tuple[str, ...]
     verification_paths: tuple[str, ...] = ()
+    readiness: str = "ready"
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "identity": self.identity,
-            "lane": self.lane,
-            "zone": self.zone,
-            "priority": self.priority,
-            "objective": self.objective,
+            "identity": self.identity, "lane": self.lane, "zone": self.zone,
+            "priority": self.priority, "objective": self.objective,
             "conflict_keys": list(self.conflict_keys),
             "prerequisites": list(self.prerequisites),
             "evidence": list(self.evidence),
             "verification_paths": list(self.verification_paths),
+            "readiness": self.readiness,
         }
 
 
@@ -38,28 +37,32 @@ class WorkNode:
 class WorkGraph:
     nodes: tuple[WorkNode, ...]
     _ordered_nodes: tuple[WorkNode, ...] = field(init=False, repr=False, compare=False)
+    _by_identity: dict[str, WorkNode] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "_ordered_nodes",
-            tuple(sorted(self.nodes, key=lambda item: (-item.priority, item.identity))),
-        )
+        ordered = tuple(sorted(self.nodes, key=lambda item: (-item.priority, item.identity)))
+        if len({item.identity for item in ordered}) != len(ordered):
+            raise ValueError("work graph contains duplicate identities")
+        by_identity = {item.identity: item for item in ordered}
+        for node in ordered:
+            missing = [item for item in node.prerequisites if item not in by_identity]
+            if missing:
+                raise ValueError(f"work graph has unknown prerequisites for {node.identity}")
+        object.__setattr__(self, "_ordered_nodes", ordered)
+        object.__setattr__(self, "_by_identity", by_identity)
 
     def as_dict(self) -> dict[str, object]:
         return {"nodes": [node.as_dict() for node in self.nodes]}
 
-    def ready(
-        self,
-        completed: Iterable[str] = (),
-        active_conflicts: Iterable[str] = (),
-        *,
-        limit: int = 8,
-    ) -> tuple[WorkNode, ...]:
+    def ready(self, completed: Iterable[str] = (), active_conflicts: Iterable[str] = (), *, limit: int = 8) -> tuple[WorkNode, ...]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= len(self.nodes) if self.nodes else limit < 1:
+            raise ValueError("limit must be positive")
         done = set(completed)
         conflicts = set(active_conflicts)
         ready: list[WorkNode] = []
         for node in self._ordered_nodes:
+            if node.identity in done:
+                continue
             if any(prerequisite not in done for prerequisite in node.prerequisites):
                 continue
             if any(key in conflicts for key in node.conflict_keys):
@@ -70,13 +73,19 @@ class WorkGraph:
                 break
         return tuple(ready)
 
+    def blocked(self, completed: Iterable[str] = ()) -> tuple[WorkNode, ...]:
+        done = set(completed)
+        return tuple(
+            node for node in self._ordered_nodes
+            if node.identity not in done and any(prerequisite not in done for prerequisite in node.prerequisites)
+        )
+
 
 def _conflicts(candidate: WorkCandidate, dependents_by_zone: dict[str, tuple[str, ...]] | None = None) -> tuple[str, ...]:
     keys = {f"zone:{candidate.zone}", f"lane:{candidate.lane}"}
     if dependents_by_zone:
         keys.update(f"dependent-zone:{zone}" for zone in dependents_by_zone.get(candidate.zone, ()))
-    for zone in candidate.dependency_zones:
-        keys.add(f"dependency-zone:{zone}")
+    keys.update(f"dependency-zone:{zone}" for zone in candidate.dependency_zones)
     if candidate.path:
         keys.add(f"path:{candidate.path}")
     return tuple(sorted(keys))
@@ -100,19 +109,16 @@ def build_work_graph(model: RepositoryModel, *, limit: int = 128) -> WorkGraph:
 
     nodes: list[WorkNode] = []
     for candidate in candidates:
-        prerequisites: list[str] = []
+        prerequisites = set(candidate.prerequisite_ids)
         higher = best_prerequisite.get(candidate.zone)
         if candidate.lane not in {"repository-health", "architecture"} and higher is not None and higher.priority > candidate.priority:
-            prerequisites.append(higher.identity)
+            prerequisites.add(higher.identity)
         nodes.append(WorkNode(
-            identity=candidate.identity,
-            lane=candidate.lane,
-            zone=candidate.zone,
-            priority=candidate.priority,
-            objective=candidate.objective,
+            identity=candidate.identity, lane=candidate.lane, zone=candidate.zone,
+            priority=candidate.priority, objective=candidate.objective,
             conflict_keys=_conflicts(candidate, dependents_by_zone),
-            prerequisites=tuple(sorted(set(prerequisites))),
-            evidence=candidate.evidence,
+            prerequisites=tuple(sorted(prerequisites)), evidence=candidate.evidence,
             verification_paths=candidate.verification_paths,
+            readiness="ready" if not prerequisites else "gated",
         ))
     return WorkGraph(tuple(nodes))
