@@ -20,7 +20,7 @@ from core.principal_seal import (
     VerifiedPrincipal,
 )
 
-ROUTE_POLICY_CATALOG_VERSION = "2026-09-15.v2"
+ROUTE_POLICY_CATALOG_VERSION = "2026-10-03.v3"
 
 # Health/readiness may expose nested probe paths. Authentication bootstrap
 # endpoints are exact-only so future descendants cannot accidentally inherit
@@ -54,6 +54,7 @@ ROUTE_DOMAIN_RULES: tuple[RouteRule, ...] = (
     RouteRule("/api/playground", "code_execution"),
     RouteRule("/api/market", "market_intelligence"),
     RouteRule("/api/collab", "collaboration"),
+    RouteRule("/api/mirror-room", "learning"),
     RouteRule("/api/learning", "learning"),
     RouteRule("/api/academy", "learning"),
     RouteRule("/api/auth", "identity"),
