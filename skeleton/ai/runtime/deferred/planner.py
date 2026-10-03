@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import re
+import threading
 from typing import Any, Iterable, Mapping, Sequence
 
 from .contracts import canonical_json, sha256_json
@@ -349,6 +350,11 @@ class DeferredPlanExecutor:
         if not isinstance(executor, DeferredExecutor):
             raise TypeError("executor must be DeferredExecutor")
         self.executor = executor
+        self._lock = threading.RLock()
+        self._plan_digests: dict[str, str] = {}
+        self._in_flight: set[str] = set()
+        self._success: dict[str, DeferredPlanReceipt] = {}
+        self._failure: dict[str, DeferredPlanReceipt] = {}
 
     @staticmethod
     def _failure_digest(exc: BaseException) -> str:
@@ -365,45 +371,74 @@ class DeferredPlanExecutor:
         if not isinstance(plan, DeferredPlan):
             raise TypeError("plan must be DeferredPlan")
 
+        plan_digest=plan.digest
+        with self._lock:
+            prior_digest=self._plan_digests.get(plan.plan_id)
+            if prior_digest is not None and prior_digest!=plan_digest:
+                raise ValueError("plan identity collision")
+            if plan.plan_id in self._failure:
+                raise DeferredPlanExecutionError(self._failure[plan.plan_id])
+            if plan.plan_id in self._in_flight:
+                raise RuntimeError("plan is already in flight")
+            self._plan_digests[plan.plan_id]=plan_digest
+            self._in_flight.add(plan.plan_id)
+
         completed: list[tuple[str, str]] = []
         results: dict[str, Any] = {}
 
-        for step in plan.ordered_steps():
-            payload = step.payload()
-            try:
-                invocation = self.executor.prepare(
-                    step.volume_id,
-                    step.operation_id,
-                    payload,
-                    cost_units=step.cost_units,
-                    latency_ms=step.latency_ms,
-                )
-                outcome: ExecutionOutcome = self.executor.execute(
-                    invocation,
-                    payload,
-                )
-            except Exception as exc:
-                operation_receipt_digest = None
-                if isinstance(exc, DeferredExecutionError):
-                    operation_receipt_digest = exc.receipt.digest
-                receipt = DeferredPlanReceipt(
-                    plan_id=plan.plan_id,
-                    plan_digest=plan.digest,
-                    status="failed",
-                    completed=tuple(completed),
-                    failure_step_id=step.step_id,
-                    failure_digest=self._failure_digest(exc),
-                    operation_failure_receipt_digest=operation_receipt_digest,
-                )
-                raise DeferredPlanExecutionError(receipt) from exc
+        try:
+            for step in plan.ordered_steps():
+                payload = step.payload()
+                try:
+                    invocation = self.executor.prepare(
+                        step.volume_id,
+                        step.operation_id,
+                        payload,
+                        cost_units=step.cost_units,
+                        latency_ms=step.latency_ms,
+                    )
+                    outcome: ExecutionOutcome = self.executor.execute(
+                        invocation,
+                        payload,
+                    )
+                except Exception as exc:
+                    operation_receipt_digest = None
+                    if isinstance(exc, DeferredExecutionError):
+                        operation_receipt_digest = exc.receipt.digest
+                    receipt = DeferredPlanReceipt(
+                        plan_id=plan.plan_id,
+                        plan_digest=plan_digest,
+                        status="failed",
+                        completed=tuple(completed),
+                        failure_step_id=step.step_id,
+                        failure_digest=self._failure_digest(exc),
+                        operation_failure_receipt_digest=operation_receipt_digest,
+                    )
+                    with self._lock:
+                        self._failure[plan.plan_id]=receipt
+                    raise DeferredPlanExecutionError(receipt) from exc
 
-            completed.append((step.step_id, outcome.receipt.digest))
-            results[step.step_id] = outcome.result
+                completed.append((step.step_id, outcome.receipt.digest))
+                results[step.step_id] = outcome.result
 
-        receipt = DeferredPlanReceipt(
-            plan_id=plan.plan_id,
-            plan_digest=plan.digest,
-            status="succeeded",
-            completed=tuple(completed),
-        )
-        return DeferredPlanOutcome(receipt=receipt, results=results)
+            receipt = DeferredPlanReceipt(
+                plan_id=plan.plan_id,
+                plan_digest=plan_digest,
+                status="succeeded",
+                completed=tuple(completed),
+            )
+            with self._lock:
+                self._success[plan.plan_id]=receipt
+            return DeferredPlanOutcome(receipt=receipt, results=results)
+        finally:
+            with self._lock:
+                self._in_flight.discard(plan.plan_id)
+
+    def receipt(self, plan_id: str) -> DeferredPlanReceipt:
+        plan_id=_text(plan_id,"plan_id",max_length=256)
+        with self._lock:
+            if plan_id in self._success:
+                return self._success[plan_id]
+            if plan_id in self._failure:
+                return self._failure[plan_id]
+        raise KeyError("unknown plan id")
