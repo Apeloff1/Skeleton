@@ -9,13 +9,19 @@ from skeleton.ai.runtime.inference.developmental_eval import (
     DevelopmentalEvalSuite,
     DevelopmentalEvaluationError,
     evaluate_local_candidate_developmentally,
+    evaluate_training_receipt_developmentally,
 )
+from skeleton.ai.runtime.inference.artifact import load_local_model_artifact
 from skeleton.ai.runtime.inference.local import ReferenceNGramModel
 from skeleton.ai.runtime.inference.training_allocation import (
     TrainingAllocationPolicy,
     allocate_training_methods,
 )
-from skeleton.ai.runtime.inference.training_methods import TrainingMethod
+from skeleton.ai.runtime.inference.training_methods import (
+    TrainingExample,
+    TrainingMethod,
+    compile_training_plan,
+)
 
 
 def _write_reference_artifact(tmp_path, name: str, corpus: tuple[str, ...]):
@@ -66,11 +72,28 @@ def test_developmental_eval_measures_real_candidate_gain_and_feeds_allocator(
     )
     plan_digest = "a" * 64
 
-    report = evaluate_local_candidate_developmentally(
+    plan = compile_training_plan(
+        (
+            TrainingExample(
+                example_id="development-attribution",
+                prompt="color",
+                response="red",
+            ),
+        ),
+        methods=(TrainingMethod.SUPERVISED_INSTRUCTION,),
+    )
+    loaded_candidate = load_local_model_artifact(candidate_path)
+    candidate_receipt = {
+        "output_path": str(candidate_path),
+        "model_digest": loaded_candidate.receipt.model_digest,
+        "artifact_sha256": loaded_candidate.receipt.artifact_sha256,
+        "training_plan": plan.as_dict(),
+    }
+
+    report = evaluate_training_receipt_developmentally(
         baseline_path=baseline_path,
-        candidate_path=candidate_path,
+        candidate_receipt=candidate_receipt,
         suite=suite,
-        training_plan_digest=plan_digest,
         method=TrainingMethod.SUPERVISED_INSTRUCTION,
     )
 
@@ -86,7 +109,8 @@ def test_developmental_eval_measures_real_candidate_gain_and_feeds_allocator(
     assert observation.evaluation_class == "development"
     assert observation.validation_gain == 1.0
     assert observation.evaluation_digest == report.digest
-    assert observation.plan_digest == plan_digest
+    assert observation.plan_digest == plan.plan_digest
+    assert report.attribution_verified is True
 
     allocation = allocate_training_methods(
         (observation,),
@@ -144,3 +168,41 @@ def test_developmental_suite_rejects_ambiguous_required_forbidden_term() -> None
             required_terms=("safe",),
             forbidden_terms=("SAFE",),
         )
+
+
+def test_generic_developmental_comparison_cannot_feed_allocator(
+    tmp_path,
+) -> None:
+    baseline_path, _baseline = _write_reference_artifact(
+        tmp_path,
+        "diagnostic-baseline",
+        ("color blue",),
+    )
+    candidate_path, _candidate = _write_reference_artifact(
+        tmp_path,
+        "diagnostic-candidate",
+        ("color red",),
+    )
+    suite = DevelopmentalEvalSuite(
+        suite_id="diagnostic-only",
+        cases=(
+            DevelopmentalEvalCase(
+                case_id="diagnostic-case",
+                prompt="color",
+                required_terms=("red",),
+            ),
+        ),
+    )
+    report = evaluate_local_candidate_developmentally(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        suite=suite,
+        training_plan_digest="c" * 64,
+        method=TrainingMethod.SUPERVISED_INSTRUCTION,
+    )
+    assert report.attribution_verified is False
+    with pytest.raises(
+        DevelopmentalEvaluationError,
+        match="requires verified training-method attribution",
+    ):
+        report.allocation_observation()
