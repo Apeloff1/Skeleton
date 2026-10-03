@@ -307,6 +307,30 @@ independent verifier identity and evidence references suitable for the existing
 model lifecycle registry's CANDIDATE -> VALIDATED transition; lifecycle policy
 still owns that transition and later activation.
 
+### 20. Canonical model-program bridge
+
+The reverse trainer now enters the repository's existing model-development
+contracts instead of terminating at an ad-hoc product receipt. Every compiled
+multi-method plan exposes a deterministic corpus digest derived from the exact
+training document identities and content digests. The product/model-program
+bridge authenticates the written local artifact again, proves the receipt's
+model and artifact identities match the bytes, and maps the candidate into
+`skeleton.learning.model_program.ModelArtifact` and `TrainingReceipt`.
+The compiled-corpus digest becomes the canonical dataset digest for this
+reverse-training run.
+
+Promotion evidence is likewise typed rather than string-only. A
+`ModelPromotionReceipt` can be produced from a qualified bridge only when its
+candidate model, artifact and training-plan identities match and the model
+promotion verifier differs from the trainer, Mirror verifier and evaluation
+firewall evaluator. The receipt binds the learning qualification and
+model-program bridge digests into its evaluation references.
+
+This still does not mutate `AI_LOCAL_MODEL_PATH`. Model promotion evidence,
+runtime artifact selection and provider activation remain separate authorities,
+so the training system cannot silently self-activate a model merely because it
+trained or evaluated successfully.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -340,7 +364,10 @@ still owns that transition and later activation.
 - deterministic validation-gain-per-compute method allocation with promotion
   holdout exclusion;
 - exact training -> Mirror Room -> evaluation-firewall -> lifecycle evidence
-  reconciliation without production authority.
+  reconciliation without production authority;
+- compiled-corpus -> canonical ModelArtifact/TrainingReceipt conversion;
+- independently verified canonical ModelPromotionReceipt creation without
+  runtime self-activation.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
