@@ -20,6 +20,8 @@ import math
 import re
 from typing import Mapping, Sequence
 
+from .visual_learning import VisualTrainingObservation
+
 
 _MAX_EXAMPLES = 4_096
 _MAX_TEXT = 200_000
@@ -146,6 +148,7 @@ class TrainingExample:
     replay: bool = False
     camera_view_refs: tuple[str, ...] = ()
     camera_coverage_digest: str | None = None
+    visual_observations: tuple[VisualTrainingObservation, ...] = ()
     tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -225,7 +228,32 @@ class TrainingExample:
                 maximum=1.0,
             ),
         )
-        views = tuple(dict.fromkeys(str(item).strip() for item in self.camera_view_refs))
+        observations = tuple(self.visual_observations)
+        if any(
+            not isinstance(item, VisualTrainingObservation)
+            for item in observations
+        ):
+            raise TypeError(
+                "visual_observations must contain VisualTrainingObservation values"
+            )
+        observation_refs = tuple(item.camera_view_ref for item in observations)
+        if len(observation_refs) != len(set(observation_refs)):
+            raise TrainingMethodError(
+                "visual observations must have unique camera views"
+            )
+        if len(observations) > 2_048:
+            raise TrainingMethodError(
+                "visual_observations exceeds hard bound"
+            )
+        object.__setattr__(self, "visual_observations", observations)
+        views = tuple(
+            dict.fromkeys(
+                [
+                    *(str(item).strip() for item in self.camera_view_refs),
+                    *observation_refs,
+                ]
+            )
+        )
         if any(not item for item in views):
             raise TrainingMethodError(
                 "camera_view_refs must be non-empty normalized strings"
@@ -296,6 +324,9 @@ class TrainingExample:
                 "replay": self.replay,
                 "camera_view_refs": list(self.camera_view_refs),
                 "camera_coverage_digest": self.camera_coverage_digest,
+                "visual_observation_digests": [
+                    item.feature_digest for item in self.visual_observations
+                ],
                 "tags": list(self.tags),
             }
         )
@@ -421,6 +452,7 @@ class MultiMethodTrainingPlan:
     methods: tuple[MethodWeight, ...]
     source_example_digests: tuple[str, ...]
     camera_coverage_digests: tuple[str, ...]
+    visual_observation_digests: tuple[str, ...]
     efficiency_policy_digest: str
     dropped_duplicate_count: int
     dropped_budget_count: int
@@ -490,6 +522,9 @@ class MultiMethodTrainingPlan:
             ],
             "source_example_digests": list(self.source_example_digests),
             "camera_coverage_digests": list(self.camera_coverage_digests),
+            "visual_observation_digests": list(
+                self.visual_observation_digests
+            ),
             "document_ids": [item.document_id for item in self.documents],
             "document_count": len(self.documents),
             "corpus_digest": self.corpus_digest,
@@ -755,17 +790,40 @@ def _multiview(
 ) -> tuple[tuple[str, Mapping[str, object]], ...]:
     if not example.camera_view_refs:
         return ()
+    observations = {
+        item.camera_view_ref: item
+        for item in example.visual_observations
+    }
     rows: list[tuple[str, Mapping[str, object]]] = []
     for view_ref in example.camera_view_refs[:limit]:
+        observation = observations.get(view_ref)
+        visual_text = (
+            ""
+            if observation is None
+            else observation.training_text() + "\n"
+        )
+        metadata: dict[str, object] = {
+            "camera_view_ref": view_ref,
+        }
+        if observation is not None:
+            metadata.update(
+                {
+                    "visual_observation_ref": observation.reference,
+                    "visual_feature_digest": observation.feature_digest,
+                    "visual_asset_digest": observation.asset_digest,
+                }
+            )
         rows.append(
             (
                 "<|camera_view|>\n"
                 + view_ref
-                + "\n<|user|>\n"
+                + "\n"
+                + visual_text
+                + "<|user|>\n"
                 + example.prompt
                 + "\n<|grounded_target|>\n"
                 + example.response,
-                {"camera_view_ref": view_ref},
+                metadata,
             )
         )
     return tuple(rows)
@@ -1079,6 +1137,15 @@ def compile_training_plan(
             }
         )
     )
+    visual_observation_digests = tuple(
+        sorted(
+            {
+                observation.feature_digest
+                for item in rows
+                for observation in item.visual_observations
+            }
+        )
+    )
     plan_payload = {
         "schema_version": "skeleton.multi_method_training_plan.v1",
         "methods": [
@@ -1090,6 +1157,9 @@ def compile_training_plan(
         ],
         "source_example_digests": list(source_digests),
         "camera_coverage_digests": list(camera_coverage_digests),
+        "visual_observation_digests": list(
+            visual_observation_digests
+        ),
         "efficiency_policy_digest": actual.digest,
         "document_ids": [item.document_id for item in emitted],
         "corpus_digest": _digest(
@@ -1114,6 +1184,7 @@ def compile_training_plan(
         methods=configured,
         source_example_digests=source_digests,
         camera_coverage_digests=camera_coverage_digests,
+        visual_observation_digests=visual_observation_digests,
         efficiency_policy_digest=actual.digest,
         dropped_duplicate_count=dropped_duplicate,
         dropped_budget_count=dropped_budget,
