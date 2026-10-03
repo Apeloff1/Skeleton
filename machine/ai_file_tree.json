@@ -2122,8 +2122,8 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "9080deea277fd96dfdcfc8697682afc075f2f036",
-      "role": "Canonical engine-neutral intent compiler and reversible design-edit surface under skeleton/forge/creator; mirrored exactly into AI Forge.",
+      "source_git_object_sha": "d4e8468d645159d658d2706a6829e04197205530",
+      "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
         "WP-W27"

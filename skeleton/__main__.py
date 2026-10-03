@@ -16,6 +16,7 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
+    creator     Canonical typed creator command surface (create/edit/test/preview/export)
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -460,6 +461,33 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
     return 0 if payload.get("succeeded") else 1
 
 
+
+def _cmd_creator(rest: List[str]) -> int:
+    """Compile one CLI creator request into the canonical B014 envelope."""
+    from skeleton.forge.creator.command_surface import (
+        CreatorCommandError,
+        creator_cli_payload,
+    )
+
+    try:
+        payload = creator_cli_payload(rest)
+    except CreatorCommandError as exc:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": exc.code,
+                    "message": str(exc),
+                    "context": dict(getattr(exc, "context", {})),
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def _cmd_test(_rest: List[str]) -> int:
     """Run the configured pytest suite, with unittest discovery as a fallback."""
     try:
@@ -503,6 +531,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
+    if cmd == "creator": return _cmd_creator(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
