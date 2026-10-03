@@ -137,6 +137,34 @@ def test_mcp_request_routing_headers():
     }
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("request_id", "req\u202e1"),
+        ("method", "tools/\u200bcall"),
+        ("name", "pyth\u043en"),
+    ),
+)
+def test_mcp_request_rejects_unicode_spoofing_in_routing_identity(
+    field,
+    value,
+):
+    values = {
+        "request_id": "request-1",
+        "method": "tools/call",
+        "name": "python",
+        "arguments": {},
+    }
+    values[field] = value
+    with pytest.raises(ValueError):
+        MCPRequestEnvelope(**values)
+
+
+def test_mcp_principal_rejects_confusable_unicode_identity():
+    with pytest.raises(ValueError, match="ASCII"):
+        MCPPrincipalPolicy("adm\u0456n")
+
+
 def test_mcp_request_copies_arguments():
     args = {"args": ["-V"]}
     request = MCPRequestEnvelope("r", "tools/call", "python", args)
@@ -322,6 +350,7 @@ def test_mcp_gateway_discovery_hides_tools_from_unknown_principal():
     assert response.ok
     assert response.result["protocolRevision"] == MCP_PROTOCOL_REVISION
     assert response.result["tools"] == []
+    assert response.result["cacheScope"] == "private"
 
 
 def test_mcp_gateway_discovery_exposes_only_authorized_tools():
@@ -335,6 +364,7 @@ def test_mcp_gateway_discovery_exposes_only_authorized_tools():
     gateway = MCPAIShellGateway(surface(), auth)
     response = gateway.list_tools(principal="alice")
     assert [item["name"] for item in response.result["tools"]] == ["python"]
+    assert response.result["cacheScope"] == "private"
 
 
 def test_mcp_gateway_discovery_respects_denylist():
@@ -348,6 +378,16 @@ def test_mcp_gateway_discovery_respects_denylist():
     gateway = MCPAIShellGateway(surface(), auth)
     response = gateway.list_tools(principal="alice")
     assert response.result["tools"] == []
+    assert response.result["cacheScope"] == "private"
+
+
+def test_mcp_surface_filter_digest_is_scoped_to_visible_tools():
+    tools = surface()
+    full = tools.list_tools()
+    hidden = tools.list_tools(allowed_names=(), cache_scope="private")
+    assert full.digest != hidden.digest
+    assert hidden.tools == ()
+    assert hidden.cache_scope == "private"
 
 
 def test_mcp_task_create_is_pending():

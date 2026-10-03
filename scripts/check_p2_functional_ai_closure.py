@@ -85,6 +85,30 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
     if manifest.get("claim_scope") != "provider_independent_functional_ai_frontier":
         errors.append("functional closure claim scope drift")
 
+    claim_limits = manifest.get("claim_limits")
+    if not isinstance(claim_limits, dict):
+        errors.append("functional closure claim_limits missing")
+        claim_limits = {}
+    required_true_claims = (
+        "provider_independent_execution_proven",
+        "advanced_claim_requires_digest_bound_model_eval",
+    )
+    required_false_claims = (
+        "advanced_model_capability_proven",
+        "general_intelligence_proven",
+        "superintelligence_proven",
+        "reference_model_is_quality_target",
+        "remaining_p2_capability_volumes_complete",
+    )
+    for key in required_true_claims:
+        if claim_limits.get(key) is not True:
+            errors.append(f"claim limit {key} must be true")
+    for key in required_false_claims:
+        if claim_limits.get(key) is not False:
+            errors.append(f"claim limit {key} must be false")
+    if claim_limits.get("local_reference_model_kind") != "reference_ngram":
+        errors.append("local reference model kind must remain reference_ngram")
+
     if p1.get("status") != "closed":
         errors.append("P1 terminal authority must be closed")
     if tranche.get("status") != "activated":
@@ -309,6 +333,7 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
         "provider_independent": not any(
             "hosted-provider marker" in error for error in errors
         ),
+        "claim_limits": dict(claim_limits),
         "production_local_weights_runtime": not any(
             "llama.cpp local runtime" in error for error in errors
         ),

@@ -46,9 +46,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_scoped_capability_security_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/jeeves/agent/tools.py",
+        "code:skeleton/jeeves/agent/epistemic_tool_gate.py",
+        "test:skeleton/testing/test_jeeves_epistemic_tool_gate.py",
+        "test:skeleton/testing/test_privileged_tool_transaction.py",
+        "workflow:P0 Capability Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-019",
       "completion_checkbox": false,
@@ -114,11 +120,12 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_rejecting_unicode_identity_boundary_pending_exact_head_ci",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
         "code:skeleton/shells/ai/mcp_authz.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-010",
@@ -148,11 +155,12 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_rejecting_unicode_identity_boundary_pending_exact_head_ci",
+      "disposition": "implemented_unicode_authority_and_routing_identity_boundary_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/security/text_identity.py",
         "code:skeleton/shells/ai/mcp_authz.py",
-        "workflow:P0 Unicode Authority Identity"
+        "workflow:P0 Unicode Authority Identity",
+        "workflow:P0 Unicode Identity Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-009",
@@ -279,9 +287,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_context_non_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-001",
       "completion_checkbox": false,
@@ -308,9 +321,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_tool_output_non_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-002",
       "completion_checkbox": false,
@@ -338,12 +356,15 @@
         "integration"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_fail_closed_policy_retention_pending_exact_head_ci",
+      "disposition": "implemented_policy_retention_and_context_pressure_proof_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/context/compiler.py",
         "code:skeleton/context/compaction.py",
         "test:skeleton/testing/test_context_compiler.py",
-        "workflow:P0 Policy Context Retention"
+        "workflow:P0 Policy Context Retention",
+        "code:skeleton/memory/guarded_compaction.py",
+        "test:skeleton/testing/test_guarded_compaction.py",
+        "workflow:P0 Policy Retention Under Context Pressure"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-013",
@@ -371,9 +392,14 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_registry_backed_approval_authority_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/observation.py",
+        "code:skeleton/shells/ai/approval.py",
+        "workflow:P0 AI Authority Boundary"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-AI-030",
       "completion_checkbox": false,
@@ -433,9 +459,14 @@
         "adversarial",
         "negative_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_strict_canonical_signing_bytes_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/contracts/canonical.py",
+        "mirror:skeleton/ai/runtime/contracts/canonical.py",
+        "test:skeleton/testing/test_canonical_contract_security.py",
+        "workflow:P0 Canonical Signing Bytes"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-CONTRACT-020",
       "completion_checkbox": false,
@@ -462,9 +493,13 @@
         "recovery_drill",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-005",
       "completion_checkbox": false,
@@ -492,9 +527,13 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-006",
       "completion_checkbox": false,
@@ -522,9 +561,13 @@
         "integration",
         "adversarial_eval"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_archive_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-007",
       "completion_checkbox": false,
@@ -712,11 +755,21 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_credential_aware_observation_redaction_pending_exact_head_ci",
+      "disposition": "implemented_credential_aware_secret_safe_observability_and_error_redaction_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/observation_policy.py",
         "code:skeleton/sandbox/sanitizers.py",
-        "workflow:P0 Observation Secret Redaction"
+        "workflow:P0 Observation Secret Redaction",
+        "code:skeleton/observability/redaction.py",
+        "mirror:skeleton/ai/runtime/observability/redaction.py",
+        "test:tests/test_observability.py",
+        "test:skeleton/testing/test_frontier_observability_correlation.py",
+        "workflow:P0 Secret Observability Evidence",
+        "code:skeleton/shells/redaction.py",
+        "test:tests/test_api_gateway_error_redaction.py",
+        "test:tests/test_orchestration_error_redaction.py",
+        "test:tests/test_app_error_redaction.py",
+        "workflow:P0 Secret Error Redaction Evidence"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-015",
@@ -742,13 +795,16 @@
         "negative_test"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_process_boundary_pending_exact_head_ci",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-016",
@@ -809,9 +865,18 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_safe_policy_and_least_privilege_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/policy_engine.py",
+        "mirror:skeleton/ai/runtime/security/policy_engine.py",
+        "code:skeleton/jeeves/agent/tools.py",
+        "code:skeleton/jeeves/agent/epistemic_tool_gate.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_security_policy_engine_fail_closed.py",
+        "workflow:P0 Saltzer Schroeder Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-020",
       "completion_checkbox": false,
@@ -840,13 +905,16 @@
         "integration"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_curated_discovery_pending_exact_head_ci",
+      "disposition": "implemented_curated_and_principal_scoped_capability_discovery_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/ai/catalog.py",
         "code:skeleton/shells/ai/mcp.py",
         "code:skeleton/shells/ai/mcp_gateway.py",
         "test:skeleton/testing/test_shell_ai_mcp_2026.py",
-        "workflow:P0 Tool Discovery Authority"
+        "workflow:P0 Tool Discovery Authority",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "mirror:skeleton/ai/shell",
+        "workflow:P0 Capability Discovery Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-OBSCURE-025",
@@ -902,9 +970,13 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_symlink_escape_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Rooted Filesystem Race Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-002",
       "completion_checkbox": false,
@@ -930,9 +1002,13 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_inode_hardlink_rejection_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Hardlink Alias Security"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-003",
       "completion_checkbox": false,
@@ -1076,9 +1152,13 @@
         "negative_test",
         "platform_test"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_temp_race_fail_closed_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/rooted_fs.py",
+        "test:skeleton/testing/test_security_rooted_fs.py",
+        "workflow:P0 Rooted Filesystem Race Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-017",
       "completion_checkbox": false,
@@ -1104,13 +1184,16 @@
         "property"
       ],
       "status": "evidence_pending",
-      "disposition": "implemented_process_boundary_pending_exact_head_ci",
+      "disposition": "implemented_process_boundary_and_trusted_environment_pending_exact_head_ci",
       "evidence": [
         "code:skeleton/shells/environment.py",
         "code:skeleton/shells/registry.py",
         "code:skeleton/shells/runner.py",
         "test:skeleton/testing/test_shell_runner.py",
-        "workflow:P0 Process Boundary Evidence"
+        "workflow:P0 Process Boundary Evidence",
+        "code:skeleton/sandbox/process.py",
+        "test:skeleton/testing/test_sandbox_isolation.py",
+        "workflow:P0 Process Environment Boundary"
       ],
       "accepted_risk": null,
       "accountability_id": "ACC-EDGE-SEC-019",
@@ -1137,9 +1220,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_dual_axis_information_policy_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "test:skeleton/testing/test_p0_information_flow_models.py",
+        "test:skeleton/testing/test_shell_ai_context_planner.py",
+        "workflow:P0 Information Flow Model Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-021",
       "completion_checkbox": false,

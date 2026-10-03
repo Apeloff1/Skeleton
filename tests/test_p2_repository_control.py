@@ -248,12 +248,17 @@ class P2RepositoryControlTests(unittest.TestCase):
 
     def test_rejects_manual_completion_inflation(self) -> None:
         root = self._fixture()
-        path, data = self._load(root, "machine/completion_model.json")
-        incomplete = next(
-            item for item in data["atomic_tasks"]
-            if item["derived_state"] == "incomplete"
+        path, data = self._load(root, "machine/ai_build_accountability.json")
+        record = next(
+            item
+            for item in data["records"]
+            if item.get("type") == "queue_task"
+            and item.get("checkbox") is True
+            and item.get("implementation_signoff", {}).get("signed") is True
+            and item.get("verification_signoff", {}).get("signed") is True
+            and item.get("evidence")
         )
-        incomplete["derived_state"] = "verified_atomic"
+        record["checkbox"] = False
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(
             MODULE.RepositoryControlError,

@@ -35705,7 +35705,7 @@
       },
       {
         "task_id": "AIQ-S0-COST-02",
-        "status": "in_progress",
+        "status": "done",
         "stage": 0,
         "task_dependencies": [
           "AIQ-S0-COST-01"
@@ -35724,7 +35724,7 @@
       },
       {
         "task_id": "AIQ-S0-COST-03",
-        "status": "pending",
+        "status": "done",
         "stage": 0,
         "task_dependencies": [
           "AIQ-S0-COST-01"
@@ -35805,7 +35805,7 @@
       },
       {
         "task_id": "AIQ-S0-PROV-01",
-        "status": "pending",
+        "status": "done",
         "stage": 0,
         "task_dependencies": [],
         "closure_dependencies": [],
@@ -35821,7 +35821,7 @@
       },
       {
         "task_id": "AIQ-S0-PROV-02",
-        "status": "pending",
+        "status": "done",
         "stage": 0,
         "task_dependencies": [
           "AIQ-S0-PROV-01"
@@ -35842,7 +35842,7 @@
       },
       {
         "task_id": "AIQ-S0-PROV-03",
-        "status": "pending",
+        "status": "done",
         "stage": 0,
         "task_dependencies": [
           "AIQ-S0-PROV-02"
@@ -35925,7 +35925,7 @@
       },
       {
         "task_id": "AIQ-S1-CONV-01",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -35948,7 +35948,7 @@
       },
       {
         "task_id": "AIQ-S1-CONV-02",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-CONV-01"
@@ -35971,7 +35971,7 @@
       },
       {
         "task_id": "AIQ-S1-CONV-03",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-CONV-02"
@@ -35994,7 +35994,7 @@
       },
       {
         "task_id": "AIQ-S1-MEM-01",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36015,7 +36015,7 @@
       },
       {
         "task_id": "AIQ-S1-MEM-02",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-MEM-01"
@@ -36038,7 +36038,7 @@
       },
       {
         "task_id": "AIQ-S1-MEM-03",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-MEM-02"
@@ -36061,7 +36061,7 @@
       },
       {
         "task_id": "AIQ-S1-TOOL-01",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36082,7 +36082,7 @@
       },
       {
         "task_id": "AIQ-S1-TOOL-02",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-TOOL-01"
@@ -36105,7 +36105,7 @@
       },
       {
         "task_id": "AIQ-S1-TOOL-03",
-        "status": "pending",
+        "status": "done",
         "stage": 1,
         "task_dependencies": [
           "AIQ-S1-TOOL-02"
@@ -36128,7 +36128,7 @@
       },
       {
         "task_id": "AIQ-S2-CTX-01",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36149,7 +36149,7 @@
       },
       {
         "task_id": "AIQ-S2-CTX-02",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [
           "AIQ-S2-CTX-01"
@@ -36173,7 +36173,7 @@
       },
       {
         "task_id": "AIQ-S2-CTX-03",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [
           "AIQ-S2-CTX-02"
@@ -36196,7 +36196,7 @@
       },
       {
         "task_id": "AIQ-S2-PROTO-01",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36217,7 +36217,7 @@
       },
       {
         "task_id": "AIQ-S2-PROTO-02",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [
           "AIQ-S2-PROTO-01"
@@ -36239,7 +36239,7 @@
       },
       {
         "task_id": "AIQ-S2-PROTO-03",
-        "status": "pending",
+        "status": "done",
         "stage": 2,
         "task_dependencies": [
           "AIQ-S2-PROTO-02"
@@ -36261,7 +36261,7 @@
       },
       {
         "task_id": "AIQ-S3-VER-01",
-        "status": "pending",
+        "status": "done",
         "stage": 3,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36282,7 +36282,7 @@
       },
       {
         "task_id": "AIQ-S3-VER-02",
-        "status": "pending",
+        "status": "done",
         "stage": 3,
         "task_dependencies": [
           "AIQ-S3-VER-01"
@@ -36306,7 +36306,7 @@
       },
       {
         "task_id": "AIQ-S3-VER-03",
-        "status": "pending",
+        "status": "done",
         "stage": 3,
         "task_dependencies": [
           "AIQ-S3-VER-02"
@@ -36328,7 +36328,7 @@
       },
       {
         "task_id": "AIQ-S4-EXEC-01",
-        "status": "pending",
+        "status": "done",
         "stage": 4,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36353,7 +36353,7 @@
       },
       {
         "task_id": "AIQ-S4-EXEC-02",
-        "status": "pending",
+        "status": "done",
         "stage": 4,
         "task_dependencies": [
           "AIQ-S4-EXEC-01"
@@ -36379,7 +36379,7 @@
       },
       {
         "task_id": "AIQ-S4-EXEC-03",
-        "status": "pending",
+        "status": "done",
         "stage": 4,
         "task_dependencies": [
           "AIQ-S4-EXEC-02"
@@ -36406,7 +36406,7 @@
       },
       {
         "task_id": "AIQ-S5-ENG-01",
-        "status": "pending",
+        "status": "done",
         "stage": 5,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36428,7 +36428,7 @@
       },
       {
         "task_id": "AIQ-S5-ENG-02",
-        "status": "pending",
+        "status": "done",
         "stage": 5,
         "task_dependencies": [
           "AIQ-S5-ENG-01"
@@ -36452,7 +36452,7 @@
       },
       {
         "task_id": "AIQ-S5-ENG-03",
-        "status": "pending",
+        "status": "done",
         "stage": 5,
         "task_dependencies": [
           "AIQ-S5-ENG-02"
@@ -36477,7 +36477,7 @@
       },
       {
         "task_id": "AIQ-S6-STREAM-01",
-        "status": "pending",
+        "status": "done",
         "stage": 6,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36497,7 +36497,7 @@
       },
       {
         "task_id": "AIQ-S6-STREAM-02",
-        "status": "pending",
+        "status": "done",
         "stage": 6,
         "task_dependencies": [
           "AIQ-S6-STREAM-01"
@@ -36520,7 +36520,7 @@
       },
       {
         "task_id": "AIQ-S6-STREAM-03",
-        "status": "pending",
+        "status": "done",
         "stage": 6,
         "task_dependencies": [
           "AIQ-S6-STREAM-02"
@@ -36543,7 +36543,7 @@
       },
       {
         "task_id": "AIQ-S7-E2E-01",
-        "status": "pending",
+        "status": "done",
         "stage": 7,
         "task_dependencies": [],
         "closure_dependencies": [
@@ -36585,7 +36585,7 @@
       },
       {
         "task_id": "AIQ-S7-E2E-02",
-        "status": "pending",
+        "status": "done",
         "stage": 7,
         "task_dependencies": [
           "AIQ-S7-E2E-01"
@@ -36626,7 +36626,7 @@
       },
       {
         "task_id": "AIQ-S7-E2E-03",
-        "status": "pending",
+        "status": "done",
         "stage": 7,
         "task_dependencies": [
           "AIQ-S7-E2E-02"

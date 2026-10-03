@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "93c5d0388426c665f0ee6753ebefa7967a40ef66",
+      "source_git_object_sha": "a63aacb8a16e298ef784fe203d97201f88bfbbd0",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
@@ -643,7 +643,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "6934c1f9b267ce23340110e4dc40bed60186d6a7",
+      "source_git_object_sha": "7e44316f165d95ee6c2148fb5ade2aa36668313e",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "5846f80f36f8e9b9e159585f0624c64e793dd2ec",
+      "source_git_object_sha": "f3299a9a20df339b4161bf23a563e5b7eb8625c9",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -2677,7 +2677,7 @@
       "source": "skeleton/shells/ai",
       "destination": "skeleton/ai/shell",
       "kind": "tree",
-      "source_git_object_sha": "8dc533185a81f0653e10f718a3e763cf3d72bc54",
+      "source_git_object_sha": "b19ef6e0c3139eeefd6d13e5c53cf97bf724f3e2",
       "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
       "work_package_refs": [
         "WP-W03",
@@ -4880,7 +4880,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
-      "source_git_object_sha": "4d95d4f4939919ddac2f2cc5f895b0a1dfd1b18c"
+      "source_git_object_sha": "90d13b5535593ffd5ff55f244725665f9bd5896a"
     }
   ],
   "ci_enforcement": {

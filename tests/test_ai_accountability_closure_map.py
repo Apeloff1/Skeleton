@@ -190,3 +190,36 @@ def test_bridge_rejects_workflow_that_detaches_declared_verifier(
         and "does not execute scripts/verify_jeeves_conversation_cutover.py" in error
         for error in receipt["errors"]
     )
+
+
+def test_bridge_rejects_group_without_expected_receipt_verifier(
+    tmp_path: Path,
+) -> None:
+    root = _copy_bridge_tree(tmp_path)
+    path = root / MAP.relative_to(ROOT)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    group = next(item for item in payload["groups"] if item["key"] == "S2-CTX")
+    group["expected_receipt_verifier"] = ""
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "S2-CTX: expected_receipt_verifier is required" in receipt["errors"]
+
+
+def test_bridge_rejects_verifier_script_digest_drift(tmp_path: Path) -> None:
+    root = _copy_bridge_tree(tmp_path)
+    verifier = root / "scripts/verify_context_compiler_closure.py"
+    verifier.write_text(
+        verifier.read_text(encoding="utf-8") + "\n# unexpected drift\n",
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "S2-CTX: verifier script digest drift" in error
+        for error in receipt["errors"]
+    )

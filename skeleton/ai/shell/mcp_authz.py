@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import threading
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from skeleton.security.text_identity import (
     TextIdentityError,
-    require_security_identifier,
+    require_authority_identifier,
 )
 
 
@@ -22,17 +22,17 @@ class MCPPrincipalPolicy:
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        principal = require_security_identifier(
+        principal = require_authority_identifier(
             self.principal,
             field="MCP principal",
             max_length=256,
         )
         allowed = frozenset(
-            require_security_identifier(tool, field="MCP tool", max_length=256)
+            require_authority_identifier(tool, field="MCP tool", max_length=256)
             for tool in self.allowed_tools
         )
         denied = frozenset(
-            require_security_identifier(tool, field="MCP tool", max_length=256)
+            require_authority_identifier(tool, field="MCP tool", max_length=256)
             for tool in self.denied_tools
         )
         if allowed & denied:
@@ -46,7 +46,7 @@ class MCPPrincipalPolicy:
         object.__setattr__(self, "metadata", MappingProxyType(metadata))
 
     def allows(self, tool: str) -> bool:
-        tool = require_security_identifier(tool, field="MCP tool", max_length=256)
+        tool = require_authority_identifier(tool, field="MCP tool", max_length=256)
         if tool in self.denied_tools:
             return False
         return not self.allowed_tools or tool in self.allowed_tools
@@ -86,6 +86,38 @@ class MCPAuthorization:
         with self._lock:
             return self._items.pop(principal, None) is not None
 
+    def visible_tools(
+        self,
+        principal: str,
+        tools: Iterable[str],
+    ) -> tuple[str, ...]:
+        """Return only capabilities visible to a registered principal."""
+        try:
+            principal = require_authority_identifier(
+                principal,
+                field="MCP principal",
+                max_length=256,
+            )
+        except TextIdentityError:
+            return ()
+        with self._lock:
+            policy = self._items.get(principal)
+        if policy is None:
+            return ()
+        visible: list[str] = []
+        for tool in tools:
+            try:
+                tool = require_authority_identifier(
+                    tool,
+                    field="MCP tool",
+                    max_length=256,
+                )
+            except TextIdentityError:
+                continue
+            if policy.allows(tool):
+                visible.append(tool)
+        return tuple(visible)
+
     def inspect(
         self,
         principal: str,
@@ -94,12 +126,12 @@ class MCPAuthorization:
         timeout_seconds: float | None = None,
     ) -> MCPAuthorizationDecision:
         try:
-            principal = require_security_identifier(
+            principal = require_authority_identifier(
                 principal,
                 field="MCP principal",
                 max_length=256,
             )
-            tool = require_security_identifier(tool, field="MCP tool", max_length=256)
+            tool = require_authority_identifier(tool, field="MCP tool", max_length=256)
         except TextIdentityError as exc:
             return MCPAuthorizationDecision(
                 False,

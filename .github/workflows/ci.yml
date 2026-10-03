@@ -20,14 +20,15 @@ on:
       - '!**/*.md'
       - '!.github/workflows/**'
       - '.github/workflows/ci.yml'
+  workflow_dispatch:
 
 # Collapse superseded validation for the same PR so rapid pushes do not occupy
-# runner capacity with stale commits. Pushes to main/develop queue behind the
-# active run instead of cancelling it, so every landed commit gets a verdict.
+# runner capacity with stale commits. Non-PR runs use a per-commit group so a
+# later main/develop push cannot replace an earlier pending commit.
 # Workflow name keeps unrelated pipelines isolated while PR number/ref scopes
 # cancellation to one change set.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

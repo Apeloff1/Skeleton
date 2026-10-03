@@ -14,7 +14,7 @@ from skeleton.shells.ai.context_provenance import (
 @dataclass(frozen=True)
 class ContextPolicy:
     allow_confidential: bool = False
-    allow_untrusted: bool = True
+    allow_untrusted: bool = False
     max_items: int = 128
     max_total_bytes: int = 131072
     max_untrusted_bytes: int = 32768
