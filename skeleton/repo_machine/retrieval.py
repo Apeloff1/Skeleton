@@ -81,6 +81,37 @@ class RepositoryRetrievalIndex:
             for term in tokens:
                 self._add(term, record.path)
 
+    def related(self, path: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+        """Return files sharing indexed metadata with a known path."""
+        if path not in self._records:
+            return ()
+        record = self._records[path]
+        terms = self._path_tokens[path]
+        candidates: set[str] = set()
+        for term in terms:
+            candidates.update(self._postings.get(term, ()))
+        candidates.discard(path)
+        hits = []
+        for candidate in candidates:
+            other = self._records[candidate]
+            overlap = len(terms.intersection(self._path_tokens[candidate]))
+            score = overlap * 10
+            if other.zone == record.zone:
+                score += 25
+            if other.kind == record.kind:
+                score += 5
+            hits.append(SearchHit(
+                path=other.path,
+                zone=other.zone,
+                kind=other.kind,
+                language=other.language,
+                score=score,
+                matched_terms=tuple(sorted(terms.intersection(self._path_tokens[candidate]))),
+                reasons=("shared indexed metadata",),
+            ))
+        hits.sort(key=lambda item: (-item.score, item.zone, item.path))
+        return tuple(hits[:limit])
+
     def search(
         self,
         query: str,
