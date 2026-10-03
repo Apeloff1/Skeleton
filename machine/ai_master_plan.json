@@ -8014,10 +8014,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/data"
+        "skeleton/data",
+        "skeleton/data/ingestion.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_data_ingestion.py"
+        "skeleton/testing/test_data_ingestion.py"
       ],
       "evaluations": [
         "planned:malformed/replayed ingestion corpus"
@@ -8061,10 +8062,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "planned:skeleton/document"
+        "planned:skeleton/document",
+        "skeleton/data/document_intelligence.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_document_intelligence.py"
+        "skeleton/testing/test_document_intelligence.py"
       ],
       "evaluations": [
         "planned:layout/OCR adversarial corpus"
@@ -8108,10 +8110,11 @@
       ],
       "implementation_paths": [
         "skeleton/persistence",
-        "machine"
+        "machine",
+        "skeleton/data/lineage_governance.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_data_lineage.py"
+        "skeleton/testing/test_data_lineage.py"
       ],
       "evaluations": [
         "planned:deletion propagation evaluation"
@@ -8155,10 +8158,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/data/quality.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_data_quality.py"
+        "skeleton/testing/test_data_quality.py"
       ],
       "evaluations": [
         "planned:drift/anomaly benchmark"
@@ -8202,10 +8206,11 @@
       ],
       "implementation_paths": [
         "machine",
-        "datasets"
+        "datasets",
+        "skeleton/data/dataset_registry.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_dataset_registry.py"
+        "skeleton/testing/test_dataset_registry.py"
       ],
       "evaluations": [
         "planned:dataset fingerprint reproducibility"
@@ -8249,10 +8254,11 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "experiments"
+        "experiments",
+        "skeleton/data/synthetic.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_synthetic_data_factory.py"
+        "skeleton/testing/test_synthetic_data_factory.py"
       ],
       "evaluations": [
         "planned:memorization/leakage evaluation"
