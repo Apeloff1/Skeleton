@@ -515,7 +515,7 @@ class AdmissionRuntime:
         else:
             if shared_lease is None:
                 raise AdmissionRuntimeError(
-                    "shared pressure reattach requires durable lease metadata"
+                    "shared_pressure_reattach_requires_durable_lease_metadata"
                 )
             if (
                 shared_lease.scope != self.shared_pressure_scope
