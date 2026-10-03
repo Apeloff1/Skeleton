@@ -2415,6 +2415,7 @@ class CostGovernor:
             raise TypeError("fallback must be SafeCostFallback")
         requested_digest = _request_digest(request)
         persisted: _CostJournalRecord | None = None
+        admission_intent: _AdmissionIntentJournal | None = None
 
         with self._lock:
             current = self._active.get(request.operation_id)
@@ -2427,6 +2428,9 @@ class CostGovernor:
 
             if self._journal is not None:
                 persisted = self._journal.load(request.operation_id)
+                admission_intent = self._journal.load_admission_intent(
+                    request.operation_id
+                )
                 if persisted is not None:
                     if persisted.requested_request_digest != requested_digest:
                         raise CostGovernorConflict(
@@ -2479,13 +2483,52 @@ class CostGovernor:
                             budget=request.budget,
                         )
                     )
+                    if admission_intent is not None:
+                        self._journal.clear_admission_intent(
+                            request.operation_id
+                        )
                     return receipt
+
+                if admission_intent is not None:
+                    recovered = self._recover_admission_intent(
+                        request,
+                        fallback,
+                        admission_intent,
+                        now_wall=now_wall,
+                    )
+                    if recovered is not None:
+                        return recovered
+                    admission_intent = None
+
+            decision_sink = None
+            if self._journal is not None:
+                direct_intent = self._admission_intent(
+                    requested=request,
+                    selected=request,
+                    fallback=None,
+                    fallback_reason=None,
+                )
+                self._journal.begin_admission_intent(
+                    direct_intent
+                )
+
+                def decision_sink(
+                    decision: AdmissionDecision,
+                    admitted_at: float,
+                ) -> None:
+                    assert self._journal is not None
+                    self._journal.record_admission_decision(
+                        request.operation_id,
+                        decision,
+                        admitted_at,
+                    )
 
             try:
                 lease = self.runtime.admit(
                     request,
                     now_monotonic=now_monotonic,
                     now_wall=now_wall,
+                    decision_sink=decision_sink,
                 )
                 receipt = self._receipt(
                     requested=request,
@@ -2496,6 +2539,11 @@ class CostGovernor:
                 )
             except AdmissionError as original_exc:
                 reason = str(original_exc)
+                if self._journal is not None:
+                    self._clear_failed_admission_intent(
+                        request,
+                        now_wall=now_wall,
+                    )
                 if fallback is None:
                     raise CostGovernorDenied(reason) from original_exc
                 if not _fallback_reason_allowed(
@@ -2507,13 +2555,41 @@ class CostGovernor:
                     request,
                     fallback,
                 )
+                fallback_sink = None
+                if self._journal is not None:
+                    fallback_intent = self._admission_intent(
+                        requested=request,
+                        selected=selected,
+                        fallback=fallback,
+                        fallback_reason=reason,
+                    )
+                    self._journal.begin_admission_intent(
+                        fallback_intent
+                    )
+
+                    def fallback_sink(
+                        decision: AdmissionDecision,
+                        admitted_at: float,
+                    ) -> None:
+                        assert self._journal is not None
+                        self._journal.record_admission_decision(
+                            request.operation_id,
+                            decision,
+                            admitted_at,
+                        )
                 try:
                     lease = self.runtime.admit(
                         selected,
                         now_monotonic=now_monotonic,
                         now_wall=now_wall,
+                        decision_sink=fallback_sink,
                     )
                 except AdmissionError as fallback_exc:
+                    if self._journal is not None:
+                        self._clear_failed_admission_intent(
+                            selected,
+                            now_wall=now_wall,
+                        )
                     raise CostGovernorDenied(
                         f"declared_cost_fallback_denied:{fallback_exc}"
                     ) from fallback_exc
@@ -2566,6 +2642,9 @@ class CostGovernor:
                         except Exception:
                             pass
                     raise
+                self._journal.clear_admission_intent(
+                    request.operation_id
+                )
 
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
