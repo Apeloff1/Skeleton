@@ -124,8 +124,12 @@ def advance_campaign(
     if validation_failed:
         state.failures += 1
 
+    if len(attempted_task_ids) > 32:
+        raise ValueError("campaign cycle exceeds 32 attempted tasks")
     for task_id in attempted_task_ids:
         key = str(task_id).strip()
+        if len(key) > 160:
+            raise ValueError("campaign task id exceeds 160 characters")
         if key:
             state.task_attempts[key] = state.task_attempts.get(key, 0) + 1
 
@@ -164,6 +168,9 @@ def advance_campaign(
         }
     )
     state.history = state.history[-MAX_HISTORY:]
+    if len(state.task_attempts) > 512:
+        active = sorted(state.task_attempts.items(), key=lambda pair: (-pair[1], pair[0]))[:512]
+        state.task_attempts = dict(active)
     return state
 
 
