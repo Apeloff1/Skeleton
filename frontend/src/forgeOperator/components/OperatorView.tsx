@@ -16,6 +16,7 @@ import BeatsPanel, { type BeatsPanelProps } from './BeatsPanel';
 import ComposeRunPanel, { type ComposeRunPanelProps } from './ComposeRunPanel';
 import ErasPanel, { type ErasPanelProps } from './ErasPanel';
 import PlansPanel, { type PlansPanelProps } from './PlansPanel';
+import WalkPanel, { type WalkPanelProps } from './WalkPanel';
 import RecoveryPanel, { type RecoveryPanelProps } from './RecoveryPanel';
 import RunReportPanel, { type RunReportPanelProps } from './RunReportPanel';
 
@@ -24,6 +25,7 @@ export interface OperatorViewProps {
   onTab: (tab: OperatorTab) => void;
   compose: ComposeRunPanelProps;
   plans: PlansPanelProps;
+  walk: WalkPanelProps;
   eras: ErasPanelProps;
   beats: BeatsPanelProps;
   report: RunReportPanelProps;
@@ -75,6 +77,7 @@ export default function OperatorView(props: OperatorViewProps) {
       <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps="handled" testID={`operator-panel-${tab}`}>
         {tab === 'compose' ? <ComposeRunPanel {...props.compose} /> : null}
         {tab === 'plans' ? <PlansPanel {...props.plans} /> : null}
+        {tab === 'walk' ? <WalkPanel {...props.walk} /> : null}
         {tab === 'eras' ? <ErasPanel {...props.eras} /> : null}
         {tab === 'beats' ? <BeatsPanel {...props.beats} /> : null}
         {tab === 'report' ? <RunReportPanel {...props.report} /> : null}

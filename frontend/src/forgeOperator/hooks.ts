@@ -10,6 +10,7 @@ import {
   fetchEras,
   operatorErrorFromApi,
   planBuild,
+  walkPreview,
   runAppForge,
   engineRun,
   type SealHeaders,
@@ -25,6 +26,7 @@ import type {
   MaterialiseTarget,
   PlaytestMode,
   RepairMode,
+  WalkPreview,
 } from './types';
 import type { RunPayload, RunRequest } from '../skeletonForge/types';
 
@@ -329,4 +331,39 @@ export function useNow(active: boolean, everyMs = 500): number {
     return () => clearInterval(id);
   }, [active, everyMs]);
   return now;
+}
+
+export function useOperatorWalk() {
+  const [preview, setPreview] = React.useState<WalkPreview | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const ctrlRef = React.useRef<AbortController | null>(null);
+
+  const run = React.useCallback(async (vision: string, era?: string | null) => {
+    ctrlRef.current?.abort();
+    const ctrl = new AbortController();
+    ctrlRef.current = ctrl;
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await walkPreview({ vision: vision || undefined, era: era || null }, { signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
+      if (r.ok && r.data) {
+        setPreview(r.data);
+        setLoading(false);
+      } else {
+        setPreview(null);
+        setError(errMessage(operatorErrorFromApi(r, { sealed: false })) ?? `HTTP ${r.status}`);
+        setLoading(false);
+      }
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      setPreview(null);
+      setError(errMessage(operatorErrorFromException(e)));
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => () => ctrlRef.current?.abort(), []);
+  return { preview, loading, error, run };
 }

@@ -1,10 +1,10 @@
 /**
  * Live forge-operator screen: wires catalog, compose, app/engine run, plan,
- * report and recovery into OperatorView.
+ * walk, report and recovery into OperatorView.
  */
 import React from 'react';
 import type { MaterialiseTarget, PlaytestMode, RepairMode } from '../types';
-import { useOperatorCatalog, useOperatorCompose, useOperatorPlan, useOperatorRun, useNow } from '../hooks';
+import { useOperatorCatalog, useOperatorCompose, useOperatorPlan, useOperatorRun, useOperatorWalk, useNow } from '../hooks';
 import { type OperatorTab } from '../operatorTabs';
 import OperatorView from './OperatorView';
 
@@ -27,6 +27,7 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
   const catalog = useOperatorCatalog();
   const run = useOperatorRun();
   const plan = useOperatorPlan();
+  const walk = useOperatorWalk();
   const now = useNow(run.phase === 'running');
 
   React.useEffect(() => {
@@ -101,6 +102,14 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
         loading: plan.loading,
         error: plan.error,
         onPlan: () => void plan.run(vision.trim(), era.trim() || null),
+      }}
+      walk={{
+        vision,
+        era,
+        preview: walk.preview,
+        loading: walk.loading,
+        error: walk.error,
+        onWalk: () => void walk.run(vision.trim(), era.trim() || null),
       }}
       eras={{
         eras: catalog.eras,
