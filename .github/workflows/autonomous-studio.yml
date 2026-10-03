@@ -452,11 +452,46 @@ jobs:
             echo '- Canonical plan and final patch bound by execution receipt: yes'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Evaluate bounded auto-completion
+        id: continuation
+        if: always() && steps.pressure.outputs.proceed == 'true'
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+          HAS_PATCH: ${{ steps.proposal.outputs.has_patch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          state = json.loads(Path('.studio-tmp/repo-state.json').read_text(encoding='utf-8'))
+          supervisor = state.get('_shift_supervisor', {})
+          progress = supervisor.get('progress', {})
+          result = {
+              'status': supervisor.get('status', 'unknown'),
+              'generation_id': supervisor.get('generation_id', ''),
+              'progress_fingerprint_sha256': progress.get('fingerprint_sha256', ''),
+              'total': progress.get('total', 0),
+              'counts': progress.get('counts', {}),
+              'terminal': bool(progress.get('terminal', False)),
+              'validated_patch': os.environ.get('HAS_PATCH') == 'true' and os.environ.get('VALIDATION_OUTCOME') == 'success',
+          }
+          Path(os.environ['RUNNER_TEMP'], 'studio-continuation.json').write_text(
+              json.dumps(result, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8') as handle:
+              handle.write(f"terminal={'true' if result['terminal'] else 'false'}\n")
+              handle.write(f"validated_patch={'true' if result['validated_patch'] else 'false'}\n")
+          PY
+
       - name: Request bounded continuation
         if: >-
           success() &&
-          steps.proposal.outputs.has_patch == 'true' &&
-          steps.validation.outcome == 'success' &&
+          steps.continuation.outputs.terminal != 'true' &&
+          steps.continuation.outputs.validated_patch == 'true' &&
           (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -465,14 +500,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Do not self-loop inside one hosted job. The next finite run is
-          # requested only after validated work was published, so the canonical
-          # supervisor can retire completed IDs and expose newly unblocked work.
           active=$(gh run list --repo "$REPO" --workflow autonomous-studio.yml --status queued --limit 20 --json databaseId --jq 'length')
           in_progress=$(gh run list --repo "$REPO" --workflow autonomous-studio.yml --status in_progress --limit 20 --json databaseId --jq '[.[] | select((.databaseId|tostring) != env.CURRENT_RUN_ID)] | length')
           if (( active == 0 && in_progress == 0 )); then
             gh workflow run autonomous-studio.yml --repo "$REPO" -f max_tasks=2 -f cohort_size=15 -f dry_run=false
-            echo 'Bounded continuation requested after validated publication.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Bounded continuation requested: canonical queue remains nonterminal.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'Continuation already queued/in progress; duplicate dispatch suppressed.' >> "$GITHUB_STEP_SUMMARY"
           fi
