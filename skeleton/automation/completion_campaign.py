@@ -95,6 +95,101 @@ class CampaignState:
 
 
 
+
+def select_frontier(
+    plan_items: object,
+    *,
+    team: str,
+    cooldowns: Mapping[str, int] | None = None,
+    attempts: Mapping[str, int] | None = None,
+    limit: int = 8,
+) -> dict[str, Any]:
+    if not 1 <= limit <= 32:
+        raise ValueError("frontier limit must be between 1 and 32")
+    cooldowns = cooldowns or {}
+    attempts = attempts or {}
+    if not isinstance(plan_items, list):
+        raise ValueError("canonical plan items must be a list")
+    rows = {
+        str(item.get("id", "")).strip(): item
+        for item in plan_items
+        if isinstance(item, Mapping)
+        and item.get("target_team") == team
+        and str(item.get("id", "")).strip()
+    }
+    reverse: dict[str, set[str]] = {key: set() for key in rows}
+    for item_id, item in rows.items():
+        deps = item.get("dependencies", [])
+        if isinstance(deps, list):
+            for dep in deps:
+                dep_id = str(dep).strip()
+                if dep_id in reverse:
+                    reverse[dep_id].add(item_id)
+
+    def descendants(root: str) -> int:
+        seen: set[str] = set()
+        stack = list(reverse.get(root, ()))
+        while stack:
+            node = stack.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(reverse.get(node, ()))
+        return len(seen)
+
+    eligible: list[tuple[tuple[int, int, int, str], dict[str, Any]]] = []
+    deferred: list[dict[str, Any]] = []
+    for item_id, item in rows.items():
+        status = str(item.get("status", "queued")).lower()
+        if status != "queued":
+            continue
+        deps = item.get("dependencies", [])
+        deps = [str(dep).strip() for dep in deps] if isinstance(deps, list) else []
+        unresolved = [
+            dep for dep in deps
+            if dep not in rows or str(rows[dep].get("status", "")).lower() != "done"
+        ]
+        cooldown = max(0, int(cooldowns.get(item_id, 0)))
+        if unresolved:
+            deferred.append({"id": item_id, "reason": "dependencies", "dependencies": unresolved})
+            continue
+        if cooldown:
+            deferred.append({"id": item_id, "reason": "cooldown", "cycles_remaining": cooldown})
+            continue
+        try:
+            priority = int(item.get("priority", 50))
+        except (TypeError, ValueError):
+            priority = 50
+        priority = max(1, min(100, priority))
+        unlock = descendants(item_id)
+        attempt_count = max(0, int(attempts.get(item_id, 0)))
+        score = (-unlock, -priority, attempt_count, item_id)
+        eligible.append((score, dict(item)))
+
+    eligible.sort(key=lambda row: row[0])
+    selected: list[dict[str, Any]] = []
+    used_roots: set[str] = set()
+    remaining = eligible[:]
+    # First pass favors independent top-level dependency lanes.
+    for score, item in eligible:
+        deps = item.get("dependencies", [])
+        root = str(deps[0]) if isinstance(deps, list) and deps else str(item.get("id", ""))
+        if root in used_roots:
+            continue
+        selected.append(item)
+        used_roots.add(root)
+        remaining.remove((score, item))
+        if len(selected) >= limit:
+            break
+    # Fill remaining capacity deterministically by unblock value/priority/attempts/id.
+    if len(selected) < limit:
+        selected.extend(item for _, item in remaining[: limit - len(selected)])
+    return {
+        "selected": selected,
+        "deferred": sorted(deferred, key=lambda row: (row["reason"], row["id"])),
+        "eligible_count": len(eligible),
+    }
+
 def acquire_lease(state: CampaignState, *, owner: str, expected_epoch: int | None = None) -> CampaignState:
     owner = str(owner).strip()
     if not owner or len(owner) > 160 or any(ord(ch) < 32 for ch in owner):
