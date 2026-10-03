@@ -5724,6 +5724,11 @@
       "path": "skeleton/foundation/architecture",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/main_guard",
+      "owner": "repository-machine control boundary",
+      "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
     }
   ],
   "classification_coverage": {
