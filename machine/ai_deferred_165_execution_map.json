@@ -4304,6 +4304,11 @@
       "promotion_authority": false
     }
   ],
-  "source_main_sha_at_materialization": "3c94df04b12f3d9a7bf81c3fea485cff84a7abf8",
-  "source_main_note": "Observed repaired main after #2590; informational only and not completion authority."
+  "source_main_sha_at_materialization": "ea971c37c9a42a453e6fc902db88456c38d5b0d6",
+  "source_main_note": "Recovered cleanly onto current main after #2611 closed without merge; informational only and not completion authority.",
+  "recovery_lineage": {
+    "supersedes_closed_pr": 2611,
+    "recovery_pr": 2624,
+    "stale_history_removed": true
+  }
 }
