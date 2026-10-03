@@ -28,4 +28,15 @@ __all__ = [
     "build_learning_candidate",
     "build_learning_candidate_artifact",
     "build_learning_candidate_from_repository",
+    "LearningQualificationBundle",
+    "LearningQualificationError",
+    "MirrorModelBinding",
+    "qualify_learning_candidate",
 ]
+
+from .qualification import (
+    LearningQualificationBundle,
+    LearningQualificationError,
+    MirrorModelBinding,
+    qualify_learning_candidate,
+)
