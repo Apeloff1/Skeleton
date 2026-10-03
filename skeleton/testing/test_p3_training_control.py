@@ -188,6 +188,8 @@ def test_releasing_same_worker_invalidates_previous_same_epoch_lease(tmp_path):
 
     with pytest.raises(TrainingStateError,match="worker lease is not current"):
         repo.assert_worker_current(first)
+    with pytest.raises(TrainingStateError,match="worker lease is not current"):
+        repo.checkpoint(_checkpoint(run,first,1,"stale-model"),first)
 
     repo.assert_worker_current(replacement)
     checkpoint=_checkpoint(run,replacement,1,"replacement-model")
