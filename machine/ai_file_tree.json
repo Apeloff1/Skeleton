@@ -5734,6 +5734,11 @@
       "path": "skeleton/main_guard",
       "owner": "repository-machine control boundary",
       "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/ops",
+      "owner": "operations/control plane",
+      "reason": "top-level operations and repository execution support remains outside canonical AI runtime ownership; AI-relevant integrations require explicit governed mapping"
     }
   ],
   "classification_coverage": {
