@@ -32,6 +32,29 @@ class P2RepositoryControlTests(unittest.TestCase):
             result["completion_rollup"]["strong_completion_blocked"]
         )
 
+    def test_edge_backlog_status_mirrors_canonical_priority_queue(self) -> None:
+        edge = json.loads(
+            (ROOT / "machine/ai_edge_case_priority_queue.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        backlog = json.loads(
+            (ROOT / "machine/backlog_registry.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        source = next(
+            item for item in edge["items"] if item["id"] == "HIST-SYS-019"
+        )
+        projection = next(
+            item
+            for item in backlog["items"]
+            if item["id"] == "BL-EDGE-HIST-SYS-019"
+        )
+        self.assertEqual(projection["source_ref"], source["id"])
+        self.assertEqual(projection["status"], source["status"])
+        self.assertEqual(projection["status"], "evidence_pending")
+
     def _fixture(self) -> Path:
         temp = Path(tempfile.mkdtemp(prefix="p2-repo-control-"))
         self.addCleanup(lambda: shutil.rmtree(temp, ignore_errors=True))
