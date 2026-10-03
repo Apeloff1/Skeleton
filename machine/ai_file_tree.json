@@ -689,7 +689,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "f16c68ccbdc4a75a04a2c5dd0c7a3248ff4a6c29",
+      "source_git_object_sha": "30b6045013f404b15acb400641139e7d57e3fcdb",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
