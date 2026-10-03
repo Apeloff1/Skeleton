@@ -13,10 +13,12 @@ from skeleton.ai.runtime.product.model_program_bridge import (
     ModelProgramBridgeError,
     bridge_product_training_to_model_program,
     model_promotion_receipt_from_qualification,
+    register_bridged_model_program_artifact,
 )
 from skeleton.ai.runtime.product.qualification import (
     LearningQualificationBundle,
 )
+from skeleton.learning.model_program import ModelDevelopmentRegistry
 
 
 def _sha(value: str) -> str:
@@ -199,3 +201,33 @@ def test_bridge_rejects_non_candidate_product_receipt(tmp_path) -> None:
             trainer_id="skeleton.reverse-multimethod-trainer.v1",
             code_revision="test-revision",
         )
+
+
+def test_reverse_training_registers_in_canonical_model_registry(
+    tmp_path,
+) -> None:
+    bridged = bridge_product_training_to_model_program(
+        _product_receipt(tmp_path),
+        run_id="reverse-run-registry",
+        trainer_id="skeleton.reverse-multimethod-trainer.v1",
+        code_revision="test-revision",
+    )
+    registry = ModelDevelopmentRegistry()
+
+    artifact, receipt = register_bridged_model_program_artifact(
+        registry,
+        bridged,
+    )
+
+    assert artifact == bridged.artifact
+    assert receipt == bridged.training_receipt
+    assert registry.artifact(artifact.model_digest) == artifact
+
+    qualification = _qualification_for(bridged)
+    promotion = registry.promote(
+        run_id=receipt.run_id,
+        verifier_id="registry-independent-verifier",
+        evaluation_refs=qualification.lifecycle_evidence_refs,
+    )
+    assert promotion.model_digest == artifact.model_digest
+    assert promotion.training_receipt_digest == receipt.digest
