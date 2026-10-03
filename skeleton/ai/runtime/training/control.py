@@ -43,6 +43,20 @@ def _utc(value: datetime | None = None) -> str:
     return instant.astimezone(timezone.utc).isoformat()
 
 
+def _require_utc_timestamp(value: str, *, field: str) -> str:
+    text=str(value).strip()
+    try:
+        instant=datetime.fromisoformat(text.replace("Z","+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO-8601 timestamp") from exc
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError(f"{field} must be timezone-aware")
+    return instant.astimezone(timezone.utc).isoformat()
+
+
+_ALLOWED_RUN_STATES={"registered","running","failed","recovering","completed"}
+
+
 @dataclass(frozen=True, slots=True)
 class TrainingRunManifest:
     run_id: str
@@ -68,11 +82,21 @@ class TrainingRunManifest:
             raise ValueError("world_size must be in [1, 65536]")
         if self.parallelism not in {"single","data_parallel","model_parallel","hybrid"}:
             raise ValueError("unsupported parallelism")
-        if not math.isfinite(float(self.collective_timeout_seconds)) or self.collective_timeout_seconds<=0:
-            raise ValueError("collective_timeout_seconds must be positive")
+        if (
+            isinstance(self.collective_timeout_seconds,bool)
+            or not isinstance(self.collective_timeout_seconds,(int,float))
+            or not math.isfinite(float(self.collective_timeout_seconds))
+            or self.collective_timeout_seconds<=0
+        ):
+            raise ValueError("collective_timeout_seconds must be a positive finite number")
         hyper=dict(self.hyperparameters)
         _canonical(hyper)
         object.__setattr__(self,"hyperparameters",hyper)
+        if any(
+            isinstance(v,bool) or not isinstance(v,(int,float))
+            for v in self.resource_budget.values()
+        ):
+            raise ValueError("resource_budget values must be numeric, not boolean")
         budget={str(k):float(v) for k,v in self.resource_budget.items()}
         if any(not math.isfinite(v) or v<0 for v in budget.values()):
             raise ValueError("resource_budget values must be finite and non-negative")
@@ -109,11 +133,11 @@ class TrainingRunManifest:
             code_digest=str(payload["code_digest"]),
             environment_digest=str(payload["environment_digest"]),
             hyperparameters=dict(payload.get("hyperparameters",{})),
-            seed=int(payload["seed"]),
-            world_size=int(payload.get("world_size",1)),
+            seed=payload["seed"],
+            world_size=payload.get("world_size",1),
             parallelism=str(payload.get("parallelism","single")),
-            collective_timeout_seconds=float(payload.get("collective_timeout_seconds",60.0)),
-            resource_budget={str(k):float(v) for k,v in dict(payload.get("resource_budget",{})).items()},
+            collective_timeout_seconds=payload.get("collective_timeout_seconds",60.0),
+            resource_budget=dict(payload.get("resource_budget",{})),
         )
         claimed=payload.get("manifest_digest")
         if claimed is not None and str(claimed)!=manifest.digest:
@@ -133,6 +157,11 @@ class WorkerLease:
             raise ValueError("worker lease ids must be non-empty")
         if isinstance(self.epoch,bool) or not isinstance(self.epoch,int) or self.epoch<0:
             raise ValueError("worker epoch must be non-negative")
+        object.__setattr__(
+            self,
+            "issued_at",
+            _require_utc_timestamp(self.issued_at,field="issued_at"),
+        )
 
     @property
     def token(self)->str:
@@ -163,6 +192,11 @@ class TrainingCheckpoint:
             raise ValueError("checkpoint step must be non-negative")
         if isinstance(self.worker_epoch,bool) or not isinstance(self.worker_epoch,int) or self.worker_epoch<0:
             raise ValueError("worker_epoch must be non-negative")
+        object.__setattr__(
+            self,
+            "created_at",
+            _require_utc_timestamp(self.created_at,field="created_at"),
+        )
 
     @property
     def digest(self)->str:
@@ -186,12 +220,12 @@ class TrainingCheckpoint:
         return cls(
             run_id=str(payload["run_id"]),
             manifest_digest=str(payload["manifest_digest"]),
-            step=int(payload["step"]),
+            step=payload["step"],
             model_digest=str(payload["model_digest"]),
             optimizer_digest=str(payload["optimizer_digest"]),
             rng_digest=str(payload["rng_digest"]),
             data_cursor_digest=str(payload["data_cursor_digest"]),
-            worker_epoch=int(payload["worker_epoch"]),
+            worker_epoch=payload["worker_epoch"],
             created_at=str(payload["created_at"]),
         )
 
@@ -213,6 +247,11 @@ class TrainingTelemetry:
             raise ValueError("telemetry metrics must be non-empty")
         if any(not math.isfinite(v) for v in values.values()):
             raise ValueError("telemetry rejects non-finite values")
+        object.__setattr__(
+            self,
+            "emitted_at",
+            _require_utc_timestamp(self.emitted_at,field="emitted_at"),
+        )
         object.__setattr__(self,"metrics",values)
 
     @property
@@ -291,14 +330,25 @@ class TrainingRepository:
         return manifest.digest
 
     def manifest(self,run_id:str)->TrainingRunManifest:
-        row=self._db.execute("SELECT manifest_json FROM training_run WHERE run_id=?",(run_id,)).fetchone()
-        if row is None: raise KeyError(run_id)
-        return TrainingRunManifest.from_dict(json.loads(row[0]))
+        row=self._db.execute(
+            "SELECT manifest_digest,manifest_json FROM training_run WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(run_id)
+        manifest=TrainingRunManifest.from_dict(json.loads(row[1]))
+        if manifest.run_id!=run_id or manifest.digest!=str(row[0]):
+            raise TrainingStateError("stored training manifest identity mismatch")
+        return manifest
 
     def state(self,run_id:str)->str:
         row=self._db.execute("SELECT state FROM training_run WHERE run_id=?",(run_id,)).fetchone()
-        if row is None: raise KeyError(run_id)
-        return str(row[0])
+        if row is None:
+            raise KeyError(run_id)
+        state=str(row[0])
+        if state not in _ALLOWED_RUN_STATES:
+            raise TrainingStateError("stored training run state is invalid")
+        return state
 
     def _epoch(self,run_id:str)->int:
         row=self._db.execute("SELECT worker_epoch FROM training_run WHERE run_id=?",(run_id,)).fetchone()
@@ -369,10 +419,21 @@ class TrainingRepository:
 
     def latest_checkpoint(self,run_id:str)->TrainingCheckpoint|None:
         row=self._db.execute(
-            "SELECT checkpoint_json FROM training_checkpoint WHERE run_id=? ORDER BY step DESC LIMIT 1",
+            "SELECT checkpoint_digest,run_id,step,checkpoint_json "
+            "FROM training_checkpoint WHERE run_id=? ORDER BY step DESC LIMIT 1",
             (run_id,),
         ).fetchone()
-        return None if row is None else TrainingCheckpoint.from_dict(json.loads(row[0]))
+        if row is None:
+            return None
+        checkpoint=TrainingCheckpoint.from_dict(json.loads(row[3]))
+        if (
+            checkpoint.digest!=str(row[0])
+            or checkpoint.run_id!=str(row[1])
+            or checkpoint.step!=int(row[2])
+            or checkpoint.run_id!=run_id
+        ):
+            raise TrainingStateError("stored checkpoint identity mismatch")
+        return checkpoint
 
     def record_telemetry(self,event:TrainingTelemetry)->str:
         if self.state(event.run_id)!="running":
