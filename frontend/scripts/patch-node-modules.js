@@ -138,7 +138,7 @@ function patchBracesDepthDoS() {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
   if (version !== '3.0.3') {
-    throw new Error(\`[patch-node-modules] braces \${version} requires security patch review\`);
+    throw new Error(`[patch-node-modules] braces ${version} requires security patch review`);
   }
 
   // CVE-2026-93687 / GHSA-vfj7-8cjw-p6xm: public string entry points
@@ -147,7 +147,7 @@ function patchBracesDepthDoS() {
   patchSecurityFile(
     'node_modules/braces/index.js',
     /braces\.parse = \(input, options = \{\}\) => parse\(input, options\);/,
-    \`const BRACES_SAFE_MAX_DEPTH = 256;
+    `const BRACES_SAFE_MAX_DEPTH = 256;
 
 const exceedsSafeBraceDepth = input => {
   if (typeof input !== 'string') return false;
@@ -183,7 +183,7 @@ const literalBraceAst = input => ({
 });
 
 braces.parse = (input, options = {}) =>
-  exceedsSafeBraceDepth(input) ? literalBraceAst(input) : parse(input, options);\`,
+  exceedsSafeBraceDepth(input) ? literalBraceAst(input) : parse(input, options);`,
     /BRACES_SAFE_MAX_DEPTH = 256/,
   );
 }
@@ -194,7 +194,7 @@ function patchHttpCacheSemanticsMaxStale() {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
   if (version !== '4.2.0') {
-    throw new Error(\`[patch-node-modules] http-cache-semantics \${version} requires security patch review\`);
+    throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
 
   // CVE-2026-93748 / GHSA-ch52-4w7c-c8xp: security-zeroed shared
@@ -215,7 +215,7 @@ function patchNodeForgeNestedDigestAlgorithm() {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
   if (version !== '1.4.0') {
-    throw new Error(\`[patch-node-modules] node-forge \${version} requires security patch review\`);
+    throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
   // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: node-forge 1.4.0 checks the
@@ -225,10 +225,10 @@ function patchNodeForgeNestedDigestAlgorithm() {
   patchSecurityFile(
     'node_modules/node-forge/lib/rsa.js',
     /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
-    \`if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
+    `if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
             obj.value.length !== 2 ||
             obj.value[0].value.length !==
-              (('parameters' in capture) ? 2 : 1)) {\`,
+              (('parameters' in capture) ? 2 : 1)) {`,
     /obj\.value\[0\]\.value\.length !==/,
   );
 }
