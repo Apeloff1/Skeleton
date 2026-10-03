@@ -44,6 +44,33 @@ def _units(value: object, name: str) -> int:
     return value
 
 
+def _validate_json(value: Any, *, depth: int = 0) -> None:
+    if depth > 64:
+        raise ValueError("JSON value exceeds maximum nesting depth")
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise ValueError("JSON numbers must be finite")
+        return
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            if not isinstance(key, str):
+                raise TypeError("JSON object keys must be strings")
+            _validate_json(child, depth=depth + 1)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            _validate_json(child, depth=depth + 1)
+        return
+    raise TypeError(f"unsupported JSON value type: {type(value).__name__}")
+
+
+def _strict_json(value: Any) -> str:
+    _validate_json(value)
+    return canonical_json(value)
+
+
 @dataclass(frozen=True, slots=True)
 class DeferredInvocation:
     operation_id: str
@@ -240,6 +267,8 @@ class DeferredExecutor:
         self.registry = registry
         self._handlers: dict[str, _Handler] = {}
         self._budgets: dict[str, Budget] = {}
+        self._payload_limits: dict[str, int] = {}
+        self._result_limits: dict[str, int] = {}
         self._fingerprints: dict[str, str] = {}
         self._success: dict[str, ExecutionReceipt] = {}
         self._success_result_json: dict[str, str] = {}
@@ -266,7 +295,14 @@ class DeferredExecutor:
             return
         self._handlers[volume_id] = candidate
 
-    def set_budget(self, volume_id: str, budget: Budget) -> None:
+    def set_budget(
+        self,
+        volume_id: str,
+        budget: Budget,
+        *,
+        max_payload_bytes: int = 262_144,
+        max_result_bytes: int = 262_144,
+    ) -> None:
         self.registry.get(volume_id)
         if not isinstance(budget, Budget):
             raise TypeError("budget must be Budget")
@@ -275,14 +311,22 @@ class DeferredExecutor:
                 "deferred operation budgets require max_attempts=1; "
                 "retries need a new operation_id"
             )
+        for name, value in (
+            ("max_payload_bytes", max_payload_bytes),
+            ("max_result_bytes", max_result_bytes),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{name} must be a positive integer")
         self._budgets[volume_id] = budget
+        self._payload_limits[volume_id] = max_payload_bytes
+        self._result_limits[volume_id] = max_result_bytes
 
     @staticmethod
     def digest_payload(payload: Mapping[str, Any]) -> str:
         if not isinstance(payload, Mapping):
             raise TypeError("payload must be a mapping")
         return hashlib.sha256(
-            canonical_json(dict(payload)).encode("utf-8")
+            _strict_json(dict(payload)).encode("utf-8")
         ).hexdigest()
 
     @staticmethod
@@ -323,8 +367,11 @@ class DeferredExecutor:
 
         if not isinstance(payload, Mapping):
             raise TypeError("payload must be a mapping")
-        payload_json = canonical_json(dict(payload))
-        payload_digest = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+        payload_json = _strict_json(dict(payload))
+        payload_bytes = payload_json.encode("utf-8")
+        if len(payload_bytes) > self._payload_limits[invocation.volume_id]:
+            raise RuntimeError("payload byte limit exceeded")
+        payload_digest = hashlib.sha256(payload_bytes).hexdigest()
         if payload_digest != invocation.payload_digest:
             raise ValueError("payload digest mismatch")
 
@@ -371,10 +418,11 @@ class DeferredExecutor:
 
         try:
             result = handler.fn(isolated)
-            result_json = canonical_json(result)
-            result_digest = hashlib.sha256(
-                result_json.encode("utf-8")
-            ).hexdigest()
+            result_json = _strict_json(result)
+            result_bytes = result_json.encode("utf-8")
+            if len(result_bytes) > self._result_limits[invocation.volume_id]:
+                raise RuntimeError("result byte limit exceeded")
+            result_digest = hashlib.sha256(result_bytes).hexdigest()
         except Exception as exc:
             error_material = {
                 "type": type(exc).__name__,
