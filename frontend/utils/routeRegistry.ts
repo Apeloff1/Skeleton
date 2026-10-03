@@ -86,6 +86,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/ai-interactions', title: 'AI Interactions', category: 'ai' },
   { path: '/sota', title: 'SOTA Models', category: 'ai' },
   { path: '/sota-extended', title: 'SOTA Extended', category: 'ai' },
+  { path: '/mirror-room', title: 'Mirror Room', category: 'ai', heavy: true },
 
   { path: '/apk-inspector', title: 'APK Inspector', category: 'tools' },
   { path: '/tools-arena', title: 'Tools Arena', category: 'tools' },
@@ -179,6 +180,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/studio', title: 'Studio', category: 'build' },
   { path: '/swarm-planner', title: 'Swarm Planner', category: 'ai' },
   { path: '/systems-forge', title: 'Systems Forge', category: 'build' },
+  { path: '/skeleton-forge', title: 'Skeleton Forge', category: 'build', heavy: true },
   { path: '/tools-hub', title: 'Tools Hub', category: 'tools' },
   { path: '/top', title: 'Top', category: 'progress' },
   { path: '/tournaments', title: 'Tournaments', category: 'progress' },
