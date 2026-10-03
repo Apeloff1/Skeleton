@@ -50,6 +50,10 @@ from skeleton.intelligence.quota import (
     TenantQuota,
 )
 from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureLease,
+    SqliteSharedPressureLedger,
+)
 
 
 _SAFE_FALLBACK_REASON_PREFIXES = (
@@ -706,6 +710,7 @@ class _RuntimeLeaseJournal:
     reason_code: str
     remaining: tuple[tuple[str, int | float], ...]
     admitted_at: float
+    shared_pressure_lease: SharedPressureLease | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -714,6 +719,20 @@ class _RuntimeLeaseJournal:
             "reason_code": self.reason_code,
             "remaining": dict(self.remaining),
             "admitted_at": self.admitted_at,
+            "shared_pressure_lease": (
+                None
+                if self.shared_pressure_lease is None
+                else {
+                    "lease_id": self.shared_pressure_lease.lease_id,
+                    "scope": self.shared_pressure_lease.scope,
+                    "operation_id": self.shared_pressure_lease.operation_id,
+                    "tenant_id": self.shared_pressure_lease.tenant_id,
+                    "owner_id": self.shared_pressure_lease.owner_id,
+                    "priority": self.shared_pressure_lease.priority,
+                    "acquired_at": self.shared_pressure_lease.acquired_at,
+                    "expires_at": self.shared_pressure_lease.expires_at,
+                }
+            ),
         }
 
 
@@ -750,6 +769,7 @@ def _runtime_lease_journal(
         ),
         remaining=tuple(remaining),
         admitted_at=admitted_at,
+        shared_pressure_lease=lease.shared_pressure_lease,
     )
 
 
@@ -796,12 +816,67 @@ def _runtime_lease_journal_from_payload(
         raise CostGovernorError(
             "runtime lease journal payload is invalid"
         ) from exc
+
+    pressure_raw = value.get("shared_pressure_lease")
+    pressure_lease: SharedPressureLease | None = None
+    if pressure_raw is not None:
+        if not isinstance(pressure_raw, dict):
+            raise CostGovernorError(
+                "shared pressure lease journal payload is invalid"
+            )
+        try:
+            priority = pressure_raw["priority"]
+            acquired_at = float(pressure_raw["acquired_at"])
+            expires_at = float(pressure_raw["expires_at"])
+            pressure_lease = SharedPressureLease(
+                lease_id=_token(
+                    "shared pressure lease_id",
+                    pressure_raw["lease_id"],
+                ),
+                scope=_token(
+                    "shared pressure scope",
+                    pressure_raw["scope"],
+                ),
+                operation_id=_token(
+                    "shared pressure operation_id",
+                    pressure_raw["operation_id"],
+                ),
+                tenant_id=_token(
+                    "shared pressure tenant_id",
+                    pressure_raw["tenant_id"],
+                ),
+                owner_id=_token(
+                    "shared pressure owner_id",
+                    pressure_raw["owner_id"],
+                ),
+                priority=int(priority),
+                acquired_at=acquired_at,
+                expires_at=expires_at,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise CostGovernorError(
+                "shared pressure lease journal payload is invalid"
+            ) from exc
+        if (
+            isinstance(priority, bool)
+            or not isinstance(priority, int)
+            or not 0 <= priority <= 1000
+            or not math.isfinite(acquired_at)
+            or acquired_at < 0
+            or not math.isfinite(expires_at)
+            or expires_at <= acquired_at
+        ):
+            raise CostGovernorError(
+                "shared pressure lease journal payload is invalid"
+            )
+
     return _RuntimeLeaseJournal(
         lease_id=_token("lease_id", lease_id),
         decision_id=_token("admission_decision_id", decision_id),
         reason_code=_token("admission_reason_code", reason_code),
         remaining=tuple(remaining),
         admitted_at=admitted_at,
+        shared_pressure_lease=pressure_lease,
     )
 
 
@@ -1375,6 +1450,9 @@ class CostGovernor:
         path: str | Path,
         *,
         default_tenant_quota: TenantQuota,
+        shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
+        shared_pressure_scope: str | None = None,
+        shared_pressure_owner_id: str | None = None,
     ) -> "CostGovernor":
         if not isinstance(default_tenant_quota, TenantQuota):
             raise TypeError(
@@ -1384,6 +1462,9 @@ class CostGovernor:
         runtime = AdmissionRuntime(
             quota_ledger=ledger,
             default_tenant_quota=default_tenant_quota,
+            shared_pressure_ledger=shared_pressure_ledger,
+            shared_pressure_scope=shared_pressure_scope,
+            shared_pressure_owner_id=shared_pressure_owner_id,
         )
         return cls(
             runtime,
@@ -1525,6 +1606,7 @@ class CostGovernor:
             decision=decision,
             quota_reservation=record.quota_reservation,
             admitted_at=metadata.admitted_at,
+            shared_pressure_lease=metadata.shared_pressure_lease,
         )
 
     def reserve(
@@ -1583,7 +1665,11 @@ class CostGovernor:
                         persisted,
                     )
                     try:
-                        self.runtime.reattach(selected, lease)
+                        self.runtime.reattach(
+                            selected,
+                            lease,
+                            now_wall=now_wall,
+                        )
                     except AdmissionRuntimeConflict as exc:
                         raise CostGovernorConflict(str(exc)) from exc
                     except AdmissionRuntimeError as exc:
