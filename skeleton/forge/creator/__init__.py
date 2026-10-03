@@ -4,6 +4,31 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.preview_transaction import (
+    EXECUTION_PHASES,
+    MAX_DIAGNOSTICS,
+    MAX_EDITS,
+    MAX_SERIALIZED_BYTES as PREVIEW_MAX_SERIALIZED_BYTES,
+    PREVIEW_PHASES,
+    PREVIEW_SCHEMA,
+    PREVIEW_VERSION,
+    PreparedPreview,
+    PreviewBackend,
+    PreviewOutcome,
+    PreviewRollbackError,
+    PreviewStepResult,
+    PreviewTransaction,
+    PreviewTransactionError,
+    execute_preview_transaction,
+    make_preview_step_result,
+    serialize_preview_outcome,
+    serialize_preview_transaction,
+    stage_preview_transaction,
+    validate_prepared_preview,
+    validate_preview_outcome,
+    validate_preview_step_result,
+)
+
 from skeleton.forge.creator.approval_boundary import (
     ACTION_KINDS,
     APPROVAL_SCHEMA,
@@ -73,6 +98,28 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "validate_preview_step_result",
+    "validate_preview_outcome",
+    "validate_prepared_preview",
+    "stage_preview_transaction",
+    "serialize_preview_transaction",
+    "serialize_preview_outcome",
+    "make_preview_step_result",
+    "execute_preview_transaction",
+    "PreviewTransactionError",
+    "PreviewTransaction",
+    "PreviewStepResult",
+    "PreviewRollbackError",
+    "PreviewOutcome",
+    "PreviewBackend",
+    "PreparedPreview",
+    "PREVIEW_VERSION",
+    "PREVIEW_SCHEMA",
+    "PREVIEW_PHASES",
+    "PREVIEW_MAX_SERIALIZED_BYTES",
+    "MAX_EDITS",
+    "MAX_DIAGNOSTICS",
+    "EXECUTION_PHASES",
     "validate_decision",
     "validate_checkpoint",
     "validate_authorization",
