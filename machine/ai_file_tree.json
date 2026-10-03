@@ -5296,11 +5296,6 @@
   },
   "retained_outside_ai_tree": [
     {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
-    },
-    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -5309,176 +5304,6 @@
       "path": "skeleton/acquired",
       "owner": "quarantine/provenance",
       "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
-    },
-    {
-      "path": "skeleton/architecture.py",
-      "owner": "architecture authority",
-      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
-    },
-    {
-      "path": "skeleton/foundation/architecture/index.py",
-      "owner": "architecture authority",
-      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round3.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round4.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round5.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round6.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round7.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round8.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round9.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round10.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round11.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round12.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round13.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round14.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round15.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round16.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round17.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round18.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round19.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round20.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round21.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/foundation/architecture/rounds/round22.py",
-      "owner": "architecture history",
-      "reason": "historical architecture round retained as design lineage, not runtime implementation"
-    },
-    {
-      "path": "skeleton/manifest.py",
-      "owner": "package/module registry",
-      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
-    },
-    {
-      "path": "skeleton/quickstart.py",
-      "owner": "developer/package guidance",
-      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
-    },
-    {
-      "path": "skeleton/release",
-      "owner": "release engineering",
-      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
-    },
-    {
-      "path": "skeleton/requirements.py",
-      "owner": "package dependency metadata",
-      "reason": "package dependency declaration stays at package boundary"
-    },
-    {
-      "path": "skeleton/setup_config.py",
-      "owner": "package/install metadata",
-      "reason": "setup/install metadata stays with packaging and installer ownership"
-    },
-    {
-      "path": "skeleton/ubuntu",
-      "owner": "deployment/platform support",
-      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
-    },
-    {
-      "path": "skeleton/telemetry",
-      "owner": "observability/telemetry boundary",
-      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
-    },
-    {
-      "path": "skeleton/turn",
-      "owner": "package/compatibility boundary",
-      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
-    },
-    {
-      "path": "skeleton/parse",
-      "owner": "package/parsing compatibility boundary",
-      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
-    },
-    {
-      "path": "skeleton/era",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
-    },
-    {
-      "path": "skeleton/genos",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/cue",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     },
     {
       "path": "skeleton/agents",
@@ -5491,127 +5316,7 @@
       "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
     },
     {
-      "path": "skeleton/contexts",
-      "owner": "context compatibility boundary",
-      "reason": "legacy plural contexts namespace remains a shim for skeleton/context/domains"
-    },
-    {
-      "path": "skeleton/persist",
-      "owner": "persistence compatibility boundary",
-      "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
-    },
-    {
-      "path": "skeleton/swarm",
-      "owner": "compatibility shim for skeleton/automation/swarm",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/swarm"
-    },
-    {
-      "path": "skeleton/hive",
-      "owner": "compatibility shim for skeleton/automation/hive",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/hive"
-    },
-    {
-      "path": "skeleton/overseer",
-      "owner": "compatibility shim for skeleton/automation/overseer",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/overseer"
-    },
-    {
-      "path": "skeleton/content",
-      "owner": "compatibility shim for skeleton/simulation/content",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/content"
-    },
-    {
-      "path": "skeleton/creator",
-      "owner": "forge compatibility boundary",
-      "reason": "legacy creator namespace remains a shim for skeleton/forge/creator"
-    },
-    {
-      "path": "skeleton/economy",
-      "owner": "compatibility shim for skeleton/simulation/economy",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/economy"
-    },
-    {
-      "path": "skeleton/world",
-      "owner": "compatibility shim for skeleton/simulation/world",
-      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
-    },
-    {
-      "path": "skeleton/platform",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy platform namespace remains a shim for skeleton/simulation/platform"
-    },
-    {
-      "path": "skeleton/pipelines",
-      "owner": "forge compatibility boundary",
-      "reason": "legacy pipelines namespace remains a shim for skeleton/forge/pipelines"
-    },
-    {
-      "path": "skeleton/genesis.py",
-      "owner": "bootstrap compatibility boundary",
-      "reason": "legacy genesis entrypoint remains a shim for skeleton/bootstrap/genesis.py"
-    },
-    {
-      "path": "skeleton/provider_contract.py",
-      "owner": "provider compatibility boundary",
-      "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
-    },
-    {
-      "path": "skeleton/jvm_accelerators.py",
-      "owner": "native compatibility boundary",
-      "reason": "legacy JVM accelerator registry remains a compatibility entrypoint"
-    },
-    {
-      "path": "skeleton/kv_cache.py",
-      "owner": "KV compatibility boundary",
-      "reason": "legacy KV cache facade remains a compatibility entrypoint"
-    },
-    {
-      "path": "skeleton/bootstrap",
-      "owner": "core bootstrap owner",
-      "reason": "bootstrap contains canonical package wiring; only explicitly governed AI-relevant files are mirrored"
-    },
-    {
-      "path": "skeleton/providers",
-      "owner": "integration contract owner",
-      "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
-    },
-    {
       "path": "skeleton/architecture_index.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round3.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round4.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round5.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round6.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round7.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round8.py",
-      "owner": "architecture compatibility/history",
-      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture_round9.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
@@ -5681,39 +5386,49 @@
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/game",
-      "owner": "simulation compatibility boundary",
-      "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
+      "path": "skeleton/architecture_round3.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/school",
-      "owner": "learning compatibility boundary",
-      "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/social",
-      "owner": "research compatibility boundary",
-      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-034"
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/galaxy",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/network",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-036"
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/mesh",
-      "owner": "distributed compatibility boundary",
-      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-037"
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
-      "path": "skeleton/graphs",
-      "owner": "knowledge compatibility boundary",
-      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-038"
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture compatibility/history",
+      "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
+    },
+    {
+      "path": "skeleton/bootstrap",
+      "owner": "core bootstrap owner",
+      "reason": "bootstrap contains canonical package wiring; only explicitly governed AI-relevant files are mirrored"
     },
     {
       "path": "skeleton/chronicle",
@@ -5721,9 +5436,34 @@
       "reason": "legacy Chronicle namespace remains a compatibility shim for skeleton/provenance/chronicle after TREE-039"
     },
     {
-      "path": "skeleton/integrations",
-      "owner": "tools compatibility boundary",
-      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-040"
+      "path": "skeleton/content",
+      "owner": "compatibility shim for skeleton/simulation/content",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/content"
+    },
+    {
+      "path": "skeleton/contexts",
+      "owner": "context compatibility boundary",
+      "reason": "legacy plural contexts namespace remains a shim for skeleton/context/domains"
+    },
+    {
+      "path": "skeleton/creator",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy creator namespace remains a shim for skeleton/forge/creator"
+    },
+    {
+      "path": "skeleton/cue",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/economy",
+      "owner": "compatibility shim for skeleton/simulation/economy",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/economy"
+    },
+    {
+      "path": "skeleton/era",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy era namespace remains a compatibility shim for skeleton/simulation/era after TREE-030"
     },
     {
       "path": "skeleton/foundation/architecture",
@@ -5731,9 +5471,274 @@
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
     },
     {
+      "path": "skeleton/foundation/architecture/index.py",
+      "owner": "architecture authority",
+      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round10.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round11.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round12.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round13.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round14.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round15.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round16.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round17.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round18.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round19.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round20.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round21.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round22.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round3.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round4.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round5.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round6.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round7.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round8.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/foundation/architecture/rounds/round9.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/galaxy",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
+    },
+    {
+      "path": "skeleton/game",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy game namespace remains a compatibility shim for skeleton/simulation/game after TREE-029"
+    },
+    {
+      "path": "skeleton/genesis.py",
+      "owner": "bootstrap compatibility boundary",
+      "reason": "legacy genesis entrypoint remains a shim for skeleton/bootstrap/genesis.py"
+    },
+    {
+      "path": "skeleton/genos",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/graphs",
+      "owner": "knowledge compatibility boundary",
+      "reason": "legacy graphs namespace remains a compatibility shim for skeleton/knowledge/graphs after TREE-038"
+    },
+    {
+      "path": "skeleton/hive",
+      "owner": "compatibility shim for skeleton/automation/hive",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/hive"
+    },
+    {
+      "path": "skeleton/integrations",
+      "owner": "tools compatibility boundary",
+      "reason": "legacy integrations namespace remains a compatibility shim for skeleton/tools/integrations after TREE-040"
+    },
+    {
+      "path": "skeleton/jvm_accelerators.py",
+      "owner": "native compatibility boundary",
+      "reason": "legacy JVM accelerator registry remains a compatibility entrypoint"
+    },
+    {
+      "path": "skeleton/kv_cache.py",
+      "owner": "KV compatibility boundary",
+      "reason": "legacy KV cache facade remains a compatibility entrypoint"
+    },
+    {
       "path": "skeleton/main_guard",
       "owner": "repository-machine control boundary",
       "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/manifest.py",
+      "owner": "package/module registry",
+      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
+    },
+    {
+      "path": "skeleton/mesh",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Mesh namespace remains a compatibility shim for skeleton/distributed/mesh after TREE-037"
+    },
+    {
+      "path": "skeleton/network",
+      "owner": "distributed compatibility boundary",
+      "reason": "legacy Network namespace remains a compatibility shim for skeleton/distributed/network after TREE-036"
+    },
+    {
+      "path": "skeleton/ops",
+      "owner": "operations/control plane",
+      "reason": "top-level operations and repository execution support remains outside canonical AI runtime ownership; AI-relevant integrations require explicit governed mapping"
+    },
+    {
+      "path": "skeleton/overseer",
+      "owner": "compatibility shim for skeleton/automation/overseer",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/overseer"
+    },
+    {
+      "path": "skeleton/parse",
+      "owner": "package/parsing compatibility boundary",
+      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/persist",
+      "owner": "persistence compatibility boundary",
+      "reason": "legacy persist namespace remains a shim for skeleton/persistence/core"
+    },
+    {
+      "path": "skeleton/pipelines",
+      "owner": "forge compatibility boundary",
+      "reason": "legacy pipelines namespace remains a shim for skeleton/forge/pipelines"
+    },
+    {
+      "path": "skeleton/platform",
+      "owner": "simulation compatibility boundary",
+      "reason": "legacy platform namespace remains a shim for skeleton/simulation/platform"
+    },
+    {
+      "path": "skeleton/provider_contract.py",
+      "owner": "provider compatibility boundary",
+      "reason": "legacy provider contract entrypoint remains a shim for skeleton/providers/contract.py"
+    },
+    {
+      "path": "skeleton/providers",
+      "owner": "integration contract owner",
+      "reason": "providers contains canonical provider-neutral boundaries; only explicitly governed AI-relevant files are mirrored"
+    },
+    {
+      "path": "skeleton/quickstart.py",
+      "owner": "developer/package guidance",
+      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
+    },
+    {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+    },
+    {
+      "path": "skeleton/release",
+      "owner": "release engineering",
+      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
+    },
+    {
+      "path": "skeleton/requirements.py",
+      "owner": "package dependency metadata",
+      "reason": "package dependency declaration stays at package boundary"
+    },
+    {
+      "path": "skeleton/school",
+      "owner": "learning compatibility boundary",
+      "reason": "legacy School namespace remains a compatibility shim for skeleton/learning/school after TREE-030"
+    },
+    {
+      "path": "skeleton/setup_config.py",
+      "owner": "package/install metadata",
+      "reason": "setup/install metadata stays with packaging and installer ownership"
+    },
+    {
+      "path": "skeleton/social",
+      "owner": "research compatibility boundary",
+      "reason": "legacy social namespace remains a compatibility shim for skeleton/research/social after TREE-034"
+    },
+    {
+      "path": "skeleton/swarm",
+      "owner": "compatibility shim for skeleton/automation/swarm",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/automation/swarm"
+    },
+    {
+      "path": "skeleton/telemetry",
+      "owner": "observability/telemetry boundary",
+      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/turn",
+      "owner": "package/compatibility boundary",
+      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/ubuntu",
+      "owner": "deployment/platform support",
+      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
+    },
+    {
+      "path": "skeleton/world",
+      "owner": "compatibility shim for skeleton/simulation/world",
+      "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
     }
   ],
   "classification_coverage": {
