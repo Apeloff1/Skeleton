@@ -83,11 +83,12 @@ class DeferredInvocation:
     latency_ms: int = 0
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "operation_id",
-            _text(self.operation_id, "operation_id"),
-        )
+        operation_id=_text(self.operation_id, "operation_id")
+        if len(operation_id)>256:
+            raise ValueError("operation_id must be at most 256 characters")
+        if any(ord(ch)<32 for ch in operation_id):
+            raise ValueError("operation_id must not contain control characters")
+        object.__setattr__(self, "operation_id", operation_id)
         volume_id = _text(self.volume_id, "volume_id")
         if not _VOLUME_RE.fullmatch(volume_id):
             raise ValueError("volume_id must be VOL-NNN")
@@ -240,6 +241,10 @@ class ExecutionOutcome:
     def __post_init__(self) -> None:
         if not isinstance(self.receipt, ExecutionReceipt):
             raise TypeError("receipt must be ExecutionReceipt")
+        result_json=_strict_json(self.result)
+        result_digest=hashlib.sha256(result_json.encode("utf-8")).hexdigest()
+        if result_digest!=self.receipt.result_digest:
+            raise ValueError("execution outcome result digest mismatch")
 
 
 class DeferredExecutionError(RuntimeError):
