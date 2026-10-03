@@ -5,6 +5,7 @@ import hashlib
 import pytest
 
 from skeleton.ai.runtime.training import (
+    CurriculumDecision,
     CurriculumEngine,
     CurriculumStage,
     DeterministicRLEnvironment,
@@ -220,4 +221,98 @@ def test_rl_ledger_rejects_evidence_after_terminal_receipt(tmp_path):
     )
     with pytest.raises(ValueError,match="already terminal"):
         ledger.record_step(after)
+
+def test_rl_receipt_rejects_boolean_or_zero_step():
+    base=dict(
+        environment_digest=_digest("env"),
+        episode_id="episode",
+        action="act",
+        reward=1.0,
+        terminal=False,
+        state_digest=_digest("state"),
+        next_state_digest=_digest("next"),
+    )
+    with pytest.raises(ValueError,match="positive integer"):
+        RLStepReceipt(step=True,**base)
+    with pytest.raises(ValueError,match="positive integer"):
+        RLStepReceipt(step=0,**base)
+
+
+def test_rl_receipt_requires_boolean_terminal_flag():
+    with pytest.raises(ValueError,match="terminal flag"):
+        RLStepReceipt(
+            environment_digest=_digest("env"),
+            episode_id="episode",
+            step=1,
+            action="act",
+            reward=1.0,
+            terminal="yes",
+            state_digest=_digest("state"),
+            next_state_digest=_digest("next"),
+        )
+
+
+def test_rl_ledger_detects_tampered_environment_payload(tmp_path):
+    spec=RLEnvironmentSpec(
+        environment_id="tamper-env",
+        version="1",
+        state_schema_digest=_digest("state"),
+        action_schema_digest=_digest("action"),
+        reward_logic_digest=_digest("reward"),
+    )
+    ledger=PostTrainingLedger(tmp_path/"tamper-env.sqlite3")
+    ledger.register_environment(spec)
+    ledger._db.execute(
+        "UPDATE environment SET payload=? WHERE environment_digest=?",
+        ('{"environment_id":"tampered","version":"1"}',spec.digest),
+    )
+    ledger._db.commit()
+    env=DeterministicRLEnvironment(spec,rewards={"go":1.0})
+    env.reset(episode_id="episode",seed=1)
+
+    with pytest.raises(ValueError,match="environment identity mismatch"):
+        ledger.record_step(env.step("go"))
+
+
+def test_rl_ledger_detects_tampered_prior_receipt(tmp_path):
+    spec=RLEnvironmentSpec(
+        environment_id="tamper-step",
+        version="1",
+        state_schema_digest=_digest("state-step"),
+        action_schema_digest=_digest("action-step"),
+        reward_logic_digest=_digest("reward-step"),
+    )
+    ledger=PostTrainingLedger(tmp_path/"tamper-step.sqlite3")
+    ledger.register_environment(spec)
+    env=DeterministicRLEnvironment(spec,rewards={"go":1.0})
+    env.reset(episode_id="episode",seed=2)
+    first=env.step("go")
+    ledger.record_step(first)
+    ledger._db.execute(
+        "UPDATE rl_step SET payload=? WHERE receipt_digest=?",
+        ('{"episode_id":"episode","step":1}',first.digest),
+    )
+    ledger._db.commit()
+
+    with pytest.raises(ValueError,match="receipt digest mismatch"):
+        ledger.record_step(env.step("go"))
+
+
+def test_curriculum_decision_rejects_forged_metric_shapes():
+    with pytest.raises(ValueError,match="advance decision requires metric"):
+        CurriculumDecision(
+            stage_id="foundation",
+            status="advance",
+            metric_value=None,
+            reason="claimed pass",
+            completed_before=(),
+        )
+    with pytest.raises(ValueError,match="blocked decision cannot carry metric"):
+        CurriculumDecision(
+            stage_id="reasoning",
+            status="blocked",
+            metric_value=1.0,
+            reason="missing prerequisite",
+            completed_before=(),
+        )
 
