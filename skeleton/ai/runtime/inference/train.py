@@ -17,6 +17,7 @@ import tempfile
 from typing import Mapping, Sequence
 
 from .artifact import load_local_model_artifact
+from .gated_neural import NumpyGatedRecurrentLM
 from .neural import NumpyRecurrentLM
 from .training_methods import (
     DEFAULT_TEXT_METHODS,
@@ -130,6 +131,7 @@ def _train_and_write(
     min_relative_improvement: float,
     shuffle_each_epoch: bool,
     gradient_accumulation_steps: int,
+    model_architecture: str,
     extra_receipt: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Train one model and atomically promote only verified bytes."""
@@ -148,7 +150,17 @@ def _train_and_write(
             "training documents must contain non-empty text"
         )
 
-    model = NumpyRecurrentLM.train(
+    architecture = str(model_architecture).strip().lower()
+    if architecture == "elman_recurrent":
+        trainer = NumpyRecurrentLM
+    elif architecture == "gated_recurrent":
+        trainer = NumpyGatedRecurrentLM
+    else:
+        raise LocalModelBuildError(
+            "model_architecture must be elman_recurrent or gated_recurrent"
+        )
+
+    model = trainer.train(
         rows,
         model_id=model_id,
         hidden_size=hidden_size,
@@ -237,6 +249,7 @@ def _train_and_write(
             "optimizer_steps": int(
                 getattr(model, "training_optimizer_steps", 0)
             ),
+            "model_architecture": architecture,
             "gradient_accumulation_steps": int(
                 getattr(
                     model,
@@ -282,6 +295,7 @@ def build_recurrent_artifact(
     min_relative_improvement: float = 0.0,
     shuffle_each_epoch: bool = True,
     gradient_accumulation_steps: int = 1,
+    model_architecture: str = "elman_recurrent",
 ) -> dict[str, object]:
     """Train, atomically write, reload, and attest one recurrent artifact."""
 
@@ -301,6 +315,7 @@ def build_recurrent_artifact(
         min_relative_improvement=min_relative_improvement,
         shuffle_each_epoch=shuffle_each_epoch,
         gradient_accumulation_steps=gradient_accumulation_steps,
+        model_architecture=model_architecture,
         extra_receipt={"training_mode": "plain_corpus"},
     )
 
@@ -323,6 +338,7 @@ def build_multi_method_recurrent_artifact(
     min_relative_improvement: float = 1e-4,
     shuffle_each_epoch: bool = True,
     gradient_accumulation_steps: int = 4,
+    model_architecture: str = "gated_recurrent",
 ) -> dict[str, object]:
     """Compile multiple learning families and train one bounded local artifact."""
 
@@ -357,6 +373,7 @@ def build_multi_method_recurrent_artifact(
         min_relative_improvement=min_relative_improvement,
         shuffle_each_epoch=shuffle_each_epoch,
         gradient_accumulation_steps=gradient_accumulation_steps,
+        model_architecture=model_architecture,
         extra_receipt={
             "training_mode": "multi_method",
             "training_plan": plan.as_dict(),
@@ -413,6 +430,12 @@ def _parser() -> argparse.ArgumentParser:
         default=1,
         help="Accumulate this many document gradients per optimizer update",
     )
+    parser.add_argument(
+        "--architecture",
+        choices=("elman_recurrent", "gated_recurrent"),
+        default="elman_recurrent",
+        help="Local recurrent architecture to train",
+    )
     return parser
 
 
@@ -433,6 +456,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         min_relative_improvement=args.min_relative_improvement,
         shuffle_each_epoch=not args.no_shuffle,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        model_architecture=args.architecture,
     )
     print(
         json.dumps(
