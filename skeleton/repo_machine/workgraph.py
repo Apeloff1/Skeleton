@@ -59,7 +59,11 @@ class WorkGraph:
     def fingerprint(self)->str:return self._fingerprint
     @property
     def critical_depth(self)->int:return max(self._depth.values(),default=0)
-    def as_dict(self): return {"fingerprint":self.fingerprint,"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure(),"strategic_value":self.strategic_value(),"bridge_candidates":list(self.bridge_candidates())}
+    def as_dict(self):
+        return {"fingerprint":self.fingerprint,"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],
+                "critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),
+                "coordination_pressure":self.pressure(),"strategic_value":self.strategic_value(),"bridge_candidates":list(self.bridge_candidates()),
+                "counterfactual_surface":list(self.counterfactual_surface(limit=8))}
     def frontier(self,completed:Iterable[str]=()):
         done=set(completed)
         return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity)))
@@ -72,7 +76,7 @@ class WorkGraph:
             selected.append(n); conflicts.update(n.conflict_keys)
             if len(selected)>=limit:break
         return tuple(selected)
-    def blocked(self,completed=()): 
+    def blocked(self,completed=()):
         done=set(completed); return tuple(n for n in self._ordered_nodes if n.identity not in done and any(p not in done for p in n.prerequisites))
     def unlock_potential(self,identity):return len(self._descendants[self.node(identity).identity])
     def critical_path(self):
@@ -128,16 +132,27 @@ class WorkGraph:
         done=set(completed);done.add(self.node(identity).identity)
         return max(0,self.pressure(completed)-self.pressure(done))
     def decision_surface(self,completed=(),*,limit:int=16)->tuple[dict[str,object],...]:
-        """Return a bounded, deterministic decision matrix for the actionable frontier."""
         if isinstance(limit,bool) or not isinstance(limit,int) or limit<1:raise ValueError("limit must be positive")
         rows=[]
         for n in self.frontier(completed)[:max(1,limit)]:
-            rows.append({"identity":n.identity,"risk_adjusted_influence":self.risk_adjusted_influence(n.identity),
-                         "verification_efficiency":self.verification_efficiency(n.identity),
-                         "counterfactual_unlock":self.counterfactual_unlock(n.identity,completed),
-                         "decision_margin":self.decision_margin(n.identity,completed),
+            rows.append({"identity":n.identity,"risk_adjusted_influence":self.risk_adjusted_influence(n.identity),"verification_efficiency":self.verification_efficiency(n.identity),
+                         "counterfactual_unlock":self.counterfactual_unlock(n.identity,completed),"decision_margin":self.decision_margin(n.identity,completed),
                          "pressure":self.node_pressure(n.identity),"downstream_value":self.downstream_value(n.identity)})
         return tuple(rows)
+    def counterfactual_surface(self,completed=(),*,limit:int=16)->tuple[dict[str,object],...]:
+        if isinstance(limit,bool) or not isinstance(limit,int) or not 1<=limit<=64:raise ValueError("limit must be in [1,64]")
+        done=set(completed); baseline=self.pressure(done); rows=[]
+        frontier=self.frontier(done)
+        for n in frontier[:limit]:
+            hypothetical=done|{n.identity}; after=self.pressure(hypothetical)
+            before_ready={x.identity for x in frontier}; after_ready={x.identity for x in self.frontier(hypothetical)}
+            newly=tuple(sorted(after_ready-before_ready))
+            rows.append({"identity":n.identity,"pressure_reduction":max(0,baseline-after),"projected_pressure":after,
+                         "newly_unblocked":list(newly[:16]),"newly_unblocked_count":len(newly),
+                         "risk_adjusted_influence":self.risk_adjusted_influence(n.identity),
+                         "strategic_value":self.influence(n.identity)})
+        rows.sort(key=lambda r:(-r["pressure_reduction"],-r["newly_unblocked_count"],-r["risk_adjusted_influence"],-r["strategic_value"],r["identity"]))
+        return tuple(rows[:limit])
     def bridge_candidates(self,*,limit:int=16)->tuple[str,...]:
         scored=[]
         for n in self._ordered_nodes:
