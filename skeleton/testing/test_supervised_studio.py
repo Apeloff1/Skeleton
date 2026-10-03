@@ -544,3 +544,31 @@ def test_canonical_items_rejects_unbounded_plan_count(tmp_path):
     )
     with pytest.raises(ValueError, match="exceeds 256 plan items"):
         supervised_studio._canonical_items(state, 1)
+
+
+def test_execution_receipt_is_deterministic_and_patch_bound():
+    from skeleton.automation.studio_director import PlannedTask
+
+    task = PlannedTask(
+        title="Receipt",
+        objective="Bind exact execution.",
+        division="qa_verification",
+        paths=("docs/example.md",),
+    )
+    kwargs = dict(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[("plan-1", task)],
+        patch="diff-body",
+        accepted=1,
+    )
+    first = supervised_studio._execution_receipt(**kwargs)
+    second = supervised_studio._execution_receipt(**kwargs)
+    assert first == second
+    assert first["patch_sha256"] == hashlib.sha256(b"diff-body").hexdigest()
+    assert len(first["receipt_sha256"]) == 64
+
+    changed = supervised_studio._execution_receipt(**{**kwargs, "patch": "different"})
+    assert changed["receipt_sha256"] != first["receipt_sha256"]
