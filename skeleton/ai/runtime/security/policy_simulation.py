@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from types import MappingProxyType
-from typing import Mapping
+from typing import Iterable, Mapping
 
 
 _DECISIONS = frozenset({"allow", "deny", "abstain"})
@@ -184,9 +184,104 @@ class PolicySimulation:
         )
 
 
+def _index_traces(
+    name: str,
+    traces: Iterable[PolicyTrace],
+) -> dict[str, PolicyTrace]:
+    rows: dict[str, PolicyTrace] = {}
+    try:
+        iterator = iter(traces)
+    except TypeError as exc:
+        raise PolicySimulationError(f"{name} traces must be iterable") from exc
+    for trace in iterator:
+        if not isinstance(trace, PolicyTrace):
+            raise PolicySimulationError(f"{name} traces must contain PolicyTrace values")
+        if trace.trace_id in rows:
+            raise PolicySimulationError(f"{name} trace IDs must be unique")
+        rows[trace.trace_id] = trace
+    return rows
+
+
+def _trace_set_digest(rows: Mapping[str, PolicyTrace]) -> str:
+    return _digest(
+        [
+            {
+                "trace_id": trace.trace_id,
+                "subject_id": trace.subject_id,
+                "workload_id": trace.workload_id,
+                "decision": trace.decision,
+            }
+            for _, trace in sorted(rows.items())
+        ]
+    )
+
+
+def simulate_policy_change(
+    *,
+    simulation_id: str,
+    baseline_policy_id: str,
+    candidate_policy_id: str,
+    baseline_traces: Iterable[PolicyTrace],
+    candidate_traces: Iterable[PolicyTrace],
+) -> PolicySimulation:
+    """Compare two decision traces without executing either policy.
+
+    The two trace sets must describe the exact same governed subjects and
+    workloads. This prevents a candidate from appearing safer by omitting
+    difficult cases or relabeling identities. Only decision values may differ.
+    """
+
+    baseline = _index_traces("baseline", baseline_traces)
+    candidate = _index_traces("candidate", candidate_traces)
+    if set(baseline) != set(candidate):
+        raise PolicySimulationError(
+            "baseline and candidate must cover the exact same trace IDs"
+        )
+
+    deltas: list[PolicyDelta] = []
+    transition_counts: dict[str, int] = {}
+    for trace_id in sorted(baseline):
+        before = baseline[trace_id]
+        after = candidate[trace_id]
+        if (
+            before.subject_id != after.subject_id
+            or before.workload_id != after.workload_id
+        ):
+            raise PolicySimulationError(
+                f"trace identity drifted for {trace_id}"
+            )
+        if before.decision == after.decision:
+            continue
+        delta = PolicyDelta(
+            trace_id=trace_id,
+            subject_id=before.subject_id,
+            workload_id=before.workload_id,
+            baseline_decision=before.decision,
+            candidate_decision=after.decision,
+        )
+        deltas.append(delta)
+        transition_counts[delta.transition] = (
+            transition_counts.get(delta.transition, 0) + 1
+        )
+
+    return PolicySimulation(
+        simulation_id=simulation_id,
+        baseline_policy_id=baseline_policy_id,
+        candidate_policy_id=candidate_policy_id,
+        baseline_trace_digest=_trace_set_digest(baseline),
+        candidate_trace_digest=_trace_set_digest(candidate),
+        total_traces=len(baseline),
+        deltas=tuple(deltas),
+        transition_counts=transition_counts,
+        affected_subjects=tuple(delta.subject_id for delta in deltas),
+        affected_workloads=tuple(delta.workload_id for delta in deltas),
+    )
+
+
 __all__ = [
     "PolicyDelta",
     "PolicySimulation",
     "PolicySimulationError",
     "PolicyTrace",
+    "simulate_policy_change",
 ]
