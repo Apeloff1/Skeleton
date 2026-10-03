@@ -13,6 +13,7 @@ from skeleton.ai.runtime.extensions import (
     ImageRegion,
     MarketplacePackage,
     MarketplaceVerifier,
+    MediaMetadata,
     MediaTransform,
     MultimodalAsset,
     MultimodalHit,
@@ -30,7 +31,9 @@ from skeleton.ai.runtime.extensions import (
     ToolRegistry,
     TranscriptSegment,
     VideoAsset,
+    detect_document_text_conflict,
     fuse_scores,
+    sample_video_timestamps,
 )
 
 
@@ -55,6 +58,15 @@ def test_multimodal_asset_identity_is_deterministic() -> None:
     assert _asset("a").digest != _asset("b").digest
 
 
+def test_media_metadata_requires_coherent_dimensions_and_finite_duration() -> None:
+    metadata = MediaMetadata("image/png", "png", width=640, height=480)
+    assert len(metadata.digest) == 64
+    with pytest.raises(ValueError, match="supplied together"):
+        MediaMetadata("image/png", "png", width=640)
+    with pytest.raises(ValueError, match="duration"):
+        MediaMetadata("audio/wav", "wav", duration_seconds=float("inf"))
+
+
 def test_multimodal_registry_rejects_byte_bomb_before_decode() -> None:
     registry = MultimodalRegistry(limits=ResourceLimits(max_bytes=8))
     with pytest.raises(ValueError, match="byte limit"):
@@ -75,6 +87,11 @@ def test_image_budget_and_region_geometry_fail_closed() -> None:
 def test_ocr_confidence_is_bounded() -> None:
     with pytest.raises(ValueError, match="confidence"):
         OCRSpan(_d("doc"), 1, "hello", 0, 0, 10, 10, 1.01)
+
+
+def test_document_vision_detects_ocr_text_layer_conflict() -> None:
+    assert detect_document_text_conflict("same   text", "same text") is False
+    assert detect_document_text_conflict("invoice total 10", "invoice total 100") is True
 
 
 def test_audio_segment_preserves_source_time_bounds() -> None:
@@ -143,6 +160,27 @@ def test_speech_sequence_mismatch_fails_closed() -> None:
     session.transition("active")
     with pytest.raises(ValueError, match="sequence"):
         session.append(TranscriptSegment("speech-3", 2, "late", 0.0, 0.1, False))
+
+
+def test_speech_backpressure_and_timestamp_regression_fail_closed() -> None:
+    session = SpeechSession("speech-4", max_segments=1)
+    session.transition("active")
+    session.append(TranscriptSegment("speech-4", 0, "one", 1.0, 1.1, False))
+    with pytest.raises(BufferError, match="backpressure"):
+        session.append(TranscriptSegment("speech-4", 1, "two", 1.1, 1.2, False))
+
+    ordered = SpeechSession("speech-5")
+    ordered.transition("active")
+    ordered.append(TranscriptSegment("speech-5", 0, "one", 2.0, 2.1, False))
+    with pytest.raises(ValueError, match="monotonic"):
+        ordered.append(TranscriptSegment("speech-5", 1, "two", 1.0, 1.1, False))
+
+
+def test_video_sampling_plan_is_bounded_before_decode() -> None:
+    video = VideoAsset(_d("sample-video"), 640, 360, 5.0, 30.0)
+    assert sample_video_timestamps(video, interval_seconds=2.0, max_samples=3) == (0.0, 2.0, 4.0)
+    with pytest.raises(ValueError, match="max_samples"):
+        sample_video_timestamps(video, interval_seconds=1.0, max_samples=3)
 
 
 def _hit(
