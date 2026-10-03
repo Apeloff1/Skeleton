@@ -147,10 +147,14 @@ def consume_plan(
         separators=(",", ":"),
     )
     generation_id = hashlib.sha256(generation_seed.encode("utf-8")).hexdigest()[:20]
+    plan_digest = hashlib.sha256(
+        json.dumps(team_items[:32], sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
     state["_shift_supervisor"] = {
         "source": "canonical-plan-issue",
         "status": "loaded",
         "generation_id": generation_id,
+        "plan_digest_sha256": plan_digest,
         "issue_number": issue_number,
         "updated_at": updated.isoformat(),
         "max_age_minutes": max_age_minutes,
