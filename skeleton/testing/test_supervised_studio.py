@@ -803,3 +803,56 @@ def test_canonical_items_rejects_malformed_allocation_nonce(tmp_path):
     path.write_text(json.dumps(state), encoding="utf-8")
     with pytest.raises(ValueError, match="nonce is malformed"):
         supervised_studio._canonical_items(path, 1)
+
+
+def test_transaction_journal_detects_tampering(tmp_path):
+    path = tmp_path / "tx.json"
+    payload = {"schema": "autonomous-studio.transaction.v1", "phase": "prepared", "base_commit_sha": "a" * 40}
+    supervised_studio._write_transaction(path, payload)
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    loaded["phase"] = "validated"
+    path.write_text(json.dumps(loaded), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="integrity mismatch"):
+        supervised_studio._load_transaction(path)
+
+
+def test_transaction_journal_round_trip(tmp_path):
+    path = tmp_path / "tx.json"
+    payload = {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "validating",
+        "base_commit_sha": "a" * 40,
+        "new_paths": ["skeleton/new.py"],
+    }
+    supervised_studio._write_transaction(path, payload)
+    loaded = supervised_studio._load_transaction(path)
+    assert loaded["phase"] == "validating"
+    assert len(loaded["journal_sha256"]) == 64
+
+
+def test_recovery_refuses_changed_head(tmp_path, monkeypatch):
+    path = tmp_path / "tx.json"
+    supervised_studio._write_transaction(path, {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "applied",
+        "base_commit_sha": "a" * 40,
+        "new_paths": [],
+    })
+    monkeypatch.setattr(supervised_studio, "_git", lambda *args, **kwargs: "b" * 40 if args[:2] == ("rev-parse", "HEAD") else "")
+    with pytest.raises(RuntimeError, match="HEAD changed"):
+        supervised_studio._recover_interrupted_transaction(path)
+
+
+def test_committed_transaction_is_cleaned_without_reset(tmp_path, monkeypatch):
+    path = tmp_path / "tx.json"
+    supervised_studio._write_transaction(path, {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "committed",
+        "base_commit_sha": "a" * 40,
+        "new_paths": [],
+    })
+    calls = []
+    monkeypatch.setattr(supervised_studio, "_git", lambda *args, **kwargs: calls.append(args) or "")
+    supervised_studio._recover_interrupted_transaction(path)
+    assert not path.exists()
+    assert calls == []
