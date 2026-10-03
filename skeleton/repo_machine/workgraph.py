@@ -63,7 +63,18 @@ class WorkGraph:
 
     def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure()}
     def frontier(self,completed:Iterable[str]=()):
-        done=set(completed); return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity))
+        done=set(completed)
+        return tuple(
+            sorted(
+                (
+                    n
+                    for n in self._ordered_nodes
+                    if n.identity not in done
+                    and all(p in done for p in n.prerequisites)
+                ),
+                key=lambda n:(-n.strategic_score,-n.priority,n.identity),
+            )
+        )
     def ready(self,completed=(),active_conflicts=(),*,limit=8):
         done=set(completed); unknown=done-set(self._by_identity)
         if unknown: raise ValueError("completed contains unknown work identities")
