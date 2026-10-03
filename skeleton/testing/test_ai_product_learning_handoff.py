@@ -264,6 +264,7 @@ def test_candidate_artifact_can_use_adaptive_method_allocation(
         (user, assistant),
         accepted_assistant_message_ids=(assistant.message_id,),
     )
+
     def digest(value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -324,6 +325,68 @@ def test_candidate_artifact_can_use_adaptive_method_allocation(
         item.method.value: item.repeat
         for item in allocation.method_weights
     }
+
+
+def test_adaptive_allocation_rejects_missing_multiview_signal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from skeleton.ai.runtime.inference.training_allocation import (
+        MethodValidationObservation,
+        TrainingAllocationPolicy,
+        allocate_training_methods,
+    )
+    from skeleton.ai.runtime.inference.training_methods import TrainingMethod
+    import hashlib
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+
+    def digest(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    allocation = allocate_training_methods(
+        (
+            MethodValidationObservation(
+                method=TrainingMethod.MULTIVIEW_GROUNDING,
+                evaluation_class="mirror_validation",
+                validation_gain=1.0,
+                compute_units=1.0,
+                evaluation_digest=digest("multiview-eval"),
+                plan_digest=digest("multiview-plan"),
+                sample_count=8,
+            ),
+        ),
+        available_methods=(
+            TrainingMethod.SUPERVISED_INSTRUCTION,
+            TrainingMethod.CAUSAL_LANGUAGE_MODELING,
+            TrainingMethod.SELF_SUPERVISED_SPAN,
+            TrainingMethod.MULTIVIEW_GROUNDING,
+        ),
+        policy=TrainingAllocationPolicy(
+            max_repeat_per_method=3,
+            max_total_repeats=6,
+        ),
+    )
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+
+    with pytest.raises(
+        CanonicalLearningHandoffError,
+        match="without required training signals",
+    ):
+        build_learning_candidate_artifact(
+            candidate,
+            output_path=tmp_path / "impossible-multiview.json",
+            model_id="impossible-multiview",
+            hidden_size=8,
+            epochs=1,
+            max_vocab=32,
+            max_document_tokens=64,
+            method_allocation=allocation,
+        )
 
 
 def test_candidate_artifact_is_trainable_but_remains_unpromoted(
