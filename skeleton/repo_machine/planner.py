@@ -1,9 +1,10 @@
-"""Convert repository organization findings into bounded machine work candidates."""
+"""Dependency-aware bounded work planning for autonomous repository agents."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
 
+from .impact import analyze_impact
 from .model import Finding, RepositoryModel
 
 _SEVERITY = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}
@@ -26,6 +27,10 @@ class WorkCandidate:
     path: str
     objective: str
     evidence: tuple[str, ...]
+    impact_score: int = 0
+    change_class: str = "unknown"
+    verification_paths: tuple[str, ...] = ()
+    dependency_zones: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -36,6 +41,10 @@ class WorkCandidate:
             "path": self.path,
             "objective": self.objective,
             "evidence": list(self.evidence),
+            "impact_score": self.impact_score,
+            "change_class": self.change_class,
+            "verification_paths": list(self.verification_paths),
+            "dependency_zones": list(self.dependency_zones),
         }
 
 
@@ -68,24 +77,54 @@ def derive_work_candidates(
 ) -> tuple[WorkCandidate, ...]:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 512:
         raise ValueError("limit must be in [1,512]")
+
     candidates: list[WorkCandidate] = []
     for finding in model.findings:
-        score = _SEVERITY[finding.severity] * 100 + _CODE_WEIGHT.get(finding.code, 0)
-        candidates.append(WorkCandidate(
-            identity=finding.identity,
-            lane=_lane(finding),
-            priority=score,
-            zone=finding.zone,
-            path=finding.path,
-            objective=_objective(finding),
-            evidence=finding.evidence,
-        ))
-    candidates.sort(key=lambda item: (-item.priority, item.zone, item.path, item.identity))
+        base = _SEVERITY[finding.severity] * 100 + _CODE_WEIGHT.get(finding.code, 0)
+        if finding.path:
+            impact = analyze_impact(model, (finding.path,), transitive_depth=3)
+            # Risk is a planning signal, not a claim that the work is dangerous.
+            priority = min(500, base + impact.risk_score)
+            dependency_zones = tuple(sorted(
+                set(impact.transitively_affected_zones) - set(impact.touched_zones)
+            ))
+            evidence = tuple(sorted(set(finding.evidence + impact.reasons)))
+            candidates.append(WorkCandidate(
+                identity=finding.identity,
+                lane=_lane(finding),
+                priority=priority,
+                zone=finding.zone,
+                path=finding.path,
+                objective=_objective(finding),
+                evidence=evidence,
+                impact_score=impact.risk_score,
+                change_class=impact.change_class,
+                verification_paths=impact.verification_paths,
+                dependency_zones=dependency_zones,
+            ))
+        else:
+            candidates.append(WorkCandidate(
+                identity=finding.identity,
+                lane=_lane(finding),
+                priority=base,
+                zone=finding.zone,
+                path=finding.path,
+                objective=_objective(finding),
+                evidence=finding.evidence,
+            ))
+
+    candidates.sort(key=lambda item: (-item.priority, -item.impact_score, item.zone, item.path, item.identity))
     return tuple(candidates[:limit])
 
 
-def candidate_payload(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
+def plan_work(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
+    candidates = derive_work_candidates(model, limit=limit)
     return {
         "repository_fingerprint": model.fingerprint,
-        "work": [item.as_dict() for item in derive_work_candidates(model, limit=limit)],
+        "planning_model": "severity + finding class + bounded topology impact",
+        "work": [item.as_dict() for item in candidates],
     }
+
+
+def candidate_payload(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
+    return plan_work(model, limit=limit)
