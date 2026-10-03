@@ -1,7 +1,7 @@
 """Conflict-aware work graph derived from repository organization evidence."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from .model import RepositoryModel
@@ -35,6 +35,14 @@ class WorkNode:
 @dataclass(frozen=True, slots=True)
 class WorkGraph:
     nodes: tuple[WorkNode, ...]
+    _ordered_nodes: tuple[WorkNode, ...] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "_ordered_nodes",
+            tuple(sorted(self.nodes, key=lambda item: (-item.priority, item.identity))),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {"nodes": [node.as_dict() for node in self.nodes]}
@@ -49,7 +57,7 @@ class WorkGraph:
         done = set(completed)
         conflicts = set(active_conflicts)
         ready: list[WorkNode] = []
-        for node in sorted(self.nodes, key=lambda item: (-item.priority, item.identity)):
+        for node in self._ordered_nodes:
             if any(prerequisite not in done for prerequisite in node.prerequisites):
                 continue
             if any(key in conflicts for key in node.conflict_keys):
