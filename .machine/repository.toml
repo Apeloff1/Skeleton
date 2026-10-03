@@ -626,6 +626,8 @@ lifecycle = "canonical"
 [ignore]
 prefixes = [
   ".git/",
+  # Generated machine artifacts are outputs of the indexer, not inventory inputs.
+  ".machine/",
   # Local runtime state, never source inventory. Canonical provenance remains indexed.
   ".skeleton/",
   "chronicle/",
