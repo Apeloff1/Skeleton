@@ -9,6 +9,7 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/multimodal/**"
       - "skeleton/api/engine_runtime.py"
       - "skeleton/ai/runtime/api/engine_runtime.py"
       - "skeleton/api/engine_routes.py"
@@ -40,6 +41,7 @@ on:
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_ai_product_learning_handoff.py"
       - "skeleton/testing/test_multi_method_training.py"
+      - "skeleton/testing/test_visual_learning.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
@@ -58,6 +60,7 @@ on:
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/ai/runtime/functional_ai.py"
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/multimodal/**"
       - "skeleton/api/engine_runtime.py"
       - "skeleton/ai/runtime/api/engine_runtime.py"
       - "skeleton/api/engine_routes.py"
@@ -89,6 +92,7 @@ on:
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_ai_product_learning_handoff.py"
       - "skeleton/testing/test_multi_method_training.py"
+      - "skeleton/testing/test_visual_learning.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
@@ -140,6 +144,7 @@ jobs:
           "matplotlib>=3.8,<4"
           "networkx>=3.2,<4"
           "numpy==2.4.6"
+          "Pillow>=11,<13"
           "matplotlib==3.11.2"
           "networkx==3.6.1"
       - name: Compile canonical product and compatibility runtimes
@@ -182,6 +187,7 @@ jobs:
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_ai_product_learning_handoff.py
           skeleton/testing/test_multi_method_training.py
+          skeleton/testing/test_visual_learning.py
           skeleton/testing/test_learning_qualification.py
           skeleton/testing/test_model_program_bridge.py
           skeleton/testing/test_local_model_artifact.py
