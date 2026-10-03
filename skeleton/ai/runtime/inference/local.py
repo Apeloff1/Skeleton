@@ -318,24 +318,100 @@ class ReferenceNGramModel:
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "ReferenceNGramModel":
+        if not isinstance(payload, Mapping):
+            raise TypeError("local model payload must be a mapping")
+        allowed_top_level = {
+            "schema_version",
+            "kind",
+            "model_id",
+            "order",
+            "transitions",
+            "model_digest",
+        }
+        unknown_top_level = set(payload) - allowed_top_level
+        if unknown_top_level:
+            raise ValueError(
+                "unsupported local model artifact key(s): "
+                + ", ".join(sorted(map(str, unknown_top_level)))
+            )
+        if payload.get("schema_version") != 1:
+            raise ValueError("unsupported local model schema_version")
         if payload.get("kind") != "reference_ngram":
             raise ValueError("unsupported local model kind")
+
+        order=payload.get("order")
+        if isinstance(order,bool) or not isinstance(order,int) or not 1 <= order <= 8:
+            raise ValueError("order must be an integer in [1, 8]")
+        model_id=payload.get("model_id")
+        if not isinstance(model_id,str) or not model_id.strip():
+            raise ValueError("model_id must be non-empty text")
+
+        rows=payload.get("transitions")
+        if not isinstance(rows,list) or not rows:
+            raise ValueError("transitions must be a non-empty list")
         transitions: dict[tuple[str, ...], dict[str, int]] = {}
-        for row in payload.get("transitions", []):
+        for index,row in enumerate(rows):
             if not isinstance(row, Mapping):
-                raise ValueError("invalid transition row")
-            transitions[tuple(map(str, row.get("context", [])))] = {
-                str(key): int(value)
-                for key, value in dict(row.get("counts", {})).items()
-            }
+                raise ValueError(f"transition row {index} must be an object")
+            unknown_row_keys = set(row) - {"context", "counts"}
+            if unknown_row_keys:
+                raise ValueError(
+                    f"transition row {index} contains unsupported key(s): "
+                    + ", ".join(sorted(map(str, unknown_row_keys)))
+                )
+            context_raw=row.get("context")
+            counts_raw=row.get("counts")
+            if not isinstance(context_raw,list) or any(
+                not isinstance(token,str) for token in context_raw
+            ):
+                raise ValueError(
+                    f"transition row {index} context must contain only strings"
+                )
+            context=tuple(context_raw)
+            if len(context)>order:
+                raise ValueError(
+                    f"transition row {index} context exceeds model order"
+                )
+            if context in transitions:
+                raise ValueError(
+                    f"duplicate transition context at row {index}"
+                )
+            if not isinstance(counts_raw,Mapping) or not counts_raw:
+                raise ValueError(
+                    f"transition row {index} counts must be a non-empty object"
+                )
+            counts:dict[str,int]={}
+            for token,value in counts_raw.items():
+                if not isinstance(token,str) or not token:
+                    raise ValueError(
+                        f"transition row {index} token ids must be non-empty strings"
+                    )
+                if (
+                    isinstance(value,bool)
+                    or not isinstance(value,int)
+                    or value <= 0
+                ):
+                    raise ValueError(
+                        f"transition row {index} counts must be positive integers"
+                    )
+                counts[token]=value
+            transitions[context]=counts
+
         model = cls(
-            order=int(payload["order"]),
+            order=order,
             transitions=transitions,
-            model_id=str(payload["model_id"]),
+            model_id=model_id,
         )
         claimed = payload.get("model_digest")
-        if claimed is not None and claimed != model.model_digest:
-            raise ValueError("local model digest mismatch")
+        if claimed is not None:
+            if (
+                not isinstance(claimed,str)
+                or len(claimed)!=64
+                or any(ch not in "0123456789abcdef" for ch in claimed)
+            ):
+                raise ValueError("model_digest must be lowercase sha256")
+            if claimed != model.model_digest:
+                raise ValueError("local model digest mismatch")
         return model
 
     def _choose(self, context: Sequence[str], rng: random.Random) -> str:
