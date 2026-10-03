@@ -654,3 +654,54 @@ def test_execution_receipt_contains_replay_key():
         plan_digest="a" * 64,
         seed="seed",
     )
+
+
+def test_replay_key_changes_with_repository_base():
+    first = supervised_studio._replay_key(
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        base_commit_sha="1" * 40,
+    )
+    second = supervised_studio._replay_key(
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        base_commit_sha="2" * 40,
+    )
+    assert first != second
+
+
+def test_verify_execution_receipt_rejects_wrong_schema():
+    receipt = {
+        "schema": "unknown",
+        "receipt_sha256": "a" * 64,
+    }
+    with pytest.raises(ValueError, match="schema is unsupported"):
+        supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_verify_execution_receipt_rejects_forged_replay_key():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run",
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "p",
+            PlannedTask("T", "O", "qa_verification", ("docs/example.md",)),
+        )],
+        patch="patch",
+        accepted=1,
+        base_commit_sha="1" * 40,
+    )
+    receipt["replay_key_sha256"] = "f" * 64
+    payload = dict(receipt)
+    payload.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    with pytest.raises(ValueError, match="replay key mismatch"):
+        supervised_studio.verify_execution_receipt(receipt)
