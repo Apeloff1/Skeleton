@@ -59,6 +59,10 @@ const mitigationChecks = new Map([
     'GHSA-86w9-cpqp-85rv',
     {
       module: 'node-forge',
+      pathAllowed: (dependencyPath) =>
+        /^(?:expo>)?@expo\/cli>(?:node-forge|@expo\/code-signing-certificates>node-forge)$/.test(
+          dependencyPath,
+        ),
       verify: () => hardenedFileContains(
         'node_modules/node-forge/lib/rsa.js',
         [
@@ -73,6 +77,16 @@ const mitigationChecks = new Map([
     'GHSA-vfj7-8cjw-p6xm',
     {
       module: 'braces',
+      pathAllowed: (dependencyPath) => {
+        const expoCli =
+          dependencyPath.startsWith('@expo/cli>') ||
+          dependencyPath.startsWith('expo>@expo/cli>');
+        return (
+          expoCli &&
+          dependencyPath.includes('>metro') &&
+          dependencyPath.endsWith('>metro-file-map>micromatch>braces')
+        );
+      },
       verify: () => hardenedFileContains(
         'node_modules/braces/lib/parse.js',
         [
@@ -94,7 +108,15 @@ function isVerifiedMitigation(item) {
     );
   }
   const rule = mitigationChecks.get(item.ghsa);
-  return Boolean(rule && rule.module === item.module && rule.verify());
+  return Boolean(
+    rule &&
+    rule.module === item.module &&
+    item.patchedVersions === '<0.0.0' &&
+    item.paths.length > 0 &&
+    item.paths.every((dependencyPath) => rule.pathAllowed(dependencyPath)) &&
+    process.env.FRONTEND_RUNTIME_BOUNDARY_VERIFIED === 'success' &&
+    rule.verify()
+  );
 }
 
 const findings = [];
@@ -174,11 +196,20 @@ for (const line of auditText.split(/\r?\n/)) {
   observedBlockingMask |= severityBit;
 
   const ghsa = String(advisory.github_advisory_id || '');
+  const paths = Array.isArray(advisory.findings)
+    ? advisory.findings.flatMap((finding) =>
+        Array.isArray(finding && finding.paths)
+          ? finding.paths.map((value) => String(value))
+          : []
+      )
+    : [];
   const item = {
     module: String(advisory.module_name || 'unknown'),
     severity,
     ghsa,
     title: String(advisory.title || ''),
+    patchedVersions: String(advisory.patched_versions || ''),
+    paths,
   };
   if (isVerifiedMitigation(item)) {
     mitigated.push(item);
