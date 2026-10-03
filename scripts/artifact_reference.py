@@ -24,6 +24,10 @@ SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,127}$")
 ALLOWED_MODES = frozenset({"100644", "100755"})
+ALLOWED_REFERENCE_ROOTS = (
+    "satellites/branch-snapshots/",
+    "memory/mongo_backup/",
+)
 ENTRY_KEYS = frozenset(
     {
         "id",
@@ -106,9 +110,9 @@ def _relative_snapshot_path(value: Any, *, field: str) -> str:
         raise ArtifactReferenceError(f"{field} must be a normalized relative path")
     if "\\" in text or ":" in text or any(part in {"", ".", ".."} for part in text.split("/")):
         raise ArtifactReferenceError(f"{field} contains invalid path segments")
-    if not text.startswith("satellites/branch-snapshots/"):
+    if not any(text.startswith(root) for root in ALLOWED_REFERENCE_ROOTS):
         raise ArtifactReferenceError(
-            f"{field} must stay within satellites/branch-snapshots"
+            f"{field} must stay within an approved artifact-history root"
         )
     return text
 

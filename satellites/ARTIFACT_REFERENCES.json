@@ -109,6 +109,18 @@
       "license": "NOASSERTION",
       "redistribution_status": "internal-historical-data-do-not-redistribute",
       "provenance_note": "Historical test-database BSON duplicate retained only through immutable Git history; the canonical repository copy remains tracked."
+    },
+    {
+      "id": "canonical-quiz-backup",
+      "target_path": "memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "source_path": "memory/mongo_backup/test_database/interactive_quizzes.bson",
+      "git_blob_oid": "70b3ac3f344aaf55dc55686690acd141c0e1979f",
+      "sha256": "4630940970532b4b0e0cfe8964b5fc93333fa2057376e41d37a2ee7c0e4aaf13",
+      "size_bytes": 14595602,
+      "mode": "100644",
+      "license": "NOASSERTION",
+      "redistribution_status": "internal-historical-data-do-not-redistribute",
+      "provenance_note": "Canonical historical test-database BSON backup removed from the live tree after duplicate consumers were eliminated; immutable Git history remains the reconstruction source."
     }
   ]
 }
