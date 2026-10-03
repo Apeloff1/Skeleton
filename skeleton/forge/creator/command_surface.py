@@ -42,6 +42,7 @@ MAX_RESULT_BYTES: Final = 512 * 1024
 
 _ID_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,159}$")
 _PROJECT_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,127}$")
+_TOKEN_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,159}$")
 
 
 class CreatorCommandError(SkeletonError):
@@ -218,13 +219,13 @@ _OPERATION_SPECS: Final = (
         fields=(
             FieldSpec(
                 "format",
-                "identifier",
+                "token",
                 True,
                 "Export format or adapter identifier.",
             ),
             FieldSpec(
                 "artifact_name",
-                "identifier",
+                "token",
                 True,
                 "Logical artifact name; this is not a filesystem path.",
             ),
@@ -318,6 +319,22 @@ def _identifier(value: object, *, field: str) -> str:
     return value
 
 
+def _token(value: object, *, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or value != value.strip()
+        or not value
+        or len(value) > MAX_IDENTIFIER_CHARS
+        or _TOKEN_RE.fullmatch(value) is None
+    ):
+        _fail(
+            f"{field} is not a canonical token",
+            reason="field_type",
+            field=field,
+        )
+    return value
+
+
 def _bounded_json(value: object, *, field: str) -> object:
     nodes = 0
 
@@ -351,13 +368,16 @@ def _bounded_json(value: object, *, field: str) -> object:
         if isinstance(current, dict):
             if len(current) > MAX_OBJECT_FIELDS:
                 _fail(f"{field} object exceeds field bound", reason="bound", field=field)
-            normalized: dict[str, object] = {}
-            for key in sorted(current):
+            checked: list[tuple[str, object]] = []
+            for key, item in current.items():
                 if not isinstance(key, str) or not key or key != key.strip():
                     _fail(f"{field} contains invalid object key", reason="field_type", field=field)
                 if len(key) > MAX_IDENTIFIER_CHARS:
                     _fail(f"{field} object key exceeds bound", reason="bound", field=field)
-                normalized[key] = visit(current[key], depth + 1)
+                checked.append((key, item))
+            normalized: dict[str, object] = {}
+            for key, item in sorted(checked, key=lambda pair: pair[0]):
+                normalized[key] = visit(item, depth + 1)
             return normalized
         _fail(f"{field} contains unsupported JSON type", reason="json_type", field=field)
 
@@ -426,6 +446,11 @@ def _validate_payload(operation: str, payload: object) -> dict[str, object]:
             normalized[field_spec.name] = list(
                 _identifier_list(value, field=field_spec.name)
             )
+        elif field_spec.kind == "token":
+            normalized[field_spec.name] = _token(
+                value,
+                field=field_spec.name,
+            )
         elif field_spec.kind == "non_negative_integer":
             if (
                 isinstance(value, bool)
@@ -483,6 +508,8 @@ def build_creator_command(
     if not isinstance(operation, str) or operation not in OPERATIONS:
         _fail("unsupported creator operation", reason="unknown_operation", operation=operation)
     canonical_project = _project_id(project_id)
+    if not isinstance(payload, Mapping):
+        _fail("creator payload must be an object", reason="malformed")
     normalized_payload = _validate_payload(operation, dict(payload))
     command_payload = _command_payload(
         operation=operation,
