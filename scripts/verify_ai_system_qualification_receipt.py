@@ -552,16 +552,8 @@ def _semantic_pass(
     if requirement == "finalization.lineage":
         return bool(
             _detail_text(details, "execution_id") == expected_subject
-            and _integer(
-                details,
-                "memory_ref_count",
-                minimum=1,
-            ) >= 1
-            and _integer(
-                details,
-                "artifact_ref_count",
-                minimum=1,
-            ) >= 1
+            and _integer(details, "memory_ref_count") >= 1
+            and _integer(details, "artifact_ref_count") >= 1
             and _boolean(
                 details,
                 "stream_terminal_bound",
