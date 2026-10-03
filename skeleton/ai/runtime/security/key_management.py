@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+from typing import Iterable
 
 
 _STATES = frozenset({"active", "retired", "revoked"})
@@ -241,10 +242,80 @@ def record_key_rotation(
     )
 
 
+def validate_key_history(
+    versions: Iterable[KeyVersion],
+    rotations: Iterable[KeyRotation],
+) -> str:
+    """Validate an immutable version/rotation chain and return its digest."""
+
+    version_rows = tuple(versions)
+    rotation_rows = tuple(rotations)
+    if not version_rows:
+        raise KeyManagementError("key history must contain at least one version")
+    if any(not isinstance(item, KeyVersion) for item in version_rows):
+        raise KeyManagementError("key history must contain KeyVersion values")
+    if any(not isinstance(item, KeyRotation) for item in rotation_rows):
+        raise KeyManagementError("key history must contain KeyRotation values")
+
+    ordered = tuple(sorted(version_rows, key=lambda item: item.version))
+    if len({item.version for item in ordered}) != len(ordered):
+        raise KeyManagementError("key history version numbers must be unique")
+    key_ids = {item.key_id for item in ordered}
+    if len(key_ids) != 1:
+        raise KeyManagementError("key history cannot mix key identities")
+    if ordered[0].version != 1 or ordered[0].predecessor_digest is not None:
+        raise KeyManagementError("key history must start at version 1")
+
+    for previous, current in zip(ordered, ordered[1:]):
+        if current.version != previous.version + 1:
+            raise KeyManagementError("key history versions must be contiguous")
+        if current.predecessor_digest != previous.digest:
+            raise KeyManagementError("key history predecessor digest mismatch")
+        if current.created_at_ns < previous.created_at_ns:
+            raise KeyManagementError("key history creation times must be monotonic")
+
+    if len(rotation_rows) != max(0, len(ordered) - 1):
+        raise KeyManagementError("key history requires one rotation per transition")
+    if len({item.rotation_id for item in rotation_rows}) != len(rotation_rows):
+        raise KeyManagementError("key rotation IDs must be unique")
+
+    by_transition = {
+        (item.from_version, item.to_version): item
+        for item in rotation_rows
+    }
+    if len(by_transition) != len(rotation_rows):
+        raise KeyManagementError("key history rotation transitions must be unique")
+
+    for previous, current in zip(ordered, ordered[1:]):
+        rotation = by_transition.get((previous.version, current.version))
+        if rotation is None:
+            raise KeyManagementError("key history is missing rotation evidence")
+        if rotation.key_id != previous.key_id:
+            raise KeyManagementError("rotation evidence key identity mismatch")
+        if rotation.from_version_digest != previous.digest:
+            raise KeyManagementError("rotation source digest mismatch")
+        if rotation.to_version_digest != current.digest:
+            raise KeyManagementError("rotation destination digest mismatch")
+        if rotation.rotated_at_ns < current.created_at_ns:
+            raise KeyManagementError("rotation receipt predates destination version")
+
+    return _digest(
+        {
+            "key_id": ordered[0].key_id,
+            "versions": [item.digest for item in ordered],
+            "rotations": [
+                by_transition[(previous.version, current.version)].digest
+                for previous, current in zip(ordered, ordered[1:])
+            ],
+        }
+    )
+
+
 __all__ = [
     "KeyId",
     "KeyManagementError",
     "KeyRotation",
     "KeyVersion",
     "record_key_rotation",
+    "validate_key_history",
 ]
