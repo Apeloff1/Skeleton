@@ -362,6 +362,54 @@ class ModelDevelopmentRegistry:
         self._artifacts[artifact.model_digest] = artifact
         return artifact, receipt
 
+    def register_external_training(
+        self,
+        artifact: ModelArtifact,
+        receipt: TrainingReceipt,
+    ) -> tuple[ModelArtifact, TrainingReceipt]:
+        """Register an independently trained artifact after exact identity checks.
+
+        This does not promote the model. It only admits already-materialized
+        training evidence into the canonical registry so later promotion uses
+        the same receipt/artifact authority as registry-native training.
+        """
+
+        if not isinstance(artifact, ModelArtifact):
+            raise TypeError("artifact must be ModelArtifact")
+        if not isinstance(receipt, TrainingReceipt):
+            raise TypeError("receipt must be TrainingReceipt")
+        if artifact.model_id != receipt.model_id:
+            raise ModelProgramError(
+                "external artifact/receipt model id drift"
+            )
+        if artifact.model_digest != receipt.model_digest:
+            raise ModelProgramError(
+                "external artifact/receipt model digest drift"
+            )
+        if artifact.artifact_digest != receipt.artifact_digest:
+            raise ModelProgramError(
+                "external artifact/receipt artifact digest drift"
+            )
+        if artifact.training_run_id != receipt.run_id:
+            raise ModelProgramError(
+                "external artifact/receipt run identity drift"
+            )
+
+        prior_receipt = self._receipts.get(receipt.run_id)
+        if prior_receipt is not None and prior_receipt != receipt:
+            raise ModelProgramError(
+                "external training run id is already bound differently"
+            )
+        prior_artifact = self._artifacts.get(artifact.model_digest)
+        if prior_artifact is not None and prior_artifact != artifact:
+            raise ModelProgramError(
+                "external model digest is already bound differently"
+            )
+
+        self._receipts[receipt.run_id] = receipt
+        self._artifacts[artifact.model_digest] = artifact
+        return artifact, receipt
+
     def promote(
         self,
         *,
