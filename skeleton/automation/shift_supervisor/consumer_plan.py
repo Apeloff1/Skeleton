@@ -180,8 +180,28 @@ def consume_plan(
         )
 
     durable = decode_durable_state(str(canonical.get("body", "")))
+    progress = plan_progress(durable.get("plan_items", []), team)
     team_items = _executable_team_items(durable.get("plan_items", []), team)
     if not team_items:
+        if progress["terminal"]:
+            state["_shift_supervisor"] = {
+                "source": "canonical-plan-issue",
+                "status": "complete",
+                "generation_id": "",
+                "plan_digest_sha256": hashlib.sha256(b"[]").hexdigest(),
+                "issue_number": canonical.get("number"),
+                "updated_at": updated.isoformat(),
+                "max_age_minutes": max_age_minutes,
+                "team": team,
+                "plan_items": [],
+                "progress": progress,
+            }
+            state[issue_key] = [
+                dict(item)
+                for item in issues
+                if str(item.get("title", "")) not in ({PLAN_TITLE} | STATUS_TITLES)
+            ]
+            return state, {}
         raise CanonicalPlanError(f"canonical supervisor plan has no executable {team} items")
 
     issue_number = canonical.get("number")
@@ -198,7 +218,6 @@ def consume_plan(
     plan_digest = hashlib.sha256(
         json.dumps(team_items[:32], sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     ).hexdigest()
-    progress = plan_progress(durable.get("plan_items", []), team)
     state["_shift_supervisor"] = {
         "source": "canonical-plan-issue",
         "status": "loaded",
@@ -280,6 +299,13 @@ def _summary(team: str, state: Mapping[str, Any], *, error: str | None = None) -
         return "\n".join(lines) + "\n"
     supervisor = state.get("_shift_supervisor", {})
     items = supervisor.get("plan_items", []) if isinstance(supervisor, Mapping) else []
+    if supervisor.get("status") == "complete":
+        lines += [
+            "Status: **canonical plan complete**",
+            "",
+            f"{team.title()} canonical queue: **drained**",
+        ]
+        return "\n".join(lines) + "\n"
     lines += [
         "Status: **canonical plan loaded**",
         "",
