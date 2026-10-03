@@ -23,7 +23,6 @@ import json
 import os
 from pathlib import Path
 import re
-import tempfile
 from typing import Iterable, Sequence
 
 from skeleton.contracts.conversation import (
@@ -32,6 +31,12 @@ from skeleton.contracts.conversation import (
 )
 from skeleton.persistence.conversation_repository import (
     SQLiteConversationRepository,
+)
+from skeleton.ai.runtime.inference.training_methods import (
+    MethodWeight,
+    TrainingEfficiencyPolicy,
+    TrainingExample,
+    TrainingMethod,
 )
 
 
@@ -531,6 +536,10 @@ def build_learning_candidate_artifact(
     max_document_tokens: int = 1_024,
     seed: int = 0,
     temperature: float = 0.8,
+    training_methods: Sequence[
+        TrainingMethod | MethodWeight
+    ] = tuple(TrainingMethod),
+    efficiency_policy: TrainingEfficiencyPolicy | None = None,
 ) -> dict[str, object]:
     """Train one *candidate* artifact from an accepted canonical corpus.
 
@@ -575,35 +584,34 @@ def build_learning_candidate_artifact(
             "candidate output parent directory does not exist"
         )
 
-    # Lazy import keeps the product runtime dependency-light when NumPy/local
-    # training is not installed.
+    # Lazy import keeps NumPy out of product import-time dependencies.
     from skeleton.ai.runtime.inference.train import (
         LocalModelBuildError,
-        build_recurrent_artifact,
+        build_multi_method_recurrent_artifact,
     )
 
-    temp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            errors="strict",
-            prefix=".learning-candidate-",
-            suffix=".txt",
-            dir=str(parent),
-            delete=False,
-            newline="\n",
-        ) as handle:
-            handle.write("\n\n".join(candidate.documents))
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-            temp_path = Path(handle.name)
+    examples = tuple(
+        TrainingExample(
+            example_id=pair.assistant_message_id,
+            prompt=pair.user_text,
+            response=pair.assistant_text,
+            difficulty=0.5,
+            source_ref=(
+                "conversation-assistant:"
+                + pair.assistant_message_id
+            ),
+            replay=False,
+        )
+        for pair in candidate.pairs
+    )
 
-        receipt = build_recurrent_artifact(
-            corpus_paths=(temp_path,),
+    try:
+        receipt = build_multi_method_recurrent_artifact(
+            examples=examples,
             output_path=destination_resolved,
             model_id=model_id,
+            methods=training_methods,
+            efficiency_policy=efficiency_policy,
             hidden_size=hidden_size,
             epochs=epochs,
             learning_rate=learning_rate,
@@ -680,13 +688,6 @@ def build_learning_candidate_artifact(
         raise CanonicalLearningHandoffError(
             "local-model candidate executable qualification failed"
         ) from exc
-    finally:
-        if temp_path is not None:
-            try:
-                temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
     evaluation_manifest: dict[str, object] = {
         "schema_version": "skeleton.product.learning-evaluation-input.v1",
         "learning_candidate_digest": candidate.identity_digest,
@@ -694,6 +695,11 @@ def build_learning_candidate_artifact(
         "candidate_model_id": receipt["model_id"],
         "candidate_model_digest": receipt["model_digest"],
         "qualification_receipt_digest": qualification["receipt_digest"],
+        "training_plan_digest": receipt["training_plan"]["plan_digest"],
+        "training_methods": [
+            item["method"]
+            for item in receipt["training_plan"]["methods"]
+        ],
         "baseline": baseline,
         "promotion_authority": False,
     }
@@ -708,6 +714,7 @@ def build_learning_candidate_artifact(
         "learning_pair_count": len(candidate.pairs),
         "promotion_state": "candidate_only",
         "qualification": qualification,
+        "training_plan": receipt["training_plan"],
         "evaluation_manifest": evaluation_manifest,
     }
 
