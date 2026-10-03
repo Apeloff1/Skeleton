@@ -20,13 +20,15 @@ def _bounded(payload,limit):
     compact["truncated_for_context"]=True
     while not _fits(compact,limit):
         changed=False
-        for key in ("files","work","findings","subsystems","topology","coordination"):
+        for key in ("files","work","findings","subsystems","topology","coordination","intelligence"):
             value=compact.get(key)
             if isinstance(value,list) and value:
                 compact[key]=value[:max(1,len(value)//2)]; changed=True
             elif isinstance(value,dict) and value:
                 if key=="topology":
                     e=value.get("edges",[]); compact[key]={"edges":e[:max(1,len(e)//2)],"cycles":value.get("cycles",[])[:4]}; changed=True
+                elif key=="intelligence":
+                    compact[key]={"graph_fingerprint":value.get("graph_fingerprint"),"strategic_value":value.get("strategic_value",0),"bridge_candidates":value.get("bridge_candidates",[])[:8]}; changed=True
                 elif key=="coordination":
                     d=value.get("decisions",[]); compact[key]={"decisions":d[:max(1,len(d)//2)],"bottleneck":value.get("bottleneck"),"frontier_size":value.get("frontier_size",0),
                                                               "max_parallelism":value.get("max_parallelism",0),"coordination_pressure":value.get("coordination_pressure",0)}; changed=True
@@ -40,9 +42,11 @@ def _bounded(payload,limit):
 def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_limit:int=MAX_CONTEXT_BYTES):
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")
     query=RepositoryQuery(model); graph=build_work_graph(model,limit=32)
+    coordination=build_coordination_plan(model,limit=8,graph=graph); execution=build_execution_plan(model,limit=8,graph=graph)
+    intelligence={"graph_fingerprint":graph.fingerprint,"strategic_value":graph.strategic_value(),"coordination_pressure":graph.pressure(),"critical_path_depth":graph.critical_depth,"bottleneck":graph.bottleneck(),"safe_parallel_groups":[list(x) for x in graph.safe_parallel_groups(limit=4)],"bridge_candidates":list(graph.bridge_candidates(limit=12))}
     base={"intent":intent,"fingerprint":model.fingerprint,"health":repository_health(model).as_dict(),"metrics":structural_metrics(model).as_dict(),
           "subsystems":[x.as_dict() for x in model.subsystems],"work":[x.as_dict() for x in graph.ordered_nodes],
-          "coordination":build_coordination_plan(model,limit=8,graph=graph),"execution":build_execution_plan(model,limit=8,graph=graph).as_dict(),
+          "coordination":coordination,"execution":execution.as_dict(),"intelligence":intelligence,
           "findings":[x.as_dict() for x in model.findings[:40]]}
     if intent=="architecture": base["topology"]={"edges":[x.as_dict() for x in model.edges],"cycles":[list(x) for x in model.cycles]}; base["files"]=[x.as_dict() for x in query.largest_files(limit=40).files]
     elif intent=="testing": base["files"]=[x.as_dict() for x in query.verification_files(tuple(x.name for x in model.subsystems),limit=100).files]
