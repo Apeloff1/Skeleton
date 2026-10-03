@@ -243,6 +243,11 @@ class MirrorCandidate:
         )
 
     @property
+    def parameter_digest(self) -> str:
+        """Behavior-state identity independent of candidate naming metadata."""
+        return _digest(self.parameters)
+
+    @property
     def digest(self) -> str:
         return _digest(self.payload())
 
@@ -397,6 +402,7 @@ class MirrorBudget:
     max_total_steps: int = 100_000
     max_total_tokens: int = 4_000_000
     max_total_cost_units: float = 256.0
+    max_validation_candidate_evaluations: int = 32
 
     def __post_init__(self) -> None:
         for field in (
@@ -405,6 +411,7 @@ class MirrorBudget:
             "max_episodes",
             "max_total_steps",
             "max_total_tokens",
+            "max_validation_candidate_evaluations",
         ):
             object.__setattr__(self, field, _positive_int(field, getattr(self, field)))
         cost = _finite("max_total_cost_units", self.max_total_cost_units, minimum=0.0)
@@ -422,6 +429,7 @@ class MirrorBudget:
                 "max_total_steps": self.max_total_steps,
                 "max_total_tokens": self.max_total_tokens,
                 "max_total_cost_units": self.max_total_cost_units,
+                "max_validation_candidate_evaluations": self.max_validation_candidate_evaluations,
             }
         )
 
