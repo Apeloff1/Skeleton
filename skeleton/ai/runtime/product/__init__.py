@@ -13,6 +13,7 @@ from .learning import (
     CanonicalLearningPair,
     build_learning_candidate,
     build_learning_candidate_artifact,
+    build_learning_candidate_from_repository,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "CanonicalLearningPair",
     "build_learning_candidate",
     "build_learning_candidate_artifact",
+    "build_learning_candidate_from_repository",
 ]
