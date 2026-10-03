@@ -38,6 +38,7 @@ from .studio_invariants import require_subset
 from .studio_outcomes import OutcomeReceipt
 from .studio_artifact_custody import ArtifactCustody
 from .studio_promotion import PromotionEvidence, require_promotable
+from .build_integration import integration_commands
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
@@ -722,6 +723,28 @@ def propose(
         raise
 
     diff = _git("diff", "--no-ext-diff", "--binary")
+    if diff:
+        aggregate_paths = _changed_paths(diff)
+        aggregate_commands = integration_commands(aggregate_paths)
+        aggregate_ok, aggregate_output = _run_validation_commands(aggregate_commands)
+        if not aggregate_ok:
+            _git("reset", "--hard", "HEAD", check=False)
+            audit.emit(
+                "run_failed_closed",
+                stage="aggregate_integration_validation",
+                commands=[list(command) for command in aggregate_commands],
+                output=list(aggregate_output),
+                accepted_tasks=accepted,
+                emitted_patch_chars=0,
+                status="failed_closed",
+            )
+            raise RuntimeError("aggregate autonomous build integration validation failed")
+        audit.emit(
+            "aggregate_integration_validated",
+            commands=[list(command) for command in aggregate_commands],
+            output=list(aggregate_output),
+            paths=list(aggregate_paths),
+        )
     if len(diff) > MAX_TOTAL_PATCH_CHARS:
         _git("reset", "--hard", "HEAD", check=False)
         audit.emit(
