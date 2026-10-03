@@ -14,6 +14,8 @@ Commands:
     plan        Jeeves BuildPlan for a vision / era
     cockpit     Apply one cockpit command
     walk        Prove spawn→extract on the emitted door graph
+                (--mode thermal, --seed S, --all-eras, --steps, --json)
+    doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
@@ -344,12 +346,9 @@ def _cmd_shared_command(rest: List[str]) -> int:
     return result.exit_code
 
 
-def _cmd_eras(_rest: List[str]) -> int:
-    from skeleton.forge.eras import list_eras, compile_era
-    for era in list_eras():
-        pack = compile_era(era)
-        print(f"{era:22} dps={pack['primary_dps']:<7} speed={pack['player']['speed']}")
-    return 0
+def _cmd_eras(rest: List[str]) -> int:
+    from skeleton.forge.walk_cli import run_eras
+    return run_eras(rest)
 
 
 def _cmd_generations(_rest: List[str]) -> int:
@@ -397,29 +396,13 @@ def _parse_walk_args(rest: List[str]):
 
 
 def _cmd_walk(rest: List[str]) -> int:
-    from skeleton.forge.eras import blend_eras, compile_era
-    from skeleton.forge.walk import walk_from_pack
-    from skeleton.jeeves.builder import BuilderBrain
-    from skeleton.context.tensor import ContextTensor
-    from skeleton.context.dodeca import Dodecahedron
-    from skeleton.context.oracle import Magic8Ball
-    era, blend, t, as_json = _parse_walk_args(rest)
-    if blend:
-        pack = blend_eras(blend[0], blend[1], t)
-        tensor = ContextTensor.from_era(blend[0]).lerp(ContextTensor.from_era(blend[1]), t)
-    else:
-        pack = compile_era(era)
-        tensor = ContextTensor.from_era(era)
-    reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-    plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
-    wr = walk_from_pack(pack, plan=plan.to_dict())
-    payload = wr.to_dict()
-    payload["plan"] = {"bias": plan.room_bias, "extract_late": plan.extract_late, "era": plan.era}
-    if as_json:
-        print(json.dumps(payload, indent=2, default=str))
-    else:
-        print(f"extracted={wr.extracted} t={wr.t:.2f} hops={wr.hops} cores={wr.cores}/{wr.required_cores}")
-    return 0 if wr.passed else 1
+    from skeleton.forge.walk_cli import run_walk
+    return run_walk(rest)
+
+
+def _cmd_doctor(rest: List[str]) -> int:
+    from skeleton.forge.walk_cli import run_doctor
+    return run_doctor(rest)
 
 
 def _parse_run_args(rest: List[str]):
@@ -519,6 +502,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "plan": return _cmd_plan(rest)
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
+    if cmd == "doctor": return _cmd_doctor(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "invoke": return _cmd_invoke(rest)
