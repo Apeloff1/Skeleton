@@ -139,8 +139,112 @@ class KeyVersion:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class KeyRotation:
+    """Evidence that one key version was superseded by another."""
+
+    rotation_id: str
+    key_id: str
+    from_version: int
+    to_version: int
+    from_version_digest: str
+    to_version_digest: str
+    reason_code: str
+    rotated_at_ns: int
+    key_material_present: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rotation_id", _token("rotation_id", self.rotation_id))
+        object.__setattr__(self, "key_id", _token("key_id", self.key_id))
+        object.__setattr__(
+            self,
+            "from_version",
+            _positive_int("from_version", self.from_version),
+        )
+        object.__setattr__(
+            self,
+            "to_version",
+            _positive_int("to_version", self.to_version),
+        )
+        if self.to_version <= self.from_version:
+            raise KeyManagementError("rotation must advance key version")
+        object.__setattr__(
+            self,
+            "from_version_digest",
+            _sha256("from_version_digest", self.from_version_digest),
+        )
+        object.__setattr__(
+            self,
+            "to_version_digest",
+            _sha256("to_version_digest", self.to_version_digest),
+        )
+        object.__setattr__(self, "reason_code", _token("reason_code", self.reason_code))
+        object.__setattr__(
+            self,
+            "rotated_at_ns",
+            _non_negative_int("rotated_at_ns", self.rotated_at_ns),
+        )
+        if self.key_material_present is not False:
+            raise KeyManagementError("KeyRotation cannot carry key material")
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "rotation_id": self.rotation_id,
+                "key_id": self.key_id,
+                "from_version": self.from_version,
+                "to_version": self.to_version,
+                "from_version_digest": self.from_version_digest,
+                "to_version_digest": self.to_version_digest,
+                "reason_code": self.reason_code,
+                "rotated_at_ns": self.rotated_at_ns,
+                "key_material_present": False,
+            }
+        )
+
+
+def record_key_rotation(
+    *,
+    rotation_id: str,
+    previous: KeyVersion,
+    current: KeyVersion,
+    reason_code: str,
+    rotated_at_ns: int,
+) -> KeyRotation:
+    """Bind a rotation receipt to exact immutable version metadata."""
+
+    if not isinstance(previous, KeyVersion):
+        raise TypeError("previous must be KeyVersion")
+    if not isinstance(current, KeyVersion):
+        raise TypeError("current must be KeyVersion")
+    if previous.key_id != current.key_id:
+        raise KeyManagementError("rotation cannot change key identity")
+    if current.version <= previous.version:
+        raise KeyManagementError("rotation must advance key version")
+    if current.predecessor_digest != previous.digest:
+        raise KeyManagementError("new key version must bind predecessor digest")
+    if current.created_at_ns < previous.created_at_ns:
+        raise KeyManagementError("new key version cannot predate previous version")
+    if rotated_at_ns < current.created_at_ns:
+        raise KeyManagementError("rotation receipt cannot predate new key version")
+
+    return KeyRotation(
+        rotation_id=rotation_id,
+        key_id=previous.key_id,
+        from_version=previous.version,
+        to_version=current.version,
+        from_version_digest=previous.digest,
+        to_version_digest=current.digest,
+        reason_code=reason_code,
+        rotated_at_ns=rotated_at_ns,
+    )
+
+
 __all__ = [
     "KeyId",
     "KeyManagementError",
+    "KeyRotation",
     "KeyVersion",
+    "record_key_rotation",
 ]
