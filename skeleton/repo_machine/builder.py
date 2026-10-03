@@ -225,9 +225,12 @@ class RepositoryModelBuilder:
                 if self._ignored(rel):
                     continue
                 result.append(path)
-                if len(result) >= self.config.max_files:
+                # Look one file past the limit so an exactly-at-limit repository
+                # is not falsely reported as truncated. The returned inventory
+                # remains bounded to max_files.
+                if len(result) > self.config.max_files:
                     truncated = True
-                    return result, truncated
+                    return result[: self.config.max_files], truncated
         return result, truncated
 
     def _record(self, path: Path) -> FileRecord:
