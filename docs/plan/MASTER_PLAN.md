@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.6.0**
+Plan version: **1.7.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -12,7 +12,9 @@ Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`m
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
-Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md) / [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
+Historical execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md) / [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
+
+Current continuation frontier: [`MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md`](MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md) / [`machine/ai_masterplan_continuation_frontier.json`](../../machine/ai_masterplan_continuation_frontier.json)
 
 ## 1. Authority and relationship to existing PR #1904 contracts
 
@@ -23,6 +25,14 @@ For **current runtime truth**, the existing fail-closed machine contracts remain
 For **target architecture, research scope, construction order, and completion criteria**, this master plan and `machine/ai_master_plan.json` are authoritative.
 
 If target and current state differ, the difference is a gap to close. It is not permission to bypass the current contract.
+
+## 1.1 Current continuation authority
+
+The live continuation authority is `machine/ai_masterplan_continuation_frontier.json`. It preserves terminal P0/P1 gap closure and the bounded P1 terminal frontier while continuing breadth through the landed P2/P3 handoffs.
+
+The conserved chain is **421 → 107 closed / 314 deferred → 57 / 257 → 23 / 234 → 37 / 197**. The next tranche is deliberately only **planned**: 32 of the exact 197 P3-T1 deferred volume identities are scheduled into one consolidated learning/native-training/multimodal/model-lifecycle frontier and 165 remain explicit.
+
+Historical planning ledgers do not reopen a terminal phase. Unmerged candidate branches do not become implementation evidence merely because their scheduling ideas are reconciled into the master plan. Current-main exact-head evidence and a separate closure authority remain mandatory.
 
 ## 2. Mission
 

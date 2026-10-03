@@ -36,9 +36,13 @@ Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
 
-Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md)
+Historical execution frontier (2026-09-24): [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md)
 
 Machine execution frontier: [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
+
+Current continuation frontier: [`MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md`](MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md)
+
+Machine continuation frontier: [`machine/ai_masterplan_continuation_frontier.json`](../../machine/ai_masterplan_continuation_frontier.json)
 
 P1 trustworthy-production execution map: [`P1_EXECUTION_MAP.md`](P1_EXECUTION_MAP.md)
 
@@ -215,7 +219,7 @@ The current execution frontier then binds live implementation candidates back to
 
 The P1 execution map begins after that functional closure. It selects 107 primary volumes for trustworthy-production maturity, keeps 314 volumes explicitly deferred, and orders evidence, core intelligence quality, safe autonomy, product truth, controlled learning, release/recovery, distributed capacity and terminal promotion without expanding architecture breadth.
 
-The P2 execution map begins from that terminal P1 boundary and takes the 314 deferred volume references as its exact source scope. Its first tranche schedules 42 control-heavy volumes while keeping 272 explicitly queued, so breadth can deepen without losing scope accounting or reopening P1 guarantees.
+The P2 execution map begins from that terminal P1 boundary and takes the 314 deferred volume references as its exact source scope. The bounded P2 functional closure now preserves 57 evidence-scheduled volumes and 257 explicit deferred volumes. P3-T0 then schedules 23 of those 257 and preserves 234; P3-T1 schedules 37 of those 234 and preserves the exact 197-volume continuation source. The current continuation frontier plans one consolidated 32-volume P3-T2 learning/native-training/multimodal/model-lifecycle tranche while keeping 165 explicit. No planning partition grants maturity or completion authority.
 
 The task matrix propagates those obligations into every atomic AIQ item, preserving queue completion semantics while preventing task-local acceptance from narrowing package-level engineering proof.
 
