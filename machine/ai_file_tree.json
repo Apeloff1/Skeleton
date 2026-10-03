@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.2",
+  "tree_version": "1.6.3",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -1242,7 +1242,7 @@
       "source": "skeleton/data",
       "destination": "skeleton/ai/runtime/data",
       "kind": "tree",
-      "source_git_object_sha": "4f15354ee8e7ea83828ece8f8460bd22722239a4",
+      "source_git_object_sha": "4ac1adb3c773ec9986e6b036388487a5e98d06f8",
       "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
       "work_package_refs": [
         "WP-W03",
@@ -1255,7 +1255,12 @@
       "volume_refs": [
         "VOL-005",
         "VOL-039",
-        "VOL-139"
+        "VOL-139",
+        "VOL-137",
+        "VOL-138",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
       ],
       "migration_action": "mirror_then_cutover",
       "cutover_preconditions": [
@@ -1269,7 +1274,7 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_governed_data_tree_exactly_mirrored_with_p3t2_ingestion_document_lineage_quality_registry_synthetic_controls"
     },
     {
       "id": "AIFT-DEVELOPER",
@@ -6008,6 +6013,20 @@
       "head_sha": "299c7ed0b2aa0bf767b9adacd51f7e4cb1e672e1",
       "refreshed_mapping_count": 11,
       "policy": "Current-main semantic mapping metadata preserved; #2441 readiness/version corrections merged and all source identities recomputed against the reconciled repair tree."
+    },
+    "p3t2_data_candidate": {
+      "head_sha": "b550adc9259d815329c57a4b76968bb4259a567e",
+      "source_tree_sha": "4ac1adb3c773ec9986e6b036388487a5e98d06f8",
+      "task_id": "P3T2-DATA-01",
+      "volume_refs": [
+        "VOL-137",
+        "VOL-138",
+        "VOL-139",
+        "VOL-140",
+        "VOL-141",
+        "VOL-142"
+      ],
+      "policy": "Canonical skeleton/data remains source authority and is exactly mirrored into skeleton/ai/runtime/data for the P3-T2 data candidate."
     }
   }
 }
