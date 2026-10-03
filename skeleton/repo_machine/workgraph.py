@@ -69,8 +69,13 @@ class WorkGraph:
         return tuple(ready)
 
 
-def _conflicts(candidate: WorkCandidate) -> tuple[str, ...]:
+def _conflicts(
+    candidate: WorkCandidate,
+    dependents_by_zone: dict[str, tuple[str, ...]] | None = None,
+) -> tuple[str, ...]:
     keys = {f"zone:{candidate.zone}", f"lane:{candidate.lane}"}
+    if dependents_by_zone:
+        keys.update(f"dependent-zone:{zone}" for zone in dependents_by_zone.get(candidate.zone, ()))
     if candidate.path:
         keys.add(f"path:{candidate.path}")
     return tuple(sorted(keys))
@@ -91,6 +96,15 @@ def build_work_graph(model: RepositoryModel, *, limit: int = 128) -> WorkGraph:
         ):
             best_prerequisite[candidate.zone] = candidate
 
+    reverse_dependencies: dict[str, set[str]] = {}
+    for subsystem in model.subsystems:
+        for dependency in subsystem.dependencies:
+            reverse_dependencies.setdefault(dependency, set()).add(subsystem.name)
+    dependents_by_zone = {
+        zone: tuple(sorted(values))
+        for zone, values in reverse_dependencies.items()
+    }
+
     nodes: list[WorkNode] = []
     for candidate in candidates:
         prerequisites: list[str] = []
@@ -107,7 +121,7 @@ def build_work_graph(model: RepositoryModel, *, limit: int = 128) -> WorkGraph:
             zone=candidate.zone,
             priority=candidate.priority,
             objective=candidate.objective,
-            conflict_keys=_conflicts(candidate),
+            conflict_keys=_conflicts(candidate, dependents_by_zone),
             prerequisites=tuple(sorted(set(prerequisites))),
             evidence=candidate.evidence,
         ))
