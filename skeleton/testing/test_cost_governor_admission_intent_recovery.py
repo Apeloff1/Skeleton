@@ -530,3 +530,69 @@ def test_tampered_admission_decision_intent_fails_closed(
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "active_reservations"
     ] == 1
+
+
+def test_decision_persistence_failure_allocates_no_authority(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    request = _request("op-intent-write-failure")
+    governor = _governor(quota_path, pressure_path)
+    assert governor._journal is not None
+
+    def reject_decision(*_args, **_kwargs):
+        raise RuntimeError("simulated durable intent write failure")
+
+    monkeypatch.setattr(
+        governor._journal,
+        "record_admission_decision",
+        reject_decision,
+    )
+
+    with pytest.raises(
+        Exception,
+        match="admission_decision_persistence_failed",
+    ):
+        governor.reserve(
+            request,
+            now_monotonic=10.0,
+            now_wall=10.0,
+        )
+
+    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 0
+    assert _pressure(pressure_path).snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=10.5,
+    ).active == 0
+    assert _intent_count(quota_path) == 1
+
+
+def test_successful_reserve_clears_admission_intent(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    request = _request("op-intent-clean-success")
+    governor = _governor(quota_path, pressure_path)
+
+    receipt = governor.reserve(
+        request,
+        now_monotonic=10.0,
+        now_wall=10.0,
+    )
+
+    assert receipt.operation_id == request.operation_id
+    assert _intent_count(quota_path) == 0
+    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 1
+    assert _pressure(pressure_path).snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=10.5,
+    ).active == 1
