@@ -33,6 +33,16 @@ def _decision(value: object) -> str:
     return result
 
 
+def _sha256(name: str, value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise PolicySimulationError(f"{name} must be a lowercase sha256 digest")
+    return value
+
+
 def _canonical_json(value: object) -> str:
     try:
         return json.dumps(
@@ -123,7 +133,21 @@ class PolicySimulation:
             object.__setattr__(self, name, _token(name, getattr(self, name)))
         if self.baseline_policy_id == self.candidate_policy_id:
             raise PolicySimulationError("candidate policy must differ from baseline policy")
-        if isinstance(self.total_traces, bool) or not isinstance(self.total_traces, int) or self.total_traces < 0:
+        object.__setattr__(
+            self,
+            "baseline_trace_digest",
+            _sha256("baseline_trace_digest", self.baseline_trace_digest),
+        )
+        object.__setattr__(
+            self,
+            "candidate_trace_digest",
+            _sha256("candidate_trace_digest", self.candidate_trace_digest),
+        )
+        if (
+            isinstance(self.total_traces, bool)
+            or not isinstance(self.total_traces, int)
+            or self.total_traces < 0
+        ):
             raise PolicySimulationError("total_traces must be a non-negative integer")
         if self.production_authority is not False:
             raise PolicySimulationError("policy simulation cannot grant production authority")
@@ -132,24 +156,44 @@ class PolicySimulation:
         if len(self.deltas) > self.total_traces:
             raise PolicySimulationError("delta count exceeds total traces")
 
+        if any(not isinstance(delta, PolicyDelta) for delta in self.deltas):
+            raise PolicySimulationError("deltas must contain PolicyDelta values")
+        trace_ids = [delta.trace_id for delta in self.deltas]
+        if len(trace_ids) != len(set(trace_ids)):
+            raise PolicySimulationError("delta trace IDs must be unique")
+
         counts = dict(self.transition_counts)
-        if any(
-            transition not in {
-                f"{left}->{right}"
-                for left in _DECISIONS
-                for right in _DECISIONS
-                if left != right
-            }
-            for transition in counts
-        ):
-            raise PolicySimulationError("unknown policy transition")
-        if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts.values()):
-            raise PolicySimulationError("transition counts must be non-negative integers")
-        if sum(counts.values()) != len(self.deltas):
+        expected_counts: dict[str, int] = {}
+        for delta in self.deltas:
+            expected_counts[delta.transition] = (
+                expected_counts.get(delta.transition, 0) + 1
+            )
+        if counts != expected_counts:
             raise PolicySimulationError("transition counts do not match deltas")
-        object.__setattr__(self, "transition_counts", MappingProxyType(dict(sorted(counts.items()))))
-        object.__setattr__(self, "affected_subjects", tuple(sorted(set(self.affected_subjects))))
-        object.__setattr__(self, "affected_workloads", tuple(sorted(set(self.affected_workloads))))
+        object.__setattr__(
+            self,
+            "transition_counts",
+            MappingProxyType(dict(sorted(counts.items()))),
+        )
+
+        expected_subjects = tuple(
+            sorted({delta.subject_id for delta in self.deltas})
+        )
+        expected_workloads = tuple(
+            sorted({delta.workload_id for delta in self.deltas})
+        )
+        supplied_subjects = tuple(
+            sorted({_token("affected_subject", value) for value in self.affected_subjects})
+        )
+        supplied_workloads = tuple(
+            sorted({_token("affected_workload", value) for value in self.affected_workloads})
+        )
+        if supplied_subjects != expected_subjects:
+            raise PolicySimulationError("affected subjects do not match deltas")
+        if supplied_workloads != expected_workloads:
+            raise PolicySimulationError("affected workloads do not match deltas")
+        object.__setattr__(self, "affected_subjects", supplied_subjects)
+        object.__setattr__(self, "affected_workloads", supplied_workloads)
 
     @property
     def changed_traces(self) -> int:
