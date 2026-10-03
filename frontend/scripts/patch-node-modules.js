@@ -132,6 +132,105 @@ function patchImageSizeDoS() {
   );
 }
 
+function patchForgeDigestAlgorithmStructure() {
+  const pkgPath = path.join(ROOT, 'node_modules/node-forge/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  if (version !== '1.4.0') {
+    throw new Error(`[patch-node-modules] node-forge ${version} requires RSA verifier review`);
+  }
+
+  const rel = 'node_modules/node-forge/lib/rsa.js';
+  const abs = path.join(ROOT, rel);
+  const src = fs.readFileSync(abs, 'utf8');
+  const hardened = [
+    'obj.value.length !== 2 ||',
+    'obj.value[0].value.length < 1 ||',
+    'obj.value[0].value.length > 2'
+  ].every((marker) => src.includes(marker));
+  if (hardened) {
+    skipped++;
+    return;
+  }
+
+  const vulnerable =
+`          if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
+            obj.value.length !== 2) {`;
+  const replacement =
+`          if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
+            obj.value.length !== 2 ||
+            obj.value[0].value.length < 1 ||
+            obj.value[0].value.length > 2) {`;
+  if (!src.includes(vulnerable)) {
+    throw new Error('[patch-node-modules] node-forge RSA verifier changed shape; review required');
+  }
+  const out = src.replace(vulnerable, replacement);
+  if (out === src || !out.includes('obj.value[0].value.length > 2')) {
+    throw new Error('[patch-node-modules] failed to harden node-forge RSA verifier');
+  }
+  fs.writeFileSync(abs, out, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
+}
+
+function patchBracesNestingDoS() {
+  const pkgPath = path.join(ROOT, 'node_modules/braces/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  if (version !== '3.0.3') {
+    throw new Error(`[patch-node-modules] braces ${version} requires nesting-guard review`);
+  }
+
+  const rel = 'node_modules/braces/lib/parse.js';
+  const abs = path.join(ROOT, rel);
+  const src = fs.readFileSync(abs, 'utf8');
+  if (
+    src.includes('const MAX_BRACE_NESTING = 64;') &&
+    src.includes('if (depth >= MAX_BRACE_NESTING)')
+  ) {
+    skipped++;
+    return;
+  }
+
+  const constantAnchor = `const parse = (input, options = {}) => {`;
+  const braceAnchor =
+`    if (value === CHAR_LEFT_CURLY_BRACE) {
+      depth++;`;
+  if (!src.includes(constantAnchor) || !src.includes(braceAnchor)) {
+    throw new Error('[patch-node-modules] braces parser changed shape; review required');
+  }
+  let out = src.replace(
+    constantAnchor,
+    `const MAX_BRACE_NESTING = 64;
+
+const parse = (input, options = {}) => {`,
+  );
+  out = out.replace(
+    braceAnchor,
+`    if (value === CHAR_LEFT_CURLY_BRACE) {
+      if (depth >= MAX_BRACE_NESTING) {
+        throw new RangeError('brace nesting exceeds security limit');
+      }
+      depth++;`,
+  );
+  if (
+    out === src ||
+    !out.includes('const MAX_BRACE_NESTING = 64;') ||
+    !out.includes('if (depth >= MAX_BRACE_NESTING)')
+  ) {
+    throw new Error('[patch-node-modules] failed to harden braces nesting');
+  }
+  fs.writeFileSync(abs, out, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
+}
+
 function patchWorkletsStaticRendering() {
   const pkgPath = path.join(ROOT, 'node_modules/react-native-worklets/package.json');
   if (!fs.existsSync(pkgPath)) {
@@ -197,6 +296,8 @@ function patchWorkletsStaticRendering() {
 }
 
 patchImageSizeDoS();
+patchForgeDigestAlgorithmStructure();
+patchBracesNestingDoS();
 patchWorkletsStaticRendering();
 
 console.log(
