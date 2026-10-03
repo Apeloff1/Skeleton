@@ -4,6 +4,24 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.design_graph import (
+    DESIGN_GRAPH_SCHEMA,
+    DESIGN_GRAPH_VERSION,
+    DesignEdge,
+    DesignGraph,
+    DesignGraphError,
+    DesignGraphVersionError,
+    DesignNode as PersistentDesignNode,
+    add_edge,
+    add_node,
+    create_design_graph,
+    parse_design_graph,
+    remove_edge,
+    remove_node,
+    replace_node,
+    serialize_design_graph,
+)
+
 from skeleton.forge.creator.approval_boundary import (
     ACTION_KINDS,
     APPROVAL_SCHEMA,
@@ -73,6 +91,21 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "serialize_design_graph",
+    "replace_node",
+    "remove_node",
+    "remove_edge",
+    "parse_design_graph",
+    "create_design_graph",
+    "add_node",
+    "add_edge",
+    "PersistentDesignNode",
+    "DesignGraphVersionError",
+    "DesignGraphError",
+    "DesignGraph",
+    "DesignEdge",
+    "DESIGN_GRAPH_VERSION",
+    "DESIGN_GRAPH_SCHEMA",
     "validate_decision",
     "validate_checkpoint",
     "validate_authorization",
