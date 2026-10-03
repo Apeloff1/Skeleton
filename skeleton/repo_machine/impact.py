@@ -28,6 +28,8 @@ class ImpactReport:
     weighted_blast_radius: int = 0
     reachability_confidence: int = 0
     max_dependency_depth: int = 0
+    criticality_weighted_blast_radius: int = 0
+    independent_path_count: int = 0
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -43,6 +45,8 @@ class ImpactReport:
             "weighted_blast_radius": self.weighted_blast_radius,
             "reachability_confidence": self.reachability_confidence,
             "max_dependency_depth": self.max_dependency_depth,
+            "criticality_weighted_blast_radius": self.criticality_weighted_blast_radius,
+            "independent_path_count": self.independent_path_count,
         }
 
 
@@ -68,6 +72,10 @@ def _zone_for_path(model: RepositoryModel, path: str, exact: dict[str, str] | No
     return "unclassified"
 
 
+def _criticality_weight(value: str) -> int:
+    return {"critical": 5, "high": 4, "medium": 2, "low": 1}.get(value, 1)
+
+
 def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, transitive_depth: int = 3) -> ImpactReport:
     if isinstance(transitive_depth, bool) or not isinstance(transitive_depth, int) or not 0 <= transitive_depth <= 16:
         raise ValueError("transitive_depth must be in [0,16]")
@@ -89,6 +97,7 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
 
     distances: dict[str, int] = {zone: 0 for zone in zones}
     path_confidence: dict[str, float] = {zone: 1.0 for zone in zones}
+    path_counts: dict[str, int] = {zone: 1 for zone in zones}
     frontier = deque(sorted(zones))
     while frontier:
         zone = frontier.popleft()
@@ -97,14 +106,18 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
             continue
         for dependent in sorted(reverse.get(zone, ())):
             edge = max(1, edge_weight.get((dependent, zone), 1))
-            confidence = min(path_confidence[zone], min(1.0, edge / 5.0))
+            edge_confidence = min(1.0, edge / 5.0)
+            confidence = min(path_confidence[zone], edge_confidence)
             new_depth = depth + 1
             if dependent not in distances or new_depth < distances[dependent]:
                 distances[dependent] = new_depth
                 path_confidence[dependent] = confidence
+                path_counts[dependent] = path_counts.get(zone, 1)
                 frontier.append(dependent)
-            elif new_depth == distances[dependent] and confidence > path_confidence[dependent]:
-                path_confidence[dependent] = confidence
+            elif new_depth == distances[dependent]:
+                path_counts[dependent] = min(100, path_counts.get(dependent, 1) + path_counts.get(zone, 1))
+                if confidence > path_confidence[dependent]:
+                    path_confidence[dependent] = confidence
 
     all_affected = set(distances) - set(zones)
     dependency_zones = set()
@@ -124,10 +137,18 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
     }))
 
     weighted_blast_radius = min(100, sum(max(1, round(path_confidence[z] * 10)) for z in all_affected))
+    criticality_weighted_blast_radius = min(100, sum(
+        max(1, round(path_confidence[z] * 10)) * _criticality_weight(by_name[z].criticality)
+        for z in all_affected if z in by_name
+    ))
     max_dependency_depth = max(distances.values(), default=0)
     reachable = [path_confidence[z] for z in all_affected]
     reachability_confidence = min(100, round((sum(reachable) / len(reachable)) * 100)) if reachable else 100
-    topology_confidence = min(100, round((reachability_confidence * 0.65) + min(35, weighted_blast_radius)))
+    topology_confidence = min(100, round(
+        (reachability_confidence * 0.55) +
+        min(25, weighted_blast_radius) +
+        min(20, independent_path_count := sum(max(0, path_counts[z] - 1) for z in all_affected))
+    ))
 
     reasons: list[str] = []
     score = 0
@@ -137,6 +158,12 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
     if critical:
         score += min(50, len(critical) * 12)
         reasons.append("change reaches critical/high subsystems")
+    if criticality_weighted_blast_radius >= 40:
+        score += min(15, criticality_weighted_blast_radius // 10)
+        reasons.append("change has high criticality-weighted blast radius")
+    if independent_path_count >= 2:
+        score += min(8, independent_path_count)
+        reasons.append(f"multiple independent topology paths={independent_path_count}")
     if len(all_affected) > len(zones):
         score += min(25, len(all_affected) * 3)
         reasons.append("change has cross-subsystem dependents")
@@ -180,4 +207,6 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, tran
         weighted_blast_radius=weighted_blast_radius,
         reachability_confidence=reachability_confidence,
         max_dependency_depth=max_dependency_depth,
+        criticality_weighted_blast_radius=criticality_weighted_blast_radius,
+        independent_path_count=independent_path_count,
     )
