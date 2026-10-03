@@ -935,6 +935,7 @@ def compile_training_plan(
             if actual.curriculum_easy_first
             else -item.difficulty,
             item.method.value,
+            item.repeat_ordinal,
             item.document_id,
         )
     )

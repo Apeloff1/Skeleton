@@ -811,4 +811,3 @@ class LocalModelAdapter(ProviderAdapter):
             context_source_snapshot=request.context_source_snapshot,
             context_compiler_version=request.context_compiler_version,
         )
-
