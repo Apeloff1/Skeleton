@@ -70,25 +70,29 @@ def _conflicts(candidate: WorkCandidate) -> tuple[str, ...]:
 
 def build_work_graph(model: RepositoryModel, *, limit: int = 128) -> WorkGraph:
     candidates = derive_work_candidates(model, limit=limit)
-    by_zone: dict[str, list[WorkCandidate]] = {}
+    # Precompute the highest-priority prerequisite per zone once. The old
+    # implementation sorted and scanned every candidate's zone repeatedly,
+    # turning large work graphs into avoidable O(n²) planning work.
+    best_prerequisite: dict[str, WorkCandidate] = {}
     for candidate in candidates:
-        by_zone.setdefault(candidate.zone, []).append(candidate)
+        if candidate.lane not in {"repository-health", "architecture"}:
+            continue
+        current = best_prerequisite.get(candidate.zone)
+        if current is None or (-candidate.priority, candidate.identity) < (
+            -current.priority, current.identity
+        ):
+            best_prerequisite[candidate.zone] = candidate
 
     nodes: list[WorkNode] = []
     for candidate in candidates:
         prerequisites: list[str] = []
-        zone_candidates = sorted(
-            by_zone.get(candidate.zone, ()),
-            key=lambda item: (-item.priority, item.identity),
-        )
-        higher = [
-            item
-            for item in zone_candidates
-            if item.priority > candidate.priority
-            and item.lane in {"repository-health", "architecture"}
-        ]
-        if candidate.lane not in {"repository-health", "architecture"} and higher:
-            prerequisites.append(higher[0].identity)
+        higher = best_prerequisite.get(candidate.zone)
+        if (
+            candidate.lane not in {"repository-health", "architecture"}
+            and higher is not None
+            and higher.priority > candidate.priority
+        ):
+            prerequisites.append(higher.identity)
         nodes.append(WorkNode(
             identity=candidate.identity,
             lane=candidate.lane,
