@@ -86,6 +86,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/ai-interactions', title: 'AI Interactions', category: 'ai' },
   { path: '/sota', title: 'SOTA Models', category: 'ai' },
   { path: '/sota-extended', title: 'SOTA Extended', category: 'ai' },
+  { path: '/mirror-room', title: 'Mirror Room', category: 'ai', heavy: true },
 
   { path: '/apk-inspector', title: 'APK Inspector', category: 'tools' },
   { path: '/tools-arena', title: 'Tools Arena', category: 'tools' },
