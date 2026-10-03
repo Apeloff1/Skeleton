@@ -40,9 +40,10 @@ def _normalize_path(path: str) -> str:
     return normalized.lstrip("/")
 
 
-def _zone_for_path(model: RepositoryModel, path: str) -> str:
+def _zone_for_path(model: RepositoryModel, path: str, exact: dict[str, str] | None = None) -> str:
     normalized = _normalize_path(path)
-    exact = {item.path: item.zone for item in model.files}
+    if exact is None:
+        exact = {item.path: item.zone for item in model.files}
     if normalized in exact:
         return exact[normalized]
     parts = PurePosixPath(normalized).parts
