@@ -610,3 +610,62 @@ def test_build_and_review_stops_after_bounded_repair_budget(monkeypatch):
     ]
     monkeypatch.setattr(studio_director, "_call_json", lambda *args, **kwargs: responses.pop(0))
     assert studio_director._build_and_review(object(), task, seed="repair") is None
+
+
+def test_changed_paths_accepts_bounded_new_python_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "skeleton").mkdir()
+    patch = (
+        "diff --git a/skeleton/new_capability.py b/skeleton/new_capability.py\n"
+        "new file mode 100644\n"
+        "--- /dev/null\n"
+        "+++ b/skeleton/new_capability.py\n"
+        "@@ -0,0 +1 @@\n"
+        "+VALUE = 1\n"
+    )
+    assert _changed_paths(patch) == ("skeleton/new_capability.py",)
+
+
+def test_changed_paths_rejects_new_executable_or_manifest_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "skeleton").mkdir()
+    patch = (
+        "diff --git a/skeleton/tool.sh b/skeleton/tool.sh\n"
+        "new file mode 100755\n"
+        "--- /dev/null\n"
+        "+++ b/skeleton/tool.sh\n"
+        "@@ -0,0 +1 @@\n"
+        "+echo unsafe\n"
+    )
+    with pytest.raises(ValueError):
+        _changed_paths(patch)
+
+
+def test_validation_discovery_finds_related_test(monkeypatch):
+    monkeypatch.setattr(
+        studio_director,
+        "_git",
+        lambda *args, **kwargs: "skeleton/foo.py\nskeleton/testing/test_foo.py\n",
+    )
+    commands = studio_director._discover_validation_commands(["skeleton/foo.py"])
+    assert any("test_foo.py" in command for command in commands)
+    assert any("compileall" in command for command in commands)
+
+
+def test_validation_executor_rejects_non_allowlisted_command():
+    with pytest.raises(ValueError, match="not allowlisted"):
+        studio_director._run_validation_commands(["bash -c 'echo nope'"])
+
+
+def test_related_context_prioritizes_matching_modules(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "skeleton" / "testing").mkdir(parents=True)
+    (tmp_path / "skeleton" / "foo.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "skeleton" / "testing" / "test_foo.py").write_text("def test_foo(): pass\n", encoding="utf-8")
+    monkeypatch.setattr(
+        studio_director,
+        "_git",
+        lambda *args, **kwargs: "skeleton/foo.py\nskeleton/testing/test_foo.py\n",
+    )
+    evidence = studio_director._related_repository_context(["skeleton/foo.py"])
+    assert any("test_foo.py" in item for item in evidence)
