@@ -32,6 +32,9 @@ from .studio_director import (
     _run_validation_commands,
 )
 from .studio_registry import STUDIO, STUDIO_SIZE, registry_fingerprint, select_cohort
+from .studio_capabilities import validate_capabilities
+from .studio_invariants import require_subset
+from .studio_outcomes import OutcomeReceipt
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
@@ -540,6 +543,7 @@ def propose(
                 if before_apply.strip():
                     raise RuntimeError("Studio worktree is dirty before candidate application")
                 new_paths = [path for path in task.paths if not Path(path).exists()]
+                capabilities = validate_capabilities(task.paths, new_paths=new_paths)
                 transaction = {
                     "schema": "autonomous-studio.transaction.v1",
                     "run_id": run_id,
@@ -565,8 +569,7 @@ def propose(
                     applied_before_validation = _git("diff", "--no-ext-diff", "--binary")
                     candidate_diff_sha = hashlib.sha256(applied_before_validation.encode("utf-8")).hexdigest()
                     applied_paths = set(_changed_paths(applied_before_validation)) if applied_before_validation else set()
-                    if not applied_paths.issubset(set(task.paths)):
-                        raise RuntimeError("applied candidate escaped authorized paths")
+                    require_subset(applied_paths, task.paths, "applied candidate")
                     validation_commands = _discover_validation_commands(task.paths)
                     transaction["phase"] = "validating"
                     _write_transaction(journal_path, transaction)
@@ -614,7 +617,21 @@ def propose(
                     candidate_patch_sha256=candidate_sha,
                     applied_diff_sha256=candidate_diff_sha,
                     paths=list(task.paths),
+                    capabilities=list(capabilities),
                 )
+                allocation = state_payload["_shift_supervisor"].get("allocation", {})
+                lanes = allocation.get("lane_assignments", {}) if isinstance(allocation, Mapping) else {}
+                outcome = OutcomeReceipt(
+                    allocation_sha256=str(allocation.get("allocation_sha256", "")),
+                    allocation_nonce=str(allocation.get("allocation_nonce", "")),
+                    task_id=plan_id,
+                    lane_id=str(lanes.get(plan_id, "")),
+                    candidate_patch_sha256=candidate_sha,
+                    applied_diff_sha256=candidate_diff_sha,
+                    validation_passed=True,
+                    validation_commands=tuple(tuple(command) for command in validation_commands),
+                )
+                audit.emit("validated_outcome", task=plan_id, outcome=outcome.payload(), outcome_sha256=outcome.digest())
                 transaction["phase"] = "committed"
                 _write_transaction(journal_path, transaction)
                 journal_path.unlink(missing_ok=True)
