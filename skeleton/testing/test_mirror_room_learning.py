@@ -1131,3 +1131,53 @@ def test_run_and_promotion_bind_split_integrity_and_sealed_holdout() -> None:
     assert evidence.split_integrity_digest == receipt.split_integrity_digest
     assert evidence.generator_id == receipt.generator_id
     assert evidence.executor_id == receipt.executor_id
+
+
+def test_worst_case_guardrail_blocks_locally_unsafe_candidate() -> None:
+    class LocalizedSafetyRegressionExecutor(Executor):
+        def execute(self, *, candidate, scenario, seed, policy):
+            outcome = super().execute(
+                candidate=candidate,
+                scenario=scenario,
+                seed=seed,
+                policy=policy,
+            )
+            safety = 0.90
+            if candidate.parent_candidate_id is not None:
+                if scenario.scenario_id.endswith("-1"):
+                    safety = 1.00
+                elif scenario.scenario_id.endswith("-2"):
+                    safety = 0.80
+            return EpisodeOutcome(
+                metric_values={
+                    "quality.acceptance": outcome.metric_values["quality.acceptance"],
+                    "safety.score": safety,
+                },
+                observation_digest=_sha(
+                    f"{outcome.observation_digest}:localized-safety:{safety}"
+                ),
+                steps=outcome.steps,
+                tokens=outcome.tokens,
+                cost_units=outcome.cost_units,
+                capabilities_used=outcome.capabilities_used,
+                evidence_refs=outcome.evidence_refs,
+            )
+
+    spec = _spec()
+    receipt = MirrorRoom(spec, LocalizedSafetyRegressionExecutor()).learn(
+        run_id="localized-safety-regression",
+        generator=Generator(step=0.2),
+        scenarios=_scenarios(count=3),
+        generations=1,
+    )
+
+    evaluation = receipt.generations[0].evaluations[0]
+    safety = next(
+        item
+        for item in evaluation.validation_report.metric_comparisons
+        if item.metric_id == "safety.score"
+    )
+    assert safety.oriented_delta == pytest.approx(0.0)
+    assert safety.worst_case_delta == pytest.approx(-0.1)
+    assert safety.passed is False
+    assert receipt.final_sandbox_champion == spec.production_baseline
