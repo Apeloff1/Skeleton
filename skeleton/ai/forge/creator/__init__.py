@@ -4,6 +4,23 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.semantic_diff import (
+    CHANGE_ACTIONS,
+    IGNORED_ATTRIBUTES,
+    MAX_CHANGES as SEMANTIC_DIFF_MAX_CHANGES,
+    MAX_SERIALIZED_BYTES as SEMANTIC_DIFF_MAX_SERIALIZED_BYTES,
+    SEMANTIC_DIFF_SCHEMA,
+    SEMANTIC_DIFF_VERSION,
+    SemanticChange,
+    SemanticDiff,
+    SemanticDiffError,
+    SemanticValueDelta,
+    render_semantic_summary,
+    semantic_diff,
+    serialize_semantic_diff,
+    validate_semantic_diff,
+)
+
 from skeleton.forge.creator.design_graph import (
     DESIGN_GRAPH_SCHEMA,
     DESIGN_GRAPH_VERSION,
@@ -87,6 +104,20 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "validate_semantic_diff",
+    "serialize_semantic_diff",
+    "semantic_diff",
+    "render_semantic_summary",
+    "SemanticValueDelta",
+    "SemanticDiffError",
+    "SemanticDiff",
+    "SemanticChange",
+    "SEMANTIC_DIFF_VERSION",
+    "SEMANTIC_DIFF_SCHEMA",
+    "SEMANTIC_DIFF_MAX_SERIALIZED_BYTES",
+    "SEMANTIC_DIFF_MAX_CHANGES",
+    "IGNORED_ATTRIBUTES",
+    "CHANGE_ACTIONS",
     "EDGE_KINDS",
     "NODE_KINDS",
     "DesignGraphEdge",
