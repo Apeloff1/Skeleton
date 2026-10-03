@@ -407,7 +407,10 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
 
     await coordinator.ensure_started(command)
     await coordinator.ensure_started(command)
-    await asyncio.sleep(0)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
     assert len(provider.requests) == 1
 
     gate.set()
