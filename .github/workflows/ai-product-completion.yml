@@ -231,8 +231,3 @@ jobs:
           skeleton/testing/test_model_identity.py
           skeleton/testing/test_model_placement.py
           skeleton/testing/test_model_rollback_compatibility.py
-          skeleton/testing/test_local_model_builder.py
-          skeleton/testing/test_local_model_deployment.py
-          skeleton/testing/test_model_identity.py
-          skeleton/testing/test_model_placement.py
-          skeleton/testing/test_model_rollback_compatibility.py
