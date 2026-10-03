@@ -239,6 +239,14 @@ class TrainingExample:
                 "camera_view_refs exceeds hard bound"
             )
         object.__setattr__(self, "camera_view_refs", views)
+        if views and self.camera_coverage_digest is None:
+            raise TrainingMethodError(
+                "camera_view_refs require camera_coverage_digest"
+            )
+        if not views and self.camera_coverage_digest is not None:
+            raise TrainingMethodError(
+                "camera_coverage_digest requires camera_view_refs"
+            )
         if self.camera_coverage_digest is not None:
             coverage_digest = str(self.camera_coverage_digest).strip().lower()
             if (
