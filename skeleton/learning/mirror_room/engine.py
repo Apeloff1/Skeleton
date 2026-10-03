@@ -285,7 +285,6 @@ class MirrorRoom:
         seen_ids: set[str],
         seen_digests: set[str],
         seen_behavior_digests: set[str],
-        seen_parameter_digests: set[str],
         limit: int,
     ) -> tuple[MirrorCandidate, ...]:
         result = tuple(candidates)
@@ -294,7 +293,6 @@ class MirrorRoom:
         local_ids: set[str] = set()
         local_digests: set[str] = set()
         local_behavior_digests: set[str] = set()
-        local_parameter_digests: set[str] = set()
         for candidate in result:
             if not isinstance(candidate, MirrorCandidate):
                 raise MirrorRoomError("candidate generator returned invalid object")
@@ -318,17 +316,9 @@ class MirrorRoom:
                 raise MirrorRoomError(
                     "candidate behavior was already explored in this learning run"
                 )
-            if (
-                candidate.parameter_digest in seen_parameter_digests
-                or candidate.parameter_digest in local_parameter_digests
-            ):
-                raise MirrorRoomError(
-                    "duplicate candidate behavior parameters were proposed"
-                )
             local_ids.add(candidate.candidate_id)
             local_digests.add(candidate.digest)
             local_behavior_digests.add(candidate.behavior_digest)
-            local_parameter_digests.add(candidate.parameter_digest)
         return result
 
     def learn(
@@ -372,7 +362,6 @@ class MirrorRoom:
         seen_ids = {production_baseline.candidate_id}
         seen_digests = {production_baseline.digest}
         seen_behavior_digests = {production_baseline.behavior_digest}
-        seen_parameter_digests = {production_baseline.parameter_digest}
         hard_examples: tuple[HardExample, ...] = ()
         prior_candidate_id: str | None = None
         generation_records: list[GenerationRecord] = []
@@ -402,7 +391,6 @@ class MirrorRoom:
                 seen_ids=seen_ids,
                 seen_digests=seen_digests,
                 seen_behavior_digests=seen_behavior_digests,
-                seen_parameter_digests=seen_parameter_digests,
                 limit=self.spec.budget.max_candidates_per_generation,
             )
             if not candidates:
@@ -444,7 +432,6 @@ class MirrorRoom:
                 seen_ids.add(candidate.candidate_id)
                 seen_digests.add(candidate.digest)
                 seen_behavior_digests.add(candidate.behavior_digest)
-                seen_parameter_digests.add(candidate.parameter_digest)
 
             ranked_training = sorted(
                 raw,
