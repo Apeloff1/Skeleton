@@ -33,6 +33,10 @@
       {
         "path": ".github/workflows/p1-feedback-release-closure.yml",
         "role": "focused exact-head gate"
+      },
+      {
+        "path": "backend/core/route_policy_catalog.py",
+        "role": "learning-domain admission classification"
       }
     ]
   },
@@ -41,6 +45,7 @@
     "rejected challenger cannot lower or replace baseline",
     "quality and detail projection is derived from validation receipts",
     "observatory is read-only and cannot influence learning or promotion",
-    "delivery remains locked until the 100-attempt campaign gates pass"
+    "delivery remains locked until the 100-attempt campaign gates pass",
+    "Mirror Room API is explicitly classified in the learning route-policy domain"
   ]
 }

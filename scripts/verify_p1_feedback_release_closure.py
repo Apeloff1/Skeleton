@@ -127,6 +127,10 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "class MirrorRoomObservatory",
         "def mirror_room_file_tree(",
     ),
+    "backend/core/route_policy_catalog.py": (
+        'ROUTE_POLICY_CATALOG_VERSION = "2026-10-03.v3"',
+        'RouteRule("/api/mirror-room", "learning")',
+    ),
     "backend/routes/mirror_room.py": (
         'prefix="/api/mirror-room"',
         '"/observatory"',
