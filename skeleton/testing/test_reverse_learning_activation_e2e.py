@@ -24,6 +24,10 @@ from skeleton.ai.runtime.product.learning import (
     build_learning_candidate,
     build_learning_candidate_artifact,
 )
+from skeleton.ai.runtime.product.lifecycle import (
+    ModelLifecycleRegistry,
+    ModelLifecycleState,
+)
 from skeleton.ai.runtime.product.model_program_bridge import (
     bridge_product_training_to_model_program,
     model_promotion_receipt_from_qualification,
@@ -299,6 +303,12 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
         trainer_id="reverse-e2e-training-authority",
         code_revision="reverse-e2e-test",
     )
+    lifecycle_registry = ModelLifecycleRegistry()
+    candidate_transition = lifecycle_registry.register_candidate(
+        bridged,
+        authority_id="reverse-e2e-training-registration",
+    )
+    assert candidate_transition.to_state is ModelLifecycleState.CANDIDATE
 
     mirror_candidate = MirrorCandidate(
         candidate_id="candidate-model",
@@ -402,12 +412,24 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
     )
     assert qualification.production_authority is False
     assert qualification.direct_self_modify is False
+    validated_transition = lifecycle_registry.validate(
+        bridged.artifact.model_digest,
+        qualification,
+        verifier_id="reverse-e2e-lifecycle-validator",
+    )
+    assert validated_transition.to_state is ModelLifecycleState.VALIDATED
 
     promotion = model_promotion_receipt_from_qualification(
         bridged,
         qualification,
         verifier_id="reverse-e2e-model-promotion-verifier",
     )
+    promoted_transition = lifecycle_registry.promote(
+        bridged.artifact.model_digest,
+        promotion,
+    )
+    assert promoted_transition.to_state is ModelLifecycleState.PROMOTED
+
     activation = build_local_model_activation_manifest(
         candidate_path=candidate_path,
         baseline_path=baseline_path,
@@ -425,6 +447,16 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
     loaded = load_local_model_activation_manifest(
         activation_path,
         expected_manifest_digest=activation.manifest_digest,
+    )
+    activated_transition = lifecycle_registry.activate(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="reverse-e2e-deployment-authority",
+    )
+    assert activated_transition.to_state is ModelLifecycleState.ACTIVATED
+    assert (
+        lifecycle_registry.snapshot(bridged.artifact.model_digest).state
+        is ModelLifecycleState.ACTIVATED
     )
 
     assert loaded.manifest.candidate_model_digest == product_receipt["model_digest"]
@@ -503,3 +535,58 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
     assert provider_response.model == product_receipt["model_id"]
     assert provider_response.text is not None
     assert provider_response.text.strip()
+
+    # The same digest-pinned manifest must make the exact pre-promotion model
+    # executable as the rollback target through the real provider bootstrap.
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "rollback")
+    rollback_registry = ProviderRegistry.from_env()
+    rollback_adapter = rollback_registry.active
+    assert rollback_adapter is not None
+    assert rollback_adapter.provider_id == "local"
+    assert rollback_adapter.model == baseline.model_id
+    assert rollback_adapter.activation_target == "rollback"
+    assert (
+        rollback_adapter.activation_manifest.manifest_digest
+        == activation.manifest_digest
+    )
+    assert (
+        rollback_adapter.artifact_receipt.model_digest
+        == baseline.model_digest
+    )
+
+    rollback_response = asyncio.run(
+        rollback_adapter.generate(
+            ProviderRequest(
+                instructions=(
+                    "Answer using only the authenticated rollback model."
+                ),
+                prompt="Give the stable baseline local answer.",
+                max_output_tokens=8,
+                model=baseline.model_id,
+                data_class="internal",
+                operation_id="reverse-e2e-rollback-provider",
+            )
+        )
+    )
+    assert rollback_response.provider == "local"
+    assert rollback_response.model == baseline.model_id
+    assert rollback_response.text is not None
+    assert rollback_response.text.strip()
+
+    rolled_back_transition = lifecycle_registry.rollback(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="reverse-e2e-deployment-authority",
+    )
+    assert (
+        rolled_back_transition.to_state
+        is ModelLifecycleState.ROLLED_BACK
+    )
+    final_snapshot = lifecycle_registry.snapshot(
+        bridged.artifact.model_digest
+    )
+    assert final_snapshot.state is ModelLifecycleState.ROLLED_BACK
+    assert final_snapshot.rollback_model_digest == baseline.model_digest
+    assert lifecycle_registry.verify_history(
+        bridged.artifact.model_digest
+    ) is True
