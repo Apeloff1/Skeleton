@@ -49,6 +49,7 @@ class DeferredInvocation:
     operation_id: str
     volume_id: str
     spec_digest: str
+    authority_digest: str
     payload_digest: str
     cost_units: int = 0
     latency_ms: int = 0
@@ -67,6 +68,11 @@ class DeferredInvocation:
             self,
             "spec_digest",
             _sha256(self.spec_digest, "spec_digest"),
+        )
+        object.__setattr__(
+            self,
+            "authority_digest",
+            _sha256(self.authority_digest, "authority_digest"),
         )
         object.__setattr__(
             self,
@@ -91,6 +97,7 @@ class DeferredInvocation:
                 "operation_id": self.operation_id,
                 "volume_id": self.volume_id,
                 "spec_digest": self.spec_digest,
+                "authority_digest": self.authority_digest,
                 "payload_digest": self.payload_digest,
                 "cost_units": self.cost_units,
                 "latency_ms": self.latency_ms,
@@ -103,6 +110,7 @@ class ExecutionReceipt:
     operation_id: str
     volume_id: str
     spec_digest: str
+    authority_digest: str
     payload_digest: str
     handler_identity: str
     result_digest: str
@@ -116,7 +124,7 @@ class ExecutionReceipt:
             raise ValueError("ExecutionReceipt status must be succeeded")
         for name in ("operation_id", "volume_id", "handler_identity"):
             _text(getattr(self, name), name)
-        for name in ("spec_digest", "payload_digest", "result_digest"):
+        for name in ("spec_digest", "authority_digest", "payload_digest", "result_digest"):
             _sha256(getattr(self, name), name)
         if isinstance(self.attempt, bool) or not isinstance(self.attempt, int) or self.attempt < 1:
             raise ValueError("attempt must be a positive integer")
@@ -128,6 +136,7 @@ class ExecutionReceipt:
             "operation_id": self.operation_id,
             "volume_id": self.volume_id,
             "spec_digest": self.spec_digest,
+            "authority_digest": self.authority_digest,
             "payload_digest": self.payload_digest,
             "handler_identity": self.handler_identity,
             "result_digest": self.result_digest,
@@ -147,6 +156,7 @@ class FailureReceipt:
     operation_id: str
     volume_id: str
     spec_digest: str
+    authority_digest: str
     payload_digest: str
     handler_identity: str
     attempt: int
@@ -166,7 +176,7 @@ class FailureReceipt:
             "error_type",
         ):
             _text(getattr(self, name), name)
-        for name in ("spec_digest", "payload_digest", "error_digest"):
+        for name in ("spec_digest", "authority_digest", "payload_digest", "error_digest"):
             _sha256(getattr(self, name), name)
         if isinstance(self.attempt, bool) or not isinstance(self.attempt, int) or self.attempt < 1:
             raise ValueError("attempt must be a positive integer")
@@ -178,6 +188,7 @@ class FailureReceipt:
             "operation_id": self.operation_id,
             "volume_id": self.volume_id,
             "spec_digest": self.spec_digest,
+            "authority_digest": self.authority_digest,
             "payload_digest": self.payload_digest,
             "handler_identity": self.handler_identity,
             "attempt": self.attempt,
@@ -191,6 +202,16 @@ class FailureReceipt:
     @property
     def digest(self) -> str:
         return sha256_json(self.as_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionOutcome:
+    receipt: ExecutionReceipt
+    result: Any
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.receipt, ExecutionReceipt):
+            raise TypeError("receipt must be ExecutionReceipt")
 
 
 class DeferredExecutionError(RuntimeError):
@@ -221,6 +242,7 @@ class DeferredExecutor:
         self._budgets: dict[str, Budget] = {}
         self._fingerprints: dict[str, str] = {}
         self._success: dict[str, ExecutionReceipt] = {}
+        self._success_result_json: dict[str, str] = {}
         self._failure: dict[str, FailureReceipt] = {}
 
     def register_handler(
@@ -248,6 +270,11 @@ class DeferredExecutor:
         self.registry.get(volume_id)
         if not isinstance(budget, Budget):
             raise TypeError("budget must be Budget")
+        if budget.max_attempts != 1:
+            raise ValueError(
+                "deferred operation budgets require max_attempts=1; "
+                "retries need a new operation_id"
+            )
         self._budgets[volume_id] = budget
 
     @staticmethod
@@ -258,6 +285,17 @@ class DeferredExecutor:
             canonical_json(dict(payload)).encode("utf-8")
         ).hexdigest()
 
+    @staticmethod
+    def authority_digest(record: Any) -> str:
+        return sha256_json(
+            {
+                "volume_id": record.spec.volume_id,
+                "spec_digest": record.spec.digest,
+                "state": record.state,
+                "evidence_digests": sorted(record.evidence),
+            }
+        )
+
     def _admit(
         self,
         invocation: DeferredInvocation,
@@ -266,6 +304,8 @@ class DeferredExecutor:
         record = self.registry.get(invocation.volume_id)
         if record.spec.digest != invocation.spec_digest:
             raise PermissionError("capability spec digest drift")
+        if self.authority_digest(record) != invocation.authority_digest:
+            raise PermissionError("capability authority digest drift")
         if record.state != "enabled":
             raise PermissionError(
                 f"capability {invocation.volume_id} is not enabled"
@@ -309,7 +349,7 @@ class DeferredExecutor:
         self,
         invocation: DeferredInvocation,
         payload: Mapping[str, Any],
-    ) -> ExecutionReceipt:
+    ) -> ExecutionOutcome:
         if not isinstance(invocation, DeferredInvocation):
             raise TypeError("invocation must be DeferredInvocation")
 
@@ -319,7 +359,12 @@ class DeferredExecutor:
                 raise ValueError("operation identity collision")
             if self.digest_payload(payload) != invocation.payload_digest:
                 raise ValueError("payload digest mismatch")
-            return prior
+            return ExecutionOutcome(
+                receipt=prior,
+                result=json.loads(
+                    self._success_result_json[invocation.operation_id]
+                ),
+            )
 
         handler, ledger, isolated = self._admit(invocation, payload)
         self._fingerprints[invocation.operation_id] = invocation.fingerprint
@@ -341,6 +386,7 @@ class DeferredExecutor:
                 operation_id=invocation.operation_id,
                 volume_id=invocation.volume_id,
                 spec_digest=invocation.spec_digest,
+                authority_digest=invocation.authority_digest,
                 payload_digest=invocation.payload_digest,
                 handler_identity=handler.identity,
                 attempt=ledger.attempts,
@@ -359,6 +405,7 @@ class DeferredExecutor:
             operation_id=invocation.operation_id,
             volume_id=invocation.volume_id,
             spec_digest=invocation.spec_digest,
+            authority_digest=invocation.authority_digest,
             payload_digest=invocation.payload_digest,
             handler_identity=handler.identity,
             result_digest=result_digest,
@@ -367,7 +414,11 @@ class DeferredExecutor:
             latency_ms=ledger.latency_ms,
         )
         self._success[invocation.operation_id] = receipt
-        return receipt
+        self._success_result_json[invocation.operation_id] = result_json
+        return ExecutionOutcome(
+            receipt=receipt,
+            result=json.loads(result_json),
+        )
 
     def receipt(
         self,
