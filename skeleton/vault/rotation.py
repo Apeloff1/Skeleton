@@ -20,6 +20,8 @@ Design laws
 
 from __future__ import annotations
 
+import hmac
+import secrets as _secrets
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -136,10 +138,12 @@ class RotationPolicy:
             return False
         now = self._now()
         for version in secret.versions:
-            if version.state == SecretState.ACTIVE and version.material == material:
+            matches = hmac.compare_digest(version.material.encode("utf-8"),
+                                          material.encode("utf-8"))
+            if version.state == SecretState.ACTIVE and matches:
                 return True
             if (version.state == SecretState.GRACE
-                    and version.material == material
+                    and matches
                     and version.grace_until is not None
                     and now <= version.grace_until):
                 return True
@@ -197,7 +201,9 @@ class RotationScheduler:
     def __init__(self, policy: RotationPolicy, *,
                  generator: Optional[Callable[[str], str]] = None) -> None:
         self.policy = policy
-        self._generator = generator or (lambda sid: f"{sid}-{int(time.time())}")
+        # Default material is 256 bits of OS entropy. The previous default
+        # (``f"{sid}-{timestamp}"``) was guessable by anyone who knew the id.
+        self._generator = generator or (lambda sid: _secrets.token_urlsafe(32))
         self._runs = 0
 
     def tick(self, *, reason: str = RotationTrigger.SCHEDULED.value) -> List[str]:
