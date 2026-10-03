@@ -40,6 +40,7 @@ from skeleton.ai.runtime.inference.training_methods import (
     TrainingEfficiencyPolicy,
     TrainingExample,
     TrainingMethod,
+    compatible_training_methods,
 )
 
 
@@ -594,13 +595,6 @@ def build_learning_candidate_artifact(
         build_multi_method_recurrent_artifact,
     )
 
-    if method_allocation is not None:
-        if not isinstance(method_allocation, AdaptiveMethodAllocation):
-            raise TypeError(
-                "method_allocation must be AdaptiveMethodAllocation"
-            )
-        training_methods = method_allocation.method_weights
-
     examples = tuple(
         TrainingExample(
             example_id=pair.assistant_message_id,
@@ -615,6 +609,24 @@ def build_learning_candidate_artifact(
         )
         for pair in candidate.pairs
     )
+
+    if method_allocation is not None:
+        if not isinstance(method_allocation, AdaptiveMethodAllocation):
+            raise TypeError(
+                "method_allocation must be AdaptiveMethodAllocation"
+            )
+        compatible = set(compatible_training_methods(examples))
+        unsupported = tuple(
+            item.method.value
+            for item in method_allocation.method_weights
+            if item.method not in compatible
+        )
+        if unsupported:
+            raise CanonicalLearningHandoffError(
+                "adaptive method allocation contains methods without "
+                "required training signals: " + ",".join(unsupported)
+            )
+        training_methods = method_allocation.method_weights
 
     try:
         receipt = build_multi_method_recurrent_artifact(
