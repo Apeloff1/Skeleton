@@ -479,6 +479,190 @@ class AdmissionRuntime:
             )
             return lease
 
+    def reattach(
+        self,
+        request: AdmissionRequest,
+        lease: AdmissionLease,
+    ) -> AdmissionLease:
+        """Restore an already-durable lease without re-running admission.
+
+        This is deliberately narrower than admit. It may only restore a lease
+        whose quota reservation still exists exactly in the configured ledger.
+        No quota is reserved and current local pressure is not used to
+        invalidate work already durably admitted before restart.
+        """
+
+        if not isinstance(request, AdmissionRequest):
+            raise TypeError("request must be an AdmissionRequest")
+        if not isinstance(lease, AdmissionLease):
+            raise TypeError("lease must be an AdmissionLease")
+        if self.shared_pressure_ledger is not None:
+            raise AdmissionRuntimeError(
+                "shared_pressure_reattach_requires_durable_lease_metadata"
+            )
+        if self.quota_ledger is None or lease.quota_reservation is None:
+            raise AdmissionRuntimeError(
+                "durable_reattach_requires_quota_reservation"
+            )
+        if (
+            lease.operation_id != request.operation_id
+            or lease.tenant_id != request.tenant_id
+            or lease.decision.capability != request.capability
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease identity does not match request"
+            )
+        if not lease.decision.admitted:
+            raise AdmissionRuntimeConflict(
+                "durable lease is not an admitted decision"
+            )
+        if lease.decision.estimated != request.estimate:
+            raise AdmissionRuntimeConflict(
+                "durable lease estimate does not match request"
+            )
+
+        remaining = lease.decision.remaining
+        required_remaining = {
+            "input_tokens": max(
+                0,
+                request.budget.max_input_tokens
+                - request.estimate.input_tokens,
+            ),
+            "output_tokens": max(
+                0,
+                request.budget.max_output_tokens
+                - request.estimate.output_tokens,
+            ),
+            "cost_usd": max(
+                0.0,
+                request.budget.max_cost_usd
+                - request.estimate.cost_usd,
+            ),
+            "wall_seconds": max(
+                0.0,
+                request.budget.max_wall_seconds
+                - request.estimate.wall_seconds,
+            ),
+            "provider_attempts": max(
+                0,
+                request.budget.max_provider_attempts
+                - request.estimate.provider_attempts,
+            ),
+            "tool_calls": max(
+                0,
+                request.budget.max_tool_calls
+                - request.estimate.tool_calls,
+            ),
+            "artifact_bytes": max(
+                0,
+                request.budget.max_artifact_bytes
+                - request.estimate.artifact_bytes,
+            ),
+            "storage_bytes": max(
+                0,
+                request.budget.max_storage_bytes
+                - request.estimate.storage_bytes,
+            ),
+        }
+        for field, expected in required_remaining.items():
+            if field not in remaining or remaining[field] != expected:
+                raise AdmissionRuntimeConflict(
+                    "durable lease remaining budget does not match request"
+                )
+        concurrency = remaining.get("concurrency")
+        queue_depth = remaining.get("queue_depth")
+        if (
+            isinstance(concurrency, bool)
+            or not isinstance(concurrency, int)
+            or concurrency < 0
+            or concurrency > request.budget.max_concurrency
+            or isinstance(queue_depth, bool)
+            or not isinstance(queue_depth, int)
+            or queue_depth < 0
+            or queue_depth > request.budget.max_queue_depth
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease pressure remainder is invalid"
+            )
+
+        reservation = lease.quota_reservation
+        if (
+            reservation.operation_id != request.operation_id
+            or reservation.tenant_id != request.tenant_id
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota reservation identity does not match request"
+            )
+        if lease.lease_id != _lease_id(
+            lease.decision,
+            reservation,
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease id does not match decision and reservation"
+            )
+        expected_quota = reservation.estimate
+        if (
+            expected_quota.operations != 1
+            or expected_quota.input_tokens != request.estimate.input_tokens
+            or expected_quota.output_tokens != request.estimate.output_tokens
+            or expected_quota.cost_usd != request.estimate.cost_usd
+            or expected_quota.tool_calls != request.estimate.tool_calls
+            or expected_quota.artifact_bytes != request.estimate.artifact_bytes
+            or expected_quota.storage_bytes != request.estimate.storage_bytes
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota estimate does not match request"
+            )
+
+        finder = getattr(
+            self.quota_ledger,
+            "reservation_for_operation",
+            None,
+        )
+        if not callable(finder):
+            raise AdmissionRuntimeError(
+                "quota ledger does not support durable reservation lookup"
+            )
+
+        fingerprint = _request_fingerprint(request)
+        with self._lock:
+            current = self._active.get(request.operation_id)
+            if current is not None:
+                if (
+                    current.request_fingerprint != fingerprint
+                    or current.lease != lease
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "operation already has a different active admission lease"
+                    )
+                return current.lease
+
+            try:
+                persisted = finder(
+                    request.tenant_id,
+                    request.operation_id,
+                )
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_reservation_unavailable"
+                ) from exc
+            if persisted is None:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation is no longer active"
+                )
+            if persisted != reservation:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation does not match lease"
+                )
+
+            self._active[request.operation_id] = _ActiveLease(
+                lease=lease,
+                request_fingerprint=fingerprint,
+                unknown_usage={},
+            )
+            self.metrics_registry.inc("admission.reattached_total")
+            return lease
+
     def _release_shared_pressure(
         self,
         lease: SharedPressureLease,
