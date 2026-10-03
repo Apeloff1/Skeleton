@@ -56,6 +56,7 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_UNKNOWN_USAGE_PREFIX = "unknown:"
 _USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -655,12 +656,60 @@ class AdmissionRuntime:
                     "durable quota reservation does not match lease"
                 )
 
+            unresolved_reader = getattr(
+                self.quota_ledger,
+                "unresolved_usage",
+                None,
+            )
+            if not callable(unresolved_reader):
+                raise AdmissionRuntimeError(
+                    "quota ledger does not support durable unresolved usage lookup"
+                )
+            try:
+                unresolved = unresolved_reader(
+                    reservation.reservation_id
+                )
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_unresolved_usage_unavailable"
+                ) from exc
+
+            recovered_unknown: dict[str, UnknownUsageMarker] = {}
+            for event in unresolved:
+                if (
+                    event.reservation_id != reservation.reservation_id
+                    or event.operation_id != request.operation_id
+                    or not event.category.startswith(
+                        _UNKNOWN_USAGE_PREFIX
+                    )
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage identity is invalid"
+                    )
+                category = event.category[len(_UNKNOWN_USAGE_PREFIX):]
+                if category not in _USAGE_CATEGORIES:
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage category is invalid"
+                    )
+                recovered_unknown[event.event_id] = UnknownUsageMarker(
+                    event_id=event.event_id,
+                    operation_id=request.operation_id,
+                    category=category,
+                    reason="durable-unknown-usage-recovered",
+                    recorded_at=event.recorded_at,
+                )
+
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
                 request_fingerprint=fingerprint,
-                unknown_usage={},
+                unknown_usage=recovered_unknown,
             )
             self.metrics_registry.inc("admission.reattached_total")
+            if recovered_unknown:
+                self.metrics_registry.inc(
+                    "admission.unknown_usage_reattached_total",
+                    len(recovered_unknown),
+                )
             return lease
 
     def _release_shared_pressure(
