@@ -10,10 +10,14 @@ from skeleton.ai.runtime.product.learning import (
     CanonicalLearningHandoffError,
     build_learning_candidate,
     build_learning_candidate_artifact,
+    build_learning_candidate_from_repository,
 )
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
+)
+from skeleton.persistence.conversation_repository import (
+    SQLiteConversationRepository,
 )
 
 
@@ -279,3 +283,85 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     assert len(receipt["qualification"]["prompt_sha256"]) == 64
     assert len(receipt["qualification"]["output_sha256"]) == 64
     assert len(receipt["qualification"]["receipt_digest"]) == 64
+
+
+def test_repository_learning_handoff_binds_exact_thread_version() -> None:
+    conversations = SQLiteConversationRepository()
+    try:
+        thread = conversations.create_thread(
+            tenant_id="tenant-learning",
+            owner_id="owner-learning",
+            data_class="internal",
+            created_at=NOW,
+        )
+        user = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=1,
+            author_type=ConversationAuthorType.USER,
+            created_at=NOW,
+            idempotency_key="repository-turn",
+            content="Teach the bounded local model this accepted pair.",
+            data_class="internal",
+        )
+        thread, user = conversations.append_message(
+            user,
+            tenant_id="tenant-learning",
+            owner_id="owner-learning",
+            expected_thread_version=thread.version,
+        )
+        assistant = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=NOW,
+            idempotency_key="repository-turn:assistant",
+            content="Only after explicit acceptance and lineage checks.",
+            parent_message_id=user.message_id,
+            causal_user_message_id=user.message_id,
+            operation_id=str(uuid4()),
+            ai_result_id="ai-result:" + ("d" * 32),
+            context_id=str(uuid4()),
+            context_digest="e" * 64,
+            context_source_snapshot=((str(uuid4()), "f" * 64),),
+            context_compiler_version="test-compiler-v1",
+            provider_receipt_refs=("provider-receipt:local",),
+            data_class="internal",
+        )
+        thread, assistant = conversations.append_message(
+            assistant,
+            tenant_id="tenant-learning",
+            owner_id="owner-learning",
+            expected_thread_version=thread.version,
+        )
+
+        candidate = build_learning_candidate_from_repository(
+            conversations,
+            thread_id=thread.thread_id,
+            tenant_id="tenant-learning",
+            owner_id="owner-learning",
+            expected_thread_version=thread.version,
+            accepted_assistant_message_ids=(assistant.message_id,),
+        )
+
+        assert candidate.source_thread_version == thread.version
+        assert candidate.pairs[0].assistant_message_id == assistant.message_id
+        assert candidate.as_dict()["source_thread_version"] == thread.version
+
+        with pytest.raises(
+            CanonicalLearningHandoffError,
+            match="version changed before",
+        ):
+            build_learning_candidate_from_repository(
+                conversations,
+                thread_id=thread.thread_id,
+                tenant_id="tenant-learning",
+                owner_id="owner-learning",
+                expected_thread_version=thread.version - 1,
+                accepted_assistant_message_ids=(assistant.message_id,),
+            )
+    finally:
+        conversations.close()
