@@ -200,8 +200,8 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "216e8c8f49ab8ae09940ffcfa3c421b4bfa1ff92",
-      "role": "memory authority and recall",
+      "source_git_object_sha": "98ef51e3efc9eb8ec7ff44b60796a694365a7049",
+      "role": "memory authority, caller-isolated admission, deterministic recall, and vector integrity",
       "work_package_refs": [
         "WP-W07"
       ],

@@ -122,6 +122,11 @@ class MAGStore(MemoryStore):
             raise ValueError("importance must be non-negative")
         if tags is not None and not isinstance(tags, set):
             raise TypeError("tags must be a set when provided")
+        normalized_tags=set()
+        for tag in tags or set():
+            if not isinstance(tag,str) or not tag.strip():
+                raise ValueError("episode tags must be non-empty strings")
+            normalized_tags.add(tag.strip())
         episode_id = f"mag_{self.user_id}_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
 
         previous = self._episodes.get(episode_id)
@@ -135,9 +140,9 @@ class MAGStore(MemoryStore):
             episode_id=episode_id,
             timestamp=time.time(),
             content=content,
-            emotional_valence=emotional_valence,
-            importance=importance,
-            tags=tags or set(),
+            emotional_valence=float(emotional_valence),
+            importance=float(importance),
+            tags=normalized_tags,
         )
         self._episodes[episode_id] = episode
         for tag in episode.tags:
