@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -359,3 +360,51 @@ def test_runtime_reattach_is_idempotent_for_same_exact_lease(tmp_path) -> None:
     assert runtime.telemetry_snapshot()["metrics"]["counters"][
         "admission.reattached_total"
     ] == 1
+
+
+def test_tampered_runtime_lease_budget_is_rejected_without_quota_mutation(
+    tmp_path,
+) -> None:
+    path = tmp_path / "quota.sqlite3"
+    request = _request("op-tampered-remaining")
+    first = _governor(path)
+    first.reserve(request, now_wall=10.0)
+
+    with sqlite3.connect(path) as conn:
+        row = conn.execute(
+            """
+            SELECT runtime_lease_json
+            FROM cost_governor_journal
+            WHERE operation_id = ?
+            """,
+            (request.operation_id,),
+        ).fetchone()
+        assert row is not None
+        payload = json.loads(row[0])
+        payload["remaining"]["cost_usd"] = 999.0
+        conn.execute(
+            """
+            UPDATE cost_governor_journal
+            SET runtime_lease_json = ?
+            WHERE operation_id = ?
+            """,
+            (
+                json.dumps(
+                    payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                request.operation_id,
+            ),
+        )
+
+    restarted = _governor(path)
+    with pytest.raises(
+        CostGovernorConflict,
+        match="remaining budget does not match request",
+    ):
+        restarted.reserve(request, now_wall=20.0)
+
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["completions"] == 0
