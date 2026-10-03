@@ -235,6 +235,13 @@ def _example_from_payload(payload: Mapping[str, object]) -> TrainingExample:
     return example
 
 
+def _example_semantic_digest(example: TrainingExample) -> str:
+    payload = _example_payload(example)
+    payload["replay"] = False
+    payload.pop("example_digest", None)
+    return _digest(payload)
+
+
 @dataclass(frozen=True, slots=True)
 class ContinualLearningPolicy:
     """Acceptance and bounded replay policy for repeated training rounds."""
@@ -355,10 +362,15 @@ class ReplayMemoryItem:
         )
 
     @property
+    def semantic_digest(self) -> str:
+        return _example_semantic_digest(self.example)
+
+    @property
     def digest(self) -> str:
         return _digest(
             {
                 "example_digest": self.example.digest,
+                "semantic_digest": self.semantic_digest,
                 "admitted_round_digest": self.admitted_round_digest,
                 "admitted_generation": self.admitted_generation,
                 "importance": self.importance,
@@ -371,6 +383,7 @@ class ReplayMemoryItem:
             "admitted_round_digest": self.admitted_round_digest,
             "admitted_generation": self.admitted_generation,
             "importance": self.importance,
+            "semantic_digest": self.semantic_digest,
             "memory_digest": self.digest,
         }
 
@@ -805,22 +818,37 @@ def _merge_replay_memory(
     round_digest: str,
     generation: int,
     policy: ContinualLearningPolicy,
+    used_replay_semantic_digests: frozenset[str],
+    retention_gain: float,
 ) -> tuple[ReplayMemoryItem, ...]:
-    by_example: dict[str, ReplayMemoryItem] = {
-        item.example.digest: item for item in state.replay_memory
-    }
+    retention_pressure = max(0.0, -retention_gain)
+    by_example: dict[str, ReplayMemoryItem] = {}
+    for item in state.replay_memory:
+        importance = item.importance
+        if item.semantic_digest in used_replay_semantic_digests:
+            importance = min(
+                1_000_000.0,
+                importance + 0.1 + retention_pressure,
+            )
+        by_example[item.semantic_digest] = ReplayMemoryItem(
+            example=item.example,
+            admitted_round_digest=item.admitted_round_digest,
+            admitted_generation=item.admitted_generation,
+            importance=importance,
+        )
     for example in accepted_examples:
         replay_example = replace(example, replay=True)
-        existing = by_example.get(replay_example.digest)
+        semantic_digest = _example_semantic_digest(replay_example)
+        existing = by_example.get(semantic_digest)
         if existing is None:
-            by_example[replay_example.digest] = ReplayMemoryItem(
+            by_example[semantic_digest] = ReplayMemoryItem(
                 example=replay_example,
                 admitted_round_digest=round_digest,
                 admitted_generation=generation,
                 importance=1.0 + replay_example.difficulty,
             )
         else:
-            by_example[replay_example.digest] = ReplayMemoryItem(
+            by_example[semantic_digest] = ReplayMemoryItem(
                 example=existing.example,
                 admitted_round_digest=existing.admitted_round_digest,
                 admitted_generation=existing.admitted_generation,
@@ -885,19 +913,25 @@ def run_continual_learning_round(
     baseline = state.active_champion
     baseline.verify_artifact()
 
-    replay_items = _select_replay(
-        state,
-        limit=actual.replay_examples_per_round,
+    new_semantic_digests = {
+        _example_semantic_digest(item) for item in rows
+    }
+    new_example_ids = {item.example_id for item in rows}
+    replay_items = tuple(
+        item
+        for item in _select_replay(
+            state,
+            limit=actual.replay_examples_per_round,
+        )
+        if (
+            item.semantic_digest not in new_semantic_digests
+            and item.example.example_id not in new_example_ids
+        )
     )
     replay_examples = tuple(
         replace(item.example, replay=True)
         for item in replay_items
     )
-    new_digests = {item.digest for item in rows}
-    if any(item.digest in new_digests for item in replay_examples):
-        raise ContinualLearningError(
-            "new examples overlap replay memory by exact content"
-        )
     training_examples = (*rows, *replay_examples)
 
     try:
@@ -1051,6 +1085,10 @@ def run_continual_learning_round(
         round_digest=round_record.digest,
         generation=generation,
         policy=actual,
+        used_replay_semantic_digests=frozenset(
+            item.semantic_digest for item in replay_items
+        ),
+        retention_gain=retention.validation_gain,
     )
     return (
         ContinualLearningState(
