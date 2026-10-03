@@ -24,6 +24,11 @@ def _full_example() -> TrainingExample:
         teacher_response="A red road vehicle is visible.",
         positive_text="red vehicle",
         negative_text="blue boat",
+        retrieval_context="Camera evidence shows a red road vehicle.",
+        trajectory="observe -> identify body -> verify color -> answer",
+        pseudo_label="red vehicle",
+        task_id="visual-grounding",
+        reward=1.0,
         difficulty=0.35,
         source_ref="dataset:fixture",
         replay=True,
@@ -261,3 +266,36 @@ def test_multi_method_builder_trains_compiled_plan(tmp_path) -> None:
     assert set(receipt["training_plan"]["method_counts"]) == {
         method.value for method in TrainingMethod
     }
+
+
+def test_full_camera_coverage_feeds_bounded_multiview_training() -> None:
+    coverage = build_camera_coverage()
+    subset = stratified_camera_subset(coverage, limit=64)
+    example = TrainingExample(
+        example_id="camera-all-angles",
+        prompt="Describe the object consistently across camera views.",
+        response="The same object identity must be preserved.",
+        source_ref="scene:fixture",
+        camera_view_refs=tuple(item.reference for item in subset),
+        tags=("vision", "multi-view"),
+    )
+    plan = compile_training_plan(
+        (example,),
+        methods=(TrainingMethod.MULTIVIEW_GROUNDING,),
+        policy=TrainingEfficiencyPolicy(
+            max_camera_views_per_example=32,
+            max_documents=64,
+            max_total_chars=500_000,
+        ),
+    )
+
+    assert len(coverage.views) > 100
+    assert len(subset) == 64
+    assert plan.method_counts[
+        TrainingMethod.MULTIVIEW_GROUNDING.value
+    ] == 32
+    refs = {
+        item.metadata["camera_view_ref"]
+        for item in plan.documents
+    }
+    assert len(refs) == 32
