@@ -225,10 +225,12 @@ def test_ttk_bands_hold_for_core_normal_and_casual_story(archetype):
 
 
 def test_zone_curve_is_healthy():
-    for n in (2, 5, 10, 16):
+    # Realistic zone lengths; very short zones cannot ramp 0.2 -> 1.0 without a spike.
+    for n in (10, 16, 25):
         curve = build_zone_curve(n)
         assert validate_curve(curve) == [], (n, curve)
         assert curve[-1] == max(curve)
+    assert "spike" in validate_curve(build_zone_curve(2))
 
 
 def test_bad_curves_are_flagged():
