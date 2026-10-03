@@ -14,8 +14,10 @@ from skeleton.eval.experiment_registry import (
     TrafficMode,
 )
 from skeleton.learning.mirror_room import (
+    CurriculumPolicy,
     DeterministicCoordinateLearner,
     EpisodeOutcome,
+    HardExample,
     MirrorBudget,
     MirrorCandidate,
     MirrorMetricPolicy,
@@ -27,7 +29,10 @@ from skeleton.learning.mirror_room import (
     NumericDimension,
     SandboxPolicy,
     ScenarioSplit,
+    SplitIntegrityPolicy,
     TrainingLearningArchive,
+    build_curriculum,
+    inspect_split_integrity,
     qualify_for_external_promotion,
     verify_selected_lineage,
 )
@@ -1009,3 +1014,120 @@ def test_coordinate_learner_archive_changes_strategy_identity() -> None:
     )
 
     assert cold.strategy_digest != warm.strategy_digest
+
+
+def test_near_duplicate_cross_split_corpus_is_detectable_before_learning() -> None:
+    train = MirrorScenario(
+        "train-near-duplicate",
+        ScenarioSplit.TRAIN,
+        {"text": "alpha beta gamma delta epsilon zeta eta theta iota kappa"},
+    )
+    validation = MirrorScenario(
+        "validation-near-duplicate",
+        ScenarioSplit.VALIDATION,
+        {"text": "alpha beta gamma delta epsilon zeta eta theta iota lambda"},
+    )
+    holdout = MirrorScenario(
+        "holdout-independent",
+        ScenarioSplit.HOLDOUT,
+        {"text": "omega psi chi phi upsilon tau sigma rho independent sample"},
+    )
+    report = inspect_split_integrity(
+        (train, validation, holdout),
+        policy=SplitIntegrityPolicy(
+            near_duplicate_threshold=0.5,
+            minimum_tokens_for_similarity=4,
+            shingle_size=2,
+        ),
+    )
+    assert report.passed is False
+    assert report.suspicious_pairs
+    assert report.maximum_cross_split_similarity >= 0.5
+
+
+def test_curriculum_is_training_only_deterministic_and_hard_example_weighted() -> None:
+    scenarios = (
+        MirrorScenario("train-easy", ScenarioSplit.TRAIN, {"x": 1}, tags=("math",)),
+        MirrorScenario("train-hard", ScenarioSplit.TRAIN, {"x": 2}, tags=("logic",)),
+        MirrorScenario("train-other", ScenarioSplit.TRAIN, {"x": 3}, tags=("math",)),
+    )
+    hard = (
+        HardExample(
+            scenario_id="train-hard",
+            scenario_digest=scenarios[1].digest,
+            difficulty=1.5,
+            metric_deltas={"quality.acceptance": -0.4},
+        ),
+    )
+    policy = CurriculumPolicy(interleave_primary_tags=False)
+    first = build_curriculum(scenarios, hard, policy=policy)
+    second = build_curriculum(scenarios, hard, policy=policy)
+
+    assert first.digest == second.digest
+    assert first.scenarios[0].scenario_id == "train-hard"
+    assert all(item.split is ScenarioSplit.TRAIN for item in first.scenarios)
+
+
+def test_validation_candidate_search_budget_fails_closed() -> None:
+    base = _spec()
+    constrained = MirrorRoomSpec(
+        manifest=base.manifest,
+        production_baseline=base.production_baseline,
+        metrics=base.metrics,
+        sandbox_policy=base.sandbox_policy,
+        budget=MirrorBudget(
+            max_generations=3,
+            max_candidates_per_generation=2,
+            max_episodes=64,
+            max_total_steps=512,
+            max_total_tokens=4096,
+            max_total_cost_units=5.0,
+            max_validation_candidate_evaluations=1,
+        ),
+        hard_example_limit=base.hard_example_limit,
+        stagnation_patience=base.stagnation_patience,
+    )
+
+    class TwoCandidateGenerator:
+        generator_id = "learner"
+
+        def propose(self, feedback, *, limit):
+            skill = float(feedback.champion.parameters["skill"])
+            return (
+                _candidate(
+                    "selection-budget-a",
+                    skill + 0.10,
+                    parent=feedback.champion.candidate_id,
+                ),
+                _candidate(
+                    "selection-budget-b",
+                    skill + 0.20,
+                    parent=feedback.champion.candidate_id,
+                ),
+            )[:limit]
+
+    with pytest.raises(MirrorRoomError, match="validation selection budget"):
+        MirrorRoom(constrained, Executor()).learn(
+            run_id="selection-budget",
+            generator=TwoCandidateGenerator(),
+            scenarios=_scenarios(),
+            generations=1,
+        )
+
+
+def test_run_and_promotion_bind_split_integrity_and_sealed_holdout() -> None:
+    _, _, _, receipt = _run(generations=1)
+    assert len(receipt.split_integrity_digest) == 64
+    assert receipt.validation_candidate_evaluations == 1
+
+    evidence = qualify_for_external_promotion(
+        receipt,
+        verifier_id="independent-verifier",
+        evaluation_refs=("eval:quality", "eval:safety"),
+        verified_at=10,
+    )
+
+    assert evidence.sealed_holdout_digest == receipt.sealed_holdout_digest
+    assert evidence.split_integrity_digest == receipt.split_integrity_digest
+    assert evidence.generator_id == receipt.generator_id
+    assert evidence.executor_id == receipt.executor_id
