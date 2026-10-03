@@ -1254,6 +1254,8 @@
       "evidence": [
         "skeleton/learning",
         "skeleton/ai/runtime/product/learning.py",
+        "skeleton/ai/runtime/inference/training_methods.py",
+        "skeleton/ai/runtime/inference/multiview.py",
         "skeleton/intelligence/adaptive.py",
         "skeleton/intelligence/experiment_tracker.py"
       ],
@@ -1263,6 +1265,8 @@
         "learning proposal",
         "accepted-turn learning candidate",
         "candidate execution qualification receipt",
+        "multi-method training plan receipt",
+        "360-degree camera coverage identity",
         "promotion receipt"
       ],
       "construction": [
@@ -1271,6 +1275,9 @@
         "bind accepted learning examples to durable conversation version, causal user lineage, execution result, context identity and provider receipts",
         "admit product-derived learning by explicit data-class policy and separate tool-augmented opt-in",
         "build content-addressed candidate artifacts without overwriting the active AI_LOCAL_MODEL_PATH",
+        "compile compatible supervised, causal, self-supervised, preference, distillation, contrastive, replay, curriculum, adversarial, multiview, denoising, sequence-to-sequence, reward, reinforcement-trace, imitation, retrieval-grounded, pseudo-label, multitask and active-learning views",
+        "bound training by document/character budgets, length buckets, sparse embedding updates, reusable gradient buffers and deterministic early stopping",
+        "represent complete spherical camera pose coverage across azimuth/elevation/roll plus bounded FOV, distance and exposure variants without fabricating pixels",
         "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
         "require eval before behavior change"
@@ -1282,6 +1289,9 @@
         "accepted-turn lineage and thread-version snapshot test",
         "candidate active-model overwrite denial",
         "candidate offline executable qualification",
+        "multi-method plan determinism and missing-signal skipping",
+        "all-angle camera coverage with bounded stratified training subset",
+        "early-stop and training-work efficiency receipt",
         "promotion gate"
       ],
       "failure_mode": "retain baseline behavior"
@@ -1725,6 +1735,38 @@
       "artifact_builder": "skeleton-train-local-model",
       "product_learning_candidate_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_artifact",
       "product_learning_snapshot_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_from_repository",
+      "multi_method_training_compiler": "skeleton/ai/runtime/inference/training_methods.py:compile_training_plan",
+      "camera_training_coverage": "skeleton/ai/runtime/inference/multiview.py:build_camera_coverage",
+      "training_method_families": [
+        "causal_language_modeling",
+        "supervised_instruction",
+        "self_supervised_span",
+        "preference",
+        "distillation",
+        "contrastive",
+        "replay",
+        "curriculum",
+        "adversarial_robustness",
+        "multiview_grounding",
+        "denoising_autoencoding",
+        "sequence_to_sequence",
+        "reward_modeling",
+        "reinforcement_trace",
+        "imitation",
+        "retrieval_augmented",
+        "pseudo_label",
+        "multitask",
+        "active_learning"
+      ],
+      "training_efficiency": {
+        "in_memory_multi_method_compile": true,
+        "content_deduplication": true,
+        "length_bucket_ordering": true,
+        "sparse_embedding_gradient_updates": true,
+        "reused_dense_gradient_buffers": true,
+        "epoch_loss_tracking": true,
+        "bounded_early_stopping": true
+      },
       "engine_dependency_extra": "local-inference",
       "execution_owner": "skeleton/provider_runtime.py",
       "artifact_owner": "skeleton/ai/runtime/inference/artifact.py",
