@@ -456,3 +456,63 @@ def test_tampered_runtime_lease_reason_is_rejected_without_quota_mutation(
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["completions"] == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered"),
+    [
+        ("concurrency", 2),
+        ("queue_depth", 99),
+    ],
+)
+def test_tampered_runtime_lease_pressure_breaks_decision_identity(
+    tmp_path,
+    field,
+    tampered,
+) -> None:
+    path = tmp_path / "quota.sqlite3"
+    request = _request(
+        "op-tampered-pressure-" + field,
+        max_concurrency=3,
+    )
+    first = _governor(path)
+    first.reserve(request, now_wall=10.0)
+
+    with sqlite3.connect(path) as conn:
+        row = conn.execute(
+            """
+            SELECT runtime_lease_json
+            FROM cost_governor_journal
+            WHERE operation_id = ?
+            """,
+            (request.operation_id,),
+        ).fetchone()
+        assert row is not None
+        payload = json.loads(row[0])
+        payload["remaining"][field] = tampered
+        conn.execute(
+            """
+            UPDATE cost_governor_journal
+            SET runtime_lease_json = ?
+            WHERE operation_id = ?
+            """,
+            (
+                json.dumps(
+                    payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                request.operation_id,
+            ),
+        )
+
+    restarted = _governor(path)
+    with pytest.raises(
+        CostGovernorConflict,
+        match="decision identity is invalid",
+    ):
+        restarted.reserve(request, now_wall=20.0)
+
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["completions"] == 0
