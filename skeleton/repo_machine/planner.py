@@ -8,11 +8,9 @@ from .impact import analyze_impact
 from .model import Finding, RepositoryModel
 
 _SEVERITY = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}
-_CODE_WEIGHT = {
-    "scan.truncated": 50, "scan.unreadable": 45, "topology.cycle": 40,
-    "quality.missing-zone-tests": 35, "organization.oversized-module": 25,
-    "organization.unclassified": 10,
-}
+_CODE_WEIGHT = {"scan.truncated": 50, "scan.unreadable": 45, "topology.cycle": 40,
+                "quality.missing-zone-tests": 35, "organization.oversized-module": 25,
+                "organization.unclassified": 10}
 _LANE_WEIGHT = {"repository-health": 30, "architecture": 20, "regression": 15, "organization": 5}
 
 
@@ -33,15 +31,12 @@ class WorkCandidate:
     readiness: str = "ready"
 
     def as_dict(self) -> dict[str, object]:
-        return {
-            "identity": self.identity, "lane": self.lane, "priority": self.priority,
-            "zone": self.zone, "path": self.path, "objective": self.objective,
-            "evidence": list(self.evidence), "impact_score": self.impact_score,
-            "change_class": self.change_class, "verification_paths": list(self.verification_paths),
-            "dependency_zones": list(self.dependency_zones),
-            "prerequisite_ids": list(self.prerequisite_ids),
-            "readiness": self.readiness,
-        }
+        return {"identity": self.identity, "lane": self.lane, "priority": self.priority,
+                "zone": self.zone, "path": self.path, "objective": self.objective,
+                "evidence": list(self.evidence), "impact_score": self.impact_score,
+                "change_class": self.change_class, "verification_paths": list(self.verification_paths),
+                "dependency_zones": list(self.dependency_zones),
+                "prerequisite_ids": list(self.prerequisite_ids), "readiness": self.readiness}
 
 
 def _lane(finding: Finding) -> str:
@@ -74,23 +69,32 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
         priority = min(500, base + impact_score + _LANE_WEIGHT.get(_lane(finding), 0))
         raw.append((finding, priority, impact))
 
-    # Higher-priority work becomes a prerequisite when it shares a zone or
-    # reaches the same dependency surface. This makes readiness explicit.
     raw.sort(key=lambda item: (-item[1], item[0].zone, item[0].path, item[0].identity))
-    candidates: list[WorkCandidate] = []
-    for index, (finding, priority, impact) in enumerate(raw):
-        prerequisites: set[str] = set()
+    # Index higher-priority findings by affected zone. This replaces the
+    # repeated O(n²) prefix scan with bounded candidate-to-zone lookups.
+    zone_gate: dict[str, tuple[str, int]] = {}
+    for finding, priority, impact in raw:
+        zones = {finding.zone}
         if impact:
-            affected = set(impact.transitively_affected_zones) | set(impact.touched_zones)
-            for previous_finding, previous_priority, previous_impact in raw[:index]:
-                if previous_priority <= priority:
-                    break
-                previous_zones = {previous_finding.zone}
-                if previous_impact:
-                    previous_zones |= set(previous_impact.transitively_affected_zones)
-                if affected & previous_zones:
-                    prerequisites.add(previous_finding.identity)
-                    break
+            zones.update(impact.transitively_affected_zones)
+            zones.update(impact.touched_zones)
+        for zone in zones:
+            current = zone_gate.get(zone)
+            if current is None:
+                zone_gate[zone] = (finding.identity, priority)
+
+    candidates: list[WorkCandidate] = []
+    for finding, priority, impact in raw:
+        affected = set(impact.transitively_affected_zones) | set(impact.touched_zones) if impact else {finding.zone}
+        prerequisites: set[str] = set()
+        gates = sorted(
+            (zone_gate[zone] for zone in affected if zone in zone_gate),
+            key=lambda item: (-item[1], item[0]),
+        )
+        for identity, gate_priority in gates:
+            if identity != finding.identity and gate_priority > priority:
+                prerequisites.add(identity)
+                break
         candidates.append(WorkCandidate(
             identity=finding.identity, lane=_lane(finding), priority=priority,
             zone=finding.zone, path=finding.path, objective=_objective(finding),
@@ -108,11 +112,9 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
 
 def plan_work(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
     candidates = derive_work_candidates(model, limit=limit)
-    return {
-        "repository_fingerprint": model.fingerprint,
-        "planning_model": "severity + lane weight + bounded topology impact + readiness gates",
-        "work": [item.as_dict() for item in candidates],
-    }
+    return {"repository_fingerprint": model.fingerprint,
+            "planning_model": "severity + lane weight + bounded topology impact + indexed readiness gates",
+            "work": [item.as_dict() for item in candidates]}
 
 
 def candidate_payload(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
