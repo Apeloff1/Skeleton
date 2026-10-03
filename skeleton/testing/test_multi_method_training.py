@@ -425,3 +425,61 @@ def test_gradient_accumulation_one_preserves_per_document_updates(
 
     assert receipt["gradient_accumulation_steps"] == 1
     assert receipt["optimizer_steps"] == receipt["training_plan"]["document_count"]
+
+
+def test_camera_coverage_plan_rejects_forged_digest() -> None:
+    import pytest
+
+    from skeleton.ai.runtime.inference.multiview import (
+        CameraCoveragePlan,
+        CameraViewError,
+    )
+
+    coverage = build_camera_coverage(
+        CameraCoveragePolicy(
+            azimuth_step_deg=90,
+            elevation_step_deg=90,
+            roll_step_deg=180,
+            fov_degrees=(55.0,),
+            max_views=128,
+        )
+    )
+    with pytest.raises(
+        CameraViewError,
+        match="coverage_digest does not match",
+    ):
+        CameraCoveragePlan(
+            policy_digest=coverage.policy_digest,
+            views=coverage.views,
+            coverage_digest="0" * 64,
+        )
+
+
+def test_camera_subset_rejects_view_outside_coverage() -> None:
+    import pytest
+
+    from skeleton.ai.runtime.inference.multiview import (
+        CameraViewError,
+        bind_camera_subset,
+    )
+
+    coverage = build_camera_coverage(
+        CameraCoveragePolicy(
+            azimuth_step_deg=90,
+            elevation_step_deg=90,
+            roll_step_deg=180,
+            fov_degrees=(55.0,),
+            max_views=128,
+        )
+    )
+    outside = CameraView(
+        azimuth_deg=45,
+        elevation_deg=0,
+        roll_deg=0,
+        fov_deg=40,
+    )
+    with pytest.raises(
+        CameraViewError,
+        match="outside coverage plan",
+    ):
+        bind_camera_subset(coverage, (outside,))
