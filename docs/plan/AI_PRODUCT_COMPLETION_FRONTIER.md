@@ -284,6 +284,29 @@ forward pass, and the multi-method builder uses bounded early stopping when
 improvement plateaus. Exact artifact validation and candidate-only promotion
 semantics remain unchanged.
 
+### 19. Adaptive training allocation and qualification evidence
+
+Training-method selection is now a bounded deterministic optimization loop rather
+than a fixed equal-cost sweep. Development, regression and Mirror Room validation
+observations can report validation gain, compute units, evidence identity and
+sample count for each method. The allocator shrinkage-weights gain-per-compute,
+retains mandatory general learning methods, explores methods without evidence,
+drops non-mandatory methods with negative observed efficiency and enforces both
+per-method and total-repeat caps.
+
+Promotion holdouts and production observations are explicitly rejected as
+allocator feedback. This keeps the final evaluation firewall from becoming a
+training oracle and preserves the holdout query budget for promotion decisions.
+
+A separate qualification bridge reconciles the exact trained model/artifact and
+training-plan digest with an explicit model-to-Mirror binding, Mirror Room
+promotion evidence, evaluation-firewall promotion evidence, optional camera
+coverage and adaptive-allocation identity. The resulting bundle has no production
+authority and no self-modification authority. It exposes only candidate digest,
+independent verifier identity and evidence references suitable for the existing
+model lifecycle registry's CANDIDATE -> VALIDATED transition; lifecycle policy
+still owns that transition and later activation.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -313,7 +336,11 @@ semantics remain unchanged.
 - in-memory multi-method artifact construction with bounded early stopping;
 - sparse/reused recurrent gradient execution;
 - spherical azimuth/elevation/roll/FOV camera coverage and bounded multiview
-  training subsets.
+  training subsets;
+- deterministic validation-gain-per-compute method allocation with promotion
+  holdout exclusion;
+- exact training -> Mirror Room -> evaluation-firewall -> lifecycle evidence
+  reconciliation without production authority.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
