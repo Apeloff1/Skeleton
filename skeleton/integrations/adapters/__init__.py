@@ -1,13 +1,10 @@
-"""Provider-neutral model adapter runtime.
+"""Provider-neutral model adapters with canonical tool authority.
 
-This package is the current-main salvage of the provider/runtime portion of
-the former integration-adapter draft.  It intentionally excludes tool
-execution and capability authority: tool/provider side effects must bind to
-the canonical :mod:`skeleton.kernel.capsec` gate in a separate integration
-slice.
-
-The surface here is safe to use for provider selection, retry/circuit/deadline
-handling, deterministic offline fallback, and provider-neutral chat types.
+The provider runtime remains independent of vendor transports and supports
+deterministic offline fallback. Tool execution is additive and has exactly one
+authority source: the frozen :mod:`skeleton.kernel.capsec` gate. Callers pass
+a signed capability token; verified token identity becomes the tool context
+identity, and denied actions fail closed before side effects.
 """
 
 from .capsec import KernelToolAuthorizer, ToolAuthorization, declared_capability_action, tool_actions
