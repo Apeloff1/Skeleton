@@ -230,3 +230,27 @@ def test_label_and_budget_evidence_is_order_stable() -> None:
     assert first.projected_max_series == second.projected_max_series
     assert first.accepted == second.accepted
     assert first.reasons == second.reasons
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "authorization",
+        "api-key",
+        "refresh_token",
+        "user_prompt",
+        "raw_content",
+    ),
+)
+def test_sensitive_looking_label_names_are_rejected_even_if_mislabeled(
+    name: str,
+) -> None:
+    with pytest.raises(
+        CardinalityControlError,
+        match="sensitive-looking telemetry label names are forbidden",
+    ):
+        TelemetryLabel(
+            name=name,
+            source_kind="bounded",
+            max_distinct_values=10,
+        )
