@@ -264,10 +264,62 @@ def derive_privacy_label(
     )
 
 
+def evaluate_privacy_use(
+    *,
+    decision_id: str,
+    label: PrivacyLabel,
+    grant: PurposeGrant,
+    subject_id: str,
+    purpose: str,
+    jurisdiction_scope: str,
+    now_ns: int,
+) -> PrivacyDecision:
+    """Evaluate declared purpose/scope compatibility without side effects."""
+
+    if not isinstance(label, PrivacyLabel):
+        raise TypeError("label must be PrivacyLabel")
+    if not isinstance(grant, PurposeGrant):
+        raise TypeError("grant must be PurposeGrant")
+    subject = _token("subject_id", subject_id)
+    requested_purpose = _token("purpose", purpose)
+    jurisdiction = _token("jurisdiction_scope", jurisdiction_scope)
+    now = _non_negative_int("now_ns", now_ns)
+
+    allowed = False
+    if grant.subject_id != subject:
+        reason = "subject-mismatch"
+    elif now >= grant.expires_at_ns:
+        reason = "grant-expired"
+    elif grant.purpose != requested_purpose:
+        reason = "grant-purpose-mismatch"
+    elif requested_purpose not in label.allowed_purposes:
+        reason = "label-purpose-denied"
+    elif jurisdiction not in grant.jurisdiction_scopes:
+        reason = "grant-jurisdiction-denied"
+    elif jurisdiction not in label.jurisdiction_scopes:
+        reason = "label-jurisdiction-denied"
+    else:
+        allowed = True
+        reason = "allowed"
+
+    return PrivacyDecision(
+        decision_id=decision_id,
+        label_digest=label.digest,
+        grant_digest=grant.digest,
+        subject_id=subject,
+        purpose=requested_purpose,
+        jurisdiction_scope=jurisdiction,
+        allowed=allowed,
+        reason_code=reason,
+        evaluated_at_ns=now,
+    )
+
+
 __all__ = [
     "PrivacyDecision",
     "PrivacyEngineError",
     "PrivacyLabel",
     "PurposeGrant",
     "derive_privacy_label",
+    "evaluate_privacy_use",
 ]
