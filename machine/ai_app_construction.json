@@ -1785,7 +1785,9 @@
         "sparse_embedding_gradient_updates": true,
         "reused_dense_gradient_buffers": true,
         "epoch_loss_tracking": true,
-        "bounded_early_stopping": true
+        "bounded_early_stopping": true,
+        "deterministic_gradient_accumulation": true,
+        "optimizer_step_accounting": true
       },
       "engine_dependency_extra": "local-inference",
       "execution_owner": "skeleton/provider_runtime.py",
