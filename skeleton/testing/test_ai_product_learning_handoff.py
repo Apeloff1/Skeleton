@@ -274,3 +274,8 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     assert receipt["learning_candidate_digest"] == candidate.identity_digest
     assert receipt["learning_pair_count"] == 1
     assert receipt["promotion_state"] == "candidate_only"
+    assert receipt["qualification"]["status"] == "executable_candidate"
+    assert receipt["qualification"]["model_digest"] == receipt["model_digest"]
+    assert len(receipt["qualification"]["prompt_sha256"]) == 64
+    assert len(receipt["qualification"]["output_sha256"]) == 64
+    assert len(receipt["qualification"]["receipt_digest"]) == 64
