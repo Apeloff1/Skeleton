@@ -182,3 +182,129 @@ def test_vs001_rejects_non_local_model_adapter() -> None:
             AsyncToolRuntime(),
             verification_hook=_verification,
         )
+
+@pytest.mark.asyncio
+async def test_vs001_rejects_local_model_identity_swap_between_turns(tmp_path) -> None:
+    database=tmp_path/"identity-fence.sqlite3"
+    repo=SQLiteExecutionRepository(database)
+    tools=AsyncToolRuntime()
+    original_digest=hashlib.sha256(b"identity-model-v1").hexdigest()
+    replacement_digest=hashlib.sha256(b"identity-model-v2").hexdigest()
+    holder={}
+
+    def runner(
+        request:LocalInferenceRequest,
+        cancel:threading.Event,
+    )->LocalInferenceResult:
+        backend=holder["backend"]
+        if request.prompt.startswith("Tool results from the previous provider turn"):
+            return LocalInferenceResult(
+                text="completed after swap",
+                model_id=backend.model_id,
+                model_digest=backend.model_digest,
+                input_tokens=2,
+                output_tokens=3,
+                response_id="local:swap-final",
+            )
+        return LocalInferenceResult(
+            text=None,
+            model_id=backend.model_id,
+            model_digest=backend.model_digest,
+            input_tokens=2,
+            output_tokens=1,
+            finish_reason="tool_calls",
+            response_id="local:swap-tool",
+            tool_calls=(
+                LocalToolCall(
+                    call_id="swap-read",
+                    tool_id="repo.read",
+                    arguments={"path":"README.md"},
+                ),
+            ),
+        )
+
+    backend=CallableLocalModel(
+        model_id="identity-model-v1",
+        model_digest=original_digest,
+        runner=runner,
+    )
+    holder["backend"]=backend
+    adapter=LocalModelAdapter(LocalInferenceEngine(backend))
+
+    async def read_handler(_request):
+        backend.model_id="identity-model-v2"
+        backend._model_digest=replacement_digest
+        return "artifact"
+
+    await tools.register(
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Read one path",
+            input_schema={
+                "type":"object",
+                "properties":{"path":{"type":"string"}},
+                "required":["path"],
+                "additionalProperties":False,
+            },
+            effect=ToolEffect.READ_ONLY,
+            approval_required=False,
+            data_policy="internal:repository",
+            network_policy="none",
+        ),
+        read_handler,
+    )
+
+    request=FunctionalAIRequest(
+        request_id="vs001-identity-swap",
+        objective="Reject model identity changes during execution.",
+        prompt="Read README.md.",
+        instructions="Stay on one bound local model.",
+        context_digest=hashlib.sha256(b"identity-context").hexdigest(),
+        allowed_tool_ids=("repo.read",),
+        created_at=NOW,
+    )
+    runtime=FunctionalAIRuntime(
+        repo,
+        adapter,
+        tools,
+        verification_hook=lambda *_: ExecutionVerificationDecision(
+            passed=True,
+            receipt={
+                "outcome":"passed",
+                "policy_satisfied":True,
+                "verifier_id":"identity-test",
+                "candidate_digest":hashlib.sha256(b"completed after swap").hexdigest(),
+                "context_digest":request.context_digest,
+            },
+            evidence_refs=("evidence:identity-test",),
+        ),
+    )
+
+    with pytest.raises(RuntimeError,match="identity changed after binding"):
+        await runtime.execute(request)
+
+
+@pytest.mark.asyncio
+async def test_vs001_rejects_identity_drift_before_new_execution(tmp_path) -> None:
+    repo=SQLiteExecutionRepository(tmp_path/"pre-run-drift.sqlite3")
+    adapter=_local_tool_model()
+    runtime=FunctionalAIRuntime(
+        repo,
+        adapter,
+        AsyncToolRuntime(),
+        verification_hook=_verification,
+    )
+    adapter.engine.model._model_digest=hashlib.sha256(b"drifted").hexdigest()
+
+    request=FunctionalAIRequest(
+        request_id="vs001-pre-run-drift",
+        objective="Reject stale runtime identity.",
+        prompt="Answer locally.",
+        instructions="No identity drift.",
+        context_digest=hashlib.sha256(b"pre-run-context").hexdigest(),
+        created_at=NOW,
+    )
+    with pytest.raises(RuntimeError,match="identity changed after binding"):
+        await runtime.execute(request)
+
