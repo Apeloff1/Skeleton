@@ -6112,12 +6112,22 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Archive preflight rejects absolute, traversal, ambiguous, duplicate, and parent-collision member paths before extraction.",
+        "Extraction publishes only a fully validated staging tree."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_rejects_traversal_absolute_or_ambiguous_paths",
+        "skeleton/testing/test_security_archive_sandbox.py::test_tar_rejects_traversal_absolute_or_ambiguous_paths"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6149,12 +6159,23 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Archive extraction enforces member-count, per-member, total-expanded-size, archive-byte, and compression-ratio bounds.",
+        "Runtime extraction fails closed if streamed size disagrees with preflight metadata."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_total_expanded_size_bound_is_enforced",
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_compression_ratio_bound_is_enforced",
+        "skeleton/testing/test_security_archive_sandbox.py::test_archive_expansion_ratio_bound_is_enforced"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
@@ -6187,12 +6208,22 @@
         164
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "ZIP symlink/FIFO members and TAR link/special members are rejected before publication.",
+        "Archive extraction cannot create a link chain or special filesystem object."
+      ],
+      "tests": [
+        "skeleton/testing/test_security_archive_sandbox.py::test_zip_symlink_member_is_rejected",
+        "skeleton/testing/test_security_archive_sandbox.py::test_tar_special_members_are_rejected"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/security/archive_sandbox.py",
+        "test:skeleton/testing/test_security_archive_sandbox.py",
+        "workflow:P0 Archive Security Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "adversarial",
