@@ -5,6 +5,8 @@ import hashlib
 
 import pytest
 
+import skeleton.ai.runtime.training.trainer as trainer_module
+
 from skeleton.ai.runtime.inference import LocalInferenceEngine, LocalInferenceRequest
 from skeleton.ai.runtime.training import (
     CandidateQualification,
@@ -22,6 +24,7 @@ from skeleton.ai.runtime.training import (
     TrainingEvaluationGate,
     TrainingRepository,
     TrainingRunManifest,
+    TrainingStateError,
     VerifierReport,
     corpus_digest,
 )
@@ -283,3 +286,118 @@ def test_qualification_candidate_must_match_stored_result(tmp_path):
     with pytest.raises(ValueError,match="does not match evaluation result"):
         ledger.record_qualification(forged)
 
+
+
+def test_reference_trainer_fails_before_execution_when_step_budget_is_exceeded(
+    tmp_path,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    constrained=TrainingRunManifest(
+        run_id="budgeted-run",
+        dataset_digest=manifest.dataset_digest,
+        base_model_digest=manifest.base_model_digest,
+        code_digest=manifest.code_digest,
+        environment_digest=manifest.environment_digest,
+        hyperparameters=manifest.hyperparameters,
+        seed=manifest.seed,
+        resource_budget={"max_steps":3},
+    )
+
+    with pytest.raises(TrainingStateError,match="training budget exceeded: max_steps"):
+        ReferenceLocalTrainer(datasets,runs).train(
+            constrained,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    with pytest.raises(KeyError):
+        runs.state(constrained.run_id)
+
+
+def test_reference_trainer_rejects_distributed_topology_it_cannot_execute(
+    tmp_path,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    distributed=TrainingRunManifest(
+        run_id="distributed-run",
+        dataset_digest=manifest.dataset_digest,
+        base_model_digest=manifest.base_model_digest,
+        code_digest=manifest.code_digest,
+        environment_digest=manifest.environment_digest,
+        hyperparameters=manifest.hyperparameters,
+        seed=manifest.seed,
+        world_size=2,
+        parallelism="data_parallel",
+        resource_budget={"max_steps":100},
+    )
+
+    with pytest.raises(
+        TrainingStateError,
+        match="only supports world_size=1 and parallelism=single",
+    ):
+        ReferenceLocalTrainer(datasets,runs).train(
+            distributed,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    with pytest.raises(KeyError):
+        runs.state(distributed.run_id)
+
+
+def test_reference_trainer_enforces_document_and_byte_budgets(tmp_path):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    for run_id,budget_name,limit in (
+        ("doc-budget","max_documents",len(corpus)-1),
+        ("byte-budget","max_corpus_bytes",1),
+    ):
+        constrained=TrainingRunManifest(
+            run_id=run_id,
+            dataset_digest=manifest.dataset_digest,
+            base_model_digest=manifest.base_model_digest,
+            code_digest=manifest.code_digest,
+            environment_digest=manifest.environment_digest,
+            hyperparameters=manifest.hyperparameters,
+            seed=manifest.seed,
+            resource_budget={budget_name:limit},
+        )
+        with pytest.raises(
+            TrainingStateError,
+            match=f"training budget exceeded: {budget_name}",
+        ):
+            ReferenceLocalTrainer(datasets,runs).train(
+                constrained,
+                corpus,
+                order=2,
+                now=NOW,
+            )
+        with pytest.raises(KeyError):
+            runs.state(constrained.run_id)
+
+
+def test_reference_trainer_marks_run_failed_on_execution_crash(
+    tmp_path,
+    monkeypatch,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+
+    def crash(*args,**kwargs):
+        raise RuntimeError("injected trainer crash")
+
+    monkeypatch.setattr(
+        trainer_module.ReferenceNGramModel,
+        "train",
+        staticmethod(crash),
+    )
+
+    with pytest.raises(RuntimeError,match="injected trainer crash"):
+        ReferenceLocalTrainer(datasets,runs).train(
+            manifest,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    assert runs.state(manifest.run_id)=="failed"
