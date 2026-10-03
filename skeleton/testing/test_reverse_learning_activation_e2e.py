@@ -436,6 +436,7 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=promoted_transition,
         model_program_bridge_digest=bridged.bridge_digest,
         operator_authorization_ref="operator-authorization:reverse-e2e",
         cache_size=0,
