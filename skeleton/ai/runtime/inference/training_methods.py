@@ -657,6 +657,7 @@ def compile_training_plan(
                     content_key = identity_payload["text_sha256"]
                     if (
                         actual.deduplicate
+                        and ordinal == 0
                         and content_key in seen_content
                     ):
                         dropped_duplicate += 1
@@ -667,7 +668,8 @@ def compile_training_plan(
                     ):
                         dropped_budget += 1
                         continue
-                    seen_content.add(str(content_key))
+                    if ordinal == 0:
+                        seen_content.add(str(content_key))
                     document_id = (
                         "train-doc:" + _digest(identity_payload)
                     )
