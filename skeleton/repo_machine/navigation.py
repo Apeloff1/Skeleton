@@ -43,10 +43,13 @@ class NavigationIndex:
         self._root = _Node("")
         self._paths = {item.path: item for item in model.files}
         self._zones_by_prefix = {}
+        self._files_by_zone: dict[str, tuple[FileRecord, ...]] = {}
         self._build()
 
     def _build(self) -> None:
+        by_zone: dict[str, list[FileRecord]] = {}
         for record in self.model.files:
+            by_zone.setdefault(record.zone, []).append(record)
             node = self._root
             node.files += 1
             node.source += int(record.kind == "source")
@@ -59,6 +62,10 @@ class NavigationIndex:
                 node.files += 1
                 node.source += int(record.kind == "source")
                 node.tests += int(record.kind == "test")
+        self._files_by_zone = {
+            zone: tuple(sorted(records, key=lambda item: item.path))
+            for zone, records in by_zone.items()
+        }
 
     def directory(self, prefix: str = "") -> NavigationEntry:
         normalized = prefix.strip("/")
@@ -90,7 +97,8 @@ class NavigationIndex:
         needle = name_contains.casefold().strip()
         kind_set = {item.casefold() for item in kinds}
         values: list[FileRecord] = []
-        for record in self.model.files:
+        records = self._files_by_zone.get(zone, self.model.files) if zone else self.model.files
+        for record in records:
             if zone and record.zone != zone:
                 continue
             if needle and needle not in record.path.casefold():
