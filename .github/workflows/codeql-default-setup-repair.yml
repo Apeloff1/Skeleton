@@ -1,0 +1,84 @@
+name: CodeQL Default Setup Repair
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/codeql-default-setup-repair.yml
+
+permissions: {}
+
+concurrency:
+  group: codeql-default-setup-repair
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure CodeQL maintained languages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Configure default setup for maintained languages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          before="$(gh api "repos/${GH_REPO}/code-scanning/default-setup")"
+          echo "CodeQL default setup before repair:"
+          jq '{state, languages, query_suite, schedule, updated_at}' <<<"${before}"
+
+          gh api --method PATCH "repos/${GH_REPO}/code-scanning/default-setup" \
+            -f state=configured \
+            -f query_suite=extended \
+            -f 'languages[]=actions' \
+            -f 'languages[]=python' \
+            -f 'languages[]=javascript-typescript' \
+            >/dev/null
+
+          verified=0
+          for attempt in {1..18}; do
+            current="$(gh api "repos/${GH_REPO}/code-scanning/default-setup")"
+            state="$(jq -r '.state // ""' <<<"${current}")"
+            suite="$(jq -r '.query_suite // ""' <<<"${current}")"
+
+            if [[ "${state}" == "configured" && "${suite}" == "extended" ]] && \
+               jq -e '
+                 (.languages // []) as $languages
+                 | ($languages | index("actions")) != null
+                 and ($languages | index("python")) != null
+                 and ($languages | index("javascript-typescript")) != null
+               ' <<<"${current}" >/dev/null; then
+              echo "CodeQL default setup repaired:"
+              jq '{state, languages, query_suite, schedule, updated_at}' <<<"${current}"
+              verified=1
+              break
+            fi
+
+            echo "Waiting for CodeQL configuration propagation (attempt ${attempt}/18)..."
+            sleep 10
+          done
+
+          if [[ "${verified}" != "1" ]]; then
+            echo "::error::CodeQL default setup did not retain actions + python + javascript-typescript with the extended query suite."
+            gh api "repos/${GH_REPO}/code-scanning/default-setup" \
+              --jq '{state, languages, query_suite, schedule, updated_at}' || true
+            exit 1
+          fi
+
+          {
+            echo "## CodeQL default setup"
+            echo
+            echo "- State: configured"
+            echo "- Query suite: extended"
+            echo "- Languages: actions, python, javascript-typescript"
+            echo
+            echo "This repairs the actions-only default setup without introducing an advanced-setup workflow that would conflict with GitHub default setup."
+          } >> "${GITHUB_STEP_SUMMARY}"
