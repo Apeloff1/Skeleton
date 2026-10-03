@@ -41,6 +41,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeConflict,
     AdmissionRuntimeError,
     UnknownUsageMarker,
+    admission_lease_id,
 )
 from skeleton.intelligence.quota import (
     QuotaCompletion,
@@ -2035,6 +2036,367 @@ class CostGovernor:
             quota_reservation=record.quota_reservation,
             admitted_at=metadata.admitted_at,
         )
+
+    @staticmethod
+    def _admission_intent(
+        *,
+        requested: AdmissionRequest,
+        selected: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        fallback_reason: str | None,
+    ) -> _AdmissionIntentJournal:
+        fallback_used = fallback is not None
+        return _AdmissionIntentJournal(
+            operation_id=requested.operation_id,
+            tenant_id=requested.tenant_id,
+            requested_request_digest=_request_digest(requested),
+            selected_request_digest=_request_digest(selected),
+            selected_capability=selected.capability,
+            fallback_used=fallback_used,
+            fallback_id=(
+                None if fallback is None else fallback.fallback_id
+            ),
+            fallback_reason=(
+                None if fallback is None else _token(
+                    "fallback_reason",
+                    fallback_reason,
+                )
+            ),
+        )
+
+    @staticmethod
+    def _selected_request_for_intent(
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        intent: _AdmissionIntentJournal,
+    ) -> AdmissionRequest:
+        if _request_digest(request) != intent.requested_request_digest:
+            raise CostGovernorConflict(
+                "admission intent requested inputs do not match replay"
+            )
+        if intent.fallback_used:
+            if fallback is None:
+                raise CostGovernorConflict(
+                    "admission intent requires original fallback"
+                )
+            if fallback.fallback_id != intent.fallback_id:
+                raise CostGovernorConflict(
+                    "admission intent fallback identity does not match replay"
+                )
+            selected = CostGovernor._fallback_request(
+                request,
+                fallback,
+            )
+        else:
+            selected = request
+        if (
+            selected.capability != intent.selected_capability
+            or _request_digest(selected)
+            != intent.selected_request_digest
+        ):
+            raise CostGovernorConflict(
+                "admission intent selected request does not match replay"
+            )
+        return selected
+
+    @staticmethod
+    def _decision_from_admission_intent(
+        selected: AdmissionRequest,
+        intent: _AdmissionIntentJournal,
+    ) -> AdmissionDecision:
+        if (
+            not intent.has_decision
+            or intent.reason_code is None
+            or intent.remaining is None
+            or intent.admitted_at is None
+        ):
+            raise CostGovernorError(
+                "durable admission intent lacks admitted decision"
+            )
+        if intent.reason_code != "within_budget":
+            raise CostGovernorConflict(
+                "durable admission intent reason is invalid"
+            )
+        remaining = dict(intent.remaining)
+        required_remaining = {
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "wall_seconds",
+            "provider_attempts",
+            "tool_calls",
+            "artifact_bytes",
+            "storage_bytes",
+            "concurrency",
+            "queue_depth",
+        }
+        if not required_remaining.issubset(remaining):
+            raise CostGovernorError(
+                "durable admission intent lacks remaining-budget fields"
+            )
+        concurrency_remaining = remaining["concurrency"]
+        queue_remaining = remaining["queue_depth"]
+        if (
+            isinstance(concurrency_remaining, bool)
+            or not isinstance(concurrency_remaining, int)
+            or concurrency_remaining < 1
+            or concurrency_remaining > selected.budget.max_concurrency
+            or isinstance(queue_remaining, bool)
+            or not isinstance(queue_remaining, int)
+            or queue_remaining < 1
+            or queue_remaining > selected.budget.max_queue_depth
+        ):
+            raise CostGovernorConflict(
+                "durable admission intent pressure remainder is invalid"
+            )
+        original_pressure = RuntimePressure(
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
+        )
+        evaluated = replace(
+            selected,
+            pressure=original_pressure,
+        )
+        expected = admission_decision_id(
+            evaluated,
+            AdmissionStatus.ADMIT,
+            "within_budget",
+        )
+        if intent.decision_id != expected:
+            raise CostGovernorConflict(
+                "durable admission intent decision identity is invalid"
+            )
+        return AdmissionDecision(
+            decision_id=intent.decision_id,
+            status=AdmissionStatus.ADMIT,
+            operation_id=selected.operation_id,
+            tenant_id=selected.tenant_id,
+            capability=selected.capability,
+            reason_code=intent.reason_code,
+            estimated=selected.estimate,
+            remaining=remaining,
+        )
+
+    def _shared_pressure_for_recovery(
+        self,
+        selected: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> SharedPressureLease | None:
+        ledger = self.runtime.shared_pressure_ledger
+        scope = self.runtime.shared_pressure_scope
+        owner = self.runtime.shared_pressure_owner_id
+        if ledger is None:
+            return None
+        if scope is None or owner is None:
+            raise CostGovernorError(
+                "shared pressure recovery runtime is incomplete"
+            )
+        finder = getattr(ledger, "lease_for_operation", None)
+        if not callable(finder):
+            raise CostGovernorError(
+                "shared pressure ledger does not support admission recovery"
+            )
+        try:
+            lease = finder(
+                scope,
+                selected.operation_id,
+                now=now_wall,
+            )
+        except Exception as exc:
+            raise CostGovernorError(
+                "shared pressure admission recovery lookup failed"
+            ) from exc
+        if lease is None:
+            return None
+        if (
+            lease.scope != scope
+            or lease.operation_id != selected.operation_id
+            or lease.tenant_id != selected.tenant_id
+            or lease.owner_id != owner
+            or lease.priority != selected.priority
+        ):
+            raise CostGovernorConflict(
+                "shared pressure admission recovery identity mismatch"
+            )
+        return lease
+
+    def _clear_failed_admission_intent(
+        self,
+        request: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> None:
+        journal = self._journal
+        if journal is None:
+            return
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
+        try:
+            quota_state = reader(
+                request.tenant_id,
+                request.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
+        if quota_state is not None:
+            raise CostGovernorConflict(
+                "failed admission retained durable quota authority"
+            )
+
+        pressure = self._shared_pressure_for_recovery(
+            request,
+            now_wall=now_wall,
+        )
+        if pressure is not None:
+            try:
+                self.runtime.settle_shared_pressure_recovery(
+                    pressure,
+                    now_wall=now_wall,
+                )
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
+        journal.clear_admission_intent(request.operation_id)
+
+    def _recover_admission_intent(
+        self,
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        intent: _AdmissionIntentJournal,
+        *,
+        now_wall: float | None,
+    ) -> CostReservation | None:
+        journal = self._journal
+        if journal is None:
+            raise CostGovernorError(
+                "admission intent recovery requires durable journal"
+            )
+        selected = self._selected_request_for_intent(
+            request,
+            fallback,
+            intent,
+        )
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
+        try:
+            quota_state = reader(
+                selected.tenant_id,
+                selected.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
+
+        pressure = self._shared_pressure_for_recovery(
+            selected,
+            now_wall=now_wall,
+        )
+        if quota_state is None:
+            if pressure is not None:
+                try:
+                    self.runtime.settle_shared_pressure_recovery(
+                        pressure,
+                        now_wall=now_wall,
+                    )
+                except AdmissionRuntimeConflict as exc:
+                    raise CostGovernorConflict(str(exc)) from exc
+                except AdmissionRuntimeError as exc:
+                    raise CostGovernorError(str(exc)) from exc
+            journal.clear_admission_intent(request.operation_id)
+            return None
+
+        if not intent.has_decision:
+            raise CostGovernorConflict(
+                "durable quota authority exists without admitted decision intent"
+            )
+        reservation, _unresolved = quota_state
+        decision = self._decision_from_admission_intent(
+            selected,
+            intent,
+        )
+        lease = AdmissionLease(
+            lease_id=admission_lease_id(
+                decision,
+                reservation,
+            ),
+            decision=decision,
+            quota_reservation=reservation,
+            admitted_at=(
+                intent.admitted_at
+                if intent.admitted_at is not None
+                else reservation.reserved_at
+            ),
+        )
+        if (
+            self.runtime.shared_pressure_ledger is not None
+            and pressure is None
+        ):
+            raise CostGovernorConflict(
+                "durable quota authority lost shared pressure lease"
+            )
+        try:
+            self.runtime.reattach(
+                selected,
+                lease,
+                shared_pressure_lease=pressure,
+                now_wall=now_wall,
+            )
+        except AdmissionRuntimeConflict as exc:
+            raise CostGovernorConflict(str(exc)) from exc
+        except AdmissionRuntimeError as exc:
+            raise CostGovernorError(str(exc)) from exc
+
+        active_fallback = (
+            fallback if intent.fallback_used else None
+        )
+        receipt = self._receipt(
+            requested=request,
+            selected=selected,
+            lease=lease,
+            fallback=active_fallback,
+            fallback_reason=intent.fallback_reason,
+        )
+        journal.record_active(
+            requested_request_digest=intent.requested_request_digest,
+            reservation=receipt,
+            quota_reservation=reservation,
+            runtime_lease=lease,
+            shared_pressure_lease=pressure,
+        )
+        journal.clear_admission_intent(request.operation_id)
+        self._active[request.operation_id] = _ActiveCostReservation(
+            requested_request_digest=intent.requested_request_digest,
+            receipt=receipt,
+            budget=request.budget,
+        )
+        return receipt
 
     def reserve(
         self,
