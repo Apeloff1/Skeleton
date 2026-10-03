@@ -45,6 +45,8 @@ class HashEmbedder:
     """
 
     def __init__(self, dims: int = 256):
+        if isinstance(dims,bool) or not isinstance(dims,int) or dims < 1:
+            raise ValueError("dims must be a positive integer")
         self.dims = dims
 
     def embed(self, text: str) -> List[float]:
@@ -95,7 +97,10 @@ class VectorStore:
         use_asm_acceleration: bool = False,
         asm_accelerator: Any = None,
     ):
+        if isinstance(dims,bool) or not isinstance(dims,int) or dims < 1:
+            raise ValueError("dims must be a positive integer")
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
+        self._dimensions: int | None = dims if embedder is None else None
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
         self._use_jvm_acceleration = bool(use_jvm_acceleration)
@@ -128,6 +133,25 @@ class VectorStore:
             "prepared_invalidations": 0,
         }
 
+    def _embed(self, text: str) -> List[float]:
+        raw=self._embedder_fn(text)
+        if not isinstance(raw,list):
+            raise TypeError("embedder must return list[float]")
+        _unit_norm(raw)
+        dimensions=len(raw)
+        if self._dimensions is None:
+            self._dimensions=dimensions
+        elif dimensions!=self._dimensions:
+            raise ValueError(
+                f"embedding dimension drift: expected {self._dimensions}, got {dimensions}"
+            )
+        return [float(value) for value in raw]
+
+    @staticmethod
+    def _validate_top_k(top_k: int) -> None:
+        if isinstance(top_k,bool) or not isinstance(top_k,int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
+
     @staticmethod
     def _retention_source_id(chunk: Chunk, explicit_source_id: str | None) -> str:
         source_id = explicit_source_id
@@ -139,7 +163,7 @@ class VectorStore:
         return source_id
 
     def add(self, chunk: Chunk, *, source_id: str | None = None) -> None:
-        vector = self._embedder_fn(chunk.text)
+        vector = self._embed(chunk.text)
         norm = _unit_norm(vector)
         retention_source_id = self._retention_source_id(chunk, source_id)
         self._entries[chunk.chunk_id] = VectorEntry(
@@ -170,11 +194,12 @@ class VectorStore:
         return len(texts)
 
     def query(self, text: str, top_k: int = 5, metadata_filter: Optional[Dict[str, Any]] = None) -> List[ScoredChunk]:
+        self._validate_top_k(top_k)
         self._stats["queries"] += 1
         if not self._entries:
             return []
 
-        qv = self._embedder_fn(text)
+        qv = self._embed(text)
         qnorm = _unit_norm(qv)
         candidates = [
             entry
@@ -261,6 +286,7 @@ class VectorStore:
         owns embedding, metadata filtering, stable result construction, stats,
         and the complete fallback path.
         """
+        self._validate_top_k(top_k)
         queries = list(texts)
         if not queries:
             return []
@@ -279,7 +305,7 @@ class VectorStore:
 
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
-            vector = self._embedder_fn(text)
+            vector = self._embed(text)
             norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
@@ -396,7 +422,7 @@ class VectorStore:
         if not self._entries:
             return []
 
-        qv = self._embedder_fn(text)
+        qv = self._embed(text)
         qnorm = _unit_norm(qv)
         candidates = [
             entry
@@ -526,7 +552,7 @@ class VectorStore:
 
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
-            vector = self._embedder_fn(text)
+            vector = self._embed(text)
             norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
@@ -820,5 +846,5 @@ class VectorStore:
         return {
             **self._stats,
             "documents": len(self._entries),
-            "dimensions": len(self._embedder_fn("probe")),
+            "dimensions": self._dimensions or 0,
         }
