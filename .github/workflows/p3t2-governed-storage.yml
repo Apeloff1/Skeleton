@@ -75,8 +75,10 @@ jobs:
           cmp skeleton/storage/cas/__init__.py skeleton/ai/runtime/storage/cas/__init__.py
 
       - name: Validate AI-tree and masterplan authority
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           python scripts/check_ai_file_tree.py
           python scripts/check_ai_master_plan.py
           python scripts/check_p3t2_storage_candidate.py --head "$(git rev-parse HEAD)" --json
