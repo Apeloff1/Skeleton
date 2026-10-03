@@ -1117,3 +1117,51 @@ def test_execution_outcome_rejects_result_receipt_mismatch() -> None:
     with pytest.raises(ValueError,match="result digest mismatch"):
         ExecutionOutcome(receipt=outcome.receipt,result={"answer":43})
 
+def test_deferred_executor_snapshot_is_safe_during_inflight_execution() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    entered=threading.Event()
+    release=threading.Event()
+
+    def handler(payload):
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","snapshot-race",payload)
+    errors=[]
+
+    def run():
+        try:
+            executor.execute(invocation,payload)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread=threading.Thread(target=run)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    during=executor.snapshot()
+    assert during["operations"]==[]
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert errors==[]
+
+    after=executor.snapshot()
+    assert [row["receipt"]["operation_id"] for row in after["operations"]]==[
+        "snapshot-race"
+    ]
+
