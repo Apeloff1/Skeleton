@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from skeleton.automation.studio_report import render_report
 
 
@@ -75,3 +77,19 @@ def test_report_surfaces_run_level_planning_failure() -> None:
     assert "planning" in report
     assert "missing_api_key" in report
     assert "`run_failed_closed`: 1" in report
+
+
+def test_report_rejects_mixed_run_ids() -> None:
+    rows = [
+        {"ts": "2026-01-01T00:00:00+00:00", "run_id": "a", "event": "run_started"},
+        {"ts": "2026-01-01T00:00:01+00:00", "run_id": "b", "event": "run_finished"},
+    ]
+    with pytest.raises(ValueError, match="multiple run ids"):
+        render_report(rows)
+
+
+def test_report_marks_missing_terminal_record() -> None:
+    report = render_report(
+        [{"ts": "2026-01-01T00:00:00+00:00", "run_id": "9", "event": "run_started"}]
+    )
+    assert "Audit lifecycle: **incomplete/ambiguous** (0 terminal records)" in report
