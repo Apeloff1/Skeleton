@@ -545,3 +545,68 @@ def test_audit_log_refuses_tampered_history(tmp_path) -> None:
     path.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="record hash is invalid"):
         AuditLog(path, "run-a")
+
+
+def test_task_parser_supports_eight_file_capability():
+    paths = [f"docs/capability-{i}.txt" for i in range(8)]
+    task = _parse_task({
+        "title": "Cross-cutting capability",
+        "objective": "Coordinate a bounded multi-file implementation.",
+        "division": "gameplay_systems",
+        "paths": paths,
+    })
+    assert len(task.paths) == 8
+    with pytest.raises(ValueError, match="1-8"):
+        _parse_task({
+            "title": "Too broad",
+            "objective": "Exceed the bounded capability.",
+            "division": "gameplay_systems",
+            "paths": paths + ["docs/ninth.txt"],
+        })
+
+
+def test_build_and_review_repairs_reviewer_rejection(monkeypatch):
+    task = studio_director.PlannedTask(
+        title="Repairable",
+        objective="Change bounded implementation.",
+        division="gameplay_systems",
+        paths=("docs/smoke.txt",),
+    )
+    monkeypatch.setattr(studio_director, "_read_context", lambda _paths: ("FILE docs/smoke.txt\nold",))
+    patch1 = "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+bad\n"
+    patch2 = "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+good\n"
+    responses = [
+        {"findings": ["fixture"], "risks": [], "recommended_checks": ["smoke"]},
+        {"patch": patch1, "summary": "first", "tests": ["smoke"]},
+        {"approve": False, "reasons": ["wrong value"]},
+        {"patch": patch2, "summary": "repaired", "tests": ["smoke"]},
+        {"approve": True, "reasons": ["fixed"]},
+        {"approve": True, "reasons": ["verified"], "required_checks": ["smoke"]},
+    ]
+    monkeypatch.setattr(studio_director, "_call_json", lambda *args, **kwargs: responses.pop(0))
+    reviewed = studio_director._build_and_review(object(), task, seed="repair")
+    assert reviewed is not None
+    assert "+good" in reviewed.patch
+    assert reviewed.summary == "repaired"
+
+
+def test_build_and_review_stops_after_bounded_repair_budget(monkeypatch):
+    task = studio_director.PlannedTask(
+        title="Unrepairable",
+        objective="Remain bounded.",
+        division="gameplay_systems",
+        paths=("docs/smoke.txt",),
+    )
+    monkeypatch.setattr(studio_director, "_read_context", lambda _paths: ("FILE docs/smoke.txt\nold",))
+    patch = "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+new\n"
+    responses = [
+        {"findings": [], "risks": [], "recommended_checks": []},
+        {"patch": patch, "summary": "first", "tests": []},
+        {"approve": False, "reasons": ["reject 1"]},
+        {"patch": patch, "summary": "repair 1", "tests": []},
+        {"approve": False, "reasons": ["reject 2"]},
+        {"patch": patch, "summary": "repair 2", "tests": []},
+        {"approve": False, "reasons": ["reject 3"]},
+    ]
+    monkeypatch.setattr(studio_director, "_call_json", lambda *args, **kwargs: responses.pop(0))
+    assert studio_director._build_and_review(object(), task, seed="repair") is None
