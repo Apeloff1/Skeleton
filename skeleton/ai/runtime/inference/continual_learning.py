@@ -677,6 +677,92 @@ class ContinualLearningState:
                 "round history must be contiguous and append-only"
             )
 
+        champion_by_digest = {item.digest: item for item in self.champions}
+        if len(champion_by_digest) != len(self.champions):
+            raise ContinualLearningError(
+                "champion lineage contains duplicate identities"
+            )
+        initial = self.champions[0]
+        if (
+            initial.generation != 0
+            or initial.source_round_digest is not None
+            or initial.training_plan_digest is not None
+        ):
+            raise ContinualLearningError(
+                "initial champion must be generation zero without round lineage"
+            )
+
+        round_by_digest = {item.digest: item for item in self.rounds}
+        if len(round_by_digest) != len(self.rounds):
+            raise ContinualLearningError(
+                "round history contains duplicate identities"
+            )
+        children_by_round: dict[str, list[DevelopmentalChampion]] = {}
+        for champion in self.champions[1:]:
+            if (
+                champion.source_round_digest is None
+                or champion.training_plan_digest is None
+            ):
+                raise ContinualLearningError(
+                    "derived champion lacks accepted-round lineage"
+                )
+            children_by_round.setdefault(
+                champion.source_round_digest,
+                [],
+            ).append(champion)
+
+        for round_record in self.rounds:
+            baseline = champion_by_digest.get(
+                round_record.baseline_champion_digest
+            )
+            if baseline is None:
+                raise ContinualLearningError(
+                    "round baseline does not identify a retained champion"
+                )
+            if baseline.source_round_digest is not None:
+                parent_round = round_by_digest.get(
+                    baseline.source_round_digest
+                )
+                if (
+                    parent_round is None
+                    or parent_round.round_index >= round_record.round_index
+                ):
+                    raise ContinualLearningError(
+                        "round baseline depends on non-prior champion lineage"
+                    )
+
+            children = children_by_round.get(round_record.digest, [])
+            if round_record.accepted:
+                if len(children) != 1:
+                    raise ContinualLearningError(
+                        "accepted round must identify exactly one champion"
+                    )
+                child = children[0]
+                if (
+                    child.model_digest != round_record.challenger_model_digest
+                    or child.artifact_sha256
+                    != round_record.challenger_artifact_sha256
+                    or child.artifact_path
+                    != round_record.challenger_artifact_path
+                    or child.generation != baseline.generation + 1
+                ):
+                    raise ContinualLearningError(
+                        "accepted round and champion identity drift"
+                    )
+            elif children:
+                raise ContinualLearningError(
+                    "rejected round cannot create a champion"
+                )
+
+        known_round_digests = set(round_by_digest)
+        if any(
+            digest not in known_round_digests
+            for digest in children_by_round
+        ):
+            raise ContinualLearningError(
+                "champion references unknown accepted round"
+            )
+
     @property
     def active_champion(self) -> DevelopmentalChampion:
         return self.champions[self.active_champion_index]
@@ -1070,7 +1156,19 @@ def run_continual_learning_round(
             round_record,
         )
 
-    candidate_loaded = load_local_model_artifact(candidate_path)
+    try:
+        candidate_loaded = load_local_model_artifact(candidate_path)
+    except LocalModelArtifactError as exc:
+        raise ContinualLearningError(
+            "accepted challenger artifact cannot be re-authenticated"
+        ) from exc
+    if (
+        candidate_loaded.receipt.model_digest != candidate_model
+        or candidate_loaded.receipt.artifact_sha256 != candidate_artifact
+    ):
+        raise ContinualLearningError(
+            "accepted challenger artifact changed after evaluation"
+        )
     generation = baseline.generation + 1
     new_champion = DevelopmentalChampion(
         generation=generation,
