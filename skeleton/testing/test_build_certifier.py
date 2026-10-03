@@ -13,3 +13,8 @@ def test_certificate_emits_composite_completion_proof():
  assert cert.status=="complete"
  assert proof.head_sha=="b"*40
  assert len(proof.digest())==64
+
+def test_unresolved_repair_blocks_certificate():
+ ci=CIEvidence("b"*40,(Gate("CI/CD","completed","success",1),),("CI/CD",))
+ with pytest.raises(ValueError):
+  certify_with_proof(inp(),ci,canonical_fingerprint="d"*64,build_state_sha256="e"*64,receipt_sha256=("f"*64,),repair_states={"repair-1":"validating"})
