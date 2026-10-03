@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -150,3 +151,35 @@ def test_observatory_file_tree_binds_landed_product_routes() -> None:
     assert "Mirror Room Observatory" in dashboard
     assert "router.push('/mirror-room'" in dashboard
 
+
+
+def test_machine_product_tree_manifest_is_fail_closed() -> None:
+    manifest = json.loads(
+        (ROOT / "machine/mirror_room_file_tree.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["schema_version"] == 1
+    assert manifest["authority"] == "evidence-only-observability"
+    assert manifest["production_authority"] is False
+
+    surfaces = manifest["root"]["surfaces"]
+    paths = {item["path"] for item in surfaces}
+    required = {
+        "skeleton/learning/mirror_room",
+        "skeleton/ai/learning/mirror_room",
+        "backend/routes/mirror_room.py",
+        "backend/core/routes_registry.py",
+        "backend/core/route_policy_catalog.py",
+        "frontend/features/MirrorRoom",
+        "frontend/app/mirror-room.tsx",
+        "frontend/utils/routeRegistry.ts",
+        "frontend/app/dashboard.tsx",
+        "skeleton/testing/test_mirror_room_observability.py",
+        ".github/workflows/mirror-room-extensions.yml",
+        "docs/plan/MIRROR_ROOM_LEARNING.md",
+    }
+    assert required.issubset(paths)
+    for surface in surfaces:
+        assert (ROOT / surface["path"]).exists(), surface["path"]
