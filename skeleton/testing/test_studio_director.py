@@ -483,3 +483,37 @@ def test_propose_planning_failure_is_audited_and_emits_empty_patch(tmp_path, mon
         text=True,
     ).stdout
     assert status == ""
+
+
+def test_path_policy_rejects_existing_symlink_target(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "outside.py"
+    target.write_text("secret\n", encoding="utf-8")
+    allowed = tmp_path / "skeleton"
+    allowed.mkdir()
+    link = allowed / "linked.py"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this platform")
+    with pytest.raises(ValueError, match="symlink"):
+        _canonical_path("skeleton/linked.py")
+
+
+def test_audit_log_builds_hash_chained_records(tmp_path) -> None:
+    import hashlib
+
+    path = tmp_path / "audit.jsonl"
+    audit = AuditLog(path, "run-chain")
+    audit.emit("run_started")
+    audit.emit("run_finished", status="no_change")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [row["sequence"] for row in rows] == [1, 2]
+    assert rows[0]["previous_record_sha256"] == "0" * 64
+    assert rows[1]["previous_record_sha256"] == rows[0]["record_sha256"]
+    for row in rows:
+        claimed = row["record_sha256"]
+        payload = dict(row)
+        payload.pop("record_sha256")
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        assert claimed == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
