@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
-import os
 import math
+import os
 import socket
 import time
 from urllib.parse import urlsplit
