@@ -418,6 +418,30 @@ def campaign_identity(supervisor: Mapping[str, Any]) -> str:
     ).hexdigest()[:24]
 
 
+
+def update_lane_health(
+    state: CampaignState,
+    *,
+    plan_items: object,
+    attempted_task_ids: Sequence[str],
+    validation_failed: bool,
+) -> None:
+    assignments = lane_assignments(plan_items, "night")
+    attempted_lanes = {assignments[item_id] for item_id in attempted_task_ids if item_id in assignments}
+    for lane in attempted_lanes:
+        health = dict(state.lane_health.get(lane, {}))
+        health["attempt_cycles"] = int(health.get("attempt_cycles", 0)) + 1
+        if validation_failed:
+            health["failures"] = int(health.get("failures", 0)) + 1
+        else:
+            health["failures"] = int(health.get("failures", 0))
+        health["status"] = "quarantined" if health["failures"] >= 3 else "healthy"
+        state.lane_health[lane] = health
+    if len(state.lane_health) > 128:
+        state.lane_health = {
+            key: state.lane_health[key] for key in sorted(state.lane_health)[:128]
+        }
+
 def advance_campaign(
     state: CampaignState,
     *,
@@ -477,6 +501,12 @@ def advance_campaign(
             if attempts > 1:
                 state.task_cooldowns[key] = min(8, 2 ** min(3, attempts - 1))
 
+    update_lane_health(
+        state,
+        plan_items=plan_items,
+        attempted_task_ids=attempted_task_ids,
+        validation_failed=validation_failed,
+    )
     diagnostics = dependency_diagnostics(plan_items, str(supervisor.get("team", "")))
     terminal = bool(progress.get("terminal", False)) or supervisor.get("status") == "complete"
     if terminal:
