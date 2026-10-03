@@ -12,6 +12,29 @@ from math import prod
 
 
 _SOURCE_KINDS=frozenset({"bounded","system_id","user_content","secret"})
+_SENSITIVE_LABEL_NAMES=frozenset({
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "private_key",
+    "prompt",
+    "user_content",
+})
+_SENSITIVE_LABEL_SUFFIXES=(
+    "_credential",
+    "_credentials",
+    "_password",
+    "_secret",
+    "_token",
+    "_api_key",
+    "_private_key",
+    "_prompt",
+    "_content",
+)
 
 
 class CardinalityControlError(ValueError):
@@ -54,6 +77,14 @@ class TelemetryLabel:
 
     def __post_init__(self) -> None:
         object.__setattr__(self,"name",_token("name",self.name))
+        normalized_name=self.name.lower().replace("-","_")
+        if (
+            normalized_name in _SENSITIVE_LABEL_NAMES
+            or normalized_name.endswith(_SENSITIVE_LABEL_SUFFIXES)
+        ):
+            raise CardinalityControlError(
+                "sensitive-looking telemetry label names are forbidden"
+            )
         source=_token("source_kind",self.source_kind)
         if source not in _SOURCE_KINDS:
             raise CardinalityControlError("unknown telemetry label source kind")
