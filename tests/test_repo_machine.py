@@ -8,6 +8,7 @@ import unittest
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
 from skeleton.repo_machine.config import load_machine_config
+from skeleton.repo_machine.impact import _normalize_path
 from skeleton.repo_machine.planner import derive_work_candidates
 
 
@@ -60,6 +61,12 @@ class RepoMachineTests(unittest.TestCase):
         (root / ".machine").mkdir()
         (root / ".machine" / "repository.toml").write_text(CONFIG, encoding="utf-8")
         return temp
+
+    def test_impact_normalizes_windows_path_separators(self) -> None:
+        self.assertEqual(
+            _normalize_path(r".\\alpha\\nested\\module.py"),
+            "alpha/nested/module.py",
+        )
 
     def test_supervisor_context_uses_real_bounded_repository_model(self) -> None:
         from unittest.mock import patch
