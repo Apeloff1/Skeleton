@@ -22,6 +22,7 @@ on:
       - 'tests/test_shift_supervisor_scheduler.py'
       - 'tests/test_shift_supervisor_consumer_plan.py'
       - '.github/workflows/autonomous-studio.yml'
+      - '.github/workflows/autonomous-build-feedback.yml'
       - '.github/workflows/autonomous-studio-smoke.yml'
   workflow_dispatch:
 
