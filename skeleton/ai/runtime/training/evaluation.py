@@ -350,12 +350,50 @@ class EvaluationLedger:
         return suite.digest
 
     def record_result(self,result:EvaluationResult)->str:
+        encoded=_canonical(result.as_dict())
         with self._lock:
-            suite=self._db.execute("SELECT 1 FROM eval_suite WHERE suite_digest=?",(result.suite_digest,)).fetchone()
-            if suite is None: raise ValueError("evaluation suite is not registered")
+            suite=self._db.execute(
+                "SELECT payload FROM eval_suite WHERE suite_digest=?",
+                (result.suite_digest,),
+            ).fetchone()
+            if suite is None:
+                raise ValueError("evaluation suite is not registered")
+            suite_payload=json.loads(suite[0])
+            claimed_suite_digest=suite_payload.get("suite_digest")
+            digest_payload=dict(suite_payload)
+            digest_payload.pop("suite_digest",None)
+            if (
+                claimed_suite_digest!=result.suite_digest
+                or _digest(digest_payload)!=result.suite_digest
+            ):
+                raise ValueError("stored evaluation suite digest mismatch")
+
+            expected_case_ids=[
+                str(case["case_id"])
+                for case in suite_payload.get("cases",[])
+                if isinstance(case,dict) and "case_id" in case
+            ]
+            observed_case_ids=list(result.passed_case_ids)+list(result.failed_case_ids)
+            if (
+                len(expected_case_ids)!=len(observed_case_ids)
+                or set(expected_case_ids)!=set(observed_case_ids)
+            ):
+                raise ValueError(
+                    "evaluation result must cover every registered suite case exactly once"
+                )
+
+            prior=self._db.execute(
+                "SELECT payload FROM eval_result WHERE result_digest=?",
+                (result.digest,),
+            ).fetchone()
+            if prior is not None:
+                if prior[0]!=encoded:
+                    raise ValueError("evaluation result digest collision")
+                return result.digest
+
             self._db.execute(
-                "INSERT OR IGNORE INTO eval_result(result_digest,candidate_model_digest,suite_digest,payload) VALUES (?,?,?,?)",
-                (result.digest,result.candidate_model_digest,result.suite_digest,_canonical(result.as_dict())),
+                "INSERT INTO eval_result(result_digest,candidate_model_digest,suite_digest,payload) VALUES (?,?,?,?)",
+                (result.digest,result.candidate_model_digest,result.suite_digest,encoded),
             )
             self._db.commit()
         return result.digest
