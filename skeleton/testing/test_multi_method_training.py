@@ -239,18 +239,25 @@ def test_multi_method_builder_trains_compiled_plan(tmp_path) -> None:
             max_camera_views_per_example=8,
         ),
         hidden_size=8,
-        epochs=1,
+        epochs=8,
         learning_rate=0.03,
         max_vocab=64,
         max_document_tokens=96,
         seed=19,
         temperature=0.7,
+        early_stopping_patience=1,
+        min_relative_improvement=1.0,
     )
 
     assert output.is_file()
     assert receipt["training_mode"] == "multi_method"
     assert receipt["training_plan"]["plan_digest"]
     assert receipt["training_plan"]["document_count"] >= 10
+    assert receipt["epochs"] == 8
+    assert 1 <= receipt["epochs_completed"] < 8
+    assert receipt["stopped_early"] is True
+    assert len(receipt["training_loss_history"]) == receipt["epochs_completed"]
+    assert receipt["training_tokens"] > 0
     assert set(receipt["training_plan"]["method_counts"]) == {
         method.value for method in TrainingMethod
     }
