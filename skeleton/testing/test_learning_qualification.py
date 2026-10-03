@@ -157,13 +157,19 @@ def _qualification_fixture():
     training_receipt = {
         "model_digest": candidate_model,
         "artifact_sha256": artifact,
-        "training_plan": {"plan_digest": plan},
+        "training_plan": {
+            "plan_digest": plan,
+            "camera_coverage_digests": [camera],
+        },
         "method_allocation": {"allocation_digest": allocation},
+        "promotion_state": "candidate_only",
         "evaluation_manifest": {
             "candidate_model_digest": candidate_model,
             "candidate_artifact_sha256": artifact,
             "training_plan_digest": plan,
+            "method_allocation_digest": allocation,
             "baseline": {"model_digest": baseline_model},
+            "promotion_authority": False,
         },
     }
     mirror = SimpleNamespace(
@@ -380,4 +386,40 @@ def test_lifecycle_handoff_requires_third_independent_verifier() -> None:
     ):
         qualified.lifecycle_validation_kwargs(
             verifier_id=mirror.verifier_id,
+        )
+
+
+def test_qualification_rejects_camera_binding_drift() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    receipt = {
+        **receipt,
+        "training_plan": {
+            **receipt["training_plan"],
+            "camera_coverage_digests": [_sha("other-camera")],
+        },
+    }
+    with pytest.raises(
+        LearningQualificationError,
+        match="camera coverage identity drift",
+    ):
+        qualify_learning_candidate(
+            training_receipt=receipt,
+            binding=binding,
+            mirror_promotion_evidence=mirror,
+            firewall_promotion_evidence=firewall,
+        )
+
+
+def test_qualification_rejects_promoted_training_receipt() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    receipt = {**receipt, "promotion_state": "active"}
+    with pytest.raises(
+        LearningQualificationError,
+        match="candidate_only",
+    ):
+        qualify_learning_candidate(
+            training_receipt=receipt,
+            binding=binding,
+            mirror_promotion_evidence=mirror,
+            firewall_promotion_evidence=firewall,
         )
