@@ -117,8 +117,18 @@ def test_client_history_is_ignored_but_project_context_is_used(
         captured["retrieval"] = query
         return []
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
-        captured["prompt"] = conversation_context
+    async def generate(
+        query,
+        recalled,
+        needs_reasoning,
+        *,
+        conversation_history=None,
+        project_context="",
+        **_engine_scope,
+    ):
+        del recalled, needs_reasoning
+        captured["project_context"] = project_context
+        captured["history"] = list(conversation_history or ())
         captured["query"] = query
         return {"text": "Follow-up answer", "tier": "free", "model": "test"}
 
@@ -134,8 +144,8 @@ def test_client_history_is_ignored_but_project_context_is_used(
     assert response.json()["history_source"] == "canonical"
     assert "Godot 2D platformer" in captured["retrieval"]
     assert "move the player" not in captured["retrieval"]
-    assert '"role": "assistant"' not in captured["prompt"]
-    assert '"current_question": "What about collisions?"' in captured["prompt"]
+    assert captured["project_context"] == "Godot 2D platformer"
+    assert captured["history"] == []
     assert captured["query"] == "What about collisions?"
 
 
@@ -233,10 +243,11 @@ def test_unavailable_paid_engine_is_not_labeled_as_paid_generation(
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
     monkeypatch.setattr(route, "EngineChat", UnavailableChat)
 
-    result = asyncio.run(route._generate_text("question", [], True))
+    with pytest.raises(route.HTTPException) as exc:
+        asyncio.run(route._generate_text("question", [], True))
 
-    assert result["tier"] == "local"
-    assert result["model"] == "unavailable-fallback"
+    assert exc.value.status_code == 503
+    assert "generative engine execution is unavailable" in str(exc.value.detail)
 
 
 def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
@@ -248,18 +259,37 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
     class RecordingChat:
         def __init__(self, *args, **kwargs):
             seen["init"] = {"args": args, **kwargs}
+            seen["history"] = []
+            seen["evidence"] = []
 
         def with_max_tokens(self, value):
             seen["max_tokens"] = value
+            return self
+
+        def add_history_message(self, role, content):
+            seen["history"].append((role, content))
+            return self
+
+        def add_evidence(self, evidence_id, content, *, kind):
+            seen["evidence"].append((evidence_id, content, kind))
             return self
 
         async def send_message(self, message):
             seen["message"] = message
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation-jeeves-1",
                 execution_id="engine-exec-jeeves-1",
+                context_id="engine-context-jeeves-1",
+                context_digest="a" * 64,
+                context_source_snapshot=(),
+                context_compiler_version="test-context-v1",
                 verification="verification:jeeves",
                 evidence_refs=("evidence:jeeves",),
+                provider_receipts=(),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
@@ -274,7 +304,12 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
         )
     )
 
-    assert "PROJECT_CONTEXT_SENTINEL" in seen["message"].text
+    assert seen["message"].text == "follow-up"
+    assert seen["history"] == []
+    assert any(
+        content == "PROJECT_CONTEXT_SENTINEL" and kind == "artifact"
+        for _evidence_id, content, kind in seen["evidence"]
+    )
     policy = seen["init"]["instruction_policy"]
     assert "PROJECT_CONTEXT_SENTINEL" not in policy.instructions
     assert policy.policy_id == "backend.jeeves.chat"
