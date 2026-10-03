@@ -227,7 +227,7 @@ def test_model_lifecycle_orders_candidate_to_activation_and_rollback(
     assert len(history) == 5
     assert all(
         right.prior_transition_digest == left.digest
-        for left, right in zip(history, history[1:], strict=True)
+        for left, right in zip(history, history[1:])
     )
     assert all(item.production_authority is False for item in history)
     assert all(item.direct_self_modify is False for item in history)
