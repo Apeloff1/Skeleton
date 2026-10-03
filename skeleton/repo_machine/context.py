@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from typing import Literal
 
+from .coordination import build_coordination_plan
 from .execution_plan import build_execution_plan
 from .health import repository_health
 from .metrics import structural_metrics
@@ -33,14 +34,22 @@ def _bounded(payload: dict[str, object], byte_limit: int) -> dict[str, object]:
     compact["truncated_for_context"] = True
     while not _fits(compact, byte_limit):
         changed = False
-        for key in ("files", "work", "findings", "subsystems", "topology"):
+        for key in ("files", "work", "findings", "subsystems", "topology", "coordination"):
             value = compact.get(key)
             if isinstance(value, list) and len(value) > 0:
                 compact[key] = value[:max(1, len(value) // 2)]
                 changed = True
             elif isinstance(value, dict) and value:
                 if key == "topology":
-                    compact[key] = {"edges": value.get("edges", [])[:max(1, len(value.get("edges", [])) // 2)], "cycles": value.get("cycles", [])[:4]}
+                    edges = value.get("edges", [])
+                    compact[key] = {"edges": edges[:max(1, len(edges) // 2)],
+                                    "cycles": value.get("cycles", [])[:4]}
+                    changed = True
+                elif key == "coordination":
+                    decisions = value.get("decisions", [])
+                    compact[key] = {"decisions": decisions[:max(1, len(decisions) // 2)],
+                                    "bottleneck": value.get("bottleneck"),
+                                    "frontier_size": value.get("frontier_size", 0)}
                     changed = True
             if _fits(compact, byte_limit):
                 return compact
@@ -48,7 +57,7 @@ def _bounded(payload: dict[str, object], byte_limit: int) -> dict[str, object]:
             break
 
     if not _fits(compact, byte_limit):
-        keep = {"intent", "fingerprint", "health", "metrics", "truncated_for_context"}
+        keep = {"intent", "fingerprint", "health", "metrics", "coordination", "truncated_for_context"}
         compact = {key: compact[key] for key in keep if key in compact}
         compact["truncated_for_context"] = True
     return compact
@@ -65,6 +74,7 @@ def context_for_intent(model: RepositoryModel, intent: Intent = "overview", *, b
         "metrics": structural_metrics(model).as_dict(),
         "subsystems": [item.as_dict() for item in model.subsystems],
         "work": [item.as_dict() for item in derive_work_candidates(model, limit=32)],
+        "coordination": build_coordination_plan(model, limit=8),
         "execution": build_execution_plan(model, limit=8).as_dict(),
         "findings": [item.as_dict() for item in model.findings[:40]],
     }
