@@ -13,6 +13,8 @@ on:
       - "frontend/app/dashboard.tsx"
       - "frontend/utils/routeRegistry.ts"
       - "backend/routes/mirror_room.py"
+      - "machine/mirror_room_file_tree.json"
+      - "docs/plan/MIRROR_ROOM_LEARNING.md"
       - ".github/workflows/mirror-room-extensions.yml"
   push:
     branches:
@@ -28,6 +30,8 @@ on:
       - "frontend/app/dashboard.tsx"
       - "frontend/utils/routeRegistry.ts"
       - "backend/routes/mirror_room.py"
+      - "machine/mirror_room_file_tree.json"
+      - "docs/plan/MIRROR_ROOM_LEARNING.md"
       - ".github/workflows/mirror-room-extensions.yml"
   workflow_dispatch:
 
