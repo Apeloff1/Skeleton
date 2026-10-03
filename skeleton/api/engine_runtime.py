@@ -180,8 +180,20 @@ class EngineExecutionCoordinator:
         # The durable submission remains authoritative across interruption.
         # Starting a new driver is reconciliation, not a second execution: the
         # cognitive runtime reads cancellation_requested first and finalizes
-        # cancelled without another provider invocation.
+        # cancelled without another provider invocation. Cancellation callers
+        # require the durable terminal state, so await this reconciliation
+        # instead of returning while the replacement driver is merely queued.
         await self.ensure_execution(execution_id)
+        async with self._lock:
+            reconciliation = self._tasks.get(execution_id)
+        if reconciliation is not None:
+            await asyncio.gather(reconciliation, return_exceptions=True)
+
+        result = self.service.repository.result(execution_id)
+        if result is None:
+            raise EngineExecutionCoordinatorError(
+                "cancelled execution did not reach a durable terminal result"
+            )
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
