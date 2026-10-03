@@ -122,43 +122,49 @@ class ReferenceLocalTrainer:
             raise ValueError(f"training run cannot execute from state {state}")
 
         lease=self.runs.lease_worker(manifest.run_id,worker_id,issued_at=instant)
-        self.runs.record_telemetry(
-            TrainingTelemetry(
-                run_id=manifest.run_id,
-                step=0,
-                metrics={"documents":float(len(corpus)),"world_size":float(manifest.world_size)},
-                emitted_at=instant.isoformat(),
+        try:
+            self.runs.record_telemetry(
+                TrainingTelemetry(
+                    run_id=manifest.run_id,
+                    step=0,
+                    metrics={"documents":float(len(corpus)),"world_size":float(manifest.world_size)},
+                    emitted_at=instant.isoformat(),
+                )
             )
-        )
-        model=ReferenceNGramModel.train(
-            tuple(corpus),
-            order=order,
-            model_id=f"skeleton-local-trained:{manifest.run_id}",
-        )
-        step=token_count
-        checkpoint=TrainingCheckpoint(
-            run_id=manifest.run_id,
-            manifest_digest=manifest.digest,
-            step=max(1,step),
-            model_digest=model.model_digest,
-            optimizer_digest=_digest_bytes(b"reference-ngram-count-estimator-v1"),
-            rng_digest=_digest_bytes(str(manifest.seed).encode("ascii")),
-            data_cursor_digest=actual_corpus_digest,
-            worker_epoch=lease.epoch,
-            created_at=instant.isoformat(),
-        )
-        checkpoint_digest=self.runs.checkpoint(checkpoint,lease)
-        self.runs.record_telemetry(
-            TrainingTelemetry(
-                run_id=manifest.run_id,
-                step=checkpoint.step,
-                metrics={"training_loss_proxy":0.0,"checkpoint_written":1.0},
-                emitted_at=instant.isoformat(),
+            model=ReferenceNGramModel.train(
+                tuple(corpus),
+                order=order,
+                model_id=f"skeleton-local-trained:{manifest.run_id}",
             )
-        )
-        terminal=self.runs.complete(manifest.run_id)
-        if terminal.digest!=checkpoint.digest:
-            raise RuntimeError("training completion did not bind latest checkpoint")
+            step=token_count
+            checkpoint=TrainingCheckpoint(
+                run_id=manifest.run_id,
+                manifest_digest=manifest.digest,
+                step=max(1,step),
+                model_digest=model.model_digest,
+                optimizer_digest=_digest_bytes(b"reference-ngram-count-estimator-v1"),
+                rng_digest=_digest_bytes(str(manifest.seed).encode("ascii")),
+                data_cursor_digest=actual_corpus_digest,
+                worker_epoch=lease.epoch,
+                created_at=instant.isoformat(),
+            )
+            checkpoint_digest=self.runs.checkpoint(checkpoint,lease)
+            self.runs.record_telemetry(
+                TrainingTelemetry(
+                    run_id=manifest.run_id,
+                    step=checkpoint.step,
+                    metrics={"training_loss_proxy":0.0,"checkpoint_written":1.0},
+                    emitted_at=instant.isoformat(),
+                )
+            )
+            terminal=self.runs.complete(manifest.run_id)
+            if terminal.digest!=checkpoint.digest:
+                raise RuntimeError("training completion did not bind latest checkpoint")
+        except Exception:
+            if self.runs.state(manifest.run_id)=="running":
+                self.runs.fail(manifest.run_id)
+            raise
+
         artifact=LocalTrainingArtifact(
             run_id=manifest.run_id,
             run_manifest_digest=manifest.digest,
