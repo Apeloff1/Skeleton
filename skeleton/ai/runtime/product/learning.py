@@ -32,6 +32,9 @@ from skeleton.contracts.conversation import (
 from skeleton.persistence.conversation_repository import (
     SQLiteConversationRepository,
 )
+from skeleton.ai.runtime.inference.training_allocation import (
+    AdaptiveMethodAllocation,
+)
 from skeleton.ai.runtime.inference.training_methods import (
     MethodWeight,
     TrainingEfficiencyPolicy,
@@ -540,6 +543,7 @@ def build_learning_candidate_artifact(
         TrainingMethod | MethodWeight
     ] = tuple(TrainingMethod),
     efficiency_policy: TrainingEfficiencyPolicy | None = None,
+    method_allocation: AdaptiveMethodAllocation | None = None,
 ) -> dict[str, object]:
     """Train one *candidate* artifact from an accepted canonical corpus.
 
@@ -589,6 +593,13 @@ def build_learning_candidate_artifact(
         LocalModelBuildError,
         build_multi_method_recurrent_artifact,
     )
+
+    if method_allocation is not None:
+        if not isinstance(method_allocation, AdaptiveMethodAllocation):
+            raise TypeError(
+                "method_allocation must be AdaptiveMethodAllocation"
+            )
+        training_methods = method_allocation.method_weights
 
     examples = tuple(
         TrainingExample(
@@ -700,6 +711,11 @@ def build_learning_candidate_artifact(
             item["method"]
             for item in receipt["training_plan"]["methods"]
         ],
+        "method_allocation_digest": (
+            None
+            if method_allocation is None
+            else method_allocation.allocation_digest
+        ),
         "baseline": baseline,
         "promotion_authority": False,
     }
@@ -715,6 +731,11 @@ def build_learning_candidate_artifact(
         "promotion_state": "candidate_only",
         "qualification": qualification,
         "training_plan": receipt["training_plan"],
+        "method_allocation": (
+            None
+            if method_allocation is None
+            else method_allocation.as_dict()
+        ),
         "evaluation_manifest": evaluation_manifest,
     }
 
