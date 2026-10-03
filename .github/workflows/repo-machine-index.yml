@@ -37,6 +37,17 @@ jobs:
           python -m pip install --no-deps .
           mkdir -p .machine
           skeleton-repo-machine --root . --output .machine/repository-machine.json
+          python - <<'PY'
+          from skeleton.repo_machine.manifest import load_manifest
+          manifest = load_manifest(".machine/repository-machine.json")
+          state = manifest["state"]
+          if state.get("truncated"):
+              raise SystemExit("machine index truncated: increase repository max_files before publishing")
+          files = state.get("files", [])
+          if not isinstance(files, list):
+              raise SystemExit("machine index has no file inventory")
+          print(f"Machine index contains {len(files)} files.")
+          PY
 
       - name: Commit changed index
         run: |
