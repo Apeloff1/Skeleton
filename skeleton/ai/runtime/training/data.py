@@ -402,6 +402,14 @@ class DataQualityReport:
         }
 
 
+_CLASSIFICATION_RANK = {
+    "public": 0,
+    "internal": 1,
+    "confidential": 2,
+    "restricted": 3,
+}
+
+
 class DatasetRegistry:
     """SQLite-backed immutable dataset/lineage/quality authority."""
 
@@ -470,6 +478,34 @@ class DatasetRegistry:
                 ingest=json.loads(row[0])
                 if not ingest.get("trusted"):
                     raise ValueError(f"dataset source remains quarantined: {digest}")
+
+                source_rights={
+                    str(item).strip().lower()
+                    for item in ingest.get("rights", [])
+                    if str(item).strip()
+                }
+                undelegated=set(manifest.permitted_uses)-source_rights
+                if undelegated:
+                    raise PermissionError(
+                        "dataset may not escalate source ingest rights: "
+                        + ",".join(sorted(undelegated))
+                    )
+
+                source_classification=str(ingest.get("classification",""))
+                if (
+                    source_classification not in _CLASSIFICATION_RANK
+                    or _CLASSIFICATION_RANK[manifest.classification]
+                    < _CLASSIFICATION_RANK[source_classification]
+                ):
+                    raise PermissionError(
+                        "dataset classification may not downgrade source ingest classification"
+                    )
+
+                parser_version=str(ingest.get("parser_version",""))
+                if parser_version not in manifest.parser_versions:
+                    raise ValueError(
+                        f"dataset parser_versions omit source parser: {parser_version}"
+                    )
             encoded=_canonical(manifest.as_dict())
             row=self._db.execute(
                 "SELECT dataset_digest,manifest_json FROM dataset_manifest WHERE dataset_id=? AND version=?",
