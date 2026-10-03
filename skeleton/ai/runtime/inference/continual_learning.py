@@ -656,6 +656,13 @@ class ContinualLearningState:
             raise ContinualLearningError(
                 "replay memory contains duplicate entries"
             )
+        semantic_digests = [
+            item.semantic_digest for item in self.replay_memory
+        ]
+        if len(semantic_digests) != len(set(semantic_digests)):
+            raise ContinualLearningError(
+                "replay memory contains semantic duplicates"
+            )
         if (
             len(self.rounds) > _MAX_ROUNDS
             or any(
@@ -1237,6 +1244,14 @@ def load_continual_learning_state(
             ),
             importance=float(raw_item.get("importance", 1.0)),
         )
+        claimed_semantic = raw_item.get("semantic_digest")
+        if claimed_semantic is not None and _sha(
+            claimed_semantic,
+            "semantic_digest",
+        ) != item.semantic_digest:
+            raise ContinualLearningError(
+                "persisted replay semantic digest mismatch"
+            )
         claimed = raw_item.get("memory_digest")
         if claimed is not None and _sha(
             claimed,
