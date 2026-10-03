@@ -38,6 +38,7 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     from skeleton.security.activation_security import ActivationSecurityError as canonical
     assert legacy is canonical
 
+
 def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
     workflow = (
         Path(__file__).resolve().parents[1]
