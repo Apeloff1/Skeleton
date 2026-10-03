@@ -166,7 +166,10 @@ jobs:
           branch_prefix='studio/night-'
           prior_pr=$(gh pr list --repo "$REPO" --state all --search 'studio: autonomous build run in:title' --limit 20 --json number,headRefName --jq '[.[] | select(.headRefName | startswith("studio/night-"))][0].number // empty')
           if [[ -n "${prior_pr:-}" ]]; then
-            gh api "repos/${REPO}/contents/.studio/audit/latest.execution-receipt.json?ref=pull/${prior_pr}/head" --jq .content 2>/dev/null | tr -d '\n' | base64 --decode > "$RUNNER_TEMP/prior-receipt/receipt.json" || true
+            head_sha=$(gh pr view "$prior_pr" --repo "$REPO" --json headRefOid --jq .headRefOid)
+            if [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              gh api "repos/${REPO}/contents/.studio/audit/latest.execution-receipt.json?ref=${head_sha}" --jq .content 2>/dev/null | tr -d '\n' | base64 --decode > "$RUNNER_TEMP/prior-receipt/receipt.json" || true
+            fi
           fi
           if [[ -s "$RUNNER_TEMP/prior-receipt/receipt.json" ]]; then
             echo "path=$RUNNER_TEMP/prior-receipt/receipt.json" >> "$GITHUB_OUTPUT"
