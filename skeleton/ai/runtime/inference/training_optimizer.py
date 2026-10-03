@@ -28,10 +28,6 @@ from .developmental_eval import (
     DevelopmentalEvaluationError,
     evaluate_training_receipt_developmentally,
 )
-from .train import (
-    LocalModelBuildError,
-    build_multi_method_recurrent_artifact,
-)
 from .training_allocation import (
     AdaptiveMethodAllocation,
     TrainingAllocationPolicy,
@@ -288,6 +284,19 @@ def optimize_training_mix(
     temperature: float = 0.8,
 ) -> TrainingOptimizationResult:
     """Probe, evaluate, allocate, and train one final unpromoted candidate."""
+
+    # Keep the inference package importable without the optional NumPy
+    # training extra. Numeric training is materialized only when optimization
+    # is explicitly executed.
+    try:
+        from .train import (
+            LocalModelBuildError,
+            build_multi_method_recurrent_artifact,
+        )
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise TrainingOptimizationError(
+            "local numeric training dependency is not materialized"
+        ) from exc
 
     rows = tuple(examples)
     if not rows or any(not isinstance(item, TrainingExample) for item in rows):
