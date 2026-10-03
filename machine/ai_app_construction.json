@@ -1258,6 +1258,7 @@
         "skeleton/ai/runtime/inference/training_allocation.py",
         "skeleton/ai/runtime/inference/multiview.py",
         "skeleton/ai/runtime/product/qualification.py",
+        "skeleton/ai/runtime/product/model_program_bridge.py",
         "skeleton/intelligence/adaptive.py",
         "skeleton/intelligence/experiment_tracker.py"
       ],
@@ -1271,6 +1272,8 @@
         "adaptive method-allocation receipt",
         "360-degree camera coverage identity",
         "Mirror/firewall/lifecycle qualification bundle",
+        "canonical model-program TrainingReceipt and ModelArtifact bridge",
+        "independently verified ModelPromotionReceipt",
         "promotion receipt"
       ],
       "construction": [
@@ -1284,6 +1287,8 @@
         "adapt method repeats from development/regression/Mirror-validation gain per compute while rejecting promotion-holdout and production-observation feedback as training oracles",
         "represent complete spherical camera pose coverage across azimuth/elevation/roll plus bounded FOV, distance and exposure variants without fabricating pixels",
         "bind exact training-plan, model, artifact, Mirror Room, promotion-firewall, camera and method-allocation identities into non-authoritative lifecycle validation evidence",
+        "bridge candidate-only reverse-training evidence into skeleton.learning.model_program ModelArtifact and TrainingReceipt using the compiled corpus digest as dataset identity",
+        "emit ModelPromotionReceipt only after qualification with a verifier distinct from trainer, Mirror verifier and firewall evaluator",
         "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
         "require eval before behavior change"
@@ -1301,6 +1306,8 @@
         "adaptive method allocation is deterministic and promotion-holdout excluded",
         "cross-plane qualification rejects candidate/baseline/evaluator identity drift",
         "lifecycle validation handoff carries evidence but no production authority",
+        "canonical model-program bridge preserves exact model/artifact/training/corpus identity",
+        "model promotion verifier is independent of trainer and evaluation authorities",
         "promotion gate"
       ],
       "failure_mode": "retain baseline behavior"
@@ -1748,6 +1755,8 @@
       "adaptive_training_allocator": "skeleton/ai/runtime/inference/training_allocation.py:allocate_training_methods",
       "camera_training_coverage": "skeleton/ai/runtime/inference/multiview.py:build_camera_coverage",
       "learning_qualification_bridge": "skeleton/ai/runtime/product/qualification.py:qualify_learning_candidate",
+      "model_program_bridge": "skeleton/ai/runtime/product/model_program_bridge.py:bridge_product_training_to_model_program",
+      "model_promotion_evidence": "skeleton/ai/runtime/product/model_program_bridge.py:model_promotion_receipt_from_qualification",
       "training_method_families": [
         "causal_language_modeling",
         "supervised_instruction",
