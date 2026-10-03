@@ -117,6 +117,12 @@ def _decision_score(finding: Finding, impact: ImpactReport | None, decision_bonu
     return min(100, max(0, severity_component + risk_component + confidence_component +
                          criticality_component + blast_component + path_component + depth_component))
 
+def _normalize_finding_path(path: str) -> str:
+    """Normalize repository finding paths to stable forward-slash form."""
+
+    return path.replace("\\", "/").lstrip("./")
+
+
 def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[WorkCandidate, ...]:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 512:
         raise ValueError("limit must be in [1,512]")
@@ -125,7 +131,7 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
     for finding in model.findings:
         impact = None
         if finding.path:
-            key = finding.path.replace("\", "/").lstrip("./")
+            key = _normalize_finding_path(finding.path)
             impact = impact_cache.get(key)
             if impact is None:
                 impact = analyze_impact(model, (key,), transitive_depth=3)
