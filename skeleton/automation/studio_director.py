@@ -17,6 +17,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import re
+import signal
 import subprocess
 from typing import Any, Iterable, Sequence
 from uuid import uuid4
@@ -597,6 +598,15 @@ def _plan(
 def _run_validation_commands(commands: Sequence[Sequence[str]]) -> tuple[bool, tuple[str, ...]]:
     outputs: list[str] = []
     allowed_prefixes = (("python", "-m", "pytest"), ("python", "-m", "compileall"))
+    base_env = {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("RUNNER_TEMP", os.environ.get("HOME", "")),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": "0",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "NO_COLOR": "1",
+        "TERM": "dumb",
+    }
     for raw_command in commands[:3]:
         argv = tuple(str(part) for part in raw_command)
         if not argv or len(argv) > 16 or not any(argv[: len(prefix)] == prefix for prefix in allowed_prefixes):
@@ -604,20 +614,28 @@ def _run_validation_commands(commands: Sequence[Sequence[str]]) -> tuple[bool, t
         if any(not part or "\x00" in part or any(ord(ch) < 32 for ch in part) for part in argv):
             raise ValueError("validation argument is malformed")
         display = " ".join(repr(part) for part in argv)
+        process = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=base_env,
+            start_new_session=True,
+        )
         try:
-            completed = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=120,
-                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-            )
+            stdout, stderr = process.communicate(timeout=120)
         except subprocess.TimeoutExpired:
-            outputs.append(f"$ {display}\nTIMEOUT")
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                process.kill()
+            stdout, stderr = process.communicate()
+            output = ((stdout or "") + "\n" + (stderr or ""))[-12000:]
+            outputs.append(f"$ {display}\nTIMEOUT\n{output}")
             return False, tuple(outputs)
-        output = ((completed.stdout or "") + "\n" + (completed.stderr or ""))[-12000:]
-        outputs.append(f"$ {display}\nexit={completed.returncode}\n{output}")
-        if completed.returncode != 0:
+        output = ((stdout or "") + "\n" + (stderr or ""))[-12000:]
+        outputs.append(f"$ {display}\nexit={process.returncode}\n{output}")
+        if process.returncode != 0:
             return False, tuple(outputs)
     return True, tuple(outputs)
 
