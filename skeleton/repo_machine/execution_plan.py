@@ -1,6 +1,8 @@
 """Closed-loop execution planning with explicit state transitions."""
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Iterable, Literal
 
@@ -46,16 +48,30 @@ class ExecutionPlan:
     blocked_work: tuple[str, ...]
     state: ExecutionState = ExecutionState()
 
+    @property
+    def fingerprint(self) -> str:
+        payload = {
+            "repository_fingerprint": self.repository_fingerprint,
+            "steps": [step.as_dict() for step in self.steps],
+            "ready_work": list(self.ready_work),
+            "blocked_work": list(self.blocked_work),
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
     def as_dict(self) -> dict[str, object]:
         return {"repository_fingerprint": self.repository_fingerprint,
+                "plan_fingerprint": self.fingerprint,
                 "steps": [item.as_dict() for item in self.steps],
                 "ready_work": list(self.ready_work), "blocked_work": list(self.blocked_work),
                 "state": self.state.as_dict()}
 
 
 def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outcome,
-                      repository_fingerprint: str) -> ExecutionPlan:
-    """Apply one observed result; reject invalid transitions and stale state."""
+                      repository_fingerprint: str, expected_plan_fingerprint: str | None = None) -> ExecutionPlan:
+    """Apply one observed result; reject invalid or stale transitions."""
+    if expected_plan_fingerprint is not None and expected_plan_fingerprint != plan.fingerprint:
+        raise ValueError("execution plan fingerprint mismatch")
     if repository_fingerprint != plan.repository_fingerprint:
         return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
                              ExecutionState(plan.state.completed_steps, plan.state.failed_work,
