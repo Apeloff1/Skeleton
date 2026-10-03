@@ -28,7 +28,7 @@ on:
 # Workflow name keeps unrelated pipelines isolated while PR number/ref scopes
 # cancellation to one change set.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
