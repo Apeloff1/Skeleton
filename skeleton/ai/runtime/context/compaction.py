@@ -80,13 +80,17 @@ def compact_context_segment(
 
     if not isinstance(segment, ContextSegment):
         raise TypeError("segment must be ContextSegment")
-    if segment.kind not in _ALLOWED_KINDS:
-        raise ContextCompactionError(
-            "segment kind is not eligible for evidence compaction"
-        )
+    # Authority wins over transform eligibility: trusted/mandatory control
+    # must fail for the authority reason even when its kind is not otherwise
+    # compactable. This keeps callers from treating policy/control content as a
+    # merely unsupported evidence shape.
     if segment.trust_level is ContextTrust.TRUSTED_CONTROL or segment.mandatory:
         raise ContextCompactionError(
             "trusted or mandatory context cannot be compacted"
+        )
+    if segment.kind not in _ALLOWED_KINDS:
+        raise ContextCompactionError(
+            "segment kind is not eligible for evidence compaction"
         )
     if segment.content is None:
         raise ContextCompactionError(
