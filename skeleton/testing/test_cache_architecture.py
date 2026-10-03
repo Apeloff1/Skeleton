@@ -129,6 +129,74 @@ def test_stale_cache_misses_or_rebuilds_by_explicit_policy() -> None:
     ) == b"card"
 
 
+def test_cache_is_bounded_and_rebuild_replaces_superseded_digest_identity() -> None:
+    store = _authority()
+    cache = GovernedContentCache(
+        store,
+        policy=CachePolicy(
+            ttl_generations=10,
+            stale_behavior="miss",
+            max_entries=2,
+        ),
+    )
+    for index in range(3):
+        store.put(
+            tenant_id="tenant-a",
+            logical_id=f"object-{index}",
+            version=1,
+            trust_context="verified",
+            payload=f"payload-{index}".encode(),
+        )
+        cache.rebuild(
+            tenant_id="tenant-a",
+            namespace="bounded",
+            logical_id=f"object-{index}",
+            version=1,
+            generation=index,
+        )
+
+    assert len(cache._entries) == 2
+
+    store.put(
+        tenant_id="tenant-a",
+        logical_id="migrated",
+        version=1,
+        trust_context="verified",
+        payload=b"same",
+    )
+    first = cache.rebuild(
+        tenant_id="tenant-a",
+        namespace="bounded",
+        logical_id="migrated",
+        version=1,
+        generation=3,
+    )
+    old_fingerprint = first.key.fingerprint()
+
+    store.migrate_digest(
+        tenant_id="tenant-a",
+        logical_id="migrated",
+        version=1,
+        to_algorithm="sha512",
+    )
+    second = cache.rebuild(
+        tenant_id="tenant-a",
+        namespace="bounded",
+        logical_id="migrated",
+        version=1,
+        generation=4,
+    )
+
+    assert second.key.fingerprint() != old_fingerprint
+    assert old_fingerprint not in cache._entries
+    assert len(cache._entries) <= 2
+
+
+def test_cache_entry_limit_is_fail_closed() -> None:
+    with pytest.raises(Exception, match="max_entries"):
+        CachePolicy(max_entries=0)
+
+
 def test_digest_migration_invalidates_old_cache_identity() -> None:
     store = _authority()
     store.put(
