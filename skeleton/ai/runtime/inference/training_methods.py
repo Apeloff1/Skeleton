@@ -25,7 +25,8 @@ _MAX_EXAMPLES = 4_096
 _MAX_TEXT = 200_000
 _MAX_OUTPUT_DOCUMENTS = 16_384
 _MAX_OUTPUT_CHARS = 32_000_000
-_TOKEN = re.compile(r"\S+", re.UNICODE)\n_CAMERA_VIEW_REF = re.compile(r"^camera-view-sha256:[0-9a-f]{64}$")
+_TOKEN = re.compile(r"\S+", re.UNICODE)
+_CAMERA_VIEW_REF = re.compile(r"^camera-view-sha256:[0-9a-f]{64}$")
 
 
 class TrainingMethodError(RuntimeError):
