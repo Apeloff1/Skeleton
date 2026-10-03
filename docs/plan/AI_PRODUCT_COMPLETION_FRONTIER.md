@@ -550,3 +550,36 @@ This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
 frontier, not a claim that model quality, general intelligence, or SI capability
 is complete.
+
+
+### 22. Governed activation and executable rollback
+
+Qualification now reaches an explicit runtime-selection boundary instead of
+ending at promotion evidence. A promoted local candidate and its exact rollback
+baseline are re-authenticated from disk and bound into one
+`LocalModelActivationManifest`. The manifest records candidate/baseline artifact
+and model digests, the canonical `ModelPromotionReceipt`, training receipt,
+learning qualification, model-program bridge, verifier identity, cache/seed
+settings, and an explicit operator authorization reference. The manifest is
+content-addressed, written atomically, and must be deployment-pinned through
+`AI_LOCAL_ACTIVATION_DIGEST`.
+
+Governed local startup uses
+`AI_LOCAL_ACTIVATION_MANIFEST` + `AI_LOCAL_ACTIVATION_DIGEST`. The operator may
+set `AI_LOCAL_ACTIVATION_TARGET=candidate` (default) or
+`AI_LOCAL_ACTIVATION_TARGET=rollback`. Both targets are loaded from the same
+authenticated manifest; rollback therefore selects the exact pre-promotion
+baseline bytes rather than a mutable loose path. A target is rejected when no
+activation manifest is configured, and `AI_LOCAL_MODEL_PATH`, cache, or seed
+overrides must agree with the selected manifest target.
+
+This closes the reverse functional chain as an executable control path:
+
+`accepted product turn -> bounded training candidate -> offline execution
+qualification -> Mirror Room -> sealed evaluation firewall -> independent model
+promotion receipt -> operator-authorized activation -> candidate execution or
+authenticated rollback`.
+
+None of these learning or evaluation objects can switch the target themselves.
+Production selection remains an operator/deployment action, and both candidate
+and rollback preserve the same digest-pinned evidence chain.
