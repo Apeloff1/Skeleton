@@ -51,176 +51,126 @@ class WorkGraph:
         payload="|".join(f"{n.identity}:{n.priority}:{n.strategic_score}:{n.prerequisites}:{n.conflict_keys}" for n in enriched)
         object.__setattr__(self,"_fingerprint",hashlib.sha256(payload.encode()).hexdigest())
     @property
-    def ordered_nodes(self)->tuple[WorkNode,...]:
-        """Stable enriched public view of the graph nodes."""
-        return self._ordered_nodes
-
+    def ordered_nodes(self)->tuple[WorkNode,...]: return self._ordered_nodes
     def node(self, identity:str)->WorkNode:
-        try:
-            return self._by_identity[identity]
-        except KeyError as exc:
-            raise ValueError(f"unknown work identity: {identity}") from exc
-
+        try:return self._by_identity[identity]
+        except KeyError as exc:raise ValueError(f"unknown work identity: {identity}") from exc
     @property
-    def fingerprint(self)->str:
-        """Stable fingerprint for the derived work graph."""
-        return self._fingerprint
-
+    def fingerprint(self)->str:return self._fingerprint
     @property
-    def critical_depth(self)->int:
-        return max(self._depth.values(),default=0)
-
+    def critical_depth(self)->int:return max(self._depth.values(),default=0)
     def as_dict(self): return {"fingerprint":self.fingerprint,"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure(),"strategic_value":self.strategic_value(),"bridge_candidates":list(self.bridge_candidates())}
     def frontier(self,completed:Iterable[str]=()):
         done=set(completed)
-        return tuple(
-            sorted(
-                (
-                    n
-                    for n in self._ordered_nodes
-                    if n.identity not in done
-                    and all(p in done for p in n.prerequisites)
-                ),
-                key=lambda n:(-n.strategic_score,-n.priority,n.identity),
-            )
-        )
+        return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity)))
     def ready(self,completed=(),active_conflicts=(),*,limit=8):
         done=set(completed); unknown=done-set(self._by_identity)
-        if unknown: raise ValueError("completed contains unknown work identities")
+        if unknown:raise ValueError("completed contains unknown work identities")
         conflicts=set(active_conflicts); selected=[]
         for n in self.frontier(done):
-            if any(k in conflicts for k in n.conflict_keys): continue
+            if any(k in conflicts for k in n.conflict_keys):continue
             selected.append(n); conflicts.update(n.conflict_keys)
-            if len(selected)>=limit: break
+            if len(selected)>=limit:break
         return tuple(selected)
-    def blocked(self,completed=()):
+    def blocked(self,completed=()): 
         done=set(completed); return tuple(n for n in self._ordered_nodes if n.identity not in done and any(p not in done for p in n.prerequisites))
-    def unlock_potential(self,identity): return len(self._descendants[self.node(identity).identity])
+    def unlock_potential(self,identity):return len(self._descendants[self.node(identity).identity])
     def critical_path(self):
         if not self._ordered_nodes:return ()
         terminal=max(self._ordered_nodes,key=lambda n:(self._depth[n.identity],n.strategic_score,n.priority,n.identity)); path=[terminal]
-        while path[-1].prerequisites:
-            path.append(max((self._by_identity[p] for p in path[-1].prerequisites),key=lambda n:(self._depth[n.identity],n.strategic_score,n.priority,n.identity)))
+        while path[-1].prerequisites:path.append(max((self._by_identity[p] for p in path[-1].prerequisites),key=lambda n:(self._depth[n.identity],n.strategic_score,n.priority,n.identity)))
         return tuple(reversed(path))
     def bottleneck(self,completed=()):
         frontier=self.frontier(completed)
         if not frontier:return None
         return max(frontier,key=lambda n:(len(self._descendants[n.identity]),self._depth[n.identity],n.strategic_score,n.priority,n.identity)).identity
     def parallelism_hint(self,identity):
-        n=self.node(identity)
-        peers=[x for x in self._ordered_nodes if x.identity!=identity and not (set(x.conflict_keys)&set(n.conflict_keys))]
+        n=self.node(identity); peers=[x for x in self._ordered_nodes if x.identity!=identity and not (set(x.conflict_keys)&set(n.conflict_keys))]
         return min(len(peers),32)
     def max_parallelism(self,completed=()):
         frontier=self.frontier(completed); used=set(); count=0
         for n in frontier:
-            if set(n.conflict_keys)&used: continue
-            used.update(n.conflict_keys); count+=1
+            if set(n.conflict_keys)&used:continue
+            used.update(n.conflict_keys);count+=1
         return count
-
-    def node_pressure(self, identity:str)->int:
-        """Return the coordination pressure for one node from the graph model."""
-        return self._pressure(self.node(identity))
-
-    def downstream_value(self, identity:str)->int:
-        """Bounded strategic value unlocked by completing a node and its descendants."""
-        node=self.node(identity)
-        return min(100, node.strategic_score + sum(min(10, self._by_identity[d].strategic_score//10) for d in self._descendants[identity]))
-
-    def conflict_density(self, identity:str)->int:
-        """Return bounded overlap with the rest of the graph's conflict surface."""
-        node=self.node(identity); keys=set(node.conflict_keys)
-        if not keys: return 0
-        overlap=sum(1 for other in self._ordered_nodes if other.identity!=identity and keys.intersection(other.conflict_keys))
-        return min(100, overlap*4)
-
-    def safe_parallel_groups(self, completed:Iterable[str]=(), *, limit:int=8)->tuple[tuple[str,...],...]:
-        """Partition the current frontier into deterministic conflict-free execution groups."""
-        if isinstance(limit,bool) or not isinstance(limit,int) or limit<1: raise ValueError("limit must be positive")
-        remaining=list(self.frontier(completed)); groups=[]
+    def node_pressure(self,identity:str)->int:return self._pressure(self.node(identity))
+    def downstream_value(self,identity:str)->int:
+        node=self.node(identity);return min(100,node.strategic_score+sum(min(10,self._by_identity[d].strategic_score//10) for d in self._descendants[identity]))
+    def conflict_density(self,identity:str)->int:
+        node=self.node(identity);keys=set(node.conflict_keys)
+        if not keys:return 0
+        return min(100,sum(1 for other in self._ordered_nodes if other.identity!=identity and keys.intersection(other.conflict_keys))*4)
+    def safe_parallel_groups(self,completed:Iterable[str]=(),*,limit:int=8)->tuple[tuple[str,...],...]:
+        if isinstance(limit,bool) or not isinstance(limit,int) or limit<1:raise ValueError("limit must be positive")
+        remaining=list(self.frontier(completed));groups=[]
         while remaining and len(groups)<limit:
-            group=[]; used=set(); rest=[]
+            group=[];used=set();rest=[]
             for n in remaining:
                 keys=set(n.conflict_keys)
-                if not keys.intersection(used):
-                    group.append(n.identity); used.update(keys)
-                else:
-                    rest.append(n)
-            if not group: break
-            groups.append(tuple(group)); remaining=rest
+                if not keys.intersection(used):group.append(n.identity);used.update(keys)
+                else:rest.append(n)
+            if not group:break
+            groups.append(tuple(group));remaining=rest
         return tuple(groups)
-
-    def influence(self, identity:str)->int:
-        """Estimate bounded graph influence from downstream value and conflict centrality."""
-        node=self.node(identity)
-        return min(100, self.downstream_value(identity)*2//3 + self.conflict_density(identity)//2 + min(25,node.blast_radius*5))
-
-    def strategic_value(self, completed=()):
-        """Bounded aggregate value of the actionable frontier."""
-        frontier=self.frontier(completed)
-        return min(100, sum(self.influence(n.identity) for n in frontier[:32]) // max(1,len(frontier)))
-
-    def risk_adjusted_influence(self, identity:str)->int:
-        """Discount influence by conflict pressure and weak topology evidence."""
-        node=self.node(identity)
-        confidence=max(1,node.topology_confidence)
-        penalty=self.conflict_density(identity)//3 + self.node_pressure(identity)//5
-        return min(100, max(0,self.influence(identity)*confidence//100-penalty))
-
-    def verification_efficiency(self, identity:str)->int:
-        """Estimate graph value gained per verification surface."""
-        node=self.node(identity)
-        cost=max(1,len(node.verification_paths))
-        return min(100,(self.downstream_value(identity)*10)//cost)
-
-    def decision_margin(self, identity:str, completed=())->int:
-        """Distance between a node and the strongest competing frontier choice."""
-        target=self.risk_adjusted_influence(identity)
-        rivals=[self.risk_adjusted_influence(n.identity) for n in self.frontier(completed) if n.identity!=identity]
+    def influence(self,identity:str)->int:
+        node=self.node(identity);return min(100,self.downstream_value(identity)*2//3+self.conflict_density(identity)//2+min(25,node.blast_radius*5))
+    def strategic_value(self,completed=()):
+        frontier=self.frontier(completed);return min(100,sum(self.influence(n.identity) for n in frontier[:32])//max(1,len(frontier)))
+    def risk_adjusted_influence(self,identity:str)->int:
+        node=self.node(identity);confidence=max(1,node.topology_confidence);penalty=self.conflict_density(identity)//3+self.node_pressure(identity)//5
+        return min(100,max(0,self.influence(identity)*confidence//100-penalty))
+    def verification_efficiency(self,identity:str)->int:
+        node=self.node(identity);return min(100,(self.downstream_value(identity)*10)//max(1,len(node.verification_paths)))
+    def decision_margin(self,identity:str,completed=())->int:
+        target=self.risk_adjusted_influence(identity);rivals=[self.risk_adjusted_influence(n.identity) for n in self.frontier(completed) if n.identity!=identity]
         return max(0,target-max(rivals,default=0))
-
-    def counterfactual_unlock(self, identity:str, completed=())->int:
-        """Approximate pressure reduction if a node completes successfully."""
-        done=set(completed); done.add(self.node(identity).identity)
+    def counterfactual_unlock(self,identity:str,completed=())->int:
+        done=set(completed);done.add(self.node(identity).identity)
         return max(0,self.pressure(completed)-self.pressure(done))
-
-    def bridge_candidates(self, *, limit:int=16)->tuple[str,...]:
-        """Return bounded candidates with large downstream dependency cuts."""
+    def decision_surface(self,completed=(),*,limit:int=16)->tuple[dict[str,object],...]:
+        """Return a bounded, deterministic decision matrix for the actionable frontier."""
+        if isinstance(limit,bool) or not isinstance(limit,int) or limit<1:raise ValueError("limit must be positive")
+        rows=[]
+        for n in self.frontier(completed)[:max(1,limit)]:
+            rows.append({"identity":n.identity,"risk_adjusted_influence":self.risk_adjusted_influence(n.identity),
+                         "verification_efficiency":self.verification_efficiency(n.identity),
+                         "counterfactual_unlock":self.counterfactual_unlock(n.identity,completed),
+                         "decision_margin":self.decision_margin(n.identity,completed),
+                         "pressure":self.node_pressure(n.identity),"downstream_value":self.downstream_value(n.identity)})
+        return tuple(rows)
+    def bridge_candidates(self,*,limit:int=16)->tuple[str,...]:
         scored=[]
         for n in self._ordered_nodes:
             descendants=self._descendants[n.identity]
             if descendants:
                 covered=sum(1 for d in descendants if n.identity in self._by_identity[d].prerequisites)
                 scored.append((min(100,len(descendants)*4+covered*8+self._depth[n.identity]*3),n.identity))
-        scored.sort(reverse=True)
-        return tuple(identity for _,identity in scored[:max(0,limit)])
-
-    def pressure(self, completed=()):
+        scored.sort(reverse=True);return tuple(identity for _,identity in scored[:max(0,limit)])
+    def pressure(self,completed=()):
         frontier=self.frontier(completed)
-        if not frontier: return 0
-        return min(100, max(self._pressure(n) for n in frontier))
-
+        if not frontier:return 0
+        return min(100,max(self._pressure(n) for n in frontier))
     @staticmethod
-    def _pressure(node:WorkNode)->int:
-        return min(100, node.unlock_potential*6 + node.blast_radius*3 + len(node.conflict_keys)*2 + (20 if node.critical_path_depth else 0))
+    def _pressure(node:WorkNode)->int:return min(100,node.unlock_potential*6+node.blast_radius*3+len(node.conflict_keys)*2+(20 if node.critical_path_depth else 0))
 
 def _conflicts(candidate,dependents_by_zone=None):
     keys={f"zone:{candidate.zone}",f"lane:{candidate.lane}"}
-    if dependents_by_zone: keys.update(f"dependent-zone:{z}" for z in dependents_by_zone.get(candidate.zone,()))
+    if dependents_by_zone:keys.update(f"dependent-zone:{z}" for z in dependents_by_zone.get(candidate.zone,()))
     keys.update(f"dependency-zone:{z}" for z in candidate.dependency_zones)
-    if candidate.path: keys.add(f"path:{candidate.path}")
+    if candidate.path:keys.add(f"path:{candidate.path}")
     return tuple(sorted(keys))
 
 def build_work_graph(model:RepositoryModel,*,limit:int=128)->WorkGraph:
-    candidates=derive_work_candidates(model,limit=limit); best={}
+    candidates=derive_work_candidates(model,limit=limit);best={}
     for c in candidates:
-        if c.lane not in {"repository-health","architecture"}: continue
-        if c.zone not in best or (-c.priority,c.identity)<(-best[c.zone].priority,best[c.zone].identity): best[c.zone]=c
+        if c.lane not in {"repository-health","architecture"}:continue
+        if c.zone not in best or (-c.priority,c.identity)<(-best[c.zone].priority,best[c.zone].identity):best[c.zone]=c
     reverse={}
     for s in model.subsystems:
-        for d in s.dependencies: reverse.setdefault(d,set()).add(s.name)
-    dependents={z:tuple(sorted(v)) for z,v in reverse.items()}; nodes=[]
+        for d in s.dependencies:reverse.setdefault(d,set()).add(s.name)
+    dependents={z:tuple(sorted(v)) for z,v in reverse.items()};nodes=[]
     for c in candidates:
-        prerequisites=set(c.prerequisite_ids); higher=best.get(c.zone)
-        if c.lane not in {"repository-health","architecture"} and higher and higher.priority>c.priority: prerequisites.add(higher.identity)
+        prerequisites=set(c.prerequisite_ids);higher=best.get(c.zone)
+        if c.lane not in {"repository-health","architecture"} and higher and higher.priority>c.priority:prerequisites.add(higher.identity)
         nodes.append(WorkNode(c.identity,c.lane,c.zone,c.priority,c.objective,_conflicts(c,dependents),tuple(sorted(prerequisites)),c.evidence,c.verification_paths,"ready" if not prerequisites else "gated",c.decision_score,c.topology_confidence,c.blast_radius))
     return WorkGraph(tuple(nodes))
