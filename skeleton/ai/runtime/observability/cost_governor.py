@@ -908,7 +908,7 @@ class _SqliteCostGovernorJournal:
                     )
                 existing = self._record(row)
                 allowed_transition = (
-                    existing.state == "active"
+                    existing.state in {"active", "release_pending"}
                     and decision.state == "completed"
                 ) or (
                     existing.state == "release_pending"
@@ -1061,6 +1061,7 @@ class CostGovernor:
         ):
             raise TypeError("fallback must be SafeCostFallback")
         requested_digest = _request_digest(request)
+        persisted: _CostJournalRecord | None = None
 
         with self._lock:
             current = self._active.get(request.operation_id)
@@ -1163,10 +1164,11 @@ class CostGovernor:
                         quota_reservation=quota_reservation,
                     )
                 except Exception:
-                    try:
-                        self.runtime.release(lease.operation_id)
-                    except Exception:
-                        pass
+                    if persisted is None:
+                        try:
+                            self.runtime.release(lease.operation_id)
+                        except Exception:
+                            pass
                     raise
 
             self._active[request.operation_id] = _ActiveCostReservation(
@@ -1363,9 +1365,9 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no durable cost journal record"
                 )
-            if record.state in {"released_unspent", "release_pending"}:
+            if record.state == "released_unspent":
                 raise CostGovernorConflict(
-                    "released or release-pending reservation cannot be recovered as completed"
+                    "released reservation cannot be recovered as completed"
                 )
             if record.terminal is not None:
                 if record.state != "completed":
