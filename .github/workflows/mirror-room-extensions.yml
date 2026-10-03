@@ -8,6 +8,7 @@ on:
       - "skeleton/testing/test_mirror_room_adversarial.py"
       - "skeleton/testing/test_mirror_room_content_delivery.py"
       - "skeleton/testing/test_mirror_room_observability.py"
+      - "skeleton/testing/test_mirror_room_learning.py"
       - "frontend/features/MirrorRoom/**"
       - "frontend/app/mirror-room.tsx"
       - "frontend/app/dashboard.tsx"
@@ -39,7 +40,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ai-mirror-room-extensions-${{ github.event.pull_request.number || github.sha }}
+  group: ai-mirror-room-extensions-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -77,3 +78,4 @@ jobs:
           skeleton/testing/test_mirror_room_adversarial.py
           skeleton/testing/test_mirror_room_content_delivery.py
           skeleton/testing/test_mirror_room_observability.py
+          skeleton/testing/test_mirror_room_learning.py
