@@ -1071,6 +1071,25 @@ class CostGovernor:
                     )
                 return current.receipt
 
+            if self._journal is not None:
+                persisted = self._journal.load(request.operation_id)
+                if persisted is not None:
+                    if persisted.requested_request_digest != requested_digest:
+                        raise CostGovernorConflict(
+                            "durable operation replayed with different requested inputs"
+                        )
+                    if persisted.state == "release_pending":
+                        raise CostGovernorConflict(
+                            "operation has release pending recovery"
+                        )
+                    if persisted.state in {
+                        "completed",
+                        "released_unspent",
+                    }:
+                        raise CostGovernorConflict(
+                            "operation already has terminal cost journal state"
+                        )
+
             try:
                 lease = self.runtime.admit(
                     request,
@@ -1344,9 +1363,9 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no durable cost journal record"
                 )
-            if record.state == "released_unspent":
+            if record.state in {"released_unspent", "release_pending"}:
                 raise CostGovernorConflict(
-                    "released reservation cannot be recovered as completed"
+                    "released or release-pending reservation cannot be recovered as completed"
                 )
             if record.terminal is not None:
                 if record.state != "completed":
@@ -1392,11 +1411,6 @@ class CostGovernor:
                 decision,
                 evidence_digest=evidence,
             )
-            if self._journal is not None:
-                self._journal.record_terminal(
-                    decision,
-                    evidence_digest=None,
-                )
             self._active.pop(operation, None)
             return decision
 
@@ -1459,6 +1473,82 @@ class CostGovernor:
                     "terminal_accounting_qualification_failed"
                 ) from exc
 
+    def recover_released(
+        self,
+        operation_id: str,
+    ) -> CostDecision:
+        """Finish an unspent release interrupted by process loss."""
+
+        operation = _token("operation_id", operation_id)
+        journal = self._journal
+        if journal is None:
+            raise CostGovernorError(
+                "release recovery requires durable cost journal"
+            )
+
+        with self._lock:
+            record = journal.load(operation)
+            if record is None:
+                raise CostGovernorError(
+                    "operation has no durable cost journal record"
+                )
+            if record.terminal is not None:
+                if record.state != "released_unspent":
+                    raise CostGovernorConflict(
+                        "completed reservation cannot be recovered as released"
+                    )
+                self._active.pop(operation, None)
+                return record.terminal
+            if record.state != "release_pending":
+                raise CostGovernorConflict(
+                    "operation has no release pending recovery"
+                )
+
+            ledger = self.runtime.quota_ledger
+            if ledger is None:
+                raise CostGovernorError(
+                    "release recovery requires quota ledger"
+                )
+            finder = getattr(ledger, "completion_for_operation", None)
+            if callable(finder):
+                completion = finder(record.tenant_id, operation)
+                if completion is not None:
+                    raise CostGovernorConflict(
+                        "completed accounting cannot be recovered as unspent release"
+                    )
+
+            if journal.quota_reservation_exists(
+                record.quota_reservation
+            ):
+                try:
+                    ledger.release(
+                        record.quota_reservation.reservation_id
+                    )
+                except QuotaConflict as exc:
+                    journal.revert_release_pending(operation)
+                    raise CostGovernorConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise CostGovernorError(
+                        "durable release recovery failed"
+                    ) from exc
+
+            decision = CostDecision(
+                operation_id=operation,
+                tenant_id=record.tenant_id,
+                state="released_unspent",
+                reservation_digest=record.reservation.digest,
+                completion_digest=None,
+                accounting_decision_digest=None,
+                accepted=False,
+                reasons=("reservation-released-unspent",),
+            )
+            journal.record_terminal(
+                decision,
+                evidence_digest=None,
+            )
+            self._active.pop(operation, None)
+            return decision
+
     def release_unspent(
         self,
         operation_id: str,
@@ -1470,11 +1560,21 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
                 )
+            journal = self._journal
+            if journal is not None:
+                journal.mark_release_pending(
+                    operation,
+                    active.receipt,
+                )
             try:
                 lease = self.runtime.release(operation)
             except (AdmissionRuntimeConflict, QuotaConflict) as exc:
+                if journal is not None:
+                    journal.revert_release_pending(operation)
                 raise CostGovernorConflict(str(exc)) from exc
             except (AdmissionRuntimeError, QuotaError) as exc:
+                if journal is not None:
+                    journal.revert_release_pending(operation)
                 raise CostGovernorError(str(exc)) from exc
             decision = CostDecision(
                 operation_id=operation,
@@ -1486,6 +1586,11 @@ class CostGovernor:
                 accepted=False,
                 reasons=("reservation-released-unspent",),
             )
+            if journal is not None:
+                journal.record_terminal(
+                    decision,
+                    evidence_digest=None,
+                )
             self._active.pop(operation, None)
             return decision
 
