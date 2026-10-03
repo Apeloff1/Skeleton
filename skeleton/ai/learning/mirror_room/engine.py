@@ -110,8 +110,6 @@ class MirrorRunReceipt:
     executor_id: str
     production_baseline: MirrorCandidate
     final_sandbox_champion: MirrorCandidate
-    generator_id: str
-    executor_id: str
     generations: tuple[GenerationRecord, ...]
     holdout_report: ComparisonReport | None
     sealed_holdout_digest: str
@@ -129,6 +127,12 @@ class MirrorRunReceipt:
             raise MirrorRoomError("Mirror Run requires executor identity")
         if self.generator_id == self.executor_id:
             raise MirrorRoomError("generator and sandbox evaluator identities must remain independent")
+        if (
+            isinstance(self.validation_candidate_evaluations, bool)
+            or not isinstance(self.validation_candidate_evaluations, int)
+            or self.validation_candidate_evaluations < 0
+        ):
+            raise MirrorRoomError("validation_candidate_evaluations must be non-negative")
         if self.production_authority is not False:
             raise MirrorRoomError("Mirror Run cannot have production authority")
         if self.direct_self_modify is not False:
@@ -154,8 +158,6 @@ class MirrorRunReceipt:
                 "executor_id": self.executor_id,
                 "production_baseline_digest": self.production_baseline.digest,
                 "final_sandbox_champion_digest": self.final_sandbox_champion.digest,
-                "generator_id": self.generator_id,
-                "executor_id": self.executor_id,
                 "generations": [item.digest for item in self.generations],
                 "holdout_report": None if self.holdout_report is None else self.holdout_report.digest,
                 "sealed_holdout_digest": self.sealed_holdout_digest,
@@ -283,6 +285,7 @@ class MirrorRoom:
         seen_ids: set[str],
         seen_digests: set[str],
         seen_behavior_digests: set[str],
+        seen_parameter_digests: set[str],
         limit: int,
     ) -> tuple[MirrorCandidate, ...]:
         result = tuple(candidates)
@@ -290,8 +293,8 @@ class MirrorRoom:
             raise MirrorRoomError("candidate generator exceeded generation limit")
         local_ids: set[str] = set()
         local_digests: set[str] = set()
-        local_parameter_digests: set[str] = set()
         local_behavior_digests: set[str] = set()
+        local_parameter_digests: set[str] = set()
         for candidate in result:
             if not isinstance(candidate, MirrorCandidate):
                 raise MirrorRoomError("candidate generator returned invalid object")
@@ -315,9 +318,17 @@ class MirrorRoom:
                 raise MirrorRoomError(
                     "candidate behavior was already explored in this learning run"
                 )
+            if (
+                candidate.parameter_digest in seen_parameter_digests
+                or candidate.parameter_digest in local_parameter_digests
+            ):
+                raise MirrorRoomError(
+                    "duplicate candidate behavior parameters were proposed"
+                )
             local_ids.add(candidate.candidate_id)
             local_digests.add(candidate.digest)
             local_behavior_digests.add(candidate.behavior_digest)
+            local_parameter_digests.add(candidate.parameter_digest)
         return result
 
     def learn(
@@ -336,7 +347,7 @@ class MirrorRoom:
             raise MirrorRoomError(
                 "candidate generator and sandbox evaluator must be independent"
             )
-        train, validation, holdout = self._partition(scenarios)
+        train, validation, holdout, split_integrity = self._partition(scenarios)
         generation_limit = (
             self.spec.budget.max_generations if generations is None else generations
         )
@@ -361,34 +372,22 @@ class MirrorRoom:
         seen_ids = {production_baseline.candidate_id}
         seen_digests = {production_baseline.digest}
         seen_behavior_digests = {production_baseline.behavior_digest}
+        seen_parameter_digests = {production_baseline.parameter_digest}
         hard_examples: tuple[HardExample, ...] = ()
         prior_candidate_id: str | None = None
         generation_records: list[GenerationRecord] = []
         stagnant_generations = 0
+        validation_candidate_evaluations = 0
         validation_family_size = (
             generation_limit * self.spec.budget.max_candidates_per_generation
         )
 
         for generation in range(1, generation_limit + 1):
-            hard_rank = {
-                item.scenario_id: item.difficulty
-                for item in hard_examples
-            }
-            curriculum = tuple(
-                sorted(
-                    train,
-                    key=lambda item: (
-                        0 if item.scenario_id in hard_rank else 1,
-                        -hard_rank.get(item.scenario_id, 0.0),
-                        -item.weight,
-                        item.scenario_id,
-                    ),
-                )
-            )
+            curriculum = build_curriculum(train, hard_examples)
             feedback = LearningFeedback(
                 generation=generation,
                 champion=learning_champion,
-                training_scenarios=curriculum,
+                training_scenarios=curriculum.scenarios,
                 hard_examples=hard_examples,
                 prior_candidate_id=prior_candidate_id,
             )
@@ -403,6 +402,7 @@ class MirrorRoom:
                 seen_ids=seen_ids,
                 seen_digests=seen_digests,
                 seen_behavior_digests=seen_behavior_digests,
+                seen_parameter_digests=seen_parameter_digests,
                 limit=self.spec.budget.max_candidates_per_generation,
             )
             if not candidates:
@@ -443,8 +443,8 @@ class MirrorRoom:
                 )
                 seen_ids.add(candidate.candidate_id)
                 seen_digests.add(candidate.digest)
-                seen_parameter_digests.add(candidate.parameter_digest)
                 seen_behavior_digests.add(candidate.behavior_digest)
+                seen_parameter_digests.add(candidate.parameter_digest)
 
             ranked_training = sorted(
                 raw,
@@ -538,6 +538,7 @@ class MirrorRoom:
                     learning_champion_id=learning_champion.candidate_id,
                     selected_champion_id=qualified_champion.candidate_id,
                     hard_examples=hard_examples,
+                    curriculum_digest=curriculum.digest,
                 )
             )
             if stagnant_generations >= self.spec.stagnation_patience:
