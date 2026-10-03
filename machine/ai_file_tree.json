@@ -4881,6 +4881,34 @@
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_execution_sandbox_tree_exactly_mirrored",
       "source_git_object_sha": "90d13b5535593ffd5ff55f244725665f9bd5896a"
+    },
+    {
+      "id": "AIFT-STORAGE",
+      "source": "skeleton/storage",
+      "destination": "skeleton/ai/runtime/storage",
+      "kind": "tree",
+      "source_git_object_sha": "3314a35fdcb1c26f03cf161c5e9a4a28c57b380b",
+      "role": "governed content addressing, cache identity, and durable saga compensation state",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S4-EXEC-01"
+      ],
+      "volume_refs": [
+        "VOL-133",
+        "VOL-135",
+        "VOL-136"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "canonical_governed_storage_tree_with_exact_ai_runtime_mirror"
     }
   ],
   "ci_enforcement": {
@@ -5133,7 +5161,6 @@
       "skeleton/routing",
       "skeleton/safety",
       "skeleton/speech",
-      "skeleton/storage",
       "skeleton/training",
       "skeleton/verification",
       "skeleton/video",
