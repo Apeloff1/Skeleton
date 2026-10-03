@@ -16,7 +16,7 @@ class ExecutionState:
     def as_dict(self): return {"completed_steps":list(self.completed_steps),"failed_work":list(self.failed_work),"verified_work":list(self.verified_work),"released_work":list(self.released_work),"stale":self.stale}
 @dataclass(frozen=True,slots=True)
 class ExecutionPlan:
-    repository_fingerprint:str; steps:tuple[PlanStep,...]; ready_work:tuple[str,...]; blocked_work:tuple[str,...]; state:ExecutionState=ExecutionState()
+    repository_fingerprint:str; steps:tuple[PlanStep,...]; ready_work:tuple[str,...]; blocked_work:tuple[str,...]; state:ExecutionState=ExecutionState(); graph_fingerprint:str=""
     _steps_by_identity:dict[str,PlanStep]=field(init=False,repr=False,compare=False)
     def __post_init__(self):
         by={}
@@ -33,10 +33,10 @@ class ExecutionPlan:
     @property
     def fingerprint(self):
         return hashlib.sha256(json.dumps({"definition":self.definition_fingerprint,"state":self.state.as_dict()},sort_keys=True,separators=(",",":")).encode()).hexdigest()
-    def as_dict(self): return {"repository_fingerprint":self.repository_fingerprint,"plan_fingerprint":self.fingerprint,"definition_fingerprint":self.definition_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work),"state":self.state.as_dict()}
+    def as_dict(self): return {"repository_fingerprint":self.repository_fingerprint,"plan_fingerprint":self.fingerprint,"definition_fingerprint":self.definition_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work),"state":self.state.as_dict(),"graph_fingerprint":self.graph_fingerprint}
 
 def _stale_plan(plan,completed,failed,verified,released):
-    return ExecutionPlan(plan.repository_fingerprint,plan.steps,(),plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),True))
+    return ExecutionPlan(plan.repository_fingerprint,plan.steps,(),plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),True),plan.graph_fingerprint)
 
 def advance_execution(plan,*,step_identity:str,outcome:Outcome,repository_fingerprint:str,expected_plan_fingerprint:str|None=None):
     if expected_plan_fingerprint is not None and expected_plan_fingerprint!=plan.fingerprint: raise ValueError("execution plan fingerprint mismatch")
@@ -55,7 +55,7 @@ def advance_execution(plan,*,step_identity:str,outcome:Outcome,repository_finger
     elif outcome=="failed": failed.add(step.work_identity); verified.discard(step.work_identity); released.discard(step.work_identity)
     elif outcome=="stale": return _stale_plan(plan,completed,failed,verified,released)
     elif outcome=="blocked": return plan
-    return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False))
+    return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False),plan.graph_fingerprint)
 
 def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),active_conflicts:Iterable[str]=(),limit:int=8,state:ExecutionState|None=None,retry_failed:bool=False,graph:WorkGraph|None=None):
     graph=graph or build_work_graph(model,limit=max(limit,32)); inherited=state or ExecutionState(); completed_set=set(completed)|set(inherited.released_work)
@@ -69,7 +69,7 @@ def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),acti
                       PlanStep(verify,"verify","Run the smallest relevant verification surface before considering the work complete.",(modify,),n.verification_paths,n.identity),
                       PlanStep(unlock,"unlock","Release the verified work and recompute downstream readiness.",(verify,),work_identity=n.identity)))
     blocked=tuple(n.identity for n in graph.ordered_nodes if n.identity not in ready_ids and n.identity not in completed_set)
-    return ExecutionPlan(model.fingerprint,tuple(steps),tuple(n.identity for n in ready),blocked,inherited)
+    return ExecutionPlan(model.fingerprint,tuple(steps),tuple(n.identity for n in ready),blocked,inherited,graph.fingerprint)
 
 def replan_execution(model,previous,*,active_conflicts=(),limit=8,retry_failed=False,graph=None):
     return build_execution_plan(model,active_conflicts=active_conflicts,limit=limit,state=previous.state,retry_failed=retry_failed,graph=graph)

@@ -1,6 +1,7 @@
 """Conflict-aware work graph with dependency, frontier, critical-path, and parallelism intelligence."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+import hashlib
 from typing import Iterable
 from .model import RepositoryModel
 from .planner import WorkCandidate, derive_work_candidates
@@ -24,6 +25,7 @@ class WorkGraph:
     _by_identity:dict[str,WorkNode]=field(init=False,repr=False,compare=False)
     _depth:dict[str,int]=field(init=False,repr=False,compare=False)
     _descendants:dict[str,frozenset[str]]=field(init=False,repr=False,compare=False)
+    _fingerprint:str=field(init=False,repr=False,compare=False)
     def __post_init__(self)->None:
         ordered=tuple(sorted(self.nodes,key=lambda n:(-n.priority,n.identity))); ids={n.identity for n in ordered}
         if len(ids)!=len(ordered): raise ValueError("work graph contains duplicate identities")
@@ -46,6 +48,8 @@ class WorkGraph:
             enriched.append(WorkNode(n.identity,n.lane,n.zone,n.priority,n.objective,n.conflict_keys,n.prerequisites,n.evidence,n.verification_paths,n.readiness,n.decision_score,n.topology_confidence,n.blast_radius,depth[n.identity],unlock,strategic))
         object.__setattr__(self,"_ordered_nodes",tuple(enriched)); object.__setattr__(self,"_by_identity",{n.identity:n for n in enriched})
         object.__setattr__(self,"_depth",depth); object.__setattr__(self,"_descendants",{k:frozenset(v) for k,v in descendants.items()})
+        payload="|".join(f"{n.identity}:{n.priority}:{n.strategic_score}:{n.prerequisites}:{n.conflict_keys}" for n in enriched)
+        object.__setattr__(self,"_fingerprint",hashlib.sha256(payload.encode()).hexdigest())
     @property
     def ordered_nodes(self)->tuple[WorkNode,...]:
         """Stable enriched public view of the graph nodes."""
@@ -58,10 +62,15 @@ class WorkGraph:
             raise ValueError(f"unknown work identity: {identity}") from exc
 
     @property
+    def fingerprint(self)->str:
+        """Stable fingerprint for the derived work graph."""
+        return self._fingerprint
+
+    @property
     def critical_depth(self)->int:
         return max(self._depth.values(),default=0)
 
-    def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure()}
+    def as_dict(self): return {"fingerprint":self.fingerprint,"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure(),"strategic_value":self.strategic_value(),"bridge_candidates":list(self.bridge_candidates())}
     def frontier(self,completed:Iterable[str]=()):
         done=set(completed)
         return tuple(
@@ -144,6 +153,46 @@ class WorkGraph:
         """Estimate bounded graph influence from downstream value and conflict centrality."""
         node=self.node(identity)
         return min(100, self.downstream_value(identity)*2//3 + self.conflict_density(identity)//2 + min(25,node.blast_radius*5))
+
+    def strategic_value(self, completed=()):
+        """Bounded aggregate value of the actionable frontier."""
+        frontier=self.frontier(completed)
+        return min(100, sum(self.influence(n.identity) for n in frontier[:32]) // max(1,len(frontier)))
+
+    def risk_adjusted_influence(self, identity:str)->int:
+        """Discount influence by conflict pressure and weak topology evidence."""
+        node=self.node(identity)
+        confidence=max(1,node.topology_confidence)
+        penalty=self.conflict_density(identity)//3 + self.node_pressure(identity)//5
+        return min(100, max(0,self.influence(identity)*confidence//100-penalty))
+
+    def verification_efficiency(self, identity:str)->int:
+        """Estimate graph value gained per verification surface."""
+        node=self.node(identity)
+        cost=max(1,len(node.verification_paths))
+        return min(100,(self.downstream_value(identity)*10)//cost)
+
+    def decision_margin(self, identity:str, completed=())->int:
+        """Distance between a node and the strongest competing frontier choice."""
+        target=self.risk_adjusted_influence(identity)
+        rivals=[self.risk_adjusted_influence(n.identity) for n in self.frontier(completed) if n.identity!=identity]
+        return max(0,target-max(rivals,default=0))
+
+    def counterfactual_unlock(self, identity:str, completed=())->int:
+        """Approximate pressure reduction if a node completes successfully."""
+        done=set(completed); done.add(self.node(identity).identity)
+        return max(0,self.pressure(completed)-self.pressure(done))
+
+    def bridge_candidates(self, *, limit:int=16)->tuple[str,...]:
+        """Return bounded candidates with large downstream dependency cuts."""
+        scored=[]
+        for n in self._ordered_nodes:
+            descendants=self._descendants[n.identity]
+            if descendants:
+                covered=sum(1 for d in descendants if n.identity in self._by_identity[d].prerequisites)
+                scored.append((min(100,len(descendants)*4+covered*8+self._depth[n.identity]*3),n.identity))
+        scored.sort(reverse=True)
+        return tuple(identity for _,identity in scored[:max(0,limit)])
 
     def pressure(self, completed=()):
         frontier=self.frontier(completed)
