@@ -168,3 +168,58 @@ def test_campaign_task_accounting_is_bounded():
         policy=CampaignPolicy(max_stagnant_cycles=20),
     )
     assert len(state.task_attempts) == 512
+
+
+def test_campaign_state_integrity_rejects_tampering(tmp_path):
+    path = tmp_path / "campaign.json"
+    CampaignState(campaign_id="campaign", cycle=2).dump(path)
+    raw = json.loads(path.read_text())
+    raw["cycle"] = 99
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="integrity digest mismatch"):
+        CampaignState.load(path)
+
+
+def test_campaign_epoch_advances_per_cycle():
+    state = advance_campaign(CampaignState(), supervisor=supervisor(), validated_patch=True, validation_failed=False)
+    assert state.epoch == 1
+    state = advance_campaign(state, supervisor=supervisor(fingerprint="b" * 64), validated_patch=True, validation_failed=False)
+    assert state.epoch == 2
+
+
+def test_dependency_diagnostics_detect_cycle():
+    from skeleton.automation.completion_campaign import dependency_diagnostics
+
+    result = dependency_diagnostics(
+        [
+            {"id": "a", "target_team": "night", "status": "queued", "dependencies": ["b"]},
+            {"id": "b", "target_team": "night", "status": "queued", "dependencies": ["a"]},
+        ],
+        "night",
+    )
+    assert result["cycles"] == [["a", "b"]]
+
+
+def test_dependency_diagnostics_detect_missing_dependency():
+    from skeleton.automation.completion_campaign import dependency_diagnostics
+
+    result = dependency_diagnostics(
+        [{"id": "a", "target_team": "night", "status": "queued", "dependencies": ["missing"]}],
+        "night",
+    )
+    assert result["missing_dependencies"] == [{"item_id": "a", "dependency_id": "missing"}]
+
+
+def test_campaign_quarantines_dependency_cycle_immediately():
+    state = advance_campaign(
+        CampaignState(),
+        supervisor=supervisor(),
+        validated_patch=False,
+        validation_failed=False,
+        plan_items=[
+            {"id": "a", "target_team": "night", "status": "queued", "dependencies": ["b"]},
+            {"id": "b", "target_team": "night", "status": "queued", "dependencies": ["a"]},
+        ],
+    )
+    assert state.status == "quarantined"
+    assert state.terminal_reason == "dependency_cycle_detected"
