@@ -60,7 +60,16 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
         for subsystem in model.subsystems
         for path in subsystem.entrypoints
     }
-    tests = [item for item in model.files if item.kind == "test"]
+    tests_by_zone: dict[str, list[object]] = {}
+    test_stems: dict[str, list[object]] = {}
+    for test in model.files:
+        if test.kind != "test":
+            continue
+        tests_by_zone.setdefault(test.zone, []).append(test)
+        stem = PurePosixPath(test.path).stem.casefold()
+        if stem:
+            test_stems.setdefault(stem, []).append(test)
+
     capabilities: list[CapabilityRecord] = []
     for item in model.files:
         kind = ""
@@ -79,11 +88,12 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
             continue
 
         stem = PurePosixPath(item.path).stem.casefold()
-        related = tuple(sorted(
-            test.path for test in tests
-            if test.zone == item.zone
-            or (stem and stem in PurePosixPath(test.path).stem.casefold())
-        )[:32])
+        related_paths = {test.path for test in tests_by_zone.get(item.zone, ())}
+        if stem:
+            for test_stem, tests in test_stems.items():
+                if stem in test_stem:
+                    related_paths.update(test.path for test in tests)
+        related = tuple(sorted(related_paths)[:32])
         subsystem = subsystem_by_name.get(item.zone)
         dependencies = subsystem.dependencies if subsystem else ()
         capabilities.append(CapabilityRecord(
