@@ -508,42 +508,66 @@ class DeltaMemory:
             }
 
     def load_state(self, state: Mapping[str, Any]) -> None:
-        """Restore from ``export_state`` / external snapshot payload."""
+        """Restore one complete state atomically; malformed recovery fails closed."""
         if not isinstance(state, Mapping):
             raise TypeError("state must be a mapping")
+
+        version=state.get("version",1)
+        if isinstance(version,bool) or not isinstance(version,int) or version!=1:
+            raise ValueError("unsupported delta memory state version")
+
+        snap=state.get("snapshot",{})
+        if not isinstance(snap,Mapping):
+            raise TypeError("snapshot must be a mapping")
+        new_snapshot={str(k):self._ingest(v) for k,v in snap.items()}
+
+        window_raw=state.get("window",[])
+        if not isinstance(window_raw,list):
+            raise TypeError("window must be a list")
+        new_window:List[Tuple[str,Any]]=[]
+        for index,entry in enumerate(window_raw):
+            if not isinstance(entry,(list,tuple)) or len(entry) not in {2,3}:
+                raise ValueError(
+                    f"window entry {index} must contain key, value and optional tombstone"
+                )
+            tombstone=False
+            if len(entry)==3:
+                if not isinstance(entry[2],bool):
+                    raise TypeError(
+                        f"window entry {index} tombstone flag must be boolean"
+                    )
+                tombstone=entry[2]
+            key=str(entry[0])
+            new_window.append(
+                (key,_TOMBSTONE if tombstone else self._ingest(entry[1]))
+            )
+
+        def counter(name:str,current:int,*,minimum:int=0)->int:
+            if name not in state:
+                return current
+            value=state[name]
+            if isinstance(value,bool) or not isinstance(value,int) or value<minimum:
+                raise ValueError(f"{name} must be an integer >= {minimum}")
+            return value
+
+        new_compactions=counter("compactions",self.compactions)
+        new_writes=counter("writes",self._writes)
+        new_reads=counter("reads",self._reads)
+        new_deletes=counter("deletes",self._deletes)
+        new_cap=counter("window_cap",self.window_cap,minimum=1)
+        if len(new_window)>=new_cap:
+            raise ValueError(
+                "restored window violates bounded-window invariant"
+            )
+
         with self._lock:
-            snap = state.get("snapshot", {})
-            if not isinstance(snap, Mapping):
-                raise TypeError("snapshot must be a mapping")
-            self._snapshot = {str(k): self._ingest(v) for k, v in snap.items()}
-            window_raw = state.get("window", [])
-            restored: List[Tuple[str, Any]] = []
-            if isinstance(window_raw, list):
-                for entry in window_raw:
-                    if not isinstance(entry, (list, tuple)) or len(entry) < 2:
-                        continue
-                    k = str(entry[0])
-                    if len(entry) >= 3 and entry[2]:
-                        restored.append((k, _TOMBSTONE))
-                    else:
-                        restored.append((k, self._ingest(entry[1])))
-            self._window = restored
-            if "compactions" in state:
-                self.compactions = int(state["compactions"])
-            if "writes" in state:
-                self._writes = int(state["writes"])
-            if "reads" in state:
-                self._reads = int(state["reads"])
-            if "deletes" in state:
-                self._deletes = int(state["deletes"])
-            # Cap may be restored only when valid; keep ctor value otherwise.
-            if "window_cap" in state:
-                cap = int(state["window_cap"])
-                if cap >= 1:
-                    self.window_cap = cap
-            # Preserve the bounded-window invariant for restored payloads.
-            if len(self._window) >= self.window_cap:
-                self._compact_locked()
+            self._snapshot=new_snapshot
+            self._window=new_window
+            self.compactions=new_compactions
+            self._writes=new_writes
+            self._reads=new_reads
+            self._deletes=new_deletes
+            self.window_cap=new_cap
 
     def apply_snapshot(self, snapshot: Mapping[str, Any], *, replace: bool = True) -> None:
         """Load a compacted snapshot (e.g. from ``DeltaSnapshotPort``)."""
