@@ -145,6 +145,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/factions', title: 'Factions', category: 'build' },
   { path: '/feature-flags', title: 'Feature Flags', category: 'settings' },
   { path: '/forge-hub', title: 'Forge Hub', category: 'build' },
+  { path: '/skeleton-forge', title: 'Skeleton Forge Cockpit', category: 'build' },
   { path: '/forge', title: 'Forge', category: 'build' },
   { path: '/game-kb', title: 'Game Knowledge Base', category: 'build' },
   { path: '/gameforge-studio', title: 'GameForge Studio', category: 'build', heavy: true },
