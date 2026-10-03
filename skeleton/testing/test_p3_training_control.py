@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import math
 
@@ -169,3 +169,27 @@ def test_completion_requires_checkpoint(tmp_path):
     repo.start(run.run_id)
     with pytest.raises(TrainingStateError,match="durable checkpoint"):
         repo.complete(run.run_id)
+
+def test_releasing_same_worker_invalidates_previous_same_epoch_lease(tmp_path):
+    datasets,dataset=_dataset(tmp_path)
+    repo=TrainingRepository(tmp_path/"training.sqlite3")
+    run=_manifest(dataset.digest)
+    repo.register_run(run,datasets,created_at=NOW)
+    repo.start(run.run_id)
+
+    first=repo.lease_worker(run.run_id,"worker-a",issued_at=NOW)
+    replacement=repo.lease_worker(
+        run.run_id,
+        "worker-a",
+        issued_at=NOW+timedelta(seconds=1),
+    )
+    assert first.epoch==replacement.epoch
+    assert first.token!=replacement.token
+
+    with pytest.raises(TrainingStateError,match="worker lease is not current"):
+        repo.assert_worker_current(first)
+
+    repo.assert_worker_current(replacement)
+    checkpoint=_checkpoint(run,replacement,1,"replacement-model")
+    assert repo.checkpoint(checkpoint,replacement)==checkpoint.digest
+
