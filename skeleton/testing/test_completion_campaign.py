@@ -223,3 +223,39 @@ def test_campaign_quarantines_dependency_cycle_immediately():
     )
     assert state.status == "quarantined"
     assert state.terminal_reason == "dependency_cycle_detected"
+
+
+def test_campaign_lease_compare_and_swap():
+    from skeleton.automation.completion_campaign import acquire_lease, release_lease
+
+    state = CampaignState(epoch=7)
+    acquire_lease(state, owner="run-1", expected_epoch=7)
+    assert state.lease_owner == "run-1"
+    with pytest.raises(ValueError, match="another controller"):
+        acquire_lease(state, owner="run-2", expected_epoch=7)
+    release_lease(state, owner="run-1")
+    assert state.lease_owner == ""
+
+
+def test_campaign_lease_rejects_stale_epoch():
+    from skeleton.automation.completion_campaign import acquire_lease
+
+    with pytest.raises(ValueError, match="compare-and-swap"):
+        acquire_lease(CampaignState(epoch=8), owner="run-1", expected_epoch=7)
+
+
+def test_campaign_lease_rejects_malformed_owner():
+    from skeleton.automation.completion_campaign import acquire_lease
+
+    with pytest.raises(ValueError, match="owner is malformed"):
+        acquire_lease(CampaignState(), owner="")
+    with pytest.raises(ValueError, match="owner is malformed"):
+        acquire_lease(CampaignState(), owner="x" * 161)
+
+
+def test_campaign_lease_release_requires_owner():
+    from skeleton.automation.completion_campaign import acquire_lease, release_lease
+
+    state = acquire_lease(CampaignState(), owner="run-1")
+    with pytest.raises(ValueError, match="release owner mismatch"):
+        release_lease(state, owner="run-2")
