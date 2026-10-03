@@ -6,11 +6,16 @@ from pathlib import Path
 
 import pytest
 
+from skeleton.ai.runtime.inference.artifact import (
+    LocalModelArtifactError,
+    local_model_adapter_from_env,
+)
 from skeleton.ai.runtime.inference.local import ReferenceNGramModel
 from skeleton.ai.runtime.product.activation import (
     LocalModelActivationError,
     build_local_model_activation_manifest,
     load_local_model_activation_manifest,
+    local_model_adapter_from_activation_manifest,
     write_local_model_activation_manifest,
 )
 from skeleton.ai.runtime.product.qualification import (
@@ -332,3 +337,125 @@ def test_activation_rejects_wrong_rollback_baseline(
             model_program_bridge_digest=bridge_digest,
             operator_authorization_ref="operator-approval:wrong-baseline",
         )
+
+
+
+def test_activation_manifest_executes_authenticated_rollback_target(
+    tmp_path: Path,
+) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    candidate_path = tmp_path / "candidate.json"
+    baseline, _ = _write_ngram(
+        baseline_path,
+        model_id="baseline-v1",
+        text="baseline rollback answer",
+    )
+    candidate, candidate_sha = _write_ngram(
+        candidate_path,
+        model_id="candidate-v2",
+        text="candidate improved answer",
+    )
+    bridge_digest = _sha("bridge-rollback")
+    qualification = _qualification(
+        candidate_digest=candidate.model_digest,
+        candidate_artifact=candidate_sha,
+        baseline_digest=baseline.model_digest,
+    )
+    promotion = _promotion(
+        model_id=candidate.model_id,
+        model_digest=candidate.model_digest,
+        qualification=qualification,
+        bridge_digest=bridge_digest,
+    )
+    manifest = build_local_model_activation_manifest(
+        candidate_path=candidate_path,
+        baseline_path=baseline_path,
+        promotion_receipt=promotion,
+        qualification=qualification,
+        model_program_bridge_digest=bridge_digest,
+        operator_authorization_ref="operator-approval:rollback",
+        cache_size=0,
+    )
+    manifest_path = write_local_model_activation_manifest(
+        manifest,
+        tmp_path / "activation-rollback.json",
+    )
+
+    adapter = local_model_adapter_from_activation_manifest(
+        manifest_path,
+        expected_manifest_digest=manifest.manifest_digest,
+        target="rollback",
+    )
+
+    assert adapter.activation_target == "rollback"
+    assert adapter.artifact_receipt.model_digest == baseline.model_digest
+    assert adapter.activation_manifest.manifest_digest == manifest.manifest_digest
+
+
+def test_environment_can_select_digest_pinned_rollback(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    candidate_path = tmp_path / "candidate.json"
+    baseline, _ = _write_ngram(
+        baseline_path,
+        model_id="baseline-v1",
+        text="baseline rollback answer",
+    )
+    candidate, candidate_sha = _write_ngram(
+        candidate_path,
+        model_id="candidate-v2",
+        text="candidate improved answer",
+    )
+    bridge_digest = _sha("bridge-env-rollback")
+    qualification = _qualification(
+        candidate_digest=candidate.model_digest,
+        candidate_artifact=candidate_sha,
+        baseline_digest=baseline.model_digest,
+    )
+    promotion = _promotion(
+        model_id=candidate.model_id,
+        model_digest=candidate.model_digest,
+        qualification=qualification,
+        bridge_digest=bridge_digest,
+    )
+    manifest = build_local_model_activation_manifest(
+        candidate_path=candidate_path,
+        baseline_path=baseline_path,
+        promotion_receipt=promotion,
+        qualification=qualification,
+        model_program_bridge_digest=bridge_digest,
+        operator_authorization_ref="operator-approval:env-rollback",
+        cache_size=0,
+        default_seed=7,
+    )
+    manifest_path = write_local_model_activation_manifest(
+        manifest,
+        tmp_path / "activation-env-rollback.json",
+    )
+
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_MANIFEST", str(manifest_path))
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_DIGEST", manifest.manifest_digest)
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "rollback")
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+
+    adapter = local_model_adapter_from_env()
+
+    assert adapter.activation_target == "rollback"
+    assert adapter.artifact_receipt.model_digest == baseline.model_digest
+
+
+def test_activation_target_fails_closed_without_manifest(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AI_LOCAL_ACTIVATION_MANIFEST", raising=False)
+    monkeypatch.delenv("AI_LOCAL_ACTIVATION_DIGEST", raising=False)
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "rollback")
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", "/tmp/unused-local-model.json")
+
+    with pytest.raises(
+        LocalModelArtifactError,
+        match="requires an activation manifest",
+    ):
+        local_model_adapter_from_env()
