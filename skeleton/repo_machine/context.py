@@ -41,7 +41,7 @@ def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_lim
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")
     query=RepositoryQuery(model); graph=build_work_graph(model,limit=32)
     base={"intent":intent,"fingerprint":model.fingerprint,"health":repository_health(model).as_dict(),"metrics":structural_metrics(model).as_dict(),
-          "subsystems":[x.as_dict() for x in model.subsystems],"work":[x.as_dict() for x in graph._ordered_nodes],
+          "subsystems":[x.as_dict() for x in model.subsystems],"work":[x.as_dict() for x in graph.ordered_nodes],
           "coordination":build_coordination_plan(model,limit=8,graph=graph),"execution":build_execution_plan(model,limit=8,graph=graph).as_dict(),
           "findings":[x.as_dict() for x in model.findings[:40]]}
     if intent=="architecture": base["topology"]={"edges":[x.as_dict() for x in model.edges],"cycles":[list(x) for x in model.cycles]}; base["files"]=[x.as_dict() for x in query.largest_files(limit=40).files]
