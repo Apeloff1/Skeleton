@@ -554,35 +554,73 @@ def _build_and_review(
     if not set(changed).issubset(set(task.paths)):
         raise ValueError("lead patch escaped planned path boundary")
 
-    review = _call_json(
-        reasoner,
-        _review_prompt(task, squad),
-        (
-            f"RESEARCH SQUAD EVIDENCE\n{research_evidence}",
-            f"PROPOSED PATCH\n{patch}",
-        ),
-        output_chars=4000,
-    )
-    if not isinstance(review, dict) or review.get("approve") is not True:
-        return None
-    reject_non_evidence_payload("reviewer", review)
-    review_reasons = _string_tuple(review.get("reasons", []))
+    review_reasons: tuple[str, ...] = ()
+    verification_reasons: tuple[str, ...] = ()
+    required_checks: tuple[str, ...] = ()
+    for repair_attempt in range(MAX_REPAIR_ATTEMPTS + 1):
+        review = _call_json(
+            reasoner,
+            _review_prompt(task, squad),
+            (
+                f"RESEARCH SQUAD EVIDENCE\n{research_evidence}",
+                f"PROPOSED PATCH\n{patch}",
+            ),
+            output_chars=4000,
+        )
+        if not isinstance(review, dict):
+            raise ValueError("reviewer output must be an object")
+        reject_non_evidence_payload("reviewer", review)
+        review_reasons = _string_tuple(review.get("reasons", []))
+        if review.get("approve") is not True:
+            if repair_attempt >= MAX_REPAIR_ATTEMPTS:
+                return None
+            repaired = _call_json(
+                reasoner,
+                _repair_prompt(task, squad, prior_patch=patch, objections=review_reasons),
+                (*context, f"RESEARCH SQUAD EVIDENCE\n{research_evidence}"),
+                output_chars=MAX_PATCH_CHARS,
+            )
+            if not isinstance(repaired, dict) or not isinstance(repaired.get("patch"), str):
+                raise ValueError("repair output is missing replacement patch")
+            patch = repaired["patch"]
+            summary = str(repaired.get("summary", summary))
+            changed = _changed_paths(patch)
+            if not set(changed).issubset(set(task.paths)):
+                raise ValueError("repaired patch escaped planned path boundary")
+            continue
 
-    verification = _call_json(
-        reasoner,
-        _verification_prompt(task, squad),
-        (
-            f"RESEARCH SQUAD EVIDENCE\n{research_evidence}",
-            f"REVIEW DECISION\n{json.dumps({'approve': True, 'reasons': review_reasons}, sort_keys=True)}",
-            f"PROPOSED PATCH\n{patch}",
-        ),
-        output_chars=4000,
-    )
-    if not isinstance(verification, dict) or verification.get("approve") is not True:
-        return None
-    reject_non_evidence_payload("verifier", verification)
-    verification_reasons = _string_tuple(verification.get("reasons", []))
-    required_checks = _string_tuple(verification.get("required_checks", []))
+        verification = _call_json(
+            reasoner,
+            _verification_prompt(task, squad),
+            (
+                f"RESEARCH SQUAD EVIDENCE\n{research_evidence}",
+                f"REVIEW DECISION\n{json.dumps({'approve': True, 'reasons': review_reasons}, sort_keys=True)}",
+                f"PROPOSED PATCH\n{patch}",
+            ),
+            output_chars=4000,
+        )
+        if not isinstance(verification, dict):
+            raise ValueError("verifier output must be an object")
+        reject_non_evidence_payload("verifier", verification)
+        verification_reasons = _string_tuple(verification.get("reasons", []))
+        required_checks = _string_tuple(verification.get("required_checks", []))
+        if verification.get("approve") is True:
+            break
+        if repair_attempt >= MAX_REPAIR_ATTEMPTS:
+            return None
+        repaired = _call_json(
+            reasoner,
+            _repair_prompt(task, squad, prior_patch=patch, objections=verification_reasons),
+            (*context, f"RESEARCH SQUAD EVIDENCE\n{research_evidence}"),
+            output_chars=MAX_PATCH_CHARS,
+        )
+        if not isinstance(repaired, dict) or not isinstance(repaired.get("patch"), str):
+            raise ValueError("repair output is missing replacement patch")
+        patch = repaired["patch"]
+        summary = str(repaired.get("summary", summary))
+        changed = _changed_paths(patch)
+        if not set(changed).issubset(set(task.paths)):
+            raise ValueError("repaired patch escaped planned path boundary")
 
     return ReviewedPatch(
         task=task,
