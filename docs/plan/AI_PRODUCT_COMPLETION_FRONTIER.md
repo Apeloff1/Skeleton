@@ -406,6 +406,31 @@ budgets. It refuses to overwrite the baseline or an existing final output and
 has no production or promotion authority. The result still enters the ordinary
 Mirror/evaluation/lifecycle path before activation.
 
+### 24. Persistent continual learning, replay, and developmental rollback
+
+Training optimization now persists across generations instead of ending after
+one candidate. A content-addressed continual-learning state retains an append-only
+developmental champion history, accepted replay examples, round receipts and the
+currently selected developmental champion. State snapshots are written
+atomically, verify their own digest on load, and can optionally authenticate the
+active champion artifact bytes after restart.
+
+Each round trains against the current champion and combines new examples with a
+bounded deterministic spread of prior replay memory. The resulting challenger is
+evaluated twice: an acquisition suite measures new capability while a separate
+retention suite measures loss on established capability. Explicit policy sets
+the minimum acquisition gain and maximum tolerated retention drop. A challenger
+that violates either bound is rejected; when configured its artifact is deleted,
+the current champion remains unchanged, and the rejected round still stays in
+the append-only audit history.
+
+Accepted examples enter bounded replay memory and accepted challengers become a
+new developmental generation. Previous champions remain addressable by exact
+model/artifact digest, so rollback selects an earlier authenticated local
+artifact without mutating or erasing the lineage. None of these transitions has
+production authority; Mirror, firewall, lifecycle validation and governed model
+promotion still remain downstream.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -450,7 +475,10 @@ Mirror/evaluation/lifecycle path before activation.
 - executable local baseline-vs-candidate development evaluation feeding
   holdout-safe adaptive reallocation;
 - bounded automatic method probes -> verified gain -> allocation -> final
-  candidate training.
+  candidate training;
+- restart-safe continual learning with deterministic experience replay;
+- acquisition/retention gating with catastrophic-forgetting rejection;
+- authenticated developmental champion rollback with append-only history.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
