@@ -90,7 +90,6 @@ def _qualification_for(bridged) -> LearningQualificationBundle:
         "evaluation-firewall-evidence-sha256:" + _sha("firewall-ref"),
     )
     payload = {
-        "schema_version": "skeleton.learning_qualification.v1",
         "binding_digest": _sha("binding"),
         "candidate_model_digest": bridged.artifact.model_digest,
         "baseline_model_digest": _sha("baseline-model"),
@@ -106,9 +105,13 @@ def _qualification_for(bridged) -> LearningQualificationBundle:
         "production_authority": False,
         "direct_self_modify": False,
     }
+    digest_payload = {
+        "schema_version": "skeleton.learning_qualification.v1",
+        **payload,
+    }
     digest = hashlib.sha256(
         json.dumps(
-            payload,
+            digest_payload,
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
