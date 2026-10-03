@@ -71,6 +71,12 @@ async def binary_package(req: PackageReq):
 async def binary_download(build_id: str, kind: str):
     if kind not in ("zip", "apk"):
         raise HTTPException(400, "kind must be 'zip' or 'apk'")
+    if (
+        not build_id
+        or len(build_id) > 128
+        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
+    ):
+        raise HTTPException(400, "invalid build_id")
     path = binary_builder.find_artifact_path(build_id, kind)
     if not path:
         raise HTTPException(404, f"artifact not found — call /api/binary/package first")

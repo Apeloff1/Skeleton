@@ -1,4 +1,6 @@
 """Tests for the 7-stage Final Build pipeline + 95 gate + completeness."""
+from urllib.parse import urlsplit
+
 from core import final_build as fb
 from core import forge_quality
 
@@ -49,7 +51,11 @@ def test_platform_builds_and_downloads():
     r = _pkg(platforms=["windows", "macos", "linux", "android", "ios"])
     assert len(r["platforms"]) == 5
     assert len(r["downloads"]) == 5
-    assert all(d["url"].startswith("https://cdn.galaxy.studio") for d in r["downloads"])
+    assert all(
+        urlsplit(d["url"]).scheme == "https"
+        and urlsplit(d["url"]).hostname == "cdn.galaxy.studio"
+        for d in r["downloads"]
+    )
 
 
 def test_gdd_reflects_choices_gates_platforms():

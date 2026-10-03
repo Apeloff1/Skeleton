@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import requests
+from urllib.parse import urlsplit
 
 BASE = "http://localhost:8001"
 results = []
@@ -79,11 +80,12 @@ def main() -> int:
         data = r.json() if ok else {}
         license_str = str(data.get("license") or "")
         url_str = str(data.get("official_url") or "")
+        official_host = (urlsplit(url_str).hostname or "").lower()
         cond = (
             ok
             and data.get("is_open_license") is True
             and "MIT" in license_str
-            and "rust-lang.org" in url_str
+            and official_host in {"doc.rust-lang.org", "www.rust-lang.org", "rust-lang.org"}
         )
         record(
             "T2 GET reading-library/book/open_the_rust_programming_language/chapter/3/content",

@@ -39,8 +39,8 @@ def make_plan(req: PlanReq) -> dict:
             platoon_size=req.platoon_size,
             game_ctx=req.game_ctx,
         )
-    except ValueError as ex:
-        raise HTTPException(400, str(ex))
+    except ValueError:
+        raise HTTPException(400, "invalid swarm planning request")
 
 
 class VerifyReq(BaseModel):
@@ -76,8 +76,8 @@ def execute(req: ExecuteReq) -> dict:
             deps=req.deps, seed=req.seed, platoon_size=req.platoon_size,
             game_ctx=req.game_ctx, rounds=req.rounds, persist=req.persist,
         )
-    except ValueError as ex:
-        raise HTTPException(400, str(ex))
+    except ValueError:
+        raise HTTPException(400, "invalid swarm execution request")
 
 
 @router.get("/runs/{build_id}")
@@ -150,8 +150,8 @@ def execute_build(req: BuildReq) -> dict:
             build_id=req.build_id, seed=req.seed,
             platoon_size=req.platoon_size, rounds=req.rounds,
         )
-    except ValueError as ex:
-        raise HTTPException(400, str(ex))
+    except ValueError:
+        raise HTTPException(400, "invalid swarm build request")
 
 
 @router.post("/execute/async")

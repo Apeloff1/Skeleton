@@ -257,14 +257,15 @@ export class WasmCompiler {
 
     // Get AST
     let astOutput = '';
+    const astSourceName = '__galaxy_ast_source__';
     try {
+      // Transfer caller source through the Pyodide globals bridge. This keeps
+      // untrusted text out of the Python program string entirely.
+      this.pyodide.globals.set(astSourceName, code);
       await this.pyodide.runPythonAsync(`
 import ast
-import sys
-from io import StringIO
 
-code = '''${code.replace(/'/g, "\\'")}'''
-
+code = __galaxy_ast_source__
 try:
     tree = ast.parse(code)
     ast_dump = ast.dump(tree, indent=2)
@@ -274,6 +275,12 @@ except SyntaxError as e:
       astOutput = await this.pyodide.runPythonAsync('ast_dump');
     } catch (e: any) {
       astOutput = `Parse error: ${e.message}`;
+    } finally {
+      try {
+        this.pyodide.globals.delete(astSourceName);
+      } catch {
+        // Best-effort cleanup only; the bridged value is caller source.
+      }
     }
 
     stages[1].status = 'completed';
@@ -319,16 +326,19 @@ sys.stderr = StringIO()
 
     stages[2].duration = performance.now() - execStart;
 
-    // Get a safe AST dump instead of executing the submitted code just to inspect it.
+    // Get a safe AST dump without interpolating caller-controlled source into
+    // Python syntax. Reuse the same explicit globals bridge as the parse stage.
     let ir = '';
+    const irSourceName = '__galaxy_ir_source__';
     try {
+      this.pyodide.globals.set(irSourceName, code);
       await this.pyodide.runPythonAsync(`
 import ast
 from io import StringIO
 
 ast_output = StringIO()
 try:
-    tree = ast.parse(${JSON.stringify(code)})
+    tree = ast.parse(__galaxy_ir_source__)
     ast_output.write(ast.dump(tree, include_attributes=False, indent=2))
 except Exception as exc:
     ast_output.write(f"Could not inspect AST: {exc}")
@@ -336,6 +346,12 @@ except Exception as exc:
       ir = await this.pyodide.runPythonAsync('ast_output.getvalue()');
     } catch {
       ir = 'Disassembly not available';
+    } finally {
+      try {
+        this.pyodide.globals.delete(irSourceName);
+      } catch {
+        // Best-effort cleanup only; the bridged value is caller source.
+      }
     }
 
     return {

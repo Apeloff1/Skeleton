@@ -84,6 +84,17 @@ async function invokeTool(tool: ToolId, params: Record<string, any>) {
 // ─────────────────────────────────────────────────────────────────────
 //  COMPONENT
 // ─────────────────────────────────────────────────────────────────────
+let arenaSessionSequence = 0;
+
+function createArenaSessionId(): string {
+  const cryptoObject = (globalThis as any).crypto;
+  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
+    return `arena_${cryptoObject.randomUUID()}`;
+  }
+  arenaSessionSequence += 1;
+  return `arena_${Date.now().toString(36)}_${arenaSessionSequence.toString(36)}`;
+}
+
 export default function ToolsArena() {
   const router = useRouter();
   const log = useModalLogger('ToolsArena');
@@ -100,7 +111,7 @@ export default function ToolsArena() {
   const [jeevesCtx, setJeevesCtx]     = useState<typeof JEEVES_CONTEXTS[number]>('lesson_intro');
   const [jeevesTopic, setJeevesTopic] = useState('compiler');
   const [pyCode, setPyCode]           = useState('import math\nprint("hello", math.pi)');
-  const [pySession]                   = useState(`arena_${Math.random().toString(36).slice(2, 8)}`);
+  const [pySession]                   = useState(() => createArenaSessionId());
   const [compLang, setCompLang]       = useState<typeof COMPILE_LANGS[number]>('c');
   const [compCode, setCompCode]       = useState('#include <stdio.h>\nint main(){printf("hi\\n");return 0;}');
   const [llmPrompt, setLlmPrompt]     = useState('Explain quantum entanglement in 2 sentences.');

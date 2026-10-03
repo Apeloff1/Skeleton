@@ -106,8 +106,15 @@ class ComplianceExportService:
         }
         body = json.dumps(pack, sort_keys=True, default=str).encode("utf-8")
         pack["meta"]["sha256"] = hashlib.sha256(body).hexdigest()
-        path = self.out_dir / f"compliance_{tenant_id}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.json"
-        path.write_text(json.dumps(pack, indent=2, default=str))
+        tenant_token = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:24]
+        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        root = self.out_dir.resolve()
+        path = (root / f"compliance_{tenant_token}_{timestamp}.json").resolve()
+        try:
+            path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("invalid compliance export path") from exc
+        path.write_text(json.dumps(pack, indent=2, default=str), encoding="utf-8")
         pack["export_path"] = str(path)
         return pack
 
