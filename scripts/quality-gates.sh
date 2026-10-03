@@ -181,6 +181,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_tiered_cache.py \
   skeleton/testing/test_toolchain_bootstrap.py \
   skeleton/testing/test_cache_contract.py \
+  skeleton/testing/test_asset_pipeline.py \
   skeleton/testing/test_parallel_scheduler.py \
   skeleton/testing/test_build_observability.py \
   skeleton/testing/test_creator_work_leases.py \

@@ -46,6 +46,18 @@ from skeleton.build.parallel_scheduler import (
     plan_parallel_build,
 )
 
+from skeleton.build.asset_pipeline import (
+    ASSET_PIPELINE_ALGORITHM,
+    ASSET_PIPELINE_SCHEMA,
+    AssetDescriptor,
+    AssetPipeline,
+    AssetPipelineError,
+    AssetRebuildPlan,
+    AssetSpec,
+    build_asset_pipeline,
+    plan_asset_rebuild,
+)
+
 from skeleton.build.build_observability import (
     OBSERVABILITY_SCHEMA,
     BuildBudgetDecision,
@@ -75,6 +87,15 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "plan_asset_rebuild",
+    "build_asset_pipeline",
+    "AssetSpec",
+    "AssetRebuildPlan",
+    "AssetPipelineError",
+    "AssetPipeline",
+    "AssetDescriptor",
+    "ASSET_PIPELINE_SCHEMA",
+    "ASSET_PIPELINE_ALGORITHM",
     "observe_build",
     "evaluate_build_budget",
     "NodeRegressionBudget",
