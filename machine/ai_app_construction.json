@@ -1793,9 +1793,11 @@
       "artifact_policy": "bounded UTF-8 JSON, duplicate-key rejection, non-finite rejection, exact model digest verification",
       "supported_artifact_schemas": [
         "reference_ngram",
-        "skeleton.numpy_recurrent_lm.v1"
+        "skeleton.numpy_recurrent_lm.v1",
+        "skeleton.numpy_gated_recurrent_lm.v1"
       ],
-      "recurrent_backend": "skeleton/ai/runtime/inference/neural.py:NumpyRecurrentLM",
+      "recurrent_backend": "skeleton/ai/runtime/inference/gated_neural.py:NumpyGatedRecurrentLM",
+      "legacy_recurrent_backend": "skeleton/ai/runtime/inference/neural.py:NumpyRecurrentLM",
       "artifact_builder": "skeleton-train-local-model",
       "product_learning_candidate_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_artifact",
       "product_learning_snapshot_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_from_repository",
@@ -1808,8 +1810,6 @@
       "developmental_capability_scorer": "skeleton/ai/runtime/inference/developmental_eval.py:score_local_model_developmentally",
       "capability_curriculum_planner": "skeleton/ai/runtime/inference/curriculum.py:plan_capability_curriculum",
       "capability_curriculum_round": "skeleton/ai/runtime/inference/curriculum.py:run_curriculum_learning_round",
-      "continual_learning_round": "skeleton/ai/runtime/inference/continual_learning.py:run_continual_learning_round",
-      "continual_learning_state": "skeleton/ai/runtime/inference/continual_learning.py:ContinualLearningState",
       "camera_training_coverage": "skeleton/ai/runtime/inference/multiview.py:build_camera_coverage",
       "learning_qualification_bridge": "skeleton/ai/runtime/product/qualification.py:qualify_learning_candidate",
       "model_program_bridge": "skeleton/ai/runtime/product/model_program_bridge.py:bridge_product_training_to_model_program",
@@ -1845,7 +1845,9 @@
         "epoch_loss_tracking": true,
         "bounded_early_stopping": true,
         "deterministic_gradient_accumulation": true,
-        "optimizer_step_accounting": true
+        "optimizer_step_accounting": true,
+        "gated_recurrent_default_for_multi_method_training": true,
+        "legacy_elman_plain_corpus_compatibility": true
       },
       "engine_dependency_extra": "local-inference",
       "execution_owner": "skeleton/provider_runtime.py",
