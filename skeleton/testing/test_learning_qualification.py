@@ -9,6 +9,7 @@ from skeleton.ai.runtime.inference.training_allocation import (
     TrainingAllocationError,
     TrainingAllocationPolicy,
     allocate_training_methods,
+    observe_mirror_validation,
 )
 from skeleton.ai.runtime.inference.training_methods import TrainingMethod
 from skeleton.ai.runtime.product.qualification import (
@@ -281,4 +282,53 @@ def test_qualification_rejects_method_allocation_identity_drift() -> None:
             binding=binding,
             mirror_promotion_evidence=mirror,
             firewall_promotion_evidence=firewall,
+        )
+
+
+def test_mirror_validation_report_maps_to_holdout_safe_observation() -> None:
+    scenario = SimpleNamespace(
+        candidate_receipt=SimpleNamespace(
+            outcome=SimpleNamespace(
+                cost_units=0.0,
+                tokens=500,
+                steps=20,
+            )
+        )
+    )
+    report = SimpleNamespace(
+        split=SimpleNamespace(value="validation"),
+        weighted_utility_delta=0.25,
+        digest=_sha("mirror-validation-report"),
+        scenario_comparisons=(scenario, scenario),
+    )
+
+    observation = observe_mirror_validation(
+        TrainingMethod.CONTRASTIVE,
+        comparison_report=report,
+        plan_digest=_sha("training-plan-source"),
+    )
+
+    assert observation.evaluation_class == "mirror_validation"
+    assert observation.validation_gain == 0.25
+    assert observation.sample_count == 2
+    assert observation.compute_units > 0.0
+    assert observation.evaluation_digest == report.digest
+
+
+def test_mirror_holdout_cannot_feed_adaptive_method_selection() -> None:
+    report = SimpleNamespace(
+        split=SimpleNamespace(value="holdout"),
+        weighted_utility_delta=1.0,
+        digest=_sha("sealed-holdout"),
+        scenario_comparisons=(SimpleNamespace(),),
+    )
+    with pytest.raises(
+        TrainingAllocationError,
+        match="only Mirror validation split",
+    ):
+        observe_mirror_validation(
+            TrainingMethod.SUPERVISED_INSTRUCTION,
+            comparison_report=report,
+            plan_digest=_sha("source-plan"),
+            compute_units=1.0,
         )
