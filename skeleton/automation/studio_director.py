@@ -171,6 +171,9 @@ def _canonical_path(value: object) -> str:
         raise ValueError(f"non-canonical repository path: {raw!r}")
     if raw.startswith(_DENIED_PREFIXES):
         raise ValueError(f"denied repository path: {raw}")
+    path_obj = Path(raw)
+    if path_obj.exists() and path_obj.is_symlink():
+        raise ValueError(f"symlink repository path is not allowed: {raw}")
     if PurePosixPath(raw).name.lower() in _DENIED_BASENAMES:
         raise ValueError(f"denied repository file: {raw}")
     if not raw.startswith(_ALLOWED_ROOTS):
