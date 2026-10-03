@@ -17,6 +17,7 @@ from core.route_privacy import require_route_provider_transfer
 from core.engine_client import (
     EngineClient,
     EngineClientError,
+    EngineNotFoundError,
     EngineTerminalResult,
     command_from_context,
 )
@@ -56,6 +57,7 @@ class EngineTextRequest:
     instruction_policy_id: str | None = None
     instruction_policy_version: str | None = None
     history: tuple[Mapping[str, str], ...] = ()
+    evidence: tuple[Mapping[str, str], ...] = ()
     tenant_id: str = "default"
     actor_id: str = "backend-ai"
     capability: str = "assistant.compat"
@@ -181,14 +183,138 @@ class EngineTextRequest:
                 raise EngineTextError("history exceeds maximum turn count")
         object.__setattr__(self, "history", tuple(normalized_history))
 
+        normalized_evidence: list[dict[str, str]] = []
+        seen_evidence_ids: set[str] = set()
+        total_evidence_chars = 0
+        for index, item in enumerate(self.evidence):
+            if not isinstance(item, Mapping):
+                raise EngineTextError(
+                    f"evidence[{index}] must be an object"
+                )
+            source_id = _text(
+                item.get("source_id"),
+                f"evidence[{index}].source_id",
+                maximum=512,
+            )
+            if source_id in seen_evidence_ids:
+                raise EngineTextError(
+                    "evidence source_id values must be unique"
+                )
+            seen_evidence_ids.add(source_id)
+            content = _text(
+                item.get("content"),
+                f"evidence[{index}].content",
+                maximum=200_000,
+            )
+            kind = str(
+                item.get("kind") or "retrieval_evidence"
+            ).strip().lower()
+            if kind not in {"retrieval_evidence", "artifact"}:
+                raise EngineTextError(
+                    f"evidence[{index}].kind is unsupported"
+                )
+            total_evidence_chars += len(content)
+            if total_evidence_chars > 1_000_000:
+                raise EngineTextError(
+                    "evidence exceeds maximum aggregate size"
+                )
+            normalized_evidence.append(
+                {
+                    "source_id": source_id,
+                    "content": content,
+                    "kind": kind,
+                }
+            )
+            if len(normalized_evidence) > 256:
+                raise EngineTextError(
+                    "evidence exceeds maximum segment count"
+                )
+        object.__setattr__(
+            self,
+            "evidence",
+            tuple(normalized_evidence),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class EngineTextResponse:
+    # Preserve the historical compatibility constructor while carrying the
+    # complete canonical engine lineage for callers that need to persist it.
     text: str
     execution_id: str
     verification: str | None
     evidence_refs: tuple[str, ...]
     usage: Mapping[str, object]
+    operation_id: str | None = None
+    context_id: str | None = None
+    context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = ()
+    context_compiler_version: str | None = None
+    provider_receipts: tuple[str, ...] = ()
+    tool_receipts: tuple[str, ...] = ()
+    memory_refs: tuple[str, ...] = ()
+    artifact_refs: tuple[str, ...] = ()
+
+
+_DATA_CLASS_ORDER = (
+    "public",
+    "internal",
+    "confidential",
+    "restricted",
+)
+
+
+def _effective_data_class(request: EngineTextRequest) -> str:
+    # EngineText's canonical instruction policy is internal by default; all
+    # history/evidence/prompt segments inherit request.data_class.
+    return max(
+        ("internal", request.data_class),
+        key=_DATA_CLASS_ORDER.index,
+    )
+
+
+def _terminal_response(
+    *,
+    request: EngineTextRequest,
+    terminal: EngineTerminalResult,
+    binding,
+    operation_id: str,
+    execution_id: str,
+    turn_id: str,
+) -> EngineTextResponse:
+    if (
+        terminal.operation_id != operation_id
+        or terminal.execution_id != execution_id
+        or binding.operation_id != operation_id
+        or binding.execution_id != execution_id
+        or binding.turn_id != turn_id
+        or binding.trace_id != "engine-text:" + operation_id
+        or binding.tenant_id != request.tenant_id
+        or binding.actor_id != request.actor_id
+        or binding.capability != request.capability
+        or binding.idempotency_key != request.idempotency_key
+        or binding.purpose != request.purpose
+        or binding.data_class != _effective_data_class(request)
+    ):
+        raise EngineTextError(
+            "canonical engine terminal/handoff identity diverged from request"
+        )
+    return EngineTextResponse(
+        text=terminal.final_output,
+        operation_id=terminal.operation_id,
+        execution_id=terminal.execution_id,
+        context_id=binding.context_id,
+        context_digest=binding.context_digest,
+        context_source_snapshot=binding.source_snapshot,
+        context_compiler_version=binding.compiler_version,
+        verification=terminal.verification,
+        evidence_refs=terminal.evidence_refs,
+        provider_receipts=terminal.provider_receipts,
+        tool_receipts=terminal.tool_receipts,
+        memory_refs=terminal.memory_refs,
+        artifact_refs=terminal.artifact_refs,
+        usage=dict(terminal.usage),
+    )
 
 
 def _policy(request: EngineTextRequest) -> InstructionPolicy:
@@ -256,6 +382,33 @@ def _context_segments(
                 created_at=created_at,
                 provenance=("backend-engine-text",),
                 retention_class="ephemeral-engine-history",
+            )
+        )
+    for index, item in enumerate(request.evidence):
+        kind = (
+            ContextKind.ARTIFACT
+            if item["kind"] == "artifact"
+            else ContextKind.RETRIEVAL_EVIDENCE
+        )
+        segments.append(
+            ContextSegment.from_content(
+                segment_id=_stable_uuid(
+                    "backend-engine-evidence",
+                    operation_id + ":" + str(index) + ":" + item["source_id"],
+                ),
+                kind=kind,
+                source_type="backend-engine-evidence",
+                source_id=item["source_id"],
+                content=item["content"],
+                trust_level=ContextTrust.DERIVED_UNTRUSTED,
+                data_class=request.data_class,
+                tenant_id=request.tenant_id,
+                purpose=request.purpose,
+                priority=700,
+                relevance=0.9,
+                created_at=created_at,
+                provenance=("backend-engine-text", "product-evidence"),
+                retention_class="ephemeral-engine-evidence",
             )
         )
     segments.append(
@@ -335,6 +488,54 @@ async def execute_engine_text(
         "backend-engine-text-turn",
         operation_id,
     )
+
+    # Recovery precedes context compilation. Product evidence/retrieval may
+    # change between attempts, but an already-admitted canonical execution is
+    # immutable truth for this idempotency identity. Lightweight injected test
+    # clients may omit recovery APIs; the real EngineClient must expose them.
+    recovery_capable = all(
+        callable(getattr(active_client, name, None))
+        for name in (
+            "terminal_result_if_available",
+            "wait_for_terminal",
+            "handoff_binding",
+        )
+    )
+    if recovery_capable:
+        try:
+            terminal = await active_client.terminal_result_if_available(
+                execution_id=execution_id,
+                actor_id=request.actor_id,
+                tenant_id=request.tenant_id,
+                trace_id="engine-text:" + operation_id,
+            )
+            if terminal is None:
+                terminal = await active_client.wait_for_terminal(
+                    execution_id=execution_id,
+                    actor_id=request.actor_id,
+                    tenant_id=request.tenant_id,
+                    trace_id="engine-text:" + operation_id,
+                )
+            binding = await active_client.handoff_binding(
+                execution_id,
+                actor_id=request.actor_id,
+                tenant_id=request.tenant_id,
+                trace_id="engine-text:" + operation_id,
+            )
+            return _terminal_response(
+                request=request,
+                terminal=terminal,
+                binding=binding,
+                operation_id=operation_id,
+                execution_id=execution_id,
+                turn_id=turn_id,
+            )
+        except EngineNotFoundError:
+            pass
+        except EngineClientError as exc:
+            raise EngineTextError(
+                "canonical engine recovery failed"
+            ) from exc
     policy = _policy(request)
     output_reserve = min(
         131_072,
@@ -394,11 +595,48 @@ async def execute_engine_text(
         terminal: EngineTerminalResult = await active_client.execute(command)
     except EngineClientError as exc:
         raise EngineTextError("canonical engine text execution failed") from exc
+    if recovery_capable:
+        try:
+            binding = await active_client.handoff_binding(
+                execution_id,
+                actor_id=request.actor_id,
+                tenant_id=request.tenant_id,
+                trace_id="engine-text:" + operation_id,
+            )
+        except EngineClientError as exc:
+            raise EngineTextError(
+                "canonical engine handoff recovery failed"
+            ) from exc
+        return _terminal_response(
+            request=request,
+            terminal=terminal,
+            binding=binding,
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+        )
+
+    if (
+        terminal.operation_id != operation_id
+        or terminal.execution_id != execution_id
+    ):
+        raise EngineTextError(
+            "canonical engine terminal identity diverged from compiled request"
+        )
     return EngineTextResponse(
         text=terminal.final_output,
+        operation_id=terminal.operation_id,
         execution_id=terminal.execution_id,
+        context_id=envelope.context_id,
+        context_digest=envelope.context_digest,
+        context_source_snapshot=envelope.source_snapshot,
+        context_compiler_version=envelope.compiler_version,
         verification=terminal.verification,
         evidence_refs=terminal.evidence_refs,
+        provider_receipts=terminal.provider_receipts,
+        tool_receipts=terminal.tool_receipts,
+        memory_refs=terminal.memory_refs,
+        artifact_refs=terminal.artifact_refs,
         usage=dict(terminal.usage),
     )
 

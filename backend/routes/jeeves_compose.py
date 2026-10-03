@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.engine_chat import EngineChat, UserMessage
+from core.engine_client import EngineClient, EngineClientError
 from core.engine_text import EngineTextError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.persistence.conversation_repository import ConversationConflict
@@ -29,7 +30,6 @@ from gameforge.jeeves import artifacts as ART
 from gameforge.jeeves.chat_contract import (
     ChatReq,
     HistoryMessage,
-    conversation_prompt,
     retrieval_query,
 )
 
@@ -55,6 +55,30 @@ _ENGINE_EXECUTION_SCOPE: ContextVar[str | None] = ContextVar(
 
 
 # ── shared helpers ─────────────────────────────────────────────
+async def _local_engine_provider_active() -> bool:
+    """Ask the canonical engine whether local model inference is active."""
+
+    try:
+        client = EngineClient.from_env()
+        if client is None:
+            return False
+        status = await client.provider_status(
+            trace_id="jeeves-provider-mode",
+        )
+    except EngineClientError:
+        return False
+    if not status.get("available") or status.get("active") != "local":
+        return False
+    return any(
+        item.get("id") == "local"
+        and item.get("available") is True
+        and item.get("execution_mode") == "local"
+        and item.get("network_policy") == "none"
+        for item in status.get("providers", ())
+        if isinstance(item, dict)
+    )
+
+
 def _canon_context(
     query: str,
     top_k: int = 5,
@@ -91,21 +115,42 @@ def _derive_dataset(recalled: List[Dict]) -> Dict:
             "title": "Canon Relevance"}
 
 
-async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool,
-                         conversation_context: str = "") -> Dict:
-    """Free-tier cascade: local extractive → free → paid LLM."""
+async def _generate_text(
+    query: str,
+    recalled: List[Dict],
+    needs_reasoning: bool,
+    conversation_context: str = "",
+    *,
+    conversation_history: List[HistoryMessage] | None = None,
+    project_context: str = "",
+    engine_tenant_id: str = "default",
+    engine_actor_id: str = "jeeves-compose",
+    engine_capability: str = "assistant.compat",
+    engine_data_class: str = "internal",
+) -> Dict:
+    """Use canonical inference while keeping history/evidence trust-separated."""
+
     tier = free_tier.decide(needs_reasoning)
-    ctx = "\n".join(f"[{i+1}] {(r.get('payload') or {}).get('extract') or (r.get('payload') or {}).get('content') or ''}"[:300]
-                    for i, r in enumerate(recalled[:5]))
-    if tier in ("local", "free"):
+    local_model_active = await _local_engine_provider_active()
+    if tier in ("local", "free") and not local_model_active:
         head = ""
         if recalled:
-            p = recalled[0].get("payload") or {}
-            head = (p.get("extract") or p.get("content") or p.get("description") or "").strip()
-        text = (f"{head[:700]}" if head
-                else "I couldn't find relevant material in the available knowledge base. "
-                     "This response is using local extraction rather than generative reasoning. "
-                     "Try a more specific question or add relevant project details.")
+            payload = recalled[0].get("payload") or {}
+            head = (
+                payload.get("extract")
+                or payload.get("content")
+                or payload.get("description")
+                or ""
+            ).strip()
+        text = (
+            head[:700]
+            if head
+            else (
+                "I couldn't find relevant material in the available knowledge base. "
+                "This response is using local extraction rather than generative reasoning. "
+                "Try a more specific question or add relevant project details."
+            )
+        )
         return {
             "text": text,
             "tier": tier,
@@ -114,53 +159,119 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             "engine_verification": None,
             "engine_evidence_refs": [],
         }
-    # Generative escalation is engine-owned. Product routes never activate
-    # provider SDKs or credentials directly.
-    prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
+
     execution_scope = _ENGINE_EXECUTION_SCOPE.get()
     engine_session_id = None
+    turn_idempotency_key = None
     if execution_scope is not None:
-        identity = hashlib.sha256(
-            (
-                execution_scope
-                + "\x1f"
-                + query
-                + "\x1f"
-                + prompt
-            ).encode("utf-8")
+        scope_digest = hashlib.sha256(
+            execution_scope.encode("utf-8")
         ).hexdigest()
-        engine_session_id = "jeeves-" + identity[:24]
+        engine_session_id = "jeeves-" + scope_digest[:24]
+        turn_idempotency_key = "jeeves-turn:" + scope_digest
+
     try:
         chat = EngineChat(
             session_id=engine_session_id,
             instruction_policy=JEEVES_CHAT_POLICY,
-            actor_id="jeeves-compose",
-            capability="assistant.compat",
+            tenant_id=engine_tenant_id,
+            actor_id=engine_actor_id,
+            capability=engine_capability,
+            data_class=engine_data_class,
+            turn_idempotency_key=turn_idempotency_key,
         ).with_max_tokens(8_192)
+
+        for item in conversation_history or ():
+            chat.add_history_message(item.role, item.content)
+
+        # Legacy positional conversation_context is retained as compatibility
+        # input, but it is evidence now—not provider prompt authority.
+        bounded_project_context = (
+            project_context.strip()
+            or conversation_context.strip()
+        )
+        if bounded_project_context:
+            context_digest = hashlib.sha256(
+                bounded_project_context.encode("utf-8")
+            ).hexdigest()
+            chat.add_evidence(
+                "jeeves-project-context:" + context_digest[:32],
+                bounded_project_context,
+                kind="artifact",
+            )
+
+        for index, item in enumerate(recalled[:5], start=1):
+            payload = item.get("payload") or {}
+            content = (
+                payload.get("extract")
+                or payload.get("content")
+                or payload.get("description")
+                or ""
+            )
+            text = str(content).strip()
+            if not text:
+                continue
+            bounded = text[:4000]
+            source_hint = str(
+                item.get("path")
+                or item.get("id")
+                or ("result-" + str(index))
+            )
+            source_digest = hashlib.sha256(
+                (
+                    source_hint
+                    + "\x1f"
+                    + bounded
+                ).encode("utf-8")
+            ).hexdigest()
+            chat.add_evidence(
+                "jeeves-retrieval:" + source_digest[:32],
+                f"[{index}] {bounded}",
+                kind="retrieval_evidence",
+            )
+
         response = await chat.send_message(
-            UserMessage(text=prompt)
+            UserMessage(text=query)
         )
         return {
             "text": response.text,
-            "tier": "paid",
+            "tier": (
+                "local-model"
+                if local_model_active
+                else "paid"
+            ),
             "model": "skeleton-engine",
+            "engine_operation_id": response.operation_id,
             "engine_execution_id": response.execution_id,
+            "engine_tenant_id": engine_tenant_id,
+            "engine_actor_id": engine_actor_id,
+            "engine_capability": engine_capability,
+            "engine_data_class": engine_data_class,
+            "engine_context_id": response.context_id,
+            "engine_context_digest": response.context_digest,
+            "engine_context_source_snapshot": list(
+                response.context_source_snapshot
+            ),
+            "engine_context_compiler_version": (
+                response.context_compiler_version
+            ),
             "engine_verification": response.verification,
             "engine_evidence_refs": list(response.evidence_refs),
-        }
-    except EngineTextError:
-        return {
-            "text": (
-                "The generative engine is unavailable. I couldn't produce "
-                "an answer to this request. Please try again after checking "
-                "the engine configuration."
+            "engine_provider_receipts": list(
+                response.provider_receipts
             ),
-            "tier": "local",
-            "model": "unavailable-fallback",
-            "engine_execution_id": None,
-            "engine_verification": None,
-            "engine_evidence_refs": [],
+            "engine_tool_receipts": list(response.tool_receipts),
+            "engine_memory_refs": list(response.memory_refs),
+            "engine_artifact_refs": list(response.artifact_refs),
         }
+    except EngineTextError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "generative engine execution is unavailable; "
+                "retry the same turn later"
+            ),
+        ) from exc
 
 
 def _build_artifacts(forms: List[str], title: str, text: str, ds: Dict,
@@ -394,6 +505,7 @@ async def _import_legacy_rows_to_canonical(
         await _ensure_canonical_thread(session_id)
     )
     imported = 0
+    parent_message_id = None
     for index, row in enumerate(rows):
         user_text = row.get("role_user")
         assistant_text = row.get("role_jeeves")
@@ -418,14 +530,25 @@ async def _import_legacy_rows_to_canonical(
                 client_message_id
             ),
             expected_thread_version=thread.version,
+            parent_message_id=parent_message_id,
             data_class="internal",
         )
+        legacy_execution_id = str(
+            row.get("engine_execution_id") or ""
+        ).strip()
         generated = {
             "text": assistant_text,
             "model": row.get("model") or "legacy-jeeves",
-            "engine_execution_id": row.get("engine_execution_id"),
+            # Historical execution IDs predate the canonical handoff contract.
+            # Preserve them as audit artifacts; never upgrade partial lineage
+            # into a canonical engine-result identity.
             "engine_evidence_refs": list(
                 row.get("engine_evidence_refs") or []
+            ),
+            "engine_artifact_refs": (
+                ["legacy-engine-execution:" + legacy_execution_id]
+                if legacy_execution_id
+                else []
             ),
         }
         thread, _assistant = await _commit_canonical_assistant_turn(
@@ -438,6 +561,7 @@ async def _import_legacy_rows_to_canonical(
             client_message_id=client_message_id,
             generated=generated,
         )
+        parent_message_id = _assistant.message_id
         imported += 1
     return imported
 
@@ -525,6 +649,17 @@ async def _append_canonical_user_turn(
                 ),
             )
 
+    if (
+        transcript
+        and transcript[-1].author_type is ConversationAuthorType.USER
+        and transcript[-1].idempotency_key == user_idempotency_key
+    ):
+        parent_message_id = transcript[-1].parent_message_id
+    else:
+        parent_message_id = (
+            transcript[-1].message_id if transcript else None
+        )
+
     prior_sequence = thread.message_sequence
     thread, message = await authority.append_user_message(
         thread.thread_id,
@@ -533,6 +668,7 @@ async def _append_canonical_user_turn(
         content=req.message,
         idempotency_key=user_idempotency_key,
         expected_thread_version=thread.version,
+        parent_message_id=parent_message_id,
         attachment_refs=request_refs,
         data_class="internal",
     )
@@ -558,18 +694,64 @@ async def _commit_canonical_assistant_turn(
     client_message_id: str | None,
     generated: Dict[str, Any],
 ):
-    operation_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            (
-                "skeleton-jeeves-operation:"
-                + session_id
-                + ":"
-                + user_message.message_id
-            ),
-        )
-    )
     execution_id = generated.get("engine_execution_id")
+    operation_id = generated.get("engine_operation_id")
+    if execution_id:
+        required_lineage = {
+            "engine_operation_id": operation_id,
+            "engine_context_id": generated.get("engine_context_id"),
+            "engine_context_digest": generated.get("engine_context_digest"),
+            "engine_context_compiler_version": generated.get(
+                "engine_context_compiler_version"
+            ),
+            "engine_tenant_id": generated.get("engine_tenant_id"),
+            "engine_actor_id": generated.get("engine_actor_id"),
+            "engine_capability": generated.get("engine_capability"),
+            "engine_data_class": generated.get("engine_data_class"),
+        }
+        missing = [
+            name
+            for name, value in required_lineage.items()
+            if not isinstance(value, str) or not value.strip()
+        ]
+        snapshot = generated.get("engine_context_source_snapshot")
+        if (
+            missing
+            or not isinstance(snapshot, (list, tuple))
+            or not snapshot
+        ):
+            raise ValueError(
+                "engine-backed Jeeves result is missing canonical lineage"
+            )
+        digest = str(generated["engine_context_digest"]).strip()
+        if len(digest) != 64 or any(
+            ch not in "0123456789abcdef" for ch in digest
+        ):
+            raise ValueError(
+                "engine-backed Jeeves context digest is invalid"
+            )
+        if (
+            generated["engine_tenant_id"] != tenant_id
+            or generated["engine_actor_id"] != owner_id
+            or generated["engine_capability"] != "assistant.chat"
+            or generated["engine_data_class"] != thread.data_class
+        ):
+            raise ValueError(
+                "engine-backed Jeeves execution identity does not match "
+                "canonical conversation authority"
+            )
+    else:
+        operation_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                (
+                    "skeleton-jeeves-operation:"
+                    + session_id
+                    + ":"
+                    + user_message.message_id
+                ),
+            )
+        )
     if execution_id:
         ai_result_id = "engine-result:" + str(execution_id)
     else:
@@ -595,10 +777,57 @@ async def _commit_canonical_assistant_turn(
         causal_user_message_id=user_message.message_id,
         operation_id=operation_id,
         ai_result_id=ai_result_id,
-        tool_receipt_refs=(),
+        context_id=(
+            generated.get("engine_context_id")
+            if execution_id
+            else None
+        ),
+        context_digest=(
+            generated.get("engine_context_digest")
+            if execution_id
+            else None
+        ),
+        context_source_snapshot=(
+            tuple(
+                tuple(item)
+                for item in (
+                    generated.get(
+                        "engine_context_source_snapshot"
+                    )
+                    or ()
+                )
+            )
+            if execution_id
+            else ()
+        ),
+        context_compiler_version=(
+            generated.get("engine_context_compiler_version")
+            if execution_id
+            else None
+        ),
+        tool_receipt_refs=tuple(
+            str(item)
+            for item in generated.get("engine_tool_receipts") or ()
+            if str(item).strip()
+        ),
+        provider_receipt_refs=tuple(
+            str(item)
+            for item in generated.get("engine_provider_receipts") or ()
+            if str(item).strip()
+        ),
+        memory_refs=tuple(
+            str(item)
+            for item in generated.get("engine_memory_refs") or ()
+            if str(item).strip()
+        ),
         citation_refs=tuple(
             str(item)
             for item in generated.get("engine_evidence_refs") or ()
+            if str(item).strip()
+        ),
+        artifact_refs=tuple(
+            str(item)
+            for item in generated.get("engine_artifact_refs") or ()
             if str(item).strip()
         ),
         data_class="internal",
@@ -932,23 +1161,17 @@ async def chat(req: ChatReq):
         execution_scope
     )
     try:
-        if req.context or effective_history:
-            gen = await _generate_text(
-                req.message,
-                recalled,
-                needs_reasoning,
-                conversation_prompt(
-                    req.message,
-                    req.context,
-                    effective_history,
-                ),
-            )
-        else:
-            gen = await _generate_text(
-                req.message,
-                recalled,
-                needs_reasoning,
-            )
+        gen = await _generate_text(
+            req.message,
+            recalled,
+            needs_reasoning,
+            conversation_history=effective_history,
+            project_context=req.context,
+            engine_tenant_id=canonical_turn[3],
+            engine_actor_id=canonical_turn[4],
+            engine_capability="assistant.chat",
+            engine_data_class=canonical_turn[1].data_class,
+        )
     finally:
         _ENGINE_EXECUTION_SCOPE.reset(execution_scope_token)
 

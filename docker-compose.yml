@@ -52,6 +52,18 @@ services:
       - SKL_ENGINE_QUOTA_STATE_PATH=/app/data/engine_quota.sqlite
       - SKL_ENGINE_PRESSURE_STATE_PATH=/app/data/engine_pressure.sqlite
       - SKL_GOVERNANCE_LIFECYCLE_PATH=/app/data/governance_lifecycle.sqlite
+      # Runtime model selection is owned by the Skeleton engine process.
+      # Local mode uses a model artifact placed in the persistent skeleton_data
+      # volume (default /app/data/local-model.json) and requires no provider key.
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_MODEL=${AI_MODEL:-}
+      - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-/app/data/local-model.json}
+      - AI_LOCAL_MODEL_CACHE_SIZE=${AI_LOCAL_MODEL_CACHE_SIZE:-128}
+      - AI_LOCAL_MODEL_SEED=${AI_LOCAL_MODEL_SEED:-0}
+      - AI_VERIFICATION_MODEL=${AI_VERIFICATION_MODEL:-}
+      - AI_SECONDARY_API_KEY=${AI_SECONDARY_API_KEY:-}
+      - AI_SECONDARY_BASE_URL=${AI_SECONDARY_BASE_URL:-}
+      - AI_SECONDARY_MODEL=${AI_SECONDARY_MODEL:-}
       - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:

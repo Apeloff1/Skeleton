@@ -34,7 +34,7 @@ COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CO
 # attack surface and causes image scanners to report them independently of
 # the application's installed packages. Install first, then remove the full
 # installer/toolchain surface from the final runtime.
-RUN pip install --no-cache-dir . \
+RUN pip install --no-cache-dir ".[local-inference]" \
     && pip uninstall -y msgpack setuptools \
     && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
               /usr/local/lib/python3.14/site-packages/setuptools* \
