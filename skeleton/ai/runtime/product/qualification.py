@@ -273,6 +273,22 @@ def qualify_learning_candidate(
             "training receipt plan identity drift"
         )
 
+    receipt_allocation = training_receipt.get("method_allocation")
+    receipt_allocation_digest: str | None = None
+    if receipt_allocation is not None:
+        if not isinstance(receipt_allocation, Mapping):
+            raise LearningQualificationError(
+                "training receipt method_allocation must be a mapping"
+            )
+        receipt_allocation_digest = _sha(
+            receipt_allocation.get("allocation_digest"),
+            "training receipt method allocation digest",
+        )
+    if receipt_allocation_digest != binding.method_allocation_digest:
+        raise LearningQualificationError(
+            "training receipt method allocation identity drift"
+        )
+
     mirror_candidate_id = _text(
         _attribute(mirror_promotion_evidence, "candidate_id"),
         "mirror candidate_id",
