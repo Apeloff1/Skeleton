@@ -43,6 +43,12 @@ def _positive_int(name: str, value: object) -> int:
     return value
 
 
+def _regression_ppm(*, baseline: float, candidate: float) -> int:
+    if baseline == 0.0:
+        return 0 if candidate == 0.0 else 1_000_000_000
+    return round((candidate - baseline) / baseline * 1_000_000)
+
+
 def _digest(value: object) -> str:
     try:
         raw=json.dumps(value,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False)
@@ -190,6 +196,14 @@ class PerformanceFinding:
         )
         if isinstance(self.regression_ppm,bool) or not isinstance(self.regression_ppm,int):
             raise ProfileRecordError("regression_ppm must be integer")
+        expected_ppm = _regression_ppm(
+            baseline=self.baseline_value_ms,
+            candidate=self.candidate_value_ms,
+        )
+        if self.regression_ppm != expected_ppm:
+            raise ProfileRecordError(
+                "regression_ppm must match baseline/candidate measurements"
+            )
         if not isinstance(self.regressed,bool):
             raise ProfileRecordError("regressed must be boolean")
         if self.regressed != (self.regression_ppm > 0):
@@ -227,10 +241,7 @@ def compare_profiles(
         raise ProfileRecordError("metric must be mean_ms, p95_ms, or p99_ms")
     before=float(getattr(baseline,metric_name))
     after=float(getattr(candidate,metric_name))
-    if before == 0.0:
-        ppm=0 if after == 0.0 else 1_000_000_000
-    else:
-        ppm=round((after-before)/before*1_000_000)
+    ppm=_regression_ppm(baseline=before,candidate=after)
     return PerformanceFinding(
         baseline_run_digest=baseline.digest,
         candidate_run_digest=candidate.digest,
