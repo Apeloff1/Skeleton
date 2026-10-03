@@ -1,7 +1,7 @@
-"""Fast deterministic queries over RepositoryModel for agents and tooling."""
+"""Fast deterministic topology-aware queries over RepositoryModel."""
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from typing import Iterable
@@ -26,9 +26,27 @@ class QueryResult:
 class RepositoryQuery:
     def __init__(self, model: RepositoryModel) -> None:
         self.model = model
-        self._by_zone: dict[str, list[FileRecord]] = defaultdict(list)
+        self._by_zone: dict[str, tuple[FileRecord, ...]] = {}
+        grouped: dict[str, list[FileRecord]] = defaultdict(list)
         for item in model.files:
-            self._by_zone[item.zone].append(item)
+            grouped[item.zone].append(item)
+        self._by_zone = {zone: tuple(items) for zone, items in grouped.items()}
+        self._by_kind: dict[str, tuple[FileRecord, ...]] = {}
+        grouped_kind: dict[str, list[FileRecord]] = defaultdict(list)
+        for item in model.files:
+            grouped_kind[item.kind].append(item)
+        self._by_kind = {kind: tuple(items) for kind, items in grouped_kind.items()}
+        self._dependents: dict[str, tuple[str, ...]] = self._reverse_edges()
+        self._dependencies: dict[str, tuple[str, ...]] = {
+            item.name: tuple(sorted(set(item.dependencies)))
+            for item in model.subsystems
+        }
+
+    def _reverse_edges(self) -> dict[str, tuple[str, ...]]:
+        reverse: dict[str, set[str]] = defaultdict(set)
+        for edge in self.model.edges:
+            reverse[edge.target].add(edge.source)
+        return {zone: tuple(sorted(values)) for zone, values in reverse.items()}
 
     def files(
         self,
@@ -45,10 +63,12 @@ class RepositoryQuery:
         kind_set = {str(item).casefold() for item in kinds}
         language_set = {str(item).casefold() for item in languages}
         globs = tuple(str(item) for item in path_globs if str(item))
+        pools = [self._by_zone[z] for z in zone_set if z in self._by_zone]
+        candidates = tuple(item for pool in pools for item in pool) if zone_set else self.model.files
+        if not pools and zone_set:
+            candidates = ()
         selected: list[FileRecord] = []
-        for item in self.model.files:
-            if zone_set and item.zone.casefold() not in zone_set:
-                continue
+        for item in candidates:
             if kind_set and item.kind.casefold() not in kind_set:
                 continue
             if language_set and item.language.casefold() not in language_set:
@@ -58,10 +78,10 @@ class RepositoryQuery:
             selected.append(item)
             if len(selected) >= limit:
                 break
-        return QueryResult(tuple(selected), tuple(sorted({item.zone for item in selected})), "deterministic-filter")
+        return QueryResult(tuple(selected), tuple(sorted({item.zone for item in selected})), "indexed-filter")
 
     def largest_files(self, *, zone: str = "", limit: int = 25) -> QueryResult:
-        values = self._by_zone.get(zone, []) if zone else list(self.model.files)
+        values = self._by_zone.get(zone, ()) if zone else self.model.files
         selected = sorted(values, key=lambda item: (-item.lines, -item.size, item.path))[:limit]
         return QueryResult(tuple(selected), tuple(sorted({item.zone for item in selected})), "largest-files")
 
@@ -71,7 +91,56 @@ class RepositoryQuery:
         return QueryResult(tuple(selected), tuple(sorted({item.zone for item in selected})), "entrypoints")
 
     def tests_for_zone(self, zone: str, *, limit: int = 200) -> QueryResult:
-        direct = [item for item in self._by_zone.get(zone, []) if item.kind == "test"]
-        shared = [item for item in self._by_zone.get("tests", []) if item.kind == "test"]
+        direct = [item for item in self._by_zone.get(zone, ()) if item.kind == "test"]
+        shared = [item for item in self._by_zone.get("tests", ()) if item.kind == "test"]
         selected = sorted({item.path: item for item in direct + shared}.values(), key=lambda item: item.path)[:limit]
         return QueryResult(tuple(selected), tuple(sorted({item.zone for item in selected})), "zone-tests")
+
+    def dependency_closure(self, zones: Iterable[str], *, depth: int = 2) -> tuple[str, ...]:
+        if isinstance(depth, bool) or not isinstance(depth, int) or not 0 <= depth <= 16:
+            raise ValueError("depth must be in [0,16]")
+        seen = {str(zone) for zone in zones if str(zone)}
+        frontier = deque((zone, 0) for zone in sorted(seen))
+        while frontier:
+            zone, level = frontier.popleft()
+            if level >= depth:
+                continue
+            for dependency in self._dependencies.get(zone, ()):
+                if dependency not in seen:
+                    seen.add(dependency)
+                    frontier.append((dependency, level + 1))
+        return tuple(sorted(seen))
+
+    def dependent_closure(self, zones: Iterable[str], *, depth: int = 2) -> tuple[str, ...]:
+        if isinstance(depth, bool) or not isinstance(depth, int) or not 0 <= depth <= 16:
+            raise ValueError("depth must be in [0,16]")
+        seen = {str(zone) for zone in zones if str(zone)}
+        frontier = deque((zone, 0) for zone in sorted(seen))
+        while frontier:
+            zone, level = frontier.popleft()
+            if level >= depth:
+                continue
+            for dependent in self._dependents.get(zone, ()):
+                if dependent not in seen:
+                    seen.add(dependent)
+                    frontier.append((dependent, level + 1))
+        return tuple(sorted(seen))
+
+    def verification_files(
+        self,
+        zones: Iterable[str],
+        *,
+        depth: int = 2,
+        limit: int = 200,
+    ) -> QueryResult:
+        impacted = self.dependent_closure(zones, depth=depth)
+        tests: dict[str, FileRecord] = {}
+        for zone in impacted:
+            for item in self._by_zone.get(zone, ()):
+                if item.kind == "test":
+                    tests[item.path] = item
+        for item in self._by_kind.get("test", ()):
+            if item.zone == "tests":
+                tests[item.path] = item
+        selected = tuple(sorted(tests.values(), key=lambda item: (item.zone, item.path))[:limit])
+        return QueryResult(selected, tuple(sorted({item.zone for item in selected})), "dependency-aware-verification")
