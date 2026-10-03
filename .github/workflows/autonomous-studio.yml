@@ -238,6 +238,7 @@ jobs:
             --max-tasks "$max_tasks" \
             --cohort-size "$cohort_size" \
             --seed "${GITHUB_RUN_ID}" \
+            --receipt-path "$RUNNER_TEMP/studio-execution-receipt.json" \
             "${prior_args[@]}"
 
           if [[ -s .studio-tmp/studio.patch ]]; then
@@ -323,6 +324,31 @@ jobs:
           git apply --check "$RUNNER_TEMP/studio.patch"
           git apply "$RUNNER_TEMP/studio.patch"
           git diff --check
+
+      - name: Advance autonomous build campaign
+        id: build_campaign
+        if: always() && steps.pressure.outputs.proceed == 'true'
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/build"
+          state="$RUNNER_TEMP/build/state.json"
+          prior=".studio/audit/latest.build-state.json"
+          if [[ -s "$prior" ]]; then cp "$prior" "$state"; fi
+          args=()
+          if [[ "$VALIDATION_OUTCOME" == "success" ]]; then args+=(--validated); fi
+          python -m skeleton.automation.autonomous_build \
+            --state "$state" \
+            --repo-state .studio-tmp/repo-state.json \
+            --max-cycles 80 \
+            --max-failures 8 \
+            --max-stagnant 5 \
+            "${args[@]}" > "$RUNNER_TEMP/build/result.json"
+          status=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$RUNNER_TEMP/build/result.json")
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cp "$state" "$RUNNER_TEMP/studio-build-state.json"
 
       - name: Record final night workforce snapshot
         if: always()
@@ -429,8 +455,12 @@ jobs:
           cp "$RUNNER_TEMP/studio-report.md" .studio/audit/latest.md
           cp "$RUNNER_TEMP/studio.patch.sha256" .studio/audit/latest.patch.sha256
           cp "$RUNNER_TEMP/studio-execution-receipt.json" .studio/audit/latest.execution-receipt.json
+          if [[ -s "$RUNNER_TEMP/studio-build-state.json" ]]; then
+            cp "$RUNNER_TEMP/studio-build-state.json" .studio/audit/latest.build-state.json
+          fi
           git add -u
           git add .studio/audit/latest.jsonl .studio/audit/latest.md .studio/audit/latest.patch.sha256 .studio/audit/latest.execution-receipt.json
+          if [[ -s .studio/audit/latest.build-state.json ]]; then git add .studio/audit/latest.build-state.json; fi
           git diff --cached --check
           if git diff --cached --name-only | grep -q '^\.studio-tmp/'; then
             echo '::error::temporary proposal files must never be committed'
