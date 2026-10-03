@@ -8,7 +8,11 @@ on:
       - "skeleton/learning/mirror_room/**"
       - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
       - ".github/workflows/mirror-room-core.yml"
+      - ".github/workflows/mirror-room-extensions.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -28,7 +32,11 @@ on:
       - "skeleton/learning/mirror_room/**"
       - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_mirror_room_adversarial.py"
+      - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
       - ".github/workflows/mirror-room-core.yml"
+      - ".github/workflows/mirror-room-extensions.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -80,6 +88,9 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_feedback_promotion.py
+          skeleton/testing/test_mirror_room_adversarial.py
+          skeleton/testing/test_mirror_room_content_delivery.py
+          skeleton/testing/test_mirror_room_observability.py
           skeleton/testing/test_release_slo_promotion.py
 
   independent-p1-verifier:
