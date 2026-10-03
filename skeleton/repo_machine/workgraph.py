@@ -124,6 +124,27 @@ class WorkGraph:
         overlap=sum(1 for other in self._ordered_nodes if other.identity!=identity and keys.intersection(other.conflict_keys))
         return min(100, overlap*4)
 
+    def safe_parallel_groups(self, completed:Iterable[str]=(), *, limit:int=8)->tuple[tuple[str,...],...]:
+        """Partition the current frontier into deterministic conflict-free execution groups."""
+        if isinstance(limit,bool) or not isinstance(limit,int) or limit<1: raise ValueError("limit must be positive")
+        remaining=list(self.frontier(completed)); groups=[]
+        while remaining and len(groups)<limit:
+            group=[]; used=set(); rest=[]
+            for n in remaining:
+                keys=set(n.conflict_keys)
+                if not keys.intersection(used):
+                    group.append(n.identity); used.update(keys)
+                else:
+                    rest.append(n)
+            if not group: break
+            groups.append(tuple(group)); remaining=rest
+        return tuple(groups)
+
+    def influence(self, identity:str)->int:
+        """Estimate bounded graph influence from downstream value and conflict centrality."""
+        node=self.node(identity)
+        return min(100, self.downstream_value(identity)*2//3 + self.conflict_density(identity)//2 + min(25,node.blast_radius*5))
+
     def pressure(self, completed=()):
         frontier=self.frontier(completed)
         if not frontier: return 0
