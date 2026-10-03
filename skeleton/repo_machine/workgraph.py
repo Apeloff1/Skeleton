@@ -108,6 +108,22 @@ class WorkGraph:
             used.update(n.conflict_keys); count+=1
         return count
 
+    def node_pressure(self, identity:str)->int:
+        """Return the coordination pressure for one node from the graph model."""
+        return self._pressure(self.node(identity))
+
+    def downstream_value(self, identity:str)->int:
+        """Bounded strategic value unlocked by completing a node and its descendants."""
+        node=self.node(identity)
+        return min(100, node.strategic_score + sum(min(10, self._by_identity[d].strategic_score//10) for d in self._descendants[identity]))
+
+    def conflict_density(self, identity:str)->int:
+        """Return bounded overlap with the rest of the graph's conflict surface."""
+        node=self.node(identity); keys=set(node.conflict_keys)
+        if not keys: return 0
+        overlap=sum(1 for other in self._ordered_nodes if other.identity!=identity and keys.intersection(other.conflict_keys))
+        return min(100, overlap*4)
+
     def pressure(self, completed=()):
         frontier=self.frontier(completed)
         if not frontier: return 0
