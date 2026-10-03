@@ -193,3 +193,94 @@ def test_releasing_same_worker_invalidates_previous_same_epoch_lease(tmp_path):
     checkpoint=_checkpoint(run,replacement,1,"replacement-model")
     assert repo.checkpoint(checkpoint,replacement)==checkpoint.digest
 
+def test_manifest_deserialization_rejects_boolean_integer_aliases():
+    run=_manifest(_digest("dataset"))
+    payload=run.as_dict()
+    payload.pop("manifest_digest",None)
+    payload["seed"]=True
+    with pytest.raises(ValueError,match="seed must be an integer"):
+        TrainingRunManifest.from_dict(payload)
+
+    payload=run.as_dict()
+    payload.pop("manifest_digest",None)
+    payload["world_size"]=True
+    with pytest.raises(ValueError,match="world_size"):
+        TrainingRunManifest.from_dict(payload)
+
+
+def test_checkpoint_deserialization_rejects_boolean_step_alias():
+    checkpoint=TrainingCheckpoint(
+        run_id="run",
+        manifest_digest=_digest("manifest"),
+        step=1,
+        model_digest=_digest("model"),
+        optimizer_digest=_digest("optimizer"),
+        rng_digest=_digest("rng"),
+        data_cursor_digest=_digest("cursor"),
+        worker_epoch=0,
+        created_at=NOW.isoformat(),
+    )
+    payload=checkpoint.as_dict()
+    payload["step"]=True
+    with pytest.raises(ValueError,match="checkpoint step"):
+        TrainingCheckpoint.from_dict(payload)
+
+
+def test_latest_checkpoint_detects_persisted_payload_tampering(tmp_path):
+    datasets,dataset=_dataset(tmp_path)
+    repo=TrainingRepository(tmp_path/"training.sqlite3")
+    run=_manifest(dataset.digest)
+    repo.register_run(run,datasets,created_at=NOW)
+    repo.start(run.run_id)
+    lease=repo.lease_worker(run.run_id,"worker-a",issued_at=NOW)
+    checkpoint=_checkpoint(run,lease,1,"model-1")
+    repo.checkpoint(checkpoint,lease)
+
+    payload=checkpoint.as_dict()
+    payload["model_digest"]=_digest("tampered-model")
+    import json
+    repo._db.execute(
+        "UPDATE training_checkpoint SET checkpoint_json=? "
+        "WHERE checkpoint_digest=?",
+        (json.dumps(payload,sort_keys=True,separators=(",",":")),checkpoint.digest),
+    )
+    repo._db.commit()
+
+    with pytest.raises(TrainingStateError,match="checkpoint identity mismatch"):
+        repo.latest_checkpoint(run.run_id)
+
+
+def test_manifest_read_detects_stored_identity_tampering(tmp_path):
+    datasets,dataset=_dataset(tmp_path)
+    repo=TrainingRepository(tmp_path/"training.sqlite3")
+    run=_manifest(dataset.digest)
+    repo.register_run(run,datasets,created_at=NOW)
+    import json
+    payload=run.as_dict()
+    payload["run_id"]="other-run"
+    payload.pop("manifest_digest",None)
+    replacement=TrainingRunManifest.from_dict(payload)
+    payload=replacement.as_dict()
+    repo._db.execute(
+        "UPDATE training_run SET manifest_json=? WHERE run_id=?",
+        (json.dumps(payload,sort_keys=True,separators=(",",":")),run.run_id),
+    )
+    repo._db.commit()
+
+    with pytest.raises(TrainingStateError,match="manifest identity mismatch"):
+        repo.manifest(run.run_id)
+
+
+def test_invalid_persisted_run_state_fails_closed(tmp_path):
+    datasets,dataset=_dataset(tmp_path)
+    repo=TrainingRepository(tmp_path/"training.sqlite3")
+    run=_manifest(dataset.digest)
+    repo.register_run(run,datasets,created_at=NOW)
+    repo._db.execute(
+        "UPDATE training_run SET state='ghost-running' WHERE run_id=?",
+        (run.run_id,),
+    )
+    repo._db.commit()
+    with pytest.raises(TrainingStateError,match="state is invalid"):
+        repo.state(run.run_id)
+
