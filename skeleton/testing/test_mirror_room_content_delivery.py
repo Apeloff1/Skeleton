@@ -285,6 +285,7 @@ def test_high_end_delivery_is_blocked_before_attempt_100():
     with pytest.raises(MirrorRoomError, match="not ready"):
         qualify_high_end_content_delivery(
             campaign, constitution=CONSTITUTION, challenge_catalog=challenges,
+            judge_receipts=_judges(campaign),
             verifier_id="high-end-delivery-verifier",
             evaluation_refs=("eval:red-team", "eval:quality-panel", "eval:sealed-holdout"),
             verified_at=3,
@@ -302,7 +303,7 @@ def test_quality_constitution_requires_broad_adversarial_coverage():
         for attempt in range(1, 101)
     )
     campaign, catalog = _campaign(challenges=narrow)
-    with pytest.raises(MirrorRoomError, match="insufficient adversarial coverage"):
+    with pytest.raises(MirrorRoomError, match=r"insufficient adversarial (?:coverage|family diversity)"):
         qualify_high_end_content_delivery(
             campaign, constitution=CONSTITUTION, challenge_catalog=catalog,
             judge_receipts=_judges(campaign),
