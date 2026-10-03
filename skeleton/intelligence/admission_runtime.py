@@ -56,6 +56,7 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_UNKNOWN_USAGE_PREFIX = "unknown:"
 _USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -614,14 +615,14 @@ class AdmissionRuntime:
                 "durable quota estimate does not match request"
             )
 
-        finder = getattr(
+        recovery_reader = getattr(
             self.quota_ledger,
-            "reservation_for_operation",
+            "recovery_state_for_operation",
             None,
         )
-        if not callable(finder):
+        if not callable(recovery_reader):
             raise AdmissionRuntimeError(
-                "quota ledger does not support durable reservation lookup"
+                "quota ledger does not support atomic durable recovery lookup"
             )
 
         fingerprint = _request_fingerprint(request)
@@ -638,29 +639,60 @@ class AdmissionRuntime:
                 return current.lease
 
             try:
-                persisted = finder(
+                recovery_state = recovery_reader(
                     request.tenant_id,
                     request.operation_id,
                 )
             except QuotaError as exc:
                 raise AdmissionRuntimeError(
-                    "durable_reservation_unavailable"
+                    "durable_recovery_state_unavailable"
                 ) from exc
-            if persisted is None:
+            if recovery_state is None:
                 raise AdmissionRuntimeConflict(
                     "durable quota reservation is no longer active"
                 )
+            persisted, unresolved = recovery_state
             if persisted != reservation:
                 raise AdmissionRuntimeConflict(
                     "durable quota reservation does not match lease"
                 )
 
+            recovered_unknown: dict[str, UnknownUsageMarker] = {}
+            for event in unresolved:
+                if (
+                    event.reservation_id != reservation.reservation_id
+                    or event.operation_id != request.operation_id
+                    or not event.category.startswith(
+                        _UNKNOWN_USAGE_PREFIX
+                    )
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage identity is invalid"
+                    )
+                category = event.category[len(_UNKNOWN_USAGE_PREFIX):]
+                if category not in _USAGE_CATEGORIES:
+                    raise AdmissionRuntimeConflict(
+                        "durable unknown usage category is invalid"
+                    )
+                recovered_unknown[event.event_id] = UnknownUsageMarker(
+                    event_id=event.event_id,
+                    operation_id=request.operation_id,
+                    category=category,
+                    reason="durable-unknown-usage-recovered",
+                    recorded_at=event.recorded_at,
+                )
+
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
                 request_fingerprint=fingerprint,
-                unknown_usage={},
+                unknown_usage=recovered_unknown,
             )
             self.metrics_registry.inc("admission.reattached_total")
+            if recovered_unknown:
+                self.metrics_registry.inc(
+                    "admission.unknown_usage_reattached_total",
+                    len(recovered_unknown),
+                )
             return lease
 
     def _release_shared_pressure(
@@ -874,10 +906,21 @@ class AdmissionRuntime:
 
             existing = active.unknown_usage.get(event)
             if existing is not None:
-                if (
-                    existing.category != normalized_category
-                    or existing.reason != normalized_reason
-                ):
+                if existing.category != normalized_category:
+                    raise AdmissionRuntimeConflict(
+                        "unknown usage event replayed with different inputs"
+                    )
+                if existing.reason == "durable-unknown-usage-recovered":
+                    restored = UnknownUsageMarker(
+                        event_id=existing.event_id,
+                        operation_id=existing.operation_id,
+                        category=existing.category,
+                        reason=normalized_reason,
+                        recorded_at=existing.recorded_at,
+                    )
+                    active.unknown_usage[event] = restored
+                    return restored
+                if existing.reason != normalized_reason:
                     raise AdmissionRuntimeConflict(
                         "unknown usage event replayed with different inputs"
                     )
