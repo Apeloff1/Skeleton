@@ -403,9 +403,15 @@ def test_claim_reconciliation_keeps_scope_and_surfaces_conflict() -> None:
         Claim("c3", HEX_B, "same", scope, ("s3",), 0.9),
     )
     deduped = ClaimReconciler.deduplicate(claims)
-    assert len(deduped) == 1
-    assert deduped[0].claim_id == "c3"
+    assert len(deduped) == 2
+    assert {item.claim_id for item in deduped} == {"c2", "c3"}
     assert ClaimReconciler.conflicts(claims) == (("c1", "c2", "c3"),)
+
+    other_scope = ClaimScope("children", "NO", 1, 100)
+    scoped = claims + (
+        Claim("c4", HEX_C, "same", other_scope, ("s4",), 0.95),
+    )
+    assert ClaimReconciler.conflicts(scoped) == (("c1", "c2", "c3"),)
 
 
 def test_embedding_identity_binds_dimensions_and_source() -> None:
