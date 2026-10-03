@@ -10,6 +10,10 @@ on:
       - "skeleton/testing/test_distributed_transactions.py"
       - "machine/ai_file_tree.json"
       - "machine/ai_master_plan.json"
+      - "machine/ai_masterplan_continuation_frontier.json"
+      - "machine/ai_p3t2_storage_candidate.json"
+      - "scripts/check_p3t2_storage_candidate.py"
+      - "tests/test_p3t2_storage_candidate.py"
       - ".github/workflows/p3t2-governed-storage.yml"
   push:
     branches:
@@ -70,6 +74,7 @@ jobs:
         run: |
           python scripts/check_ai_file_tree.py
           python scripts/check_ai_master_plan.py
+          python scripts/check_p3t2_storage_candidate.py --head "$(git rev-parse HEAD)" --json
 
       - name: Run P3-T2 storage regressions
         run: >-

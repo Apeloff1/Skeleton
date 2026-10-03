@@ -7828,7 +7828,7 @@
         "skeleton/storage/cas"
       ],
       "tests": [
-        "planned:skeleton/testing/test_distributed_transactions.py"
+        "skeleton/testing/test_distributed_transactions.py"
       ],
       "evaluations": [
         "planned:partial-commit recovery campaign"
@@ -7923,7 +7923,7 @@
         "skeleton/storage/cas"
       ],
       "tests": [
-        "planned:skeleton/testing/test_cache_architecture.py"
+        "skeleton/testing/test_cache_architecture.py"
       ],
       "evaluations": [
         "planned:stale/poisoned cache evaluation"
@@ -7970,7 +7970,7 @@
         "skeleton/storage/cas"
       ],
       "tests": [
-        "planned:skeleton/testing/test_content_addressing.py"
+        "skeleton/testing/test_content_addressing.py"
       ],
       "evaluations": [
         "planned:digest migration evaluation"
