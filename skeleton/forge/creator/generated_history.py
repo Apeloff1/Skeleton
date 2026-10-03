@@ -763,6 +763,21 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
     if history.current_digest not in parsed_snapshots:
         _fail("history current snapshot is missing", reason="snapshot_integrity")
 
+    if history.snapshots != tuple(
+        sorted(history.snapshots, key=lambda row: row.graph_digest)
+    ):
+        _fail(
+            "history snapshot inventory is not canonically ordered",
+            reason="snapshot_integrity",
+        )
+    if history.transitions != tuple(
+        sorted(history.transitions, key=lambda row: row.transition_id)
+    ):
+        _fail(
+            "history transition inventory is not canonically ordered",
+            reason="transition_integrity",
+        )
+
     transition_by_id = _transition_map(history.transitions)
     for transition in history.transitions:
         _transition_id(transition.transition_id)
