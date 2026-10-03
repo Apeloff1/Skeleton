@@ -39,6 +39,7 @@ from .studio_outcomes import OutcomeReceipt
 from .studio_artifact_custody import ArtifactCustody
 from .studio_promotion import PromotionEvidence, require_promotable
 from .build_integration import integration_commands
+from .build_composition import composition_digest
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
@@ -514,6 +515,7 @@ def propose(
     )
 
     accepted = 0
+    accepted_receipts: list[tuple[str, str]] = []
     total_chars = 0
     try:
         for plan_id, task in scoped:
@@ -664,6 +666,7 @@ def propose(
                 transaction["applied_diff_sha256"] = candidate_diff_sha
                 _write_transaction(journal_path, transaction)
                 accepted += 1
+                accepted_receipts.append((plan_id, candidate_diff_sha))
                 audit.emit(
                     "patch_accepted",
                     task=plan_id,
@@ -739,6 +742,12 @@ def propose(
                 status="failed_closed",
             )
             raise RuntimeError("aggregate autonomous build integration validation failed")
+        aggregate_composition_sha = composition_digest(tuple(accepted_receipts))
+        audit.emit(
+            "aggregate_build_composed",
+            composition_sha256=aggregate_composition_sha,
+            accepted_receipts=[{"task": task, "applied_diff_sha256": digest} for task, digest in accepted_receipts],
+        )
         audit.emit(
             "aggregate_integration_validated",
             commands=[list(command) for command in aggregate_commands],
