@@ -757,3 +757,49 @@ def test_canonical_items_rejects_allocation_authorization_mismatch(tmp_path):
     path.write_text(json.dumps(state), encoding="utf-8")
     with pytest.raises(ValueError, match="does not match executable plan"):
         supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_allocation_without_lane_coverage(tmp_path):
+    item = {"id": "actual", "title": "A", "description": "D", "status": "queued"}
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign",
+        "campaign_epoch": 1,
+        "allocation_nonce": "a" * 24,
+        "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64,
+        "frontier_sha256": "c" * 64,
+        "authorized_plan_ids": ["actual"],
+        "lane_assignments": {},
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {"_shift_supervisor": {
+        "status": "loaded", "team": "night", "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64, "plan_items": [item], "allocation": allocation,
+    }}
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="lane assignments do not cover"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_malformed_allocation_nonce(tmp_path):
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign", "campaign_epoch": 1, "allocation_nonce": "bad",
+        "generation_id": "gen", "plan_digest_sha256": "b" * 64,
+        "frontier_sha256": "c" * 64, "authorized_plan_ids": [], "lane_assignments": {},
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {"_shift_supervisor": {
+        "status": "loaded", "team": "night", "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64, "plan_items": [], "allocation": allocation,
+    }}
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="nonce is malformed"):
+        supervised_studio._canonical_items(path, 1)
