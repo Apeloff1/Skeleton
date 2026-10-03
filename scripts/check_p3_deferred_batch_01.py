@@ -48,6 +48,28 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     source = _load(root, SOURCE)
     master = _load(root, MASTER)
 
+    if batch.get("schema_version") != "skeleton.ai.p3.deferred_batch.v1":
+        raise DeferredBatchValidationError("deferred batch schema drift")
+    if batch.get("batch_id") != "P3-DEFERRED-BATCH-01":
+        raise DeferredBatchValidationError("deferred batch identity drift")
+    if batch.get("phase") != "P3-T3":
+        raise DeferredBatchValidationError("deferred batch phase drift")
+    if batch.get("status") != "implemented_pending_validation":
+        raise DeferredBatchValidationError("deferred batch status drift")
+
+    source_meta = batch.get("source")
+    if not isinstance(source_meta, dict):
+        raise DeferredBatchValidationError("deferred batch source authority must be an object")
+    expected_source = {
+        "execution_map": str(SOURCE),
+        "queue_pointer": "#/first_tranche/queued_volume_refs",
+        "source_queue_count": 178,
+        "source_is_frozen": True,
+    }
+    for key, expected in expected_source.items():
+        if source_meta.get(key) != expected:
+            raise DeferredBatchValidationError(f"deferred batch source authority drift: {key}")
+
     queue = source.get("first_tranche", {}).get("queued_volume_refs")
     if not isinstance(queue, list) or len(queue) != 178 or len(set(queue)) != 178:
         raise DeferredBatchValidationError("source P3-T2 deferred frontier must remain exactly 178 unique volumes")
@@ -66,11 +88,17 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if set(remaining) | set(selected) != set(queue) or set(remaining) & set(selected):
         raise DeferredBatchValidationError("successor projection must preserve the source queue exactly")
 
-    tasks = {
-        task.get("task_id"): task
-        for task in batch.get("tasks", [])
+    raw_tasks = batch.get("tasks")
+    if not isinstance(raw_tasks, list):
+        raise DeferredBatchValidationError("batch tasks must be a list")
+    task_ids = [
+        task.get("task_id")
+        for task in raw_tasks
         if isinstance(task, dict) and task.get("task_id")
-    }
+    ]
+    if len(task_ids) != len(raw_tasks) or len(task_ids) != len(set(task_ids)):
+        raise DeferredBatchValidationError("batch task IDs must be unique and non-empty")
+    tasks = {task["task_id"]: task for task in raw_tasks}
     if set(tasks) != set(EXPECTED_TASKS):
         raise DeferredBatchValidationError("batch task inventory drift")
 
@@ -86,16 +114,38 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             raise DeferredBatchValidationError(f"{task_id} dependency drift")
         owned.extend(refs)
         status = str(task.get("status", "")).lower()
-        if not status or status in FORBIDDEN_TERMINAL_STATUSES:
-            raise DeferredBatchValidationError(f"{task_id} may not claim terminal completion")
+        if status != "implemented_pending_validation":
+            raise DeferredBatchValidationError(
+                f"{task_id} status must remain implemented_pending_validation"
+            )
         if (
             task.get("completion_checkbox") is not False
             or task.get("implementation_signed") is not False
             or task.get("verification_signed") is not False
         ):
             raise DeferredBatchValidationError(f"{task_id} may not self-complete or self-sign")
-        implementation_paths.update(str(path) for path in task.get("implementation_paths", []))
-        test_paths.update(str(path) for path in task.get("test_paths", []))
+        declared_implementation = task.get("implementation_paths")
+        declared_tests = task.get("test_paths")
+        if (
+            not isinstance(declared_implementation, list)
+            or not declared_implementation
+            or len(declared_implementation) != len(set(declared_implementation))
+            or not all(isinstance(path, str) and path for path in declared_implementation)
+        ):
+            raise DeferredBatchValidationError(
+                f"{task_id} implementation_paths must be unique non-empty paths"
+            )
+        if (
+            not isinstance(declared_tests, list)
+            or not declared_tests
+            or len(declared_tests) != len(set(declared_tests))
+            or not all(isinstance(path, str) and path for path in declared_tests)
+        ):
+            raise DeferredBatchValidationError(
+                f"{task_id} test_paths must be unique non-empty paths"
+            )
+        implementation_paths.update(declared_implementation)
+        test_paths.update(declared_tests)
 
     if len(owned) != 11 or len(set(owned)) != 11 or set(owned) != set(selected):
         raise DeferredBatchValidationError("every selected volume requires exactly one task owner")
