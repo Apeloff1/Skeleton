@@ -295,6 +295,60 @@ def _repo_manifest(limit: int = 500) -> str:
     return "\n".join(files[:limit])
 
 
+def _related_repository_context(paths: Iterable[str], *, limit: int = 24) -> tuple[str, ...]:
+    seeds = tuple(dict.fromkeys(str(path) for path in paths))
+    terms: set[str] = set()
+    for path in seeds:
+        stem = PurePosixPath(path).stem
+        if len(stem) >= 4:
+            terms.add(stem)
+        for part in PurePosixPath(path).parts[-3:-1]:
+            if len(part) >= 4 and part not in {"skeleton", "backend", "scripts", "docs", "tests", "testing"}:
+                terms.add(part)
+    candidates: list[tuple[int, str]] = []
+    for raw in _git("ls-files").splitlines():
+        path = raw.strip()
+        if not path or path in seeds or path.startswith((".git/", ".studio/", ".github/")):
+            continue
+        score = sum(1 for term in terms if term.lower() in path.lower())
+        if score:
+            candidates.append((-score, path))
+    evidence: list[str] = []
+    for _, path in sorted(candidates)[:limit]:
+        file_path = Path(path)
+        if not file_path.is_file() or file_path.stat().st_size > 256_000:
+            continue
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        evidence.append(f"RELATED FILE {path}\n{content[:8000]}")
+    return tuple(evidence)
+
+
+def _discover_validation_commands(paths: Iterable[str]) -> tuple[str, ...]:
+    commands: list[str] = []
+    canonical = tuple(dict.fromkeys(str(path) for path in paths))
+    py_paths = [path for path in canonical if path.endswith(".py")]
+    test_paths = [path for path in py_paths if "/test" in path or PurePosixPath(path).name.startswith("test_")]
+    if test_paths:
+        commands.append("python -m pytest -q " + " ".join(test_paths[:8]))
+    else:
+        sibling_tests: list[str] = []
+        stems = {PurePosixPath(path).stem for path in py_paths}
+        for raw in _git("ls-files").splitlines():
+            path = raw.strip()
+            name = PurePosixPath(path).name
+            if path.endswith(".py") and ("/test" in path or name.startswith("test_")):
+                if any(stem in name or stem in path for stem in stems if len(stem) >= 4):
+                    sibling_tests.append(path)
+        if sibling_tests:
+            commands.append("python -m pytest -q " + " ".join(sorted(sibling_tests)[:8]))
+    if py_paths:
+        commands.append("python -m compileall -q " + " ".join(py_paths[:8]))
+    return tuple(commands[:3])
+
+
 def _read_context(paths: Iterable[str]) -> tuple[str, ...]:
     evidence: list[str] = []
     for path in paths:
@@ -526,7 +580,7 @@ def _build_and_review(
     seed: str,
 ) -> ReviewedPatch | None:
     squad = select_task_squad(task.division, seed=f"{seed}:{task.title}")
-    context = _read_context(task.paths)
+    context = (*_read_context(task.paths), *_related_repository_context(task.paths))
 
     research = _call_json(
         reasoner,
