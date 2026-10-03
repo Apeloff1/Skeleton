@@ -54,6 +54,7 @@ from skeleton.intelligence.quota import (
 )
 from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
 from skeleton.intelligence.shared_pressure import (
+    SharedPressureError,
     SharedPressureLease,
     SqliteSharedPressureLedger,
 )
@@ -1390,6 +1391,14 @@ class _SqliteCostGovernorJournal:
                     remaining=remaining,
                     admitted_at=float(admitted_at),
                 )
+                # Validate the exact serialized form before it becomes durable.
+                validated = _admission_intent_from_payload(
+                    updated.as_dict()
+                )
+                if validated != updated:
+                    raise CostGovernorConflict(
+                        "admission decision intent changed during normalization"
+                    )
                 if existing.has_decision and existing != updated:
                     raise CostGovernorConflict(
                         "admission decision replayed with different inputs"
@@ -2209,7 +2218,7 @@ class CostGovernor:
                 selected.operation_id,
                 now=now_wall,
             )
-        except Exception as exc:
+        except SharedPressureError as exc:
             raise CostGovernorError(
                 "shared pressure admission recovery lookup failed"
             ) from exc
