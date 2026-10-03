@@ -21,6 +21,11 @@ on:
       - ".github/workflows/p0-ai-authority-boundary-current.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-ai-authority-boundary-current-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
