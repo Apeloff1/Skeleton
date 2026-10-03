@@ -47,8 +47,23 @@ class WorkGraph:
         object.__setattr__(self,"_ordered_nodes",tuple(enriched)); object.__setattr__(self,"_by_identity",{n.identity:n for n in enriched})
         object.__setattr__(self,"_depth",depth); object.__setattr__(self,"_descendants",{k:frozenset(v) for k,v in descendants.items()})
     def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":max(self._depth.values(),default=0)}
-    def frontier(self,completed:Iterable[str]=()):
-        done=set(completed); return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity))
+    def frontier(self, completed: Iterable[str] = ()) -> tuple[WorkNode, ...]:
+        done = set(completed)
+        return tuple(
+            sorted(
+                (
+                    node
+                    for node in self._ordered_nodes
+                    if node.identity not in done
+                    and all(prerequisite in done for prerequisite in node.prerequisites)
+                ),
+                key=lambda node: (
+                    -node.strategic_score,
+                    -node.priority,
+                    node.identity,
+                ),
+            )
+        )
     def ready(self,completed=(),active_conflicts=(),*,limit=8):
         done=set(completed); unknown=done-set(self._by_identity)
         if unknown: raise ValueError("completed contains unknown work identities")
