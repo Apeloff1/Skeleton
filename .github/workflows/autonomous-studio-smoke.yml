@@ -5,13 +5,29 @@ on:
     types: [opened, synchronize, reopened, closed]
     paths:
       - 'skeleton/automation/studio_*.py'
+      - 'skeleton/automation/build_*.py'
+      - 'skeleton/automation/ci_*.py'
+      - 'skeleton/automation/repair_*.py'
+      - 'skeleton/automation/evidence_provenance.py'
+      - 'skeleton/automation/autonomous_build.py'
+      - 'skeleton/automation/supervised_studio.py'
+      - 'skeleton/automation/supervisor_repair_ingest.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
+      - 'skeleton/testing/test_build_*.py'
+      - 'skeleton/testing/test_ci_*.py'
+      - 'skeleton/testing/test_repair_*.py'
+      - 'skeleton/testing/test_evidence_provenance.py'
+      - 'skeleton/testing/test_autonomous_build.py'
+      - 'skeleton/testing/test_supervised_studio.py'
+      - 'skeleton/testing/test_completion_campaign.py'
       - 'core/shift_supervisor/**'
       - 'tests/test_shift_supervisor_planning_harness.py'
       - 'tests/test_shift_supervisor_peak_loop.py'
       - 'tests/test_shift_supervisor_scheduler.py'
+      - 'tests/test_shift_supervisor_consumer_plan.py'
       - '.github/workflows/autonomous-studio.yml'
+      - '.github/workflows/autonomous-build-feedback.yml'
       - '.github/workflows/autonomous-studio-smoke.yml'
   workflow_dispatch:
 
@@ -70,7 +86,14 @@ jobs:
             skeleton/testing/test_studio_registry.py \
             skeleton/testing/test_studio_director.py \
             skeleton/testing/test_studio_report.py \
+            skeleton/testing/test_completion_campaign.py \
             skeleton/testing/test_studio_pipeline_smoke.py \
+            skeleton/testing/test_supervised_studio.py \
+            skeleton/testing/test_autonomous_build.py \
+            skeleton/testing/test_build_*.py \
+            skeleton/testing/test_ci_*.py \
+            skeleton/testing/test_repair_*.py \
+            skeleton/testing/test_evidence_provenance.py \
             -q --tb=short --maxfail=1
 
       - name: Run deterministic Shift Supervisor planning suite
@@ -79,6 +102,7 @@ jobs:
             tests/test_shift_supervisor_planning_harness.py \
             tests/test_shift_supervisor_peak_loop.py \
             tests/test_shift_supervisor_scheduler.py \
+            tests/test_shift_supervisor_consumer_plan.py \
             -q --tb=short --maxfail=1
 
       - name: Run 1,000-worker SMB planning stress contract

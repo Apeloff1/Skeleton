@@ -11,6 +11,11 @@ on:
       - ".github/workflows/p0-archive-security-evidence-current.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-archive-security-evidence-current-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

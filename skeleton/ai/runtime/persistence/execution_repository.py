@@ -25,6 +25,7 @@ from skeleton.contracts.ai_execution import (
     ExecutionCheckpoint,
     ExecutionFinalizationIntent,
     ExecutionState,
+    execution_payload_digest,
 )
 from skeleton.contracts.verification import VerificationReceipt
 
@@ -156,6 +157,7 @@ class SQLiteExecutionRepository:
                     execution_id TEXT NOT NULL,
                     operation_id TEXT NOT NULL,
                     identity_digest TEXT NOT NULL,
+                    state_digest TEXT NOT NULL,
                     request_json TEXT NOT NULL,
                     state TEXT NOT NULL,
                     version INTEGER NOT NULL,
@@ -173,6 +175,7 @@ class SQLiteExecutionRepository:
                     turn_id TEXT NOT NULL,
                     turn_index INTEGER NOT NULL,
                     parent_turn_id TEXT,
+                    turn_digest TEXT NOT NULL,
                     turn_json TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id, turn_id),
                     UNIQUE(namespace, execution_id, turn_index),
@@ -185,6 +188,7 @@ class SQLiteExecutionRepository:
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
                     checkpoint_version INTEGER NOT NULL,
+                    checkpoint_digest TEXT NOT NULL,
                     checkpoint_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id, checkpoint_version),
@@ -196,6 +200,7 @@ class SQLiteExecutionRepository:
                 CREATE TABLE IF NOT EXISTS ai_execution_result (
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
+                    result_digest TEXT NOT NULL,
                     result_json TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
                     PRIMARY KEY(namespace, execution_id),
@@ -245,6 +250,7 @@ class SQLiteExecutionRepository:
                     execution_id TEXT NOT NULL,
                     execution_version INTEGER NOT NULL,
                     event_type TEXT NOT NULL,
+                    payload_digest TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     published_at TEXT,
@@ -259,6 +265,198 @@ class SQLiteExecutionRepository:
                 ON ai_execution_outbox(namespace, published_at, created_at);
                 """
             )
+            state_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_state)"
+                )
+            }
+            if "state_digest" not in state_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_state "
+                    "ADD COLUMN state_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT * FROM ai_execution_state
+                WHERE state_digest IS NULL OR state_digest = ''
+                """
+            ).fetchall():
+                request_payload = _json_object(
+                    row["request_json"],
+                    "request_json",
+                )
+                request = self._request_from_dict(request_payload)
+                if request.identity_digest != row["identity_digest"]:
+                    raise ExecutionRepositoryCorruption(
+                        "persisted execution identity digest mismatch"
+                    )
+                execution = AIExecution(
+                    request=request,
+                    state=ExecutionState(row["state"]),
+                    version=int(row["version"]),
+                    latest_turn_index=int(row["latest_turn_index"]),
+                    checkpoint_version=int(row["checkpoint_version"]),
+                    cancellation_requested=bool(
+                        row["cancellation_requested"]
+                    ),
+                    updated_at=_parse_time(
+                        row["updated_at"],
+                        "updated_at",
+                    ),
+                )
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_state
+                    SET state_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (
+                        self._execution_state_digest(execution),
+                        row["namespace"],
+                        row["execution_id"],
+                    ),
+                )
+
+            turn_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_turn)"
+                )
+            }
+            if "turn_digest" not in turn_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_turn "
+                    "ADD COLUMN turn_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, turn_id, turn_json
+                FROM ai_execution_turn
+                WHERE turn_digest IS NULL OR turn_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["turn_json"], "turn_json")
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_turn
+                    SET turn_digest = ?
+                    WHERE namespace = ? AND execution_id = ? AND turn_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                        row["turn_id"],
+                    ),
+                )
+
+            checkpoint_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_checkpoint)"
+                )
+            }
+            if "checkpoint_digest" not in checkpoint_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_checkpoint "
+                    "ADD COLUMN checkpoint_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, checkpoint_version,
+                       checkpoint_json
+                FROM ai_execution_checkpoint
+                WHERE checkpoint_digest IS NULL OR checkpoint_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(
+                    row["checkpoint_json"],
+                    "checkpoint_json",
+                )
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_checkpoint
+                    SET checkpoint_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                      AND checkpoint_version = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                        row["checkpoint_version"],
+                    ),
+                )
+
+            result_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_result)"
+                )
+            }
+            if "result_digest" not in result_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_result "
+                    "ADD COLUMN result_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, execution_id, result_json
+                FROM ai_execution_result
+                WHERE result_digest IS NULL OR result_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["result_json"], "result_json")
+                result = self._result_from_payload(payload)
+                digest = execution_payload_digest(result.as_dict())
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_result
+                    SET result_digest = ?
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["execution_id"],
+                    ),
+                )
+
+            outbox_columns = {
+                str(row["name"])
+                for row in self._connection.execute(
+                    "PRAGMA table_info(ai_execution_outbox)"
+                )
+            }
+            if "payload_digest" not in outbox_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_outbox "
+                    "ADD COLUMN payload_digest TEXT"
+                )
+            for row in self._connection.execute(
+                """
+                SELECT namespace, outbox_id, payload_json
+                FROM ai_execution_outbox
+                WHERE payload_digest IS NULL OR payload_digest = ''
+                """
+            ).fetchall():
+                payload = _json_object(row["payload_json"], "payload_json")
+                digest = execution_payload_digest(payload)
+                self._connection.execute(
+                    """
+                    UPDATE ai_execution_outbox
+                    SET payload_digest = ?
+                    WHERE namespace = ? AND outbox_id = ?
+                    """,
+                    (
+                        digest,
+                        row["namespace"],
+                        row["outbox_id"],
+                    ),
+                )
 
     @staticmethod
     def _request_from_dict(payload: dict[str, Any]) -> AIExecutionRequest:
@@ -274,6 +472,23 @@ class SQLiteExecutionRepository:
             created_at=_parse_time(payload["created_at"], "created_at"),
         )
 
+    @staticmethod
+    def _execution_state_digest(execution: AIExecution) -> str:
+        return execution_payload_digest(
+            {
+                "operation_id": execution.operation_id,
+                "execution_id": execution.execution_id,
+                "identity_digest": execution.request.identity_digest,
+                "state": execution.state.value,
+                "version": execution.version,
+                "latest_turn_index": execution.latest_turn_index,
+                "checkpoint_version": execution.checkpoint_version,
+                "cancellation_requested":
+                    execution.cancellation_requested,
+                "updated_at": execution.updated_at.isoformat(),
+            }
+        )
+
     def _execution_from_row(self, row: sqlite3.Row) -> AIExecution:
         try:
             request_payload = _json_object(row["request_json"], "request_json")
@@ -282,7 +497,14 @@ class SQLiteExecutionRepository:
                 raise ExecutionRepositoryCorruption(
                     "persisted execution identity digest mismatch"
                 )
-            return AIExecution(
+            if (
+                request.execution_id != row["execution_id"]
+                or request.operation_id != row["operation_id"]
+            ):
+                raise ExecutionRepositoryCorruption(
+                    "persisted execution request identity mismatch"
+                )
+            execution = AIExecution(
                 request=request,
                 state=ExecutionState(row["state"]),
                 version=int(row["version"]),
@@ -291,6 +513,12 @@ class SQLiteExecutionRepository:
                 cancellation_requested=bool(row["cancellation_requested"]),
                 updated_at=_parse_time(row["updated_at"], "updated_at"),
             )
+            digest = self._execution_state_digest(execution)
+            if digest != row["state_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted execution state digest mismatch"
+                )
+            return execution
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
@@ -302,7 +530,7 @@ class SQLiteExecutionRepository:
     def _turn_from_row(row: sqlite3.Row) -> AgentTurn:
         try:
             payload = _json_object(row["turn_json"], "turn_json")
-            return AgentTurn(
+            turn = AgentTurn(
                 operation_id=payload["operation_id"],
                 execution_id=payload["execution_id"],
                 turn_id=payload["turn_id"],
@@ -319,6 +547,14 @@ class SQLiteExecutionRepository:
                 checkpoint_ref=payload["checkpoint_ref"],
                 status=payload["status"],
             )
+            digest = execution_payload_digest(turn.as_dict())
+            if digest != row["turn_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted turn digest mismatch"
+                )
+            return turn
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted turn violates contract"
@@ -328,7 +564,7 @@ class SQLiteExecutionRepository:
     def _checkpoint_from_row(row: sqlite3.Row) -> ExecutionCheckpoint:
         try:
             payload = _json_object(row["checkpoint_json"], "checkpoint_json")
-            return ExecutionCheckpoint(
+            checkpoint = ExecutionCheckpoint(
                 operation_id=payload["operation_id"],
                 execution_id=payload["execution_id"],
                 checkpoint_version=int(payload["checkpoint_version"]),
@@ -339,6 +575,14 @@ class SQLiteExecutionRepository:
                 payload_digest=payload["payload_digest"],
                 created_at=_parse_time(payload["created_at"], "created_at"),
             )
+            digest = execution_payload_digest(checkpoint.as_dict())
+            if digest != row["checkpoint_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted checkpoint digest mismatch"
+                )
+            return checkpoint
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted checkpoint violates contract"
@@ -368,7 +612,15 @@ class SQLiteExecutionRepository:
     def _result_from_row(cls, row: sqlite3.Row) -> AIExecutionResult:
         try:
             payload = _json_object(row["result_json"], "result_json")
-            return cls._result_from_payload(payload)
+            result = cls._result_from_payload(payload)
+            digest = execution_payload_digest(result.as_dict())
+            if digest != row["result_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted result digest mismatch"
+                )
+            return result
+        except ExecutionRepositoryCorruption:
+            raise
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted result violates contract"
@@ -461,19 +713,32 @@ class SQLiteExecutionRepository:
 
     @staticmethod
     def _outbox_from_row(row: sqlite3.Row) -> ExecutionOutboxEvent:
-        return ExecutionOutboxEvent(
-            outbox_id=row["outbox_id"],
-            execution_id=row["execution_id"],
-            execution_version=int(row["execution_version"]),
-            event_type=row["event_type"],
-            payload=_json_object(row["payload_json"], "payload_json"),
-            created_at=_parse_time(row["created_at"], "created_at"),
-            published_at=(
-                None
-                if row["published_at"] is None
-                else _parse_time(row["published_at"], "published_at")
-            ),
-        )
+        try:
+            payload = _json_object(row["payload_json"], "payload_json")
+            digest = execution_payload_digest(payload)
+            if digest != row["payload_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted outbox payload digest mismatch"
+                )
+            return ExecutionOutboxEvent(
+                outbox_id=row["outbox_id"],
+                execution_id=row["execution_id"],
+                execution_version=int(row["execution_version"]),
+                event_type=row["event_type"],
+                payload=payload,
+                created_at=_parse_time(row["created_at"], "created_at"),
+                published_at=(
+                    None
+                    if row["published_at"] is None
+                    else _parse_time(row["published_at"], "published_at")
+                ),
+            )
+        except ExecutionRepositoryCorruption:
+            raise
+        except Exception as exc:
+            raise ExecutionRepositoryCorruption(
+                "persisted outbox event violates contract"
+            ) from exc
 
     def create(
         self,
@@ -503,26 +768,32 @@ class SQLiteExecutionRepository:
                     self._connection.execute("COMMIT")
                     return current
 
+                initial = AIExecution(
+                    request=request,
+                    updated_at=instant,
+                )
                 self._connection.execute(
                     """
                     INSERT INTO ai_execution_state(
                         namespace, execution_id, operation_id, identity_digest,
-                        request_json, state, version, latest_turn_index,
-                        checkpoint_version, cancellation_requested, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, 1, -1, 0, 0, ?)
+                        state_digest, request_json, state, version,
+                        latest_turn_index, checkpoint_version,
+                        cancellation_requested, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, -1, 0, 0, ?)
                     """,
                     (
                         self.namespace,
                         request.execution_id,
                         request.operation_id,
                         request.identity_digest,
+                        self._execution_state_digest(initial),
                         _json_dump(request.as_dict()),
                         ExecutionState.CREATED.value,
                         instant.isoformat(),
                     ),
                 )
                 self._connection.execute("COMMIT")
-                return AIExecution(request=request, updated_at=instant)
+                return initial
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(
@@ -566,13 +837,15 @@ class SQLiteExecutionRepository:
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET state = ?, version = ?, updated_at = ?
+                    SET state = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         updated.state.value,
                         updated.version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -607,15 +880,26 @@ class SQLiteExecutionRepository:
                 if current.terminal:
                     self._connection.execute("COMMIT")
                     return current
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=current.version + 1,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=True,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET cancellation_requested = 1, version = ?, updated_at = ?
+                    SET cancellation_requested = 1, version = ?,
+                        updated_at = ?, state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
-                        current.version + 1,
+                        updated.version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -626,15 +910,7 @@ class SQLiteExecutionRepository:
                         "execution version changed during cancellation request"
                     )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=current.state,
-                    version=current.version + 1,
-                    latest_turn_index=current.latest_turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=True,
-                    updated_at=instant,
-                )
+                return updated
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -686,8 +962,8 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_turn(
                         namespace, execution_id, turn_id, turn_index,
-                        parent_turn_id, turn_json
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        parent_turn_id, turn_digest, turn_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
@@ -695,20 +971,32 @@ class SQLiteExecutionRepository:
                         turn.turn_id,
                         turn.turn_index,
                         turn.parent_turn_id,
+                        execution_payload_digest(turn.as_dict()),
                         _json_dump(turn.as_dict()),
                     ),
                 )
                 next_version = current.version + 1
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=next_version,
+                    latest_turn_index=turn.turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET latest_turn_index = ?, version = ?, updated_at = ?
+                    SET latest_turn_index = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         turn.turn_index,
                         next_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         turn.execution_id,
                         current.version,
@@ -719,15 +1007,7 @@ class SQLiteExecutionRepository:
                         "execution changed during turn append"
                     )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=current.state,
-                    version=next_version,
-                    latest_turn_index=turn.turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=current.cancellation_requested,
-                    updated_at=instant,
-                )
+                return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(
@@ -787,21 +1067,32 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_checkpoint(
                         namespace, execution_id, checkpoint_version,
-                        checkpoint_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?)
+                        checkpoint_digest, checkpoint_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
                         execution_id,
                         next_checkpoint_version,
+                        execution_payload_digest(checkpoint.as_dict()),
                         _json_dump(checkpoint.as_dict()),
                         instant.isoformat(),
                     ),
                 )
+                updated = AIExecution(
+                    request=current.request,
+                    state=current.state,
+                    version=next_execution_version,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=next_checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET checkpoint_version = ?, version = ?, updated_at = ?
+                    SET checkpoint_version = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ?
                       AND version = ? AND checkpoint_version = ?
                     """,
@@ -809,6 +1100,7 @@ class SQLiteExecutionRepository:
                         next_checkpoint_version,
                         next_execution_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         execution_id,
                         current.version,
@@ -1154,16 +1446,27 @@ class SQLiteExecutionRepository:
                     )
                 next_state = target.state
                 next_version = target.version
+                updated = AIExecution(
+                    request=current.request,
+                    state=next_state,
+                    version=next_version,
+                    latest_turn_index=current.latest_turn_index,
+                    checkpoint_version=current.checkpoint_version,
+                    cancellation_requested=current.cancellation_requested,
+                    updated_at=instant,
+                )
 
                 self._connection.execute(
                     """
                     INSERT INTO ai_execution_result(
-                        namespace, execution_id, result_json, completed_at
-                    ) VALUES (?, ?, ?, ?)
+                        namespace, execution_id, result_digest,
+                        result_json, completed_at
+                    ) VALUES (?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
                         result.execution_id,
+                        execution_payload_digest(result.as_dict()),
                         _json_dump(result.as_dict()),
                         result.completed_at.isoformat(),
                     ),
@@ -1195,8 +1498,9 @@ class SQLiteExecutionRepository:
                     """
                     INSERT INTO ai_execution_outbox(
                         namespace, outbox_id, execution_id, execution_version,
-                        event_type, payload_json, created_at, published_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+                        event_type, payload_digest, payload_json,
+                        created_at, published_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
                     """,
                     (
                         self.namespace,
@@ -1204,6 +1508,7 @@ class SQLiteExecutionRepository:
                         result.execution_id,
                         next_version,
                         "execution." + result.status,
+                        execution_payload_digest(payload),
                         _json_dump(payload),
                         instant.isoformat(),
                     ),
@@ -1211,13 +1516,15 @@ class SQLiteExecutionRepository:
                 cursor = self._connection.execute(
                     """
                     UPDATE ai_execution_state
-                    SET state = ?, version = ?, updated_at = ?
+                    SET state = ?, version = ?, updated_at = ?,
+                        state_digest = ?
                     WHERE namespace = ? AND execution_id = ? AND version = ?
                     """,
                     (
                         next_state.value,
                         next_version,
                         instant.isoformat(),
+                        self._execution_state_digest(updated),
                         self.namespace,
                         result.execution_id,
                         current.version,
@@ -1235,15 +1542,7 @@ class SQLiteExecutionRepository:
                     (self.namespace, result.execution_id),
                 )
                 self._connection.execute("COMMIT")
-                return AIExecution(
-                    request=current.request,
-                    state=next_state,
-                    version=next_version,
-                    latest_turn_index=current.latest_turn_index,
-                    checkpoint_version=current.checkpoint_version,
-                    cancellation_requested=current.cancellation_requested,
-                    updated_at=instant,
-                )
+                return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
                 raise ExecutionRepositoryConflict(

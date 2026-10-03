@@ -11,6 +11,11 @@ on:
       - ".github/workflows/p0-rooted-fs-race-evidence.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-rooted-fs-race-evidence-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

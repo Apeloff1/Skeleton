@@ -14,6 +14,11 @@ on:
       - ".github/workflows/p0-process-environment-boundary.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-process-environment-boundary-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
