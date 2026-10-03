@@ -494,7 +494,11 @@ async def test_stage7_approval_write_survives_restart_and_executes_effect_once(
         effects.append(request.approval_ref)
         return "artifact:approved-write"
 
-    await first_tools.register(manifest, first_handler)
+    await first_tools.register(
+        manifest,
+        first_handler,
+        postcondition=lambda _request, _result_ref: True,
+    )
     first_provider = _SequenceProvider(
         [
             _tool_response(
@@ -558,7 +562,11 @@ async def test_stage7_approval_write_survives_restart_and_executes_effect_once(
         effects.append(request.approval_ref)
         return "artifact:approved-write"
 
-    await restarted_tools.register(manifest, restarted_handler)
+    await restarted_tools.register(
+        manifest,
+        restarted_handler,
+        postcondition=lambda _request, _result_ref: True,
+    )
     final_provider = _SequenceProvider(
         [_text_response("write confirmed", response_id="provider-write-final")]
     )
@@ -789,7 +797,11 @@ async def test_stage7_artifact_action_is_receipted_once(
         effects.append(build_id)
         return "artifact:" + build_id
 
-    await tools.register(manifest, package)
+    await tools.register(
+        manifest,
+        package,
+        postcondition=lambda _request, _result_ref: True,
+    )
 
     provider = _SequenceProvider(
         [
@@ -894,7 +906,11 @@ async def test_stage7_expired_approval_can_be_renewed_without_widening_identity(
         effects.append(request.approval_ref)
         return "artifact:renewed-write"
 
-    await first_tools.register(manifest, handler)
+    await first_tools.register(
+        manifest,
+        handler,
+        postcondition=lambda _request, _result_ref: True,
+    )
     first_provider = _SequenceProvider(
         [
             _tool_response(
@@ -995,7 +1011,11 @@ async def test_stage7_expired_approval_can_be_renewed_without_widening_identity(
     restarted_tools = AsyncToolRuntime(
         receipt_store=SQLiteToolReceiptStore(receipt_path)
     )
-    await restarted_tools.register(manifest, handler)
+    await restarted_tools.register(
+        manifest,
+        handler,
+        postcondition=lambda _request, _result_ref: True,
+    )
     final_provider = _SequenceProvider(
         [_text_response("renewed write confirmed", response_id="provider-renew-final")]
     )
