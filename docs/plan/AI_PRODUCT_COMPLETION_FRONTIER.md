@@ -334,6 +334,34 @@ runtime artifact selection and provider activation remain separate authorities,
 so the training system cannot silently self-activate a model merely because it
 trained or evaluated successfully.
 
+### 21. Real pixel learning and cross-view identity
+
+The camera-learning path now accepts real image signal rather than camera hashes
+alone. Sanitized image bytes are re-authenticated against the multimodal intake
+digest, decoded with bounded dimensions, checked against sanitized width/height
+metadata, and reduced into deterministic RGB statistics, luminance histograms,
+4x4 spatial features and edge density. Those features are content-addressed and
+bound to the exact camera-view identity.
+
+Camera coverage is now self-authenticating. Coverage-plan digests are recomputed
+from policy + exact view inventory, and pixel-derived observations require an
+authenticated subset whose view references are proven members of that coverage.
+This prevents a camera-view hash and a coverage digest from being paired
+arbitrarily after training.
+
+A twentieth executable learning family, `cross_view_consistency`, consumes two
+or more authenticated visual observations and trains one invariant target across
+their camera poses. Existing `multiview_grounding` still creates per-view
+supervision; cross-view consistency adds the complementary requirement that
+scene/object identity survive viewpoint changes.
+
+Product candidate training can also accept supplemental `TrainingExample`
+values under a separate explicit opt-in. This lets accepted dialogue and
+authenticated multimodal/camera examples train one artifact and one training
+plan while preserving exact supplemental-example, visual-observation and camera
+coverage digests in the evaluation manifest. Supplemental examples are rejected
+without opt-in and may not collide with conversation-derived example ids.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -370,7 +398,11 @@ trained or evaluated successfully.
   reconciliation without production authority;
 - compiled-corpus -> canonical ModelArtifact/TrainingReceipt conversion;
 - independently verified canonical ModelPromotionReceipt creation without
-  runtime self-activation.
+  runtime self-activation;
+- real authenticated pixel observations in multiview training;
+- authenticated camera coverage subsets and tamper rejection;
+- cross-view consistency training across multiple camera images;
+- explicit supplemental multimodal examples in the same product candidate.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
