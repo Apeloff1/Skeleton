@@ -186,6 +186,7 @@ class AdmissionLease:
     decision: AdmissionDecision
     quota_reservation: QuotaReservation | None
     admitted_at: float
+    shared_pressure_lease: SharedPressureLease | None = None
 
     @property
     def operation_id(self) -> str:
@@ -205,6 +206,11 @@ class AdmissionLease:
                 else self.quota_reservation.reservation_id
             ),
             "admitted_at": self.admitted_at,
+            "shared_pressure_lease_id": (
+                None
+                if self.shared_pressure_lease is None
+                else self.shared_pressure_lease.lease_id
+            ),
         }
 
 
@@ -464,6 +470,7 @@ class AdmissionRuntime:
                 decision=decision,
                 quota_reservation=reservation,
                 admitted_at=wall,
+                shared_pressure_lease=shared_lease,
             )
             self.metrics_registry.inc("admission.admitted_total")
             _observe_usage(
@@ -483,6 +490,8 @@ class AdmissionRuntime:
         self,
         request: AdmissionRequest,
         lease: AdmissionLease,
+        *,
+        now_wall: float | None = None,
     ) -> AdmissionLease:
         """Restore an already-durable lease without re-running admission.
 
@@ -496,10 +505,56 @@ class AdmissionRuntime:
             raise TypeError("request must be an AdmissionRequest")
         if not isinstance(lease, AdmissionLease):
             raise TypeError("lease must be an AdmissionLease")
-        if self.shared_pressure_ledger is not None:
-            raise AdmissionRuntimeError(
-                "shared_pressure_reattach_requires_durable_lease_metadata"
+        wall = _wall_time(now_wall, field="now_wall")
+        shared_lease = lease.shared_pressure_lease
+        if self.shared_pressure_ledger is None:
+            if shared_lease is not None:
+                raise AdmissionRuntimeError(
+                    "durable lease requires shared pressure ledger"
+                )
+        else:
+            if shared_lease is None:
+                raise AdmissionRuntimeError(
+                    "shared pressure reattach requires durable lease metadata"
+                )
+            if (
+                shared_lease.scope != self.shared_pressure_scope
+                or shared_lease.owner_id != self.shared_pressure_owner_id
+                or shared_lease.operation_id != request.operation_id
+                or shared_lease.tenant_id != request.tenant_id
+                or shared_lease.priority != request.priority
+            ):
+                raise AdmissionRuntimeConflict(
+                    "durable shared pressure lease identity does not match runtime"
+                )
+            pressure_finder = getattr(
+                self.shared_pressure_ledger,
+                "lease_for_operation",
+                None,
             )
+            if not callable(pressure_finder):
+                raise AdmissionRuntimeError(
+                    "shared pressure ledger does not support durable lease lookup"
+                )
+            try:
+                persisted_pressure = pressure_finder(
+                    self.shared_pressure_scope,
+                    request.operation_id,
+                    now=wall,
+                )
+            except SharedPressureError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_shared_pressure_unavailable"
+                ) from exc
+            if persisted_pressure is None:
+                raise AdmissionRuntimeConflict(
+                    "durable shared pressure lease is no longer active"
+                )
+            if persisted_pressure != shared_lease:
+                raise AdmissionRuntimeConflict(
+                    "durable shared pressure lease does not match journal"
+                )
+
         if self.quota_ledger is None or lease.quota_reservation is None:
             raise AdmissionRuntimeError(
                 "durable_reattach_requires_quota_reservation"
@@ -659,6 +714,7 @@ class AdmissionRuntime:
                 lease=lease,
                 request_fingerprint=fingerprint,
                 unknown_usage={},
+                shared_pressure_lease=shared_lease,
             )
             self.metrics_registry.inc("admission.reattached_total")
             return lease
