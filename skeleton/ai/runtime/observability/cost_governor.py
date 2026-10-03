@@ -630,7 +630,14 @@ class _SqliteCostGovernorJournal:
         state TEXT NOT NULL,
         terminal_json TEXT,
         evidence_digest TEXT,
-        CHECK (state IN ('active', 'completed', 'released_unspent'))
+        CHECK (
+            state IN (
+                'active',
+                'release_pending',
+                'completed',
+                'released_unspent'
+            )
+        )
     );
     """
 
@@ -703,6 +710,111 @@ class _SqliteCostGovernorJournal:
                 (operation,),
             ).fetchone()
         return None if row is None else self._record(row)
+
+    def quota_reservation_exists(
+        self,
+        reservation: QuotaReservation,
+    ) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT reserved_at FROM quota_reservations
+                WHERE reservation_id = ?
+                """,
+                (reservation.reservation_id,),
+            ).fetchone()
+        if row is None:
+            return False
+        return float(row["reserved_at"]) == reservation.reserved_at
+
+    def mark_release_pending(
+        self,
+        operation_id: str,
+        reservation: CostReservation,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "release requires active cost journal"
+                    )
+                existing = self._record(row)
+                if existing.reservation != reservation:
+                    raise CostGovernorConflict(
+                        "release journal receipt mismatch"
+                    )
+                if existing.state == "active":
+                    conn.execute(
+                        """
+                        UPDATE cost_governor_journal
+                        SET state = 'release_pending'
+                        WHERE operation_id = ?
+                        """,
+                        (operation,),
+                    )
+                elif existing.state != "release_pending":
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot enter release"
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("release-pending journal write was lost")
+        return loaded
+
+    def revert_release_pending(
+        self,
+        operation_id: str,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "release rollback requires cost journal"
+                    )
+                existing = self._record(row)
+                if existing.state == "release_pending":
+                    conn.execute(
+                        """
+                        UPDATE cost_governor_journal
+                        SET state = 'active'
+                        WHERE operation_id = ?
+                        """,
+                        (operation,),
+                    )
+                elif existing.state != "active":
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot roll back release"
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("release rollback journal write was lost")
+        return loaded
 
     def record_active(
         self,
@@ -795,7 +907,14 @@ class _SqliteCostGovernorJournal:
                         "terminal cost journal requires active reservation"
                     )
                 existing = self._record(row)
-                if existing.state == "active":
+                allowed_transition = (
+                    existing.state == "active"
+                    and decision.state == "completed"
+                ) or (
+                    existing.state == "release_pending"
+                    and decision.state == "released_unspent"
+                )
+                if allowed_transition:
                     conn.execute(
                         """
                         UPDATE cost_governor_journal
