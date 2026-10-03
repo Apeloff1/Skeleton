@@ -55,6 +55,21 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
         raise ValueError("canonical supervisor snapshot has no plan_generation")
     if len(generation) > 128 or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in generation):
         raise ValueError("canonical supervisor generation id is malformed")
+    allocation = supervisor.get("allocation")
+    if allocation is not None:
+        if not isinstance(allocation, Mapping) or allocation.get("schema") != "autonomous-studio.frontier-allocation.v1":
+            raise ValueError("canonical frontier allocation is malformed")
+        claimed = str(allocation.get("allocation_sha256", ""))
+        payload = dict(allocation)
+        payload.pop("allocation_sha256", None)
+        actual = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+        ).hexdigest()
+        if claimed != actual:
+            raise ValueError("canonical frontier allocation digest mismatch")
+        if str(allocation.get("generation_id", "")) != generation:
+            raise ValueError("canonical frontier allocation generation mismatch")
+
     raw = supervisor.get("plan_items")
     if not isinstance(raw, list):
         raise ValueError("canonical supervisor snapshot has no plan_items")
@@ -63,12 +78,22 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
     expected_digest = str(supervisor.get("plan_digest_sha256", "")).strip()
     if expected_digest and (len(expected_digest) != 64 or any(ch not in "0123456789abcdef" for ch in expected_digest)):
         raise ValueError("canonical supervisor plan digest is malformed")
-    if expected_digest:
+    if allocation is not None and str(allocation.get("plan_digest_sha256", "")) != expected_digest:
+        raise ValueError("canonical frontier allocation plan digest mismatch")
+    if expected_digest and allocation is None:
         actual_digest = hashlib.sha256(
             json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         ).hexdigest()
         if actual_digest != expected_digest:
             raise ValueError("canonical supervisor plan digest mismatch")
+    if allocation is not None:
+        authorized = allocation.get("authorized_plan_ids", [])
+        if not isinstance(authorized, list):
+            raise ValueError("canonical frontier authorization list is malformed")
+        actual_ids = sorted(str(item.get("id", "")) for item in raw if isinstance(item, Mapping))
+        if actual_ids != sorted(str(value) for value in authorized):
+            raise ValueError("canonical frontier allocation does not match executable plan")
+
     items = [
         item
         for item in raw
