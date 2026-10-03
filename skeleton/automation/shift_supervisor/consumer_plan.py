@@ -38,6 +38,8 @@ def _parse_time(value: object) -> datetime | None:
 
 
 def decode_durable_state(body: str) -> Mapping[str, Any]:
+    if len(body) > 2_000_000:
+        raise CanonicalPlanError("canonical plan issue body exceeds 2 MB safety bound")
     match = _STATE_PATTERN.search(body)
     if not match:
         raise CanonicalPlanError("canonical plan issue has no durable machine state")
@@ -46,7 +48,13 @@ def decode_durable_state(body: str) -> Mapping[str, Any]:
         raise CanonicalPlanError("canonical plan state encoding is unsupported")
     try:
         packed = base64.b64decode(encoded[len("gz:v1:") :], validate=True)
-        value = json.loads(gzip.decompress(packed).decode("utf-8"))
+        if len(packed) > 1_000_000:
+            raise CanonicalPlanError("canonical plan compressed state exceeds 1 MB safety bound")
+        with gzip.GzipFile(fileobj=__import__("io").BytesIO(packed), mode="rb") as handle:
+            decoded = handle.read(5_000_001)
+        if len(decoded) > 5_000_000:
+            raise CanonicalPlanError("canonical plan expanded state exceeds 5 MB safety bound")
+        value = json.loads(decoded.decode("utf-8"))
     except (ValueError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CanonicalPlanError("canonical plan machine state is corrupt") from exc
     if not isinstance(value, Mapping) or value.get("version") != 1:
