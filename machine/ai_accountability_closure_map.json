@@ -21,7 +21,9 @@
       "gap_id": "gap-state-authority-convergence",
       "workflow": ".github/workflows/state-recovery-drill.yml",
       "workflow_name": "State Recovery Drill",
-      "verifier_script": "scripts/verify_state_authority_closure.py"
+      "verifier_script": "scripts/verify_state_authority_closure.py",
+      "expected_receipt_verifier": "independent-state-authority-v1",
+      "expected_script_sha256": "8c6242a7d030bc090bbb9b8ad05f6adbbe0485f2a7d337132c1939469595f7fe"
     },
     {
       "key": "S0-GOV",
@@ -30,7 +32,9 @@
       "gap_id": "gap-governance-registry",
       "workflow": ".github/workflows/governance-closure.yml",
       "workflow_name": "Governance Closure Gate",
-      "verifier_script": "scripts/verify_governance_closure.py"
+      "verifier_script": "scripts/verify_governance_closure.py",
+      "expected_receipt_verifier": "independent-governance-v1",
+      "expected_script_sha256": "cdbe8a5412db111efcaec697cd7888ac753a30aa7cac74a86aea8da433f6e909"
     },
     {
       "key": "S0-COST",
@@ -39,7 +43,9 @@
       "gap_id": "gap-cost-admission",
       "workflow": ".github/workflows/cost-admission-closure.yml",
       "workflow_name": "Cost Admission Closure Gate",
-      "verifier_script": "scripts/verify_cost_admission_closure.py"
+      "verifier_script": "scripts/verify_cost_admission_closure.py",
+      "expected_receipt_verifier": "independent-cost-admission-v1",
+      "expected_script_sha256": "fba560a6e6facf450b3496af0dcf6cf5869d96348528caaff90ee65c5c96500e"
     },
     {
       "key": "S0-PROV",
@@ -49,7 +55,9 @@
       "workflow": ".github/workflows/provider-surface-closure.yml",
       "workflow_name": "Provider Surface Closure Gate",
       "verifier_script": "scripts/verify_provider_surface_closure.py",
-      "verifier_binding_token": "provider_surface_convergence_blueprint"
+      "verifier_binding_token": "provider_surface_convergence_blueprint",
+      "expected_receipt_verifier": "independent-provider-surface-v1",
+      "expected_script_sha256": "25b240e6cae5104dfe17be224c3372cd5094d10f30d243693823585beb787b1f"
     },
     {
       "key": "S1-CONV",
@@ -59,7 +67,9 @@
       "workflow": ".github/workflows/conversation-authority-closure.yml",
       "workflow_name": "Conversation Authority Closure Gate",
       "verifier_script": "scripts/verify_jeeves_conversation_cutover.py",
-      "verifier_binding_token": "ConversationThread/ConversationMessage is the only mutable"
+      "verifier_binding_token": "ConversationThread/ConversationMessage is the only mutable",
+      "expected_receipt_verifier": "jeeves-conversation-cutover-v1",
+      "expected_script_sha256": "f1c43af1c0cb0cbe9a5d94d0bb979ae74cb72ada73881bd5e0ae3881fd710b25"
     },
     {
       "key": "S1-MEM",
@@ -68,7 +78,9 @@
       "gap_id": "gap-memory-durable-authority",
       "workflow": ".github/workflows/memory-authority-closure.yml",
       "workflow_name": "Memory Authority Closure Gate",
-      "verifier_script": "scripts/verify_memory_authority_closure.py"
+      "verifier_script": "scripts/verify_memory_authority_closure.py",
+      "expected_receipt_verifier": "independent-memory-authority-v1",
+      "expected_script_sha256": "42f74e33d54bada8ba3af896d123c195ede855de07f35874b944bf661f6882bb"
     },
     {
       "key": "S1-TOOL",
@@ -77,7 +89,9 @@
       "gap_id": "gap-tool-runtime-convergence",
       "workflow": ".github/workflows/tool-runtime-closure.yml",
       "workflow_name": "Tool Runtime Closure Gate",
-      "verifier_script": "scripts/verify_tool_runtime_closure.py"
+      "verifier_script": "scripts/verify_tool_runtime_closure.py",
+      "expected_receipt_verifier": "independent-tool-runtime-v1",
+      "expected_script_sha256": "fec813a41092ebed42c663d9c7796e952d040425fa400884f596bdda916d4381"
     },
     {
       "key": "S2-CTX",
@@ -86,7 +100,9 @@
       "gap_id": "gap-context-compiler-convergence",
       "workflow": ".github/workflows/context-compiler-closure.yml",
       "workflow_name": "Context Compiler Closure Gate",
-      "verifier_script": "scripts/verify_context_compiler_closure.py"
+      "verifier_script": "scripts/verify_context_compiler_closure.py",
+      "expected_receipt_verifier": "independent-context-compiler-v1",
+      "expected_script_sha256": "386fa8583d5d84e0fd6d892b206949a34cdb05fc9f3830220150d98087723131"
     },
     {
       "key": "S2-PROTO",
@@ -95,7 +111,9 @@
       "gap_id": "gap-provider-interaction-protocol",
       "workflow": ".github/workflows/provider-protocol-closure.yml",
       "workflow_name": "Provider Interaction Protocol Closure Gate",
-      "verifier_script": "scripts/verify_provider_protocol_closure.py"
+      "verifier_script": "scripts/verify_provider_protocol_closure.py",
+      "expected_receipt_verifier": "independent-provider-protocol-v1",
+      "expected_script_sha256": "9f6a43e4165b5636b2ca919907b28eef0259f07dcc5179f0114e38ada7d42254"
     },
     {
       "key": "S3-VER",
@@ -104,7 +122,9 @@
       "gap_id": "gap-verification-evidence-contract",
       "workflow": ".github/workflows/verification-evidence-closure.yml",
       "workflow_name": "Verification Evidence Closure Gate",
-      "verifier_script": "scripts/verify_verification_evidence_closure.py"
+      "verifier_script": "scripts/verify_verification_evidence_closure.py",
+      "expected_receipt_verifier": "independent-verification-evidence-v1",
+      "expected_script_sha256": "c0b0bb512757a92ccfe9e01a2e75233277c3c3a31a7f906995694c041a5e4e1c"
     },
     {
       "key": "S4-EXEC",
@@ -113,7 +133,9 @@
       "gap_id": "gap-cognitive-execution-loop",
       "workflow": ".github/workflows/cognitive-execution-closure.yml",
       "workflow_name": "Cognitive Execution Closure Gate",
-      "verifier_script": "scripts/verify_cognitive_execution_closure.py"
+      "verifier_script": "scripts/verify_cognitive_execution_closure.py",
+      "expected_receipt_verifier": "independent-cognitive-execution-v1",
+      "expected_script_sha256": "7612c294ffb64c7b793d78db7c57388ab17f7719f7b85e354bfd8b82eaea1565"
     },
     {
       "key": "S5-ENG",
@@ -122,7 +144,9 @@
       "gap_id": "gap-engine-application-execution-boundary",
       "workflow": ".github/workflows/engine-container-boundary.yml",
       "workflow_name": "Engine Container Boundary",
-      "verifier_script": "scripts/verify_engine_application_boundary_closure.py"
+      "verifier_script": "scripts/verify_engine_application_boundary_closure.py",
+      "expected_receipt_verifier": "independent-engine-application-boundary-v1",
+      "expected_script_sha256": "96815511b743c49445f648d90b4ea00113699323bc3ac6cdb9ea48bd038624e2"
     },
     {
       "key": "S6-STREAM",
@@ -131,7 +155,9 @@
       "gap_id": "gap-streaming-protocol",
       "workflow": ".github/workflows/streaming-protocol-closure.yml",
       "workflow_name": "Streaming Protocol Closure Gate",
-      "verifier_script": "scripts/verify_streaming_protocol_closure.py"
+      "verifier_script": "scripts/verify_streaming_protocol_closure.py",
+      "expected_receipt_verifier": "independent-streaming-protocol-v1",
+      "expected_script_sha256": "2a01aa5a31173d028384e864b119033be199b825daef6bdfae9288f36c195dd4"
     },
     {
       "key": "S7-E2E",
@@ -140,7 +166,9 @@
       "gap_id": "gap-e2e-golden-journeys",
       "workflow": ".github/workflows/stage7-golden-journeys-closure.yml",
       "workflow_name": "Stage 7 Golden Journeys Closure Gate",
-      "verifier_script": "scripts/verify_stage7_golden_journeys.py"
+      "verifier_script": "scripts/verify_stage7_golden_journeys.py",
+      "expected_receipt_verifier": "independent-stage7-golden-journeys-v1",
+      "expected_script_sha256": "fdebc365990f846cad40389c8ba0b404a5b0a5f70dbecd1d8f02420efbe8cfd2"
     }
   ]
 }

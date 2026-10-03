@@ -10,7 +10,7 @@
     },
     "accountability": {
       "path": "machine/ai_build_accountability.json",
-      "git_blob_sha": "b8e9278f0ea08691190a28deab9b2191a93a63fa"
+      "git_blob_sha": "d6b9e13b7aeb54ed5145fb2b1ab2d43143cbbee2"
     }
   },
   "states": [

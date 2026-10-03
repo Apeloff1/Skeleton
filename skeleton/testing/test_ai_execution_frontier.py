@@ -31,9 +31,9 @@ def test_execution_frontier_tracks_landed_stage3_with_signed_accountability() ->
         for candidate in frontier["promotion_candidates"]
     )
     assert frontier["queue_snapshot"] == {
-        "done": 7,
+        "done": 42,
         "evidence_pending": 0,
-        "in_progress": 1,
-        "pending": 34,
+        "in_progress": 0,
+        "pending": 0,
         "total": 42,
     }

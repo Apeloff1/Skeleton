@@ -165,6 +165,12 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         workflow = str(group.get("workflow") or "")
         workflow_name = str(group.get("workflow_name") or "")
         verifier_script = group.get("verifier_script")
+        expected_receipt_verifier = str(
+            group.get("expected_receipt_verifier") or ""
+        ).strip()
+        expected_script_sha256 = str(
+            group.get("expected_script_sha256") or ""
+        ).strip()
         stage = group.get("stage")
 
         if not key or key in group_keys:
@@ -214,6 +220,10 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         errors.extend(
             _workflow_exact_head_errors(root, workflow, workflow_name)
         )
+        if not expected_receipt_verifier:
+            errors.append(f"{key}: expected_receipt_verifier is required")
+        if SHA256_RE.fullmatch(expected_script_sha256) is None:
+            errors.append(f"{key}: expected_script_sha256 must be a SHA-256 digest")
         if not isinstance(verifier_script, str) or not verifier_script:
             errors.append(f"{key}: verifier_script is required")
         else:
@@ -223,6 +233,17 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                     f"{key}: missing verifier script {verifier_script}"
                 )
             else:
+                actual_script_sha256 = hashlib.sha256(
+                    verifier_path.read_bytes()
+                ).hexdigest()
+                if (
+                    SHA256_RE.fullmatch(expected_script_sha256)
+                    and actual_script_sha256 != expected_script_sha256
+                ):
+                    errors.append(
+                        f"{key}: verifier script digest drift "
+                        f"(expected {expected_script_sha256}, found {actual_script_sha256})"
+                    )
                 source = verifier_path.read_text(encoding="utf-8")
                 binding_token = str(
                     group.get("verifier_binding_token") or gap_id
@@ -285,6 +306,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 "workflow": workflow,
                 "workflow_name": workflow_name,
                 "verifier_script": verifier_script,
+                "expected_receipt_verifier": expected_receipt_verifier,
+                "expected_script_sha256": expected_script_sha256,
                 "verifier_binding_token": (
                     group.get("verifier_binding_token") or gap_id
                 ),

@@ -12,17 +12,17 @@
     "rule": "this frontier can require evidence and sequencing but cannot fabricate implementation or verification signoff"
   },
   "queue_snapshot": {
-    "done": 7,
+    "done": 42,
     "evidence_pending": 0,
-    "in_progress": 1,
-    "pending": 34,
+    "in_progress": 0,
+    "pending": 0,
     "total": 42
   },
   "promotion_candidates": [
     {
       "task_id": "AIQ-S0-COST-02",
       "accountability_id": "ACC-AIQ-S0-COST-02",
-      "ledger_status": "in_progress",
+      "ledger_status": "done",
       "landed_commits": [
         "ab1ecae1e1b89ed43d23f395aada24cd7b68c00d"
       ],
@@ -39,7 +39,7 @@
     {
       "task_id": "AIQ-S0-COST-03",
       "accountability_id": "ACC-AIQ-S0-COST-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "029a852d6d42278adf65699ef90a3d5012131ba7"
       ],
@@ -57,7 +57,7 @@
     {
       "task_id": "AIQ-S0-PROV-01",
       "accountability_id": "ACC-AIQ-S0-PROV-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
       ],
@@ -72,7 +72,7 @@
     {
       "task_id": "AIQ-S0-PROV-02",
       "accountability_id": "ACC-AIQ-S0-PROV-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
       ],
@@ -87,7 +87,7 @@
     {
       "task_id": "AIQ-S0-PROV-03",
       "accountability_id": "ACC-AIQ-S0-PROV-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
       ],
@@ -102,7 +102,7 @@
     {
       "task_id": "AIQ-S1-CONV-01",
       "accountability_id": "ACC-AIQ-S1-CONV-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "d80713b71b1b07f818d602628dfd0b017295822c"
       ],
@@ -120,7 +120,7 @@
     {
       "task_id": "AIQ-S1-CONV-02",
       "accountability_id": "ACC-AIQ-S1-CONV-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "d80713b71b1b07f818d602628dfd0b017295822c"
       ],
@@ -138,7 +138,7 @@
     {
       "task_id": "AIQ-S1-MEM-01",
       "accountability_id": "ACC-AIQ-S1-MEM-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "39f4b48424133d3823c1d9dc17952135778852fc"
       ],
@@ -156,7 +156,7 @@
     {
       "task_id": "AIQ-S1-MEM-02",
       "accountability_id": "ACC-AIQ-S1-MEM-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "39f4b48424133d3823c1d9dc17952135778852fc"
       ],
@@ -174,7 +174,7 @@
     {
       "task_id": "AIQ-S1-MEM-03",
       "accountability_id": "ACC-AIQ-S1-MEM-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0"
       ],
@@ -192,7 +192,7 @@
     {
       "task_id": "AIQ-S1-TOOL-01",
       "accountability_id": "ACC-AIQ-S1-TOOL-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "780be93964e5bfd65359e660fad0090c78b777d0"
       ],
@@ -210,7 +210,7 @@
     {
       "task_id": "AIQ-S1-TOOL-02",
       "accountability_id": "ACC-AIQ-S1-TOOL-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "780be93964e5bfd65359e660fad0090c78b777d0"
       ],
@@ -228,7 +228,7 @@
     {
       "task_id": "AIQ-S1-TOOL-03",
       "accountability_id": "ACC-AIQ-S1-TOOL-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "780be93964e5bfd65359e660fad0090c78b777d0",
         "2df70c44e8667509f6755d0ddcdc7fc51cd50458"
@@ -248,7 +248,7 @@
     {
       "task_id": "AIQ-S2-PROTO-01",
       "accountability_id": "ACC-AIQ-S2-PROTO-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "f233fc0449084bf19dcf119297180d8d0bbeb161"
       ],
@@ -266,7 +266,7 @@
     {
       "task_id": "AIQ-S2-PROTO-02",
       "accountability_id": "ACC-AIQ-S2-PROTO-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "f233fc0449084bf19dcf119297180d8d0bbeb161"
       ],
@@ -284,7 +284,7 @@
     {
       "task_id": "AIQ-S2-PROTO-03",
       "accountability_id": "ACC-AIQ-S2-PROTO-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "f233fc0449084bf19dcf119297180d8d0bbeb161"
       ],
@@ -302,7 +302,7 @@
     {
       "task_id": "AIQ-S2-CTX-01",
       "accountability_id": "ACC-AIQ-S2-CTX-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "ded171c318d1b6e9ad57c6324f7070fbe6cf4e27"
       ],
@@ -320,7 +320,7 @@
     {
       "task_id": "AIQ-S2-CTX-02",
       "accountability_id": "ACC-AIQ-S2-CTX-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "f274f601b94557ae2f520884816f0c990a21d0e1"
       ],
@@ -338,7 +338,7 @@
     {
       "task_id": "AIQ-S2-CTX-03",
       "accountability_id": "ACC-AIQ-S2-CTX-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "13d6c55b566eae2134875afb4bc3b066b6aa143c"
       ],
@@ -356,7 +356,7 @@
     {
       "task_id": "AIQ-S3-VER-01",
       "accountability_id": "ACC-AIQ-S3-VER-01",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "d37e079b777e8b2ce0de377d4f07cd301c005107"
       ],
@@ -374,7 +374,7 @@
     {
       "task_id": "AIQ-S3-VER-02",
       "accountability_id": "ACC-AIQ-S3-VER-02",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "6825f5ca3a80de129a3311188524dceeb99fa1e9"
       ],
@@ -392,7 +392,7 @@
     {
       "task_id": "AIQ-S3-VER-03",
       "accountability_id": "ACC-AIQ-S3-VER-03",
-      "ledger_status": "pending",
+      "ledger_status": "done",
       "landed_commits": [
         "9296af0437716e501f52ce46e8e301806e7a933e"
       ],
@@ -539,6 +539,6 @@
     "task_count": 22,
     "through_stage": 3,
     "latest_merge_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0",
-    "note": "implementation evidence is ahead of the signed accountability ledger; no lifecycle state is promoted by this frontier"
+    "note": "historical landed-candidate inventory retained after accountability closure; lifecycle authority remains the signed ledger and no state is promoted by this frontier"
   }
 }

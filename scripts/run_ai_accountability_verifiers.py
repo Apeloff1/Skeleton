@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -110,6 +111,26 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
             if not gap_id:
                 raise RunnerError(f"{key}: accountability gap_id is required")
             rel, script = _safe_script(root, group.get("verifier_script"))
+            expected_receipt_verifier = str(
+                group.get("expected_receipt_verifier") or ""
+            ).strip()
+            if not expected_receipt_verifier:
+                raise RunnerError(
+                    f"{key}: expected_receipt_verifier is required"
+                )
+            expected_script_sha256 = str(
+                group.get("expected_script_sha256") or ""
+            ).strip()
+            if not re.fullmatch(r"[0-9a-f]{64}", expected_script_sha256):
+                raise RunnerError(
+                    f"{key}: expected_script_sha256 must be a SHA-256 digest"
+                )
+            actual_script_sha256 = hashlib.sha256(script.read_bytes()).hexdigest()
+            if actual_script_sha256 != expected_script_sha256:
+                raise RunnerError(
+                    f"{key}: verifier script digest drift "
+                    f"(expected {expected_script_sha256}, found {actual_script_sha256})"
+                )
             if rel in seen:
                 raise RunnerError(
                     f"verifier script is reused by multiple groups: {rel}"
@@ -166,6 +187,8 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
             if receipt is not None:
                 if receipt.get("head_sha") != head:
                     receipt_error = "verifier receipt is not exact-head"
+                elif receipt.get("verifier") != expected_receipt_verifier:
+                    receipt_error = "verifier receipt identity mismatch"
                 elif receipt.get("valid") is not True or receipt.get("errors"):
                     receipt_error = "verifier receipt reports invalid evidence"
                 elif (
@@ -182,7 +205,9 @@ def run_verifiers(root: Path, *, head_sha: str) -> dict[str, Any]:
                 "key": key,
                 "gap_id": gap_id,
                 "verifier_script": rel,
-                "script_digest": hashlib.sha256(script.read_bytes()).hexdigest(),
+                "expected_receipt_verifier": expected_receipt_verifier,
+                "expected_script_sha256": expected_script_sha256,
+                "script_digest": actual_script_sha256,
                 "returncode": returncode,
                 "passed": passed,
                 "stdout_tail": stdout,
