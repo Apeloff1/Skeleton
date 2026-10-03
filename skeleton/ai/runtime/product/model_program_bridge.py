@@ -176,6 +176,11 @@ def bridge_product_training_to_model_program(
         product_receipt.get("learning_candidate_digest"),
         "learning_candidate_digest",
     )
+    architecture = _text(
+        product_receipt.get("model_architecture"),
+        "model_architecture",
+        maximum=128,
+    )
 
     plan = product_receipt.get("training_plan")
     if not isinstance(plan, Mapping):
@@ -262,6 +267,8 @@ def bridge_product_training_to_model_program(
             "training_plan_digest": plan_digest,
             "corpus_digest": corpus_digest,
             "method_allocation_digest": allocation_digest,
+            "model_architecture": architecture,
+            "artifact_schema": loaded.receipt.schema,
             "seed": product_receipt.get("seed"),
             "epochs": product_receipt.get("epochs"),
         }
@@ -331,6 +338,8 @@ def bridge_product_training_to_model_program(
         "corpus_digest": corpus_digest,
         "learning_candidate_digest": learning_candidate_digest,
         "source_receipt_digest": source_receipt_digest,
+        "model_architecture": architecture,
+        "artifact_schema": loaded.receipt.schema,
     }
     return BridgedModelProgramArtifact(
         artifact=artifact,
