@@ -837,10 +837,21 @@ class _ActiveCostReservation:
 class CostGovernor:
     """Integrated admission/quota governor with declared safe fallback."""
 
-    def __init__(self, runtime: AdmissionRuntime) -> None:
+    def __init__(
+        self,
+        runtime: AdmissionRuntime,
+        *,
+        journal: _SqliteCostGovernorJournal | None = None,
+    ) -> None:
         if not isinstance(runtime, AdmissionRuntime):
             raise TypeError("runtime must be AdmissionRuntime")
+        if journal is not None and not isinstance(
+            journal,
+            _SqliteCostGovernorJournal,
+        ):
+            raise TypeError("journal must be _SqliteCostGovernorJournal")
         self.runtime = runtime
+        self._journal = journal
         self._lock = threading.RLock()
         self._active: dict[str, _ActiveCostReservation] = {}
 
@@ -860,7 +871,10 @@ class CostGovernor:
             quota_ledger=ledger,
             default_tenant_quota=default_tenant_quota,
         )
-        return cls(runtime)
+        return cls(
+            runtime,
+            journal=_SqliteCostGovernorJournal(path),
+        )
 
     @staticmethod
     def _receipt(
@@ -994,6 +1008,29 @@ class CostGovernor:
             except AdmissionRuntimeError as exc:
                 raise CostGovernorError(str(exc)) from exc
 
+            if self._journal is not None:
+                quota_reservation = lease.quota_reservation
+                if quota_reservation is None:
+                    try:
+                        self.runtime.release(lease.operation_id)
+                    except Exception:
+                        pass
+                    raise CostGovernorError(
+                        "durable cost governor requires quota reservation"
+                    )
+                try:
+                    self._journal.record_active(
+                        requested_request_digest=requested_digest,
+                        reservation=receipt,
+                        quota_reservation=quota_reservation,
+                    )
+                except Exception:
+                    try:
+                        self.runtime.release(lease.operation_id)
+                    except Exception:
+                        pass
+                    raise
+
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
                 receipt=receipt,
@@ -1112,6 +1149,138 @@ class CostGovernor:
             resolved_unknown_usage=True,
         )
 
+    def _completed_decision(
+        self,
+        *,
+        operation_id: str,
+        receipt: CostReservation,
+        quota_reservation: QuotaReservation,
+        quota_completion: QuotaCompletion,
+        refs: tuple[EvidenceRef, ...],
+    ) -> CostDecision:
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "cost completion requires quota ledger"
+            )
+        if quota_reservation.operation_id != operation_id:
+            raise CostGovernorConflict(
+                "cost journal reservation operation mismatch"
+            )
+        if quota_completion.operation_id != operation_id:
+            raise CostGovernorConflict(
+                "cost completion operation mismatch"
+            )
+        if quota_completion.reservation_id != quota_reservation.reservation_id:
+            raise CostGovernorConflict(
+                "cost completion reservation mismatch"
+            )
+        snapshot = ledger.snapshot(quota_completion.tenant_id)
+        accounting: BudgetAccountingDecision = qualify_budget_accounting(
+            tenant_id=quota_completion.tenant_id,
+            operation_id=operation_id,
+            reservation=quota_reservation,
+            completion=quota_completion,
+            snapshot=snapshot,
+            evidence_refs=refs,
+        )
+        reasons = list(accounting.reasons)
+        if quota_completion.overrun:
+            reasons.append(
+                "cost-overrun:"
+                + ",".join(quota_completion.overrun_dimensions)
+            )
+        normalized = tuple(sorted(set(reasons)))
+        return CostDecision(
+            operation_id=operation_id,
+            tenant_id=quota_completion.tenant_id,
+            state="completed",
+            reservation_digest=receipt.digest,
+            completion_digest=_completion_digest(quota_completion),
+            accounting_decision_digest=accounting.decision_digest,
+            accepted=not normalized,
+            reasons=normalized,
+        )
+
+    def recover_completed(
+        self,
+        operation_id: str,
+        *,
+        evidence_refs: Iterable[EvidenceRef],
+    ) -> CostDecision:
+        """Recover terminal qualification after a post-completion process loss."""
+
+        operation = _token("operation_id", operation_id)
+        refs = _validated_evidence_refs(evidence_refs)
+        evidence = _evidence_digest(refs)
+        journal = self._journal
+        if journal is None:
+            raise CostGovernorError(
+                "completed recovery requires durable cost journal"
+            )
+
+        with self._lock:
+            record = journal.load(operation)
+            if record is None:
+                raise CostGovernorError(
+                    "operation has no durable cost journal record"
+                )
+            if record.state == "released_unspent":
+                raise CostGovernorConflict(
+                    "released reservation cannot be recovered as completed"
+                )
+            if record.terminal is not None:
+                if record.state != "completed":
+                    raise CostGovernorConflict(
+                        "terminal cost journal state is inconsistent"
+                    )
+                if record.evidence_digest != evidence:
+                    raise CostGovernorConflict(
+                        "completed recovery replayed with different evidence"
+                    )
+                self._active.pop(operation, None)
+                return record.terminal
+
+            ledger = self.runtime.quota_ledger
+            if ledger is None:
+                raise CostGovernorError(
+                    "completed recovery requires quota ledger"
+                )
+            finder = getattr(ledger, "completion_for_operation", None)
+            if not callable(finder):
+                raise CostGovernorError(
+                    "quota ledger does not support completion recovery"
+                )
+            try:
+                completion = finder(record.tenant_id, operation)
+            except QuotaError as exc:
+                raise CostGovernorError(
+                    "durable completion lookup failed"
+                ) from exc
+            if completion is None:
+                raise CostGovernorError(
+                    "operation has no durable completed accounting"
+                )
+
+            decision = self._completed_decision(
+                operation_id=operation,
+                receipt=record.reservation,
+                quota_reservation=record.quota_reservation,
+                quota_completion=completion,
+                refs=refs,
+            )
+            journal.record_terminal(
+                decision,
+                evidence_digest=evidence,
+            )
+            if self._journal is not None:
+                self._journal.record_terminal(
+                    decision,
+                    evidence_digest=None,
+                )
+            self._active.pop(operation, None)
+            return decision
+
     def complete(
         self,
         operation_id: str,
@@ -1142,7 +1311,7 @@ class CostGovernor:
                 raise CostGovernorError(str(exc)) from exc
 
             # The runtime lease is terminal after complete(). From this point on
-            # the governor must never retain a stale active reservation.
+            # recovery must use the durable journal + quota completion.
             self._active.pop(operation, None)
             try:
                 quota_completion = completion.quota_completion
@@ -1151,37 +1320,19 @@ class CostGovernor:
                     raise CostGovernorError(
                         "cost completion requires durable quota accounting"
                     )
-                ledger = self.runtime.quota_ledger
-                if ledger is None:
-                    raise CostGovernorError(
-                        "cost completion requires quota ledger"
-                    )
-                snapshot = ledger.snapshot(completion.lease.tenant_id)
-                accounting: BudgetAccountingDecision = qualify_budget_accounting(
-                    tenant_id=completion.lease.tenant_id,
+                decision = self._completed_decision(
                     operation_id=operation,
-                    reservation=quota_reservation,
-                    completion=quota_completion,
-                    snapshot=snapshot,
-                    evidence_refs=refs,
+                    receipt=active.receipt,
+                    quota_reservation=quota_reservation,
+                    quota_completion=quota_completion,
+                    refs=refs,
                 )
-                reasons = list(accounting.reasons)
-                if quota_completion.overrun:
-                    reasons.append(
-                        "cost-overrun:"
-                        + ",".join(quota_completion.overrun_dimensions)
+                if self._journal is not None:
+                    self._journal.record_terminal(
+                        decision,
+                        evidence_digest=_evidence_digest(refs),
                     )
-                normalized = tuple(sorted(set(reasons)))
-                return CostDecision(
-                    operation_id=operation,
-                    tenant_id=completion.lease.tenant_id,
-                    state="completed",
-                    reservation_digest=active.receipt.digest,
-                    completion_digest=_completion_digest(quota_completion),
-                    accounting_decision_digest=accounting.decision_digest,
-                    accepted=not normalized,
-                    reasons=normalized,
-                )
+                return decision
             except CostGovernorError:
                 raise
             except Exception as exc:
