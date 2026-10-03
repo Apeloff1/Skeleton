@@ -206,11 +206,6 @@ class AdmissionLease:
                 else self.quota_reservation.reservation_id
             ),
             "admitted_at": self.admitted_at,
-            "shared_pressure_lease_id": (
-                None
-                if self.shared_pressure_lease is None
-                else self.shared_pressure_lease.lease_id
-            ),
         }
 
 
