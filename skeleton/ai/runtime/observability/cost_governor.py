@@ -1665,10 +1665,47 @@ class CostGovernor:
                 raise CostGovernorError(
                     "durable completion lookup failed"
                 ) from exc
-            if completion is None:
-                raise CostGovernorError(
-                    "operation has no durable completed accounting"
+
+            intent = record.completion_intent
+            if intent is not None and intent.evidence_digest != evidence:
+                raise CostGovernorConflict(
+                    "completed recovery replayed with different evidence"
                 )
+
+            if completion is None:
+                if intent is None:
+                    raise CostGovernorError(
+                        "operation has no durable completed accounting"
+                    )
+                try:
+                    completion = ledger.complete(
+                        record.quota_reservation.reservation_id,
+                        intent.actual,
+                    )
+                except QuotaConflict as exc:
+                    if str(exc).startswith("actual_usage_unknown:"):
+                        raise CostGovernorError(str(exc)) from exc
+                    raise CostGovernorConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise CostGovernorError(
+                        "durable completion recovery failed"
+                    ) from exc
+
+            if intent is None:
+                overrun_dimensions: tuple[str, ...] = ()
+                recovery_reasons = (
+                    "operation-budget-recovery-intent-missing",
+                )
+            else:
+                effective_actual = _effective_terminal_actual(
+                    intent.actual,
+                    completion,
+                )
+                overrun_dimensions = _budget_overrun_dimensions(
+                    intent.budget,
+                    effective_actual,
+                )
+                recovery_reasons = ()
 
             decision = self._completed_decision(
                 operation_id=operation,
@@ -1676,6 +1713,8 @@ class CostGovernor:
                 quota_reservation=record.quota_reservation,
                 quota_completion=completion,
                 refs=refs,
+                operation_overrun_dimensions=overrun_dimensions,
+                extra_reasons=recovery_reasons,
             )
             journal.record_terminal(
                 decision,
@@ -1696,11 +1735,20 @@ class CostGovernor:
         if not isinstance(actual, UsageEstimate):
             raise TypeError("actual must be UsageEstimate")
         refs = _validated_evidence_refs(evidence_refs)
+        evidence = _evidence_digest(refs)
         with self._lock:
             active = self._active.get(operation)
             if active is None:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
+                )
+            journal = self._journal
+            if journal is not None:
+                journal.record_completion_intent(
+                    operation,
+                    actual=actual,
+                    budget=active.budget,
+                    evidence_digest=evidence,
                 )
             try:
                 completion: AdmissionCompletion = self.runtime.complete(
@@ -1709,9 +1757,17 @@ class CostGovernor:
                     now_wall=now_wall,
                 )
             except AdmissionRuntimeConflict as exc:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
                 raise CostGovernorConflict(str(exc)) from exc
             except AdmissionRuntimeError as exc:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
                 raise CostGovernorError(str(exc)) from exc
+            except ValueError:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
+                raise
 
             # The runtime lease is terminal after complete(). From this point on
             # recovery must use the durable journal + quota completion.
@@ -1729,11 +1785,14 @@ class CostGovernor:
                     quota_reservation=quota_reservation,
                     quota_completion=quota_completion,
                     refs=refs,
+                    operation_overrun_dimensions=(
+                        completion.operation_overrun_dimensions
+                    ),
                 )
-                if self._journal is not None:
-                    self._journal.record_terminal(
+                if journal is not None:
+                    journal.record_terminal(
                         decision,
-                        evidence_digest=_evidence_digest(refs),
+                        evidence_digest=evidence,
                     )
                 return decision
             except CostGovernorError:
