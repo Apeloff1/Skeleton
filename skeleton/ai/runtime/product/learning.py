@@ -494,6 +494,31 @@ def build_learning_candidate_from_repository(
     )
 
 
+def _baseline_identity(active_raw: str) -> dict[str, object] | None:
+    """Resolve the exact active local artifact identity for later comparison."""
+
+    if not active_raw:
+        return None
+    from skeleton.ai.runtime.inference.artifact import (
+        LocalModelArtifactError,
+        load_local_model_artifact,
+    )
+
+    try:
+        loaded = load_local_model_artifact(active_raw)
+    except LocalModelArtifactError as exc:
+        raise CanonicalLearningHandoffError(
+            "active local model artifact cannot be authenticated"
+        ) from exc
+    return {
+        "artifact_sha256": loaded.receipt.artifact_sha256,
+        "model_id": loaded.receipt.model_id,
+        "model_digest": loaded.receipt.model_digest,
+        "schema": loaded.receipt.schema,
+        "reference": loaded.receipt.reference,
+    }
+
+
 def build_learning_candidate_artifact(
     candidate: CanonicalLearningCandidate,
     *,
@@ -541,6 +566,8 @@ def build_learning_candidate_artifact(
             raise CanonicalLearningHandoffError(
                 "learning candidate cannot overwrite active local model artifact"
             )
+
+    baseline = _baseline_identity(active_raw)
 
     parent = destination_resolved.parent
     if not parent.exists() or not parent.is_dir():
@@ -660,6 +687,20 @@ def build_learning_candidate_artifact(
             except OSError:
                 pass
 
+    evaluation_manifest: dict[str, object] = {
+        "schema_version": "skeleton.product.learning-evaluation-input.v1",
+        "learning_candidate_digest": candidate.identity_digest,
+        "candidate_artifact_sha256": receipt["artifact_sha256"],
+        "candidate_model_id": receipt["model_id"],
+        "candidate_model_digest": receipt["model_digest"],
+        "qualification_receipt_digest": qualification["receipt_digest"],
+        "baseline": baseline,
+        "promotion_authority": False,
+    }
+    evaluation_manifest["manifest_digest"] = _stable_digest(
+        evaluation_manifest
+    )
+
     return {
         **receipt,
         "learning_candidate_ref": candidate.reference,
@@ -667,6 +708,7 @@ def build_learning_candidate_artifact(
         "learning_pair_count": len(candidate.pairs),
         "promotion_state": "candidate_only",
         "qualification": qualification,
+        "evaluation_manifest": evaluation_manifest,
     }
 
 
