@@ -642,17 +642,21 @@ class NumpyRecurrentLM:
                         5.0,
                         out=gradient,
                     )
-                    embedding[token_index] -= (
-                        np.float32(rate) * gradient
-                    )
+                    accumulated = acc_embedding_rows.get(token_index)
+                    if accumulated is None:
+                        acc_embedding_rows[token_index] = gradient.copy()
+                    else:
+                        accumulated += gradient
 
-                recurrent -= np.float32(rate) * d_recurrent
-                recurrent_bias -= (
-                    np.float32(rate) * d_recurrent_bias
-                )
-                output -= np.float32(rate) * d_output
-                output_bias -= np.float32(rate) * d_output_bias
+                acc_recurrent += d_recurrent
+                acc_recurrent_bias += d_recurrent_bias
+                acc_output += d_output
+                acc_output_bias += d_output_bias
+                accumulated_sequences += 1
+                if accumulated_sequences >= accumulation_steps:
+                    flush_accumulated_gradients()
 
+            flush_accumulated_gradients()
             epochs_completed += 1
             average_loss = (
                 epoch_loss / max(1, epoch_targets)
@@ -691,6 +695,8 @@ class NumpyRecurrentLM:
         model.training_stopped_early = stopped_early
         model.training_examples = len(sequences)
         model.training_tokens = total_training_tokens
+        model.training_optimizer_steps = optimizer_steps
+        model.training_gradient_accumulation_steps = accumulation_steps
         return model
 
     def _token_id(self, token: str) -> int:
