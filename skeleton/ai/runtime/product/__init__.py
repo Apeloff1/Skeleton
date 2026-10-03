@@ -14,4 +14,17 @@ __all__ = [
     "CanonicalAITurnRequest",
     "CanonicalConversationAIRuntime",
     "CanonicalProductRuntimeError",
+    "CanonicalLearningCandidate",
+    "CanonicalLearningHandoffError",
+    "CanonicalLearningPair",
+    "build_learning_candidate",
+    "build_learning_candidate_artifact",
 ]
+
+from .learning import (
+    CanonicalLearningCandidate,
+    CanonicalLearningHandoffError,
+    CanonicalLearningPair,
+    build_learning_candidate,
+    build_learning_candidate_artifact,
+)
