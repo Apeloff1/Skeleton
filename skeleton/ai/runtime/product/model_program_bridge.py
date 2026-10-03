@@ -24,6 +24,7 @@ from skeleton.ai.runtime.inference.artifact import (
 )
 from skeleton.learning.model_program import (
     ModelArtifact,
+    ModelDevelopmentRegistry,
     ModelProgramError,
     ModelPromotionReceipt,
     TrainingReceipt,
@@ -342,6 +343,27 @@ def bridge_product_training_to_model_program(
     )
 
 
+def register_bridged_model_program_artifact(
+    registry: ModelDevelopmentRegistry,
+    bridged: BridgedModelProgramArtifact,
+) -> tuple[ModelArtifact, TrainingReceipt]:
+    """Admit one reverse-trained candidate into canonical model-program state."""
+
+    if not isinstance(registry, ModelDevelopmentRegistry):
+        raise TypeError("registry must be ModelDevelopmentRegistry")
+    if not isinstance(bridged, BridgedModelProgramArtifact):
+        raise TypeError("bridged must be BridgedModelProgramArtifact")
+    try:
+        return registry.register_external_training(
+            bridged.artifact,
+            bridged.training_receipt,
+        )
+    except ModelProgramError as exc:
+        raise ModelProgramBridgeError(
+            "bridged training could not enter canonical model registry"
+        ) from exc
+
+
 def model_promotion_receipt_from_qualification(
     bridged: BridgedModelProgramArtifact,
     qualification: LearningQualificationBundle,
@@ -407,4 +429,5 @@ __all__ = [
     "ModelProgramBridgeError",
     "bridge_product_training_to_model_program",
     "model_promotion_receipt_from_qualification",
+    "register_bridged_model_program_artifact",
 ]
