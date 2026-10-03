@@ -32,6 +32,28 @@ def _tokens(name: str, values: Iterable[str]) -> tuple[str, ...]:
     return result
 
 
+def _pairs(
+    name: str,
+    values: Iterable[tuple[str, str]],
+) -> tuple[tuple[str, str], ...]:
+    if isinstance(values, (str, bytes)):
+        raise DataDeletionError(f"{name} must be a collection")
+    result: set[tuple[str, str]] = set()
+    for value in values:
+        if (
+            not isinstance(value, tuple)
+            or len(value) != 2
+        ):
+            raise DataDeletionError(f"{name} entries must be (target, surface) pairs")
+        result.add(
+            (
+                _token("target_ref", value[0]),
+                _token("surface", value[1]),
+            )
+        )
+    return tuple(sorted(result))
+
+
 def _non_negative_int(name: str, value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise DataDeletionError(f"{name} must be a non-negative integer")
@@ -160,8 +182,8 @@ class DeletionEvidence:
     evidence_id: str
     request_digest: str
     tombstone_digests: tuple[str, ...]
-    covered_pairs: tuple[str, ...]
-    missing_pairs: tuple[str, ...]
+    covered_pairs: tuple[tuple[str, str], ...]
+    missing_pairs: tuple[tuple[str, str], ...]
     assessed_at_ns: int
     external_side_effects: bool = False
 
@@ -186,12 +208,12 @@ class DeletionEvidence:
         object.__setattr__(
             self,
             "covered_pairs",
-            tuple(sorted(set(self.covered_pairs))),
+            _pairs("covered_pairs", self.covered_pairs),
         )
         object.__setattr__(
             self,
             "missing_pairs",
-            tuple(sorted(set(self.missing_pairs))),
+            _pairs("missing_pairs", self.missing_pairs),
         )
         if set(self.covered_pairs) & set(self.missing_pairs):
             raise DataDeletionError(
@@ -218,12 +240,71 @@ class DeletionEvidence:
                 "evidence_id": self.evidence_id,
                 "request_digest": self.request_digest,
                 "tombstone_digests": list(self.tombstone_digests),
-                "covered_pairs": list(self.covered_pairs),
-                "missing_pairs": list(self.missing_pairs),
+                "covered_pairs": [list(pair) for pair in self.covered_pairs],
+                "missing_pairs": [list(pair) for pair in self.missing_pairs],
                 "assessed_at_ns": self.assessed_at_ns,
                 "external_side_effects": False,
             }
         )
+
+
+def assess_deletion_evidence(
+    *,
+    evidence_id: str,
+    request: DeletionRequest,
+    tombstones: Iterable[DeletionTombstone],
+    assessed_at_ns: int,
+) -> DeletionEvidence:
+    """Assess exact deletion-scope coverage without performing deletion."""
+
+    if not isinstance(request, DeletionRequest):
+        raise TypeError("request must be DeletionRequest")
+    rows = tuple(tombstones)
+    if any(not isinstance(item, DeletionTombstone) for item in rows):
+        raise DataDeletionError(
+            "tombstones must contain DeletionTombstone values"
+        )
+    assessed = _non_negative_int("assessed_at_ns", assessed_at_ns)
+    if assessed < request.requested_at_ns:
+        raise DataDeletionError(
+            "deletion assessment cannot predate request"
+        )
+
+    expected = {
+        (target, surface)
+        for target in request.target_refs
+        for surface in request.required_surfaces
+    }
+    covered: set[tuple[str, str]] = set()
+    tombstone_ids: set[str] = set()
+    for item in rows:
+        if item.tombstone_id in tombstone_ids:
+            raise DataDeletionError("tombstone IDs must be unique")
+        tombstone_ids.add(item.tombstone_id)
+        if item.request_id != request.request_id:
+            raise DataDeletionError("tombstone request identity mismatch")
+        if item.pair not in expected:
+            raise DataDeletionError(
+                "tombstone is outside declared deletion scope"
+            )
+        if item.pair in covered:
+            raise DataDeletionError(
+                "duplicate tombstone for deletion target/surface pair"
+            )
+        if item.deleted_at_ns < request.requested_at_ns:
+            raise DataDeletionError("tombstone predates deletion request")
+        if assessed < item.deleted_at_ns:
+            raise DataDeletionError("deletion assessment predates tombstone")
+        covered.add(item.pair)
+
+    return DeletionEvidence(
+        evidence_id=evidence_id,
+        request_digest=request.digest,
+        tombstone_digests=tuple(sorted(item.digest for item in rows)),
+        covered_pairs=tuple(sorted(covered)),
+        missing_pairs=tuple(sorted(expected - covered)),
+        assessed_at_ns=assessed,
+    )
 
 
 __all__ = [
@@ -231,4 +312,5 @@ __all__ = [
     "DeletionEvidence",
     "DeletionRequest",
     "DeletionTombstone",
+    "assess_deletion_evidence",
 ]
