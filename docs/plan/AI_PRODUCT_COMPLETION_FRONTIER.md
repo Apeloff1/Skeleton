@@ -460,6 +460,37 @@ When every declared capability meets its threshold, the planner produces no
 target, performs no training, and writes no challenger artifact. Curriculum
 state has no production or promotion authority.
 
+### 26. Gated recurrent local model core
+
+The multi-method learning path now defaults to a bounded GRU-style local model
+instead of the original plain Elman recurrence. The gated backend uses explicit
+update and reset gates around recurrent state, giving the local learner a direct
+mechanism for preserving useful state and controlling replacement of prior
+context while retaining the same provider-neutral inference interface.
+
+The gated model remains credential-free and offline. It uses NumPy only, owns no
+tools or network authority, and serializes every embedding, gate, recurrent,
+output and bias tensor into one content-addressed JSON artifact under
+`skeleton.numpy_gated_recurrent_lm.v1`. Loading recomputes the model identity
+and the artifact loader authenticates the exact bytes before execution.
+
+Multi-method, product, optimizer, continual-learning and curriculum training now
+use `gated_recurrent` by default. The plain-corpus builder keeps the legacy
+`elman_recurrent` default for compatibility and can opt into the gated backend
+explicitly. Both architectures continue through the same atomic artifact writer,
+training receipts and provider-neutral local inference runtime.
+
+Architecture identity is evidence, not an implicit implementation detail. The
+product evaluation manifest records it, qualification rejects manifest/receipt
+architecture drift, and the canonical model-program bridge verifies that the
+declared architecture matches the authenticated artifact schema before creating
+canonical training or promotion evidence.
+
+Focused regressions cover deterministic gated training, serialize/reload
+identity, deterministic inference, gated multi-method defaults, legacy Elman
+compatibility, architecture-drift rejection, schema/architecture mismatch
+rejection, and averaged gradient accumulation for both recurrent backends.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -510,7 +541,10 @@ state has no production or promotion authority.
 - authenticated developmental champion rollback with append-only history;
 - absolute developmental capability scoring on the active local champion;
 - dependency-aware autonomous target selection from measured mastery gaps;
-- no-op completion when all declared capabilities satisfy thresholds.
+- no-op completion when all declared capabilities satisfy thresholds;
+- gated recurrent multi-method training with legacy Elman compatibility;
+- architecture identity preserved through evaluation, qualification and the
+  canonical model-program bridge.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
