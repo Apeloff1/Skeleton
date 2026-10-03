@@ -20,7 +20,9 @@ from .contracts import (
     ScenarioSplit,
     _digest,
 )
+from .curriculum import build_curriculum
 from .evaluation import ComparisonReport, PairedEvaluator
+from .integrity import SplitIntegrityReport, validate_split_integrity
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
 
 
@@ -71,6 +73,7 @@ class GenerationRecord:
     learning_champion_id: str
     selected_champion_id: str
     hard_examples: tuple[HardExample, ...]
+    curriculum_digest: str
 
     @property
     def digest(self) -> str:
@@ -81,6 +84,7 @@ class GenerationRecord:
                 "evaluations": [item.digest for item in self.evaluations],
                 "learning_champion_id": self.learning_champion_id,
                 "selected_champion_id": self.selected_champion_id,
+                "curriculum_digest": self.curriculum_digest,
                 "hard_examples": [
                     {
                         "scenario_id": item.scenario_id,
@@ -106,9 +110,13 @@ class MirrorRunReceipt:
     executor_id: str
     production_baseline: MirrorCandidate
     final_sandbox_champion: MirrorCandidate
+    generator_id: str
+    executor_id: str
     generations: tuple[GenerationRecord, ...]
     holdout_report: ComparisonReport | None
     sealed_holdout_digest: str
+    split_integrity_digest: str
+    validation_candidate_evaluations: int
     usage: SandboxUsage
     eligible_for_external_promotion: bool
     production_authority: bool = False
@@ -146,9 +154,13 @@ class MirrorRunReceipt:
                 "executor_id": self.executor_id,
                 "production_baseline_digest": self.production_baseline.digest,
                 "final_sandbox_champion_digest": self.final_sandbox_champion.digest,
+                "generator_id": self.generator_id,
+                "executor_id": self.executor_id,
                 "generations": [item.digest for item in self.generations],
                 "holdout_report": None if self.holdout_report is None else self.holdout_report.digest,
                 "sealed_holdout_digest": self.sealed_holdout_digest,
+                "split_integrity_digest": self.split_integrity_digest,
+                "validation_candidate_evaluations": self.validation_candidate_evaluations,
                 "usage": {
                     "episodes": self.usage.episodes,
                     "steps": self.usage.steps,
@@ -216,12 +228,14 @@ class MirrorRoom:
         tuple[MirrorScenario, ...],
         tuple[MirrorScenario, ...],
         tuple[MirrorScenario, ...],
+        SplitIntegrityReport,
     ]:
         items = tuple(scenarios)
         if not items:
             raise MirrorRoomError("Mirror Room requires scenarios")
         if any(not isinstance(item, MirrorScenario) for item in items):
             raise MirrorRoomError("scenarios must contain MirrorScenario")
+        integrity = validate_split_integrity(items)
         ids = [item.scenario_id for item in items]
         if len(ids) != len(set(ids)):
             raise MirrorRoomError("scenario IDs must be globally unique")
@@ -249,7 +263,7 @@ class MirrorRoom:
             raise MirrorRoomError("validation split does not meet experiment minimum samples")
         if len(holdout) < min_samples:
             raise MirrorRoomError("holdout split does not meet experiment minimum samples")
-        return train, validation, holdout
+        return train, validation, holdout, integrity
 
     @staticmethod
     def _generator_identity(generator: CandidateGenerator) -> str:
@@ -276,6 +290,7 @@ class MirrorRoom:
             raise MirrorRoomError("candidate generator exceeded generation limit")
         local_ids: set[str] = set()
         local_digests: set[str] = set()
+        local_parameter_digests: set[str] = set()
         local_behavior_digests: set[str] = set()
         for candidate in result:
             if not isinstance(candidate, MirrorCandidate):
@@ -406,6 +421,14 @@ class MirrorRoom:
                     split=ScenarioSplit.TRAIN,
                     enforce_gate=False,
                 )
+                validation_candidate_evaluations += 1
+                if (
+                    validation_candidate_evaluations
+                    > self.spec.budget.max_validation_candidate_evaluations
+                ):
+                    raise MirrorRoomError(
+                        "Mirror Room validation selection budget exhausted"
+                    )
                 validation_report = evaluator.compare(
                     run_id=run_id,
                     baseline=production_baseline,
@@ -420,6 +443,7 @@ class MirrorRoom:
                 )
                 seen_ids.add(candidate.candidate_id)
                 seen_digests.add(candidate.digest)
+                seen_parameter_digests.add(candidate.parameter_digest)
                 seen_behavior_digests.add(candidate.behavior_digest)
 
             ranked_training = sorted(
@@ -551,6 +575,8 @@ class MirrorRoom:
             generations=tuple(generation_records),
             holdout_report=holdout_report,
             sealed_holdout_digest=_sealed_split_digest(holdout),
+            split_integrity_digest=split_integrity.digest,
+            validation_candidate_evaluations=validation_candidate_evaluations,
             usage=sandbox.usage,
             eligible_for_external_promotion=eligible,
         )
