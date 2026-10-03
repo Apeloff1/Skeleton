@@ -7,12 +7,16 @@ on:
       - 'skeleton/automation/studio_*.py'
       - 'skeleton/automation/build_*.py'
       - 'skeleton/automation/ci_*.py'
+      - 'skeleton/automation/repair_*.py'
+      - 'skeleton/automation/evidence_provenance.py'
       - 'skeleton/automation/autonomous_build.py'
       - 'skeleton/automation/supervised_studio.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
       - 'skeleton/testing/test_build_*.py'
       - 'skeleton/testing/test_ci_*.py'
+      - 'skeleton/testing/test_repair_*.py'
+      - 'skeleton/testing/test_evidence_provenance.py'
       - 'skeleton/testing/test_autonomous_build.py'
       - 'skeleton/testing/test_supervised_studio.py'
       - 'skeleton/testing/test_completion_campaign.py'
@@ -87,6 +91,8 @@ jobs:
             skeleton/testing/test_autonomous_build.py \
             skeleton/testing/test_build_*.py \
             skeleton/testing/test_ci_*.py \
+            skeleton/testing/test_repair_*.py \
+            skeleton/testing/test_evidence_provenance.py \
             -q --tb=short --maxfail=1
 
       - name: Run deterministic Shift Supervisor planning suite
