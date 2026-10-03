@@ -422,6 +422,8 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     assert receipt["learning_pair_count"] == 1
     assert receipt["promotion_state"] == "candidate_only"
     assert receipt["training_mode"] == "multi_method"
+    assert receipt["gradient_accumulation_steps"] == 4
+    assert receipt["optimizer_steps"] > 0
     assert receipt["training_plan"]["plan_digest"]
     materialized = set(receipt["training_plan"]["materialized_methods"])
     assert {
