@@ -1440,6 +1440,93 @@ class CostGovernor:
             estimate=fallback.estimate,
         )
 
+    @staticmethod
+    def _selected_request_for_replay(
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        record: _CostJournalRecord,
+    ) -> AdmissionRequest:
+        receipt = record.reservation
+        if receipt.fallback_used:
+            if fallback is None:
+                raise CostGovernorConflict(
+                    "durable fallback reservation requires original fallback"
+                )
+            if fallback.fallback_id != receipt.fallback_id:
+                raise CostGovernorConflict(
+                    "durable fallback identity does not match replay"
+                )
+            selected = CostGovernor._fallback_request(
+                request,
+                fallback,
+            )
+        else:
+            selected = request
+
+        if (
+            selected.capability != receipt.selected_capability
+            or _request_digest(selected)
+            != receipt.selected_request_digest
+        ):
+            raise CostGovernorConflict(
+                "durable selected request does not match replay"
+            )
+        return selected
+
+    @staticmethod
+    def _lease_from_journal(
+        selected: AdmissionRequest,
+        record: _CostJournalRecord,
+    ) -> AdmissionLease:
+        metadata = record.runtime_lease
+        if metadata is None:
+            raise CostGovernorError(
+                "legacy active cost journal lacks runtime lease recovery metadata"
+            )
+        receipt = record.reservation
+        if (
+            metadata.lease_id != receipt.lease_id
+            or metadata.decision_id != receipt.admission_decision_id
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal identity does not match reservation receipt"
+            )
+
+        remaining = dict(metadata.remaining)
+        required_remaining = {
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "wall_seconds",
+            "provider_attempts",
+            "tool_calls",
+            "artifact_bytes",
+            "storage_bytes",
+            "concurrency",
+            "queue_depth",
+        }
+        if not required_remaining.issubset(remaining):
+            raise CostGovernorError(
+                "runtime lease journal is missing remaining-budget fields"
+            )
+
+        decision = AdmissionDecision(
+            decision_id=metadata.decision_id,
+            status=AdmissionStatus.ADMIT,
+            operation_id=selected.operation_id,
+            tenant_id=selected.tenant_id,
+            capability=selected.capability,
+            reason_code=metadata.reason_code,
+            estimated=selected.estimate,
+            remaining=remaining,
+        )
+        return AdmissionLease(
+            lease_id=metadata.lease_id,
+            decision=decision,
+            quota_reservation=record.quota_reservation,
+            admitted_at=metadata.admitted_at,
+        )
+
     def reserve(
         self,
         request: AdmissionRequest,
@@ -1485,6 +1572,31 @@ class CostGovernor:
                         raise CostGovernorConflict(
                             "operation already has terminal cost journal state"
                         )
+
+                    selected = self._selected_request_for_replay(
+                        request,
+                        fallback,
+                        persisted,
+                    )
+                    lease = self._lease_from_journal(
+                        selected,
+                        persisted,
+                    )
+                    try:
+                        self.runtime.reattach(selected, lease)
+                    except AdmissionRuntimeConflict as exc:
+                        raise CostGovernorConflict(str(exc)) from exc
+                    except AdmissionRuntimeError as exc:
+                        raise CostGovernorError(str(exc)) from exc
+                    receipt = persisted.reservation
+                    self._active[request.operation_id] = (
+                        _ActiveCostReservation(
+                            requested_request_digest=requested_digest,
+                            receipt=receipt,
+                            budget=request.budget,
+                        )
+                    )
+                    return receipt
 
             try:
                 lease = self.runtime.admit(
