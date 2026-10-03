@@ -226,7 +226,7 @@ class TrainingExample:
 class TrainingEfficiencyPolicy:
     """Hard resource and ordering policy for corpus materialization."""
 
-    max_documents: int = 8_192
+    max_documents: int = 4_096
     max_total_chars: int = 16_000_000
     max_document_chars: int = 64_000
     length_bucket_chars: int = 1_024
@@ -655,7 +655,11 @@ def compile_training_plan(
                         "metadata": dict(metadata),
                     }
                     content_key = identity_payload["text_sha256"]
-                    if actual.deduplicate and content_key in seen_content:
+                    if (
+                        actual.deduplicate
+                        and ordinal == 0
+                        and content_key in seen_content
+                    ):
                         dropped_duplicate += 1
                         continue
                     if (
@@ -664,7 +668,8 @@ def compile_training_plan(
                     ):
                         dropped_budget += 1
                         continue
-                    seen_content.add(str(content_key))
+                    if ordinal == 0:
+                        seen_content.add(str(content_key))
                     document_id = (
                         "train-doc:" + _digest(identity_payload)
                     )
@@ -698,7 +703,7 @@ def compile_training_plan(
             item.document_id,
         )
     )
-    source_digests = tuple(item.digest for item in rows)
+    source_digests = tuple(sorted(item.digest for item in rows))
     plan_payload = {
         "schema_version": "skeleton.multi_method_training_plan.v1",
         "methods": [
