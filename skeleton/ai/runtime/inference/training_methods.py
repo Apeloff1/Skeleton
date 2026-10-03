@@ -145,6 +145,7 @@ class TrainingExample:
     source_ref: str = "source:unspecified"
     replay: bool = False
     camera_view_refs: tuple[str, ...] = ()
+    camera_coverage_digest: str | None = None
     tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -238,6 +239,20 @@ class TrainingExample:
                 "camera_view_refs exceeds hard bound"
             )
         object.__setattr__(self, "camera_view_refs", views)
+        if self.camera_coverage_digest is not None:
+            coverage_digest = str(self.camera_coverage_digest).strip().lower()
+            if (
+                len(coverage_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in coverage_digest)
+            ):
+                raise TrainingMethodError(
+                    "camera_coverage_digest must be lowercase sha256"
+                )
+            object.__setattr__(
+                self,
+                "camera_coverage_digest",
+                coverage_digest,
+            )
         tags = tuple(
             sorted(
                 {
@@ -272,6 +287,7 @@ class TrainingExample:
                 "source_ref": self.source_ref,
                 "replay": self.replay,
                 "camera_view_refs": list(self.camera_view_refs),
+                "camera_coverage_digest": self.camera_coverage_digest,
                 "tags": list(self.tags),
             }
         )
@@ -396,6 +412,7 @@ class MultiMethodTrainingPlan:
     documents: tuple[CompiledTrainingDocument, ...]
     methods: tuple[MethodWeight, ...]
     source_example_digests: tuple[str, ...]
+    camera_coverage_digests: tuple[str, ...]
     efficiency_policy_digest: str
     dropped_duplicate_count: int
     dropped_budget_count: int
@@ -449,6 +466,7 @@ class MultiMethodTrainingPlan:
                 for item in self.methods
             ],
             "source_example_digests": list(self.source_example_digests),
+            "camera_coverage_digests": list(self.camera_coverage_digests),
             "document_ids": [item.document_id for item in self.documents],
             "document_count": len(self.documents),
             "method_counts": dict(self.method_counts),
@@ -1028,6 +1046,15 @@ def compile_training_plan(
         )
     )
     source_digests = tuple(sorted(item.digest for item in rows))
+    camera_coverage_digests = tuple(
+        sorted(
+            {
+                item.camera_coverage_digest
+                for item in rows
+                if item.camera_coverage_digest is not None
+            }
+        )
+    )
     plan_payload = {
         "schema_version": "skeleton.multi_method_training_plan.v1",
         "methods": [
@@ -1038,6 +1065,7 @@ def compile_training_plan(
             for item in configured
         ],
         "source_example_digests": list(source_digests),
+        "camera_coverage_digests": list(camera_coverage_digests),
         "efficiency_policy_digest": actual.digest,
         "document_ids": [item.document_id for item in emitted],
         "method_counts": dict(sorted(method_counts.items())),
@@ -1049,6 +1077,7 @@ def compile_training_plan(
         documents=tuple(emitted),
         methods=configured,
         source_example_digests=source_digests,
+        camera_coverage_digests=camera_coverage_digests,
         efficiency_policy_digest=actual.digest,
         dropped_duplicate_count=dropped_duplicate,
         dropped_budget_count=dropped_budget,
