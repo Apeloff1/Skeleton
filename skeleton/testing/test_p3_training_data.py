@@ -183,3 +183,110 @@ def test_manifest_digest_detects_serialized_tampering(tmp_path):
     payload["classification"]="public"
     with pytest.raises(ValueError,match="digest mismatch"):
         DatasetManifest.from_dict(payload)
+
+def test_dataset_cannot_escalate_source_rights_to_training(tmp_path):
+    registry=DatasetRegistry(tmp_path/"rights.sqlite3")
+    ingest=IngestEnvelope.from_bytes(
+        source_id="fixture://evaluation-only",
+        payload=b"evaluation only",
+        parser_version="parser@1",
+        classification="internal",
+        rights=("evaluation",),
+        trusted=True,
+        acquired_at=NOW,
+    )
+    registry.register_ingest(ingest)
+    manifest=DatasetManifest(
+        dataset_id="rights-escalation",
+        version="1",
+        splits=(DatasetSplit("train",_digest("rights-split"),1),),
+        source_ingest_digests=(ingest.content_digest,),
+        classification="internal",
+        permitted_uses=("training",),
+        retention_class="model-development",
+        parser_versions=("parser@1",),
+    )
+
+    with pytest.raises(PermissionError,match="escalate source ingest rights"):
+        registry.register_dataset(manifest)
+
+
+def test_dataset_cannot_downgrade_source_classification(tmp_path):
+    registry=DatasetRegistry(tmp_path/"classification.sqlite3")
+    ingest=IngestEnvelope.from_bytes(
+        source_id="fixture://restricted",
+        payload=b"restricted source",
+        parser_version="parser@1",
+        classification="restricted",
+        rights=("training",),
+        trusted=True,
+        acquired_at=NOW,
+    )
+    registry.register_ingest(ingest)
+    manifest=DatasetManifest(
+        dataset_id="classification-downgrade",
+        version="1",
+        splits=(DatasetSplit("train",_digest("classification-split"),1),),
+        source_ingest_digests=(ingest.content_digest,),
+        classification="internal",
+        permitted_uses=("training",),
+        retention_class="restricted-development",
+        parser_versions=("parser@1",),
+    )
+
+    with pytest.raises(PermissionError,match="may not downgrade"):
+        registry.register_dataset(manifest)
+
+
+def test_dataset_must_preserve_source_parser_identity(tmp_path):
+    registry=DatasetRegistry(tmp_path/"parser.sqlite3")
+    ingest=IngestEnvelope.from_bytes(
+        source_id="fixture://parser",
+        payload=b"parser-bound",
+        parser_version="source-parser@7",
+        classification="internal",
+        rights=("training",),
+        trusted=True,
+        acquired_at=NOW,
+    )
+    registry.register_ingest(ingest)
+    manifest=DatasetManifest(
+        dataset_id="parser-drift",
+        version="1",
+        splits=(DatasetSplit("train",_digest("parser-split"),1),),
+        source_ingest_digests=(ingest.content_digest,),
+        classification="internal",
+        permitted_uses=("training",),
+        retention_class="model-development",
+        parser_versions=("different-parser@1",),
+    )
+
+    with pytest.raises(ValueError,match="omit source parser"):
+        registry.register_dataset(manifest)
+
+
+def test_dataset_may_be_more_restrictive_than_its_source(tmp_path):
+    registry=DatasetRegistry(tmp_path/"restrictive.sqlite3")
+    ingest=IngestEnvelope.from_bytes(
+        source_id="fixture://public",
+        payload=b"public source",
+        parser_version="parser@1",
+        classification="public",
+        rights=("training","evaluation"),
+        trusted=True,
+        acquired_at=NOW,
+    )
+    registry.register_ingest(ingest)
+    manifest=DatasetManifest(
+        dataset_id="more-restrictive",
+        version="1",
+        splits=(DatasetSplit("train",_digest("restrictive-split"),1),),
+        source_ingest_digests=(ingest.content_digest,),
+        classification="internal",
+        permitted_uses=("training",),
+        retention_class="model-development",
+        parser_versions=("parser@1",),
+    )
+
+    assert registry.register_dataset(manifest)==manifest.digest
+
