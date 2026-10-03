@@ -30,6 +30,9 @@ from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
 )
+from skeleton.persistence.conversation_repository import (
+    SQLiteConversationRepository,
+)
 
 
 _MAX_ACCEPTED_PAIRS = 1_024
@@ -198,6 +201,7 @@ class CanonicalLearningCandidate:
     pairs: tuple[CanonicalLearningPair, ...]
     allowed_data_classes: tuple[str, ...]
     tool_augmented: bool
+    source_thread_version: int | None = None
 
     def __post_init__(self) -> None:
         if not self.pairs:
@@ -212,6 +216,14 @@ class CanonicalLearningCandidate:
         if len(ids) != len(set(ids)):
             raise CanonicalLearningHandoffError(
                 "learning candidate contains duplicate assistant identity"
+            )
+        if self.source_thread_version is not None and (
+            isinstance(self.source_thread_version, bool)
+            or not isinstance(self.source_thread_version, int)
+            or self.source_thread_version < 1
+        ):
+            raise CanonicalLearningHandoffError(
+                "source_thread_version must be a positive integer"
             )
         total = sum(len(pair.document) for pair in self.pairs)
         if total > _MAX_CORPUS_CHARS:
@@ -231,6 +243,7 @@ class CanonicalLearningCandidate:
                 "pair_digests": [pair.identity_digest for pair in self.pairs],
                 "allowed_data_classes": list(self.allowed_data_classes),
                 "tool_augmented": self.tool_augmented,
+                "source_thread_version": self.source_thread_version,
             }
         )
 
@@ -249,6 +262,7 @@ class CanonicalLearningCandidate:
             ],
             "allowed_data_classes": list(self.allowed_data_classes),
             "tool_augmented": self.tool_augmented,
+            "source_thread_version": self.source_thread_version,
         }
 
 
@@ -258,6 +272,7 @@ def build_learning_candidate(
     accepted_assistant_message_ids: Iterable[str],
     allowed_data_classes: Iterable[str] = _DEFAULT_ALLOWED_DATA_CLASSES,
     allow_tool_augmented: bool = False,
+    source_thread_version: int | None = None,
 ) -> CanonicalLearningCandidate:
     """Select explicit accepted turns and bind them to canonical lineage.
 
@@ -407,6 +422,75 @@ def build_learning_candidate(
         pairs=tuple(selected),
         allowed_data_classes=classes,
         tool_augmented=bool(allow_tool_augmented),
+        source_thread_version=source_thread_version,
+    )
+
+
+def build_learning_candidate_from_repository(
+    conversations: SQLiteConversationRepository,
+    *,
+    thread_id: str,
+    tenant_id: str,
+    owner_id: str,
+    expected_thread_version: int,
+    accepted_assistant_message_ids: Iterable[str],
+    allowed_data_classes: Iterable[str] = _DEFAULT_ALLOWED_DATA_CLASSES,
+    allow_tool_augmented: bool = False,
+) -> CanonicalLearningCandidate:
+    """Build from the exact active durable transcript at one thread version."""
+
+    if not isinstance(conversations, SQLiteConversationRepository):
+        raise TypeError(
+            "conversations must be SQLiteConversationRepository"
+        )
+    if (
+        isinstance(expected_thread_version, bool)
+        or not isinstance(expected_thread_version, int)
+        or expected_thread_version < 1
+    ):
+        raise CanonicalLearningHandoffError(
+            "expected_thread_version must be a positive integer"
+        )
+
+    before = conversations.get_thread(
+        thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    if before.version != expected_thread_version:
+        raise CanonicalLearningHandoffError(
+            "conversation version changed before learning snapshot"
+        )
+    if before.message_sequence > 500:
+        raise CanonicalLearningHandoffError(
+            "learning snapshot exceeds bounded active transcript window"
+        )
+
+    transcript = conversations.active_transcript(
+        thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    after = conversations.get_thread(
+        thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    if (
+        after.version != before.version
+        or after.message_sequence != before.message_sequence
+        or after.active_branch_id != before.active_branch_id
+    ):
+        raise CanonicalLearningHandoffError(
+            "conversation changed while learning snapshot was read"
+        )
+
+    return build_learning_candidate(
+        transcript,
+        accepted_assistant_message_ids=accepted_assistant_message_ids,
+        allowed_data_classes=allowed_data_classes,
+        allow_tool_augmented=allow_tool_augmented,
+        source_thread_version=before.version,
     )
 
 
@@ -548,6 +632,10 @@ def build_learning_candidate_artifact(
         }
         qualification["receipt_digest"] = _stable_digest(qualification)
     except LocalModelBuildError as exc:
+        try:
+            destination_resolved.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise CanonicalLearningHandoffError(
             "local-model candidate build failed"
         ) from exc
@@ -588,4 +676,5 @@ __all__ = [
     "CanonicalLearningPair",
     "build_learning_candidate",
     "build_learning_candidate_artifact",
+    "build_learning_candidate_from_repository",
 ]
