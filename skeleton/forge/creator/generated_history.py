@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import re
 from typing import Final, Mapping, NoReturn
 
 from skeleton.forge.creator.design_graph import (
@@ -34,6 +35,9 @@ MAX_SNAPSHOTS: Final = MAX_HISTORY_ENTRIES + 1
 MAX_LABEL_CHARS: Final = 256
 MAX_SUMMARIES: Final = 64
 MAX_SERIALIZED_BYTES: Final = 32 * 1024 * 1024
+
+_SHA256_RE: Final = re.compile(r"^[0-9a-f]{64}$")
+_TRANSITION_ID_RE: Final = re.compile(r"^tr_[0-9a-f]{24}$")
 
 
 class GeneratedHistoryError(SkeletonError):
@@ -148,6 +152,25 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
             _fail("duplicate JSON field in generated history", reason="duplicate_field", field=key)
         result[key] = value
     return result
+
+
+def _sha256(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or _SHA256_RE.fullmatch(value) is None:
+        _fail(
+            f"{field} must be a lowercase sha256 digest",
+            reason="malformed",
+            field=field,
+        )
+    return value
+
+
+def _transition_id(value: object) -> str:
+    if not isinstance(value, str) or _TRANSITION_ID_RE.fullmatch(value) is None:
+        _fail(
+            "transition_id is not canonical",
+            reason="transition_integrity",
+        )
+    return value
 
 
 def _strict_int(
@@ -303,13 +326,14 @@ def _transition_map(
     for transition in transitions:
         if not isinstance(transition, StateTransition):
             _fail("history transition has invalid type", reason="transition_integrity")
-        if transition.transition_id in result:
+        transition_id = _transition_id(transition.transition_id)
+        if transition_id in result:
             _fail(
                 "duplicate transition id",
                 reason="transition_integrity",
-                transition_id=transition.transition_id,
+                transition_id=transition_id,
             )
-        result[transition.transition_id] = transition
+        result[transition_id] = transition
     return result
 
 
@@ -318,13 +342,24 @@ def _snapshot_map(
 ) -> dict[str, StoredSnapshot]:
     result: dict[str, StoredSnapshot] = {}
     for record in snapshots:
-        if record.graph_digest in result:
+        if not isinstance(record, StoredSnapshot):
+            _fail("snapshot record has invalid type", reason="snapshot_integrity")
+        graph_digest = _sha256(
+            record.graph_digest,
+            field="snapshot.graph_digest",
+        )
+        if not isinstance(record.serialized, str) or not record.serialized:
+            _fail(
+                "snapshot serialization is malformed",
+                reason="snapshot_integrity",
+            )
+        if graph_digest in result:
             _fail(
                 "duplicate stored snapshot digest",
                 reason="snapshot_integrity",
-                graph_digest=record.graph_digest,
+                graph_digest=graph_digest,
             )
-        result[record.graph_digest] = record
+        result[graph_digest] = record
     return result
 
 
@@ -508,7 +543,6 @@ def record_generated_transition(
     )
 
     transition_by_id = _transition_map(history.transitions)
-    retained_ids = set(history.undo_stack)
     retained_transitions = [
         transition_by_id[transition_id]
         for transition_id in history.undo_stack
@@ -693,6 +727,8 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
     )
     if not isinstance(history.project_id, str) or not history.project_id:
         _fail("history project_id is malformed", reason="malformed")
+    _sha256(history.current_digest, field="history.current_digest")
+    _sha256(history.digest, field="history.digest")
     if len(history.snapshots) > MAX_SNAPSHOTS:
         _fail("history exceeds snapshot bound", reason="bound")
     if len(history.transitions) > MAX_HISTORY_ENTRIES:
@@ -711,6 +747,14 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
 
     transition_by_id = _transition_map(history.transitions)
     for transition in history.transitions:
+        _transition_id(transition.transition_id)
+        _sha256(transition.before_digest, field="transition.before_digest")
+        _sha256(transition.after_digest, field="transition.after_digest")
+        _sha256(
+            transition.semantic_diff_digest,
+            field="transition.semantic_diff_digest",
+        )
+        _sha256(transition.digest, field="transition.digest")
         _validate_transition(
             transition,
             ordinal_ceiling=max(1, revision),
@@ -724,11 +768,20 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
     if set(history.undo_stack) & set(history.redo_stack):
         _fail("transition appears in both undo and redo stacks", reason="stack_integrity")
     stacked = set(history.undo_stack) | set(history.redo_stack)
-    if stacked != set(transition_by_id):
-        _fail("history transition inventory differs from stacks", reason="stack_integrity")
     missing_stack_ids = stacked - set(transition_by_id)
     if missing_stack_ids:
-        _fail("history stack references unknown transition", reason="stack_integrity")
+        _fail(
+            "history stack references unknown transition",
+            reason="stack_integrity",
+            missing=sorted(missing_stack_ids),
+        )
+    unstacked_ids = set(transition_by_id) - stacked
+    if unstacked_ids:
+        _fail(
+            "history transition inventory contains unreachable entries",
+            reason="stack_integrity",
+            unstacked=sorted(unstacked_ids),
+        )
 
     _validate_stack_chain(
         current_digest=history.current_digest,
