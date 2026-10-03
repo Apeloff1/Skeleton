@@ -639,13 +639,21 @@ class AdmissionRuntime:
                 - request.estimate.storage_bytes,
             ),
         }
+        expected_remaining_keys = set(required_remaining) | {
+            "concurrency",
+            "queue_depth",
+        }
+        if set(remaining) != expected_remaining_keys:
+            raise AdmissionRuntimeConflict(
+                "durable lease remaining budget fields do not match request"
+            )
         for field, expected in required_remaining.items():
-            if field not in remaining or remaining[field] != expected:
+            if remaining[field] != expected:
                 raise AdmissionRuntimeConflict(
                     "durable lease remaining budget does not match request"
                 )
-        concurrency = remaining.get("concurrency")
-        queue_depth = remaining.get("queue_depth")
+        concurrency = remaining["concurrency"]
+        queue_depth = remaining["queue_depth"]
         if (
             isinstance(concurrency, bool)
             or not isinstance(concurrency, int)
