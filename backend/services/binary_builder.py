@@ -917,5 +917,20 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
 
 
 def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
-    p = ARTIFACTS_ROOT / f"{build_id}.{kind}"
-    return p if p.exists() else None
+    if kind not in {"zip", "apk"}:
+        return None
+    if (
+        not isinstance(build_id, str)
+        or not build_id
+        or len(build_id) > 128
+        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
+    ):
+        return None
+
+    root = ARTIFACTS_ROOT.resolve()
+    candidate = (root / f"{build_id}.{kind}").resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
