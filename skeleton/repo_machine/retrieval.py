@@ -7,6 +7,7 @@ scanner. Repository file contents are not copied into the retrieval index.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import re
 from typing import Iterable
 
@@ -16,6 +17,7 @@ _TOKEN = re.compile(r"[A-Za-z0-9_./:-]{2,}")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 
+@lru_cache(maxsize=8192)
 def _tokens(value: str) -> tuple[str, ...]:
     expanded = _CAMEL.sub(" ", value.replace("\\", "/"))
     raw = _TOKEN.findall(expanded)
