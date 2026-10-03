@@ -1,5 +1,18 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
+from .continual_learning import (
+    ContinualLearningError,
+    ContinualLearningPolicy,
+    ContinualLearningRound,
+    ContinualLearningState,
+    DevelopmentalChampion,
+    ReplayMemoryItem,
+    initialize_continual_learning_state,
+    load_continual_learning_state,
+    rollback_developmental_champion,
+    run_continual_learning_round,
+    save_continual_learning_state,
+)
 from .developmental_eval import (
     DevelopmentalCaseResult,
     DevelopmentalComparisonReport,
@@ -90,6 +103,17 @@ from .local import (
 )
 
 __all__ = [
+    "save_continual_learning_state",
+    "run_continual_learning_round",
+    "rollback_developmental_champion",
+    "load_continual_learning_state",
+    "initialize_continual_learning_state",
+    "ReplayMemoryItem",
+    "DevelopmentalChampion",
+    "ContinualLearningState",
+    "ContinualLearningRound",
+    "ContinualLearningPolicy",
+    "ContinualLearningError",
     "optimize_training_mix",
     "TrainingOptimizationResult",
     "TrainingOptimizationPolicy",
