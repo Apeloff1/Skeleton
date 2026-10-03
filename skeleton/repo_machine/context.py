@@ -31,22 +31,22 @@ def _bounded(payload: dict[str, object], byte_limit: int) -> dict[str, object]:
         return compact
 
     compact["truncated_for_context"] = True
-    # Trim the highest-volume, least structural surfaces first.
-    limits = {"files": 64, "work": 24, "findings": 24, "subsystems": 64}
     while not _fits(compact, byte_limit):
         changed = False
-        for key in ("files", "work", "findings", "subsystems"):
+        for key in ("files", "work", "findings", "subsystems", "topology"):
             value = compact.get(key)
             if isinstance(value, list) and len(value) > 0:
-                old = len(value)
-                compact[key] = value[:max(1, old // 2)]
+                compact[key] = value[:max(1, len(value) // 2)]
                 changed = True
-                if _fits(compact, byte_limit):
-                    return compact
+            elif isinstance(value, dict) and value:
+                if key == "topology":
+                    compact[key] = {"edges": value.get("edges", [])[:max(1, len(value.get("edges", [])) // 2)], "cycles": value.get("cycles", [])[:4]}
+                    changed = True
+            if _fits(compact, byte_limit):
+                return compact
         if not changed:
             break
 
-    # Last resort: retain the machine identity and control metadata.
     if not _fits(compact, byte_limit):
         keep = {"intent", "fingerprint", "health", "metrics", "truncated_for_context"}
         compact = {key: compact[key] for key in keep if key in compact}
@@ -54,45 +54,31 @@ def _bounded(payload: dict[str, object], byte_limit: int) -> dict[str, object]:
     return compact
 
 
-def context_for_intent(
-    model: RepositoryModel,
-    intent: Intent = "overview",
-    *,
-    byte_limit: int = MAX_CONTEXT_BYTES,
-) -> dict[str, object]:
+def context_for_intent(model: RepositoryModel, intent: Intent = "overview", *, byte_limit: int = MAX_CONTEXT_BYTES) -> dict[str, object]:
     if isinstance(byte_limit, bool) or not isinstance(byte_limit, int) or not 4_096 <= byte_limit <= 256_000:
         raise ValueError("byte_limit must be in [4096,256000]")
     query = RepositoryQuery(model)
-    health = repository_health(model)
-    metrics = structural_metrics(model)
-    work = [item.as_dict() for item in derive_work_candidates(model, limit=32)]
-    plan = build_execution_plan(model, limit=8)
     base: dict[str, object] = {
         "intent": intent,
         "fingerprint": model.fingerprint,
-        "health": health.as_dict(),
-        "metrics": metrics.as_dict(),
+        "health": repository_health(model).as_dict(),
+        "metrics": structural_metrics(model).as_dict(),
         "subsystems": [item.as_dict() for item in model.subsystems],
-        "work": work,
-        "execution": plan.as_dict(),
+        "work": [item.as_dict() for item in derive_work_candidates(model, limit=32)],
+        "execution": build_execution_plan(model, limit=8).as_dict(),
         "findings": [item.as_dict() for item in model.findings[:40]],
     }
 
     if intent == "architecture":
-        base["topology"] = {
-            "edges": [item.as_dict() for item in model.edges],
-            "cycles": [list(item) for item in model.cycles],
-        }
+        base["topology"] = {"edges": [item.as_dict() for item in model.edges], "cycles": [list(item) for item in model.cycles]}
         base["files"] = [item.as_dict() for item in query.largest_files(limit=40).files]
     elif intent == "testing":
-        base["files"] = [item.as_dict() for item in query.verification_files(tuple(item.name for item in model.subsystems), limit=100)]
+        zones = tuple(item.name for item in model.subsystems)
+        base["files"] = [item.as_dict() for item in query.verification_files(zones, limit=100).files]
     elif intent == "repair":
         base["files"] = [item.as_dict() for item in query.files(kinds=["source", "workflow", "config"], limit=80).files]
     elif intent == "security":
-        base["files"] = [item.as_dict() for item in query.files(
-            zones=["automation", "github", "backend", "core"],
-            kinds=["source", "workflow", "config", "script"], limit=80,
-        ).files]
+        base["files"] = [item.as_dict() for item in query.files(zones=["automation", "github", "backend", "core"], kinds=["source", "workflow", "config", "script"], limit=80).files]
     elif intent == "documentation":
         base["files"] = [item.as_dict() for item in query.files(kinds=["docs"], limit=100).files]
     elif intent == "performance":
