@@ -437,3 +437,30 @@ def test_canonical_items_rejects_oversized_snapshot(tmp_path):
     state.write_text(" " * 5_000_001, encoding="utf-8")
     with pytest.raises(ValueError, match="exceeds 5 MB"):
         supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_plan_digest_tampering(tmp_path):
+    import hashlib
+
+    items = [{"id": "one", "title": "One", "description": "Original", "priority": 50}]
+    digest = hashlib.sha256(
+        json.dumps(items, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    items[0]["description"] = "Tampered"
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-tamper",
+                    "plan_digest_sha256": digest,
+                    "plan_items": items,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="plan digest mismatch"):
+        supervised_studio._canonical_items(state, 1)
