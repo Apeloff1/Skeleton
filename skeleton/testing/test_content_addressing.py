@@ -110,6 +110,31 @@ def test_content_addresses_are_tenant_scoped() -> None:
         )
 
 
+def test_same_content_may_back_multiple_logical_ids_but_digest_only_resolution_is_ambiguous() -> None:
+    store = GovernedContentStore()
+    first = store.put(
+        tenant_id="tenant-a",
+        logical_id="artifact-a",
+        version=1,
+        trust_context="internal",
+        payload=b"shared",
+    )
+    second = store.put(
+        tenant_id="tenant-a",
+        logical_id="artifact-b",
+        version=1,
+        trust_context="restricted",
+        payload=b"shared",
+    )
+
+    assert first.digest == second.digest
+    with pytest.raises(StorageContractError, match="ambiguous"):
+        store.resolve(
+            tenant_id="tenant-a",
+            digest=first.digest,
+        )
+
+
 def test_unaccepted_digest_algorithm_fails_closed() -> None:
     store = GovernedContentStore(
         digest_policy=DigestPolicy(
