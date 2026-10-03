@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any,Mapping
 from .studio_convergence import evaluate
 from .studio_promotion import PromotionEvidence,promotable
+from .build_state_store import advance as advance_state_envelope
+from .build_lease import acquire as acquire_build_lease
 
 SCHEMA="autonomous-studio.build-controller.v1"
 TERMINAL={"complete","quarantined","exhausted"}
@@ -71,9 +73,17 @@ def main(argv=None)->int:
  p.add_argument("--state",required=True); p.add_argument("--repo-state",required=True)
  p.add_argument("--validated",action="store_true"); p.add_argument("--outcome-sha",default="")
  p.add_argument("--max-cycles",type=int,default=80); p.add_argument("--max-failures",type=int,default=8); p.add_argument("--max-stagnant",type=int,default=5)
+ p.add_argument("--durable-envelope",default=""); p.add_argument("--lease-owner",default=""); p.add_argument("--expected-lease-epoch",type=int,default=0)
  a=p.parse_args(argv); state=BuildState.load(Path(a.state))
  repo=json.loads(Path(a.repo_state).read_text()); supervisor=repo.get("_shift_supervisor")
  if not isinstance(supervisor,Mapping): raise ValueError("missing supervisor state")
  state=advance(state,supervisor=supervisor,validated=a.validated,outcome_sha=a.outcome_sha,max_cycles=a.max_cycles,max_failures=a.max_failures,max_stagnant=a.max_stagnant)
- state.dump(Path(a.state)); print(json.dumps(asdict(state),sort_keys=True)); return 0
+ state.dump(Path(a.state))
+ if a.durable_envelope:
+  head=os.environ.get("GITHUB_SHA","")
+  if len(head)!=40: raise ValueError("durable build state requires exact GITHUB_SHA")
+  lease=acquire_build_lease(None,owner=a.lease_owner or os.environ.get("GITHUB_RUN_ID","local"),expected_epoch=a.expected_lease_epoch,head_sha=head)
+  envelope=advance_state_envelope(None,head_sha=head,payload={"build":asdict(state),"lease":asdict(lease)})
+  Path(a.durable_envelope).write_text(json.dumps({"revision":envelope.revision,"head_sha":envelope.head_sha,"payload":envelope.payload,"sha256":envelope.sha256},sort_keys=True,indent=2)+"\n",encoding="utf-8")
+ print(json.dumps(asdict(state),sort_keys=True)); return 0
 if __name__=="__main__": raise SystemExit(main())
