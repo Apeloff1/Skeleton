@@ -96,6 +96,25 @@ class CampaignState:
 
 
 
+
+def frontier_digest(frontier: Mapping[str, Any]) -> str:
+    payload = {
+        "selected": [
+            {
+                "id": str(item.get("id", "")),
+                "priority": item.get("priority", 50),
+                "dependencies": item.get("dependencies", []),
+            }
+            for item in frontier.get("selected", [])
+            if isinstance(item, Mapping)
+        ],
+        "deferred": frontier.get("deferred", []),
+        "eligible_count": frontier.get("eligible_count", 0),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+
 def select_frontier(
     plan_items: object,
     *,
@@ -184,11 +203,13 @@ def select_frontier(
     # Fill remaining capacity deterministically by unblock value/priority/attempts/id.
     if len(selected) < limit:
         selected.extend(item for _, item in remaining[: limit - len(selected)])
-    return {
+    result = {
         "selected": selected,
         "deferred": sorted(deferred, key=lambda row: (row["reason"], row["id"])),
         "eligible_count": len(eligible),
     }
+    result["frontier_sha256"] = frontier_digest(result)
+    return result
 
 def acquire_lease(state: CampaignState, *, owner: str, expected_epoch: int | None = None) -> CampaignState:
     owner = str(owner).strip()
