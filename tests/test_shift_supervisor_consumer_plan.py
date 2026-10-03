@@ -299,3 +299,31 @@ def test_decode_durable_state_rejects_expansion_bomb():
     body = f"<!-- shift-supervisor-state:gz:v1:{encoded} -->"
     with pytest.raises(CanonicalPlanError, match="expanded state exceeds"):
         decode_durable_state(body)
+
+
+def test_plan_progress_distinguishes_drained_from_blocked():
+    from skeleton.automation.shift_supervisor.consumer_plan import plan_progress
+
+    drained = plan_progress(
+        [
+            {"id": "a", "target_team": "night", "status": "done"},
+            {"id": "b", "target_team": "night", "status": "rejected"},
+        ],
+        "night",
+    )
+    assert drained["terminal"] is True
+    assert drained["counts"]["done"] == 1
+    blocked = plan_progress(
+        [{"id": "a", "target_team": "night", "status": "blocked"}],
+        "night",
+    )
+    assert blocked["terminal"] is False
+    assert blocked["fingerprint_sha256"] != drained["fingerprint_sha256"]
+
+
+def test_plan_progress_fingerprint_changes_when_status_advances():
+    from skeleton.automation.shift_supervisor.consumer_plan import plan_progress
+
+    queued = plan_progress([{"id": "a", "target_team": "night", "status": "queued"}], "night")
+    done = plan_progress([{"id": "a", "target_team": "night", "status": "done"}], "night")
+    assert queued["fingerprint_sha256"] != done["fingerprint_sha256"]
