@@ -292,6 +292,10 @@ def allocate_supervisor_state(
         limit=limit,
     )
     selected = frontier["selected"]
+    lane_map = {
+        str(item.get("id", "")): str(item.get("_campaign_lane", ""))
+        for item in selected
+    }
     selected_ids = {str(item.get("id", "")) for item in selected}
     executable = supervisor.get("plan_items", [])
     if not isinstance(executable, list):
@@ -312,6 +316,7 @@ def allocate_supervisor_state(
         "plan_digest_sha256": plan_digest,
         "frontier_sha256": frontier["frontier_sha256"],
         "authorized_plan_ids": sorted(authorized_ids),
+        "lane_assignments": {item_id: lane_map[item_id] for item_id in sorted(authorized_ids)},
     }
     allocation["allocation_sha256"] = hashlib.sha256(
         json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
