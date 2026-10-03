@@ -76,14 +76,10 @@ jobs:
           "pydantic>=2.13.5"
           "pydantic-settings>=2.15.0"
 
-      - name: Run feedback promotion contracts
+      - name: Run feedback and release contracts
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_feedback_promotion.py
-
-      - name: Run release SLO promotion contracts
-        run: >-
-          python -m pytest -q --noconftest
           skeleton/testing/test_release_slo_promotion.py
 
   independent-p1-verifier:
