@@ -11,7 +11,7 @@ activation manifest, edit process environment, or select the runtime target.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 import hashlib
 import json
@@ -501,6 +501,30 @@ class ModelLifecycleRegistry:
             == bridged.learning_candidate_digest
         )
 
+    def _commit_record(
+        self,
+        model_digest: str,
+        staged: _Record,
+        *,
+        prior: _Record | None,
+    ) -> None:
+        """Publish one staged lifecycle record only if durable persistence succeeds.
+
+        Lifecycle decisions are fail-closed across the process/disk boundary:
+        callers never observe a state transition in memory when the canonical
+        state file could not be atomically committed.
+        """
+
+        self._records[model_digest] = staged
+        try:
+            self._persist()
+        except ModelLifecycleError:
+            if prior is None:
+                self._records.pop(model_digest, None)
+            else:
+                self._records[model_digest] = prior
+            raise
+
     def register_candidate(
         self,
         bridged: BridgedModelProgramArtifact,
@@ -527,8 +551,8 @@ class ModelLifecycleRegistry:
             authority_id=_text(authority_id, "authority_id"),
             evidence_refs=self._candidate_evidence(bridged),
         )
-        self._records[digest] = _Record.from_bridged(bridged, receipt)
-        self._persist()
+        staged = _Record.from_bridged(bridged, receipt)
+        self._commit_record(digest, staged, prior=None)
         return receipt
 
     def validate(
@@ -584,12 +608,17 @@ class ModelLifecycleRegistry:
             authority_id=verifier,
             evidence_refs=refs,
         )
-        record.state = ModelLifecycleState.VALIDATED
-        record.validation_verifier_id = verifier
-        record.qualification_digest = qualification.qualification_digest
-        record.qualification_refs = tuple(qualification.lifecycle_evidence_refs)
-        record.history.append(receipt)
-        self._persist()
+        staged = replace(
+            record,
+            state=ModelLifecycleState.VALIDATED,
+            history=[*record.history, receipt],
+            validation_verifier_id=verifier,
+            qualification_digest=qualification.qualification_digest,
+            qualification_refs=tuple(
+                qualification.lifecycle_evidence_refs
+            ),
+        )
+        self._commit_record(record.model_digest, staged, prior=record)
         return receipt
 
     def promote(
@@ -656,12 +685,15 @@ class ModelLifecycleRegistry:
                 *promotion_receipt.evaluation_refs,
             ),
         )
-        record.state = ModelLifecycleState.PROMOTED
-        record.promotion_verifier_id = verifier
-        record.promotion_receipt_digest = promotion_receipt.digest
-        record.promotion_transition_digest = receipt.digest
-        record.history.append(receipt)
-        self._persist()
+        staged = replace(
+            record,
+            state=ModelLifecycleState.PROMOTED,
+            history=[*record.history, receipt],
+            promotion_verifier_id=verifier,
+            promotion_receipt_digest=promotion_receipt.digest,
+            promotion_transition_digest=receipt.digest,
+        )
+        self._commit_record(record.model_digest, staged, prior=record)
         return receipt
 
     def activate(
@@ -751,11 +783,14 @@ class ModelLifecycleRegistry:
                 + manifest.baseline_artifact_sha256,
             ),
         )
-        record.state = ModelLifecycleState.ACTIVATED
-        record.activation_manifest_digest = manifest.manifest_digest
-        record.rollback_model_digest = manifest.baseline_model_digest
-        record.history.append(receipt)
-        self._persist()
+        staged = replace(
+            record,
+            state=ModelLifecycleState.ACTIVATED,
+            history=[*record.history, receipt],
+            activation_manifest_digest=manifest.manifest_digest,
+            rollback_model_digest=manifest.baseline_model_digest,
+        )
+        self._commit_record(record.model_digest, staged, prior=record)
         return receipt
 
     def rollback(
@@ -817,9 +852,12 @@ class ModelLifecycleRegistry:
                 + manifest.baseline_artifact_sha256,
             ),
         )
-        record.state = ModelLifecycleState.ROLLED_BACK
-        record.history.append(receipt)
-        self._persist()
+        staged = replace(
+            record,
+            state=ModelLifecycleState.ROLLED_BACK,
+            history=[*record.history, receipt],
+        )
+        self._commit_record(record.model_digest, staged, prior=record)
         return receipt
 
     def history(
