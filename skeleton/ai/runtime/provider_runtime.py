@@ -2158,9 +2158,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
             admission_runtime=self.admission_runtime,
         )
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
+                dispatched = True
                 response = await client.images.generate(
                     model=request.model,
                     prompt=request.prompt,
@@ -2175,7 +2177,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 raise ProviderInvocationError("image provider request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=request.prompt)
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2185,9 +2194,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image provider usage reconciliation failed"
             ) from exc
@@ -2240,9 +2257,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
         source = io.BytesIO(image)
         source.name = "image.png"
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
+                dispatched = True
                 response = await client.images.create_variation(
                     image=source,
                     n=count,
@@ -2253,7 +2272,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 raise ProviderInvocationError("image variation request failed") from exc
             images = _extract_b64_images(response, fallback_prompt="variation")
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2263,9 +2289,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image variation usage reconciliation failed"
             ) from exc
@@ -2336,15 +2370,24 @@ class OpenAIProviderAdapter(ProviderAdapter):
             mask_file.name = "mask.png"
             kwargs["mask"] = mask_file
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
+                dispatched = True
                 response = await client.images.edit(**kwargs)
             except Exception as exc:
                 raise ProviderInvocationError("image edit request failed") from exc
             images = _extract_b64_images(response, fallback_prompt=prompt)
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2354,9 +2397,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=_image_artifact_bytes(images),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "image edit usage reconciliation failed"
             ) from exc
@@ -2408,9 +2459,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
             admission_runtime=self.admission_runtime,
         )
         started = time.perf_counter()
+        dispatched = False
         try:
             client = self._get_client()
             try:
+                dispatched = True
                 response = await client.audio.speech.create(
                     model=request.model,
                     voice=request.voice,
@@ -2437,7 +2490,14 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if len(audio) > _MAX_PROVIDER_MEDIA_BYTES:
                 raise ProviderInvocationError("speech provider response exceeded size limit")
         except BaseException:
-            _release_provider_lease(self.admission_runtime, lease)
+            if dispatched:
+                _quarantine_provider_usage(
+                    self.admission_runtime,
+                    lease,
+                    reason="provider-dispatch-or-response-ambiguous",
+                )
+            else:
+                _release_provider_lease(self.admission_runtime, lease)
             raise
 
         latency_seconds = max(0.0, time.perf_counter() - started)
@@ -2447,9 +2507,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             artifact_bytes=len(audio),
         )
         try:
-            self.admission_runtime.complete(lease.operation_id, actual)
+            _finalize_provider_usage(
+                self.admission_runtime,
+                lease,
+                actual,
+            )
         except AdmissionRuntimeError as exc:
-            _release_provider_lease(self.admission_runtime, lease)
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-reconciliation-failed",
+            )
             raise ProviderPolicyError(
                 "speech provider usage reconciliation failed"
             ) from exc
