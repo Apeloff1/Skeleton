@@ -18,8 +18,6 @@ import tempfile
 from typing import Mapping, Sequence
 
 from .artifact import load_local_model_artifact
-from .gated_neural import NumpyGatedRecurrentLM
-from .neural import NumpyRecurrentLM
 from .training_methods import (
     DEFAULT_TEXT_METHODS,
     MethodWeight,
@@ -153,8 +151,20 @@ def _train_and_write(
 
     architecture = str(model_architecture).strip().lower()
     if architecture == "elman_recurrent":
+        try:
+            from .neural import NumpyRecurrentLM
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise LocalModelBuildError(
+                "NumPy recurrent local-model backend is not materialized"
+            ) from exc
         trainer = NumpyRecurrentLM
     elif architecture == "gated_recurrent":
+        try:
+            from .gated_neural import NumpyGatedRecurrentLM
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise LocalModelBuildError(
+                "NumPy gated recurrent local-model backend is not materialized"
+            ) from exc
         trainer = NumpyGatedRecurrentLM
     else:
         raise LocalModelBuildError(
