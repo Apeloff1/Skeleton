@@ -384,6 +384,28 @@ Promotion evaluation, Mirror holdout, lifecycle validation and activation remain
 separate authorities, so optimizing the training loop cannot consume or tune
 against the final promotion oracle.
 
+### 23. Automatic method-probe training optimization
+
+The local learner can now execute a bounded optimization round instead of
+requiring a human to hand-assemble allocator observations. It discovers methods
+compatible with the actual signal inventory, preserves mandatory general methods,
+trains a deterministic candidate probe for each selected method, verifies the
+probe artifact and its materialized training-plan attribution, compares it
+against the exact baseline on the development-only suite, and feeds every
+verified gain-per-compute observation into the adaptive allocator.
+
+The resulting method weights are then used to train one final combined local
+candidate. Probe artifacts are content-addressed in their evaluation reports and
+may be deleted after evaluation; the report retains exact probe model and
+artifact digests. The final optimization receipt binds baseline identity, source
+example digests, probe report digests, allocation identity and final
+model/artifact/training-plan identity.
+
+The optimizer is bounded by probe count, probe epochs and gradient-accumulation
+budgets. It refuses to overwrite the baseline or an existing final output and
+has no production or promotion authority. The result still enters the ordinary
+Mirror/evaluation/lifecycle path before activation.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -426,7 +448,9 @@ against the final promotion oracle.
 - cross-view consistency training across multiple camera images;
 - explicit supplemental multimodal examples in the same product candidate;
 - executable local baseline-vs-candidate development evaluation feeding
-  holdout-safe adaptive reallocation.
+  holdout-safe adaptive reallocation;
+- bounded automatic method probes -> verified gain -> allocation -> final
+  candidate training.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
