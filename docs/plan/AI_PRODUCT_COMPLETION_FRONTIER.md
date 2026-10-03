@@ -229,6 +229,26 @@ Effectful-tool postcondition enforcement remains below this layer in
 `CognitiveExecutionRuntime`, so a permissive external verifier cannot turn an
 unproven side effect into publishable success.
 
+### 17. Explicit reverse learning handoff
+
+The reverse path now continues one step inward from a completed product turn into
+an offline learning candidate without granting the running model self-modification
+authority.
+
+Only explicitly selected canonical assistant messages can enter the handoff. Each
+selected message must retain its causal user message, direct parent lineage,
+operation/result identity, context identity/digest, and provider receipt lineage.
+The handoff is fail-closed for missing inline content, mixed threads/branches,
+unauthorized data classes, duplicate identities, oversized corpora, and tool-
+augmented turns unless the caller separately opts those turns into learning.
+
+The resulting corpus is content-addressed and deterministic. It can train the
+credential-free local recurrent backend into a **candidate-only** artifact. The
+builder refuses to overwrite the exact path named by `AI_LOCAL_MODEL_PATH`, so a
+successful runtime response cannot silently replace the active production model.
+Evaluation firewall, Mirror Room qualification, promotion, rollout and rollback
+remain distinct authorities.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -250,7 +270,10 @@ unproven side effect into publishable success.
 - exact multi-turn parent lineage;
 - cancellation closure followed by a clean next turn whose model context omits
   the abandoned request;
-- frontend conversation transport route/reconnect contract checks.
+- frontend conversation transport route/reconnect contract checks;
+- explicit accepted-turn -> deterministic learning-candidate lineage;
+- privacy/tool-use learning admission guards;
+- candidate-artifact training that refuses active-model overwrite.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
