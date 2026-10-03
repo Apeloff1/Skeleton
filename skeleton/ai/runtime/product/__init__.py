@@ -20,6 +20,7 @@ from .model_program_bridge import (
     ModelProgramBridgeError,
     bridge_product_training_to_model_program,
     model_promotion_receipt_from_qualification,
+    register_bridged_model_program_artifact,
 )
 from .qualification import (
     LearningQualificationBundle,
@@ -29,6 +30,7 @@ from .qualification import (
 )
 
 __all__ = [
+    "register_bridged_model_program_artifact",
     "model_promotion_receipt_from_qualification",
     "bridge_product_training_to_model_program",
     "ModelProgramBridgeError",
