@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import asyncio
 import hashlib
 import json
 from pathlib import Path
@@ -48,6 +49,7 @@ from skeleton.eval.firewall import (
     EvaluationSet,
     EvaluatorIdentity,
 )
+from skeleton.provider_runtime import ProviderRegistry, ProviderRequest
 from skeleton.learning.mirror_room import (
     EpisodeOutcome,
     MirrorBudget,
@@ -441,3 +443,63 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
     assert result.model_digest == product_receipt["model_digest"]
     assert result.text is not None and result.text.strip()
     assert result.response_id is not None
+
+    # Prove the exact promoted bytes are selected by the same environment
+    # bootstrap used by the real engine provider registry, not merely by a
+    # direct test-only artifact loader.
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv(
+        "AI_LOCAL_ACTIVATION_MANIFEST",
+        str(activation_path),
+    )
+    monkeypatch.setenv(
+        "AI_LOCAL_ACTIVATION_DIGEST",
+        activation.manifest_digest,
+    )
+    monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "candidate")
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+    monkeypatch.delenv("AI_LOCAL_MODEL_CACHE_SIZE", raising=False)
+    monkeypatch.delenv("AI_LOCAL_MODEL_SEED", raising=False)
+    monkeypatch.delenv("AI_SECONDARY_API_KEY", raising=False)
+    monkeypatch.delenv("AI_SECONDARY_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_SECONDARY_MODEL", raising=False)
+    monkeypatch.delenv("AI_VERIFICATION_MODEL", raising=False)
+
+    registry = ProviderRegistry.from_env()
+    adapter = registry.active
+    assert adapter is not None
+    assert adapter.provider_id == "local"
+    assert adapter.model == product_receipt["model_id"]
+    assert adapter.activation_target == "candidate"
+    assert (
+        adapter.artifact_receipt.artifact_sha256
+        == product_receipt["artifact_sha256"]
+    )
+    assert (
+        adapter.activation_manifest.manifest_digest
+        == activation.manifest_digest
+    )
+    status = adapter.status()
+    assert status["network_policy"] == "none"
+    assert status["execution_mode"] == "local"
+    assert status["activation"]["rollback_required"] is True
+    assert status["activation"]["direct_self_modify"] is False
+
+    provider_response = asyncio.run(
+        adapter.generate(
+            ProviderRequest(
+                instructions=(
+                    "Answer using only the activated offline local model."
+                ),
+                prompt="Give the verified deterministic local answer.",
+                max_output_tokens=8,
+                model=product_receipt["model_id"],
+                data_class="internal",
+                operation_id="reverse-e2e-activated-provider",
+            )
+        )
+    )
+    assert provider_response.provider == "local"
+    assert provider_response.model == product_receipt["model_id"]
+    assert provider_response.text is not None
+    assert provider_response.text.strip()
