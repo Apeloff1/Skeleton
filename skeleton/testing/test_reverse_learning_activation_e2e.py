@@ -501,6 +501,14 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
         activation.manifest_digest,
     )
     monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "candidate")
+    monkeypatch.setenv(
+        "AI_LOCAL_LIFECYCLE_STATE",
+        str(lifecycle_path),
+    )
+    monkeypatch.setenv(
+        "AI_LOCAL_LIFECYCLE_DIGEST",
+        activated_state_digest,
+    )
     monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
     monkeypatch.delenv("AI_LOCAL_MODEL_CACHE_SIZE", raising=False)
     monkeypatch.delenv("AI_LOCAL_MODEL_SEED", raising=False)
@@ -550,7 +558,22 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
 
     # The same digest-pinned manifest must make the exact pre-promotion model
     # executable as the rollback target through the real provider bootstrap.
+    # Lifecycle state changes first; deployment then pins the new state digest.
+    rolled_back_transition = lifecycle_registry.rollback(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="reverse-e2e-deployment-authority",
+    )
+    assert (
+        rolled_back_transition.to_state
+        is ModelLifecycleState.ROLLED_BACK
+    )
+    rolled_back_state_digest = lifecycle_registry.state_digest()
     monkeypatch.setenv("AI_LOCAL_ACTIVATION_TARGET", "rollback")
+    monkeypatch.setenv(
+        "AI_LOCAL_LIFECYCLE_DIGEST",
+        rolled_back_state_digest,
+    )
     rollback_registry = ProviderRegistry.from_env()
     rollback_adapter = rollback_registry.active
     assert rollback_adapter is not None
@@ -585,15 +608,6 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
     assert rollback_response.text is not None
     assert rollback_response.text.strip()
 
-    rolled_back_transition = lifecycle_registry.rollback(
-        bridged.artifact.model_digest,
-        activation,
-        deployment_authority_id="reverse-e2e-deployment-authority",
-    )
-    assert (
-        rolled_back_transition.to_state
-        is ModelLifecycleState.ROLLED_BACK
-    )
     final_snapshot = lifecycle_registry.snapshot(
         bridged.artifact.model_digest
     )
