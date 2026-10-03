@@ -332,3 +332,46 @@ def test_mirror_holdout_cannot_feed_adaptive_method_selection() -> None:
             plan_digest=_sha("source-plan"),
             compute_units=1.0,
         )
+
+
+def test_qualification_rejects_training_baseline_drift() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    receipt = {
+        **receipt,
+        "evaluation_manifest": {
+            **receipt["evaluation_manifest"],
+            "baseline": {"model_digest": _sha("wrong-baseline")},
+        },
+    }
+    with pytest.raises(
+        LearningQualificationError,
+        match="baseline identity drift",
+    ):
+        qualify_learning_candidate(
+            training_receipt=receipt,
+            binding=binding,
+            mirror_promotion_evidence=mirror,
+            firewall_promotion_evidence=firewall,
+        )
+
+
+def test_lifecycle_handoff_requires_third_independent_verifier() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    qualified = qualify_learning_candidate(
+        training_receipt=receipt,
+        binding=binding,
+        mirror_promotion_evidence=mirror,
+        firewall_promotion_evidence=firewall,
+    )
+    with pytest.raises(
+        LearningQualificationError,
+        match="explicit independent verifier",
+    ):
+        qualified.lifecycle_validation_kwargs()
+    with pytest.raises(
+        LearningQualificationError,
+        match="differ from Mirror verifier",
+    ):
+        qualified.lifecycle_validation_kwargs(
+            verifier_id=mirror.verifier_id,
+        )
