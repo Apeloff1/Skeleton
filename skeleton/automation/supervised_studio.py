@@ -345,6 +345,10 @@ def propose(
         items, generation_id = _canonical_items(repo_state_path, max_tasks)
         state_payload = json.loads(repo_state_path.read_text(encoding="utf-8"))
         plan_digest = str(state_payload["_shift_supervisor"].get("plan_digest_sha256", ""))
+        if not items and not generation_id:
+            audit.emit("run_finished", status="canonical_queue_drained", accepted_tasks=0)
+            _atomic_write(patch_path, "")
+            return 0
         if not items:
             raise ValueError("canonical night plan contains no executable items")
         base_commit_sha = _git("rev-parse", "HEAD").strip()
