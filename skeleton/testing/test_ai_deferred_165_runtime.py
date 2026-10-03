@@ -11,6 +11,10 @@ from skeleton.ai.runtime.deferred import (
     DeferredExecutionError,
     DeferredExecutor,
     DeferredInvocation,
+    DeferredPlan,
+    DeferredPlanExecutionError,
+    DeferredPlanExecutor,
+    DeferredPlanStep,
     build_registry,
     volume_ids,
 )
@@ -1164,4 +1168,322 @@ def test_deferred_executor_snapshot_is_safe_during_inflight_execution() -> None:
     assert [row["receipt"]["operation_id"] for row in after["operations"]]==[
         "snapshot-race"
     ]
+
+def test_deferred_plan_step_captures_payload_by_value() -> None:
+    payload={"nested":{"value":1}}
+    step=DeferredPlanStep.create(
+        step_id="capture",
+        volume_id="VOL-160",
+        operation_id="capture-op",
+        payload=payload,
+    )
+    payload["nested"]["value"]=9
+
+    assert step.payload()=={"nested":{"value":1}}
+    assert step.payload_digest==DeferredExecutor.digest_payload(
+        {"nested":{"value":1}}
+    )
+
+
+def test_deferred_plan_rejects_unknown_dependencies_and_cycles() -> None:
+    first=DeferredPlanStep.create(
+        step_id="first",
+        volume_id="VOL-160",
+        operation_id="first-op",
+        payload={"value":1},
+        depends_on=("missing",),
+    )
+    with pytest.raises(ValueError,match="unknown dependencies"):
+        DeferredPlan(plan_id="unknown-dep",steps=(first,))
+
+    a=DeferredPlanStep.create(
+        step_id="a",
+        volume_id="VOL-160",
+        operation_id="a-op",
+        payload={"value":1},
+        depends_on=("b",),
+    )
+    b=DeferredPlanStep.create(
+        step_id="b",
+        volume_id="VOL-161",
+        operation_id="b-op",
+        payload={"value":2},
+        depends_on=("a",),
+    )
+    with pytest.raises(ValueError,match="cycle"):
+        DeferredPlan(plan_id="cycle",steps=(a,b))
+
+
+def test_deferred_plan_order_and_digest_are_input_order_independent() -> None:
+    a=DeferredPlanStep.create(
+        step_id="a",
+        volume_id="VOL-160",
+        operation_id="a-op",
+        payload={"value":1},
+    )
+    b=DeferredPlanStep.create(
+        step_id="b",
+        volume_id="VOL-161",
+        operation_id="b-op",
+        payload={"value":2},
+    )
+    c=DeferredPlanStep.create(
+        step_id="c",
+        volume_id="VOL-162",
+        operation_id="c-op",
+        payload={"value":3},
+        depends_on=("a","b"),
+    )
+    first=DeferredPlan(plan_id="stable-plan",steps=(c,b,a))
+    second=DeferredPlan(plan_id="stable-plan",steps=(a,c,b))
+
+    assert first.digest==second.digest
+    assert [step.step_id for step in first.ordered_steps()]==["a","b","c"]
+    assert [step.step_id for step in second.ordered_steps()]==["a","b","c"]
+
+
+def test_deferred_plan_success_replays_without_duplicate_effects() -> None:
+    registry=build_registry()
+    first_record=_enable_volume(registry,"VOL-160")
+    second_record=_enable_volume(registry,"VOL-161")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(("first",payload["value"])) or {"a":1},
+        handler_identity=first_record.spec.handler,
+    )
+    executor.register_handler(
+        "VOL-161",
+        lambda payload: calls.append(("second",payload["value"])) or {"b":2},
+        handler_identity=second_record.spec.handler,
+    )
+    for volume_id in ("VOL-160","VOL-161"):
+        executor.set_budget(
+            volume_id,
+            Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+        )
+
+    plan=DeferredPlan(
+        plan_id="success-plan",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="first",
+                volume_id="VOL-160",
+                operation_id="success-first",
+                payload={"value":1},
+            ),
+            DeferredPlanStep.create(
+                step_id="second",
+                volume_id="VOL-161",
+                operation_id="success-second",
+                payload={"value":2},
+                depends_on=("first",),
+            ),
+        ),
+    )
+    planner=DeferredPlanExecutor(executor)
+    first=planner.execute(plan)
+    first.results["first"]["a"]=99
+    second=planner.execute(plan)
+
+    assert second.results=={"first":{"a":1},"second":{"b":2}}
+    assert first.receipt==second.receipt
+    assert calls==[("first",1),("second",2)]
+    assert planner.receipt("success-plan")==second.receipt
+
+
+def test_deferred_plan_prepare_failure_stops_dependents_fail_closed() -> None:
+    registry=build_registry()
+    first_record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append("first") or {"ok":True},
+        handler_identity=first_record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+
+    plan=DeferredPlan(
+        plan_id="prepare-failure",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="first",
+                volume_id="VOL-160",
+                operation_id="prepare-first",
+                payload={"value":1},
+            ),
+            DeferredPlanStep.create(
+                step_id="second",
+                volume_id="VOL-161",
+                operation_id="prepare-second",
+                payload={"value":2},
+                depends_on=("first",),
+            ),
+        ),
+    )
+    planner=DeferredPlanExecutor(executor)
+
+    with pytest.raises(DeferredPlanExecutionError) as exc:
+        planner.execute(plan)
+
+    receipt=exc.value.receipt
+    assert receipt.status=="failed"
+    assert receipt.failure_step_id=="second"
+    assert len(receipt.completed)==1
+    assert receipt.completed[0][0]=="first"
+    assert receipt.operation_failure_receipt_digest is None
+    assert calls==["first"]
+
+    with pytest.raises(DeferredPlanExecutionError) as replay:
+        planner.execute(plan)
+    assert replay.value.receipt==receipt
+    assert calls==["first"]
+
+
+def test_deferred_plan_handler_failure_binds_operation_failure_receipt() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+
+    def broken(payload):
+        calls.append(payload)
+        raise RuntimeError("private detail")
+
+    executor.register_handler(
+        "VOL-160",
+        broken,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    plan=DeferredPlan(
+        plan_id="handler-failure",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="broken",
+                volume_id="VOL-160",
+                operation_id="handler-failure-op",
+                payload={"value":1},
+            ),
+        ),
+    )
+
+    with pytest.raises(DeferredPlanExecutionError) as exc:
+        DeferredPlanExecutor(executor).execute(plan)
+
+    receipt=exc.value.receipt
+    assert receipt.failure_step_id=="broken"
+    assert receipt.operation_failure_receipt_digest is not None
+    assert "private detail" not in json.dumps(receipt.as_dict())
+    assert calls==[{"value":1}]
+
+
+def test_deferred_plan_id_collision_is_rejected_before_new_effects() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload["value"]) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    planner=DeferredPlanExecutor(executor)
+    original=DeferredPlan(
+        plan_id="collision-plan",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="only",
+                volume_id="VOL-160",
+                operation_id="collision-original",
+                payload={"value":1},
+            ),
+        ),
+    )
+    planner.execute(original)
+
+    changed=DeferredPlan(
+        plan_id="collision-plan",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="only",
+                volume_id="VOL-160",
+                operation_id="collision-changed",
+                payload={"value":2},
+            ),
+        ),
+    )
+    with pytest.raises(ValueError,match="plan identity collision"):
+        planner.execute(changed)
+
+    assert calls==[1]
+
+
+def test_deferred_plan_same_id_cannot_run_concurrently() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    entered=threading.Event()
+    release=threading.Event()
+    calls=[]
+
+    def handler(payload):
+        calls.append(payload)
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    planner=DeferredPlanExecutor(executor)
+    plan=DeferredPlan(
+        plan_id="race-plan",
+        steps=(
+            DeferredPlanStep.create(
+                step_id="only",
+                volume_id="VOL-160",
+                operation_id="race-plan-op",
+                payload={"value":1},
+            ),
+        ),
+    )
+    errors=[]
+
+    def run():
+        try:
+            planner.execute(plan)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread=threading.Thread(target=run)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    with pytest.raises(RuntimeError,match="plan is already in flight"):
+        planner.execute(plan)
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert errors==[]
+    assert calls==[{"value":1}]
 
