@@ -501,9 +501,69 @@ def build_learning_candidate_artifact(
             seed=seed,
             temperature=temperature,
         )
+        from skeleton.ai.runtime.inference.artifact import (
+            load_local_model_artifact,
+        )
+        from skeleton.ai.runtime.inference.local import (
+            LocalInferenceRequest,
+        )
+        import threading
+
+        loaded = load_local_model_artifact(destination_resolved)
+        qualification_prompt = candidate.pairs[0].user_text
+        qualification_request = LocalInferenceRequest(
+            prompt=qualification_prompt,
+            instructions=(
+                "Offline candidate execution qualification. "
+                "Do not use external services."
+            ),
+            max_output_tokens=16,
+            seed=0,
+        )
+        result = loaded.model.infer(
+            qualification_request,
+            threading.Event(),
+        )
+        if (
+            result.model_digest != loaded.receipt.model_digest
+            or result.text is None
+            or not result.text.strip()
+            or not isinstance(result.response_id, str)
+            or not result.response_id.strip()
+        ):
+            raise CanonicalLearningHandoffError(
+                "local-model candidate failed executable qualification"
+            )
+        qualification = {
+            "schema_version": "skeleton.product.learning-qualification.v1",
+            "status": "executable_candidate",
+            "prompt_sha256": hashlib.sha256(
+                qualification_prompt.encode("utf-8")
+            ).hexdigest(),
+            "output_sha256": hashlib.sha256(
+                result.text.encode("utf-8")
+            ).hexdigest(),
+            "response_id": result.response_id,
+            "model_digest": result.model_digest,
+        }
+        qualification["receipt_digest"] = _stable_digest(qualification)
     except LocalModelBuildError as exc:
         raise CanonicalLearningHandoffError(
             "local-model candidate build failed"
+        ) from exc
+    except CanonicalLearningHandoffError:
+        try:
+            destination_resolved.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    except Exception as exc:
+        try:
+            destination_resolved.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise CanonicalLearningHandoffError(
+            "local-model candidate executable qualification failed"
         ) from exc
     finally:
         if temp_path is not None:
@@ -518,6 +578,7 @@ def build_learning_candidate_artifact(
         "learning_candidate_digest": candidate.identity_digest,
         "learning_pair_count": len(candidate.pairs),
         "promotion_state": "candidate_only",
+        "qualification": qualification,
     }
 
 
