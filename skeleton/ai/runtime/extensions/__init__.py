@@ -10,6 +10,7 @@ from .multimodal import (
     ImageAsset,
     ImageRegion,
     LayoutRegion,
+    MediaMetadata,
     MediaTransform,
     MultimodalAsset,
     MultimodalHit,
@@ -23,8 +24,10 @@ from .multimodal import (
     VideoAsset,
     VideoSegment,
     VisionResult,
+    detect_document_text_conflict,
     digest_bytes,
     fuse_scores,
+    sample_video_timestamps,
 )
 
 __all__ = [
@@ -37,6 +40,7 @@ __all__ = [
     "ImageAsset",
     "ImageRegion",
     "LayoutRegion",
+    "MediaMetadata",
     "MediaTransform",
     "MultimodalAsset",
     "MultimodalHit",
@@ -50,8 +54,10 @@ __all__ = [
     "VideoAsset",
     "VideoSegment",
     "VisionResult",
+    "detect_document_text_conflict",
     "digest_bytes",
     "fuse_scores",
+    "sample_video_timestamps",
 ]
 
 from .ecosystem import (
