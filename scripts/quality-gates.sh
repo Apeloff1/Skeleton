@@ -180,6 +180,8 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_webhook_destination_security.py \
   skeleton/testing/test_tiered_cache.py \
   skeleton/testing/test_toolchain_bootstrap.py \
+  skeleton/testing/test_remote_build.py \
+  skeleton/testing/test_release_graph.py \
   skeleton/testing/test_cache_contract.py \
   skeleton/testing/test_creator_work_leases.py \
   skeleton/testing/test_creator_approval_boundary.py \
