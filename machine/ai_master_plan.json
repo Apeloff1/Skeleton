@@ -3932,7 +3932,8 @@
         ".github/workflows",
         "machine",
         "skeleton/release/qualification.py",
-        ".github/workflows/p1-release-evidence-bundle.yml"
+        ".github/workflows/p1-release-evidence-bundle.yml",
+        "Dockerfile"
       ],
       "tests": [
         "skeleton/testing/test_release_qualification.py"
