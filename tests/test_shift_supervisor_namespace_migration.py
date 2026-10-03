@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 import pytest
 
@@ -36,3 +37,18 @@ def test_activation_security_core_entrypoint_is_canonical_shim() -> None:
     from core.activation_security import ActivationSecurityError as legacy
     from skeleton.security.activation_security import ActivationSecurityError as canonical
     assert legacy is canonical
+
+def test_shift_supervisor_control_failover_uses_canonical_state_reader() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "shift-supervisor-control.yml"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "from skeleton.automation.shift_supervisor.__main__ import _read_state"
+        in workflow
+    )
+    assert "from core.shift_supervisor.__main__ import _read_state" not in workflow
+
