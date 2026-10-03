@@ -1491,6 +1491,10 @@ class CostGovernor:
             raise CostGovernorConflict(
                 "runtime lease journal identity does not match reservation receipt"
             )
+        if metadata.reason_code != "within_budget":
+            raise CostGovernorConflict(
+                "runtime lease journal admission reason is invalid"
+            )
 
         remaining = dict(metadata.remaining)
         required_remaining = {
