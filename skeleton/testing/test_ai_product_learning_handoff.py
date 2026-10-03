@@ -595,3 +595,84 @@ def test_candidate_evaluation_manifest_binds_exact_active_baseline(
     assert baseline["reference"].startswith("local-model-artifact:")
     assert receipt["model_digest"] != baseline["model_digest"]
     assert receipt["evaluation_manifest"]["promotion_authority"] is False
+
+
+def test_supplemental_learning_examples_require_explicit_opt_in(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from skeleton.ai.runtime.inference.training_methods import TrainingExample
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+    supplemental = TrainingExample(
+        example_id="supplemental-1",
+        prompt="What does the auxiliary observation establish?",
+        response="It establishes a separately admitted training signal.",
+        source_ref="supplemental:test",
+    )
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+
+    with pytest.raises(
+        CanonicalLearningHandoffError,
+        match="require explicit opt-in",
+    ):
+        build_learning_candidate_artifact(
+            candidate,
+            output_path=tmp_path / "supplemental-denied.json",
+            model_id="supplemental-denied",
+            hidden_size=8,
+            epochs=1,
+            max_vocab=48,
+            max_document_tokens=64,
+            supplemental_examples=(supplemental,),
+        )
+
+
+def test_supplemental_learning_examples_join_same_candidate_plan(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.inference.training_methods import (
+        TrainingExample,
+        TrainingMethod,
+    )
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+    supplemental = TrainingExample(
+        example_id="supplemental-joined",
+        prompt="What additional evidence was admitted?",
+        response="A separately consented training example.",
+        source_ref="supplemental:test",
+    )
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+
+    receipt = build_learning_candidate_artifact(
+        candidate,
+        output_path=tmp_path / "supplemental-joined.json",
+        model_id="supplemental-joined",
+        hidden_size=8,
+        epochs=1,
+        max_vocab=64,
+        max_document_tokens=64,
+        training_methods=(TrainingMethod.SUPERVISED_INSTRUCTION,),
+        supplemental_examples=(supplemental,),
+        supplemental_learning_opt_in=True,
+    )
+
+    assert receipt["supplemental_learning_example_count"] == 1
+    assert receipt["supplemental_learning_example_digests"] == [
+        supplemental.digest
+    ]
+    assert receipt["evaluation_manifest"][
+        "supplemental_example_digests"
+    ] == [supplemental.digest]
+    assert receipt["training_plan"]["document_count"] == 2
