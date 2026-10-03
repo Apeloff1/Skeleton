@@ -168,6 +168,7 @@ class BudgetDecision:
     blocking_reasons: tuple[str, ...]
     safety_gate_passed: bool
     reliability_gate_passed: bool
+    budget_exhausted: bool
     safety_override: bool = False
     reliability_override: bool = False
     promotion_authority: bool = False
@@ -191,9 +192,37 @@ class BudgetDecision:
                 "blocking_reasons must contain non-empty strings"
             )
         object.__setattr__(self, "blocking_reasons", reasons)
-        for name in ("safety_gate_passed", "reliability_gate_passed"):
+        for name in (
+            "safety_gate_passed",
+            "reliability_gate_passed",
+            "budget_exhausted",
+        ):
             if not isinstance(getattr(self, name), bool):
                 raise ErrorBudgetPolicyError(f"{name} must be boolean")
+
+        expected_reasons: list[str] = []
+        if self.budget_exhausted:
+            expected_reasons.append("error-budget-exhausted")
+        if not self.safety_gate_passed:
+            expected_reasons.append("safety-gate-failed")
+        if not self.reliability_gate_passed:
+            expected_reasons.append("reliability-gate-failed")
+        if self.blocking_reasons != tuple(sorted(expected_reasons)):
+            raise ErrorBudgetPolicyError(
+                "blocking reasons do not match budget/gate evidence"
+            )
+
+        if not self.safety_gate_passed or not self.reliability_gate_passed:
+            expected_status = "blocked"
+        elif self.budget_exhausted:
+            expected_status = "exhausted"
+        else:
+            expected_status = "healthy"
+        if self.status != expected_status:
+            raise ErrorBudgetPolicyError(
+                "status does not match budget/gate evidence"
+            )
+
         if self.safety_override is not False:
             raise ErrorBudgetPolicyError("error budget cannot override safety gate")
         if self.reliability_override is not False:
@@ -211,6 +240,7 @@ class BudgetDecision:
                 "blocking_reasons": list(self.blocking_reasons),
                 "safety_gate_passed": self.safety_gate_passed,
                 "reliability_gate_passed": self.reliability_gate_passed,
+                "budget_exhausted": self.budget_exhausted,
                 "safety_override": False,
                 "reliability_override": False,
                 "promotion_authority": False,
@@ -304,6 +334,7 @@ def evaluate_budget_decision(
         blocking_reasons=tuple(reasons),
         safety_gate_passed=safety_gate_passed,
         reliability_gate_passed=reliability_gate_passed,
+        budget_exhausted=budget.exhausted,
     )
 
 
