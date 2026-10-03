@@ -360,7 +360,12 @@ class HumanEvaluation:
             grouped.setdefault(item.case_id, []).append(item)
         result: dict[str, float] = {}
         for case_id, items in grouped.items():
-            raters = {item.evaluator_id for item in items}
+            rater_ids=[item.evaluator_id for item in items]
+            raters=set(rater_ids)
+            if len(rater_ids)!=len(raters):
+                raise ValueError(
+                    f"duplicate evaluator judgment for {case_id}"
+                )
             if len(raters) < min_raters:
                 raise ValueError(f"insufficient independent raters for {case_id}")
             if len({item.rubric_version for item in items}) != 1:
