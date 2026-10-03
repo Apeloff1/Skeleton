@@ -1,3 +1,11 @@
+from .developmental_eval import (
+    DevelopmentalCaseResult,
+    DevelopmentalComparisonReport,
+    DevelopmentalEvalCase,
+    DevelopmentalEvalSuite,
+    DevelopmentalEvaluationError,
+    evaluate_local_candidate_developmentally,
+)
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
 from .artifact import (
@@ -75,6 +83,12 @@ from .local import (
 )
 
 __all__ = [
+    "evaluate_local_candidate_developmentally",
+    "DevelopmentalEvaluationError",
+    "DevelopmentalEvalSuite",
+    "DevelopmentalEvalCase",
+    "DevelopmentalComparisonReport",
+    "DevelopmentalCaseResult",
     "bind_camera_subset",
     "CameraCoverageSelection",
     "extract_visual_training_observation",
