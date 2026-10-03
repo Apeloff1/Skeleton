@@ -33,6 +33,27 @@ from skeleton.build.incremental_graph import (
     build_incremental_graph,
 )
 
+from skeleton.build.remote_build import (
+    REMOTE_BUILD_ALGORITHM,
+    REMOTE_BUILD_SCHEMA,
+    ArtifactTransferManifest,
+    RemoteArtifactRef,
+    RemoteBuildError,
+    RemoteBuildJob,
+    RemoteBuildPlan,
+    RemoteExecutionSpec,
+    RemoteJobReceipt,
+    TransferChunk,
+    VerifiedRemoteReceipt,
+    build_remote_plan,
+    build_transfer_manifest,
+    resume_missing_chunks,
+    toolchain_manifest_digest,
+    verify_remote_receipt,
+    verify_transfer_chunks,
+    validate_remote_plan,
+)
+
 from skeleton.build.network_audit import (
     CLASSIFICATION_NETWORK_REQUIRED,
     CLASSIFICATION_NETWORK_UNKNOWN,
@@ -50,6 +71,24 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "validate_remote_plan",
+    "verify_transfer_chunks",
+    "verify_remote_receipt",
+    "toolchain_manifest_digest",
+    "resume_missing_chunks",
+    "build_transfer_manifest",
+    "build_remote_plan",
+    "VerifiedRemoteReceipt",
+    "TransferChunk",
+    "RemoteJobReceipt",
+    "RemoteExecutionSpec",
+    "RemoteBuildPlan",
+    "RemoteBuildJob",
+    "RemoteBuildError",
+    "RemoteArtifactRef",
+    "ArtifactTransferManifest",
+    "REMOTE_BUILD_SCHEMA",
+    "REMOTE_BUILD_ALGORITHM",
     "plan_eviction",
     "build_cache_key",
     "EvictionPolicy",
