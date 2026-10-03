@@ -669,3 +669,52 @@ def test_related_context_prioritizes_matching_modules(tmp_path, monkeypatch):
     )
     evidence = studio_director._related_repository_context(["skeleton/foo.py"])
     assert any("test_foo.py" in item for item in evidence)
+
+
+def test_canonical_path_rejects_symlink_ancestor(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "outside").mkdir()
+    (tmp_path / "skeleton").mkdir()
+    (tmp_path / "skeleton" / "linked").symlink_to(tmp_path / "outside", target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink repository path component"):
+        _canonical_path("skeleton/linked/escape.py")
+
+
+def test_changed_paths_rejects_executable_new_file_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "skeleton").mkdir()
+    patch = (
+        "diff --git a/skeleton/new.py b/skeleton/new.py\n"
+        "new file mode 100755\n--- /dev/null\n+++ b/skeleton/new.py\n"
+        "@@ -0,0 +1 @@\n+VALUE = 1\n"
+    )
+    with pytest.raises(ValueError, match="100644"):
+        _changed_paths(patch)
+
+
+def test_changed_paths_rejects_carriage_return_patch(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "docs").mkdir()
+    with pytest.raises(ValueError, match="carriage"):
+        _changed_paths("diff --git a/docs/a.txt b/docs/a.txt\r\n")
+
+
+def test_validation_commands_are_structured_argv(monkeypatch):
+    monkeypatch.setattr(studio_director, "_git", lambda *args, **kwargs: "")
+    commands = studio_director._discover_validation_commands(["skeleton/a.py"])
+    assert commands == (("python", "-m", "compileall", "-q", "skeleton/a.py"),)
+
+
+def test_validation_executor_rejects_control_character_argument():
+    with pytest.raises(ValueError, match="malformed"):
+        studio_director._run_validation_commands([
+            ("python", "-m", "pytest", "skeleton/testing/test_ok.py\n--collect-only")
+        ])
+
+
+def test_read_context_omits_oversized_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "huge.txt").write_text("x" * 600_000, encoding="utf-8")
+    evidence = studio_director._read_context(["docs/huge.txt"])
+    assert "exceeds context safety bound" in evidence[0]
