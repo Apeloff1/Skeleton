@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import gzip
+import io
 import hashlib
 import json
 import re
@@ -50,7 +51,7 @@ def decode_durable_state(body: str) -> Mapping[str, Any]:
         packed = base64.b64decode(encoded[len("gz:v1:") :], validate=True)
         if len(packed) > 1_000_000:
             raise CanonicalPlanError("canonical plan compressed state exceeds 1 MB safety bound")
-        with gzip.GzipFile(fileobj=__import__("io").BytesIO(packed), mode="rb") as handle:
+        with gzip.GzipFile(fileobj=io.BytesIO(packed), mode="rb") as handle:
             decoded = handle.read(5_000_001)
         if len(decoded) > 5_000_000:
             raise CanonicalPlanError("canonical plan expanded state exceeds 5 MB safety bound")
