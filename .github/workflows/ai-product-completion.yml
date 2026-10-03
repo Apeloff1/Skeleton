@@ -3,7 +3,7 @@ name: AI Product Completion Acceptance
 on:
   pull_request:
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -42,35 +42,37 @@ on:
       - "machine/ai_app_construction.json"
       - "skeleton/testing/test_local_provider_activation.py"
       - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/testing/test_ai_product_canonical.py"
-      - "skeleton/testing/test_ai_product_learning_handoff.py"
-      - "skeleton/testing/test_multi_method_training.py"
-      - "skeleton/testing/test_visual_learning.py"
-      - "skeleton/testing/test_developmental_eval.py"
-      - "skeleton/testing/test_training_optimizer.py"
-      - "skeleton/testing/test_continual_learning.py"
-      - "skeleton/testing/test_capability_curriculum.py"
-      - "skeleton/testing/test_gated_recurrent_training.py"
-      - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/testing/test_learning_contracts.py"
+      - "skeleton/testing/test_learning_evidence.py"
+      - "skeleton/testing/test_learning_control.py"
+      - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - "skeleton/testing/test_p3_local_training_evaluation.py"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "skeleton/testing/test_p3_post_training.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - "skeleton/testing/test_p3_training_data.py"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_model_rollback_compatibility.py"
       - "skeleton/eval/firewall.py"
       - "skeleton/ai/evaluation/firewall.py"
       - "skeleton/learning/mirror_room/**"
       - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_model_program_bridge.py"
-      - "skeleton/testing/test_reverse_learning_activation_e2e.py"
-      - "skeleton/testing/test_model_lifecycle.py"
-      - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   push:
     branches:
       - main
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -109,28 +111,30 @@ on:
       - "machine/ai_app_construction.json"
       - "skeleton/testing/test_local_provider_activation.py"
       - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/testing/test_ai_product_canonical.py"
-      - "skeleton/testing/test_ai_product_learning_handoff.py"
-      - "skeleton/testing/test_multi_method_training.py"
-      - "skeleton/testing/test_visual_learning.py"
-      - "skeleton/testing/test_developmental_eval.py"
-      - "skeleton/testing/test_training_optimizer.py"
-      - "skeleton/testing/test_continual_learning.py"
-      - "skeleton/testing/test_capability_curriculum.py"
-      - "skeleton/testing/test_gated_recurrent_training.py"
-      - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/testing/test_learning_contracts.py"
+      - "skeleton/testing/test_learning_evidence.py"
+      - "skeleton/testing/test_learning_control.py"
+      - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - "skeleton/testing/test_p3_local_training_evaluation.py"
+      - "skeleton/testing/test_p3_model_foundation.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "skeleton/testing/test_p3_post_training.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - "skeleton/testing/test_p3_training_data.py"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_local_model_deployment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_model_placement.py"
+      - "skeleton/testing/test_model_rollback_compatibility.py"
       - "skeleton/eval/firewall.py"
       - "skeleton/ai/evaluation/firewall.py"
       - "skeleton/learning/mirror_room/**"
       - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_model_program_bridge.py"
-      - "skeleton/testing/test_reverse_learning_activation_e2e.py"
-      - "skeleton/testing/test_model_lifecycle.py"
-      - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   workflow_dispatch:
@@ -173,7 +177,7 @@ jobs:
       - name: Compile canonical product and compatibility runtimes
         run: >-
           python -m compileall -q
-          skeleton/ai/runtime/product
+          skeleton/ai/runtime/learning_foundation
           skeleton/ai/runtime/inference
           backend/core/engine_client.py
           backend/core/engine_text.py
@@ -209,21 +213,21 @@ jobs:
           backend/tests/test_jeeves_ai_completion.py
           backend/tests/test_jeeves_local_engine_selection.py
           skeleton/testing/test_conversation_repository.py
-          skeleton/testing/test_ai_product_canonical.py
-          skeleton/testing/test_ai_product_learning_handoff.py
-          skeleton/testing/test_multi_method_training.py
-          skeleton/testing/test_visual_learning.py
-          skeleton/testing/test_developmental_eval.py
-          skeleton/testing/test_training_optimizer.py
-          skeleton/testing/test_continual_learning.py
-          skeleton/testing/test_capability_curriculum.py
-          skeleton/testing/test_gated_recurrent_training.py
-          skeleton/testing/test_learning_qualification.py
           skeleton/testing/test_evaluation_firewall.py
-          skeleton/testing/test_mirror_room_learning.py
-          skeleton/testing/test_model_program_bridge.py
-          skeleton/testing/test_reverse_learning_activation_e2e.py
-          skeleton/testing/test_model_lifecycle.py
-          skeleton/testing/test_local_model_activation_manifest.py
-          skeleton/testing/test_local_model_artifact.py
-          skeleton/testing/test_vs001_functional_ai.py
+          skeleton/testing/test_learning_contracts.py
+          skeleton/testing/test_learning_evidence.py
+          skeleton/testing/test_learning_control.py
+          skeleton/testing/test_p3_learning_foundation_acceptance.py
+          skeleton/testing/test_p3_learning_programs.py
+          skeleton/testing/test_p3_local_training_evaluation.py
+          skeleton/testing/test_p3_model_foundation.py
+          skeleton/testing/test_p3_model_lifecycle.py
+          skeleton/testing/test_p3_post_training.py
+          skeleton/testing/test_p3_training_control.py
+          skeleton/testing/test_p3_training_data.py
+          skeleton/testing/test_mirror_room_core.py
+          skeleton/testing/test_local_model_builder.py
+          skeleton/testing/test_local_model_deployment.py
+          skeleton/testing/test_model_identity.py
+          skeleton/testing/test_model_placement.py
+          skeleton/testing/test_model_rollback_compatibility.py
