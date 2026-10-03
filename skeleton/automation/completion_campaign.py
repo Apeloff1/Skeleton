@@ -170,6 +170,7 @@ def advance_campaign(
     validated_patch: bool,
     validation_failed: bool,
     attempted_task_ids: Sequence[str] = (),
+    plan_items: object = None,
     policy: CampaignPolicy | None = None,
 ) -> CampaignState:
     policy = policy or CampaignPolicy()
@@ -211,10 +212,17 @@ def advance_campaign(
         if key:
             state.task_attempts[key] = state.task_attempts.get(key, 0) + 1
 
+    diagnostics = dependency_diagnostics(plan_items, str(supervisor.get("team", "")))
     terminal = bool(progress.get("terminal", False)) or supervisor.get("status") == "complete"
     if terminal:
         state.status = "complete"
         state.terminal_reason = "canonical_queue_drained"
+    elif diagnostics["cycles"]:
+        state.status = "quarantined"
+        state.terminal_reason = "dependency_cycle_detected"
+    elif diagnostics["missing_dependencies"]:
+        state.status = "quarantined"
+        state.terminal_reason = "missing_dependency_detected"
     elif any(count > policy.max_task_attempts for count in state.task_attempts.values()):
         state.status = "quarantined"
         state.terminal_reason = "task_attempt_budget_exceeded"
@@ -243,6 +251,7 @@ def advance_campaign(
             "validation_failed": validation_failed,
             "status": state.status,
             "terminal_reason": state.terminal_reason,
+            "dependency_diagnostics": diagnostics,
         }
     )
     state.history = state.history[-MAX_HISTORY:]
@@ -277,6 +286,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         validated_patch=args.validated_patch,
         validation_failed=args.validation_failed,
         attempted_task_ids=args.attempted_task,
+        plan_items=repo_state.get("_shift_supervisor_all_plan_items"),
         policy=CampaignPolicy(
             max_cycles=args.max_cycles,
             max_stagnant_cycles=args.max_stagnant_cycles,
