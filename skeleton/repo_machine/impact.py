@@ -25,6 +25,9 @@ class ImpactReport:
     dependency_zones: tuple[str, ...] = ()
     blast_radius: int = 0
     topology_confidence: int = 0
+    weighted_blast_radius: int = 0
+    reachability_confidence: int = 0
+    max_dependency_depth: int = 0
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -37,11 +40,14 @@ class ImpactReport:
             "verification_paths": list(self.verification_paths),
             "dependency_zones": list(self.dependency_zones), "blast_radius": self.blast_radius,
             "topology_confidence": self.topology_confidence,
+            "weighted_blast_radius": self.weighted_blast_radius,
+            "reachability_confidence": self.reachability_confidence,
+            "max_dependency_depth": self.max_dependency_depth,
         }
 
 
 def _normalize_path(path: str) -> str:
-    normalized = path.replace("\", "/")
+    normalized = path.replace("\\", "/")
     while normalized.startswith("./"):
         normalized = normalized[2:]
     return normalized.lstrip("/")
@@ -62,8 +68,7 @@ def _zone_for_path(model: RepositoryModel, path: str, exact: dict[str, str] | No
     return "unclassified"
 
 
-def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *,
-                   transitive_depth: int = 3) -> ImpactReport:
+def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *, transitive_depth: int = 3) -> ImpactReport:
     if isinstance(transitive_depth, bool) or not isinstance(transitive_depth, int) or not 0 <= transitive_depth <= 16:
         raise ValueError("transitive_depth must be in [0,16]")
     paths = tuple(sorted({_normalize_path(str(path)) for path in changed_paths if str(path).strip()}))
@@ -82,18 +87,26 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *,
     for zone in zones:
         direct.update(reverse.get(zone, ()))
 
-    all_affected = set(direct)
-    frontier = deque((zone, 1) for zone in sorted(direct))
+    distances: dict[str, int] = {zone: 0 for zone in zones}
+    path_confidence: dict[str, float] = {zone: 1.0 for zone in zones}
+    frontier = deque(sorted(zones))
     while frontier:
-        zone, depth = frontier.popleft()
+        zone = frontier.popleft()
+        depth = distances[zone]
         if depth >= transitive_depth:
             continue
         for dependent in sorted(reverse.get(zone, ())):
-            if dependent in all_affected:
-                continue
-            all_affected.add(dependent)
-            frontier.append((dependent, depth + 1))
+            edge = max(1, edge_weight.get((dependent, zone), 1))
+            confidence = min(path_confidence[zone], min(1.0, edge / 5.0))
+            new_depth = depth + 1
+            if dependent not in distances or new_depth < distances[dependent]:
+                distances[dependent] = new_depth
+                path_confidence[dependent] = confidence
+                frontier.append(dependent)
+            elif new_depth == distances[dependent] and confidence > path_confidence[dependent]:
+                path_confidence[dependent] = confidence
 
+    all_affected = set(distances) - set(zones)
     dependency_zones = set()
     for zone in zones:
         dependency_zones.update(forward.get(zone, ()))
@@ -110,12 +123,11 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *,
         if item.test_surface_count and item.name in verification_zone_set
     }))
 
-    impacted_edges = sum(edge_weight.get((source, target), 1)
-                         for source in set(zones) | all_affected
-                         for target in forward.get(source, ()))
-    blast_radius = len(set(zones) | all_affected)
-    max_evidence = max(edge_weight.values(), default=0)
-    topology_confidence = min(100, max(0, 20 + min(50, impacted_edges * 3) + min(30, max_evidence * 2)))
+    weighted_blast_radius = min(100, sum(max(1, round(path_confidence[z] * 10)) for z in all_affected))
+    max_dependency_depth = max(distances.values(), default=0)
+    reachable = [path_confidence[z] for z in all_affected]
+    reachability_confidence = min(100, round((sum(reachable) / len(reachable)) * 100)) if reachable else 100
+    topology_confidence = min(100, round((reachability_confidence * 0.65) + min(35, weighted_blast_radius)))
 
     reasons: list[str] = []
     score = 0
@@ -131,11 +143,14 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *,
     if len(dependency_zones) > 1:
         score += min(10, len(dependency_zones) * 2)
         reasons.append("change feeds multiple downstream subsystem directions")
-    if blast_radius >= 8:
-        score += min(10, blast_radius)
-        reasons.append("change has a broad topology blast radius")
-    if topology_confidence < 40:
-        reasons.append("topology evidence is sparse; prefer conservative verification")
+    if weighted_blast_radius >= 40:
+        score += min(10, weighted_blast_radius // 10)
+        reasons.append("change has a strongly evidenced topology blast radius")
+    if max_dependency_depth >= 3:
+        score += 5
+        reasons.append(f"dependency propagation reaches depth {max_dependency_depth}")
+    if reachability_confidence < 50:
+        reasons.append("reachable topology has weak edge evidence; prefer conservative verification")
     if len(verification_paths) >= 100:
         reasons.append("verification surface is broad; prefer targeted selection before full suite")
     if any(path.startswith(".github/workflows/") for path in paths):
@@ -161,5 +176,8 @@ def analyze_impact(model: RepositoryModel, changed_paths: Iterable[str], *,
         critical_zones=critical, risk_score=score, reasons=tuple(reasons),
         change_class=change_class, recommended_depth=recommended_depth,
         verification_paths=verification_paths, dependency_zones=tuple(sorted(dependency_zones)),
-        blast_radius=blast_radius, topology_confidence=topology_confidence,
+        blast_radius=len(all_affected), topology_confidence=topology_confidence,
+        weighted_blast_radius=weighted_blast_radius,
+        reachability_confidence=reachability_confidence,
+        max_dependency_depth=max_dependency_depth,
     )
