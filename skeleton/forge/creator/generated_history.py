@@ -676,10 +676,21 @@ def _validate_transition(
         _fail("transition id mismatch", reason="transition_integrity")
     if transition.semantic_diff_digest != diff.digest:
         _fail("transition semantic diff mismatch", reason="transition_integrity")
-    if transition.change_count != len(diff.changes):
+    change_count = _strict_int(
+        transition.change_count,
+        field="transition.change_count",
+        minimum=0,
+        maximum=MAX_HISTORY_ENTRIES * MAX_SUMMARIES,
+    )
+    if change_count != len(diff.changes):
         _fail("transition change count mismatch", reason="transition_integrity")
     if transition.summaries != tuple(diff.summaries()[:MAX_SUMMARIES]):
         _fail("transition semantic summaries mismatch", reason="transition_integrity")
+    if not isinstance(transition.summaries_truncated, bool):
+        _fail(
+            "transition summary truncation flag must be boolean",
+            reason="transition_integrity",
+        )
     if transition.summaries_truncated != (len(diff.changes) > MAX_SUMMARIES):
         _fail("transition summary truncation flag mismatch", reason="transition_integrity")
     if transition.digest != expected_digest:
@@ -717,8 +728,14 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
 
     if not isinstance(history, GeneratedStateHistory):
         _fail("history must be GeneratedStateHistory", reason="malformed")
-    if history.schema != HISTORY_SCHEMA or history.schema_version != HISTORY_VERSION:
-        _fail("unsupported generated history schema/version", reason="schema")
+    if history.schema != HISTORY_SCHEMA:
+        _fail("unsupported generated history schema", reason="schema")
+    _strict_int(
+        history.schema_version,
+        field="history.schema_version",
+        minimum=HISTORY_VERSION,
+        maximum=HISTORY_VERSION,
+    )
     revision = _strict_int(
         history.revision,
         field="history.revision",
@@ -761,9 +778,13 @@ def validate_generated_history(history: GeneratedStateHistory) -> None:
             snapshots=parsed_snapshots,
         )
 
-    if len(set(history.undo_stack)) != len(history.undo_stack):
+    checked_undo = tuple(_transition_id(item) for item in history.undo_stack)
+    checked_redo = tuple(_transition_id(item) for item in history.redo_stack)
+    if checked_undo != history.undo_stack or checked_redo != history.redo_stack:
+        _fail("history stacks are not canonical", reason="stack_integrity")
+    if len(set(checked_undo)) != len(checked_undo):
         _fail("undo stack contains duplicate transition ids", reason="stack_integrity")
-    if len(set(history.redo_stack)) != len(history.redo_stack):
+    if len(set(checked_redo)) != len(checked_redo):
         _fail("redo stack contains duplicate transition ids", reason="stack_integrity")
     if set(history.undo_stack) & set(history.redo_stack):
         _fail("transition appears in both undo and redo stacks", reason="stack_integrity")
