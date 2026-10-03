@@ -14,6 +14,7 @@ on:
       - "frontend/yarn.lock"
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
@@ -30,6 +31,7 @@ on:
       - "frontend/yarn.lock"
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
@@ -126,6 +128,11 @@ jobs:
         working-directory: frontend
         run: node scripts/verify-image-size-security.js
 
+      - name: Verify no-release npm security mitigations
+        id: npm-compensating-security
+        working-directory: frontend
+        run: node scripts/verify-no-release-npm-security.js
+
       - name: Audit production JavaScript dependencies
         id: yarn-audit
         working-directory: frontend
@@ -175,6 +182,7 @@ jobs:
         if: always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          NPM_COMPENSATING_SECURITY_VERIFIED: ${{ steps.npm-compensating-security.outcome }}
           YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
