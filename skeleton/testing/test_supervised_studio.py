@@ -423,3 +423,17 @@ def test_canonical_items_rejects_duplicate_ids(tmp_path):
     )
     with pytest.raises(ValueError, match="duplicate plan item ids"):
         supervised_studio._canonical_items(state, 2)
+
+
+def test_canonical_items_rejects_invalid_json_with_stable_error(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text("{broken", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid JSON"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_oversized_snapshot(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(" " * 5_000_001, encoding="utf-8")
+    with pytest.raises(ValueError, match="exceeds 5 MB"):
+        supervised_studio._canonical_items(state, 1)
