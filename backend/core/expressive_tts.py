@@ -71,66 +71,97 @@ def resolve_tone(tone: Optional[str]) -> Dict:
 
 
 def shape_cadence(text: str, tone: Optional[str] = None) -> str:
-    """Rewrite a script with storyteller punctuation so tts-1-hd performs it
-    with rhythm, breath and emotional lift. Meaning is never changed — only
-    pacing marks (commas, em-dashes, ellipses) are added."""
+    """Rewrite a script with bounded, linear-time cadence shaping."""
     preset = resolve_tone(tone)
     pauses = preset["pauses"]
     use_ellipses = preset["ellipses"]
     if not text:
         return ""
 
-    s = text.strip()
-    # Normalise whitespace and stray markdown that would be read aloud.
-    s = re.sub(r"[#*_`~>]", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
+    # Bound caller-controlled text before any shaping work. TTS accepts at most
+    # TTS_LIMIT characters anyway, so processing more only creates DoS surface.
+    s = text.strip()[:TTS_LIMIT]
+    if not s:
+        return ""
 
-    # 1) Hyphen spans → em-dash dramatic beats.  "word - word" → "word — word"
-    s = re.sub(r"\s+-\s+", " — ", s)
+    translation = str.maketrans({ch: " " for ch in "#*_\`~>"})
+    s = s.translate(translation)
+    s = " ".join(s.split())
+    s = s.replace(" - ", " — ")
 
     if pauses in ("medium", "rich"):
-        # 2) Gentle breath comma *before* clause-opening connective words
-        #    (only when not already preceded by punctuation).
-        for w in _BREATH_WORDS:
-            s = re.sub(rf"(?<=[a-zA-Z])\s+({re.escape(w)})\b",
-                       lambda m: f", {m.group(1)}", s, flags=re.IGNORECASE)
-        # 3) Pause after a short scene-setting opener: "Now then the door..."
-        for w in _PAUSE_AFTER_INTRO:
-            s = re.sub(rf"^({re.escape(w)})\s+(?=[a-zA-Z])",
-                       lambda m: f"{m.group(1)}, ", s, flags=re.IGNORECASE)
+        # Input is whitespace-normalized, so connective matching can use
+        # bounded case-insensitive substring scans instead of backtracking regex.
+        for word in _BREATH_WORDS:
+            needle = f" {word.casefold()} "
+            cursor = 0
+            while True:
+                folded = s.casefold()
+                index = folded.find(needle, cursor)
+                if index < 0:
+                    break
+                if index > 0 and s[index - 1].isalpha():
+                    s = s[:index] + ", " + s[index + 1:]
+                    cursor = index + len(word) + 2
+                else:
+                    cursor = index + len(needle)
+
+        folded = s.casefold()
+        for word in _PAUSE_AFTER_INTRO:
+            prefix = word.casefold() + " "
+            if folded.startswith(prefix):
+                s = s[:len(word)] + ", " + s[len(word) + 1:]
+                break
 
     if pauses == "rich":
-        # 4) Break very long run-on sentences so the model can breathe — insert
-        #    a comma at a natural midpoint conjunction if the sentence is long.
         def _breathe(sentence: str) -> str:
             if len(sentence) < 140:
                 return sentence
-            # add a comma before a mid conjunction if none nearby
-            return re.sub(r"\s+(and|but|which|where|while)\s+",
-                          r", \1 ", sentence, count=1)
-        s = " ".join(_breathe(p) for p in re.split(r"(?<=[.!?])\s+", s))
+            folded = sentence.casefold()
+            candidates = []
+            for word in ("and", "but", "which", "where", "while"):
+                index = folded.find(f" {word} ")
+                if index >= 0:
+                    candidates.append(index)
+            if not candidates:
+                return sentence
+            index = min(candidates)
+            return sentence[:index] + ", " + sentence[index + 1:]
+
+        sentences: list[str] = []
+        current: list[str] = []
+        for character in s:
+            current.append(character)
+            if character in ".!?":
+                sentence = "".join(current).strip()
+                if sentence:
+                    sentences.append(sentence)
+                current = []
+        tail = "".join(current).strip()
+        if tail:
+            sentences.append(tail)
+        s = " ".join(_breathe(sentence) for sentence in sentences)
 
     if use_ellipses:
-        # 5) Suspense beat: turn a comma after a strong lead-in into an ellipsis
-        #    once per script, for a held dramatic pause.
-        s = re.sub(r"\b(and then|until|but then|slowly|at last|finally),",
-                   r"\1…", s, count=1, flags=re.IGNORECASE)
+        folded = s.casefold()
+        for phrase in ("and then", "until", "but then", "slowly", "at last", "finally"):
+            needle = phrase + ","
+            index = folded.find(needle)
+            if index >= 0:
+                comma = index + len(phrase)
+                s = s[:comma] + "…" + s[comma + 1:]
+                break
 
-    # Tidy duplicate punctuation and spacing artefacts.
-    s = re.sub(r"\s+,", ",", s)
-    s = re.sub(r",\s*,", ",", s)
-    s = re.sub(r"\s+—\s+", " — ", s)
-    s = re.sub(r"\s+", " ", s).strip()
+    s = s.replace(" ,", ",").replace(", ,", ",")
+    s = " ".join(s.split()).strip()
 
-    # Guarantee terminal punctuation for a clean final cadence.
     if s and s[-1] not in ".!?…":
         s += "."
 
-    # Respect the hard TTS input limit — trim at a sentence boundary.
     if len(s) > TTS_LIMIT:
         cut = s[:TTS_LIMIT]
-        m = re.search(r"[.!?…][^.!?…]*$", cut)
-        s = cut[: m.start() + 1] if m else cut
+        last_terminal = max(cut.rfind(mark) for mark in ".!?…")
+        s = cut[: last_terminal + 1] if last_terminal >= 0 else cut
     return s
 
 
