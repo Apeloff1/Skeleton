@@ -90,6 +90,69 @@ class CampaignState:
             raise
 
 
+
+def dependency_diagnostics(plan_items: object, team: str) -> dict[str, Any]:
+    if not isinstance(plan_items, list):
+        return {"blocked": [], "cycles": [], "missing_dependencies": []}
+    rows = {
+        str(item.get("id", "")).strip(): item
+        for item in plan_items
+        if isinstance(item, Mapping)
+        and item.get("target_team") == team
+        and str(item.get("id", "")).strip()
+    }
+    blocked: list[str] = []
+    missing: list[dict[str, str]] = []
+    graph: dict[str, list[str]] = {}
+    for item_id, item in rows.items():
+        deps = item.get("dependencies", [])
+        deps = [str(dep).strip() for dep in deps] if isinstance(deps, list) else []
+        graph[item_id] = [dep for dep in deps if dep in rows]
+        if str(item.get("status", "")).lower() not in {"done", "rejected"}:
+            unresolved = [
+                dep for dep in deps
+                if dep not in rows or str(rows[dep].get("status", "")).lower() != "done"
+            ]
+            if unresolved:
+                blocked.append(item_id)
+            for dep in unresolved:
+                if dep not in rows:
+                    missing.append({"item_id": item_id, "dependency_id": dep})
+
+    cycles: list[list[str]] = []
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    stack: list[str] = []
+
+    def visit(node: str) -> None:
+        if node in visiting:
+            if node in stack:
+                cycle = stack[stack.index(node):] + [node]
+                normalized = cycle[:-1]
+                if normalized:
+                    pivot = min(range(len(normalized)), key=lambda i: normalized[i])
+                    canonical = normalized[pivot:] + normalized[:pivot]
+                    if canonical not in cycles:
+                        cycles.append(canonical)
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        stack.append(node)
+        for dep in graph.get(node, []):
+            visit(dep)
+        stack.pop()
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in sorted(graph):
+        visit(node)
+    return {
+        "blocked": sorted(set(blocked)),
+        "cycles": sorted(cycles),
+        "missing_dependencies": sorted(missing, key=lambda row: (row["item_id"], row["dependency_id"])),
+    }
+
 def campaign_identity(supervisor: Mapping[str, Any]) -> str:
     payload = {
         "team": supervisor.get("team"),
