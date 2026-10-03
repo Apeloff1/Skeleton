@@ -561,6 +561,14 @@ async def test_cross_service_approval_gate_resumes_once_with_bound_receipt(
         )
         return "artifact:approved-write"
 
+    async def write_postcondition(request, _result_ref):
+        # Effectful tools must prove an observed postcondition (#2377).
+        return any(
+            effect["arguments"] == dict(request.arguments)
+            and effect["approval_ref"] == request.approval_ref
+            for effect in effects
+        )
+
     manifest = ToolManifest(
         tool_id="repo.write",
         version="1.0.0",
@@ -574,7 +582,7 @@ async def test_cross_service_approval_gate_resumes_once_with_bound_receipt(
         effect=ToolEffect.REVERSIBLE,
         approval_required=True,
     )
-    await tools.register(manifest, write_handler)
+    await tools.register(manifest, write_handler, postcondition=write_postcondition)
     tool_definition = ProviderToolDefinition(
         tool_id=manifest.tool_id,
         description=manifest.description,
