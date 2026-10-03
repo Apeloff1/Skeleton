@@ -345,7 +345,7 @@ def get_default_observatory() -> MirrorRoomObservatory:
 
 
 def mirror_room_file_tree() -> Mapping[str, object]:
-    """Governed logical file tree for the complete Mirror Room product."""
+    """Governed logical file tree for the landed Mirror Room extension surface."""
 
     return {
         "name": "Mirror Room",
@@ -375,25 +375,6 @@ def mirror_room_file_tree() -> Mapping[str, object]:
                 "kind": "mirror",
             },
             {
-                "name": "API Adapter",
-                "path": "backend/routes/mirror_room.py",
-                "kind": "adapter",
-            },
-            {
-                "name": "Observatory UI",
-                "path": "frontend/features/MirrorRoom",
-                "kind": "ui",
-                "children": [
-                    {"name": "MirrorRoomObservatory.tsx", "kind": "screen"},
-                    {"name": "types.ts", "kind": "contract"},
-                ],
-            },
-            {
-                "name": "App Route",
-                "path": "frontend/app/mirror-room.tsx",
-                "kind": "route",
-            },
-            {
                 "name": "Focused Tests",
                 "path": "skeleton/testing",
                 "kind": "tests",
@@ -408,13 +389,13 @@ def mirror_room_file_tree() -> Mapping[str, object]:
                     },
                     {
                         "name": "test_mirror_room_observability.py",
-                        "kind": "ui-contract-tests",
+                        "kind": "observability-tests",
                     },
                 ],
             },
             {
-                "name": "CI Gate",
-                "path": ".github/workflows/p1-feedback-release-closure.yml",
+                "name": "Extension CI Gate",
+                "path": ".github/workflows/mirror-room-extensions.yml",
                 "kind": "ci",
             },
         ],
