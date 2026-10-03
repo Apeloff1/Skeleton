@@ -224,7 +224,7 @@ jobs:
             echo "::warning::Advisory model planning unavailable (status=${model_status}); compiling deterministic issue-backed failover plan."
             python - <<'PY'
           from pathlib import Path
-          from core.shift_supervisor.__main__ import _read_state
+          from skeleton.automation.shift_supervisor.__main__ import _read_state
           from core.shift_supervisor.fallback_plan import emit_failover_outputs
 
           state_path = Path('.shift-supervisor-tmp/state-in.txt')
