@@ -718,3 +718,48 @@ def test_read_context_omits_oversized_file(tmp_path, monkeypatch):
     (tmp_path / "docs" / "huge.txt").write_text("x" * 600_000, encoding="utf-8")
     evidence = studio_director._read_context(["docs/huge.txt"])
     assert "exceeds context safety bound" in evidence[0]
+
+
+def test_validation_executor_uses_reduced_environment(monkeypatch):
+    captured = {}
+    class Proc:
+        pid = 123
+        returncode = 0
+        def communicate(self, timeout=None):
+            return ("ok", "")
+    def fake_popen(argv, **kwargs):
+        captured.update(kwargs)
+        return Proc()
+    monkeypatch.setattr(studio_director.subprocess, "Popen", fake_popen)
+    ok, _ = studio_director._run_validation_commands([
+        ("python", "-m", "compileall", "-q", "skeleton/a.py")
+    ])
+    assert ok
+    env = captured["env"]
+    assert env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] == "1"
+    assert env["PYTHONHASHSEED"] == "0"
+    assert "GITHUB_TOKEN" not in env
+    assert captured["start_new_session"] is True
+
+
+def test_validation_timeout_kills_process_group(monkeypatch):
+    killed = []
+    class Proc:
+        pid = 456
+        returncode = None
+        calls = 0
+        def communicate(self, timeout=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise studio_director.subprocess.TimeoutExpired(("python",), timeout)
+            return ("partial", "")
+        def kill(self):
+            killed.append(("process", self.pid))
+    monkeypatch.setattr(studio_director.subprocess, "Popen", lambda *args, **kwargs: Proc())
+    monkeypatch.setattr(studio_director.os, "killpg", lambda pid, sig: killed.append(("group", pid)))
+    ok, output = studio_director._run_validation_commands([
+        ("python", "-m", "compileall", "-q", "skeleton/a.py")
+    ])
+    assert not ok
+    assert ("group", 456) in killed
+    assert "TIMEOUT" in output[0]
