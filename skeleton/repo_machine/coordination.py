@@ -44,7 +44,7 @@ def select_next_work(model:RepositoryModel,*,completed:tuple[str,...]=(),active_
     decisions=tuple(_decision(n,graph) for n in ready)
     if len(decisions)<limit: decisions+=tuple(_decision(n,graph,True) for n in blocked[:limit-len(decisions)])
     return CoordinationPlan(model.fingerprint,decisions,graph.bottleneck(completed),len(graph.frontier(completed)),graph.max_parallelism(completed),
-                            max((_pressure(n,graph) for n in graph._ordered_nodes),default=0))
+                            max((_pressure(n,graph) for n in graph.ordered_nodes),default=0))
 
 def build_coordination_plan(model:RepositoryModel,*,limit:int=8,graph:WorkGraph|None=None)->dict[str,object]:
     return select_next_work(model,limit=limit,graph=graph).as_dict()
