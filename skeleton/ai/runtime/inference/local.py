@@ -19,6 +19,7 @@ from collections import Counter, OrderedDict
 from dataclasses import dataclass, field, replace
 import hashlib
 import json
+import math
 import random
 import re
 import threading
@@ -26,6 +27,7 @@ import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from skeleton.provider_runtime import ProviderAdapter, ProviderRequest, ProviderResponse
+from skeleton.skills.tool_contract import ToolContractError, validate_json_value
 from skeleton.providers.contract import FinishReason, ProviderToolCall, ProviderUsage
 
 
@@ -169,10 +171,20 @@ class LocalInferenceResult:
     def __post_init__(self) -> None:
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
-        if len(self.model_digest) != 64:
-            raise ValueError("model_digest must be sha256")
-        if self.input_tokens < 0 or self.output_tokens < 0:
-            raise ValueError("token counts must be non-negative")
+        if (
+            len(self.model_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.model_digest)
+        ):
+            raise ValueError("model_digest must be lowercase sha256")
+        if (
+            isinstance(self.input_tokens,bool)
+            or isinstance(self.output_tokens,bool)
+            or not isinstance(self.input_tokens,int)
+            or not isinstance(self.output_tokens,int)
+            or self.input_tokens < 0
+            or self.output_tokens < 0
+        ):
+            raise ValueError("token counts must be non-negative integers")
         if self.finish_reason not in {
             "completed",
             "tool_calls",
@@ -181,10 +193,24 @@ class LocalInferenceResult:
             "deadline",
         }:
             raise ValueError("invalid local finish_reason")
-        if self.text is None and not self.tool_calls and self.structured_output is None:
+        calls=tuple(self.tool_calls)
+        call_ids=[call.call_id for call in calls]
+        if len(call_ids)!=len(set(call_ids)):
+            raise ValueError("local tool call ids must be unique")
+        if self.finish_reason=="tool_calls" and not calls:
+            raise ValueError("tool_calls finish reason requires tool calls")
+        if calls and self.finish_reason!="tool_calls":
+            raise ValueError("tool calls require tool_calls finish reason")
+        if self.text is None and not calls and self.structured_output is None:
             raise ValueError("local inference result must contain output")
+        object.__setattr__(self,"tool_calls",calls)
         if self.structured_output is not None:
             object.__setattr__(self, "structured_output", dict(self.structured_output))
+        if self.latency_ms is not None:
+            latency=float(self.latency_ms)
+            if not math.isfinite(latency) or latency<0:
+                raise ValueError("latency_ms must be finite and non-negative")
+            object.__setattr__(self,"latency_ms",latency)
 
 
 class LocalModelBackend(Protocol):
@@ -454,6 +480,50 @@ class LocalInferenceEngine:
 
         if result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
+
+        declared_tools={
+            str(item.get("tool_id","")).strip(): item
+            for item in request.tools
+            if str(item.get("tool_id","")).strip()
+        }
+        for call in result.tool_calls:
+            declared=declared_tools.get(call.tool_id)
+            if declared is None:
+                raise ValueError(
+                    f"local inference requested undeclared tool_id {call.tool_id!r}"
+                )
+            schema=declared.get("input_schema")
+            if schema is not None:
+                if not isinstance(schema,Mapping):
+                    raise ValueError(
+                        f"declared tool {call.tool_id!r} input_schema must be an object"
+                    )
+                try:
+                    validate_json_value(
+                        schema,
+                        dict(call.arguments),
+                        path=f"tool_call[{call.call_id}].arguments",
+                    )
+                except ToolContractError as exc:
+                    raise ValueError(
+                        f"local tool arguments violate schema for {call.tool_id!r}: {exc}"
+                    ) from exc
+
+        if (
+            result.structured_output is not None
+            and request.structured_output_schema is not None
+        ):
+            try:
+                validate_json_value(
+                    request.structured_output_schema,
+                    dict(result.structured_output),
+                    path="structured_output",
+                )
+            except ToolContractError as exc:
+                raise ValueError(
+                    f"local structured output violates request schema: {exc}"
+                ) from exc
+
         if self.cache_size:
             async with self._cache_lock:
                 self._cache[key] = result
@@ -487,9 +557,18 @@ class LocalInferenceScheduler:
         max_batch_size: int = 8,
         batch_window_ms: float = 2.0,
     ) -> None:
-        if not 1 <= max_batch_size <= 256:
+        if (
+            isinstance(max_batch_size,bool)
+            or not isinstance(max_batch_size,int)
+            or not 1 <= max_batch_size <= 256
+        ):
             raise ValueError("max_batch_size must be in [1, 256]")
-        if not 0 <= batch_window_ms <= 1000:
+        if (
+            isinstance(batch_window_ms,bool)
+            or not isinstance(batch_window_ms,(int,float))
+            or not math.isfinite(float(batch_window_ms))
+            or not 0 <= batch_window_ms <= 1000
+        ):
             raise ValueError("batch_window_ms must be in [0, 1000]")
         self.engine = engine
         self.max_batch_size = max_batch_size
@@ -519,6 +598,7 @@ class LocalInferenceScheduler:
             if first is None:
                 return
             batch = [first]
+            close_after_batch=False
             deadline = asyncio.get_running_loop().time() + self.batch_window
             while len(batch) < self.max_batch_size:
                 remaining = deadline - asyncio.get_running_loop().time()
@@ -529,23 +609,24 @@ class LocalInferenceScheduler:
                 except asyncio.TimeoutError:
                     break
                 if item is None:
-                    self._closed = True
+                    close_after_batch=True
                     break
                 batch.append(item)
 
             active = [item for item in batch if not item.future.cancelled()]
-            if not active:
-                continue
-            try:
-                results = await self.engine.generate_many([item.request for item in active])
-            except Exception as exc:
-                for item in active:
-                    if not item.future.done():
-                        item.future.set_exception(exc)
-            else:
-                for item, result in zip(active, results):
-                    if not item.future.done():
-                        item.future.set_result(result)
+            if active:
+                try:
+                    results = await self.engine.generate_many([item.request for item in active])
+                except Exception as exc:
+                    for item in active:
+                        if not item.future.done():
+                            item.future.set_exception(exc)
+                else:
+                    for item, result in zip(active, results):
+                        if not item.future.done():
+                            item.future.set_result(result)
+            if close_after_batch:
+                return
 
     async def close(self) -> None:
         if self._closed:
