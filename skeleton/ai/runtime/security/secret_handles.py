@@ -299,7 +299,7 @@ def sanitize_secret_metadata(
             "secret metadata must contain only JSON-like values"
         )
 
-    return walk(value, "$", 0), tuple(findings)
+    return walk(value, "$", 0), tuple(sorted(findings))
 
 
 __all__ = [
