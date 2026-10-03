@@ -52,6 +52,8 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
     generation = str(supervisor.get("generation_id", "")).strip()
     if not generation:
         raise ValueError("canonical supervisor snapshot has no plan_generation")
+    if len(generation) > 128 or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in generation):
+        raise ValueError("canonical supervisor generation id is malformed")
     raw = supervisor.get("plan_items")
     if not isinstance(raw, list):
         raise ValueError("canonical supervisor snapshot has no plan_items")
@@ -79,6 +81,8 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
         return max(1, min(100, value))
 
     ids = [str(item.get("id", "")).strip() for item in items]
+    if any(len(item_id) > 160 for item_id in ids):
+        raise ValueError("canonical supervisor plan item id exceeds 160 characters")
     if len(ids) != len(set(ids)):
         raise ValueError("canonical supervisor snapshot contains duplicate plan item ids")
     items.sort(key=lambda item: (-priority(item), str(item.get("id"))))
