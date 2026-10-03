@@ -93,6 +93,58 @@ def _observe_usage_delta(
         )
 
 
+def _effective_actual_usage(
+    reported: UsageEstimate,
+    quota_completion: QuotaCompletion | None,
+) -> UsageEstimate:
+    """Join reported runtime usage with any larger durable metered usage."""
+
+    if quota_completion is None:
+        return reported
+    observed = quota_completion.actual
+    return UsageEstimate(
+        input_tokens=max(reported.input_tokens, observed.input_tokens),
+        output_tokens=max(reported.output_tokens, observed.output_tokens),
+        cost_usd=max(reported.cost_usd, observed.cost_usd),
+        wall_seconds=reported.wall_seconds,
+        provider_attempts=reported.provider_attempts,
+        tool_calls=max(reported.tool_calls, observed.tool_calls),
+        artifact_bytes=max(
+            reported.artifact_bytes,
+            observed.artifact_bytes,
+        ),
+        storage_bytes=max(
+            reported.storage_bytes,
+            observed.storage_bytes,
+        ),
+    )
+
+
+def _operation_budget_overruns(
+    decision: AdmissionDecision,
+    actual: UsageEstimate,
+) -> tuple[str, ...]:
+    """Return operation-budget dimensions exceeded by terminal actual usage."""
+
+    limits: dict[str, int | float] = {
+        field: (
+            getattr(decision.estimated, field)
+            + decision.remaining[field]
+        )
+        for field in _USAGE_FIELDS
+    }
+    exceeded: list[str] = []
+    for field in _USAGE_FIELDS:
+        value = getattr(actual, field)
+        limit = limits[field]
+        if field in {"cost_usd", "wall_seconds"}:
+            if float(value) > float(limit) + 1e-12:
+                exceeded.append(field)
+        elif int(value) > int(limit):
+            exceeded.append(field)
+    return tuple(exceeded)
+
+
 def _wall_time(value: float | None, *, field: str) -> float:
     number = time.time() if value is None else float(value)
     if not math.isfinite(number) or number < 0:
@@ -161,13 +213,31 @@ class AdmissionCompletion:
     lease: AdmissionLease
     quota_completion: QuotaCompletion | None
     completed_at: float
+    effective_actual: UsageEstimate | None = None
+    operation_overrun_dimensions: tuple[str, ...] = ()
+
+    @property
+    def operation_overrun(self) -> bool:
+        return bool(self.operation_overrun_dimensions)
 
     def as_dict(self) -> dict[str, Any]:
+        actual = self.effective_actual
         return {
             "lease_id": self.lease.lease_id,
             "operation_id": self.lease.operation_id,
             "tenant_id": self.lease.tenant_id,
             "completed_at": self.completed_at,
+            "effective_actual": (
+                None
+                if actual is None
+                else {
+                    field: getattr(actual, field)
+                    for field in _USAGE_FIELDS
+                }
+            ),
+            "operation_overrun_dimensions": list(
+                self.operation_overrun_dimensions
+            ),
             "quota": (
                 None
                 if self.quota_completion is None
@@ -758,26 +828,47 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
+            effective_actual = _effective_actual_usage(
+                actual,
+                quota_completion,
+            )
+            operation_overruns = _operation_budget_overruns(
+                active.lease.decision,
+                effective_actual,
+            )
+
             if active.shared_pressure_lease is not None:
                 self._release_shared_pressure(
                     active.shared_pressure_lease
                 )
             self.metrics_registry.inc("admission.completed_total")
+            if operation_overruns:
+                self.metrics_registry.inc(
+                    "admission.operation_overrun_total"
+                )
+                for dimension in operation_overruns:
+                    self.metrics_registry.inc(
+                        "admission.operation_overrun."
+                        + dimension
+                        + "_total"
+                    )
             _observe_usage(
                 self.metrics_registry,
                 "actual",
-                actual,
+                effective_actual,
             )
             _observe_usage_delta(
                 self.metrics_registry,
                 active.lease.decision.estimated,
-                actual,
+                effective_actual,
             )
             self._active.pop(operation)
             return AdmissionCompletion(
                 lease=active.lease,
                 quota_completion=quota_completion,
                 completed_at=wall,
+                effective_actual=effective_actual,
+                operation_overrun_dimensions=operation_overruns,
             )
 
     def release(
