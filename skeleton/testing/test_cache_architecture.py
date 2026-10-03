@@ -69,15 +69,14 @@ def test_cache_key_binds_tenant_version_and_trust_context() -> None:
         trust_context="unverified",
         generation=11,
     ) is None
-    with pytest.raises(KeyError):
-        cache.get(
-            tenant_id="tenant-b",
-            namespace="retrieval",
-            logical_id="index",
-            version=3,
-            trust_context="verified",
-            generation=11,
-        )
+    assert cache.get(
+        tenant_id="tenant-b",
+        namespace="retrieval",
+        logical_id="index",
+        version=3,
+        trust_context="verified",
+        generation=11,
+    ) is None
 
 
 def test_stale_cache_misses_or_rebuilds_by_explicit_policy() -> None:
