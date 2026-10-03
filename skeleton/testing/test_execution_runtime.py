@@ -1485,3 +1485,129 @@ async def test_reversible_tool_action_without_independent_verifier_fails_closed(
     assert receipt["policy"]["require_postcondition"] is True
     assert receipt["disposition"] == "block"
     assert "independent_origin_requirement_unsatisfied" in receipt["issues"]
+
+@pytest.mark.asyncio
+async def test_provider_response_id_cannot_alias_different_turn_payloads() -> None:
+    repo=SQLiteExecutionRepository()
+    tools=AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(),handler)
+    provider=FakeProvider(
+        [
+            _tool_response("call-alias",response_id="reused-response"),
+            _text_response("different second payload",response_id="reused-response"),
+        ]
+    )
+    runtime=_runtime(repo,provider,tools)
+    request=_request(
+        execution_id="exec-provider-alias",
+        allowed_tools=("repo.read",),
+    )
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="identity reused with different payload",
+    ):
+        await runtime.start(
+            request,
+            instructions="Use the tool then answer.",
+            prompt="Read and answer.",
+            context_digest="4"*64,
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_provider_response_id_exact_replay_is_rejected() -> None:
+    repo=SQLiteExecutionRepository()
+    tools=AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(),handler)
+    first=_tool_response("call-replay",response_id="same-response")
+    second=_tool_response("call-replay",response_id="same-response")
+    provider=FakeProvider([first,second])
+    runtime=_runtime(repo,provider,tools)
+    request=_request(
+        execution_id="exec-provider-replay",
+        allowed_tools=("repo.read",),
+    )
+
+    with pytest.raises(CognitiveExecutionError,match="identity replayed"):
+        await runtime.start(
+            request,
+            instructions="Use governed tools.",
+            prompt="Read twice.",
+            context_digest="5"*64,
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_provider_response_must_match_bound_adapter_identity() -> None:
+    repo=SQLiteExecutionRepository()
+    tools=AsyncToolRuntime()
+    drifted=ProviderResponse(
+        text="answer",
+        provider="other-provider",
+        model="fake-model",
+        request_id="drift",
+        response_id="drift",
+        finish_reason=FinishReason.COMPLETED,
+        usage=ProviderUsage(
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            usage_source="provider",
+        ),
+    )
+    runtime=_runtime(repo,FakeProvider([drifted]),tools)
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="does not match bound adapter",
+    ):
+        await runtime.start(
+            _request(execution_id="exec-provider-drift"),
+            instructions="Answer.",
+            prompt="Do the task.",
+            context_digest="6"*64,
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_provider_response_context_digest_cannot_drift() -> None:
+    repo=SQLiteExecutionRepository()
+    tools=AsyncToolRuntime()
+    drifted=ProviderResponse(
+        text="answer",
+        provider="fake",
+        model="fake-model",
+        request_id="context-drift",
+        response_id="context-drift",
+        finish_reason=FinishReason.COMPLETED,
+        usage=ProviderUsage(
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            usage_source="provider",
+        ),
+        context_digest="7"*64,
+    )
+    runtime=_runtime(repo,FakeProvider([drifted]),tools)
+
+    with pytest.raises(CognitiveExecutionError,match="context digest drift"):
+        await runtime.start(
+            _request(execution_id="exec-context-drift"),
+            instructions="Answer.",
+            prompt="Do the task.",
+            context_digest="8"*64,
+            now=_now(),
+        )
+
