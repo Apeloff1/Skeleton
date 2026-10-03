@@ -12,6 +12,7 @@ _CODE_WEIGHT = {"scan.truncated": 50, "scan.unreadable": 45, "topology.cycle": 4
                 "quality.missing-zone-tests": 35, "organization.oversized-module": 25,
                 "organization.unclassified": 10}
 _LANE_WEIGHT = {"repository-health": 30, "architecture": 20, "regression": 15, "organization": 5}
+_CRITICALITY_WEIGHT = {"critical": 24, "high": 16, "medium": 8, "low": 2}
 _MAX_PREREQUISITES = 3
 
 
@@ -35,6 +36,7 @@ class WorkCandidate:
     topology_confidence: int = 0
     blast_radius: int = 0
     verification_depth: int = 0
+    decision_reasons: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {"identity": self.identity, "lane": self.lane, "priority": self.priority,
@@ -46,7 +48,8 @@ class WorkCandidate:
                 "prerequisite_reasons": list(self.prerequisite_reasons),
                 "readiness": self.readiness, "decision_score": self.decision_score,
                 "topology_confidence": self.topology_confidence, "blast_radius": self.blast_radius,
-                "verification_depth": self.verification_depth}
+                "verification_depth": self.verification_depth,
+                "decision_reasons": list(self.decision_reasons)}
 
 
 def _lane(finding: Finding) -> str:
@@ -77,28 +80,49 @@ def _gate_reason(gate: Finding, gate_priority: int, candidate: Finding, candidat
 def _impact_priority(impact: ImpactReport | None) -> int:
     if impact is None:
         return 0
-    # Confidence prevents sparse topology from dominating. Blast radius is
-    # logarithmically bounded by the fixed multiplier and final priority cap.
-    confidence = impact.topology_confidence // 10
-    radius = min(20, impact.blast_radius * 2)
-    return impact.risk_score + confidence + radius
+    return impact.risk_score + impact.topology_confidence // 10 + min(20, impact.blast_radius * 2)
+
+
+def _decision_factors(finding: Finding, impact: ImpactReport | None, model: RepositoryModel) -> tuple[int, tuple[str, ...]]:
+    subsystem = next((item for item in model.subsystems if item.name == finding.zone), None)
+    criticality = subsystem.criticality if subsystem else "medium"
+    score = _CRITICALITY_WEIGHT.get(criticality, 0)
+    reasons = [f"zone criticality={criticality}"]
+    if finding.severity in {"critical", "high"}:
+        reasons.append(f"finding severity={finding.severity}")
+    if impact and impact.blast_radius >= 4:
+        reasons.append(f"blast radius={impact.blast_radius}")
+    if impact and impact.topology_confidence < 40:
+        score -= 4
+        reasons.append("sparse topology evidence reduces confidence")
+    if finding.code == "quality.missing-zone-tests":
+        test_surface = subsystem.test_surface_count if subsystem else 0
+        if test_surface == 0:
+            score += 12
+            reasons.append("no known test surface")
+    if impact and impact.change_class == "control-plane":
+        score += 10
+        reasons.append("control-plane change")
+    return score, tuple(reasons)
 
 
 def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[WorkCandidate, ...]:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 512:
         raise ValueError("limit must be in [1,512]")
-    raw: list[tuple[Finding, int, ImpactReport | None]] = []
+    raw: list[tuple[Finding, int, ImpactReport | None, int, tuple[str, ...]]] = []
     for finding in model.findings:
         impact = analyze_impact(model, (finding.path,), transitive_depth=3) if finding.path else None
+        decision_bonus, decision_reasons = _decision_factors(finding, impact, model)
         base = _SEVERITY[finding.severity] * 100 + _CODE_WEIGHT.get(finding.code, 0)
-        priority = min(500, base + _LANE_WEIGHT.get(_lane(finding), 0) + _impact_priority(impact))
-        raw.append((finding, priority, impact))
+        priority = min(500, base + _LANE_WEIGHT.get(_lane(finding), 0) +
+                       _impact_priority(impact) + decision_bonus)
+        raw.append((finding, priority, impact, decision_bonus, decision_reasons))
 
     raw.sort(key=lambda item: (-item[1], item[0].zone, item[0].path, item[0].identity))
     zone_gates: dict[str, list[tuple[str, int]]] = {}
-    finding_by_id = {finding.identity: finding for finding, _, _ in raw}
-    priority_by_id = {finding.identity: priority for finding, priority, _ in raw}
-    for finding, priority, impact in raw:
+    finding_by_id = {finding.identity: finding for finding, _, _, _, _ in raw}
+    priority_by_id = {finding.identity: priority for finding, priority, _, _, _ in raw}
+    for finding, priority, impact, _, _ in raw:
         zones = {finding.zone}
         if impact:
             zones.update(impact.transitively_affected_zones)
@@ -110,7 +134,7 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
             del gates[_MAX_PREREQUISITES:]
 
     candidates: list[WorkCandidate] = []
-    for finding, priority, impact in raw:
+    for finding, priority, impact, _, decision_reasons in raw:
         affected = set(impact.transitively_affected_zones) | set(impact.touched_zones) if impact else {finding.zone}
         gate_map: dict[str, set[str]] = {}
         for zone in affected:
@@ -126,7 +150,7 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
         reasons = tuple(_gate_reason(finding_by_id[identity], gate_priority, finding, priority,
                                      tuple(sorted(zones)))
                         for identity, zones, gate_priority in ranked_gates)
-        decision_score = min(100, priority // 5)
+        decision_score = min(100, max(0, priority // 5))
         candidates.append(WorkCandidate(
             identity=finding.identity, lane=_lane(finding), priority=priority,
             zone=finding.zone, path=finding.path, objective=_objective(finding),
@@ -141,15 +165,16 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
             topology_confidence=impact.topology_confidence if impact else 0,
             blast_radius=impact.blast_radius if impact else 0,
             verification_depth=impact.recommended_depth if impact else 0,
+            decision_reasons=decision_reasons,
         ))
-    candidates.sort(key=lambda item: (-item.decision_score, -item.impact_score, item.zone, item.path, item.identity))
+    candidates.sort(key=lambda item: (-item.decision_score, -item.priority, item.zone, item.path, item.identity))
     return tuple(candidates[:limit])
 
 
 def plan_work(model: RepositoryModel, *, limit: int = 24) -> dict[str, object]:
     candidates = derive_work_candidates(model, limit=limit)
     return {"repository_fingerprint": model.fingerprint,
-            "planning_model": "severity + lane + risk + topology confidence + bounded blast radius + multi-gate evidence",
+            "planning_model": "severity + lane + criticality + risk + topology confidence + bounded blast radius + multi-gate evidence",
             "work": [item.as_dict() for item in candidates]}
 
 
