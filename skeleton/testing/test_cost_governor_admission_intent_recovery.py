@@ -7,6 +7,7 @@ import pytest
 from skeleton.ai.runtime.observability.cost_governor import (
     CostGovernor,
     CostGovernorConflict,
+    CostGovernorError,
     SafeCostFallback,
 )
 from skeleton.intelligence.admission import (
@@ -552,7 +553,7 @@ def test_decision_persistence_failure_allocates_no_authority(
     )
 
     with pytest.raises(
-        Exception,
+        CostGovernorError,
         match="admission_decision_persistence_failed",
     ):
         governor.reserve(
