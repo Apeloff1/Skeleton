@@ -841,10 +841,14 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         effects.append(tool_request.approval_ref)
         return "artifact:approved-write"
 
+    def observe_postcondition(_request, result_ref):
+        postconditions.append(result_ref)
+        return True
+
     await tools.register(
         _approval_tool_manifest(),
         handler,
-        postcondition=lambda _request, _result_ref: True,
+        postcondition=observe_postcondition,
     )
     first_provider = SequenceProvider([_approval_tool_response("call-write")])
     coordinator = EngineExecutionCoordinator(
@@ -902,7 +906,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     await restarted_tools.register(
         _approval_tool_manifest(),
         restarted_handler,
-        postcondition=lambda _request, _result_ref: True,
+        postcondition=observe_postcondition,
     )
     final_provider = SequenceProvider(
         [
