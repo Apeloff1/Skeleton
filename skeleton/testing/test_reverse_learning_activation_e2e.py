@@ -303,7 +303,8 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
         trainer_id="reverse-e2e-training-authority",
         code_revision="reverse-e2e-test",
     )
-    lifecycle_registry = ModelLifecycleRegistry()
+    lifecycle_path = tmp_path / "model-lifecycle.json"
+    lifecycle_registry = ModelLifecycleRegistry(lifecycle_path)
     candidate_transition = lifecycle_registry.register_candidate(
         bridged,
         authority_id="reverse-e2e-training-registration",
@@ -458,6 +459,16 @@ def test_reverse_learning_reaches_governed_activation_and_offline_execution(
         lifecycle_registry.snapshot(bridged.artifact.model_digest).state
         is ModelLifecycleState.ACTIVATED
     )
+    activated_state_digest = lifecycle_registry.state_digest()
+    lifecycle_registry = ModelLifecycleRegistry(lifecycle_path)
+    assert (
+        lifecycle_registry.snapshot(bridged.artifact.model_digest).state
+        is ModelLifecycleState.ACTIVATED
+    )
+    assert lifecycle_registry.state_digest() == activated_state_digest
+    assert lifecycle_registry.verify_history(
+        bridged.artifact.model_digest
+    ) is True
 
     assert loaded.manifest.candidate_model_digest == product_receipt["model_digest"]
     assert loaded.manifest.baseline_model_digest == baseline.model_digest
