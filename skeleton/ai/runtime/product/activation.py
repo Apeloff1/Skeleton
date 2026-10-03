@@ -36,7 +36,7 @@ from skeleton.ai.runtime.product.qualification import (
 from skeleton.learning.model_program import ModelPromotionReceipt
 
 
-_SCHEMA = "skeleton.local_model_activation.v1"
+_SCHEMA = "skeleton.local_model_activation.v2"
 _MAX_MANIFEST_BYTES = 64 * 1024
 
 
@@ -166,6 +166,7 @@ class LocalModelActivationManifest:
     baseline_model_id: str
     baseline_model_digest: str
     promotion_receipt_digest: str
+    lifecycle_promotion_transition_digest: str
     training_receipt_digest: str
     qualification_digest: str
     model_program_bridge_digest: str
@@ -206,6 +207,7 @@ class LocalModelActivationManifest:
             "baseline_artifact_sha256",
             "baseline_model_digest",
             "promotion_receipt_digest",
+            "lifecycle_promotion_transition_digest",
             "training_receipt_digest",
             "qualification_digest",
             "model_program_bridge_digest",
@@ -303,6 +305,9 @@ class LocalModelActivationManifest:
             "baseline_model_id": self.baseline_model_id,
             "baseline_model_digest": self.baseline_model_digest,
             "promotion_receipt_digest": self.promotion_receipt_digest,
+            "lifecycle_promotion_transition_digest": (
+                self.lifecycle_promotion_transition_digest
+            ),
             "training_receipt_digest": self.training_receipt_digest,
             "qualification_digest": self.qualification_digest,
             "model_program_bridge_digest": self.model_program_bridge_digest,
@@ -371,6 +376,7 @@ def build_local_model_activation_manifest(
     baseline_path: str | Path,
     promotion_receipt: ModelPromotionReceipt,
     qualification: LearningQualificationBundle,
+    lifecycle_promotion_transition: object,
     model_program_bridge_digest: str,
     operator_authorization_ref: str,
     cache_size: int = 128,
@@ -385,6 +391,30 @@ def build_local_model_activation_manifest(
     if not isinstance(qualification, LearningQualificationBundle):
         raise TypeError(
             "qualification must be LearningQualificationBundle"
+        )
+    # Lazy import avoids an activation<->lifecycle module import cycle while
+    # still requiring the actual typed transition contract.
+    from .lifecycle import (
+        ModelLifecycleState,
+        ModelLifecycleTransitionReceipt,
+    )
+
+    if not isinstance(
+        lifecycle_promotion_transition,
+        ModelLifecycleTransitionReceipt,
+    ):
+        raise TypeError(
+            "lifecycle_promotion_transition must be "
+            "ModelLifecycleTransitionReceipt"
+        )
+    if (
+        lifecycle_promotion_transition.from_state
+        is not ModelLifecycleState.VALIDATED
+        or lifecycle_promotion_transition.to_state
+        is not ModelLifecycleState.PROMOTED
+    ):
+        raise LocalModelActivationError(
+            "activation requires exact validated-to-promoted lifecycle transition"
         )
 
     candidate_resolved = _artifact_path(
@@ -427,6 +457,33 @@ def build_local_model_activation_manifest(
             "qualification does not bind rollback baseline"
         )
 
+    lifecycle_transition = lifecycle_promotion_transition
+    if (
+        lifecycle_transition.model_id != candidate.receipt.model_id
+        or lifecycle_transition.model_digest
+        != candidate.receipt.model_digest
+        or lifecycle_transition.artifact_digest
+        != candidate.receipt.artifact_sha256
+    ):
+        raise LocalModelActivationError(
+            "lifecycle promotion transition does not bind candidate artifact"
+        )
+    if lifecycle_transition.authority_id != promotion_receipt.verifier_id:
+        raise LocalModelActivationError(
+            "lifecycle promotion authority differs from promotion receipt"
+        )
+    promotion_ref = (
+        "model-promotion-receipt-sha256:" + promotion_receipt.digest
+    )
+    if promotion_ref not in lifecycle_transition.evidence_refs:
+        raise LocalModelActivationError(
+            "lifecycle promotion transition lacks model promotion receipt"
+        )
+    lifecycle_transition_digest = _sha(
+        lifecycle_transition.digest,
+        "lifecycle_promotion_transition_digest",
+    )
+
     bridge_digest = _sha(
         model_program_bridge_digest,
         "model_program_bridge_digest",
@@ -455,6 +512,9 @@ def build_local_model_activation_manifest(
         "baseline_model_id": baseline.receipt.model_id,
         "baseline_model_digest": baseline.receipt.model_digest,
         "promotion_receipt_digest": promotion_receipt.digest,
+        "lifecycle_promotion_transition_digest": (
+            lifecycle_transition_digest
+        ),
         "training_receipt_digest": (
             promotion_receipt.training_receipt_digest
         ),
@@ -636,6 +696,7 @@ def load_local_model_activation_manifest(
         "baseline_model_id",
         "baseline_model_digest",
         "promotion_receipt_digest",
+        "lifecycle_promotion_transition_digest",
         "training_receipt_digest",
         "qualification_digest",
         "model_program_bridge_digest",
@@ -666,6 +727,9 @@ def load_local_model_activation_manifest(
         baseline_model_digest=payload["baseline_model_digest"],
         promotion_receipt_digest=payload[
             "promotion_receipt_digest"
+        ],
+        lifecycle_promotion_transition_digest=payload[
+            "lifecycle_promotion_transition_digest"
         ],
         training_receipt_digest=payload[
             "training_receipt_digest"
