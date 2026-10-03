@@ -744,6 +744,7 @@ def build_learning_candidate_artifact(
             item["method"]
             for item in receipt["training_plan"]["methods"]
         ],
+        "model_architecture": receipt["model_architecture"],
         "method_allocation_digest": (
             None
             if method_allocation is None
