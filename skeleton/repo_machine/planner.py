@@ -46,6 +46,10 @@ class WorkCandidate:
                 "topology_confidence": self.topology_confidence, "blast_radius": self.blast_radius,
                 "verification_depth": self.verification_depth, "decision_reasons": list(self.decision_reasons)}
 
+def _normalize_finding_path(path: str) -> str:
+    return path.replace("\\", "/").lstrip("./")
+
+
 def _lane(finding: Finding) -> str:
     if finding.code.startswith("quality."): return "regression"
     if finding.code.startswith("topology."): return "architecture"
@@ -125,7 +129,7 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
     for finding in model.findings:
         impact = None
         if finding.path:
-            key = finding.path.replace("\", "/").lstrip("./")
+            key = _normalize_finding_path(finding.path)
             impact = impact_cache.get(key)
             if impact is None:
                 impact = analyze_impact(model, (key,), transitive_depth=3)
