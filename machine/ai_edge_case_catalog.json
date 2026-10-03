@@ -2253,12 +2253,26 @@
         348
       ],
       "status": "catalogued",
-      "requirements": [],
-      "tests": [],
+      "requirements": [
+        "Confidentiality sensitivity and integrity/trust are represented as independent context-policy axes.",
+        "Secret context is denied from model exposure regardless of integrity label.",
+        "Low-integrity untrusted context can be denied independently of confidentiality classification."
+      ],
+      "tests": [
+        "skeleton/testing/test_p0_information_flow_models.py::test_confidentiality_and_integrity_are_orthogonal_context_axes",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_context_planner_never_sends_secret_context",
+        "skeleton/testing/test_shell_ai_context_planner.py::test_context_planner_can_reject_untrusted_context"
+      ],
       "properties": [],
       "chaos_cases": [],
       "runbooks": [],
-      "evidence": [],
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "test:skeleton/testing/test_p0_information_flow_models.py",
+        "test:skeleton/testing/test_shell_ai_context_planner.py",
+        "workflow:P0 Information Flow Model Evidence"
+      ],
       "criticality": "critical",
       "recommended_test_modes": [
         "design_review",

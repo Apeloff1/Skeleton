@@ -1208,9 +1208,15 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_dual_axis_information_policy_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/shells/ai/context_provenance.py",
+        "code:skeleton/shells/ai/context_policy.py",
+        "test:skeleton/testing/test_p0_information_flow_models.py",
+        "test:skeleton/testing/test_shell_ai_context_planner.py",
+        "workflow:P0 Information Flow Model Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-021",
       "completion_checkbox": false,
