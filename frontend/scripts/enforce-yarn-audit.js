@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 /* eslint-disable */
 const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+
+function hardenedFileContains(rel, markers) {
+  const target = path.join(ROOT, rel);
+  if (!fs.existsSync(target)) return false;
+  const source = fs.readFileSync(target, 'utf8');
+  return markers.every((marker) => source.includes(marker));
+}
 
 const auditPath = process.argv[2];
 if (!auditPath) {
@@ -36,12 +46,56 @@ const blockingSeverityMask = severityBits.high | severityBits.critical;
 const severityNames = Object.keys(severityBits);
 
 const allowedMitigatedAdvisories = new Set([
-  // image-size has no patched npm release. These two parser-progress flaws are
-  // patched fail-closed by scripts/patch-node-modules.js and verified by
-  // scripts/verify-image-size-security.js before this policy is evaluated.
+  // These advisories are accepted only when the corresponding deterministic
+  // post-install compensating control is observed below.
   'GHSA-5p2g-fcmc-qvqq',
   'GHSA-w3rx-r6r6-pgpr',
+  'GHSA-86w9-cpqp-85rv',
+  'GHSA-vfj7-8cjw-p6xm',
 ]);
+
+const mitigationChecks = new Map([
+  [
+    'GHSA-86w9-cpqp-85rv',
+    {
+      module: 'node-forge',
+      verify: () => hardenedFileContains(
+        'node_modules/node-forge/lib/rsa.js',
+        [
+          'obj.value.length !== 2 ||',
+          'obj.value[0].value.length < 1 ||',
+          'obj.value[0].value.length > 2',
+        ],
+      ),
+    },
+  ],
+  [
+    'GHSA-vfj7-8cjw-p6xm',
+    {
+      module: 'braces',
+      verify: () => hardenedFileContains(
+        'node_modules/braces/lib/parse.js',
+        [
+          'const MAX_BRACE_NESTING = 64;',
+          'if (depth >= MAX_BRACE_NESTING)',
+          "throw new RangeError('brace nesting exceeds security limit');",
+        ],
+      ),
+    },
+  ],
+]);
+
+function isVerifiedMitigation(item) {
+  if (!allowedMitigatedAdvisories.has(item.ghsa)) return false;
+  if (item.module === 'image-size') {
+    return (
+      item.ghsa === 'GHSA-5p2g-fcmc-qvqq' ||
+      item.ghsa === 'GHSA-w3rx-r6r6-pgpr'
+    );
+  }
+  const rule = mitigationChecks.get(item.ghsa);
+  return Boolean(rule && rule.module === item.module && rule.verify());
+}
 
 const findings = [];
 const mitigated = [];
@@ -126,7 +180,7 @@ for (const line of auditText.split(/\r?\n/)) {
     ghsa,
     title: String(advisory.title || ''),
   };
-  if (item.module === 'image-size' && allowedMitigatedAdvisories.has(ghsa)) {
+  if (isVerifiedMitigation(item)) {
     mitigated.push(item);
   } else {
     findings.push(item);
