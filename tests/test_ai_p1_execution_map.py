@@ -315,7 +315,7 @@ def test_p1_backlog_realizes_lane_dependencies(tmp_path: Path) -> None:
 
 UPSTREAM_P1_EVIDENCE = {
     "P1-EVID-01": (
-        "ready",
+        "in_progress",
         "1a66b2212c438cdc8d77ba912160d46682775a94",
         "36453604824",
         "109034199882",
@@ -394,8 +394,12 @@ def test_upstream_p1_dependency_evidence_is_materialized_and_exact_head() -> Non
         )
 
         assert task["status"] == status
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
+        if task_id.startswith("P1-EVID-"):
+            assert task["accountability_status"] == "evidence_pending"
+            assert task["implementation_signed"] is True
+        else:
+            assert task["accountability_status"] == "planned"
+            assert task["implementation_signed"] is False
         assert task["verification_signed"] is False
         assert task["completion_checkbox"] is False
         assert task["completion_checkbox_mark"] == "[ ]"
@@ -482,8 +486,8 @@ def test_evid_02_06_use_materialized_exact_head_evidence(
     )
 
     assert task["status"] == "blocked"
-    assert task["accountability_status"] == "planned"
-    assert task["implementation_signed"] is False
+    assert task["accountability_status"] == "evidence_pending"
+    assert task["implementation_signed"] is True
     assert task["verification_signed"] is False
     assert task["completion_checkbox"] is False
     assert task["completion_checkbox_mark"] == "[ ]"

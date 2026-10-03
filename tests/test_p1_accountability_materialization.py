@@ -6,6 +6,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+IMPLEMENTATION_SIGNED = {
+    "P1-EVID-01",
+    "P1-EVID-02",
+    "P1-EVID-03",
+    "P1-EVID-04",
+    "P1-EVID-05",
+    "P1-EVID-06",
+}
 
 
 def _load_accountability_tool():
@@ -46,10 +54,23 @@ def test_all_p1_tasks_have_materialized_accountability_records() -> None:
         rid = task["accountability_ref"]
         assert rid == f"ACC-{task['task_id']}"
         assert rid in records
-        assert records[rid]["status"] == "planned"
-        assert records[rid]["baseline_status"] == "planned"
-        assert records[rid]["checkbox"] is False
-        assert records[rid]["history"] == []
+        record = records[rid]
+        assert record["baseline_status"] == "planned"
+        assert record["checkbox"] is False
+        if task["task_id"] in IMPLEMENTATION_SIGNED:
+            assert record["status"] == "evidence_pending"
+            assert record["implementation_signoff"]["signed"] is True
+            assert record["verification_signoff"]["signed"] is False
+            assert [event["event_type"] for event in record["history"]] == [
+                "started",
+                "implementation_signed",
+            ]
+            assert record["evidence"]
+        else:
+            assert record["status"] == "planned"
+            assert record["implementation_signoff"]["signed"] is False
+            assert record["verification_signoff"]["signed"] is False
+            assert record["history"] == []
 
 
 def test_scheduling_state_is_separate_from_signed_accountability_state() -> None:
@@ -60,16 +81,19 @@ def test_scheduling_state_is_separate_from_signed_accountability_state() -> None
     )
     by_id = {task["task_id"]: task for task in backlog["tasks"]}
 
-    assert by_id["P1-EVID-01"]["status"] == "ready"
-    assert by_id["P1-EVID-01"]["accountability_status"] == "planned"
+    assert by_id["P1-EVID-01"]["status"] == "in_progress"
     assert by_id["P1-EVID-02"]["status"] == "blocked"
-    assert by_id["P1-EVID-02"]["accountability_status"] == "planned"
 
     for task in backlog["tasks"]:
         assert task["accountability_required"] is True
         assert task["completion_checkbox"] is False
         assert task["completion_checkbox_mark"] == "[ ]"
-        assert task["implementation_signed"] is False
+        if task["task_id"] in IMPLEMENTATION_SIGNED:
+            assert task["accountability_status"] == "evidence_pending"
+            assert task["implementation_signed"] is True
+        else:
+            assert task["accountability_status"] == "planned"
+            assert task["implementation_signed"] is False
         assert task["verification_signed"] is False
 
 

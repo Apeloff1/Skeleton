@@ -535,12 +535,12 @@ Completion requires implementation sign-off plus independent verification sign-o
 
 ## P1 Trustworthy-Production Tasks
 
-- [ ] `ACC-P1-EVID-01` — P1-EVID-01 Canonical evidence identity — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-02` — P1-EVID-02 Maturity reconciliation engine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-03` — P1-EVID-03 Required-gate authority map — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-04` — P1-EVID-04 Risk/gap evidence binding — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-05` — P1-EVID-05 Reproducibility bundle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-P1-EVID-06` — P1-EVID-06 Scope-freeze and ADR enforcement — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-01` — P1-EVID-01 Canonical evidence identity — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-02` — P1-EVID-02 Maturity reconciliation engine — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-03` — P1-EVID-03 Required-gate authority map — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-04` — P1-EVID-04 Risk/gap evidence binding — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-05` — P1-EVID-05 Reproducibility bundle — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-P1-EVID-06` — P1-EVID-06 Scope-freeze and ADR enforcement — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-P1-INTEL-01` — P1-INTEL-01 Quality measurement and routing/context receipt spine — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-P1-INTEL-02` — P1-INTEL-02 Memory, retrieval and knowledge quality authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-P1-INTEL-03` — P1-INTEL-03 Reasoning, search and stopping policy registry — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`

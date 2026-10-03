@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "p1_l0_implementation_reconciliation",
+  "lane_id": "P1-L0",
+  "signer_id": "chatgpt:gpt-5.6-sol",
+  "signer_type": "agent",
+  "role": "implementation-agent",
+  "statement": "Materialize implementation accountability for the six P1-L0 evidence-spine tasks from repository code already landed and task-bound exact-head evidence already recorded. Independent verification remains unsigned until new exact-head CI runs on this reconciliation branch.",
+  "tasks": [
+    {
+      "task_id": "P1-EVID-01",
+      "head_sha": "1a66b2212c438cdc8d77ba912160d46682775a94",
+      "run_id": 36453604824,
+      "job_id": 109034199882,
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199882",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
+    },
+    {
+      "task_id": "P1-EVID-02",
+      "head_sha": "1a66b2212c438cdc8d77ba912160d46682775a94",
+      "run_id": 36453604802,
+      "job_id": 109034199519,
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199519",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
+    },
+    {
+      "task_id": "P1-EVID-03",
+      "head_sha": "1a66b2212c438cdc8d77ba912160d46682775a94",
+      "run_id": 36453604787,
+      "job_id": 109034199390,
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199390",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
+    },
+    {
+      "task_id": "P1-EVID-04",
+      "head_sha": "1a66b2212c438cdc8d77ba912160d46682775a94",
+      "run_id": 36453604812,
+      "job_id": 109034199375,
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034199375",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
+    },
+    {
+      "task_id": "P1-EVID-05",
+      "head_sha": "52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+      "run_id": 36352236430,
+      "job_id": 108713003767,
+      "evidence": [
+        "git-head:52acf3c531af849e8793e8c88ff663c4ddd1bef8",
+        "github-actions-job:108713003767",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
+        "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8"
+      ]
+    },
+    {
+      "task_id": "P1-EVID-06",
+      "head_sha": "1a66b2212c438cdc8d77ba912160d46682775a94",
+      "run_id": 36453604810,
+      "job_id": 109034204451,
+      "evidence": [
+        "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
+        "github-actions-job:109034204451",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+      ]
+    }
+  ]
+}
