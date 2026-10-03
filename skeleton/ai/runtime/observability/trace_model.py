@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import re
 from typing import Mapping
 
@@ -88,6 +89,8 @@ def _safe_scalar(name: str, value: object) -> str | int | float | bool | None:
     if value is None or isinstance(value, (str, int, float, bool)):
         if isinstance(value, str) and len(value) > 1024:
             raise TraceModelError(f"{name} exceeds maximum value length")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise TraceModelError(f"{name} must be finite")
         return value
     raise TraceModelError(f"{name} must be a JSON scalar")
 
@@ -213,6 +216,17 @@ class SpanEvidence:
         object.__setattr__(self, "end_ns", _ns("end_ns", self.end_ns))
         if self.end_ns < self.start_ns:
             raise TraceModelError("span end cannot predate span start")
+        if not isinstance(self.attributes, tuple):
+            raise TraceModelError("attributes must be an immutable tuple")
+        keys = [
+            item[0]
+            for item in self.attributes
+            if isinstance(item, tuple) and len(item) == 2
+        ]
+        if len(keys) != len(self.attributes):
+            raise TraceModelError("attributes must contain key/value pairs")
+        if len(keys) != len(set(keys)):
+            raise TraceModelError("trace attribute keys must be unique")
         canonical = sanitize_trace_attributes(dict(self.attributes))
         object.__setattr__(self, "attributes", canonical)
         if self.telemetry_authoritative is not False:
