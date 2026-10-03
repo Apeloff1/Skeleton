@@ -45,6 +45,15 @@ class TrainingMethod(str, Enum):
     CURRICULUM = "curriculum"
     ADVERSARIAL_ROBUSTNESS = "adversarial_robustness"
     MULTIVIEW_GROUNDING = "multiview_grounding"
+    DENOISING_AUTOENCODING = "denoising_autoencoding"
+    SEQUENCE_TO_SEQUENCE = "sequence_to_sequence"
+    REWARD_MODELING = "reward_modeling"
+    REINFORCEMENT_TRACE = "reinforcement_trace"
+    IMITATION = "imitation"
+    RETRIEVAL_AUGMENTED = "retrieval_augmented"
+    PSEUDO_LABEL = "pseudo_label"
+    MULTITASK = "multitask"
+    ACTIVE_LEARNING = "active_learning"
 
 
 DEFAULT_TEXT_METHODS = (
@@ -126,6 +135,11 @@ class TrainingExample:
     teacher_response: str | None = None
     positive_text: str | None = None
     negative_text: str | None = None
+    retrieval_context: str | None = None
+    trajectory: str | None = None
+    pseudo_label: str | None = None
+    task_id: str | None = None
+    reward: float | None = None
     difficulty: float = 0.5
     source_ref: str = "source:unspecified"
     replay: bool = False
@@ -168,6 +182,37 @@ class TrainingExample:
             "negative_text",
             _clean_text(self.negative_text, "negative_text"),
         )
+        object.__setattr__(
+            self,
+            "retrieval_context",
+            _clean_text(self.retrieval_context, "retrieval_context"),
+        )
+        object.__setattr__(
+            self,
+            "trajectory",
+            _clean_text(self.trajectory, "trajectory"),
+        )
+        object.__setattr__(
+            self,
+            "pseudo_label",
+            _clean_text(self.pseudo_label, "pseudo_label"),
+        )
+        object.__setattr__(
+            self,
+            "task_id",
+            _clean_text(self.task_id, "task_id"),
+        )
+        if self.reward is not None:
+            object.__setattr__(
+                self,
+                "reward",
+                _finite(
+                    self.reward,
+                    "reward",
+                    minimum=-1_000_000.0,
+                    maximum=1_000_000.0,
+                ),
+            )
         object.__setattr__(
             self,
             "difficulty",
@@ -213,6 +258,11 @@ class TrainingExample:
                 "teacher_response": self.teacher_response,
                 "positive_text": self.positive_text,
                 "negative_text": self.negative_text,
+                "retrieval_context": self.retrieval_context,
+                "trajectory": self.trajectory,
+                "pseudo_label": self.pseudo_label,
+                "task_id": self.task_id,
+                "reward": self.reward,
                 "difficulty": self.difficulty,
                 "source_ref": self.source_ref,
                 "replay": self.replay,
@@ -494,6 +544,142 @@ def _adversarial(example: TrainingExample) -> str:
     )
 
 
+def _denoising(
+    example: TrainingExample,
+    ratio: float,
+) -> str:
+    source = f"{example.prompt}\n{example.response}"
+    tokens = list(_TOKEN.findall(source))
+    if not tokens:
+        return "<|denoise_input|>\n<mask>\n<|clean_target|>\n" + source
+    span = max(1, int(round(len(tokens) * ratio)))
+    seed = int(example.digest[16:32], 16)
+    start = seed % max(1, len(tokens) - span + 1)
+    corrupted = list(tokens)
+    corrupted[start : start + span] = ["<noise>"]
+    return (
+        "<|denoise_input|>\n"
+        + " ".join(corrupted)
+        + "\n<|clean_target|>\n"
+        + source
+    )
+
+
+def _seq2seq(example: TrainingExample) -> str:
+    return (
+        "<|source|>\n"
+        + example.prompt
+        + "\n<|target|>\n"
+        + example.response
+    )
+
+
+def _reward_modeling(example: TrainingExample) -> str | None:
+    if example.reward is None:
+        return None
+    rejected = (
+        ""
+        if example.rejected_response is None
+        else "\n<|rejected|>\n" + example.rejected_response
+    )
+    return (
+        "<|reward_prompt|>\n"
+        + example.prompt
+        + "\n<|candidate|>\n"
+        + example.response
+        + rejected
+        + "\n<|reward|>\n"
+        + f"{example.reward:.9g}"
+    )
+
+
+def _reinforcement(example: TrainingExample) -> str | None:
+    if example.trajectory is None or example.reward is None:
+        return None
+    return (
+        "<|state|>\n"
+        + example.prompt
+        + "\n<|trajectory|>\n"
+        + example.trajectory
+        + "\n<|reward|>\n"
+        + f"{example.reward:.9g}"
+        + "\n<|improved_target|>\n"
+        + example.response
+    )
+
+
+def _imitation(example: TrainingExample) -> str:
+    demonstration = (
+        example.trajectory
+        if example.trajectory is not None
+        else example.response
+    )
+    return (
+        "<|observation|>\n"
+        + example.prompt
+        + "\n<|demonstration|>\n"
+        + demonstration
+        + "\n<|behavior_target|>\n"
+        + example.response
+    )
+
+
+def _retrieval(example: TrainingExample) -> str | None:
+    if example.retrieval_context is None:
+        return None
+    return (
+        "<|retrieved_evidence|>\n"
+        + example.retrieval_context
+        + "\n<|question|>\n"
+        + example.prompt
+        + "\n<|grounded_answer|>\n"
+        + example.response
+    )
+
+
+def _pseudo_label(example: TrainingExample) -> str | None:
+    label = (
+        example.pseudo_label
+        if example.pseudo_label is not None
+        else example.teacher_response
+    )
+    if label is None:
+        return None
+    return (
+        "<|unlabeled_input|>\n"
+        + example.prompt
+        + "\n<|pseudo_label|>\n"
+        + label
+        + "\n<|verified_target|>\n"
+        + example.response
+    )
+
+
+def _multitask(example: TrainingExample) -> str | None:
+    task = example.task_id
+    if task is None and example.tags:
+        task = ",".join(example.tags)
+    if task is None:
+        return None
+    return (
+        "<|task|>\n"
+        + task
+        + "\n<|input|>\n"
+        + example.prompt
+        + "\n<|output|>\n"
+        + example.response
+    )
+
+
+def _active_learning(example: TrainingExample) -> str:
+    return (
+        "<|active_learning difficulty="
+        + f"{example.difficulty:.6f}"
+        + "|>\n"
+        + _supervised(example)
+    )
+
+
 def _multiview(
     example: TrainingExample,
     *,
@@ -550,6 +736,29 @@ def _method_rows(
             example,
             limit=policy.max_camera_views_per_example,
         )
+    if method is TrainingMethod.DENOISING_AUTOENCODING:
+        return ((_denoising(example, policy.span_mask_ratio), {}),)
+    if method is TrainingMethod.SEQUENCE_TO_SEQUENCE:
+        return ((_seq2seq(example), {}),)
+    if method is TrainingMethod.REWARD_MODELING:
+        value = _reward_modeling(example)
+        return () if value is None else ((value, {}),)
+    if method is TrainingMethod.REINFORCEMENT_TRACE:
+        value = _reinforcement(example)
+        return () if value is None else ((value, {}),)
+    if method is TrainingMethod.IMITATION:
+        return ((_imitation(example), {}),)
+    if method is TrainingMethod.RETRIEVAL_AUGMENTED:
+        value = _retrieval(example)
+        return () if value is None else ((value, {}),)
+    if method is TrainingMethod.PSEUDO_LABEL:
+        value = _pseudo_label(example)
+        return () if value is None else ((value, {}),)
+    if method is TrainingMethod.MULTITASK:
+        value = _multitask(example)
+        return () if value is None else ((value, {}),)
+    if method is TrainingMethod.ACTIVE_LEARNING:
+        return ((_active_learning(example), {}),)
     raise TrainingMethodError("unsupported training method")
 
 
