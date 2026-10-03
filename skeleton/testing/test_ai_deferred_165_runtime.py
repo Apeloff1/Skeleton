@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -934,4 +935,137 @@ def test_deferred_executor_rejects_invalid_byte_limits() -> None:
             Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
             max_result_bytes=True,
         )
+
+def test_deferred_executor_prepare_binds_current_authority() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare(
+        "VOL-160",
+        "prepared",
+        payload,
+        cost_units=1,
+        latency_ms=1,
+    )
+    assert invocation.spec_digest==record.spec.digest
+    assert invocation.authority_digest==DeferredExecutor.authority_digest(record)
+    assert invocation.payload_digest==DeferredExecutor.digest_payload(payload)
+
+
+def test_deferred_executor_success_replay_rechecks_current_authority() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","stale-replay",payload)
+    executor.execute(invocation,payload)
+
+    record.transition("verified")
+
+    with pytest.raises(PermissionError,match="authority digest drift"):
+        executor.execute(invocation,payload)
+
+    assert calls==[{"value":1}]
+
+
+def test_deferred_executor_same_operation_cannot_execute_concurrently() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    entered=threading.Event()
+    release=threading.Event()
+    calls=[]
+
+    def handler(payload):
+        calls.append(payload)
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","race-op",payload)
+    worker_errors=[]
+
+    def run_first():
+        try:
+            executor.execute(invocation,payload)
+        except BaseException as exc:
+            worker_errors.append(exc)
+
+    thread=threading.Thread(target=run_first)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    with pytest.raises(RuntimeError,match="already in flight"):
+        executor.execute(invocation,payload)
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert worker_errors==[]
+    assert calls==[{"value":1}]
+
+
+def test_deferred_executor_baseexception_releases_inflight_reservation() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+
+    class StopExecution(BaseException):
+        pass
+
+    def handler(payload):
+        calls.append(payload)
+        if len(calls)==1:
+            raise StopExecution()
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","baseexception",payload)
+
+    with pytest.raises(StopExecution):
+        executor.execute(invocation,payload)
+
+    outcome=executor.execute(invocation,payload)
+    assert outcome.result=={"ok":True}
+    assert calls==[{"value":1},{"value":1}]
 
