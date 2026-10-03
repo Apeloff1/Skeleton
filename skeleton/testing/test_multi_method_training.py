@@ -38,6 +38,7 @@ def _full_example() -> TrainingExample:
             "camera-view-sha256:" + ("a" * 64),
             "camera-view-sha256:" + ("b" * 64),
         ),
+        camera_coverage_digest="c" * 64,
         tags=("vision", "grounding"),
     )
 
@@ -338,3 +339,31 @@ def test_compatible_methods_exclude_missing_signal_families() -> None:
     assert TrainingMethod.CONTRASTIVE not in compatible
     assert TrainingMethod.MULTIVIEW_GROUNDING not in compatible
     assert TrainingMethod.REINFORCEMENT_TRACE not in compatible
+
+
+def test_camera_refs_require_coverage_identity() -> None:
+    import pytest
+
+    with pytest.raises(
+        TrainingMethodError,
+        match="camera_view_refs require camera_coverage_digest",
+    ):
+        TrainingExample(
+            example_id="camera-without-coverage",
+            prompt="Describe the view.",
+            response="A stable object.",
+            camera_view_refs=(
+                "camera-view-sha256:" + ("a" * 64),
+            ),
+        )
+
+    with pytest.raises(
+        TrainingMethodError,
+        match="camera_coverage_digest requires camera_view_refs",
+    ):
+        TrainingExample(
+            example_id="coverage-without-camera",
+            prompt="Describe the view.",
+            response="A stable object.",
+            camera_coverage_digest="b" * 64,
+        )
