@@ -26,6 +26,7 @@ from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
     AdmissionError,
     AdmissionRequest,
+    ResourceBudget,
     UsageEstimate,
 )
 from skeleton.intelligence.admission_runtime import (
@@ -128,6 +129,96 @@ def _usage_payload(usage: UsageEstimate) -> dict[str, int | float]:
         field: getattr(usage, field)
         for field in _USAGE_FIELDS
     }
+
+
+def _usage_from_payload(value: object) -> UsageEstimate:
+    if not isinstance(value, dict):
+        raise CostGovernorError("usage journal payload is invalid")
+    try:
+        return UsageEstimate(
+            input_tokens=int(value["input_tokens"]),
+            output_tokens=int(value["output_tokens"]),
+            cost_usd=float(value["cost_usd"]),
+            wall_seconds=float(value["wall_seconds"]),
+            provider_attempts=int(value["provider_attempts"]),
+            tool_calls=int(value["tool_calls"]),
+            artifact_bytes=int(value["artifact_bytes"]),
+            storage_bytes=int(value["storage_bytes"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "usage journal payload is invalid"
+        ) from exc
+
+
+def _budget_from_payload(value: object) -> ResourceBudget:
+    if not isinstance(value, dict):
+        raise CostGovernorError("budget journal payload is invalid")
+    try:
+        return ResourceBudget(
+            max_input_tokens=int(value["max_input_tokens"]),
+            max_output_tokens=int(value["max_output_tokens"]),
+            max_cost_usd=float(value["max_cost_usd"]),
+            max_wall_seconds=float(value["max_wall_seconds"]),
+            max_provider_attempts=int(value["max_provider_attempts"]),
+            max_tool_calls=int(value["max_tool_calls"]),
+            max_artifact_bytes=int(value["max_artifact_bytes"]),
+            max_storage_bytes=int(value["max_storage_bytes"]),
+            max_concurrency=int(value["max_concurrency"]),
+            max_queue_depth=int(value["max_queue_depth"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "budget journal payload is invalid"
+        ) from exc
+
+
+def _effective_terminal_actual(
+    reported: UsageEstimate,
+    completion: QuotaCompletion,
+) -> UsageEstimate:
+    observed = completion.actual
+    return UsageEstimate(
+        input_tokens=max(reported.input_tokens, observed.input_tokens),
+        output_tokens=max(reported.output_tokens, observed.output_tokens),
+        cost_usd=max(reported.cost_usd, observed.cost_usd),
+        wall_seconds=reported.wall_seconds,
+        provider_attempts=reported.provider_attempts,
+        tool_calls=max(reported.tool_calls, observed.tool_calls),
+        artifact_bytes=max(
+            reported.artifact_bytes,
+            observed.artifact_bytes,
+        ),
+        storage_bytes=max(
+            reported.storage_bytes,
+            observed.storage_bytes,
+        ),
+    )
+
+
+def _budget_overrun_dimensions(
+    budget: ResourceBudget,
+    actual: UsageEstimate,
+) -> tuple[str, ...]:
+    limits: dict[str, int | float] = {
+        "input_tokens": budget.max_input_tokens,
+        "output_tokens": budget.max_output_tokens,
+        "cost_usd": budget.max_cost_usd,
+        "wall_seconds": budget.max_wall_seconds,
+        "provider_attempts": budget.max_provider_attempts,
+        "tool_calls": budget.max_tool_calls,
+        "artifact_bytes": budget.max_artifact_bytes,
+        "storage_bytes": budget.max_storage_bytes,
+    }
+    exceeded: list[str] = []
+    for field, limit in limits.items():
+        value = getattr(actual, field)
+        if field in {"cost_usd", "wall_seconds"}:
+            if float(value) > float(limit) + 1e-12:
+                exceeded.append(field)
+        elif int(value) > int(limit):
+            exceeded.append(field)
+    return tuple(exceeded)
 
 
 def _request_digest(request: AdmissionRequest) -> str:
@@ -606,6 +697,36 @@ def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class _CostCompletionIntent:
+    actual: UsageEstimate
+    budget: ResourceBudget
+    evidence_digest: str
+
+
+def _completion_intent_from_payload(
+    value: object,
+) -> _CostCompletionIntent:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        )
+    try:
+        evidence = _sha256(
+            "completion intent evidence_digest",
+            value["evidence_digest"],
+        )
+        return _CostCompletionIntent(
+            actual=_usage_from_payload(value["actual"]),
+            budget=_budget_from_payload(value["budget"]),
+            evidence_digest=evidence,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        ) from exc
+
+
+@dataclass(frozen=True, slots=True)
 class _CostJournalRecord:
     operation_id: str
     tenant_id: str
@@ -615,6 +736,7 @@ class _CostJournalRecord:
     state: str
     terminal: CostDecision | None
     evidence_digest: str | None
+    completion_intent: _CostCompletionIntent | None
 
 
 class _SqliteCostGovernorJournal:
@@ -630,6 +752,7 @@ class _SqliteCostGovernorJournal:
         state TEXT NOT NULL,
         terminal_json TEXT,
         evidence_digest TEXT,
+        completion_intent_json TEXT,
         CHECK (
             state IN (
                 'active',
@@ -645,6 +768,19 @@ class _SqliteCostGovernorJournal:
         self.path = Path(path)
         with self._connect() as conn:
             conn.execute(self._SCHEMA)
+            columns = {
+                str(row["name"])
+                for row in conn.execute(
+                    "PRAGMA table_info(cost_governor_journal)"
+                ).fetchall()
+            }
+            if "completion_intent_json" not in columns:
+                conn.execute(
+                    """
+                    ALTER TABLE cost_governor_journal
+                    ADD COLUMN completion_intent_json TEXT
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.path), isolation_level=None)
@@ -696,6 +832,16 @@ class _SqliteCostGovernorJournal:
                 None
                 if row["evidence_digest"] is None
                 else str(row["evidence_digest"])
+            ),
+            completion_intent=(
+                None
+                if row["completion_intent_json"] is None
+                else _completion_intent_from_payload(
+                    cls._decode_json(
+                        row["completion_intent_json"],
+                        "completion_intent",
+                    )
+                )
             ),
         )
 
@@ -751,6 +897,10 @@ class _SqliteCostGovernorJournal:
                 if existing.reservation != reservation:
                     raise CostGovernorConflict(
                         "release journal receipt mismatch"
+                    )
+                if existing.completion_intent is not None:
+                    raise CostGovernorConflict(
+                        "completion intent cannot be released as unspent"
                     )
                 if existing.state == "active":
                     conn.execute(
@@ -880,6 +1030,114 @@ class _SqliteCostGovernorJournal:
             raise CostGovernorError("cost journal active write was lost")
         return loaded
 
+    def record_completion_intent(
+        self,
+        operation_id: str,
+        *,
+        actual: UsageEstimate,
+        budget: ResourceBudget,
+        evidence_digest: str,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        if not isinstance(actual, UsageEstimate):
+            raise TypeError("actual must be UsageEstimate")
+        if not isinstance(budget, ResourceBudget):
+            raise TypeError("budget must be ResourceBudget")
+        evidence = _sha256("evidence_digest", evidence_digest)
+        payload = _canonical_json_text(
+            {
+                "actual": _usage_payload(actual),
+                "budget": budget.as_dict(),
+                "evidence_digest": evidence,
+            }
+        )
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "completion intent requires active cost journal"
+                    )
+                existing = self._record(row)
+                if existing.state != "active":
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot accept completion intent"
+                    )
+                requested = _CostCompletionIntent(
+                    actual=actual,
+                    budget=budget,
+                    evidence_digest=evidence,
+                )
+                if existing.completion_intent is None:
+                    conn.execute(
+                        """
+                        UPDATE cost_governor_journal
+                        SET completion_intent_json = ?
+                        WHERE operation_id = ?
+                        """,
+                        (payload, operation),
+                    )
+                elif existing.completion_intent != requested:
+                    raise CostGovernorConflict(
+                        "completion intent replayed with different inputs"
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("completion intent write was lost")
+        return loaded
+
+    def clear_completion_intent(
+        self,
+        operation_id: str,
+    ) -> _CostJournalRecord:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "completion intent clear requires cost journal"
+                    )
+                existing = self._record(row)
+                if existing.terminal is not None:
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot clear completion intent"
+                    )
+                conn.execute(
+                    """
+                    UPDATE cost_governor_journal
+                    SET completion_intent_json = NULL
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(operation)
+        if loaded is None:
+            raise CostGovernorError("completion intent clear was lost")
+        return loaded
+
     def record_terminal(
         self,
         decision: CostDecision,
@@ -951,6 +1209,7 @@ class _SqliteCostGovernorJournal:
 class _ActiveCostReservation:
     requested_request_digest: str
     receipt: CostReservation
+    budget: ResourceBudget
 
 
 class CostGovernor:
@@ -1174,6 +1433,7 @@ class CostGovernor:
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
                 receipt=receipt,
+                budget=request.budget,
             )
             return receipt
 
@@ -1297,6 +1557,8 @@ class CostGovernor:
         quota_reservation: QuotaReservation,
         quota_completion: QuotaCompletion,
         refs: tuple[EvidenceRef, ...],
+        operation_overrun_dimensions: tuple[str, ...] = (),
+        extra_reasons: tuple[str, ...] = (),
     ) -> CostDecision:
         ledger = self.runtime.quota_ledger
         if ledger is None:
@@ -1330,6 +1592,12 @@ class CostGovernor:
                 "cost-overrun:"
                 + ",".join(quota_completion.overrun_dimensions)
             )
+        if operation_overrun_dimensions:
+            reasons.append(
+                "operation-budget-overrun:"
+                + ",".join(operation_overrun_dimensions)
+            )
+        reasons.extend(extra_reasons)
         normalized = tuple(sorted(set(reasons)))
         return CostDecision(
             operation_id=operation_id,
@@ -1397,10 +1665,47 @@ class CostGovernor:
                 raise CostGovernorError(
                     "durable completion lookup failed"
                 ) from exc
-            if completion is None:
-                raise CostGovernorError(
-                    "operation has no durable completed accounting"
+
+            intent = record.completion_intent
+            if intent is not None and intent.evidence_digest != evidence:
+                raise CostGovernorConflict(
+                    "completed recovery replayed with different evidence"
                 )
+
+            if completion is None:
+                if intent is None:
+                    raise CostGovernorError(
+                        "operation has no durable completed accounting"
+                    )
+                try:
+                    completion = ledger.complete(
+                        record.quota_reservation.reservation_id,
+                        intent.actual,
+                    )
+                except QuotaConflict as exc:
+                    if str(exc).startswith("actual_usage_unknown:"):
+                        raise CostGovernorError(str(exc)) from exc
+                    raise CostGovernorConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise CostGovernorError(
+                        "durable completion recovery failed"
+                    ) from exc
+
+            if intent is None:
+                overrun_dimensions: tuple[str, ...] = ()
+                recovery_reasons = (
+                    "operation-budget-recovery-intent-missing",
+                )
+            else:
+                effective_actual = _effective_terminal_actual(
+                    intent.actual,
+                    completion,
+                )
+                overrun_dimensions = _budget_overrun_dimensions(
+                    intent.budget,
+                    effective_actual,
+                )
+                recovery_reasons = ()
 
             decision = self._completed_decision(
                 operation_id=operation,
@@ -1408,6 +1713,8 @@ class CostGovernor:
                 quota_reservation=record.quota_reservation,
                 quota_completion=completion,
                 refs=refs,
+                operation_overrun_dimensions=overrun_dimensions,
+                extra_reasons=recovery_reasons,
             )
             journal.record_terminal(
                 decision,
@@ -1428,11 +1735,20 @@ class CostGovernor:
         if not isinstance(actual, UsageEstimate):
             raise TypeError("actual must be UsageEstimate")
         refs = _validated_evidence_refs(evidence_refs)
+        evidence = _evidence_digest(refs)
         with self._lock:
             active = self._active.get(operation)
             if active is None:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
+                )
+            journal = self._journal
+            if journal is not None:
+                journal.record_completion_intent(
+                    operation,
+                    actual=actual,
+                    budget=active.budget,
+                    evidence_digest=evidence,
                 )
             try:
                 completion: AdmissionCompletion = self.runtime.complete(
@@ -1441,9 +1757,17 @@ class CostGovernor:
                     now_wall=now_wall,
                 )
             except AdmissionRuntimeConflict as exc:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
                 raise CostGovernorConflict(str(exc)) from exc
             except AdmissionRuntimeError as exc:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
                 raise CostGovernorError(str(exc)) from exc
+            except ValueError:
+                if journal is not None:
+                    journal.clear_completion_intent(operation)
+                raise
 
             # The runtime lease is terminal after complete(). From this point on
             # recovery must use the durable journal + quota completion.
@@ -1461,11 +1785,14 @@ class CostGovernor:
                     quota_reservation=quota_reservation,
                     quota_completion=quota_completion,
                     refs=refs,
+                    operation_overrun_dimensions=(
+                        completion.operation_overrun_dimensions
+                    ),
                 )
-                if self._journal is not None:
-                    self._journal.record_terminal(
+                if journal is not None:
+                    journal.record_terminal(
                         decision,
-                        evidence_digest=_evidence_digest(refs),
+                        evidence_digest=evidence,
                     )
                 return decision
             except CostGovernorError:
