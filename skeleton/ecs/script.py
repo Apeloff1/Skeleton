@@ -23,7 +23,6 @@ import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import CodeType, FunctionType
-import builtins
 from typing import Any
 
 from skeleton.simulation.ecs.errors import (
@@ -150,7 +149,7 @@ class ScriptInstance:
 
 def _execute_validated_code(code: CodeType, namespace: dict[str, Any]) -> None:
     """Execute only code that already passed the sandbox policy and rewrite pipeline."""
-    builtins.exec(code, namespace)
+    FunctionType(code, namespace, "<sandbox-module>")()
 
 
 def _script_line(exc: BaseException) -> int | None:
