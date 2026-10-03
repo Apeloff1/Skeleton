@@ -10,6 +10,8 @@ on:
       - "skeleton/testing/test_mirror_room_observability.py"
       - "frontend/features/MirrorRoom/**"
       - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
+      - "frontend/utils/routeRegistry.ts"
       - "backend/routes/mirror_room.py"
       - ".github/workflows/mirror-room-extensions.yml"
   push:
@@ -23,6 +25,8 @@ on:
       - "skeleton/testing/test_mirror_room_observability.py"
       - "frontend/features/MirrorRoom/**"
       - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
+      - "frontend/utils/routeRegistry.ts"
       - "backend/routes/mirror_room.py"
       - ".github/workflows/mirror-room-extensions.yml"
   workflow_dispatch:
