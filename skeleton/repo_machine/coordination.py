@@ -16,10 +16,11 @@ class CoordinationDecision:
 
 @dataclass(frozen=True, slots=True)
 class CoordinationPlan:
-    repository_fingerprint:str; decisions:tuple[CoordinationDecision,...]; bottleneck:str|None; frontier_size:int; max_parallelism:int=0; coordination_pressure:int=0; graph_fingerprint:str=""
+    repository_fingerprint:str; decisions:tuple[CoordinationDecision,...]; bottleneck:str|None; frontier_size:int; max_parallelism:int=0; coordination_pressure:int=0; graph_fingerprint:str=""; safe_parallel_groups:tuple[tuple[str,...],...]=()
     def as_dict(self)->dict[str,object]:
         return {"repository_fingerprint":self.repository_fingerprint,"decisions":[d.as_dict() for d in self.decisions],"bottleneck":self.bottleneck,
-                "frontier_size":self.frontier_size,"max_parallelism":self.max_parallelism,"coordination_pressure":self.coordination_pressure,"graph_fingerprint":self.graph_fingerprint}
+                "frontier_size":self.frontier_size,"max_parallelism":self.max_parallelism,"coordination_pressure":self.coordination_pressure,"graph_fingerprint":self.graph_fingerprint,
+                "safe_parallel_groups":[list(group) for group in self.safe_parallel_groups]}
 
 def _confidence(node:WorkNode)->int:
     value=node.topology_confidence+(10 if node.verification_paths else 0)-(10 if node.readiness=="gated" else 0)+min(10,node.decision_score//10)
@@ -47,8 +48,9 @@ def select_next_work(model:RepositoryModel,*,completed:tuple[str,...]=(),active_
     ready=graph.ready(completed,active_conflicts,limit=limit); blocked=graph.blocked(completed)
     decisions=tuple(_decision(n,graph) for n in ready)
     if len(decisions)<limit: decisions+=tuple(_decision(n,graph,True) for n in blocked[:limit-len(decisions)])
+    groups=graph.safe_parallel_groups(completed,limit=min(8,limit))
     return CoordinationPlan(model.fingerprint,decisions,graph.bottleneck(completed),len(graph.frontier(completed)),graph.max_parallelism(completed),
-                            graph.pressure(),graph.fingerprint)
+                            graph.pressure(),graph.fingerprint,groups)
 
 def build_coordination_plan(model:RepositoryModel,*,limit:int=8,graph:WorkGraph|None=None)->dict[str,object]:
     return select_next_work(model,limit=limit,graph=graph).as_dict()
