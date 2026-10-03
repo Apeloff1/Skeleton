@@ -257,14 +257,15 @@ export class WasmCompiler {
 
     // Get AST
     let astOutput = '';
+    const astSourceName = '__galaxy_ast_source__';
     try {
+      // Transfer caller source through the Pyodide globals bridge. This keeps
+      // untrusted text out of the Python program string entirely.
+      this.pyodide.globals.set(astSourceName, code);
       await this.pyodide.runPythonAsync(`
 import ast
-import sys
-from io import StringIO
 
-code = '''${code.replace(/'/g, "\\'")}'''
-
+code = __galaxy_ast_source__
 try:
     tree = ast.parse(code)
     ast_dump = ast.dump(tree, indent=2)
@@ -274,6 +275,12 @@ except SyntaxError as e:
       astOutput = await this.pyodide.runPythonAsync('ast_dump');
     } catch (e: any) {
       astOutput = `Parse error: ${e.message}`;
+    } finally {
+      try {
+        this.pyodide.globals.delete(astSourceName);
+      } catch {
+        // Best-effort cleanup only; the bridged value is caller source.
+      }
     }
 
     stages[1].status = 'completed';
