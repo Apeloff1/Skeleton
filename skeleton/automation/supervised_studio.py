@@ -588,7 +588,9 @@ def propose(
                         output=list(validation_output),
                     )
                     _git("reset", "--hard", "HEAD", check=False)
-                    _git("clean", "-fd", "--", *[path for path in task.paths if not Path(path).exists()], check=False)
+                    if new_paths:
+                        _git("clean", "-fd", "--", *new_paths, check=False)
+                    journal_path.unlink(missing_ok=True)
                     continue
                 transaction["phase"] = "validated"
                 transaction["applied_diff_sha256"] = candidate_diff_sha
@@ -617,6 +619,15 @@ def propose(
                 _write_transaction(journal_path, transaction)
                 journal_path.unlink(missing_ok=True)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                _git("reset", "--hard", "HEAD", check=False)
+                try:
+                    pending = _load_transaction(journal_path)
+                    pending_new = pending.get("new_paths", []) if pending else []
+                    if isinstance(pending_new, list) and pending_new:
+                        _git("clean", "-fd", "--", *[_canonical_path(str(p)) for p in pending_new[:8]], check=False)
+                    journal_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
                 audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
     except BaseException:
         _git("reset", "--hard", "HEAD", check=False)
