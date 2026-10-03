@@ -1,8 +1,9 @@
 """Offline builders for content-addressed local recurrent model artifacts.
 
-The base builder accepts plain UTF-8 corpora.  The multi-method builder accepts
+The base builder accepts plain UTF-8 corpora and keeps the legacy Elman
+architecture as its compatibility default. The multi-method builder accepts
 structured TrainingExample values, compiles them through the deterministic
-training-method planner, and trains the exact same local recurrent backend.
+training-method planner, and defaults to the gated recurrent backend.
 
 Both paths converge on one atomic artifact writer and one model identity.
 """
