@@ -126,3 +126,37 @@ def test_builder_output_is_strict_finite_json(tmp_path: Path) -> None:
     )
     assert payload["schema_version"] == "skeleton.numpy_recurrent_lm.v1"
     assert payload["model_digest"] == receipt["model_digest"]
+
+
+def test_training_module_import_does_not_require_numpy() -> None:
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent(
+        """
+        import builtins
+        import sys
+
+        real_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name == "numpy" or name.startswith("numpy."):
+                raise ModuleNotFoundError("numpy intentionally unavailable")
+            return real_import(name, *args, **kwargs)
+
+        builtins.__import__ = guarded_import
+        import skeleton.ai.runtime.inference.train as training
+        assert hasattr(training, "build_recurrent_artifact")
+        assert "skeleton.ai.runtime.inference.neural" not in sys.modules
+        assert "skeleton.ai.runtime.inference.gated_neural" not in sys.modules
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=".",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
