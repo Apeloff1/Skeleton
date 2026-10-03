@@ -321,6 +321,59 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def _transaction_journal_path(patch_path: Path) -> Path:
+    return patch_path.with_name(f".{patch_path.name}.transaction.json")
+
+
+def _write_transaction(path: Path, payload: Mapping[str, Any]) -> None:
+    body = dict(payload)
+    body.pop("journal_sha256", None)
+    body["journal_sha256"] = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    _atomic_write(path, json.dumps(body, sort_keys=True, indent=2) + "\n")
+
+
+def _load_transaction(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    if path.is_symlink() or path.stat().st_size > 256_000:
+        raise RuntimeError("Studio transaction journal is unsafe")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("Studio transaction journal is malformed")
+    claimed = str(payload.pop("journal_sha256", ""))
+    actual = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    if claimed != actual:
+        raise RuntimeError("Studio transaction journal integrity mismatch")
+    payload["journal_sha256"] = claimed
+    return payload
+
+
+def _recover_interrupted_transaction(path: Path) -> None:
+    journal = _load_transaction(path)
+    if journal is None:
+        return
+    phase = str(journal.get("phase", ""))
+    if phase == "committed":
+        path.unlink(missing_ok=True)
+        return
+    base = str(journal.get("base_commit_sha", ""))
+    current = _git("rev-parse", "HEAD").strip()
+    if base and current != base:
+        raise RuntimeError("cannot recover Studio transaction after HEAD changed")
+    _git("reset", "--hard", "HEAD", check=False)
+    new_paths = journal.get("new_paths", [])
+    if isinstance(new_paths, list) and new_paths:
+        safe = [_canonical_path(str(item)) for item in new_paths[:8]]
+        _git("clean", "-fd", "--", *safe, check=False)
+    if _git("status", "--porcelain=v1", "--untracked-files=all").strip():
+        raise RuntimeError("Studio transaction recovery could not restore clean worktree")
+    path.unlink(missing_ok=True)
+
+
 def propose(
     *,
     patch_path: Path,
