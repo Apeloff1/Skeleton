@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.0",
+  "tree_version": "1.6.2",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "f55c0dd337c92c4e1f90d41a8ec030300549add3",
+      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -94,7 +94,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "713bb89d7c141db4b602190f5dd1a3e5d5fc1b2e",
+      "source_git_object_sha": "41a2a9b54e37ce50322ed444b453c3d026500bd3",
       "role": "canonical operation/conversation/context contracts",
       "work_package_refs": [
         "WP-W00",
@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "2bcda9309122adbff02eabf6ec4b269ba6a2bf67",
+      "source_git_object_sha": "779b9d94b91c06cf8037449fb80217ad73caab2c",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -149,7 +149,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "44c3ed81170346e1812c39b60f4ef9a8b262a82c",
+      "source_git_object_sha": "e795e85e081e7619015132a90c196c55f5668c29",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -200,7 +200,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "dbc761041288560f50b4616d0bc756dc2fd70c5d",
+      "source_git_object_sha": "216e8c8f49ab8ae09940ffcfa3c421b4bfa1ff92",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -352,7 +352,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "06b591323243b6619eb3ebf9aeec3f86dea4b584",
+      "source_git_object_sha": "c966370b80a04e46f13a553c32d655a0c48df427",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -454,7 +454,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "4eba36de0929d86e685f9a1a728255ad4e5218ad",
+      "source_git_object_sha": "e9e5cddc61cdfe9d76cd550b7a3106e61c65452f",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -689,7 +689,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "19c43b48d024e78122cd1366b5fe511868f268a8",
+      "source_git_object_sha": "376037bc7f3cd1ec14a200dd0fc53126fdb14d32",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "8308468e1dfb756bd531efd69cb9460a96b48a47",
+      "source_git_object_sha": "cf301feec9ebaf2ca1fcd4c406ca838e50a3cbe9",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -1386,7 +1386,7 @@
       "source": "skeleton/gate_plane",
       "destination": "skeleton/ai/runtime/policy/gate_plane",
       "kind": "tree",
-      "source_git_object_sha": "97c5170042a7c8319b0dc393812516c6d5aa785b",
+      "source_git_object_sha": "0b57d03553f18817ae5d4760bf9d7be8f08d4fbc",
       "role": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
       "work_package_refs": [
         "WP-W14",
@@ -4392,7 +4392,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "4f877b37278f8951e62f9028e91351cbc39728f8",
+      "source_git_object_sha": "39fe2b55156976d19a9db8ecb96a491d45c26cea",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -4855,7 +4855,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "b0ee5576e67fee44f29f3a755adfc1d2519bf233"
+      "source_git_object_sha": "3eee887a11b2acee992c6bdf7c29c259a7c4e63a"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
@@ -5969,6 +5969,13 @@
       "commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
       "state": "pending_app_assembly",
       "package": "react-native-worklets@0.13.0"
+    }
+  },
+  "reconciliation": {
+    "shared_main_exact_head_refresh": {
+      "head_sha": "299c7ed0b2aa0bf767b9adacd51f7e4cb1e672e1",
+      "refreshed_mapping_count": 11,
+      "policy": "Current-main semantic mapping metadata preserved; #2441 readiness/version corrections merged and all source identities recomputed against the reconciled repair tree."
     }
   }
 }
