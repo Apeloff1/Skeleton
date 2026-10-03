@@ -5737,8 +5737,8 @@
     },
     {
       "path": "skeleton/ops",
-      "owner": "operations/control plane",
-      "reason": "top-level operations and repository execution support remains outside canonical AI runtime ownership; AI-relevant integrations require explicit governed mapping"
+      "owner": "operations/release tooling",
+      "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
     }
   ],
   "classification_coverage": {
