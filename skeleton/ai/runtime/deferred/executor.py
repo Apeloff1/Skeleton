@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import re
+import threading
 from typing import Any, Callable, Mapping
 
 from .contracts import (
@@ -270,6 +271,8 @@ class DeferredExecutor:
         self._payload_limits: dict[str, int] = {}
         self._result_limits: dict[str, int] = {}
         self._fingerprints: dict[str, str] = {}
+        self._in_flight: set[str] = set()
+        self._lock = threading.RLock()
         self._success: dict[str, ExecutionReceipt] = {}
         self._success_result_json: dict[str, str] = {}
         self._failure: dict[str, FailureReceipt] = {}
@@ -340,6 +343,46 @@ class DeferredExecutor:
             }
         )
 
+    def prepare(
+        self,
+        volume_id: str,
+        operation_id: str,
+        payload: Mapping[str, Any],
+        *,
+        cost_units: int = 0,
+        latency_ms: int = 0,
+    ) -> DeferredInvocation:
+        record = self.registry.get(volume_id)
+        if record.state != "enabled":
+            raise PermissionError(f"capability {volume_id} is not enabled")
+        if volume_id not in self._handlers:
+            raise PermissionError("no host-registered handler")
+        if volume_id not in self._budgets:
+            raise PermissionError("no explicit execution budget")
+        return DeferredInvocation(
+            operation_id=operation_id,
+            volume_id=volume_id,
+            spec_digest=record.spec.digest,
+            authority_digest=self.authority_digest(record),
+            payload_digest=self.digest_payload(payload),
+            cost_units=cost_units,
+            latency_ms=latency_ms,
+        )
+
+    def _assert_current_authority(
+        self,
+        invocation: DeferredInvocation,
+    ) -> None:
+        record = self.registry.get(invocation.volume_id)
+        if record.spec.digest != invocation.spec_digest:
+            raise PermissionError("capability spec digest drift")
+        if self.authority_digest(record) != invocation.authority_digest:
+            raise PermissionError("capability authority digest drift")
+        if record.state != "enabled":
+            raise PermissionError(
+                f"capability {invocation.volume_id} is not enabled"
+            )
+
     def _admit(
         self,
         invocation: DeferredInvocation,
@@ -400,21 +443,25 @@ class DeferredExecutor:
         if not isinstance(invocation, DeferredInvocation):
             raise TypeError("invocation must be DeferredInvocation")
 
-        prior = self._success.get(invocation.operation_id)
-        if prior is not None:
-            if self._fingerprints.get(invocation.operation_id) != invocation.fingerprint:
-                raise ValueError("operation identity collision")
-            if self.digest_payload(payload) != invocation.payload_digest:
-                raise ValueError("payload digest mismatch")
-            return ExecutionOutcome(
-                receipt=prior,
-                result=json.loads(
-                    self._success_result_json[invocation.operation_id]
-                ),
-            )
-
-        handler, ledger, isolated = self._admit(invocation, payload)
-        self._fingerprints[invocation.operation_id] = invocation.fingerprint
+        with self._lock:
+            prior = self._success.get(invocation.operation_id)
+            if prior is not None:
+                if self._fingerprints.get(invocation.operation_id) != invocation.fingerprint:
+                    raise ValueError("operation identity collision")
+                if self.digest_payload(payload) != invocation.payload_digest:
+                    raise ValueError("payload digest mismatch")
+                self._assert_current_authority(invocation)
+                return ExecutionOutcome(
+                    receipt=prior,
+                    result=json.loads(
+                        self._success_result_json[invocation.operation_id]
+                    ),
+                )
+            if invocation.operation_id in self._in_flight:
+                raise RuntimeError("operation is already in flight")
+            handler, ledger, isolated = self._admit(invocation, payload)
+            self._fingerprints[invocation.operation_id] = invocation.fingerprint
+            self._in_flight.add(invocation.operation_id)
 
         try:
             result = handler.fn(isolated)
@@ -443,7 +490,9 @@ class DeferredExecutor:
                 error_type=type(exc).__name__,
                 error_digest=sha256_json(error_material),
             )
-            self._failure[invocation.operation_id] = failure
+            with self._lock:
+                self._failure[invocation.operation_id] = failure
+                self._in_flight.discard(invocation.operation_id)
             raise DeferredExecutionError(
                 "deferred capability execution failed",
                 failure,
@@ -461,8 +510,10 @@ class DeferredExecutor:
             cost_units=ledger.cost_units,
             latency_ms=ledger.latency_ms,
         )
-        self._success[invocation.operation_id] = receipt
-        self._success_result_json[invocation.operation_id] = result_json
+        with self._lock:
+            self._success[invocation.operation_id] = receipt
+            self._success_result_json[invocation.operation_id] = result_json
+            self._in_flight.discard(invocation.operation_id)
         return ExecutionOutcome(
             receipt=receipt,
             result=json.loads(result_json),
@@ -473,10 +524,11 @@ class DeferredExecutor:
         operation_id: str,
     ) -> ExecutionReceipt | FailureReceipt:
         operation_id = _text(operation_id, "operation_id")
-        if operation_id in self._success:
-            return self._success[operation_id]
-        if operation_id in self._failure:
-            return self._failure[operation_id]
+        with self._lock:
+            if operation_id in self._success:
+                return self._success[operation_id]
+            if operation_id in self._failure:
+                return self._failure[operation_id]
         raise KeyError("unknown operation id")
 
     def snapshot(self) -> dict[str, object]:
