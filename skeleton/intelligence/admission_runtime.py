@@ -479,6 +479,106 @@ class AdmissionRuntime:
             )
             return lease
 
+    def reattach(
+        self,
+        request: AdmissionRequest,
+        lease: AdmissionLease,
+    ) -> AdmissionLease:
+        """Restore an already-durable lease without re-running admission.
+
+        This is deliberately narrower than admit. It may only restore a lease
+        whose quota reservation still exists exactly in the configured ledger.
+        No quota is reserved and current local pressure is not used to
+        invalidate work already durably admitted before restart.
+        """
+
+        if not isinstance(request, AdmissionRequest):
+            raise TypeError("request must be an AdmissionRequest")
+        if not isinstance(lease, AdmissionLease):
+            raise TypeError("lease must be an AdmissionLease")
+        if self.shared_pressure_ledger is not None:
+            raise AdmissionRuntimeError(
+                "shared_pressure_reattach_requires_durable_lease_metadata"
+            )
+        if self.quota_ledger is None or lease.quota_reservation is None:
+            raise AdmissionRuntimeError(
+                "durable_reattach_requires_quota_reservation"
+            )
+        if (
+            lease.operation_id != request.operation_id
+            or lease.tenant_id != request.tenant_id
+            or lease.decision.capability != request.capability
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable lease identity does not match request"
+            )
+        if not lease.decision.admitted:
+            raise AdmissionRuntimeConflict(
+                "durable lease is not an admitted decision"
+            )
+        if lease.decision.estimated != request.estimate:
+            raise AdmissionRuntimeConflict(
+                "durable lease estimate does not match request"
+            )
+
+        reservation = lease.quota_reservation
+        if (
+            reservation.operation_id != request.operation_id
+            or reservation.tenant_id != request.tenant_id
+        ):
+            raise AdmissionRuntimeConflict(
+                "durable quota reservation identity does not match request"
+            )
+
+        finder = getattr(
+            self.quota_ledger,
+            "reservation_for_operation",
+            None,
+        )
+        if not callable(finder):
+            raise AdmissionRuntimeError(
+                "quota ledger does not support durable reservation lookup"
+            )
+
+        fingerprint = _request_fingerprint(request)
+        with self._lock:
+            current = self._active.get(request.operation_id)
+            if current is not None:
+                if (
+                    current.request_fingerprint != fingerprint
+                    or current.lease != lease
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "operation already has a different active admission lease"
+                    )
+                return current.lease
+
+            try:
+                persisted = finder(
+                    request.tenant_id,
+                    request.operation_id,
+                )
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "durable_reservation_unavailable"
+                ) from exc
+            if persisted is None:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation is no longer active"
+                )
+            if persisted != reservation:
+                raise AdmissionRuntimeConflict(
+                    "durable quota reservation does not match lease"
+                )
+
+            self._active[request.operation_id] = _ActiveLease(
+                lease=lease,
+                request_fingerprint=fingerprint,
+                unknown_usage={},
+            )
+            self.metrics_registry.inc("admission.reattached_total")
+            return lease
+
     def _release_shared_pressure(
         self,
         lease: SharedPressureLease,
