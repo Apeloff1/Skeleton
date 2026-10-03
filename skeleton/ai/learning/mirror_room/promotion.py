@@ -25,7 +25,11 @@ class MirrorPromotionEvidence:
     candidate_id: str
     candidate_digest: str
     candidate_version: str
+    generator_id: str
+    executor_id: str
     holdout_report_digest: str
+    sealed_holdout_digest: str
+    split_integrity_digest: str
     validation_report_digests: tuple[str, ...]
     verifier_id: str
     evaluation_refs: tuple[str, ...]
@@ -45,6 +49,8 @@ class MirrorPromotionEvidence:
             "baseline_candidate_digest",
             "candidate_digest",
             "holdout_report_digest",
+            "sealed_holdout_digest",
+            "split_integrity_digest",
             "rollback_candidate_digest",
         ):
             value = getattr(self, field)
@@ -60,7 +66,15 @@ class MirrorPromotionEvidence:
             for value in self.validation_report_digests
         ):
             raise MirrorRoomError("validation report digests must be non-empty sha256 values")
+        object.__setattr__(self, "generator_id", _token("generator_id", self.generator_id))
+        object.__setattr__(self, "executor_id", _token("executor_id", self.executor_id))
+        if self.generator_id == self.executor_id:
+            raise MirrorRoomError("generator and executor identities must remain distinct")
         object.__setattr__(self, "verifier_id", _token("verifier_id", self.verifier_id))
+        if self.verifier_id in {self.generator_id, self.executor_id}:
+            raise MirrorRoomError(
+                "promotion verifier must be independent of generator and executor"
+            )
         refs = _tokens("evaluation_ref", self.evaluation_refs, allow_empty=False)
         if len(refs) < 2:
             raise MirrorRoomError("promotion handoff requires at least two evaluation references")
@@ -95,7 +109,11 @@ class MirrorPromotionEvidence:
                 "candidate_id": self.candidate_id,
                 "candidate_digest": self.candidate_digest,
                 "candidate_version": self.candidate_version,
+                "generator_id": self.generator_id,
+                "executor_id": self.executor_id,
                 "holdout_report_digest": self.holdout_report_digest,
+                "sealed_holdout_digest": self.sealed_holdout_digest,
+                "split_integrity_digest": self.split_integrity_digest,
                 "validation_report_digests": list(self.validation_report_digests),
                 "verifier_id": self.verifier_id,
                 "evaluation_refs": list(self.evaluation_refs),
@@ -132,8 +150,10 @@ def qualify_for_external_promotion(
     candidate = run.final_sandbox_champion
     if verifier == candidate.producer_id:
         raise MirrorRoomError("candidate producer cannot independently verify promotion")
-    if verifier == run.executor_id:
-        raise MirrorRoomError("sandbox evaluator cannot independently verify promotion")
+    if verifier in {run.generator_id, run.executor_id}:
+        raise MirrorRoomError(
+            "promotion verifier must be independent of generator and executor"
+        )
 
     validation_digests = []
     selected_ids = set()
@@ -158,7 +178,11 @@ def qualify_for_external_promotion(
         candidate_id=candidate.candidate_id,
         candidate_digest=candidate.digest,
         candidate_version=candidate.version,
+        generator_id=run.generator_id,
+        executor_id=run.executor_id,
         holdout_report_digest=run.holdout_report.digest,
+        sealed_holdout_digest=run.sealed_holdout_digest,
+        split_integrity_digest=run.split_integrity_digest,
         validation_report_digests=tuple(validation_digests),
         verifier_id=verifier,
         evaluation_refs=evaluation_refs,
