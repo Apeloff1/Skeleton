@@ -30,6 +30,10 @@ class TracePRImpactTests(unittest.TestCase):
             MODULE._TRACE_EXACT_IMPLEMENTATION_BINDINGS["Dockerfile"],
             ("VOL-060",),
         )
+        self.assertEqual(
+            MODULE._TRACE_EXACT_IMPLEMENTATION_BINDINGS["setup.cfg"],
+            ("VOL-060",),
+        )
 
     def test_hex_object_id_validation(self) -> None:
         with self.assertRaisesRegex(MODULE.TraceImpactError, "hexadecimal"):
