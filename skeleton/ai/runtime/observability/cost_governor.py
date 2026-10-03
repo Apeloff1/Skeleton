@@ -14,8 +14,9 @@ from dataclasses import dataclass, replace
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 import threading
-from typing import Iterable
+from typing import Any, Iterable
 
 from skeleton.ai.runtime.observability.budget_accounting import (
     BudgetAccountingDecision,
@@ -40,6 +41,7 @@ from skeleton.intelligence.quota import (
     QuotaConflict,
     QuotaError,
     QuotaReservation,
+    QuotaUsage,
     QuotaUsageEvent,
     TenantQuota,
 )
@@ -99,9 +101,9 @@ def _sha256(name: str, value: object) -> str:
     return value
 
 
-def _canonical_digest(value: object) -> str:
+def _canonical_json_text(value: object) -> str:
     try:
-        raw = json.dumps(
+        return json.dumps(
             value,
             sort_keys=True,
             separators=(",", ":"),
@@ -112,6 +114,10 @@ def _canonical_digest(value: object) -> str:
         raise CostGovernorError(
             "cost-governor evidence must be canonical JSON"
         ) from exc
+
+
+def _canonical_digest(value: object) -> str:
+    raw = _canonical_json_text(value)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
