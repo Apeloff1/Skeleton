@@ -484,6 +484,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("canonical supervisor state missing")
     state_path = Path(args.state)
     state = CampaignState.load(state_path)
+    if args.allocate:
+        allocation = allocate_supervisor_state(repo_state, state, limit=args.frontier_limit)
+        repo_path = Path(args.repo_state)
+        repo_path.write_text(json.dumps(repo_state, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     if args.frontier:
         frontier = select_frontier(
             repo_state.get("_shift_supervisor_all_plan_items", []),
