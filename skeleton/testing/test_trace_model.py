@@ -207,3 +207,30 @@ def test_span_evidence_rejects_impossible_time_order() -> None:
             end_ns=100,
             attributes=(),
         )
+
+
+def test_trace_attributes_reject_nonfinite_float() -> None:
+    with pytest.raises(
+        TraceModelError,
+        match="must be finite",
+    ):
+        sanitize_trace_attributes({"latency_ms": float("nan")})
+
+
+def test_span_evidence_rejects_duplicate_attribute_keys() -> None:
+    with pytest.raises(
+        TraceModelError,
+        match="attribute keys must be unique",
+    ):
+        SpanEvidence(
+            trace_id="a" * 16,
+            span_id="b" * 16,
+            parent_span_id=None,
+            name="model.invoke",
+            start_ns=100,
+            end_ns=200,
+            attributes=(
+                ("provider", "offline"),
+                ("provider", "changed"),
+            ),
+        )
