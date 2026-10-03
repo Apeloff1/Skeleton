@@ -4,6 +4,30 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.approval_boundary import (
+    ACTION_KINDS,
+    APPROVAL_SCHEMA,
+    APPROVAL_VERSION,
+    ApprovalAuthorization,
+    ApprovalBoundaryError,
+    ApprovalCheckpoint,
+    ApprovalDecision,
+    DECISIONS,
+    HIGH_IMPACT_ACTIONS,
+    MAX_CHECKPOINT_TTL_SECONDS,
+    MAX_EVIDENCE_DIGESTS,
+    ROUTINE_ACTIONS,
+    approval_required,
+    authorize_action,
+    create_approval_checkpoint,
+    record_human_decision,
+    serialize_checkpoint,
+    serialize_decision,
+    validate_authorization,
+    validate_checkpoint,
+    validate_decision,
+)
+
 from skeleton.forge.creator.work_leases import (
     LeaseConflict,
     LeaseScope,
@@ -49,6 +73,27 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "validate_decision",
+    "validate_checkpoint",
+    "validate_authorization",
+    "serialize_decision",
+    "serialize_checkpoint",
+    "record_human_decision",
+    "create_approval_checkpoint",
+    "authorize_action",
+    "approval_required",
+    "ROUTINE_ACTIONS",
+    "MAX_EVIDENCE_DIGESTS",
+    "MAX_CHECKPOINT_TTL_SECONDS",
+    "HIGH_IMPACT_ACTIONS",
+    "DECISIONS",
+    "ApprovalDecision",
+    "ApprovalCheckpoint",
+    "ApprovalBoundaryError",
+    "ApprovalAuthorization",
+    "APPROVAL_VERSION",
+    "APPROVAL_SCHEMA",
+    "ACTION_KINDS",
     "sweep_expired_leases",
     "serialize_lease_state",
     "renew_lease",
