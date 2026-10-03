@@ -254,6 +254,8 @@ class DevelopmentalComparisonReport:
     suite_digest: str
     baseline_model_digest: str
     candidate_model_digest: str
+    baseline_artifact_sha256: str
+    candidate_artifact_sha256: str
     training_plan_digest: str
     method: TrainingMethod
     case_results: tuple[DevelopmentalCaseResult, ...]
@@ -269,6 +271,8 @@ class DevelopmentalComparisonReport:
             "suite_digest",
             "baseline_model_digest",
             "candidate_model_digest",
+            "baseline_artifact_sha256",
+            "candidate_artifact_sha256",
             "training_plan_digest",
         ):
             object.__setattr__(
@@ -338,6 +342,8 @@ class DevelopmentalComparisonReport:
                 "suite_digest": self.suite_digest,
                 "baseline_model_digest": self.baseline_model_digest,
                 "candidate_model_digest": self.candidate_model_digest,
+                "baseline_artifact_sha256": self.baseline_artifact_sha256,
+                "candidate_artifact_sha256": self.candidate_artifact_sha256,
                 "training_plan_digest": self.training_plan_digest,
                 "method": self.method.value,
                 "case_result_digests": [
@@ -553,6 +559,8 @@ def evaluate_local_candidate_developmentally(
         suite_digest=suite.digest,
         baseline_model_digest=baseline.receipt.model_digest,
         candidate_model_digest=candidate.receipt.model_digest,
+        baseline_artifact_sha256=baseline.receipt.artifact_sha256,
+        candidate_artifact_sha256=candidate.receipt.artifact_sha256,
         training_plan_digest=plan_digest,
         method=method,
         case_results=tuple(results),
@@ -621,6 +629,8 @@ def evaluate_training_receipt_developmentally(
         suite_digest=generic.suite_digest,
         baseline_model_digest=generic.baseline_model_digest,
         candidate_model_digest=generic.candidate_model_digest,
+        baseline_artifact_sha256=generic.baseline_artifact_sha256,
+        candidate_artifact_sha256=generic.candidate_artifact_sha256,
         training_plan_digest=generic.training_plan_digest,
         method=generic.method,
         case_results=generic.case_results,
