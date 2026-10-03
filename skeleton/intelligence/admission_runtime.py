@@ -480,10 +480,30 @@ class AdmissionRuntime:
             )
             return lease
 
+    def shared_pressure_lease_for_operation(
+        self,
+        operation_id: str,
+    ) -> SharedPressureLease | None:
+        """Return the process-local shared-pressure receipt for active work."""
+
+        operation = str(operation_id).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            return active.shared_pressure_lease
+
     def reattach(
         self,
         request: AdmissionRequest,
         lease: AdmissionLease,
+        *,
+        shared_pressure_lease: SharedPressureLease | None = None,
+        now_wall: float | None = None,
     ) -> AdmissionLease:
         """Restore an already-durable lease without re-running admission.
 
@@ -497,10 +517,35 @@ class AdmissionRuntime:
             raise TypeError("request must be an AdmissionRequest")
         if not isinstance(lease, AdmissionLease):
             raise TypeError("lease must be an AdmissionLease")
-        if self.shared_pressure_ledger is not None:
-            raise AdmissionRuntimeError(
-                "shared_pressure_reattach_requires_durable_lease_metadata"
+        if (
+            shared_pressure_lease is not None
+            and not isinstance(shared_pressure_lease, SharedPressureLease)
+        ):
+            raise TypeError(
+                "shared_pressure_lease must be SharedPressureLease"
             )
+        wall = _wall_time(now_wall, field="now_wall")
+        if self.shared_pressure_ledger is None:
+            if shared_pressure_lease is not None:
+                raise AdmissionRuntimeConflict(
+                    "recovered shared pressure lease has no configured ledger"
+                )
+        else:
+            if shared_pressure_lease is None:
+                raise AdmissionRuntimeError(
+                    "shared_pressure_reattach_requires_durable_lease_metadata"
+                )
+            if (
+                shared_pressure_lease.scope != self.shared_pressure_scope
+                or shared_pressure_lease.operation_id != request.operation_id
+                or shared_pressure_lease.tenant_id != request.tenant_id
+                or shared_pressure_lease.owner_id
+                != self.shared_pressure_owner_id
+                or shared_pressure_lease.priority != request.priority
+            ):
+                raise AdmissionRuntimeConflict(
+                    "durable shared pressure lease identity does not match runtime"
+                )
         if self.quota_ledger is None or lease.quota_reservation is None:
             raise AdmissionRuntimeError(
                 "durable_reattach_requires_quota_reservation"
@@ -632,11 +677,42 @@ class AdmissionRuntime:
                 if (
                     current.request_fingerprint != fingerprint
                     or current.lease != lease
+                    or current.shared_pressure_lease
+                    != shared_pressure_lease
                 ):
                     raise AdmissionRuntimeConflict(
                         "operation already has a different active admission lease"
                     )
                 return current.lease
+
+            if self.shared_pressure_ledger is not None:
+                shared_finder = getattr(
+                    self.shared_pressure_ledger,
+                    "lease_for_operation",
+                    None,
+                )
+                if not callable(shared_finder):
+                    raise AdmissionRuntimeError(
+                        "shared pressure ledger does not support durable lease lookup"
+                    )
+                try:
+                    persisted_shared = shared_finder(
+                        self.shared_pressure_scope,
+                        request.operation_id,
+                        now=wall,
+                    )
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "durable_shared_pressure_unavailable"
+                    ) from exc
+                if persisted_shared is None:
+                    raise AdmissionRuntimeConflict(
+                        "durable shared pressure lease is no longer active"
+                    )
+                if persisted_shared != shared_pressure_lease:
+                    raise AdmissionRuntimeConflict(
+                        "durable shared pressure lease does not match journal"
+                    )
 
             try:
                 recovery_state = recovery_reader(
@@ -686,6 +762,7 @@ class AdmissionRuntime:
                 lease=lease,
                 request_fingerprint=fingerprint,
                 unknown_usage=recovered_unknown,
+                shared_pressure_lease=shared_pressure_lease,
             )
             self.metrics_registry.inc("admission.reattached_total")
             if recovered_unknown:
