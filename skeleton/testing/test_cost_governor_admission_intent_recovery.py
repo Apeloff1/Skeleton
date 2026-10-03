@@ -597,3 +597,136 @@ def test_successful_reserve_clears_admission_intent(
         tenant_id="tenant-a",
         now=10.5,
     ).active == 1
+
+
+def test_unjournaled_quota_authority_cannot_be_adopted(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    request = _request("op-orphan-quota")
+    governor = _governor(quota_path)
+    ledger = governor.runtime.quota_ledger
+    ledger.configure("tenant-a", _quota())
+    original = ledger.reserve(
+        request.tenant_id,
+        request.operation_id,
+        request.estimate,
+        now=10.0,
+    )
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="unjournaled durable quota authority already exists",
+    ):
+        governor.reserve(
+            request,
+            now_monotonic=20.0,
+            now_wall=20.0,
+        )
+
+    recovered = ledger.reservation_for_operation(
+        request.tenant_id,
+        request.operation_id,
+    )
+    assert recovered == original
+    assert _intent_count(quota_path) == 0
+
+
+def test_unjournaled_shared_pressure_authority_cannot_be_adopted(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    request = _request("op-orphan-pressure")
+    pressure = _pressure(pressure_path)
+    lease = pressure.acquire(
+        _SCOPE,
+        request.tenant_id,
+        request.operation_id,
+        _OWNER,
+        priority=request.priority,
+        lease_seconds=60.0,
+        now=10.0,
+    )
+    governor = _governor(quota_path, pressure_path)
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="unjournaled shared pressure authority already exists",
+    ):
+        governor.reserve(
+            request,
+            now_monotonic=20.0,
+            now_wall=20.0,
+        )
+
+    assert pressure.lease_for_operation(
+        _SCOPE,
+        request.operation_id,
+        now=20.5,
+    ) == lease
+    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 0
+    assert _intent_count(quota_path) == 0
+
+
+def test_extra_admission_intent_budget_field_is_rejected(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    request = _request("op-intent-extra-field")
+    first = _governor(quota_path)
+    assert first._journal is not None
+
+    monkeypatch.setattr(
+        first._journal,
+        "record_active",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            SystemExit("crash after quota allocation")
+        ),
+    )
+    with pytest.raises(SystemExit):
+        first.reserve(request, now_wall=10.0)
+
+    with sqlite3.connect(quota_path) as conn:
+        row = conn.execute(
+            """
+            SELECT payload_json
+            FROM cost_governor_admission_intent
+            WHERE operation_id = ?
+            """,
+            (request.operation_id,),
+        ).fetchone()
+        assert row is not None
+        import json
+
+        payload = json.loads(row[0])
+        payload["remaining"]["unexpected_dimension"] = 1
+        conn.execute(
+            """
+            UPDATE cost_governor_admission_intent
+            SET payload_json = ?
+            WHERE operation_id = ?
+            """,
+            (
+                json.dumps(
+                    payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                request.operation_id,
+            ),
+        )
+
+    restarted = _governor(quota_path)
+    with pytest.raises(
+        CostGovernorError,
+        match="remaining-budget fields are invalid",
+    ):
+        restarted.reserve(request, now_wall=20.0)
+
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 1
