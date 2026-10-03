@@ -279,6 +279,7 @@ def test_full_camera_coverage_feeds_bounded_multiview_training() -> None:
         response="The same object identity must be preserved.",
         source_ref="scene:fixture",
         camera_view_refs=tuple(item.reference for item in subset),
+        camera_coverage_digest=coverage.coverage_digest,
         tags=("vision", "multi-view"),
     )
     plan = compile_training_plan(
@@ -301,6 +302,10 @@ def test_full_camera_coverage_feeds_bounded_multiview_training() -> None:
         for item in plan.documents
     }
     assert len(refs) == 32
+    assert plan.camera_coverage_digests == (coverage.coverage_digest,)
+    assert plan.as_dict()["camera_coverage_digests"] == [
+        coverage.coverage_digest
+    ]
 
 
 def test_training_example_rejects_noncanonical_camera_view_identity() -> None:
