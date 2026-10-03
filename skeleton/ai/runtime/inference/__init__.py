@@ -1,3 +1,5 @@
+"""Provider-independent local model execution for the Skeleton AI runtime."""
+
 from .developmental_eval import (
     DevelopmentalCaseResult,
     DevelopmentalComparisonReport,
@@ -6,8 +8,6 @@ from .developmental_eval import (
     DevelopmentalEvaluationError,
     evaluate_local_candidate_developmentally,
 )
-"""Provider-independent local model execution for the Skeleton AI runtime."""
-
 from .artifact import (
     LoadedLocalModel,
     LocalModelArtifactError,
