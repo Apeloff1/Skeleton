@@ -4,6 +4,30 @@ Core creator intent stays here. Engine adapters, UI, live preview, and model
 orchestration must consume this package rather than owning creator semantics.
 """
 
+from skeleton.forge.creator.work_leases import (
+    LeaseConflict,
+    LeaseScope,
+    LeaseState,
+    LeaseSweep,
+    MAX_BATCHES_PER_LEASE,
+    MAX_LEASES,
+    MAX_PATHS_PER_LEASE,
+    MAX_TTL_SECONDS,
+    WORK_LEASE_SCHEMA,
+    WORK_LEASE_VERSION,
+    WorkLease,
+    WorkLeaseError,
+    WorkLeaseVersionError,
+    claim_work,
+    conflicts_for_scope,
+    empty_lease_state,
+    parse_lease_state,
+    release_lease,
+    renew_lease,
+    serialize_lease_state,
+    sweep_expired_leases,
+)
+
 from skeleton.forge.creator.intent_compiler import (
     DESIGN_PLAN_SCHEMA,
     EDIT_SCHEMA,
@@ -25,6 +49,27 @@ from skeleton.forge.creator.intent_compiler import (
 )
 
 __all__ = [
+    "sweep_expired_leases",
+    "serialize_lease_state",
+    "renew_lease",
+    "release_lease",
+    "parse_lease_state",
+    "empty_lease_state",
+    "conflicts_for_scope",
+    "claim_work",
+    "WorkLeaseVersionError",
+    "WorkLeaseError",
+    "WorkLease",
+    "WORK_LEASE_VERSION",
+    "WORK_LEASE_SCHEMA",
+    "MAX_TTL_SECONDS",
+    "MAX_PATHS_PER_LEASE",
+    "MAX_LEASES",
+    "MAX_BATCHES_PER_LEASE",
+    "LeaseSweep",
+    "LeaseState",
+    "LeaseScope",
+    "LeaseConflict",
     "DESIGN_PLAN_SCHEMA",
     "EDIT_SCHEMA",
     "INTENT_SCHEMA",
