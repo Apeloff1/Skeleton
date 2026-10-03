@@ -676,3 +676,116 @@ def test_supplemental_learning_examples_join_same_candidate_plan(
         "supplemental_example_digests"
     ] == [supplemental.digest]
     assert receipt["training_plan"]["document_count"] == 2
+
+
+def test_product_candidate_trains_conversation_and_real_camera_examples_together(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pytest.importorskip("numpy")
+    image_module = pytest.importorskip("PIL.Image")
+    from io import BytesIO
+
+    from skeleton.ai.runtime.inference.multiview import (
+        CameraCoveragePolicy,
+        bind_camera_subset,
+        build_camera_coverage,
+        stratified_camera_subset,
+    )
+    from skeleton.ai.runtime.inference.training_methods import (
+        TrainingExample,
+        TrainingMethod,
+    )
+    from skeleton.ai.runtime.inference.visual_learning import (
+        extract_visual_training_observation,
+    )
+    from skeleton.ai.runtime.multimodal.intake import (
+        Modality,
+        MultimodalIntake,
+    )
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+    coverage = build_camera_coverage(
+        CameraCoveragePolicy(
+            azimuth_step_deg=90,
+            elevation_step_deg=90,
+            roll_step_deg=180,
+            fov_degrees=(55.0,),
+            max_views=128,
+        )
+    )
+    views = stratified_camera_subset(coverage, limit=2)
+    intake = MultimodalIntake()
+    observations = []
+    for index, (view, rgb) in enumerate(
+        zip(
+            views,
+            ((220, 30, 30), (185, 55, 55)),
+            strict=True,
+        )
+    ):
+        image = image_module.new("RGB", (6, 6), rgb)
+        image.putpixel((0, 0), (255, 255, 255))
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        payload = buffer.getvalue()
+        asset = intake.sanitize(
+            asset_id=f"product-camera-{index}",
+            modality=Modality.IMAGE,
+            mime_type="image/png",
+            payload=payload,
+            metadata={"width": 6, "height": 6},
+        )
+        observations.append(
+            extract_visual_training_observation(
+                asset=asset,
+                payload=payload,
+                camera_view=view,
+            )
+        )
+
+    visual_example = TrainingExample(
+        example_id="product-visual-supplement",
+        prompt="What identity remains stable across the camera views?",
+        response="The same red object remains present across both views.",
+        source_ref="product-visual:test",
+        camera_selection=bind_camera_subset(coverage, views),
+        visual_observations=tuple(observations),
+        tags=("vision", "cross-view"),
+    )
+    monkeypatch.delenv("AI_LOCAL_MODEL_PATH", raising=False)
+
+    receipt = build_learning_candidate_artifact(
+        candidate,
+        output_path=tmp_path / "conversation-plus-vision.json",
+        model_id="conversation-plus-vision",
+        hidden_size=8,
+        epochs=1,
+        learning_rate=0.03,
+        max_vocab=256,
+        max_document_tokens=256,
+        training_methods=(
+            TrainingMethod.SUPERVISED_INSTRUCTION,
+            TrainingMethod.MULTIVIEW_GROUNDING,
+            TrainingMethod.CROSS_VIEW_CONSISTENCY,
+        ),
+        supplemental_examples=(visual_example,),
+        supplemental_learning_opt_in=True,
+        gradient_accumulation_steps=2,
+    )
+
+    counts = receipt["training_plan"]["method_counts"]
+    assert counts[TrainingMethod.SUPERVISED_INSTRUCTION.value] == 2
+    assert counts[TrainingMethod.MULTIVIEW_GROUNDING.value] == 2
+    assert counts[TrainingMethod.CROSS_VIEW_CONSISTENCY.value] == 1
+    assert set(receipt["evaluation_manifest"]["visual_observation_digests"]) == {
+        item.feature_digest for item in observations
+    }
+    assert receipt["evaluation_manifest"]["camera_coverage_digests"] == [
+        coverage.coverage_digest
+    ]
+    assert receipt["supplemental_learning_example_count"] == 1
