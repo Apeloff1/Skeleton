@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
 from skeleton.ai.runtime.inference.continual_learning import (
     ContinualLearningError,
     ContinualLearningPolicy,
+    ContinualLearningRound,
+    ContinualLearningState,
+    DevelopmentalChampion,
     initialize_continual_learning_state,
     load_continual_learning_state,
     rollback_developmental_champion,
@@ -226,3 +230,77 @@ def test_continual_state_detects_champion_artifact_drift(tmp_path) -> None:
         match="champion artifact",
     ):
         load_continual_learning_state(path)
+
+
+
+def test_continual_state_binds_accepted_round_to_exact_champion(
+    tmp_path,
+) -> None:
+    baseline = _baseline(tmp_path)
+    initial = initialize_continual_learning_state(
+        lineage_id="lineage-graph",
+        baseline_path=baseline,
+    )
+    parent = initial.active_champion
+    round_record = ContinualLearningRound(
+        round_index=1,
+        baseline_champion_digest=parent.digest,
+        challenger_model_digest="a" * 64,
+        challenger_artifact_sha256="b" * 64,
+        challenger_artifact_path=str(tmp_path / "candidate.json"),
+        optimization_digest="c" * 64,
+        acquisition_report_digest="d" * 64,
+        retention_report_digest="e" * 64,
+        replay_example_digests=(),
+        new_example_digests=("f" * 64,),
+        acquisition_gain=0.1,
+        retention_gain=0.0,
+        accepted=True,
+        reason="accepted-developmental-challenger",
+        policy_digest="1" * 64,
+    )
+    child = DevelopmentalChampion(
+        generation=1,
+        artifact_path=round_record.challenger_artifact_path,
+        model_id="candidate",
+        model_digest=round_record.challenger_model_digest,
+        artifact_sha256=round_record.challenger_artifact_sha256,
+        source_round_digest=round_record.digest,
+        training_plan_digest="2" * 64,
+    )
+
+    valid = ContinualLearningState(
+        lineage_id=initial.lineage_id,
+        champions=(parent, child),
+        active_champion_index=1,
+        rounds=(round_record,),
+    )
+    assert valid.active_champion.digest == child.digest
+
+    with pytest.raises(
+        ContinualLearningError,
+        match="unknown accepted round",
+    ):
+        ContinualLearningState(
+            lineage_id=initial.lineage_id,
+            champions=(
+                parent,
+                replace(child, source_round_digest="3" * 64),
+            ),
+            active_champion_index=1,
+            rounds=(round_record,),
+        )
+
+    with pytest.raises(
+        ContinualLearningError,
+        match="accepted round and champion identity drift",
+    ):
+        ContinualLearningState(
+            lineage_id=initial.lineage_id,
+            champions=(
+                parent,
+                replace(child, artifact_sha256="4" * 64),
+            ),
+            active_champion_index=1,
+            rounds=(round_record,),
+        )
