@@ -10,6 +10,7 @@ from .executor import (
     DeferredExecutionError,
     DeferredExecutor,
     DeferredInvocation,
+    ExecutionOutcome,
     ExecutionReceipt,
     FailureReceipt,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "DeferredExecutor",
     "DeferredInvocation",
     "EvidenceReceipt",
+    "ExecutionOutcome",
     "ExecutionReceipt",
     "FailureReceipt",
     "build_registry",
