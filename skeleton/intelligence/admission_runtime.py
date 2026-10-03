@@ -168,10 +168,19 @@ def _request_fingerprint(request: AdmissionRequest) -> str:
     return hashlib.sha256(material).hexdigest()
 
 
-def _lease_id(
+def admission_lease_id(
     decision: AdmissionDecision,
     reservation: QuotaReservation | None,
 ) -> str:
+    """Return the deterministic identity of an admission + quota lease."""
+
+    if not isinstance(decision, AdmissionDecision):
+        raise TypeError("decision must be AdmissionDecision")
+    if reservation is not None and not isinstance(
+        reservation,
+        QuotaReservation,
+    ):
+        raise TypeError("reservation must be QuotaReservation")
     material = "\x1f".join(
         (
             decision.decision_id,
@@ -179,6 +188,13 @@ def _lease_id(
         )
     ).encode("utf-8")
     return "lease-" + hashlib.sha256(material).hexdigest()[:24]
+
+
+def _lease_id(
+    decision: AdmissionDecision,
+    reservation: QuotaReservation | None,
+) -> str:
+    return admission_lease_id(decision, reservation)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1315,4 +1331,5 @@ __all__ = [
     "AdmissionRuntimeConflict",
     "AdmissionRuntimeError",
     "UnknownUsageMarker",
+    "admission_lease_id",
 ]
