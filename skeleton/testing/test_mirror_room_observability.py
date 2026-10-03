@@ -117,13 +117,27 @@ def test_observatory_file_tree_exposes_landed_extension_surface() -> None:
     assert "mirror-room-extensions.yml" in encoded
 
 
-def test_observatory_file_tree_does_not_claim_unlanded_product_routes() -> None:
+def test_observatory_file_tree_binds_landed_product_routes() -> None:
     encoded = repr(mirror_room_file_tree())
 
-    assert "backend/routes/mirror_room.py" not in encoded
-    assert "frontend/features/MirrorRoom" not in encoded
-    assert "frontend/app/mirror-room.tsx" not in encoded
+    assert "backend/routes/mirror_room.py" in encoded
+    assert "frontend/features/MirrorRoom" in encoded
+    assert "frontend/app/mirror-room.tsx" in encoded
 
-    assert (ROOT / "skeleton/learning/mirror_room/observability.py").is_file()
-    assert (ROOT / "skeleton/ai/learning/mirror_room/observability.py").is_file()
-    assert (ROOT / ".github/workflows/mirror-room-extensions.yml").is_file()
+    screen = (
+        ROOT / "frontend/features/MirrorRoom/MirrorRoomObservatory.tsx"
+    ).read_text(encoding="utf-8")
+    route = (ROOT / "frontend/app/mirror-room.tsx").read_text(encoding="utf-8")
+    types = (ROOT / "frontend/features/MirrorRoom/types.ts").read_text(
+        encoding="utf-8"
+    )
+    api_route = (ROOT / "backend/routes/mirror_room.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "/api/mirror-room/observatory" in screen
+    assert "features/MirrorRoom/MirrorRoomObservatory" in route
+    assert "interface MirrorRoomObservatoryPayload" in types
+    assert "production_authority: false" in types
+    assert "get_default_observatory().snapshot()" in api_route
+
