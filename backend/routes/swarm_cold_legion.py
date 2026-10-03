@@ -45,8 +45,8 @@ class FreezeReq(BaseModel):
 def cold_freeze(req: FreezeReq) -> dict:
     try:
         return cs.freeze(req.name, drop_after=req.drop_after, compact=req.compact, force=req.force)
-    except Exception as ex:
-        raise HTTPException(400, str(ex))
+    except Exception:
+        raise HTTPException(400, "cold storage operation rejected")
 
 
 class ThawReq(BaseModel):

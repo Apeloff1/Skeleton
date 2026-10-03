@@ -42,7 +42,20 @@ export function truncateWords(s: string, max = 80, ellipsis = '…'): string {
 /** ⑤ Strip HTML tags safely (no regex catastrophic backtracking). */
 export function stripHtml(s: string): string {
   if (!s) return '';
-  return s.replace(/<[^>]*>/g, '');
+  let output = '';
+  let insideTag = false;
+  for (const character of s) {
+    if (character === '<') {
+      insideTag = true;
+      continue;
+    }
+    if (insideTag) {
+      if (character === '>') insideTag = false;
+      continue;
+    }
+    if (character !== '\0') output += character;
+  }
+  return output;
 }
 
 /** ⑥ Slugify for URL-safe ids. */

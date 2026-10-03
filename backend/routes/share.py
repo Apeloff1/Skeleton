@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import html
+import json
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -18,7 +19,19 @@ _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 
 
 def _page(title: str, desc: str, image: str, deep_link: str) -> str:
-    t, d = html.escape(title), html.escape(desc)
+    t = html.escape(title, quote=True)
+    d = html.escape(desc, quote=True)
+    image_attr = html.escape(image, quote=True)
+    deep_link_attr = html.escape(deep_link, quote=True)
+    # JSON encoding makes the redirect a JavaScript string literal rather than
+    # executable markup. Escape HTML-significant code points so a crafted URL
+    # cannot terminate the surrounding script element.
+    deep_link_js = (
+        json.dumps(deep_link)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{t}</title>
@@ -26,19 +39,19 @@ def _page(title: str, desc: str, image: str, deep_link: str) -> str:
 <meta property="og:type" content="website">
 <meta property="og:title" content="{t}">
 <meta property="og:description" content="{d}">
-<meta property="og:image" content="{image}">
+<meta property="og:image" content="{image_attr}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{t}">
 <meta name="twitter:description" content="{d}">
-<meta name="twitter:image" content="{image}">
+<meta name="twitter:image" content="{image_attr}">
 <style>body{{margin:0;background:#0A0A0A;color:#E5E5E5;font-family:system-ui,-apple-system,sans-serif;
 display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}}
 .c{{padding:32px;max-width:520px}}img{{width:220px;height:220px;border-radius:20px;border:1px solid #262626;object-fit:cover}}
 h1{{font-size:24px;letter-spacing:.4px}}a{{display:inline-block;margin-top:20px;background:#8B5CF6;color:#fff;
 text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:800}}p{{color:#A3A3A3}}</style>
-<script>setTimeout(function(){{location.href={deep_link!r}}},1200)</script></head>
-<body><div class="c"><img src="{image}" alt="cover"/><h1>{t}</h1><p>{d}</p>
-<a href="{deep_link}">▶ Open in Galaxy Studio</a></div></body></html>"""
+<script>setTimeout(function(){{location.href={deep_link_js}}},1200)</script></head>
+<body><div class="c"><img src="{image_attr}" alt="cover"/><h1>{t}</h1><p>{d}</p>
+<a href="{deep_link_attr}">▶ Open in Galaxy Studio</a></div></body></html>"""
 
 
 @router.get("/playable/{pid}", response_class=HTMLResponse)

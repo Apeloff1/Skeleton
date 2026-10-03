@@ -159,10 +159,15 @@ async def simulate_benchmark(request: BenchmarkRequest):
     import random
 
     lines = len(request.code.splitlines())
+    # Benchmark heuristics never need an unbounded wildcard over caller code.
+    # Bound the inspection surface and count lexical "for" tokens with a
+    # linear-time expression instead of a polynomial backtracking pattern.
+    benchmark_source = request.code[:200_000]
+    for_count = len(re.findall(r"\bfor\b", benchmark_source))
     complexity = 1
-    if re.search(r"for\s+", request.code):
+    if for_count >= 1:
         complexity *= 2
-    if re.search(r"for\s+.*for\s+", request.code, re.DOTALL):
+    if for_count >= 2:
         complexity *= 5
 
     base_time = lines * 0.05 * complexity

@@ -22,9 +22,20 @@ const QUEUE_KEY = '@telemetry/queue';
 
 // One session id per app launch — persists across route changes.
 let _sessionId: string | null = null;
+let _sessionSequence = 0;
+
+function createSessionId(): string {
+  const cryptoObject = (globalThis as any).crypto;
+  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
+    return `s_${cryptoObject.randomUUID()}`;
+  }
+  _sessionSequence += 1;
+  return `s_${Date.now().toString(36)}_${_sessionSequence.toString(36)}`;
+}
+
 function sessionId(): string {
   if (!_sessionId) {
-    _sessionId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    _sessionId = createSessionId();
   }
   return _sessionId;
 }
