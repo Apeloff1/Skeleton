@@ -43,7 +43,7 @@ def _full_example() -> TrainingExample:
     )
 
 
-def test_all_training_families_compile_when_fields_are_available() -> None:
+def test_all_nonvisual_training_families_compile_when_fields_are_available() -> None:
     methods = tuple(TrainingMethod)
     plan = compile_training_plan(
         (_full_example(),),
@@ -57,8 +57,14 @@ def test_all_training_families_compile_when_fields_are_available() -> None:
     )
 
     assert set(plan.method_counts) == {
-        method.value for method in TrainingMethod
+        method.value
+        for method in TrainingMethod
+        if method is not TrainingMethod.CROSS_VIEW_CONSISTENCY
     }
+    assert (
+        TrainingMethod.CROSS_VIEW_CONSISTENCY.value
+        not in plan.method_counts
+    )
     assert plan.method_counts[
         TrainingMethod.MULTIVIEW_GROUNDING.value
     ] == 2
@@ -84,6 +90,10 @@ def test_missing_optional_signals_skip_only_dependent_methods() -> None:
     assert TrainingMethod.CONTRASTIVE.value not in plan.method_counts
     assert TrainingMethod.REPLAY.value not in plan.method_counts
     assert TrainingMethod.MULTIVIEW_GROUNDING.value not in plan.method_counts
+    assert (
+        TrainingMethod.CROSS_VIEW_CONSISTENCY.value
+        not in plan.method_counts
+    )
     assert TrainingMethod.SUPERVISED_INSTRUCTION.value in plan.method_counts
     assert TrainingMethod.CAUSAL_LANGUAGE_MODELING.value in plan.method_counts
     assert TrainingMethod.SELF_SUPERVISED_SPAN.value in plan.method_counts
@@ -278,7 +288,9 @@ def test_multi_method_builder_trains_compiled_plan(tmp_path) -> None:
         * receipt["epochs_completed"]
     )
     assert set(receipt["training_plan"]["method_counts"]) == {
-        method.value for method in TrainingMethod
+        method.value
+        for method in TrainingMethod
+        if method is not TrainingMethod.CROSS_VIEW_CONSISTENCY
     }
 
 
