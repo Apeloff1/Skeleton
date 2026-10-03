@@ -92,6 +92,15 @@ def test_digest_migration_preserves_logical_identity_and_old_address() -> None:
     assert by_old.digest == by_new.digest == migrated.digest
     assert old_payload == new_payload == b"model-bytes"
 
+    replay = store.put(
+        tenant_id="tenant-a",
+        logical_id="model-artifact",
+        version=7,
+        trust_context="promotion-approved",
+        payload=b"model-bytes",
+    )
+    assert replay.digest == migrated.digest
+
 
 def test_content_addresses_are_tenant_scoped() -> None:
     store = GovernedContentStore()
