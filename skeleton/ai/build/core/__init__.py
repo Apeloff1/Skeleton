@@ -33,6 +33,19 @@ from skeleton.build.incremental_graph import (
     build_incremental_graph,
 )
 
+from skeleton.build.parallel_scheduler import (
+    BuildEvidence,
+    ParallelBuildPlan,
+    ParallelSchedulerError,
+    ResourceCapacity,
+    ResourceRequest,
+    ScheduleWave,
+    ScheduledTarget,
+    TargetEvidence,
+    aggregate_build_evidence,
+    plan_parallel_build,
+)
+
 from skeleton.build.network_audit import (
     CLASSIFICATION_NETWORK_REQUIRED,
     CLASSIFICATION_NETWORK_UNKNOWN,
@@ -50,6 +63,16 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "aggregate_build_evidence",
+    "plan_parallel_build",
+    "TargetEvidence",
+    "ScheduledTarget",
+    "ScheduleWave",
+    "ResourceRequest",
+    "ResourceCapacity",
+    "ParallelSchedulerError",
+    "ParallelBuildPlan",
+    "BuildEvidence",
     "plan_eviction",
     "build_cache_key",
     "EvictionPolicy",
