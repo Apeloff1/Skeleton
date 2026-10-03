@@ -57,6 +57,7 @@ class TrainingMethod(str, Enum):
     PSEUDO_LABEL = "pseudo_label"
     MULTITASK = "multitask"
     ACTIVE_LEARNING = "active_learning"
+    CROSS_VIEW_CONSISTENCY = "cross_view_consistency"
 
 
 DEFAULT_TEXT_METHODS = (
@@ -829,6 +830,55 @@ def _multiview(
     return tuple(rows)
 
 
+def _cross_view_consistency(
+    example: TrainingExample,
+    *,
+    limit: int,
+) -> tuple[tuple[str, Mapping[str, object]], ...]:
+    observations = example.visual_observations[:limit]
+    if len(observations) < 2:
+        return ()
+    text_parts = [
+        "<|cross_view_consistency|>",
+        "<|shared_identity_target|>",
+        example.response,
+        "<|question|>",
+        example.prompt,
+    ]
+    refs: list[str] = []
+    asset_digests: list[str] = []
+    for ordinal, observation in enumerate(observations):
+        text_parts.extend(
+            (
+                f"<|view_{ordinal}|>",
+                observation.camera_view_ref,
+                observation.training_text(),
+            )
+        )
+        refs.append(observation.reference)
+        asset_digests.append(observation.asset_digest)
+    text_parts.extend(
+        (
+            "<|invariance_rule|>",
+            "preserve shared object and scene identity across camera views",
+        )
+    )
+    return (
+        (
+            "\n".join(text_parts),
+            {
+                "visual_observation_refs": refs,
+                "visual_asset_digests": asset_digests,
+                "camera_view_refs": [
+                    item.camera_view_ref for item in observations
+                ],
+                "camera_coverage_digest": example.camera_coverage_digest,
+                "view_count": len(observations),
+            },
+        ),
+    )
+
+
 def _method_rows(
     example: TrainingExample,
     method: TrainingMethod,
@@ -885,6 +935,11 @@ def _method_rows(
         return () if value is None else ((value, {}),)
     if method is TrainingMethod.ACTIVE_LEARNING:
         return ((_active_learning(example), {}),)
+    if method is TrainingMethod.CROSS_VIEW_CONSISTENCY:
+        return _cross_view_consistency(
+            example,
+            limit=policy.max_camera_views_per_example,
+        )
     raise TrainingMethodError("unsupported training method")
 
 
@@ -996,6 +1051,11 @@ def compatible_training_methods(
                     example.task_id is not None
                     or bool(example.tags)
                 )
+            ):
+                supported = True
+            elif (
+                method is TrainingMethod.CROSS_VIEW_CONSISTENCY
+                and len(example.visual_observations) >= 2
             ):
                 supported = True
             if supported:
