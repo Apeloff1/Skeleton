@@ -188,6 +188,7 @@ def _execution_receipt(
     scoped: Sequence[tuple[str, PlannedTask]],
     patch: str,
     accepted: int,
+    base_commit_sha: str = "",
 ) -> dict[str, Any]:
     task_payload = [
         {
@@ -206,6 +207,7 @@ def _execution_receipt(
         "plan_digest_sha256": plan_digest,
         "seed": seed,
         "registry_fingerprint": registry_fingerprint(),
+        "base_commit_sha": base_commit_sha,
         "replay_key_sha256": _replay_key(
             generation_id=generation_id,
             plan_digest=plan_digest,
@@ -324,6 +326,9 @@ def propose(
         plan_digest = str(state_payload["_shift_supervisor"].get("plan_digest_sha256", ""))
         if not items:
             raise ValueError("canonical night plan contains no executable items")
+        base_commit_sha = _git("rev-parse", "HEAD").strip()
+        if len(base_commit_sha) != 40 or any(ch not in "0123456789abcdef" for ch in base_commit_sha):
+            raise ValueError("repository base commit identity is malformed")
         replay_key = _replay_key(generation_id=generation_id, plan_digest=plan_digest, seed=seed)
         prior_receipt: Mapping[str, Any] | None = None
         if prior_receipt_path is not None and prior_receipt_path.is_file():
@@ -448,9 +453,11 @@ def propose(
         scoped=scoped,
         patch=diff,
         accepted=accepted,
+        base_commit_sha=base_commit_sha,
     )
     if prior_receipt is not None and (
-        prior_receipt.get("patch_sha256") != receipt.get("patch_sha256")
+        prior_receipt.get("base_commit_sha") != receipt.get("base_commit_sha")
+        or prior_receipt.get("patch_sha256") != receipt.get("patch_sha256")
         or prior_receipt.get("tasks") != receipt.get("tasks")
         or prior_receipt.get("accepted_tasks") != receipt.get("accepted_tasks")
     ):
