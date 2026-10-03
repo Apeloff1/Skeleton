@@ -159,6 +159,12 @@ def _qualification_fixture():
         "artifact_sha256": artifact,
         "training_plan": {"plan_digest": plan},
         "method_allocation": {"allocation_digest": allocation},
+        "evaluation_manifest": {
+            "candidate_model_digest": candidate_model,
+            "candidate_artifact_sha256": artifact,
+            "training_plan_digest": plan,
+            "baseline": {"model_digest": baseline_model},
+        },
     }
     mirror = SimpleNamespace(
         candidate_id="mirror-candidate-v2",
