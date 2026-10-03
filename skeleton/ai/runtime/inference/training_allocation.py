@@ -272,6 +272,7 @@ class AdaptiveMethodAllocation:
 
     policy_digest: str
     observation_digests: tuple[str, ...]
+    source_plan_digests: tuple[str, ...]
     scores: tuple[MethodAllocationScore, ...]
     method_weights: tuple[MethodWeight, ...]
     allocation_digest: str
@@ -291,6 +292,7 @@ class AdaptiveMethodAllocation:
             "schema_version": "skeleton.adaptive_method_allocation.v1",
             "policy_digest": self.policy_digest,
             "observation_digests": list(self.observation_digests),
+            "source_plan_digests": list(self.source_plan_digests),
             "scores": [
                 {
                     "method": score.method.value,
@@ -350,6 +352,13 @@ def allocate_training_methods(
             "observations must contain MethodValidationObservation values"
         )
     observation_digests = tuple(sorted(item.digest for item in rows))
+    if len(observation_digests) != len(set(observation_digests)):
+        raise TrainingAllocationError(
+            "duplicate validation observation evidence is not allowed"
+        )
+    source_plan_digests = tuple(
+        sorted({item.plan_digest for item in rows})
+    )
 
     by_method: dict[TrainingMethod, list[MethodValidationObservation]] = {
         method: [] for method in available
@@ -509,6 +518,7 @@ def allocate_training_methods(
         "schema_version": "skeleton.adaptive_method_allocation.v1",
         "policy_digest": actual.digest,
         "observation_digests": list(observation_digests),
+        "source_plan_digests": list(source_plan_digests),
         "scores": [score.digest for score in final_scores],
         "method_weights": [
             {"method": item.method.value, "repeat": item.repeat}
@@ -518,6 +528,7 @@ def allocate_training_methods(
     return AdaptiveMethodAllocation(
         policy_digest=actual.digest,
         observation_digests=observation_digests,
+        source_plan_digests=source_plan_digests,
         scores=final_scores,
         method_weights=weights,
         allocation_digest=_digest(payload),
