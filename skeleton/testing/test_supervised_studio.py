@@ -464,3 +464,41 @@ def test_canonical_items_rejects_plan_digest_tampering(tmp_path):
     )
     with pytest.raises(ValueError, match="plan digest mismatch"):
         supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_malformed_generation_identity(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "../escape",
+                    "plan_items": [{"id": "one", "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="generation id is malformed"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_unbounded_plan_item_identity(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe-generation",
+                    "plan_items": [{"id": "x" * 161, "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exceeds 160"):
+        supervised_studio._canonical_items(state, 1)
