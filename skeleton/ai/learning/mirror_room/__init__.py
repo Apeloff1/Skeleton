@@ -1,10 +1,31 @@
-"""Bounded offline Mirror Room learning core.
+"""Mirror Room: bounded offline learning without production self-mutation."""
 
-This package intentionally exports only the hermetic learning/evaluation path.
-Adversarial campaigns, UI/observability, archives, and production deployment
-remain separate authorities.
-"""
-
+from .adaptation import (
+    DeterministicCoordinateLearner,
+    NumericDimension,
+)
+from .adversarial import (
+    ADVERSARIAL_ATTEMPTS_REQUIRED,
+    AdversarialAttemptReceipt,
+    AdversarialCampaignReceipt,
+    AdversarialChallengeContext,
+    AdversarialDeliveryEvidence,
+    AdversarialMirrorRoom,
+    AdversarialRatchetPolicy,
+    AdversarialScenarioGenerator,
+    AdversarialStandard,
+    FixedAdversarialSuite,
+    qualify_adversarial_delivery,
+)
+from .content_quality import (
+    ContentQualityDimension,
+    HighEndContentConstitution,
+    HighEndContentDeliveryDossier,
+    IndependentQualityJudgeReceipt,
+    QualityJudgePanelReceipt,
+    QUALITY_TAG_PREFIX,
+    qualify_high_end_content_delivery,
+)
 from .contracts import (
     EpisodeOutcome,
     HardExample,
@@ -31,6 +52,7 @@ from .engine import (
     MirrorRoom,
     MirrorRunReceipt,
 )
+from .memory import TrainingLearningArchive, TrainingLesson
 from .evaluation import (
     ComparisonReport,
     MetricComparison,
@@ -44,42 +66,64 @@ from .integrity import (
     inspect_split_integrity,
     validate_split_integrity,
 )
-from .promotion import (
-    MirrorPromotionEvidence,
-    qualify_for_external_promotion,
+from .promotion import MirrorPromotionEvidence, qualify_for_external_promotion
+from .observability import (
+    MirrorAttemptView,
+    MirrorMetricView,
+    MirrorRoomObservatory,
+    get_default_observatory,
+    mirror_room_file_tree,
 )
-from .sandbox import (
-    EpisodeReceipt,
-    MirrorSandbox,
-    SandboxExecutor,
-    SandboxUsage,
-)
+from .replay import MirrorRunReplayReceipt, verify_selected_lineage
+from .sandbox import EpisodeReceipt, MirrorSandbox, SandboxExecutor, SandboxUsage
 
 __all__ = [
+    "ADVERSARIAL_ATTEMPTS_REQUIRED",
+    "AdversarialAttemptReceipt",
+    "AdversarialCampaignReceipt",
+    "AdversarialChallengeContext",
+    "AdversarialDeliveryEvidence",
+    "AdversarialMirrorRoom",
+    "AdversarialRatchetPolicy",
+    "AdversarialScenarioGenerator",
+    "AdversarialStandard",
     "CandidateEvaluation",
     "CandidateGenerator",
-    "ComparisonReport",
     "CrossSplitSimilarity",
     "CurriculumItem",
     "CurriculumPlan",
     "CurriculumPolicy",
+    "ComparisonReport",
+    "ContentQualityDimension",
+    "DeterministicCoordinateLearner",
     "EpisodeOutcome",
     "EpisodeReceipt",
+    "FixedAdversarialSuite",
     "GenerationRecord",
     "HardExample",
+    "HighEndContentConstitution",
+    "HighEndContentDeliveryDossier",
+    "IndependentQualityJudgeReceipt",
     "LearningFeedback",
     "MetricComparison",
     "MirrorBudget",
     "MirrorCandidate",
     "MirrorMetricPolicy",
+    "NumericDimension",
+    "MirrorAttemptView",
+    "MirrorMetricView",
     "MirrorPromotionEvidence",
+    "MirrorRoomObservatory",
     "MirrorRoom",
     "MirrorRoomError",
     "MirrorRoomSpec",
     "MirrorRunReceipt",
+    "MirrorRunReplayReceipt",
     "MirrorSandbox",
     "MirrorScenario",
     "PairedEvaluator",
+    "QUALITY_TAG_PREFIX",
+    "QualityJudgePanelReceipt",
     "SandboxExecutor",
     "SandboxPolicy",
     "SandboxUsage",
@@ -87,8 +131,15 @@ __all__ = [
     "ScenarioSplit",
     "SplitIntegrityPolicy",
     "SplitIntegrityReport",
+    "TrainingLearningArchive",
+    "TrainingLesson",
     "build_curriculum",
+    "get_default_observatory",
     "inspect_split_integrity",
+    "mirror_room_file_tree",
+    "qualify_adversarial_delivery",
     "qualify_for_external_promotion",
+    "qualify_high_end_content_delivery",
     "validate_split_integrity",
+    "verify_selected_lineage",
 ]
