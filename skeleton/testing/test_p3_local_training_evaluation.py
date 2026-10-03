@@ -21,6 +21,7 @@ from skeleton.ai.runtime.training import (
     TrainingEvaluationGate,
     TrainingRepository,
     TrainingRunManifest,
+    TrainingStateError,
     VerifierReport,
     corpus_digest,
 )
@@ -190,3 +191,90 @@ def test_evaluation_suite_version_is_immutable(tmp_path):
     )
     with pytest.raises(ValueError,match="immutable"):
         ledger.register_suite(drifted)
+
+def test_reference_trainer_fails_before_execution_when_step_budget_is_exceeded(
+    tmp_path,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    constrained=TrainingRunManifest(
+        run_id="budgeted-run",
+        dataset_digest=manifest.dataset_digest,
+        base_model_digest=manifest.base_model_digest,
+        code_digest=manifest.code_digest,
+        environment_digest=manifest.environment_digest,
+        hyperparameters=manifest.hyperparameters,
+        seed=manifest.seed,
+        resource_budget={"max_steps":3},
+    )
+
+    with pytest.raises(TrainingStateError,match="training budget exceeded: max_steps"):
+        ReferenceLocalTrainer(datasets,runs).train(
+            constrained,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    with pytest.raises(KeyError):
+        runs.state(constrained.run_id)
+
+
+def test_reference_trainer_rejects_distributed_topology_it_cannot_execute(
+    tmp_path,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    distributed=TrainingRunManifest(
+        run_id="distributed-run",
+        dataset_digest=manifest.dataset_digest,
+        base_model_digest=manifest.base_model_digest,
+        code_digest=manifest.code_digest,
+        environment_digest=manifest.environment_digest,
+        hyperparameters=manifest.hyperparameters,
+        seed=manifest.seed,
+        world_size=2,
+        parallelism="data_parallel",
+        resource_budget={"max_steps":100},
+    )
+
+    with pytest.raises(
+        TrainingStateError,
+        match="only supports world_size=1 and parallelism=single",
+    ):
+        ReferenceLocalTrainer(datasets,runs).train(
+            distributed,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    with pytest.raises(KeyError):
+        runs.state(distributed.run_id)
+
+
+def test_reference_trainer_enforces_document_and_byte_budgets(tmp_path):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+    for run_id,budget_name,limit in (
+        ("doc-budget","max_documents",len(corpus)-1),
+        ("byte-budget","max_corpus_bytes",1),
+    ):
+        constrained=TrainingRunManifest(
+            run_id=run_id,
+            dataset_digest=manifest.dataset_digest,
+            base_model_digest=manifest.base_model_digest,
+            code_digest=manifest.code_digest,
+            environment_digest=manifest.environment_digest,
+            hyperparameters=manifest.hyperparameters,
+            seed=manifest.seed,
+            resource_budget={budget_name:limit},
+        )
+        with pytest.raises(
+            TrainingStateError,
+            match=f"training budget exceeded: {budget_name}",
+        ):
+            ReferenceLocalTrainer(datasets,runs).train(
+                constrained,
+                corpus,
+                order=2,
+                now=NOW,
+            )
+
