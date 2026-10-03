@@ -541,6 +541,7 @@ def _invocation(record, operation_id: str, payload: dict, *, cost: int = 1, late
         operation_id=operation_id,
         volume_id=record.spec.volume_id,
         spec_digest=record.spec.digest,
+        authority_digest=DeferredExecutor.authority_digest(record),
         payload_digest=DeferredExecutor.digest_payload(payload),
         cost_units=cost,
         latency_ms=latency,
@@ -627,6 +628,7 @@ def test_deferred_executor_rejects_payload_or_spec_drift_before_effect() -> None
         operation_id="spec-drift",
         volume_id=record.spec.volume_id,
         spec_digest=HEX_C,
+        authority_digest=DeferredExecutor.authority_digest(record),
         payload_digest=DeferredExecutor.digest_payload(payload),
         cost_units=1,
         latency_ms=1,
@@ -686,12 +688,14 @@ def test_deferred_executor_success_is_idempotent_and_content_bound() -> None:
     invocation=_invocation(record,"same-op",payload)
 
     first=executor.execute(invocation,payload)
+    first.result["answer"]=0
     second=executor.execute(invocation,payload)
 
-    assert first==second
-    assert first.status=="succeeded"
-    assert first.attempt==1
-    assert first.result_digest==DeferredExecutor.digest_payload({"answer":42})
+    assert first.receipt==second.receipt
+    assert second.receipt.status=="succeeded"
+    assert second.receipt.attempt==1
+    assert second.receipt.result_digest==DeferredExecutor.digest_payload({"answer":42})
+    assert second.result=={"answer":42}
     assert calls==[{"value":999}]
     assert payload=={"value":1}
 
@@ -734,7 +738,7 @@ def test_deferred_executor_failure_is_terminal_and_message_is_not_stored() -> No
     )
     executor.set_budget(
         "VOL-160",
-        Budget(max_attempts=2,max_cost_units=4,max_latency_ms=20),
+        Budget(max_attempts=1,max_cost_units=4,max_latency_ms=20),
     )
     payload={"value":1}
     invocation=_invocation(record,"terminal-failure",payload)
@@ -798,4 +802,48 @@ def test_deferred_executor_snapshot_is_deterministic() -> None:
     assert first==second
     assert [row["receipt"]["operation_id"] for row in first["operations"]]==["a","b"]
     assert len(first["snapshot_digest"])==64
+
+def test_deferred_executor_rejects_multi_attempt_budget_policy() -> None:
+    registry=build_registry()
+    _enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+
+    with pytest.raises(ValueError,match="max_attempts=1"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=2,max_cost_units=4,max_latency_ms=20),
+        )
+
+
+def test_deferred_executor_rejects_stale_authority_evidence_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"authority-drift",payload)
+
+    record.attach(
+        EvidenceReceipt(
+            volume_id="VOL-160",
+            head_sha=HEAD,
+            artifact_digests=(HEX_C,),
+            tests=("late:evidence",),
+            status="verified",
+        )
+    )
+
+    with pytest.raises(PermissionError,match="authority digest drift"):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
 
