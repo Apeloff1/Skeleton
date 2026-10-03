@@ -832,6 +832,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
 
     receipt_path = tmp_path / "tool-receipts.sqlite3"
     effects: list[str | None] = []
+    postconditions: list[str | None] = []
     tools = AsyncToolRuntime(
         receipt_store=SQLiteToolReceiptStore(receipt_path)
     )
@@ -935,6 +936,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     assert result.final_output == "write confirmed"
     assert result.verification_receipt["outcome"] == "passed"
     assert effects == [approval.approval_ref]
+    assert postconditions == ["artifact:approved-write"]
     assert result.usage["tool_calls"] == 1
     assert len(result.tool_receipts) == 1
     assert final_provider.requests
