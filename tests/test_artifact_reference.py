@@ -83,6 +83,23 @@ def _fixture(root: Path, *, executable: bool = False):
 
 
 class ArtifactReferenceTests(unittest.TestCase):
+    def test_canonical_backup_root_is_supported(self):
+        self.assertEqual(
+            refs._relative_snapshot_path(
+                "memory/mongo_backup/test_database/interactive_quizzes.bson",
+                field="target_path",
+            ),
+            "memory/mongo_backup/test_database/interactive_quizzes.bson",
+        )
+        with self.assertRaisesRegex(
+            refs.ArtifactReferenceError,
+            "approved artifact-history root",
+        ):
+            refs._relative_snapshot_path(
+                "memory/unapproved/blob.bin",
+                field="target_path",
+            )
+
     def test_reference_paths_require_portable_normalized_segments(self):
         for suffix in ("a//b", "a/./b", "a/../b", "a\\b", "a:b"):
             with self.subTest(suffix=suffix):
