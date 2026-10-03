@@ -90,7 +90,6 @@ def _stale_plan(plan: ExecutionPlan, completed: set[str], failed: set[str], veri
 
 def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outcome,
                       repository_fingerprint: str, expected_plan_fingerprint: str | None = None) -> ExecutionPlan:
-    """Apply one observed result; reject invalid or stale transitions."""
     if expected_plan_fingerprint is not None and expected_plan_fingerprint != plan.fingerprint:
         raise ValueError("execution plan fingerprint mismatch")
     if repository_fingerprint != plan.repository_fingerprint:
@@ -136,11 +135,10 @@ def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (
     graph = build_work_graph(model, limit=max(limit, 32))
     inherited = state or ExecutionState()
     completed_set = set(completed) | set(inherited.released_work)
-    if retry_failed:
-        completed_set -= set(inherited.failed_work)
-    else:
-        completed_set -= set(inherited.failed_work)
     ready = graph.ready(completed_set, active_conflicts, limit=limit)
+    failed = set(inherited.failed_work)
+    if not retry_failed:
+        ready = tuple(node for node in ready if node.identity not in failed)
     ready_ids = {node.identity for node in ready}
     steps: list[PlanStep] = []
     for node in ready:
