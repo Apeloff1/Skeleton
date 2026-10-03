@@ -220,9 +220,54 @@ class PrivacyDecision:
         )
 
 
+def derive_privacy_label(
+    *,
+    label_id: str,
+    parents: Iterable[PrivacyLabel],
+    source_ref: str,
+) -> PrivacyLabel:
+    """Derive the most restrictive label shared by all parent evidence."""
+
+    parent_rows = tuple(parents)
+    if not parent_rows:
+        raise PrivacyEngineError("derived label requires at least one parent")
+    if any(not isinstance(item, PrivacyLabel) for item in parent_rows):
+        raise PrivacyEngineError("parents must contain PrivacyLabel values")
+
+    classification = max(
+        (item.classification for item in parent_rows),
+        key=lambda value: _LEVELS[value],
+    )
+    purposes = set(parent_rows[0].allowed_purposes)
+    jurisdictions = set(parent_rows[0].jurisdiction_scopes)
+    for item in parent_rows[1:]:
+        purposes.intersection_update(item.allowed_purposes)
+        jurisdictions.intersection_update(item.jurisdiction_scopes)
+    if not purposes:
+        raise PrivacyEngineError(
+            "parent labels have no common allowed purpose"
+        )
+    if not jurisdictions:
+        raise PrivacyEngineError(
+            "parent labels have no common jurisdiction scope"
+        )
+
+    return PrivacyLabel(
+        label_id=label_id,
+        classification=classification,
+        allowed_purposes=tuple(sorted(purposes)),
+        jurisdiction_scopes=tuple(sorted(jurisdictions)),
+        source_ref=source_ref,
+        parent_label_digests=tuple(
+            sorted({item.digest for item in parent_rows})
+        ),
+    )
+
+
 __all__ = [
     "PrivacyDecision",
     "PrivacyEngineError",
     "PrivacyLabel",
     "PurposeGrant",
+    "derive_privacy_label",
 ]
