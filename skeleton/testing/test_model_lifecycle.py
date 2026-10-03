@@ -8,12 +8,14 @@ import pytest
 
 from skeleton.ai.runtime.inference.local import ReferenceNGramModel
 from skeleton.ai.runtime.product.activation import (
+    LocalModelActivationManifest,
     build_local_model_activation_manifest,
 )
 from skeleton.ai.runtime.product.lifecycle import (
     ModelLifecycleError,
     ModelLifecycleRegistry,
     ModelLifecycleState,
+    ModelLifecycleTransitionReceipt,
 )
 from skeleton.ai.runtime.product.model_program_bridge import (
     BridgedModelProgramArtifact,
@@ -67,7 +69,15 @@ def _write_model(
     return model, payload, hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _fixture(tmp_path: Path):
+def _fixture(
+    tmp_path: Path,
+) -> tuple[
+    Path,
+    Path,
+    BridgedModelProgramArtifact,
+    LearningQualificationBundle,
+    ModelPromotionReceipt,
+]:
     baseline_path = tmp_path / "baseline.json"
     candidate_path = tmp_path / "candidate.json"
     baseline, _, _ = _write_model(
@@ -155,23 +165,67 @@ def _fixture(tmp_path: Path):
         evaluation_refs=promotion_refs,
         verifier_id="promotion-verifier",
     )
-    activation = build_local_model_activation_manifest(
+    return (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    )
+
+
+def _activation(
+    *,
+    baseline_path: Path,
+    candidate_path: Path,
+    bridged: BridgedModelProgramArtifact,
+    qualification: LearningQualificationBundle,
+    promotion: ModelPromotionReceipt,
+    promoted_transition: ModelLifecycleTransitionReceipt,
+) -> LocalModelActivationManifest:
+    return build_local_model_activation_manifest(
         candidate_path=candidate_path,
         baseline_path=baseline_path,
         promotion_receipt=promotion,
         qualification=qualification,
+        lifecycle_promotion_transition=promoted_transition,
         model_program_bridge_digest=bridged.bridge_digest,
         operator_authorization_ref="operator-approval:lifecycle-v2",
         cache_size=0,
         default_seed=11,
     )
-    return bridged, qualification, promotion, activation
+
+
+def _promote(
+    registry: ModelLifecycleRegistry,
+    bridged: BridgedModelProgramArtifact,
+    qualification: LearningQualificationBundle,
+    promotion: ModelPromotionReceipt,
+    *,
+    validation_verifier: str = "lifecycle-validation-verifier",
+) -> ModelLifecycleTransitionReceipt:
+    registry.register_candidate(
+        bridged,
+        authority_id="training-registration-authority",
+    )
+    registry.validate(
+        bridged.artifact.model_digest,
+        qualification,
+        verifier_id=validation_verifier,
+    )
+    return registry.promote(bridged.artifact.model_digest, promotion)
 
 
 def test_model_lifecycle_orders_candidate_to_activation_and_rollback(
     tmp_path: Path,
 ) -> None:
-    bridged, qualification, promotion, activation = _fixture(tmp_path)
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
     registry = ModelLifecycleRegistry()
 
     candidate = registry.register_candidate(
@@ -196,6 +250,14 @@ def test_model_lifecycle_orders_candidate_to_activation_and_rollback(
     assert promoted.from_state is ModelLifecycleState.VALIDATED
     assert promoted.to_state is ModelLifecycleState.PROMOTED
 
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=promoted,
+    )
     activated = registry.activate(
         bridged.artifact.model_digest,
         activation,
@@ -207,7 +269,11 @@ def test_model_lifecycle_orders_candidate_to_activation_and_rollback(
     snapshot = registry.snapshot(bridged.artifact.model_digest)
     assert snapshot.state is ModelLifecycleState.ACTIVATED
     assert snapshot.transition_count == 4
-    assert snapshot.activation_manifest_digest == activation.manifest_digest
+    assert snapshot.promotion_transition_digest == promoted.digest
+    assert (
+        snapshot.activation_manifest_digest
+        == activation.manifest_digest
+    )
     assert snapshot.rollback_model_digest == activation.baseline_model_digest
     assert registry.verify_history(bridged.artifact.model_digest) is True
 
@@ -236,7 +302,7 @@ def test_model_lifecycle_orders_candidate_to_activation_and_rollback(
 def test_lifecycle_rejects_skipping_validation(
     tmp_path: Path,
 ) -> None:
-    bridged, _qualification, promotion, _activation = _fixture(tmp_path)
+    _, _, bridged, _qualification, promotion = _fixture(tmp_path)
     registry = ModelLifecycleRegistry()
     registry.register_candidate(
         bridged,
@@ -256,7 +322,7 @@ def test_lifecycle_rejects_skipping_validation(
 def test_lifecycle_validation_requires_independent_authority(
     tmp_path: Path,
 ) -> None:
-    bridged, qualification, _promotion, _activation = _fixture(tmp_path)
+    _, _, bridged, qualification, _promotion = _fixture(tmp_path)
     registry = ModelLifecycleRegistry()
     registry.register_candidate(
         bridged,
@@ -277,7 +343,31 @@ def test_lifecycle_validation_requires_independent_authority(
 def test_lifecycle_rejects_activation_before_promotion(
     tmp_path: Path,
 ) -> None:
-    bridged, qualification, _promotion, activation = _fixture(tmp_path)
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
+
+    staging = ModelLifecycleRegistry()
+    staging_promoted = _promote(
+        staging,
+        bridged,
+        qualification,
+        promotion,
+        validation_verifier="staging-lifecycle-validator",
+    )
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=staging_promoted,
+    )
+
     registry = ModelLifecycleRegistry()
     registry.register_candidate(
         bridged,
@@ -303,18 +393,28 @@ def test_lifecycle_rejects_activation_before_promotion(
 def test_lifecycle_deployment_authority_is_independent(
     tmp_path: Path,
 ) -> None:
-    bridged, qualification, promotion, activation = _fixture(tmp_path)
-    registry = ModelLifecycleRegistry()
-    registry.register_candidate(
+    (
+        baseline_path,
+        candidate_path,
         bridged,
-        authority_id="training-registration-authority",
-    )
-    registry.validate(
-        bridged.artifact.model_digest,
         qualification,
-        verifier_id="lifecycle-validation-verifier",
+        promotion,
+    ) = _fixture(tmp_path)
+    registry = ModelLifecycleRegistry()
+    promoted = _promote(
+        registry,
+        bridged,
+        qualification,
+        promotion,
     )
-    registry.promote(bridged.artifact.model_digest, promotion)
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=promoted,
+    )
 
     with pytest.raises(
         ModelLifecycleError,
@@ -327,23 +427,80 @@ def test_lifecycle_deployment_authority_is_independent(
         )
 
 
+def test_lifecycle_rejects_manifest_from_other_promotion_chain(
+    tmp_path: Path,
+) -> None:
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
+
+    other = ModelLifecycleRegistry()
+    other_promoted = _promote(
+        other,
+        bridged,
+        qualification,
+        promotion,
+        validation_verifier="other-lifecycle-validator",
+    )
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=other_promoted,
+    )
+
+    registry = ModelLifecycleRegistry()
+    promoted = _promote(
+        registry,
+        bridged,
+        qualification,
+        promotion,
+        validation_verifier="canonical-lifecycle-validator",
+    )
+    assert promoted.digest != other_promoted.digest
+    with pytest.raises(
+        ModelLifecycleError,
+        match="lifecycle promotion transition drift",
+    ):
+        registry.activate(
+            bridged.artifact.model_digest,
+            activation,
+            deployment_authority_id="deployment-authority",
+        )
+
 
 def test_lifecycle_state_survives_restart_and_can_roll_back(
     tmp_path: Path,
 ) -> None:
-    bridged, qualification, promotion, activation = _fixture(tmp_path)
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
     state_path = tmp_path / "model-lifecycle.json"
     registry = ModelLifecycleRegistry(state_path)
-    registry.register_candidate(
+    promoted = _promote(
+        registry,
         bridged,
-        authority_id="training-registration-authority",
-    )
-    registry.validate(
-        bridged.artifact.model_digest,
         qualification,
-        verifier_id="lifecycle-validation-verifier",
+        promotion,
     )
-    registry.promote(bridged.artifact.model_digest, promotion)
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=promoted,
+    )
     registry.activate(
         bridged.artifact.model_digest,
         activation,
@@ -384,7 +541,7 @@ def test_lifecycle_state_survives_restart_and_can_roll_back(
 def test_lifecycle_state_tamper_fails_closed(
     tmp_path: Path,
 ) -> None:
-    bridged, _qualification, _promotion, _activation = _fixture(tmp_path)
+    _, _, bridged, _qualification, _promotion = _fixture(tmp_path)
     state_path = tmp_path / "model-lifecycle.json"
     registry = ModelLifecycleRegistry(state_path)
     registry.register_candidate(
