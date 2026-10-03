@@ -546,6 +546,8 @@ def build_learning_candidate_artifact(
     efficiency_policy: TrainingEfficiencyPolicy | None = None,
     method_allocation: AdaptiveMethodAllocation | None = None,
     gradient_accumulation_steps: int = 4,
+    supplemental_examples: Sequence[TrainingExample] = (),
+    supplemental_learning_opt_in: bool = False,
 ) -> dict[str, object]:
     """Train one *candidate* artifact from an accepted canonical corpus.
 
@@ -596,7 +598,7 @@ def build_learning_candidate_artifact(
         build_multi_method_recurrent_artifact,
     )
 
-    examples = tuple(
+    conversation_examples = tuple(
         TrainingExample(
             example_id=pair.assistant_message_id,
             prompt=pair.user_text,
@@ -610,6 +612,23 @@ def build_learning_candidate_artifact(
         )
         for pair in candidate.pairs
     )
+    supplements = tuple(supplemental_examples)
+    if any(not isinstance(item, TrainingExample) for item in supplements):
+        raise TypeError(
+            "supplemental_examples must contain TrainingExample values"
+        )
+    if supplements and supplemental_learning_opt_in is not True:
+        raise CanonicalLearningHandoffError(
+            "supplemental learning examples require explicit opt-in"
+        )
+    all_example_ids = [
+        item.example_id for item in (*conversation_examples, *supplements)
+    ]
+    if len(all_example_ids) != len(set(all_example_ids)):
+        raise CanonicalLearningHandoffError(
+            "supplemental learning example ids must not collide"
+        )
+    examples = (*conversation_examples, *supplements)
 
     if method_allocation is not None:
         if not isinstance(method_allocation, AdaptiveMethodAllocation):
@@ -730,6 +749,15 @@ def build_learning_candidate_artifact(
             if method_allocation is None
             else method_allocation.allocation_digest
         ),
+        "supplemental_example_digests": [
+            item.digest for item in supplements
+        ],
+        "visual_observation_digests": receipt[
+            "training_plan"
+        ].get("visual_observation_digests", []),
+        "camera_coverage_digests": receipt[
+            "training_plan"
+        ].get("camera_coverage_digests", []),
         "baseline": baseline,
         "promotion_authority": False,
     }
@@ -742,6 +770,10 @@ def build_learning_candidate_artifact(
         "learning_candidate_ref": candidate.reference,
         "learning_candidate_digest": candidate.identity_digest,
         "learning_pair_count": len(candidate.pairs),
+        "supplemental_learning_example_count": len(supplements),
+        "supplemental_learning_example_digests": [
+            item.digest for item in supplements
+        ],
         "promotion_state": "candidate_only",
         "qualification": qualification,
         "training_plan": receipt["training_plan"],
