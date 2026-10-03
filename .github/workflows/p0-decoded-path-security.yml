@@ -16,6 +16,11 @@ on:
       - ".github/workflows/p0-decoded-path-security.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-decoded-path-security-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
