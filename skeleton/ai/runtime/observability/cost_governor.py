@@ -30,7 +30,9 @@ from skeleton.intelligence.admission import (
     AdmissionRequest,
     AdmissionStatus,
     ResourceBudget,
+    RuntimePressure,
     UsageEstimate,
+    admission_decision_id,
 )
 from skeleton.intelligence.admission_runtime import (
     AdmissionCompletion,
@@ -1512,6 +1514,45 @@ class CostGovernor:
         if not required_remaining.issubset(remaining):
             raise CostGovernorError(
                 "runtime lease journal is missing remaining-budget fields"
+            )
+
+        concurrency_remaining = remaining["concurrency"]
+        queue_remaining = remaining["queue_depth"]
+        if (
+            isinstance(concurrency_remaining, bool)
+            or not isinstance(concurrency_remaining, int)
+            or concurrency_remaining < 1
+            or concurrency_remaining > selected.budget.max_concurrency
+            or isinstance(queue_remaining, bool)
+            or not isinstance(queue_remaining, int)
+            or queue_remaining < 1
+            or queue_remaining > selected.budget.max_queue_depth
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal pressure remainder is invalid"
+            )
+        original_pressure = RuntimePressure(
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
+        )
+        evaluated_request = replace(
+            selected,
+            pressure=original_pressure,
+        )
+        expected_decision_id = admission_decision_id(
+            evaluated_request,
+            AdmissionStatus.ADMIT,
+            "within_budget",
+        )
+        if metadata.decision_id != expected_decision_id:
+            raise CostGovernorConflict(
+                "runtime lease journal decision identity is invalid"
             )
 
         decision = AdmissionDecision(
