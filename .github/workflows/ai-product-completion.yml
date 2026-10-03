@@ -48,6 +48,11 @@ on:
       - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_gated_recurrent_training.py"
       - "skeleton/testing/test_learning_qualification.py"
+      - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/eval/firewall.py"
+      - "skeleton/ai/evaluation/firewall.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
@@ -104,6 +109,11 @@ on:
       - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_gated_recurrent_training.py"
       - "skeleton/testing/test_learning_qualification.py"
+      - "skeleton/testing/test_evaluation_firewall.py"
+      - "skeleton/eval/firewall.py"
+      - "skeleton/ai/evaluation/firewall.py"
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
@@ -204,6 +214,8 @@ jobs:
           skeleton/testing/test_capability_curriculum.py
           skeleton/testing/test_gated_recurrent_training.py
           skeleton/testing/test_learning_qualification.py
+          skeleton/testing/test_evaluation_firewall.py
+          skeleton/testing/test_mirror_room_learning.py
           skeleton/testing/test_model_program_bridge.py
           skeleton/testing/test_local_model_artifact.py
           skeleton/testing/test_vs001_functional_ai.py
