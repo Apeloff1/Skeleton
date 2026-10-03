@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ai-effect-pass-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ai-effect-pass-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   qualify:
