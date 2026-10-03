@@ -16,7 +16,8 @@ from skeleton.intelligence.admission import (
     ResourceBudget,
     UsageEstimate,
 )
-from skeleton.intelligence.quota import TenantQuota
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
+from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
 
 
 def _quota() -> TenantQuota:
@@ -297,3 +298,46 @@ def test_tampered_durable_unknown_category_fails_closed(tmp_path) -> None:
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["completions"] == 0
+
+
+@pytest.mark.parametrize("durable", [False, True])
+def test_atomic_recovery_snapshot_returns_reservation_and_unknown_markers(
+    tmp_path,
+    durable,
+) -> None:
+    if durable:
+        ledger = SqliteTenantQuotaLedger(tmp_path / "atomic-recovery.sqlite3")
+    else:
+        ledger = TenantQuotaLedger()
+    ledger.configure("tenant-a", _quota())
+
+    request = _request("op-atomic-recovery")
+    reservation = ledger.reserve(
+        request.tenant_id,
+        request.operation_id,
+        request.estimate,
+        now=10.0,
+    )
+    marker = ledger.mark_usage_unknown(
+        reservation.reservation_id,
+        "provider-atomic-unknown",
+        "provider",
+        now=10.5,
+    )
+
+    state = ledger.recovery_state_for_operation(
+        request.tenant_id,
+        request.operation_id,
+    )
+    assert state is not None
+    recovered_reservation, unresolved = state
+    assert recovered_reservation == reservation
+    assert unresolved == (marker,)
+
+    assert (
+        ledger.recovery_state_for_operation(
+            request.tenant_id,
+            "missing-operation",
+        )
+        is None
+    )
