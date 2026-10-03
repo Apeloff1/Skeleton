@@ -46,7 +46,22 @@ class WorkGraph:
             enriched.append(WorkNode(n.identity,n.lane,n.zone,n.priority,n.objective,n.conflict_keys,n.prerequisites,n.evidence,n.verification_paths,n.readiness,n.decision_score,n.topology_confidence,n.blast_radius,depth[n.identity],unlock,strategic))
         object.__setattr__(self,"_ordered_nodes",tuple(enriched)); object.__setattr__(self,"_by_identity",{n.identity:n for n in enriched})
         object.__setattr__(self,"_depth",depth); object.__setattr__(self,"_descendants",{k:frozenset(v) for k,v in descendants.items()})
-    def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":max(self._depth.values(),default=0)}
+    @property
+    def ordered_nodes(self)->tuple[WorkNode,...]:
+        """Stable enriched public view of the graph nodes."""
+        return self._ordered_nodes
+
+    def node(self, identity:str)->WorkNode:
+        try:
+            return self._by_identity[identity]
+        except KeyError as exc:
+            raise ValueError(f"unknown work identity: {identity}") from exc
+
+    @property
+    def critical_depth(self)->int:
+        return max(self._depth.values(),default=0)
+
+    def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck()}
     def frontier(self,completed:Iterable[str]=()):
         done=set(completed); return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity))
     def ready(self,completed=(),active_conflicts=(),*,limit=8):
@@ -60,9 +75,7 @@ class WorkGraph:
         return tuple(selected)
     def blocked(self,completed=()):
         done=set(completed); return tuple(n for n in self._ordered_nodes if n.identity not in done and any(p not in done for p in n.prerequisites))
-    def unlock_potential(self,identity):
-        if identity not in self._by_identity: raise ValueError(f"unknown work identity: {identity}")
-        return len(self._descendants[identity])
+    def unlock_potential(self,identity): return len(self._descendants[self.node(identity).identity])
     def critical_path(self):
         if not self._ordered_nodes:return ()
         terminal=max(self._ordered_nodes,key=lambda n:(self._depth[n.identity],n.strategic_score,n.priority,n.identity)); path=[terminal]
@@ -74,8 +87,7 @@ class WorkGraph:
         if not frontier:return None
         return max(frontier,key=lambda n:(len(self._descendants[n.identity]),self._depth[n.identity],n.strategic_score,n.priority,n.identity)).identity
     def parallelism_hint(self,identity):
-        if identity not in self._by_identity: raise ValueError(f"unknown work identity: {identity}")
-        n=self._by_identity[identity]
+        n=self.node(identity)
         peers=[x for x in self._ordered_nodes if x.identity!=identity and not (set(x.conflict_keys)&set(n.conflict_keys))]
         return min(len(peers),32)
     def max_parallelism(self,completed=()):
