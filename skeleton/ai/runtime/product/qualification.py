@@ -191,14 +191,16 @@ class LearningQualificationBundle:
         verifier identity, and the already-bound evidence references.
         """
 
-        verifier = (
-            self.mirror_verifier_id
-            if verifier_id is None
-            else _text(verifier_id, "lifecycle verifier_id")
-        )
+        if verifier_id is None:
+            raise LearningQualificationError(
+                "lifecycle validation requires an explicit independent verifier"
+            )
+        verifier = _text(verifier_id, "lifecycle verifier_id")
+        if verifier == self.mirror_verifier_id:
+            raise LearningQualificationError(
+                "lifecycle verifier must differ from Mirror verifier"
+            )
         if verifier == self.firewall_evaluator_identity:
-            # Distinct identities are preferable so one evaluator does not
-            # silently become the sole cross-plane authority.
             raise LearningQualificationError(
                 "lifecycle verifier must differ from firewall evaluator identity"
             )
@@ -271,6 +273,45 @@ def qualify_learning_candidate(
     if plan_digest != binding.training_plan_digest:
         raise LearningQualificationError(
             "training receipt plan identity drift"
+        )
+
+    evaluation_manifest = training_receipt.get("evaluation_manifest")
+    if not isinstance(evaluation_manifest, Mapping):
+        raise LearningQualificationError(
+            "training receipt lacks evaluation_manifest"
+        )
+    manifest_candidate = _sha(
+        evaluation_manifest.get("candidate_model_digest"),
+        "evaluation manifest candidate model digest",
+    )
+    manifest_artifact = _sha(
+        evaluation_manifest.get("candidate_artifact_sha256"),
+        "evaluation manifest candidate artifact digest",
+    )
+    manifest_plan = _sha(
+        evaluation_manifest.get("training_plan_digest"),
+        "evaluation manifest training plan digest",
+    )
+    if (
+        manifest_candidate != binding.candidate_model_digest
+        or manifest_artifact != binding.candidate_artifact_sha256
+        or manifest_plan != binding.training_plan_digest
+    ):
+        raise LearningQualificationError(
+            "training evaluation manifest candidate identity drift"
+        )
+    baseline = evaluation_manifest.get("baseline")
+    if not isinstance(baseline, Mapping):
+        raise LearningQualificationError(
+            "promotion qualification requires an authenticated baseline"
+        )
+    baseline_model = _sha(
+        baseline.get("model_digest"),
+        "evaluation manifest baseline model digest",
+    )
+    if baseline_model != binding.baseline_model_digest:
+        raise LearningQualificationError(
+            "training evaluation manifest baseline identity drift"
         )
 
     receipt_allocation = training_receipt.get("method_allocation")
