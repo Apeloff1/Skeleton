@@ -696,6 +696,7 @@ class CanonicalConversationAIRuntime:
             local_model_digest=(
                 self.functional_runtime.local_model.engine.model.model_digest
             ),
+            local_runtime_digest=self.functional_runtime.local_model.runtime_digest,
             final_output_digest=hashlib.sha256(
                 terminal.final_output.encode("utf-8")
             ).hexdigest(),
