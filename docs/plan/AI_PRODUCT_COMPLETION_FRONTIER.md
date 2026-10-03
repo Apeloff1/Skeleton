@@ -254,6 +254,36 @@ A broken candidate is deleted rather than left behind as a plausible artifact.
 Evaluation firewall, Mirror Room qualification, promotion, rollout and rollback
 remain distinct authorities.
 
+### 18. Multi-method training and all-angle view coverage
+
+The reverse path now compiles one accepted learning set through a single
+content-addressed multi-method training authority instead of requiring separate
+trainers for each learning style. The compiler can materialize 19 learning
+families: causal LM, supervised instruction, self-supervised span reconstruction,
+preference, distillation, contrastive, replay, curriculum, adversarial
+robustness, multiview grounding, denoising autoencoding, sequence-to-sequence,
+reward modeling, reinforcement traces, imitation, retrieval-grounded training,
+pseudo-label/semi-supervised training, multitask training and active-learning
+views.
+
+Methods with missing evidence are skipped rather than fabricated. The training
+receipt records configured, materialized and skipped methods, exact source
+digests, method counts, budget drops and the deterministic plan digest.
+
+Multiview training has an independent spherical camera-coverage contract. It
+covers azimuth, elevation and roll, including canonicalized top/bottom poles,
+and can vary FOV, distance and exposure under hard view-count bounds. Training
+uses deterministic stratified subsets so a complete 360-degree source plan does
+not explode into an unbounded Cartesian product. The view layer emits pose and
+augmentation identities only; it never claims to have rendered image pixels.
+
+The recurrent trainer now removes avoidable inner-loop work: multi-method
+corpora are compiled in memory, gradient buffers are reused, embedding updates
+are sparse by touched token row, epoch loss is collected from the existing
+forward pass, and the multi-method builder uses bounded early stopping when
+improvement plateaus. Exact artifact validation and candidate-only promotion
+semantics remain unchanged.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -278,7 +308,12 @@ remain distinct authorities.
 - frontend conversation transport route/reconnect contract checks;
 - explicit accepted-turn -> deterministic learning-candidate lineage;
 - privacy/tool-use learning admission guards;
-- candidate-artifact training that refuses active-model overwrite.
+- candidate-artifact training that refuses active-model overwrite;
+- deterministic 19-family training-plan compilation and missing-signal skipping;
+- in-memory multi-method artifact construction with bounded early stopping;
+- sparse/reused recurrent gradient execution;
+- spherical azimuth/elevation/roll/FOV camera coverage and bounded multiview
+  training subsets.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
