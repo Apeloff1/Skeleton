@@ -484,13 +484,15 @@ def propose(
                 before_apply = _git("status", "--porcelain=v1", "--untracked-files=all")
                 if before_apply.strip():
                     raise RuntimeError("Studio worktree is dirty before candidate application")
+                new_paths = [path for path in task.paths if not Path(path).exists()]
                 try:
                     subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
                     validation_commands = _discover_validation_commands(task.paths)
                     validation_ok, validation_output = _run_validation_commands(validation_commands)
                 except BaseException:
                     _git("reset", "--hard", "HEAD", check=False)
-                    _git("clean", "-fd", "--", *[path for path in task.paths if not Path(path).exists()], check=False)
+                    if new_paths:
+                        _git("clean", "-fd", "--", *new_paths, check=False)
                     raise
                 if not validation_ok:
                     audit.emit(
