@@ -611,8 +611,17 @@ def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
     def unavailable_collection():
         raise OSError("legacy storage unavailable")
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
-        captured["context"] = conversation_context
+    async def generate(
+        query,
+        recalled,
+        needs_reasoning,
+        *,
+        conversation_history=None,
+        project_context="",
+        **_engine_scope,
+    ):
+        del query, recalled, needs_reasoning, project_context
+        captured["history"] = list(conversation_history or ())
         return {"text": "canonical", "tier": "free", "model": "test"}
 
     monkeypatch.setattr(route, "_chat_col", unavailable_collection)
@@ -639,7 +648,7 @@ def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
     assert response.status_code == 200
     assert response.json()["history_source"] == "canonical"
     assert response.json()["persisted"] is True
-    assert captured["context"] == ""
+    assert captured["history"] == []
     assert "ATTACKER HISTORY" not in response.text
 
 
