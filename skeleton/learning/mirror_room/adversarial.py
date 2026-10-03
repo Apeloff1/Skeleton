@@ -48,6 +48,7 @@ from .engine import (
 )
 from .evaluation import ComparisonReport, PairedEvaluator
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
+from .observability import MirrorRoomObservatory, get_default_observatory
 
 
 ADVERSARIAL_ATTEMPTS_REQUIRED = 100
@@ -1184,6 +1185,7 @@ class AdversarialMirrorRoom:
         adversary: AdversarialScenarioGenerator,
         *,
         policy: AdversarialRatchetPolicy | None = None,
+        observatory: MirrorRoomObservatory | None = None,
     ) -> None:
         if not isinstance(spec, MirrorRoomSpec):
             raise TypeError("spec must be MirrorRoomSpec")
@@ -1202,6 +1204,7 @@ class AdversarialMirrorRoom:
         self.executor = executor
         self.adversary = adversary
         self.policy = policy or AdversarialRatchetPolicy()
+        self.observatory = observatory or get_default_observatory()
         if (
             self.spec.budget.max_generations
             < self.policy.attempts_required
@@ -1357,6 +1360,10 @@ class AdversarialMirrorRoom:
         evaluator = PairedEvaluator(self.spec, sandbox)
         original_baseline = self.spec.production_baseline
         baseline = original_baseline
+        self.observatory.begin(
+            run_id=run_id,
+            baseline=original_baseline,
+        )
         seen_candidate_ids = {baseline.candidate_id}
         seen_candidate_digests = {baseline.digest}
         seen_behavior_digests = {baseline.behavior_digest}
@@ -1582,6 +1589,7 @@ class AdversarialMirrorRoom:
                 standard_after=standard_after,
             )
             receipts.append(receipt)
+            self.observatory.record_attempt(receipt)
 
             new_hard = challenge_report.hard_examples(
                 limit=self.spec.hard_example_limit
@@ -1631,7 +1639,7 @@ class AdversarialMirrorRoom:
             and holdout_report is not None
             and holdout_report.passed
         )
-        return AdversarialCampaignReceipt(
+        campaign = AdversarialCampaignReceipt(
             run_id=run_id,
             spec_digest=self.spec.digest,
             manifest_digest=self.spec.manifest.manifest_digest,
@@ -1648,6 +1656,8 @@ class AdversarialMirrorRoom:
             usage=sandbox.usage,
             delivery_ready=delivery_ready,
         )
+        self.observatory.finish(campaign)
+        return campaign
 
 
 def qualify_adversarial_delivery(

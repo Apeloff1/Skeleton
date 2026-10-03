@@ -136,3 +136,18 @@ def test_independent_p1_verifier_rejects_missing_mirror_replay_surface(
 
     assert receipt["valid"] is False
     assert any("mirror_room/replay.py" in error for error in receipt["errors"])
+
+def test_independent_p1_verifier_rejects_missing_mirror_observatory_surface(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "skeleton/learning/mirror_room/observability.py"
+    path.unlink()
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "mirror_room/observability.py" in error
+        for error in receipt["errors"]
+    )

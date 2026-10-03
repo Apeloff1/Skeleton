@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "mirror-room-product-tree-v1",
+  "authority": "evidence-only-observability",
+  "production_authority": false,
+  "root": {
+    "name": "Mirror Room",
+    "surfaces": [
+      {
+        "path": "skeleton/learning/mirror_room",
+        "role": "canonical learning and adversarial ratchet"
+      },
+      {
+        "path": "skeleton/ai/learning/mirror_room",
+        "role": "governed AI-tree mirror"
+      },
+      {
+        "path": "backend/routes/mirror_room.py",
+        "role": "read-only observability API"
+      },
+      {
+        "path": "frontend/features/MirrorRoom",
+        "role": "visual quality observatory"
+      },
+      {
+        "path": "frontend/app/mirror-room.tsx",
+        "role": "Expo route"
+      },
+      {
+        "path": "skeleton/testing/test_mirror_room_observability.py",
+        "role": "projection and UI contract tests"
+      },
+      {
+        "path": ".github/workflows/p1-feedback-release-closure.yml",
+        "role": "focused exact-head gate"
+      }
+    ]
+  },
+  "invariants": [
+    "accepted challenger becomes next ratchet baseline",
+    "rejected challenger cannot lower or replace baseline",
+    "quality and detail projection is derived from validation receipts",
+    "observatory is read-only and cannot influence learning or promotion",
+    "delivery remains locked until the 100-attempt campaign gates pass"
+  ]
+}

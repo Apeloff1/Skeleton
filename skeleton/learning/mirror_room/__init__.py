@@ -54,6 +54,13 @@ from .evaluation import (
     ScenarioComparison,
 )
 from .promotion import MirrorPromotionEvidence, qualify_for_external_promotion
+from .observability import (
+    MirrorAttemptView,
+    MirrorMetricView,
+    MirrorRoomObservatory,
+    get_default_observatory,
+    mirror_room_file_tree,
+)
 from .replay import MirrorRunReplayReceipt, verify_selected_lineage
 from .sandbox import EpisodeReceipt, MirrorSandbox, SandboxExecutor, SandboxUsage
 
@@ -86,7 +93,10 @@ __all__ = [
     "MirrorCandidate",
     "MirrorMetricPolicy",
     "NumericDimension",
+    "MirrorAttemptView",
+    "MirrorMetricView",
     "MirrorPromotionEvidence",
+    "MirrorRoomObservatory",
     "MirrorRoom",
     "MirrorRoomError",
     "MirrorRoomSpec",
@@ -104,6 +114,8 @@ __all__ = [
     "ScenarioSplit",
     "TrainingLearningArchive",
     "TrainingLesson",
+    "get_default_observatory",
+    "mirror_room_file_tree",
     "qualify_adversarial_delivery",
     "qualify_for_external_promotion",
     "qualify_high_end_content_delivery",

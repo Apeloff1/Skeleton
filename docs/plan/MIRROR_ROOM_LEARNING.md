@@ -251,3 +251,33 @@ standard to be at least four times the initial acceptance bar and requires
 accepted upgrades in every 25-attempt quartile. A campaign that improves early
 and then spends the remaining attempts producing decorative or stagnant
 variants cannot qualify as high-end delivery.
+
+## Mirror Room Observatory
+
+The Mirror Room now includes an evidence-only product surface that makes the
+100-attempt ratchet visible while it runs. The learning engine publishes only
+immutable receipt projections to `MirrorRoomObservatory`; the UI never writes
+into candidate generation, evaluation, promotion, or production state.
+
+The Observatory exposes:
+
+- a 1..100 ratchet grid showing accepted and rejected challengers;
+- baseline-versus-challenger quality and detail comparisons for every attempt;
+- cumulative quality/detail ascent curves using the effective accepted baseline;
+- per-content-dimension deltas so quality growth is inspectable rather than a
+  single opaque score;
+- progressive gain bars, retained adversarial-suite size, and rejection reasons;
+- delivery gates for attempt completion, cumulative gauntlet, sealed holdout,
+  and final delivery readiness;
+- a governed file tree spanning the canonical learning engine, AI mirror,
+  backend read adapter, frontend screen, tests, and CI gate.
+
+The projection contains candidate identities and aggregate metric evidence only.
+It does not expose scenario payloads or holdout content. The API is read-only
+and marked `Cache-Control: no-store` so a user watching an active campaign sees
+fresh evidence.
+
+The physical product tree is also declared in
+`machine/mirror_room_file_tree.json`. The broader governed AI mapping continues
+to bind `skeleton/learning` to `skeleton/ai/learning` by exact git tree
+identity.

@@ -114,6 +114,42 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "class HighEndContentDeliveryDossier",
         "def qualify_high_end_content_delivery(",
     ),
+    "skeleton/learning/mirror_room/observability.py": (
+        "class MirrorMetricView",
+        "class MirrorAttemptView",
+        "class MirrorRoomObservatory",
+        "def mirror_room_file_tree(",
+        "effective_quality_score",
+        "effective_detail_score",
+        "production_authority",
+    ),
+    "skeleton/ai/learning/mirror_room/observability.py": (
+        "class MirrorRoomObservatory",
+        "def mirror_room_file_tree(",
+    ),
+    "backend/routes/mirror_room.py": (
+        'prefix="/api/mirror-room"',
+        '"/observatory"',
+        "get_default_observatory().snapshot()",
+        "mirror_room_file_tree",
+    ),
+    "frontend/features/MirrorRoom/MirrorRoomObservatory.tsx": (
+        "100-attempt ratchet",
+        "Quality ascent",
+        "Selected duel",
+        "Quality anatomy",
+        "Integrated file tree",
+        "/api/mirror-room/observatory",
+    ),
+    "frontend/app/mirror-room.tsx": (
+        "features/MirrorRoom/MirrorRoomObservatory",
+    ),
+    "skeleton/testing/test_mirror_room_observability.py": (
+        "test_observatory_projects_baseline_challenger_and_detail_lift",
+        "test_observatory_rejected_attempt_cannot_move_visible_baseline",
+        "test_observatory_file_tree_exposes_full_product_surface",
+        "test_visual_observatory_is_real_route_and_not_mock_dashboard",
+    ),
     "skeleton/release/slo_promotion.py": (
         "class ReleaseSLOPolicy",
         "class CanarySLOSignal",
@@ -181,6 +217,7 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "test_mirror_room_learning.py",
         "test_mirror_room_adversarial.py",
         "test_mirror_room_content_delivery.py",
+        "test_mirror_room_observability.py",
         "test_release_slo_promotion.py",
     ),
 }

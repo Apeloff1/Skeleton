@@ -11,6 +11,12 @@ on:
       - "skeleton/testing/test_mirror_room_learning.py"
       - "skeleton/testing/test_mirror_room_adversarial.py"
       - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - "backend/routes/mirror_room.py"
+      - "backend/core/routes_registry.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
       - "machine/ai_file_tree.json"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -33,6 +39,12 @@ on:
       - "skeleton/testing/test_mirror_room_learning.py"
       - "skeleton/testing/test_mirror_room_adversarial.py"
       - "skeleton/testing/test_mirror_room_content_delivery.py"
+      - "skeleton/testing/test_mirror_room_observability.py"
+      - "backend/routes/mirror_room.py"
+      - "backend/core/routes_registry.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
+      - "frontend/app/dashboard.tsx"
       - "machine/ai_file_tree.json"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -99,6 +111,11 @@ jobs:
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_mirror_room_content_delivery.py
+
+      - name: Run Mirror Room observability contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_mirror_room_observability.py
 
       - name: Run release SLO promotion contracts
         run: >-
