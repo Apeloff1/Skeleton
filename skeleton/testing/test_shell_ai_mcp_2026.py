@@ -218,11 +218,16 @@ def test_mcp_auth_inspect_fails_closed_on_ambiguous_request_identity() -> None:
     assert "invalid authority identity" in decision.reason
 
 
-def test_mcp_auth_allows_canonical_single_script_identity() -> None:
-    policy = MCPPrincipalPolicy("αλφα", allowed_tools=frozenset({"python"}))
+def test_mcp_auth_allows_canonical_ascii_authority_identity() -> None:
+    policy = MCPPrincipalPolicy("alpha-01", allowed_tools=frozenset({"python"}))
     auth = MCPAuthorization()
     auth.set(policy)
-    assert auth.inspect("αλφα", "python").allowed is True
+    assert auth.inspect("alpha-01", "python").allowed is True
+
+
+def test_mcp_auth_rejects_non_ascii_single_script_authority_identity() -> None:
+    with pytest.raises(ValueError, match="ASCII"):
+        MCPPrincipalPolicy("αλφα", allowed_tools=frozenset({"python"}))
 
 
 def test_mcp_auth_unknown_principal_denied():
