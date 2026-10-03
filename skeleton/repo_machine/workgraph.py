@@ -24,6 +24,8 @@ class WorkNode:
     topology_confidence: int = 0
     blast_radius: int = 0
     critical_path_depth: int = 0
+    unlock_potential: int = 0
+    strategic_score: int = 0
 
     def as_dict(self) -> dict[str, object]:
         return {"identity": self.identity, "lane": self.lane, "zone": self.zone, "priority": self.priority,
@@ -31,7 +33,8 @@ class WorkNode:
                 "prerequisites": list(self.prerequisites), "evidence": list(self.evidence),
                 "verification_paths": list(self.verification_paths), "readiness": self.readiness,
                 "decision_score": self.decision_score, "topology_confidence": self.topology_confidence,
-                "blast_radius": self.blast_radius, "critical_path_depth": self.critical_path_depth}
+                "blast_radius": self.blast_radius, "critical_path_depth": self.critical_path_depth,
+                "unlock_potential": self.unlock_potential, "strategic_score": self.strategic_score}
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +43,7 @@ class WorkGraph:
     _ordered_nodes: tuple[WorkNode, ...] = field(init=False, repr=False, compare=False)
     _by_identity: dict[str, WorkNode] = field(init=False, repr=False, compare=False)
     _depth: dict[str, int] = field(init=False, repr=False, compare=False)
+    _descendants: dict[str, frozenset[str]] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         ordered = tuple(sorted(self.nodes, key=lambda item: (-item.priority, item.identity)))
@@ -53,6 +57,7 @@ class WorkGraph:
         visiting: set[str] = set()
         visited: set[str] = set()
         depth: dict[str, int] = {}
+        descendants: dict[str, set[str]] = {identity: set() for identity in by_identity}
 
         def visit(identity: str) -> int:
             if identity in visiting:
@@ -63,6 +68,8 @@ class WorkGraph:
             node_depth = 0
             for prerequisite in by_identity[identity].prerequisites:
                 node_depth = max(node_depth, visit(prerequisite) + 1)
+                descendants[prerequisite].add(identity)
+                descendants[prerequisite].update(descendants[identity])
             visiting.remove(identity)
             visited.add(identity)
             depth[identity] = node_depth
@@ -70,15 +77,29 @@ class WorkGraph:
 
         for identity in by_identity:
             visit(identity)
-        enriched = tuple(
-            WorkNode(n.identity, n.lane, n.zone, n.priority, n.objective, n.conflict_keys, n.prerequisites,
-                     n.evidence, n.verification_paths, n.readiness, n.decision_score,
-                     n.topology_confidence, n.blast_radius, depth[n.identity])
-            for n in ordered
-        )
+
+        max_depth = max(depth.values(), default=0)
+        enriched_nodes: list[WorkNode] = []
+        for n in ordered:
+            unlock = len(descendants[n.identity])
+            strategic = min(100, max(0,
+                n.decision_score
+                + min(25, unlock * 5)
+                + min(15, depth[n.identity] * 3)
+                + min(10, n.blast_radius * 2)
+                + min(10, n.topology_confidence // 10)
+                + (10 if max_depth and depth[n.identity] == max_depth else 0)
+            ))
+            enriched_nodes.append(WorkNode(
+                n.identity, n.lane, n.zone, n.priority, n.objective, n.conflict_keys, n.prerequisites,
+                n.evidence, n.verification_paths, n.readiness, n.decision_score, n.topology_confidence,
+                n.blast_radius, depth[n.identity], unlock, strategic,
+            ))
+        enriched = tuple(enriched_nodes)
         object.__setattr__(self, "_ordered_nodes", enriched)
         object.__setattr__(self, "_by_identity", {n.identity: n for n in enriched})
         object.__setattr__(self, "_depth", depth)
+        object.__setattr__(self, "_descendants", {k: frozenset(v) for k, v in descendants.items()})
 
     def as_dict(self) -> dict[str, object]:
         return {"nodes": [node.as_dict() for node in self._ordered_nodes],
@@ -93,32 +114,33 @@ class WorkGraph:
         if unknown:
             raise ValueError("completed contains unknown work identities")
         conflicts = set(active_conflicts)
-        ready: list[WorkNode] = []
-        for node in self._ordered_nodes:
-            if node.identity in done or any(prerequisite not in done for prerequisite in node.prerequisites):
-                continue
-            if any(key in conflicts for key in node.conflict_keys):
-                continue
-            ready.append(node)
+        ready = [node for node in self.frontier(done)
+                 if not any(key in conflicts for key in node.conflict_keys)]
+        ready.sort(key=lambda node: (-node.strategic_score, -node.priority, node.identity))
+        selected: list[WorkNode] = []
+        for node in ready:
+            selected.append(node)
             conflicts.update(node.conflict_keys)
-            if len(ready) >= limit:
+            if len(selected) >= limit:
                 break
-        return tuple(ready)
+        return tuple(selected)
 
     def frontier(self, completed: Iterable[str] = ()) -> tuple[WorkNode, ...]:
         done = set(completed)
-        return tuple(node for node in self._ordered_nodes
-                     if node.identity not in done and all(prerequisite in done for prerequisite in node.prerequisites))
+        frontier = [node for node in self._ordered_nodes
+                    if node.identity not in done and all(prerequisite in done for prerequisite in node.prerequisites)]
+        frontier.sort(key=lambda node: (-node.strategic_score, -node.priority, node.identity))
+        return tuple(frontier)
 
     def critical_path(self) -> tuple[WorkNode, ...]:
         if not self._ordered_nodes:
             return ()
-        terminal = max(self._ordered_nodes, key=lambda n: (self._depth[n.identity], n.priority, n.identity))
+        terminal = max(self._ordered_nodes, key=lambda n: (self._depth[n.identity], n.strategic_score, n.priority, n.identity))
         path = [terminal]
         current = terminal
         while current.prerequisites:
             current = max((self._by_identity[p] for p in current.prerequisites),
-                          key=lambda n: (self._depth[n.identity], n.priority, n.identity))
+                          key=lambda n: (self._depth[n.identity], n.strategic_score, n.priority, n.identity))
             path.append(current)
         return tuple(reversed(path))
 
@@ -126,6 +148,11 @@ class WorkGraph:
         done = set(completed)
         return tuple(node for node in self._ordered_nodes
                      if node.identity not in done and any(prerequisite not in done for prerequisite in node.prerequisites))
+
+    def unlock_potential(self, identity: str) -> int:
+        if identity not in self._by_identity:
+            raise ValueError(f"unknown work identity: {identity}")
+        return len(self._descendants[identity])
 
 
 def _conflicts(candidate: WorkCandidate, dependents_by_zone: dict[str, tuple[str, ...]] | None = None) -> tuple[str, ...]:
