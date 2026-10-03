@@ -206,6 +206,11 @@ def _execution_receipt(
         "plan_digest_sha256": plan_digest,
         "seed": seed,
         "registry_fingerprint": registry_fingerprint(),
+        "replay_key_sha256": _replay_key(
+            generation_id=generation_id,
+            plan_digest=plan_digest,
+            seed=seed,
+        ),
         "tasks": task_payload,
         "accepted_tasks": accepted,
         "patch_sha256": hashlib.sha256(patch.encode("utf-8")).hexdigest(),
@@ -214,6 +219,30 @@ def _execution_receipt(
     canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":"), default=str)
     receipt["receipt_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return receipt
+
+
+def _replay_key(*, generation_id: str, plan_digest: str, seed: str) -> str:
+    payload = {
+        "generation_id": generation_id,
+        "plan_digest_sha256": plan_digest,
+        "registry_fingerprint": registry_fingerprint(),
+        "seed": seed,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def verify_execution_receipt(receipt: Mapping[str, Any]) -> None:
+    claimed = str(receipt.get("receipt_sha256", ""))
+    if len(claimed) != 64 or any(ch not in "0123456789abcdef" for ch in claimed):
+        raise ValueError("execution receipt digest is malformed")
+    payload = dict(receipt)
+    payload.pop("receipt_sha256", None)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    if actual != claimed:
+        raise ValueError("execution receipt digest mismatch")
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -241,6 +270,7 @@ def propose(
     seed: str,
     repo_state_path: Path,
     receipt_path: Path | None = None,
+    prior_receipt_path: Path | None = None,
 ) -> int:
     if not 1 <= max_tasks <= 3:
         raise ValueError("max_tasks must be 1-3")
@@ -294,6 +324,18 @@ def propose(
         plan_digest = str(state_payload["_shift_supervisor"].get("plan_digest_sha256", ""))
         if not items:
             raise ValueError("canonical night plan contains no executable items")
+        replay_key = _replay_key(generation_id=generation_id, plan_digest=plan_digest, seed=seed)
+        prior_receipt: Mapping[str, Any] | None = None
+        if prior_receipt_path is not None and prior_receipt_path.is_file():
+            raw_prior = prior_receipt_path.read_text(encoding="utf-8")
+            if len(raw_prior) > 1_000_000:
+                raise ValueError("prior execution receipt exceeds 1 MB safety bound")
+            loaded_prior = json.loads(raw_prior)
+            if not isinstance(loaded_prior, Mapping):
+                raise ValueError("prior execution receipt must be an object")
+            verify_execution_receipt(loaded_prior)
+            if str(loaded_prior.get("replay_key_sha256", "")) == replay_key:
+                prior_receipt = loaded_prior
         reasoner = ChatGPTReasoner()
         scoped: list[tuple[str, PlannedTask]] = []
         scope_errors: list[tuple[str, str]] = []
@@ -407,6 +449,20 @@ def propose(
         patch=diff,
         accepted=accepted,
     )
+    if prior_receipt is not None and (
+        prior_receipt.get("patch_sha256") != receipt.get("patch_sha256")
+        or prior_receipt.get("tasks") != receipt.get("tasks")
+        or prior_receipt.get("accepted_tasks") != receipt.get("accepted_tasks")
+    ):
+        _git("reset", "--hard", "HEAD", check=False)
+        audit.emit(
+            "run_failed_closed",
+            stage="deterministic_replay",
+            prior_receipt_sha256=prior_receipt.get("receipt_sha256"),
+            current_receipt_sha256=receipt.get("receipt_sha256"),
+            status="failed_closed",
+        )
+        raise RuntimeError("deterministic replay diverged from prior execution receipt")
     if receipt_path is not None:
         _atomic_write(receipt_path, json.dumps(receipt, sort_keys=True, indent=2) + "\n")
     _git("reset", "--hard", "HEAD")
@@ -444,6 +500,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--cohort-size", type=int, default=15)
     parser.add_argument("--seed", default=os.environ.get("GITHUB_RUN_ID") or "supervised-night")
     parser.add_argument("--receipt-path", default=".studio-tmp/execution-receipt.json")
+    parser.add_argument("--prior-receipt-path")
     args = parser.parse_args(argv)
     return propose(
         patch_path=Path(args.patch_path),
@@ -453,6 +510,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cohort_size=args.cohort_size,
         seed=args.seed,
         receipt_path=Path(args.receipt_path),
+        prior_receipt_path=Path(args.prior_receipt_path) if args.prior_receipt_path else None,
     )
 
 
