@@ -1191,6 +1191,7 @@ class _SqliteCostGovernorJournal:
         reservation: CostReservation,
         quota_reservation: QuotaReservation,
         runtime_lease: AdmissionLease,
+        shared_pressure_lease: SharedPressureLease | None,
     ) -> _CostJournalRecord:
         requested = _sha256(
             "requested_request_digest",
@@ -1198,7 +1199,10 @@ class _SqliteCostGovernorJournal:
         )
         reservation_json = _canonical_json_text(reservation.as_dict())
         quota_json = _canonical_json_text(quota_reservation.as_dict())
-        runtime_lease_record = _runtime_lease_journal(runtime_lease)
+        runtime_lease_record = _runtime_lease_journal(
+            runtime_lease,
+            shared_pressure_lease,
+        )
         runtime_lease_json = _canonical_json_text(
             runtime_lease_record.as_dict()
         )
@@ -1465,6 +1469,9 @@ class CostGovernor:
         path: str | Path,
         *,
         default_tenant_quota: TenantQuota,
+        shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
+        shared_pressure_scope: str | None = None,
+        shared_pressure_owner_id: str | None = None,
     ) -> "CostGovernor":
         if not isinstance(default_tenant_quota, TenantQuota):
             raise TypeError(
@@ -1474,6 +1481,9 @@ class CostGovernor:
         runtime = AdmissionRuntime(
             quota_ledger=ledger,
             default_tenant_quota=default_tenant_quota,
+            shared_pressure_ledger=shared_pressure_ledger,
+            shared_pressure_scope=shared_pressure_scope,
+            shared_pressure_owner_id=shared_pressure_owner_id,
         )
         return cls(
             runtime,
@@ -1715,8 +1725,20 @@ class CostGovernor:
                         selected,
                         persisted,
                     )
+                    metadata = persisted.runtime_lease
+                    if metadata is None:
+                        raise CostGovernorError(
+                            "legacy active cost journal lacks runtime lease recovery metadata"
+                        )
                     try:
-                        self.runtime.reattach(selected, lease)
+                        self.runtime.reattach(
+                            selected,
+                            lease,
+                            shared_pressure_lease=(
+                                metadata.shared_pressure_lease
+                            ),
+                            now_wall=now_wall,
+                        )
                     except AdmissionRuntimeConflict as exc:
                         raise CostGovernorConflict(str(exc)) from exc
                     except AdmissionRuntimeError as exc:
@@ -1803,6 +1825,11 @@ class CostGovernor:
                         reservation=receipt,
                         quota_reservation=quota_reservation,
                         runtime_lease=lease,
+                        shared_pressure_lease=(
+                            self.runtime.shared_pressure_lease_for_operation(
+                                lease.operation_id
+                            )
+                        ),
                     )
                 except Exception:
                     if persisted is None:
