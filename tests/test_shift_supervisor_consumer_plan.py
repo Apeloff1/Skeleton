@@ -9,6 +9,7 @@ import pytest
 from core.shift_supervisor.consumer_plan import (
     CanonicalPlanError,
     consume_plan,
+    decode_durable_state,
     normalize_worker_status,
 )
 
@@ -327,3 +328,42 @@ def test_plan_progress_fingerprint_changes_when_status_advances():
     queued = plan_progress([{"id": "a", "target_team": "night", "status": "queued"}], "night")
     done = plan_progress([{"id": "a", "target_team": "night", "status": "done"}], "night")
     assert queued["fingerprint_sha256"] != done["fingerprint_sha256"]
+
+def test_compatibility_module_executes_canonical_prepare_cli(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    state_path = tmp_path / "repo-state.json"
+    summary_path = tmp_path / "summary.md"
+    state_path.write_text(json.dumps(_state()), encoding="utf-8")
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(__import__("pathlib").Path(__file__).resolve().parents[1])
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "core.shift_supervisor.consumer_plan",
+            "prepare",
+            "--team",
+            "night",
+            "--state",
+            str(state_path),
+            "--summary",
+            str(summary_path),
+            "--max-age-minutes",
+            "20",
+            "--now",
+            "2026-09-16T10:10:00+00:00",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    assert payload["_shift_supervisor"]["status"] == "loaded"
+    assert payload["_shift_supervisor"]["team"] == "night"
+    assert [item["id"] for item in payload["_shift_supervisor"]["plan_items"]] == ["night-task-1"]
+    assert "canonical plan loaded" in summary_path.read_text(encoding="utf-8")

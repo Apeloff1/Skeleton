@@ -3,7 +3,7 @@
   "closure_id": "P2-FUNCTIONAL-AI-FRONTIER",
   "status": "closed",
   "claim_scope": "provider_independent_functional_ai_frontier",
-  "claim": "P2 functional closure requires executable credential-free local model inference, governed model-tool-model execution, durable terminal state/reconnect, independent verification, and mapped state/security/recovery controls. It does not claim the remaining queued P2 capability volumes are implemented.",
+  "claim": "P2 functional closure proves executable credential-free local model inference, governed model-tool-model execution, durable terminal state/reconnect, independent verification, and mapped state/security/recovery controls. It does not prove advanced model capability, general intelligence, superintelligence, or completion of the remaining queued P2 capability volumes.",
   "source_scope": {
     "p2_volume_count": 314,
     "scheduled_volume_count": 57,
@@ -134,5 +134,15 @@
     "provider_deadline_enforcement": "CognitiveExecutionRuntime bounds provider I/O with asyncio.wait_for using the logical execution deadline and durably finalizes timeout as execution_deadline_exceeded",
     "cancellation_enforcement": "LocalModelAdapter advertises cooperative cancellation; CognitiveExecutionRuntime polls durable cancellation authority and cancels the in-flight local provider coroutine, which propagates into LocalInferenceEngine and terminates the subprocess",
     "structured_output_enforcement": "LocalModelAdapter preserves ProviderRequest.structured_output_schema; llama.cpp receives the canonical schema through --json-schema-file and parsed output is independently validated with validate_json_value before ProviderResponse exposure"
+  },
+  "claim_limits": {
+    "provider_independent_execution_proven": true,
+    "advanced_model_capability_proven": false,
+    "general_intelligence_proven": false,
+    "superintelligence_proven": false,
+    "reference_model_is_quality_target": false,
+    "remaining_p2_capability_volumes_complete": false,
+    "advanced_claim_requires_digest_bound_model_eval": true,
+    "local_reference_model_kind": "reference_ngram"
   }
 }
