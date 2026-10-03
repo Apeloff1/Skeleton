@@ -377,3 +377,49 @@ def test_supervised_night_operator_pause_preempts_model_work(tmp_path, monkeypat
     assert blocked["event"] == "run_blocked_by_operator"
     assert blocked["hold_status"] == "paused"
     assert blocked["reason"] == "maintenance"
+
+
+def test_canonical_items_tolerates_malformed_priority_and_clamps_order(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-priority",
+                    "plan_items": [
+                        {"id": "bad", "title": "Bad priority", "description": "Fallback.", "priority": "oops"},
+                        {"id": "high", "title": "High priority", "description": "First.", "priority": 999},
+                        {"id": "low", "title": "Low priority", "description": "Last.", "priority": -100},
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    items, generation = supervised_studio._canonical_items(state, 3)
+    assert generation == "gen-priority"
+    assert [item["id"] for item in items] == ["high", "bad", "low"]
+
+
+def test_canonical_items_rejects_duplicate_ids(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-duplicate",
+                    "plan_items": [
+                        {"id": "same", "title": "One", "description": "One."},
+                        {"id": "same", "title": "Two", "description": "Two."},
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicate plan item ids"):
+        supervised_studio._canonical_items(state, 2)
