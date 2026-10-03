@@ -64,6 +64,7 @@ class MetricComparison:
     baseline_mean: float
     candidate_mean: float
     oriented_delta: float
+    worst_case_delta: float
     lower_confidence_bound: float
     standard_error: float
     sample_count: int
@@ -80,6 +81,7 @@ class MetricComparison:
             "baseline_mean": self.baseline_mean,
             "candidate_mean": self.candidate_mean,
             "oriented_delta": self.oriented_delta,
+            "worst_case_delta": self.worst_case_delta,
             "lower_confidence_bound": self.lower_confidence_bound,
             "standard_error": self.standard_error,
             "sample_count": self.sample_count,
@@ -318,6 +320,7 @@ class PairedEvaluator:
             baseline_mean = _weighted_mean(baseline_values, weights)
             candidate_mean = _weighted_mean(candidate_values, weights)
             mean_delta = _weighted_mean(deltas, weights)
+            worst_case_delta = min(deltas)
             standard_error = _weighted_standard_error(
                 deltas,
                 weights,
@@ -335,6 +338,7 @@ class PairedEvaluator:
                 passed = (
                     mean_delta >= -policy.max_regression
                     and lower_bound >= -policy.max_regression
+                    and worst_case_delta >= -policy.max_regression
                 )
                 reason = "guardrail_within_regression_budget" if passed else "guardrail_regression"
             else:
@@ -350,6 +354,7 @@ class PairedEvaluator:
                     baseline_mean=baseline_mean,
                     candidate_mean=candidate_mean,
                     oriented_delta=mean_delta,
+                    worst_case_delta=worst_case_delta,
                     lower_confidence_bound=lower_bound,
                     standard_error=standard_error,
                     sample_count=len(paired),
