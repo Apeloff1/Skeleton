@@ -161,18 +161,22 @@ class DeterministicRLEnvironment:
         self._episode_id=""
         self._step=0
         self._state=""
+        self._terminal=False
 
     def reset(self,*,episode_id:str,seed:int)->str:
         if not episode_id.strip() or isinstance(seed,bool) or not isinstance(seed,int):
             raise ValueError("episode identity/seed invalid")
         self._episode_id=episode_id
         self._step=0
+        self._terminal=False
         self._state=_digest({"environment":self.spec.digest,"episode":episode_id,"seed":seed,"step":0})
         return self._state
 
     def step(self,action:str)->RLStepReceipt:
         if not self._episode_id:
             raise RuntimeError("environment must be reset before step")
+        if self._terminal:
+            raise RuntimeError("episode is terminal; reset required before another step")
         if action not in self.rewards:
             raise ValueError("action outside declared action space")
         previous=self._state
@@ -195,6 +199,7 @@ class DeterministicRLEnvironment:
             next_state_digest=next_state,
         )
         self._state=next_state
+        self._terminal=receipt.terminal
         return receipt
 
 
@@ -349,10 +354,54 @@ class PostTrainingLedger:
         return spec.digest
 
     def record_step(self,receipt:RLStepReceipt)->str:
+        encoded=_canonical(receipt.as_dict())
         with self._lock:
-            known=self._db.execute("SELECT 1 FROM environment WHERE environment_digest=?",(receipt.environment_digest,)).fetchone()
-            if known is None:raise ValueError("RL environment is not registered")
-            self._db.execute("INSERT OR IGNORE INTO rl_step(receipt_digest,environment_digest,payload) VALUES (?,?,?)",(receipt.digest,receipt.environment_digest,_canonical(receipt.as_dict())));self._db.commit()
+            known=self._db.execute(
+                "SELECT 1 FROM environment WHERE environment_digest=?",
+                (receipt.environment_digest,),
+            ).fetchone()
+            if known is None:
+                raise ValueError("RL environment is not registered")
+
+            prior_exact=self._db.execute(
+                "SELECT payload FROM rl_step WHERE receipt_digest=?",
+                (receipt.digest,),
+            ).fetchone()
+            if prior_exact is not None:
+                if prior_exact[0]!=encoded:
+                    raise ValueError("RL receipt digest collision")
+                return receipt.digest
+
+            rows=self._db.execute(
+                "SELECT payload FROM rl_step WHERE environment_digest=?",
+                (receipt.environment_digest,),
+            ).fetchall()
+            episode=[
+                json.loads(row[0])
+                for row in rows
+                if json.loads(row[0]).get("episode_id")==receipt.episode_id
+            ]
+            if not episode:
+                if receipt.step!=1:
+                    raise ValueError("RL episode must begin at step 1")
+            else:
+                latest=max(episode,key=lambda item:int(item["step"]))
+                if latest.get("terminal") is True:
+                    raise ValueError("RL episode is already terminal")
+                expected_step=int(latest["step"])+1
+                if receipt.step!=expected_step:
+                    raise ValueError(
+                        f"RL step must be contiguous: expected {expected_step}"
+                    )
+                if receipt.state_digest!=latest.get("next_state_digest"):
+                    raise ValueError("RL state chain does not extend latest receipt")
+
+            self._db.execute(
+                "INSERT INTO rl_step(receipt_digest,environment_digest,payload) "
+                "VALUES (?,?,?)",
+                (receipt.digest,receipt.environment_digest,encoded),
+            )
+            self._db.commit()
         return receipt.digest
 
     def record_curriculum(self,decision:CurriculumDecision)->str:
