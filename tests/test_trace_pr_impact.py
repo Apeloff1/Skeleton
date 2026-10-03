@@ -25,6 +25,12 @@ class TracePRImpactTests(unittest.TestCase):
         )
         self.assertFalse(MODULE._is_control_path("mystery/runtime.py"))
 
+    def test_root_runtime_image_has_exact_release_binding(self) -> None:
+        self.assertEqual(
+            MODULE._TRACE_EXACT_IMPLEMENTATION_BINDINGS["Dockerfile"],
+            ("VOL-060",),
+        )
+
     def test_hex_object_id_validation(self) -> None:
         with self.assertRaisesRegex(MODULE.TraceImpactError, "hexadecimal"):
             MODULE._changed_files(ROOT, "not-a-sha", "0" * 40)
