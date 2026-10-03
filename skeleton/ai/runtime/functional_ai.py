@@ -219,6 +219,10 @@ class FunctionalAIRuntime:
         self.local_model = local_model
         self.tools = tools
         self.startup_qualification_receipt: Mapping[str, object] | None = None
+        self._bound_model_id=self.local_model.model
+        self._bound_model_digest=self.local_model.engine.model.model_digest
+        self._bound_runtime_digest=self.local_model.runtime_digest
+        self._assert_local_identity()
         self.runtime = CognitiveExecutionRuntime(
             repository,
             local_model,
@@ -226,6 +230,35 @@ class FunctionalAIRuntime:
             verification_hook=verification_hook,
             finalization_binding_hook=finalization_binding_hook,
         )
+
+    def _assert_local_identity(self) -> None:
+        current_model_id=self.local_model.model
+        current_model_digest=self.local_model.engine.model.model_digest
+        current_runtime_digest=self.local_model.runtime_digest
+        if (
+            current_model_id!=self._bound_model_id
+            or current_model_digest!=self._bound_model_digest
+            or current_runtime_digest!=self._bound_runtime_digest
+        ):
+            raise RuntimeError(
+                "VS-001 local model/runtime identity changed after binding"
+            )
+
+    def _assert_startup_qualification_identity(self) -> None:
+        receipt=self.startup_qualification_receipt
+        if receipt is None:
+            return
+        if receipt.get("provider")!="local":
+            raise RuntimeError("VS-001 startup qualification provider drift")
+        if receipt.get("model_id")!=self._bound_model_id:
+            raise RuntimeError("VS-001 startup qualification model_id drift")
+        if receipt.get("model_sha256")!=self._bound_model_digest:
+            raise RuntimeError("VS-001 startup qualification model digest drift")
+        if (
+            self._bound_runtime_digest is not None
+            and receipt.get("executable_sha256")!=self._bound_runtime_digest
+        ):
+            raise RuntimeError("VS-001 startup qualification runtime digest drift")
 
     @classmethod
     def from_local_model_manifest(
@@ -259,11 +292,14 @@ class FunctionalAIRuntime:
             finalization_binding_hook=finalization_binding_hook,
         )
         runtime.startup_qualification_receipt = qualification
+        runtime._assert_startup_qualification_identity()
         return runtime
 
     async def execute(self, request: FunctionalAIRequest) -> FunctionalAIRun:
         if not isinstance(request, FunctionalAIRequest):
             raise TypeError("request must be FunctionalAIRequest")
+        self._assert_local_identity()
+        self._assert_startup_qualification_identity()
         result = await self.runtime.start(
             request.to_execution_request(),
             instructions=request.instructions,
@@ -271,6 +307,7 @@ class FunctionalAIRuntime:
             context_digest=request.context_digest,
             now=request.created_at,
         )
+        self._assert_local_identity()
         if result.state is not ExecutionState.COMPLETED or result.result is None:
             raise RuntimeError(f"VS-001 did not complete: {result.state.value}")
         terminal = result.result
@@ -292,9 +329,9 @@ class FunctionalAIRuntime:
             operation_id=request.operation_id,
             state=result.state.value,
             status=terminal.status,
-            local_model_id=self.local_model.model,
-            local_model_digest=self.local_model.engine.model.model_digest,
-            local_runtime_digest=self.local_model.runtime_digest,
+            local_model_id=self._bound_model_id,
+            local_model_digest=self._bound_model_digest,
+            local_runtime_digest=self._bound_runtime_digest,
             final_output_digest=hashlib.sha256(
                 terminal.final_output.encode("utf-8")
             ).hexdigest(),
