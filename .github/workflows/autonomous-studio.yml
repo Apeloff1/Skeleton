@@ -345,10 +345,14 @@ jobs:
             --max-cycles 80 \
             --max-failures 8 \
             --max-stagnant 5 \
+            --durable-envelope "$RUNNER_TEMP/build/envelope.json" \
+            --lease-owner "github-run-${GITHUB_RUN_ID}" \
+            --expected-lease-epoch 0 \
             "${args[@]}" > "$RUNNER_TEMP/build/result.json"
           status=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$RUNNER_TEMP/build/result.json")
           echo "status=$status" >> "$GITHUB_OUTPUT"
           cp "$state" "$RUNNER_TEMP/studio-build-state.json"
+          cp "$RUNNER_TEMP/build/envelope.json" "$RUNNER_TEMP/studio-build-envelope.json"
 
       - name: Record final night workforce snapshot
         if: always()
@@ -458,9 +462,13 @@ jobs:
           if [[ -s "$RUNNER_TEMP/studio-build-state.json" ]]; then
             cp "$RUNNER_TEMP/studio-build-state.json" .studio/audit/latest.build-state.json
           fi
+          if [[ -s "$RUNNER_TEMP/studio-build-envelope.json" ]]; then
+            cp "$RUNNER_TEMP/studio-build-envelope.json" .studio/audit/latest.build-envelope.json
+          fi
           git add -u
           git add .studio/audit/latest.jsonl .studio/audit/latest.md .studio/audit/latest.patch.sha256 .studio/audit/latest.execution-receipt.json
           if [[ -s .studio/audit/latest.build-state.json ]]; then git add .studio/audit/latest.build-state.json; fi
+          if [[ -s .studio/audit/latest.build-envelope.json ]]; then git add .studio/audit/latest.build-envelope.json; fi
           git diff --cached --check
           if git diff --cached --name-only | grep -q '^\.studio-tmp/'; then
             echo '::error::temporary proposal files must never be committed'
