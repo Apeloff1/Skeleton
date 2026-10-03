@@ -85,6 +85,13 @@ __all__ = [
     "NonApplicabilityDecision",
     "learning_signal_for",
     "qualify_failure_knowledge",
+    "EVAL_CLASSES",
+    "EvaluationFirewall",
+    "EvaluationFirewallError",
+    "EvaluationQueryReceipt",
+    "EvaluationSet",
+    "EvaluatorIdentity",
+    "PromotionEvidence",
 ]
 
 from skeleton.eval.champion_registry import (
@@ -165,4 +172,14 @@ from skeleton.eval.failure_knowledge import (
     NonApplicabilityDecision,
     learning_signal_for,
     qualify_failure_knowledge,
+)
+
+from skeleton.eval.firewall import (
+    EVAL_CLASSES,
+    EvaluationFirewall,
+    EvaluationFirewallError,
+    EvaluationQueryReceipt,
+    EvaluationSet,
+    EvaluatorIdentity,
+    PromotionEvidence,
 )
