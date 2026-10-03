@@ -119,10 +119,23 @@ class RLStepReceipt:
     def __post_init__(self)->None:
         for name in ("environment_digest","state_digest","next_state_digest"):
             object.__setattr__(self,name,_require_digest(getattr(self,name),field=name))
-        if not self.episode_id.strip() or not self.action.strip():
+        if (
+            not isinstance(self.episode_id,str)
+            or not self.episode_id.strip()
+            or not isinstance(self.action,str)
+            or not self.action.strip()
+        ):
             raise ValueError("RL receipt identity must be non-empty")
-        if self.step<0 or not math.isfinite(float(self.reward)):
-            raise ValueError("invalid RL step/reward")
+        if isinstance(self.step,bool) or not isinstance(self.step,int) or self.step<1:
+            raise ValueError("RL step must be a positive integer")
+        if (
+            isinstance(self.reward,bool)
+            or not isinstance(self.reward,(int,float))
+            or not math.isfinite(float(self.reward))
+        ):
+            raise ValueError("RL reward must be a finite number")
+        if not isinstance(self.terminal,bool):
+            raise ValueError("RL terminal flag must be boolean")
 
     @property
     def digest(self)->str:
@@ -152,10 +165,28 @@ class DeterministicRLEnvironment:
         terminal_actions:Sequence[str]=(),
     )->None:
         self.spec=spec
-        self.rewards={str(k):float(v) for k,v in rewards.items()}
-        if not self.rewards or any(not math.isfinite(v) for v in self.rewards.values()):
+        if not isinstance(spec,RLEnvironmentSpec):
+            raise TypeError("spec must be RLEnvironmentSpec")
+        if not rewards:
             raise ValueError("rewards must be finite and non-empty")
-        self.terminal_actions=frozenset(map(str,terminal_actions))
+        normalized_rewards:dict[str,float]={}
+        for raw_action,raw_reward in rewards.items():
+            action=str(raw_action).strip()
+            if not action:
+                raise ValueError("reward action ids must be non-empty")
+            if (
+                isinstance(raw_reward,bool)
+                or not isinstance(raw_reward,(int,float))
+                or not math.isfinite(float(raw_reward))
+            ):
+                raise ValueError("rewards must be finite numeric values")
+            if action in normalized_rewards:
+                raise ValueError("reward action ids must remain unique after normalization")
+            normalized_rewards[action]=float(raw_reward)
+        self.rewards=normalized_rewards
+        self.terminal_actions=frozenset(
+            str(item).strip() for item in terminal_actions if str(item).strip()
+        )
         if not self.terminal_actions<=set(self.rewards):
             raise ValueError("terminal actions must exist in reward table")
         self._episode_id=""
@@ -240,8 +271,31 @@ class CurriculumDecision:
     completed_before: tuple[str,...]
 
     def __post_init__(self)->None:
+        if not isinstance(self.stage_id,str) or not self.stage_id.strip():
+            raise ValueError("curriculum decision stage_id must be non-empty")
         if self.status not in {"advance","hold","blocked","already_complete"}:
             raise ValueError("unsupported curriculum decision")
+        if not isinstance(self.reason,str) or not self.reason.strip():
+            raise ValueError("curriculum decision reason must be non-empty")
+        if self.metric_value is not None:
+            if (
+                isinstance(self.metric_value,bool)
+                or not isinstance(self.metric_value,(int,float))
+                or not math.isfinite(float(self.metric_value))
+            ):
+                raise ValueError("curriculum metric_value must be finite or null")
+            object.__setattr__(self,"metric_value",float(self.metric_value))
+        completed=tuple(self.completed_before)
+        if (
+            any(not isinstance(item,str) or not item.strip() for item in completed)
+            or len(completed)!=len(set(completed))
+        ):
+            raise ValueError("completed_before must contain unique non-empty stage ids")
+        if self.status=="advance" and self.metric_value is None:
+            raise ValueError("advance decision requires metric evidence")
+        if self.status in {"blocked","already_complete"} and self.metric_value is not None:
+            raise ValueError(f"{self.status} decision cannot carry metric evidence")
+        object.__setattr__(self,"completed_before",completed)
 
     @property
     def digest(self)->str:
@@ -357,11 +411,25 @@ class PostTrainingLedger:
         encoded=_canonical(receipt.as_dict())
         with self._lock:
             known=self._db.execute(
-                "SELECT 1 FROM environment WHERE environment_digest=?",
+                "SELECT environment_key,payload FROM environment "
+                "WHERE environment_digest=?",
                 (receipt.environment_digest,),
             ).fetchone()
             if known is None:
                 raise ValueError("RL environment is not registered")
+            try:
+                environment_payload=json.loads(known[1])
+            except json.JSONDecodeError as exc:
+                raise ValueError("stored RL environment payload is corrupted") from exc
+            expected_key=(
+                f"{environment_payload.get('environment_id','')}@"
+                f"{environment_payload.get('version','')}"
+            )
+            if (
+                known[0]!=expected_key
+                or _digest(environment_payload)!=receipt.environment_digest
+            ):
+                raise ValueError("stored RL environment identity mismatch")
 
             prior_exact=self._db.execute(
                 "SELECT payload FROM rl_step WHERE receipt_digest=?",
@@ -373,14 +441,22 @@ class PostTrainingLedger:
                 return receipt.digest
 
             rows=self._db.execute(
-                "SELECT payload FROM rl_step WHERE environment_digest=?",
+                "SELECT receipt_digest,payload FROM rl_step "
+                "WHERE environment_digest=?",
                 (receipt.environment_digest,),
             ).fetchall()
-            episode=[
-                json.loads(row[0])
-                for row in rows
-                if json.loads(row[0]).get("episode_id")==receipt.episode_id
-            ]
+            episode=[]
+            for stored_digest,stored_payload in rows:
+                try:
+                    payload=json.loads(stored_payload)
+                except json.JSONDecodeError as exc:
+                    raise ValueError("stored RL receipt payload is corrupted") from exc
+                if _digest(payload)!=stored_digest:
+                    raise ValueError("stored RL receipt digest mismatch")
+                if payload.get("environment_digest")!=receipt.environment_digest:
+                    raise ValueError("stored RL receipt environment identity mismatch")
+                if payload.get("episode_id")==receipt.episode_id:
+                    episode.append(payload)
             if not episode:
                 if receipt.step!=1:
                     raise ValueError("RL episode must begin at step 1")
@@ -405,6 +481,22 @@ class PostTrainingLedger:
         return receipt.digest
 
     def record_curriculum(self,decision:CurriculumDecision)->str:
+        encoded=_canonical(decision.as_dict())
         with self._lock:
-            self._db.execute("INSERT OR IGNORE INTO curriculum_decision(decision_digest,stage_id,payload) VALUES (?,?,?)",(decision.digest,decision.stage_id,_canonical(decision.as_dict())));self._db.commit()
+            prior=self._db.execute(
+                "SELECT stage_id,payload FROM curriculum_decision "
+                "WHERE decision_digest=?",
+                (decision.digest,),
+            ).fetchone()
+            if prior is not None:
+                if prior[0]!=decision.stage_id or prior[1]!=encoded:
+                    raise ValueError("curriculum decision digest collision")
+                return decision.digest
+            self._db.execute(
+                "INSERT INTO curriculum_decision("
+                "decision_digest,stage_id,payload"
+                ") VALUES (?,?,?)",
+                (decision.digest,decision.stage_id,encoded),
+            )
+            self._db.commit()
         return decision.digest
