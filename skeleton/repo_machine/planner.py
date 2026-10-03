@@ -125,7 +125,7 @@ def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[
     for finding in model.findings:
         impact = None
         if finding.path:
-            key = finding.path.replace("\", "/").lstrip("./")
+            key = finding.path.replace("\\", "/").lstrip("./")
             impact = impact_cache.get(key)
             if impact is None:
                 impact = analyze_impact(model, (key,), transitive_depth=3)
