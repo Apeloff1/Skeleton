@@ -853,9 +853,18 @@
         "adversarial_eval",
         "integration"
       ],
-      "status": "planned",
-      "disposition": null,
-      "evidence": [],
+      "status": "evidence_pending",
+      "disposition": "implemented_fail_safe_policy_and_least_privilege_pending_exact_head_ci",
+      "evidence": [
+        "code:skeleton/security/policy_engine.py",
+        "mirror:skeleton/ai/runtime/security/policy_engine.py",
+        "code:skeleton/jeeves/agent/tools.py",
+        "code:skeleton/jeeves/agent/epistemic_tool_gate.py",
+        "code:skeleton/shells/ai/mcp_authz.py",
+        "code:skeleton/shells/ai/approval.py",
+        "test:skeleton/testing/test_security_policy_engine_fail_closed.py",
+        "workflow:P0 Saltzer Schroeder Evidence"
+      ],
       "accepted_risk": null,
       "accountability_id": "ACC-HIST-SYS-020",
       "completion_checkbox": false,
