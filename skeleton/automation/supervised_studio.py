@@ -416,54 +416,59 @@ def propose(
         for plan_id, task in scoped:
             try:
                 reviewed = _build_and_review(reasoner, task, seed=f"{seed}:{plan_id}")
-            if reviewed is None:
+                if reviewed is None:
+                    audit.emit(
+                        "patch_rejected_by_squad",
+                        task=plan_id,
+                        task_title=task.title,
+                        division=task.division,
+                    )
+                    continue
+                total_chars += len(reviewed.patch)
+                if total_chars > MAX_TOTAL_PATCH_CHARS:
+                    audit.emit("patch_rejected_by_budget", task=plan_id, reason="aggregate patch budget")
+                    break
+                candidate = Path(os.environ.get("RUNNER_TEMP", ".studio-tmp")) / f"supervised-{accepted:02d}.patch"
+                candidate.parent.mkdir(parents=True, exist_ok=True)
+                candidate.write_text(reviewed.patch, encoding="utf-8")
+                checked = subprocess.run(
+                    ["git", "apply", "--check", str(candidate)],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                if checked.returncode != 0:
+                    audit.emit("patch_rejected_by_git", task=plan_id, error=checked.stderr[-2000:])
+                    continue
+                subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                accepted += 1
                 audit.emit(
-                    "patch_rejected_by_squad",
+                    "patch_accepted",
                     task=plan_id,
                     task_title=task.title,
-                    division=task.division,
+                    researcher=reviewed.researcher.bot_id,
+                    builder=reviewed.builder.bot_id,
+                    reviewer=reviewed.reviewer.bot_id,
+                    verifier=reviewed.verifier.bot_id,
+                    summary=reviewed.summary,
+                    research_findings=reviewed.research_findings,
+                    review_reasons=reviewed.review_reasons,
+                    verification_reasons=reviewed.verification_reasons,
+                    required_checks=reviewed.required_checks,
+                    paths=list(task.paths),
                 )
-                continue
-            total_chars += len(reviewed.patch)
-            if total_chars > MAX_TOTAL_PATCH_CHARS:
-                audit.emit("patch_rejected_by_budget", task=plan_id, reason="aggregate patch budget")
-                break
-            candidate = Path(os.environ.get("RUNNER_TEMP", ".studio-tmp")) / f"supervised-{accepted:02d}.patch"
-            candidate.parent.mkdir(parents=True, exist_ok=True)
-            candidate.write_text(reviewed.patch, encoding="utf-8")
-            checked = subprocess.run(
-                ["git", "apply", "--check", str(candidate)],
-                capture_output=True,
-                text=True,
-                timeout=20,
-            )
-            if checked.returncode != 0:
-                audit.emit("patch_rejected_by_git", task=plan_id, error=checked.stderr[-2000:])
-                continue
-            subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
-            accepted += 1
-            audit.emit(
-                "patch_accepted",
-                task=plan_id,
-                task_title=task.title,
-                researcher=reviewed.researcher.bot_id,
-                builder=reviewed.builder.bot_id,
-                reviewer=reviewed.reviewer.bot_id,
-                verifier=reviewed.verifier.bot_id,
-                summary=reviewed.summary,
-                research_findings=reviewed.research_findings,
-                review_reasons=reviewed.review_reasons,
-                verification_reasons=reviewed.verification_reasons,
-                required_checks=reviewed.required_checks,
-                paths=list(task.paths),
-            )
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                 audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
-    
-    finally:
-        # Never leave model-authored worktree mutations behind after an
-        # unexpected controller exception.
-        pass
+    except BaseException:
+        _git("reset", "--hard", "HEAD", check=False)
+        audit.emit(
+            "run_failed_closed",
+            stage="unexpected_build_exception",
+            accepted_tasks=accepted,
+            emitted_patch_chars=0,
+            status="failed_closed",
+        )
+        raise
 
     diff = _git("diff", "--no-ext-diff", "--binary")
     if len(diff) > MAX_TOTAL_PATCH_CHARS:
