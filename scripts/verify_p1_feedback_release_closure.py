@@ -73,6 +73,30 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "class TrainingLesson",
         "class TrainingLearningArchive",
     ),
+    "skeleton/learning/mirror_room/integrity.py": (
+        "class SplitIntegrityPolicy",
+        "class SplitIntegrityReport",
+        "def inspect_split_integrity(",
+        "def validate_split_integrity(",
+        "Mirror Room split contamination detected",
+    ),
+    "skeleton/ai/learning/mirror_room/integrity.py": (
+        "class SplitIntegrityPolicy",
+        "class SplitIntegrityReport",
+        "def validate_split_integrity(",
+    ),
+    "skeleton/learning/mirror_room/curriculum.py": (
+        "class CurriculumPolicy",
+        "class CurriculumPlan",
+        "def build_curriculum(",
+        "hard_example_boost",
+        "tag_rarity_boost",
+    ),
+    "skeleton/ai/learning/mirror_room/curriculum.py": (
+        "class CurriculumPolicy",
+        "class CurriculumPlan",
+        "def build_curriculum(",
+    ),
     "skeleton/learning/mirror_room/engine.py": (
         "candidate generator and sandbox evaluator must be independent",
         "duplicate scenario payload detected across Mirror Room corpus",
@@ -83,6 +107,10 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "baseline=production_baseline",
         "seen_behavior_digests",
         "stagnant_generations",
+        "validation selection budget exhausted",
+        "split_integrity_digest",
+        "curriculum_digest",
+        "build_curriculum",
     ),
     "skeleton/learning/mirror_room/replay.py": (
         "class MirrorRunReplayReceipt",
@@ -195,6 +223,10 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "test_coordinate_learner_warm_starts_from_train_archive",
         "test_selected_lineage_replay_reexecutes_exact_evidence",
         "test_selected_lineage_replay_detects_executor_divergence",
+        "test_near_duplicate_cross_split_corpus_is_detectable_before_learning",
+        "test_curriculum_is_training_only_deterministic_and_hard_example_weighted",
+        "test_validation_candidate_search_budget_fails_closed",
+        "test_run_and_promotion_bind_split_integrity_and_sealed_holdout",
     ),
     "skeleton/testing/test_mirror_room_content_delivery.py": (
         "test_high_end_content_dossier_requires_full_ratchet_gauntlet_and_holdout",
