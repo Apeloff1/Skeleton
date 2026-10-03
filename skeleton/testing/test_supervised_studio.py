@@ -876,3 +876,10 @@ def test_live_executor_requires_aggregate_integration_validation():
     assert "integration_commands(aggregate_paths)" in source
     assert 'stage="aggregate_integration_validation"' in source
     assert '"aggregate_integration_validated"' in source
+
+
+def test_aggregate_build_is_bound_to_accepted_receipts():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "accepted_receipts.append((plan_id, candidate_diff_sha))" in source
+    assert "composition_digest(tuple(accepted_receipts))" in source
+    assert '"aggregate_build_composed"' in source
