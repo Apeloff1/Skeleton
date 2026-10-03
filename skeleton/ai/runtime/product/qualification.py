@@ -179,6 +179,35 @@ class LearningQualificationBundle:
                 "qualification cannot self-modify production"
             )
 
+    def lifecycle_validation_kwargs(
+        self,
+        *,
+        verifier_id: str | None = None,
+    ) -> dict[str, object]:
+        """Arguments for ModelLifecycleRegistry.transition(... VALIDATED ...).
+
+        The caller still chooses and invokes the lifecycle authority.  This
+        adapter only supplies the exact candidate digest, an independent
+        verifier identity, and the already-bound evidence references.
+        """
+
+        verifier = (
+            self.mirror_verifier_id
+            if verifier_id is None
+            else _text(verifier_id, "lifecycle verifier_id")
+        )
+        if verifier == self.firewall_evaluator_identity:
+            # Distinct identities are preferable so one evaluator does not
+            # silently become the sole cross-plane authority.
+            raise LearningQualificationError(
+                "lifecycle verifier must differ from firewall evaluator identity"
+            )
+        return {
+            "model_digest": self.candidate_model_digest,
+            "verifier_id": verifier,
+            "evidence_refs": self.lifecycle_evidence_refs,
+        }
+
     def as_dict(self) -> dict[str, object]:
         return {
             "schema_version": "skeleton.learning_qualification.v1",
