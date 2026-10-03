@@ -64,3 +64,16 @@ def advance(state:BuildState,*,supervisor:Mapping[str,Any],validated:bool,outcom
  return state
 
 def should_continue(state:BuildState)->bool:return state.status=="continue"
+
+def main(argv=None)->int:
+ import argparse
+ p=argparse.ArgumentParser()
+ p.add_argument("--state",required=True); p.add_argument("--repo-state",required=True)
+ p.add_argument("--validated",action="store_true"); p.add_argument("--outcome-sha",default="")
+ p.add_argument("--max-cycles",type=int,default=80); p.add_argument("--max-failures",type=int,default=8); p.add_argument("--max-stagnant",type=int,default=5)
+ a=p.parse_args(argv); state=BuildState.load(Path(a.state))
+ repo=json.loads(Path(a.repo_state).read_text()); supervisor=repo.get("_shift_supervisor")
+ if not isinstance(supervisor,Mapping): raise ValueError("missing supervisor state")
+ state=advance(state,supervisor=supervisor,validated=a.validated,outcome_sha=a.outcome_sha,max_cycles=a.max_cycles,max_failures=a.max_failures,max_stagnant=a.max_stagnant)
+ state.dump(Path(a.state)); print(json.dumps(asdict(state),sort_keys=True)); return 0
+if __name__=="__main__": raise SystemExit(main())
