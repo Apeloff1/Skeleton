@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -601,6 +602,82 @@ async def test_execute_polls_terminal_result_and_preserves_lineage() -> None:
     assert result.provider_receipts == ("provider:receipt-a",)
     assert result.memory_refs == ("memory:one",)
     assert result.artifact_refs == ("artifact:one",)
+
+
+@pytest.mark.asyncio
+async def test_execute_cancellation_requests_durable_engine_cancel() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    status_started = asyncio.Event()
+    cancel_calls: list[dict] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST" and request.url.path.endswith("/executions"):
+            return _json(
+                202,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "state": "admitted",
+                    "accepted_at": _now().isoformat(),
+                    "idempotency_digest": "c" * 64,
+                    "status_ref": "status",
+                    "events_ref": "events",
+                    "trace_id": command.operation.trace_id,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            status_started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled status request resumed unexpectedly")
+        if request.method == "POST" and request.url.path.endswith(
+            f"/executions/{execution_id}/cancel"
+        ):
+            body = __import__("json").loads(request.content)
+            cancel_calls.append(body)
+            return _json(
+                200,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "operation_state": "cancelled",
+                    "execution_state": "cancelled",
+                    "latest_checkpoint_version": 1,
+                    "result_ref": "execution-result:" + execution_id,
+                    "failure_code": "cancellation_requested",
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": True,
+                },
+            )
+        raise AssertionError(
+            f"unexpected request {request.method} {request.url}"
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+            poll_interval_s=0.001,
+            execution_timeout_s=30,
+            request_timeout_s=2,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    task = asyncio.create_task(client.execute(command))
+    await asyncio.wait_for(status_started.wait(), timeout=1)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert len(cancel_calls) == 1
+    assert cancel_calls[0] == {
+        "actor_id": command.operation.actor_id,
+        "tenant_id": command.operation.tenant_id,
+        "reason": "client_cancelled",
+    }
 
 
 @pytest.mark.asyncio
