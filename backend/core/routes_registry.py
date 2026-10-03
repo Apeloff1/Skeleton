@@ -276,7 +276,6 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.language_academy",                 "router"),
     ("routes.jeeves_languages",                 "router"),
     ("routes.class_progress",                   "router"),
-    ("routes.mirror_room",                      "router"),
     ("routes.math_academy",                     "router"),
     ("routes.pipeline_agents",                  "router"),
     ("routes.quality_control",                  "router"),
