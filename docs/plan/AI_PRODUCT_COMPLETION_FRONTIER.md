@@ -491,6 +491,39 @@ identity, deterministic inference, gated multi-method defaults, legacy Elman
 compatibility, architecture-drift rejection, schema/architecture mismatch
 rejection, and averaged gradient accumulation for both recurrent backends.
 
+
+### 27. Typed model lifecycle authority
+
+The reverse-learning frontier now materializes the lifecycle authority that the
+qualification contract previously referenced only by interface. A
+`ModelLifecycleRegistry` admits one exact bridged candidate and permits only the
+ordered state chain:
+
+`CANDIDATE -> VALIDATED -> PROMOTED -> ACTIVATED -> ROLLED_BACK`.
+
+Each transition is content-addressed and chained to the digest of the previous
+transition. Candidate registration binds the canonical training receipt, bridge,
+training-plan and learning-candidate identities. Validation consumes the exact
+`LearningQualificationBundle` and requires a verifier independent of the
+training authority, Mirror verifier and firewall evaluator. Promotion requires
+the canonical `ModelPromotionReceipt`, its exact training receipt, and the
+qualification/bridge evidence set. Activation requires the exact digest-pinned
+`LocalModelActivationManifest` and a deployment authority independent of
+training and verification roles. Rollback can reference only the exact manifest
+that was activated and therefore the exact authenticated pre-promotion baseline.
+
+The lifecycle registry is an evidence/state authority, not an execution plane.
+It cannot write an activation manifest, edit `AI_LOCAL_MODEL_PATH`, select an
+environment target, invoke the provider, or mutate model weights. This preserves
+the separation between learning, evaluation, lifecycle approval and deployment
+while making their order executable and replay-verifiable.
+
+The reverse end-to-end acceptance additionally boots the promoted candidate via
+the real `ProviderRegistry.from_env()` local-provider path and generates a
+provider-normalized response. This proves the same digest-pinned activation
+artifact consumed by deployment reaches the engine provider boundary without
+external credentials or network transport.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -544,7 +577,9 @@ rejection, and averaged gradient accumulation for both recurrent backends.
 - no-op completion when all declared capabilities satisfy thresholds;
 - gated recurrent multi-method training with legacy Elman compatibility;
 - architecture identity preserved through evaluation, qualification and the
-  canonical model-program bridge.
+  canonical model-program bridge;
+- digest-chained candidate -> validated -> promoted -> activated -> rollback lifecycle;
+- promoted candidate bootstrap through the real local ProviderRegistry environment path.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
