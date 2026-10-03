@@ -569,7 +569,175 @@
       "Keep the 19-volume native-training core wholly inside the 32-volume T2 tranche so training has one planning owner.",
       "Preserve all 165 unscheduled volume identities explicitly instead of converting planning breadth into implied completion.",
       "Require a fresh current-main-derived implementation lane and exact-head evidence before any T2 closure claim."
-    ]
+    ],
+    "planned_task_owners": [
+      {
+        "task_id": "P3T2-STORAGE-01",
+        "lane_id": "P3T2-L0",
+        "planning_status": "planned",
+        "title": "Establish distributed data identity and cache semantics",
+        "depends_on": [],
+        "primary_volume_refs": [
+          "VOL-133",
+          "VOL-135",
+          "VOL-136"
+        ],
+        "objective": "Bind distributed transaction identity, content addressing and cache identity to deterministic fail-closed data semantics.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "All training/model artifacts must bind exact dataset, code/config and checkpoint identity.",
+          "Synthetic, simulated or transformed content must preserve provenance and may not be silently represented as real-world evidence.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      },
+      {
+        "task_id": "P3T2-DATA-01",
+        "lane_id": "P3T2-L1",
+        "planning_status": "planned",
+        "title": "Build governed ingestion, lineage and dataset quality plane",
+        "depends_on": [
+          "P3T2-STORAGE-01"
+        ],
+        "primary_volume_refs": [
+          "VOL-137",
+          "VOL-138",
+          "VOL-139",
+          "VOL-140",
+          "VOL-141",
+          "VOL-142"
+        ],
+        "objective": "Materialize bounded ingestion, document intelligence, lineage, quality, dataset registry and synthetic-data provenance.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "All training/model artifacts must bind exact dataset, code/config and checkpoint identity.",
+          "Synthetic, simulated or transformed content must preserve provenance and may not be silently represented as real-world evidence.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      },
+      {
+        "task_id": "P3T2-TRAINING-01",
+        "lane_id": "P3T2-L2",
+        "planning_status": "planned",
+        "title": "Build resumable local training control plane",
+        "depends_on": [
+          "P3T2-DATA-01"
+        ],
+        "primary_volume_refs": [
+          "VOL-143",
+          "VOL-144",
+          "VOL-145",
+          "VOL-146",
+          "VOL-147",
+          "VOL-148",
+          "VOL-149"
+        ],
+        "objective": "Run deterministic local training with distributed shard identity, content-addressed checkpoints, elastic recovery, observability, evaluation gates and post-training receipts.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "All training/model artifacts must bind exact dataset, code/config and checkpoint identity.",
+          "Synthetic, simulated or transformed content must preserve provenance and may not be silently represented as real-world evidence.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      },
+      {
+        "task_id": "P3T2-LEARNING-01",
+        "lane_id": "P3T2-L3",
+        "planning_status": "planned",
+        "title": "Bound reinforcement, curriculum and verifier-model programs",
+        "depends_on": [
+          "P3T2-TRAINING-01"
+        ],
+        "primary_volume_refs": [
+          "VOL-150",
+          "VOL-151",
+          "VOL-152"
+        ],
+        "objective": "Represent RL environments, curriculum progression and verifier-model promotion as bounded evidence-bearing programs with independent gates.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "All training/model artifacts must bind exact dataset, code/config and checkpoint identity.",
+          "Synthetic, simulated or transformed content must preserve provenance and may not be silently represented as real-world evidence.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      },
+      {
+        "task_id": "P3T2-MULTIMODAL-01",
+        "lane_id": "P3T2-L4",
+        "planning_status": "planned",
+        "title": "Unify multimodal ingestion and retrieval contracts",
+        "depends_on": [
+          "P3T2-DATA-01",
+          "P3T2-TRAINING-01",
+          "P3T2-LEARNING-01"
+        ],
+        "primary_volume_refs": [
+          "VOL-153",
+          "VOL-154",
+          "VOL-155",
+          "VOL-156",
+          "VOL-157",
+          "VOL-158",
+          "VOL-159"
+        ],
+        "objective": "Normalize document, image, audio, live-speech and video inputs into content-addressed multimodal records and retrieval-ready evidence without treating generated/simulated content as real evidence.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "All training/model artifacts must bind exact dataset, code/config and checkpoint identity.",
+          "Synthetic, simulated or transformed content must preserve provenance and may not be silently represented as real-world evidence.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      },
+      {
+        "task_id": "P3T2-LIFECYCLE-01",
+        "lane_id": "P3T2-L5",
+        "planning_status": "planned",
+        "title": "Govern model lineage, lifecycle and migration",
+        "depends_on": [
+          "P3T2-TRAINING-01",
+          "P3T2-LEARNING-01"
+        ],
+        "primary_volume_refs": [
+          "VOL-179",
+          "VOL-407",
+          "VOL-408",
+          "VOL-411",
+          "VOL-412",
+          "VOL-413"
+        ],
+        "objective": "Bind model bills of materials, license/data-usage rights, lifecycle transitions, deprecation and parity-gated migration to exact local training identities and independent evidence.",
+        "acceptance": [
+          "Preserve every inherited masterplan requirement, gap, risk and contract exactly until executable evidence closes it.",
+          "No task may self-promote implementation maturity, completion checkbox, implementation signature or verification signature.",
+          "Every model lifecycle action must bind immutable model, artifact, training, dataset, license and usage-right identities.",
+          "Validation and activation require independent verifier identity and evidence; migration requires parity evidence and an explicit rollback model.",
+          "Evidence must bind the exact branch/head and executable test or runtime receipt."
+        ],
+        "completion_checkbox": false,
+        "implementation_signed": false,
+        "verification_signed": false
+      }
+    ],
+    "owner_count": 6
   },
   "reconciliation": {
     "native_training_core_volume_count": 19,
@@ -627,6 +795,7 @@
     "Every handoff conserves source breadth: source = scheduled-or-closed + deferred.",
     "P3-T2 scheduled and queued volume references are disjoint and their union equals the exact 197-volume P3-T1 deferred set.",
     "The 19-volume native-training core is contained in the single consolidated 32-volume P3-T2 schedule and has no second planning owner.",
+    "Every scheduled P3-T2 volume has exactly one planned task owner; task ownership is dependency-ordered and carries no implementation or verification sign-off.",
     "All continuation volume references resolve to the frozen Volume 000-420 masterplan.",
     "P3-T2 is planned, not closed; unmerged branch evidence cannot promote current-main maturity."
   ]

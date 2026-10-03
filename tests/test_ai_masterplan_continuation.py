@@ -14,7 +14,7 @@ def _load(path:Path)->dict: return json.loads(path.read_text(encoding="utf-8"))
 def _store(path:Path,payload:dict)->None: path.write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
 
 def test_current_continuation_frontier_is_valid():
-    r=validate(ROOT); assert r["canonical_gap_count"]==17; assert r["p1_terminal_closed_volume_count"]==107; assert r["p3_t1_deferred_volume_count"]==197; assert r["p3_t2_planned_volume_count"]==32; assert r["p3_t2_queued_volume_count"]==165; assert r["native_training_core_volume_count"]==19
+    r=validate(ROOT); assert r["canonical_gap_count"]==17; assert r["p1_terminal_closed_volume_count"]==107; assert r["p3_t1_deferred_volume_count"]==197; assert r["p3_t2_planned_volume_count"]==32; assert r["p3_t2_queued_volume_count"]==165; assert r["native_training_core_volume_count"]==19; assert r["planned_owner_count"]==6
 def test_rejects_reopened_p0_gap(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_app_construction.json"; p=_load(path); p["gap_register"][0]["status"]="open"; _store(path,p)
     with pytest.raises(MasterplanContinuationError,match="canonical gap reopened"): validate(root)
@@ -33,3 +33,10 @@ def test_rejects_false_t2_completion(tmp_path:Path):
 def test_rejects_native_training_escape(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_masterplan_continuation_frontier.json"; p=_load(path); escaped=p["reconciliation"]["native_training_core_volume_refs"][0]; p["next_tranche"]["scheduled_volume_refs"].remove(escaped); repl=p["next_tranche"]["queued_volume_refs"].pop(); p["next_tranche"]["scheduled_volume_refs"].append(repl); p["next_tranche"]["queued_volume_refs"].append(escaped); _store(path,p)
     with pytest.raises(MasterplanContinuationError,match="scheduled identity drift|escaped consolidated"): validate(root)
+
+def test_rejects_duplicate_planned_volume_owner(tmp_path:Path):
+    root=_fixture(tmp_path); path=root/"machine/ai_masterplan_continuation_frontier.json"; p=_load(path); duplicate=p["next_tranche"]["planned_task_owners"][0]["primary_volume_refs"][0]; p["next_tranche"]["planned_task_owners"][1]["primary_volume_refs"].append(duplicate); _store(path,p)
+    with pytest.raises(MasterplanContinuationError,match="exactly one owner"): validate(root)
+def test_rejects_unowned_scheduled_volume(tmp_path:Path):
+    root=_fixture(tmp_path); path=root/"machine/ai_masterplan_continuation_frontier.json"; p=_load(path); p["next_tranche"]["planned_task_owners"][0]["primary_volume_refs"].pop(); _store(path,p)
+    with pytest.raises(MasterplanContinuationError,match="exactly one owner|exact scheduled"): validate(root)

@@ -84,6 +84,21 @@ def validate(root:Path=ROOT)->dict[str,Any]:
     if core!=EXPECTED_NATIVE_TRAINING_CORE: raise MasterplanContinuationError("native-training core identity drift")
     if not set(core).issubset(set(scheduled)): raise MasterplanContinuationError("native-training core escaped consolidated T2 ownership")
     if rec.get("native_training_core_is_subset_of_t2") is not True: raise MasterplanContinuationError("native-training subset assertion missing")
+    owners=t2.get("planned_task_owners")
+    if not isinstance(owners,list) or len(owners)!=6 or t2.get("owner_count")!=6: raise MasterplanContinuationError("P3-T2 requires six planned task owners")
+    task_ids=[x.get("task_id") for x in owners if isinstance(x,dict)]
+    if len(task_ids)!=6 or len(set(task_ids))!=6: raise MasterplanContinuationError("P3-T2 task owner identity drift")
+    owned=[]
+    seen_tasks=set()
+    for task in owners:
+        tid=task.get("task_id"); deps=task.get("depends_on"); refs=task.get("primary_volume_refs")
+        if task.get("planning_status")!="planned": raise MasterplanContinuationError(f"{tid} planning status must remain planned")
+        if task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False: raise MasterplanContinuationError(f"{tid} planning owner may not self-complete or self-sign")
+        if not isinstance(deps,list) or not set(deps).issubset(seen_tasks): raise MasterplanContinuationError(f"{tid} task dependency order is not forward-safe")
+        if not isinstance(refs,list) or not refs: raise MasterplanContinuationError(f"{tid} has no planned volume ownership")
+        owned.extend(refs); seen_tasks.add(tid)
+    if len(owned)!=32 or len(set(owned))!=32: raise MasterplanContinuationError("P3-T2 volume ownership must be exactly one owner per scheduled volume")
+    if set(owned)!=set(scheduled): raise MasterplanContinuationError("P3-T2 task ownership must cover the exact scheduled volume set")
     lanes=t2.get("lanes")
     if not isinstance(lanes,list) or len(lanes)!=6: raise MasterplanContinuationError("P3-T2 requires six dependency lanes")
     ids=[x.get("id") for x in lanes if isinstance(x,dict)]
@@ -103,7 +118,7 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if policy.get(key) is not False: raise MasterplanContinuationError(f"unsafe planning authority: {key}")
     for key in ("exact_head_ci_required_for_landed_evidence","independent_closure_authority_required","current_main_reconciliation_required"):
         if policy.get(key) is not True: raise MasterplanContinuationError(f"missing continuation gate: {key}")
-    return {"status":"valid","canonical_gap_count":17,"p0_gap_count":14,"p1_gap_count":3,"p1_terminal_closed_volume_count":107,"p2_deferred_volume_count":257,"p3_t0_deferred_volume_count":234,"p3_t1_deferred_volume_count":197,"p3_t2_planned_volume_count":32,"p3_t2_queued_volume_count":165,"native_training_core_volume_count":19}
+    return {"status":"valid","canonical_gap_count":17,"p0_gap_count":14,"p1_gap_count":3,"p1_terminal_closed_volume_count":107,"p2_deferred_volume_count":257,"p3_t0_deferred_volume_count":234,"p3_t1_deferred_volume_count":197,"p3_t2_planned_volume_count":32,"p3_t2_queued_volume_count":165,"native_training_core_volume_count":19,"planned_owner_count":6}
 
 def main(argv:Sequence[str]|None=None)->int:
     parser=argparse.ArgumentParser(description=__doc__); parser.add_argument("--json",action="store_true"); args=parser.parse_args(argv)
