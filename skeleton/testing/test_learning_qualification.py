@@ -93,6 +93,11 @@ def test_adaptive_allocation_favors_validation_gain_per_compute() -> None:
     assert by_method[TrainingMethod.SELF_SUPERVISED_SPAN] >= 1
     assert sum(by_method.values()) <= 10
     assert len(allocation.allocation_digest) == 64
+    assert allocation.source_plan_digests == (
+        _sha("plan-1"),
+        _sha("plan-2"),
+        _sha("plan-3"),
+    )
 
 
 def test_allocation_never_uses_promotion_holdout_as_training_oracle() -> None:
@@ -423,3 +428,17 @@ def test_qualification_rejects_promoted_training_receipt() -> None:
             mirror_promotion_evidence=mirror,
             firewall_promotion_evidence=firewall,
         )
+
+
+def test_allocation_rejects_duplicate_validation_receipt_replay() -> None:
+    observation = _observation(
+        TrainingMethod.SUPERVISED_INSTRUCTION,
+        gain=0.4,
+        compute=1.0,
+        index=7,
+    )
+    with pytest.raises(
+        TrainingAllocationError,
+        match="duplicate validation observation evidence",
+    ):
+        allocate_training_methods((observation, observation))
