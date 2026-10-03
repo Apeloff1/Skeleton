@@ -452,46 +452,27 @@ jobs:
             echo '- Canonical plan and final patch bound by execution receipt: yes'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Evaluate bounded auto-completion
+      - name: Advance bounded completion campaign
         id: continuation
         if: always() && steps.pressure.outputs.proceed == 'true'
         env:
-          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
           HAS_PATCH: ${{ steps.proposal.outputs.has_patch }}
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          state = json.loads(Path('.studio-tmp/repo-state.json').read_text(encoding='utf-8'))
-          supervisor = state.get('_shift_supervisor', {})
-          progress = supervisor.get('progress', {})
-          result = {
-              'status': supervisor.get('status', 'unknown'),
-              'generation_id': supervisor.get('generation_id', ''),
-              'progress_fingerprint_sha256': progress.get('fingerprint_sha256', ''),
-              'total': progress.get('total', 0),
-              'counts': progress.get('counts', {}),
-              'terminal': bool(progress.get('terminal', False)),
-              'validated_patch': os.environ.get('HAS_PATCH') == 'true' and os.environ.get('VALIDATION_OUTCOME') == 'success',
-          }
-          Path(os.environ['RUNNER_TEMP'], 'studio-continuation.json').write_text(
-              json.dumps(result, sort_keys=True, indent=2) + '\n',
-              encoding='utf-8',
-          )
-          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8') as handle:
-              handle.write(f"terminal={'true' if result['terminal'] else 'false'}\n")
-              handle.write(f"validated_patch={'true' if result['validated_patch'] else 'false'}\n")
-          PY
+          mkdir -p "$RUNNER_TEMP/campaign"
+          campaign="$RUNNER_TEMP/campaign/state.json"
+          args=()
+          if [[ "${HAS_PATCH:-}" == "true" && "${VALIDATION_OUTCOME:-}" == "success" ]]; then args+=(--validated-patch); fi
+          if [[ "${VALIDATION_OUTCOME:-}" == "failure" ]]; then args+=(--validation-failed); fi
+          python -m skeleton.automation.completion_campaign --state "$campaign" --repo-state .studio-tmp/repo-state.json "${args[@]}" > "$RUNNER_TEMP/campaign/result.json"
+          python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/result.json")); h=open(os.environ["GITHUB_OUTPUT"],"a"); h.write("status="+d["status"]+"\nterminal_reason="+d.get("terminal_reason","")+"\n"); h.close()'
 
       - name: Request bounded continuation
         if: >-
           success() &&
-          steps.continuation.outputs.terminal != 'true' &&
-          steps.continuation.outputs.validated_patch == 'true' &&
+          steps.continuation.outputs.status == 'continue' &&
           (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
         env:
           GH_TOKEN: ${{ github.token }}
