@@ -1865,6 +1865,40 @@ def _quarantine_provider_usage(
     return True
 
 
+def _require_accountable_provider_usage(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+    usage: ProviderUsage,
+) -> None:
+    """Fail closed when a durable text call lacks provider token actuals.
+
+    Request estimates remain valid admission inputs, but they are not rewritten
+    as observed token usage after a provider has returned a response.
+    Compatibility runtimes without durable quota reservations retain the
+    historical estimate fallback because there is no durable accounting state
+    to quarantine.
+    """
+
+    if lease.quota_reservation is None:
+        return
+    missing: list[str] = []
+    if usage.input_tokens is None:
+        missing.append("input_tokens")
+    if usage.output_tokens is None:
+        missing.append("output_tokens")
+    if not missing:
+        return
+    _quarantine_provider_usage(
+        runtime,
+        lease,
+        reason="provider-usage-metadata-incomplete",
+    )
+    raise ProviderPolicyError(
+        "model provider usage metadata incomplete:"
+        + ",".join(missing)
+    )
+
+
 def _media_operation_id(
     provider_id: str,
     purpose: str,
@@ -2198,6 +2232,11 @@ class OpenAIProviderAdapter(ProviderAdapter):
                     request,
                     text=(str(raw_text) if raw_text is not None else None),
                 )
+            )
+            _require_accountable_provider_usage(
+                self.admission_runtime,
+                lease,
+                usage,
             )
         except BaseException:
             if dispatched:
@@ -2954,6 +2993,11 @@ class OpenAISyncProviderAdapter:
                         payload,
                         request,
                         text=raw_text,
+                    )
+                    _require_accountable_provider_usage(
+                        self.admission_runtime,
+                        lease,
+                        usage,
                     )
                     request_id = payload.get("id")
                     latency_seconds = max(0.0, time.perf_counter() - started)
