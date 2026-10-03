@@ -77,7 +77,7 @@ def execute(req: ExecuteReq) -> dict:
             game_ctx=req.game_ctx, rounds=req.rounds, persist=req.persist,
         )
     except ValueError:
-        raise HTTPException(400, str(ex))
+        raise HTTPException(400, "invalid swarm execution request")
 
 
 @router.get("/runs/{build_id}")
@@ -151,7 +151,7 @@ def execute_build(req: BuildReq) -> dict:
             platoon_size=req.platoon_size, rounds=req.rounds,
         )
     except ValueError:
-        raise HTTPException(400, str(ex))
+        raise HTTPException(400, "invalid swarm build request")
 
 
 @router.post("/execute/async")
