@@ -76,3 +76,29 @@ def test_bounded_response_is_returned_exactly() -> None:
     response = _FakeResponse([b'{"ok":', b"true}"])
 
     assert asyncio.run(free_apis._read_bounded_body(response)) == b'{"ok":true}'
+
+
+
+def test_catalog_request_parts_keep_user_data_out_of_authority() -> None:
+    api = free_apis.FREE_APIS["github"]
+    url = free_apis._build_url(
+        api,
+        {"q": "//evil.example/%2f%2fadmin?x=1#fragment"},
+    )
+
+    origin, target = free_apis._catalog_request_parts(api, url)
+
+    assert origin == "https://api.github.com"
+    assert target.startswith("/search/repositories?")
+    assert "evil.example" in target
+    assert urlsplit(origin).hostname == "api.github.com"
+
+
+def test_catalog_request_parts_collapse_network_path_prefix() -> None:
+    api = {"url": "https://api.example.test/{q}"}
+    url = "https://api.example.test//evil.example/path"
+
+    origin, target = free_apis._catalog_request_parts(api, url)
+
+    assert origin == "https://api.example.test"
+    assert target == "/evil.example/path"

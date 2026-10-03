@@ -75,6 +75,7 @@ jobs:
                     group: ("code:" + clip((.rule.id // "unknown-rule"); 100)),
                     summary: clip((.rule.description // .rule.id // "unknown rule"); 180),
                     path: clip((.most_recent_instance.location.path // "unknown"); 260),
+                    archived: ((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/")),
                     line: (.most_recent_instance.location.start_line // 0),
                     url: clip((.html_url // ""); 220)
                   }
@@ -101,6 +102,7 @@ jobs:
                 else .
                 end
               | unique_by([.kind, .number])
+              | map(select(.kind != "code-scanning" or (.archived | not)))
               | sort_by([.priority, -(.number // 0)])
               | .[:$limit]
             ' > "$RUNNER_TEMP/security/batch.json"
@@ -111,10 +113,13 @@ jobs:
           set -euo pipefail
           gh label create 'security' --repo "$REPO" --color 'b60205' --description 'Security-related repository work' --force
           code_count=$(jq 'if type == "array" then length else 0 end' "$RUNNER_TEMP/security/code.json")
+          archive_code_count=$(jq '[.[] | select((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/"))] | length' "$RUNNER_TEMP/security/code.json")
+          canonical_code_count=$((code_count - archive_code_count))
           dep_count=$(jq 'if type == "array" then length else 0 end' "$RUNNER_TEMP/security/dependabot.json")
           batch_count=$(jq 'if type == "array" then length else 0 end' "$RUNNER_TEMP/security/batch.json")
           total=$((code_count + dep_count))
-          expected_batch=$(( total < BATCH_SIZE ? total : BATCH_SIZE ))
+          actionable_total=$((canonical_code_count + dep_count))
+          expected_batch=$(( actionable_total < BATCH_SIZE ? actionable_total : BATCH_SIZE ))
           if (( batch_count > BATCH_SIZE )); then
             echo "Prioritized security batch exceeded configured bound." >&2
             exit 1
@@ -132,8 +137,11 @@ jobs:
             echo "Updated: ${now}"
             echo
             echo "- Open code-scanning alerts: **${code_count}**"
+            echo "  - Canonical maintained code: **${canonical_code_count}**"
+            echo "  - Immutable branch snapshots: **${archive_code_count}**"
             echo "- Open Dependabot alerts: **${dep_count}**"
             echo "- Total tracked findings: **${total}**"
+            echo "- Actionable canonical/dependency findings: **${actionable_total}**"
             echo "- Prioritized remediation batch: **${batch_count} / ${BATCH_SIZE}**"
             echo "- Nominal batch target before identity de-duplication: **${expected_batch}**"
             echo
@@ -159,7 +167,7 @@ jobs:
               else empty end
             ' "$RUNNER_TEMP/security/batch.json"
             echo
-            echo '> Batch selection is severity-first and capped at 50 findings. Fix repeated rules/packages at the root cause; do not dismiss alerts merely to reduce the count.'
+            echo '> Batch selection is severity-first, excludes immutable historical snapshots, and is capped at 50 actionable findings. Canonical code and dependency findings must be fixed at the root cause.'
           } > "$body_file"
 
           body_bytes=$(wc -c < "$body_file" | tr -d ' ')
