@@ -98,6 +98,10 @@ class ProviderPolicyError(ProviderError):
     """Raised when governance or admission denies provider-bound work."""
 
 
+class _ProviderUsageIncompleteError(ProviderPolicyError):
+    """Raised after dispatch when token actuals are not accountable."""
+
+
 def _read_provider_json(response: Any) -> Mapping[str, Any]:
     """Read one provider JSON response under the canonical hard byte budget."""
 
@@ -1888,12 +1892,7 @@ def _require_accountable_provider_usage(
         missing.append("output_tokens")
     if not missing:
         return
-    _quarantine_provider_usage(
-        runtime,
-        lease,
-        reason="provider-usage-metadata-incomplete",
-    )
-    raise ProviderPolicyError(
+    raise _ProviderUsageIncompleteError(
         "model provider usage metadata incomplete:"
         + ",".join(missing)
     )
@@ -2238,6 +2237,13 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 lease,
                 usage,
             )
+        except _ProviderUsageIncompleteError:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-metadata-incomplete",
+            )
+            raise
         except BaseException:
             if dispatched:
                 _quarantine_provider_usage(
@@ -3065,6 +3071,13 @@ class OpenAISyncProviderAdapter:
                 ) as exc:
                     last_error = exc
                     continue
+        except _ProviderUsageIncompleteError:
+            _quarantine_provider_usage(
+                self.admission_runtime,
+                lease,
+                reason="provider-usage-metadata-incomplete",
+            )
+            raise
         except BaseException:
             if dispatched:
                 _quarantine_provider_usage(
