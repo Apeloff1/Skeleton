@@ -5734,6 +5734,11 @@
       "path": "skeleton/main_guard",
       "owner": "repository-machine control boundary",
       "reason": "main-guard enforces repository and CI integrity outside canonical AI runtime ownership"
+    },
+    {
+      "path": "skeleton/ops",
+      "owner": "operations/release tooling",
+      "reason": "operational cockpit, release/preview hygiene, and smoke-verdict tooling stay outside canonical AI runtime ownership"
     }
   ],
   "classification_coverage": {
