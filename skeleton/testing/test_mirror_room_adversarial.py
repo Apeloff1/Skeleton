@@ -317,7 +317,6 @@ def test_validation_standard_floors_increase_monotonically() -> None:
         for left, right in zip(
             quality_floors,
             quality_floors[1:],
-            strict=True,
         )
     )
 
