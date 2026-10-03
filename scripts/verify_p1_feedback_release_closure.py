@@ -23,6 +23,43 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "feedback cannot be retained without explicit consent",
         "def rollback(",
     ),
+    "skeleton/learning/mirror_room/contracts.py": (
+        "class MirrorRoomError",
+        "class MirrorCandidate",
+        "Mirror Room candidate cannot have production authority",
+        "Mirror Room candidate cannot directly self-modify",
+    ),
+    "skeleton/learning/mirror_room/engine.py": (
+        "class CandidateGenerator",
+        "class MirrorRunReceipt",
+        "validate_split_integrity",
+        "build_curriculum",
+        "generator and sandbox evaluator identities must remain independent",
+        "sealed_holdout_digest",
+    ),
+    "skeleton/learning/mirror_room/sandbox.py": (
+        "class MirrorSandbox",
+        "sandbox executor failed closed",
+        "sandbox executor reported forbidden capabilities",
+    ),
+    "skeleton/learning/mirror_room/promotion.py": (
+        "class MirrorPromotionEvidence",
+        "def qualify_for_external_promotion(",
+        "promotion verifier must be independent of generator and executor",
+        "rollback_candidate_id",
+    ),
+    "skeleton/testing/test_mirror_room_core.py": (
+        "test_iterative_learning_keeps_holdout_sealed_until_final_candidate",
+        "test_forbidden_capability_fails_closed",
+        "test_split_contamination_is_rejected_before_learning",
+        "test_promotion_handoff_requires_independent_verifier_and_rollback",
+        "test_core_source_and_ai_mirror_are_byte_identical",
+    ),
+    ".github/workflows/mirror-room-core.yml": (
+        "Verify canonical and AI mirrors",
+        "Compile Mirror Room core",
+        "Run bounded Mirror Room acceptance",
+    ),
     "skeleton/release/slo_promotion.py": (
         "class ReleaseSLOPolicy",
         "class CanarySLOSignal",
