@@ -33,7 +33,7 @@ class ExecutionPlan:
     @property
     def fingerprint(self):
         return hashlib.sha256(json.dumps({"definition":self.definition_fingerprint,"state":self.state.as_dict()},sort_keys=True,separators=(",",":")).encode()).hexdigest()
-    def as_dict(self): return {"repository_fingerprint":self.repository_fingerprint,"plan_fingerprint":self.fingerprint,"definition_fingerprint":self.definition_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work),"state":self.state.as_dict(),"graph_fingerprint":self.graph_fingerprint}
+    def as_dict(self): return {"repository_fingerprint":self.repository_fingerprint,"plan_fingerprint":self.fingerprint,"definition_fingerprint":self.definition_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work),"state":self.state.as_dict(),"graph_fingerprint":self.graph_fingerprint,"parallel_batches":[list(b) for b in self.parallel_batches]}
 
 def _stale_plan(plan,completed,failed,verified,released):
     return ExecutionPlan(plan.repository_fingerprint,plan.steps,(),plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),True),plan.graph_fingerprint,plan.parallel_batches)
@@ -55,7 +55,7 @@ def advance_execution(plan,*,step_identity:str,outcome:Outcome,repository_finger
     elif outcome=="failed": failed.add(step.work_identity); verified.discard(step.work_identity); released.discard(step.work_identity)
     elif outcome=="stale": return _stale_plan(plan,completed,failed,verified,released)
     elif outcome=="blocked": return plan
-    return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False),plan.graph_fingerprint)
+    return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False),plan.graph_fingerprint,plan.parallel_batches)
 
 def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),active_conflicts:Iterable[str]=(),limit:int=8,state:ExecutionState|None=None,retry_failed:bool=False,graph:WorkGraph|None=None):
     graph=graph or build_work_graph(model,limit=max(limit,32)); inherited=state or ExecutionState(); completed_set=set(completed)|set(inherited.released_work)
@@ -69,6 +69,7 @@ def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),acti
                       PlanStep(verify,"verify","Run the smallest relevant verification surface before considering the work complete.",(modify,),n.verification_paths,n.identity),
                       PlanStep(unlock,"unlock","Release the verified work and recompute downstream readiness.",(verify,),work_identity=n.identity)))
     blocked=tuple(n.identity for n in graph.ordered_nodes if n.identity not in ready_ids and n.identity not in completed_set)
+    batches=tuple(tuple(group) for group in graph.safe_parallel_groups(completed_set,limit=min(8,limit)))
     return ExecutionPlan(model.fingerprint,tuple(steps),tuple(n.identity for n in ready),blocked,inherited,graph.fingerprint,batches)
 
 def replan_execution(model,previous,*,active_conflicts=(),limit=8,retry_failed=False,graph=None):
