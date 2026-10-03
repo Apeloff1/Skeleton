@@ -293,6 +293,75 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
             ) from exc
 
         manifest = adapter.activation_manifest
+
+        lifecycle_path = os.getenv(
+            "AI_LOCAL_LIFECYCLE_STATE",
+            "",
+        ).strip()
+        lifecycle_digest = os.getenv(
+            "AI_LOCAL_LIFECYCLE_DIGEST",
+            "",
+        ).strip()
+        if not lifecycle_path or not lifecycle_digest:
+            raise LocalModelArtifactError(
+                "AI_LOCAL_LIFECYCLE_STATE and "
+                "AI_LOCAL_LIFECYCLE_DIGEST are required for governed activation"
+            )
+        try:
+            from skeleton.ai.runtime.product.lifecycle import (
+                ModelLifecycleError,
+                ModelLifecycleRegistry,
+                ModelLifecycleState,
+            )
+
+            lifecycle = ModelLifecycleRegistry(lifecycle_path)
+            actual_lifecycle_digest = lifecycle.state_digest()
+            if (
+                len(lifecycle_digest) != 64
+                or any(
+                    char not in "0123456789abcdef"
+                    for char in lifecycle_digest
+                )
+                or lifecycle_digest != actual_lifecycle_digest
+            ):
+                raise ModelLifecycleError(
+                    "deployment-pinned lifecycle state digest mismatch"
+                )
+            lifecycle_snapshot = lifecycle.snapshot(
+                manifest.candidate_model_digest
+            )
+            required_state = (
+                ModelLifecycleState.ACTIVATED
+                if adapter.activation_target == "candidate"
+                else ModelLifecycleState.ROLLED_BACK
+            )
+            if lifecycle_snapshot.state is not required_state:
+                raise ModelLifecycleError(
+                    "lifecycle state does not authorize selected activation target"
+                )
+            if (
+                lifecycle_snapshot.activation_manifest_digest
+                != manifest.manifest_digest
+            ):
+                raise ModelLifecycleError(
+                    "lifecycle state activation manifest identity drift"
+                )
+            if (
+                lifecycle_snapshot.promotion_transition_digest
+                != manifest.lifecycle_promotion_transition_digest
+            ):
+                raise ModelLifecycleError(
+                    "lifecycle state promotion transition identity drift"
+                )
+        except ModelLifecycleError as exc:
+            raise LocalModelArtifactError(
+                "governed local model lifecycle state is invalid"
+            ) from exc
+
+        adapter.lifecycle_snapshot = lifecycle_snapshot
+        adapter.lifecycle_state_digest = actual_lifecycle_digest
+        adapter.lifecycle_state_path = str(lifecycle.state_path)
+
         direct_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
         if direct_path:
             try:
