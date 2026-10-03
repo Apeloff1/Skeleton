@@ -331,3 +331,17 @@ def test_closed_gaps_require_hardened_implementation_status() -> None:
         "VOL-013: depth pass requires non-empty gaps"
         in integrated_errors
     )
+
+def test_master_plan_rejects_stale_execution_frontier_snapshot() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["execution_frontier"]["queue_snapshot"]["done"] = 41
+    mutated["execution_frontier"]["queue_snapshot"]["pending"] = 1
+
+    errors = checker.validate(mutated)
+
+    assert (
+        "execution_frontier queue_snapshot disagrees with canonical frontier"
+        in errors
+    )
+
