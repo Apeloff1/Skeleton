@@ -736,9 +736,9 @@ def _shared_pressure_lease_from_payload(
             "shared pressure lease journal payload is invalid"
         )
     try:
-        priority = int(value["priority"])
-        acquired_at = float(value["acquired_at"])
-        expires_at = float(value["expires_at"])
+        raw_priority = value["priority"]
+        raw_acquired_at = value["acquired_at"]
+        raw_expires_at = value["expires_at"]
         lease_id = _token("shared_pressure_lease_id", value["lease_id"])
         scope = _token("shared_pressure_scope", value["scope"])
         operation_id = _token(
@@ -758,9 +758,22 @@ def _shared_pressure_lease_from_payload(
             "shared pressure lease journal payload is invalid"
         ) from exc
     if (
-        isinstance(value.get("priority"), bool)
-        or not 0 <= priority <= 1000
-        or not math.isfinite(acquired_at)
+        isinstance(raw_priority, bool)
+        or not isinstance(raw_priority, int)
+        or not 0 <= raw_priority <= 1000
+        or isinstance(raw_acquired_at, bool)
+        or not isinstance(raw_acquired_at, (int, float))
+        or isinstance(raw_expires_at, bool)
+        or not isinstance(raw_expires_at, (int, float))
+    ):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    priority = raw_priority
+    acquired_at = float(raw_acquired_at)
+    expires_at = float(raw_expires_at)
+    if (
+        not math.isfinite(acquired_at)
         or acquired_at < 0
         or not math.isfinite(expires_at)
         or expires_at <= acquired_at
