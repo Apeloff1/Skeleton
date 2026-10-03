@@ -16,6 +16,13 @@ from .canonical import (
     CanonicalConversationAIRuntime,
     CanonicalProductRuntimeError,
 )
+from .lifecycle import (
+    ModelLifecycleError,
+    ModelLifecycleRegistry,
+    ModelLifecycleSnapshot,
+    ModelLifecycleState,
+    ModelLifecycleTransitionReceipt,
+)
 from .learning import (
     CanonicalLearningCandidate,
     CanonicalLearningHandoffError,
@@ -40,6 +47,11 @@ from .qualification import (
 
 __all__ = [
     "LoadedLocalModelActivation",
+    "ModelLifecycleTransitionReceipt",
+    "ModelLifecycleState",
+    "ModelLifecycleSnapshot",
+    "ModelLifecycleRegistry",
+    "ModelLifecycleError",
     "LocalModelActivationError",
     "LocalModelActivationManifest",
     "build_local_model_activation_manifest",
