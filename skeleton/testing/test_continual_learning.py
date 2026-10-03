@@ -279,7 +279,7 @@ def test_continual_state_binds_accepted_round_to_exact_champion(
 
     with pytest.raises(
         ContinualLearningError,
-        match="unknown accepted round",
+        match="accepted round must identify exactly one champion",
     ):
         ContinualLearningState(
             lineage_id=initial.lineage_id,
