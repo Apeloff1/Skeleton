@@ -52,6 +52,10 @@ from skeleton.intelligence.quota import (
     TenantQuota,
 )
 from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureLease,
+    SqliteSharedPressureLedger,
+)
 
 
 _SAFE_FALLBACK_REASON_PREFIXES = (
@@ -701,6 +705,81 @@ def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
     )
 
 
+def _shared_pressure_lease_payload(
+    lease: SharedPressureLease | None,
+) -> dict[str, Any] | None:
+    if lease is None:
+        return None
+    if not isinstance(lease, SharedPressureLease):
+        raise TypeError(
+            "shared_pressure_lease must be SharedPressureLease"
+        )
+    return {
+        "lease_id": lease.lease_id,
+        "scope": lease.scope,
+        "operation_id": lease.operation_id,
+        "tenant_id": lease.tenant_id,
+        "owner_id": lease.owner_id,
+        "priority": lease.priority,
+        "acquired_at": lease.acquired_at,
+        "expires_at": lease.expires_at,
+    }
+
+
+def _shared_pressure_lease_from_payload(
+    value: object,
+) -> SharedPressureLease | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    try:
+        priority = int(value["priority"])
+        acquired_at = float(value["acquired_at"])
+        expires_at = float(value["expires_at"])
+        lease_id = _token("shared_pressure_lease_id", value["lease_id"])
+        scope = _token("shared_pressure_scope", value["scope"])
+        operation_id = _token(
+            "shared_pressure_operation_id",
+            value["operation_id"],
+        )
+        tenant_id = _token(
+            "shared_pressure_tenant_id",
+            value["tenant_id"],
+        )
+        owner_id = _token(
+            "shared_pressure_owner_id",
+            value["owner_id"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        ) from exc
+    if (
+        isinstance(value.get("priority"), bool)
+        or not 0 <= priority <= 1000
+        or not math.isfinite(acquired_at)
+        or acquired_at < 0
+        or not math.isfinite(expires_at)
+        or expires_at <= acquired_at
+    ):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    return SharedPressureLease(
+        lease_id=lease_id,
+        scope=scope,
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+        priority=priority,
+        acquired_at=acquired_at,
+        expires_at=expires_at,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _RuntimeLeaseJournal:
     lease_id: str
@@ -708,6 +787,7 @@ class _RuntimeLeaseJournal:
     reason_code: str
     remaining: tuple[tuple[str, int | float], ...]
     admitted_at: float
+    shared_pressure_lease: SharedPressureLease | None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -716,11 +796,15 @@ class _RuntimeLeaseJournal:
             "reason_code": self.reason_code,
             "remaining": dict(self.remaining),
             "admitted_at": self.admitted_at,
+            "shared_pressure_lease": _shared_pressure_lease_payload(
+                self.shared_pressure_lease
+            ),
         }
 
 
 def _runtime_lease_journal(
     lease: AdmissionLease,
+    shared_pressure_lease: SharedPressureLease | None,
 ) -> _RuntimeLeaseJournal:
     if not isinstance(lease, AdmissionLease):
         raise TypeError("runtime_lease must be AdmissionLease")
@@ -752,6 +836,7 @@ def _runtime_lease_journal(
         ),
         remaining=tuple(remaining),
         admitted_at=admitted_at,
+        shared_pressure_lease=shared_pressure_lease,
     )
 
 
@@ -804,6 +889,9 @@ def _runtime_lease_journal_from_payload(
         reason_code=_token("admission_reason_code", reason_code),
         remaining=tuple(remaining),
         admitted_at=admitted_at,
+        shared_pressure_lease=_shared_pressure_lease_from_payload(
+            value.get("shared_pressure_lease")
+        ),
     )
 
 
