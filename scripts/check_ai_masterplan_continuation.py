@@ -16,7 +16,9 @@ P3_T1_MAP=Path("machine/ai_p3_engineering_execution_map.json")
 P3_ACTIVE_MAP=Path("machine/ai_p3_execution_map.json")
 MASTER=Path("machine/ai_master_plan.json")
 STORAGE_CANDIDATE=Path("machine/ai_p3t2_storage_candidate.json")
+DATA_CANDIDATE=Path("machine/ai_p3t2_data_candidate.json")
 STORAGE_LANDED_MAIN_SHA="ed7035334243bb60c2b4d231cab4b86ee648ec0c"
+DATA_LANDED_MAIN_SHA="573658f64efc0ae8a52e08ddec256f98ce963617"
 P0_GAPS={"gap-conversation-state-authority","gap-tool-runtime-convergence","gap-context-compiler-convergence","gap-verification-evidence-contract","gap-provider-interaction-protocol","gap-engine-application-execution-boundary","gap-cognitive-execution-loop","gap-streaming-protocol","gap-governance-registry","gap-memory-durable-authority","gap-state-authority-convergence","gap-cost-admission","gap-e2e-golden-journeys","gap-provider-surface-convergence"}
 P1_GAPS={"gap-feedback-promotion","gap-provider-redundancy","gap-release-slo-loop"}
 EXPECTED_T2=["VOL-133","VOL-135","VOL-136","VOL-137","VOL-138","VOL-139","VOL-140","VOL-141","VOL-142","VOL-143","VOL-144","VOL-145","VOL-146","VOL-147","VOL-148","VOL-149","VOL-150","VOL-151","VOL-152","VOL-153","VOL-154","VOL-155","VOL-156","VOL-157","VOL-158","VOL-159","VOL-179","VOL-407","VOL-408","VOL-411","VOL-412","VOL-413"]
@@ -36,7 +38,7 @@ def _partition(name:str,source:int,scheduled:int,deferred:int)->None:
 def validate(root:Path=ROOT)->dict[str,Any]:
     root=root.resolve()
     f=_load(root,FRONTIER); construction=_load(root,CONSTRUCTION); p1=_load(root,P1); p2=_load(root,P2)
-    t0=_load(root,P3_T0); t1=_load(root,P3_T1); t1m=_load(root,P3_T1_MAP); p3=_load(root,P3_ACTIVE_MAP); master=_load(root,MASTER); storage_candidate=_load(root,STORAGE_CANDIDATE)
+    t0=_load(root,P3_T0); t1=_load(root,P3_T1); t1m=_load(root,P3_T1_MAP); p3=_load(root,P3_ACTIVE_MAP); master=_load(root,MASTER); storage_candidate=_load(root,STORAGE_CANDIDATE); data_candidate=_load(root,DATA_CANDIDATE)
     if f.get("schema_version")!="skeleton.ai.masterplan_continuation_frontier.v1": raise MasterplanContinuationError("continuation schema drift")
     if f.get("status")!="active": raise MasterplanContinuationError("continuation frontier must remain active")
     rows=construction.get("gap_register")
@@ -99,30 +101,49 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if not isinstance(deps,list) or not set(deps).issubset(seen_tasks): raise MasterplanContinuationError(f"{tid} task dependency order is not forward-safe")
         if not isinstance(refs,list) or not refs: raise MasterplanContinuationError(f"{tid} has no planned volume ownership")
         owned.extend(refs); seen_tasks.add(tid)
-    storage_owner=next((x for x in owners if isinstance(x,dict) and x.get("task_id")=="P3T2-STORAGE-01"),None)
-    candidate_owners=[x.get("task_id") for x in owners if isinstance(x,dict) and x.get("implementation_candidate") is not None]
-    if candidate_owners!=["P3T2-STORAGE-01"]: raise MasterplanContinuationError("only P3T2-STORAGE-01 may carry landed implementation-candidate evidence")
-    if t2.get("implementation_candidate_count")!=1 or t2.get("landed_unpromoted_owner_count")!=0: raise MasterplanContinuationError("P3-T2 implementation-candidate progress counts drift")
-    if not isinstance(storage_owner,dict): raise MasterplanContinuationError("P3T2-STORAGE-01 owner missing")
-    candidate_meta=storage_owner.get("implementation_candidate")
-    if not isinstance(candidate_meta,dict): raise MasterplanContinuationError("storage implementation-candidate evidence missing")
-    expected_candidate={
-        "status":"landed_pending_exact_head_validation",
-        "pull_request":2477,
-        "merged_main_sha":STORAGE_LANDED_MAIN_SHA,
-        "candidate_contract":str(STORAGE_CANDIDATE),
-        "candidate_status":"implementation_candidate",
-        "exact_head_validation_required":True,
-        "exact_head_validation_status":"pending",
-        "promotion_authority":False,
+    owner_by_id={x.get("task_id"):x for x in owners if isinstance(x,dict)}
+    expected_candidates={
+        "P3T2-STORAGE-01":{
+            "lane_id":"P3T2-L0",
+            "pull_request":2477,
+            "merged_main_sha":STORAGE_LANDED_MAIN_SHA,
+            "candidate_contract":STORAGE_CANDIDATE,
+            "contract":storage_candidate,
+        },
+        "P3T2-DATA-01":{
+            "lane_id":"P3T2-L1",
+            "pull_request":2484,
+            "merged_main_sha":DATA_LANDED_MAIN_SHA,
+            "candidate_contract":DATA_CANDIDATE,
+            "contract":data_candidate,
+        },
     }
-    for key,value in expected_candidate.items():
-        if candidate_meta.get(key)!=value: raise MasterplanContinuationError(f"storage candidate metadata drift: {key}")
-    if re.fullmatch(r"[0-9a-f]{40}",str(candidate_meta.get("merged_main_sha",""))) is None: raise MasterplanContinuationError("storage candidate merged main SHA is malformed")
-    if storage_candidate.get("task_id")!="P3T2-STORAGE-01" or storage_candidate.get("lane_id")!="P3T2-L0" or storage_candidate.get("status")!="implementation_candidate": raise MasterplanContinuationError("storage candidate contract identity drift")
-    promotion=storage_candidate.get("promotion_state",{})
-    for key in ("completion_checkbox","implementation_signed","verification_signed","may_self_close"):
-        if promotion.get(key) is not False: raise MasterplanContinuationError(f"storage candidate contract illegally promoted {key}")
+    candidate_owners=[x.get("task_id") for x in owners if isinstance(x,dict) and x.get("implementation_candidate") is not None]
+    if candidate_owners!=list(expected_candidates): raise MasterplanContinuationError("P3-T2 landed implementation-candidate owner inventory drift")
+    if t2.get("implementation_candidate_count")!=2 or t2.get("landed_unpromoted_owner_count")!=0: raise MasterplanContinuationError("P3-T2 implementation-candidate progress counts drift")
+    for task_id,spec in expected_candidates.items():
+        owner=owner_by_id.get(task_id)
+        if not isinstance(owner,dict): raise MasterplanContinuationError(f"{task_id} owner missing")
+        meta=owner.get("implementation_candidate")
+        if not isinstance(meta,dict): raise MasterplanContinuationError(f"{task_id} implementation-candidate evidence missing")
+        expected_meta={
+            "status":"landed_pending_exact_head_validation",
+            "pull_request":spec["pull_request"],
+            "merged_main_sha":spec["merged_main_sha"],
+            "candidate_contract":str(spec["candidate_contract"]),
+            "candidate_status":"implementation_candidate",
+            "exact_head_validation_required":True,
+            "exact_head_validation_status":"pending",
+            "promotion_authority":False,
+        }
+        for key,value in expected_meta.items():
+            if meta.get(key)!=value: raise MasterplanContinuationError(f"{task_id} candidate metadata drift: {key}")
+        if re.fullmatch(r"[0-9a-f]{40}",str(meta.get("merged_main_sha",""))) is None: raise MasterplanContinuationError(f"{task_id} merged main SHA is malformed")
+        contract=spec["contract"]
+        if contract.get("task_id")!=task_id or contract.get("lane_id")!=spec["lane_id"] or contract.get("status")!="implementation_candidate": raise MasterplanContinuationError(f"{task_id} candidate contract identity drift")
+        promotion=contract.get("promotion_state",{})
+        for key in ("completion_checkbox","implementation_signed","verification_signed","may_self_close"):
+            if promotion.get(key) is not False: raise MasterplanContinuationError(f"{task_id} candidate contract illegally promoted {key}")
     if len(owned)!=32 or len(set(owned))!=32: raise MasterplanContinuationError("P3-T2 volume ownership must be exactly one owner per scheduled volume")
     if set(owned)!=set(scheduled): raise MasterplanContinuationError("P3-T2 task ownership must cover the exact scheduled volume set")
     lanes=t2.get("lanes")
@@ -144,7 +165,7 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if policy.get(key) is not False: raise MasterplanContinuationError(f"unsafe planning authority: {key}")
     for key in ("exact_head_ci_required_for_landed_evidence","independent_closure_authority_required","current_main_reconciliation_required"):
         if policy.get(key) is not True: raise MasterplanContinuationError(f"missing continuation gate: {key}")
-    return {"status":"valid","canonical_gap_count":17,"p0_gap_count":14,"p1_gap_count":3,"p1_terminal_closed_volume_count":107,"p2_deferred_volume_count":257,"p3_t0_deferred_volume_count":234,"p3_t1_deferred_volume_count":197,"p3_t2_planned_volume_count":32,"p3_t2_queued_volume_count":165,"native_training_core_volume_count":19,"planned_owner_count":6,"landed_implementation_candidate_count":1,"landed_unpromoted_owner_count":0}
+    return {"status":"valid","canonical_gap_count":17,"p0_gap_count":14,"p1_gap_count":3,"p1_terminal_closed_volume_count":107,"p2_deferred_volume_count":257,"p3_t0_deferred_volume_count":234,"p3_t1_deferred_volume_count":197,"p3_t2_planned_volume_count":32,"p3_t2_queued_volume_count":165,"native_training_core_volume_count":19,"planned_owner_count":6,"landed_implementation_candidate_count":2,"landed_unpromoted_owner_count":0}
 
 def main(argv:Sequence[str]|None=None)->int:
     parser=argparse.ArgumentParser(description=__doc__); parser.add_argument("--json",action="store_true"); args=parser.parse_args(argv)
