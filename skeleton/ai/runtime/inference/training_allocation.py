@@ -357,6 +357,8 @@ def allocate_training_methods(
     for item in rows:
         if item.method in by_method:
             by_method[item.method].append(item)
+    for method in by_method:
+        by_method[method].sort(key=lambda item: item.digest)
 
     raw_rows: list[
         tuple[TrainingMethod, int, int, float, float, float, float]
@@ -522,6 +524,115 @@ def allocate_training_methods(
     )
 
 
+def observe_mirror_validation(
+    method: TrainingMethod,
+    *,
+    comparison_report: object,
+    plan_digest: str,
+    compute_units: float | None = None,
+) -> MethodValidationObservation:
+    """Translate one Mirror Room VALIDATION report into allocator evidence.
+
+    The helper is structural so this branch does not duplicate or import the
+    Mirror Room implementation.  It explicitly rejects TRAIN/HOLDOUT reports.
+    When compute_units is omitted, candidate sandbox episode cost is summed;
+    zero-cost local episodes fall back to bounded token+step work units.
+    """
+
+    try:
+        actual_method = TrainingMethod(method)
+    except ValueError as exc:
+        raise TrainingAllocationError(
+            "Mirror validation uses unsupported training method"
+        ) from exc
+
+    try:
+        split = getattr(comparison_report, "split")
+        split_value = getattr(split, "value", split)
+        gain = getattr(comparison_report, "weighted_utility_delta")
+        report_digest = getattr(comparison_report, "digest")
+        scenarios = tuple(
+            getattr(comparison_report, "scenario_comparisons")
+        )
+    except (AttributeError, TypeError) as exc:
+        raise TrainingAllocationError(
+            "Mirror validation report lacks required structure"
+        ) from exc
+
+    if split_value != "validation":
+        raise TrainingAllocationError(
+            "adaptive allocation accepts only Mirror validation split reports"
+        )
+    if not scenarios:
+        raise TrainingAllocationError(
+            "Mirror validation report requires scenario evidence"
+        )
+
+    if compute_units is None:
+        cost = 0.0
+        tokens = 0
+        steps = 0
+        try:
+            for item in scenarios:
+                outcome = getattr(
+                    getattr(item, "candidate_receipt"),
+                    "outcome",
+                )
+                cost += _finite(
+                    getattr(outcome, "cost_units"),
+                    "Mirror cost_units",
+                    minimum=0.0,
+                )
+                raw_tokens = getattr(outcome, "tokens")
+                raw_steps = getattr(outcome, "steps")
+                if (
+                    isinstance(raw_tokens, bool)
+                    or not isinstance(raw_tokens, int)
+                    or raw_tokens < 0
+                    or isinstance(raw_steps, bool)
+                    or not isinstance(raw_steps, int)
+                    or raw_steps < 0
+                ):
+                    raise TrainingAllocationError(
+                        "Mirror resource counters must be non-negative integers"
+                    )
+                tokens += raw_tokens
+                steps += raw_steps
+        except AttributeError as exc:
+            raise TrainingAllocationError(
+                "Mirror validation report lacks candidate resource evidence"
+            ) from exc
+        # Cost units remain authoritative when present. Local/reference
+        # executors may report zero monetary cost, so deterministic abstract
+        # work prevents division by zero while still rewarding cheaper runs.
+        if cost > 0.0:
+            compute = cost
+        else:
+            compute = max(1.0, (tokens / 1000.0) + (steps / 100.0))
+    else:
+        compute = _finite(
+            compute_units,
+            "compute_units",
+            minimum=1e-12,
+            maximum=1_000_000_000.0,
+        )
+
+    return MethodValidationObservation(
+        method=actual_method,
+        evaluation_class="mirror_validation",
+        validation_gain=_finite(
+            gain,
+            "Mirror weighted_utility_delta",
+            minimum=-1_000_000.0,
+            maximum=1_000_000.0,
+        ),
+        compute_units=compute,
+        evaluation_digest=_sha(report_digest, "Mirror report digest"),
+        plan_digest=_sha(plan_digest, "plan_digest"),
+        sample_count=len(scenarios),
+    )
+
+
 __all__ = [
     "AdaptiveMethodAllocation",
     "MethodAllocationScore",
@@ -529,4 +640,5 @@ __all__ = [
     "TrainingAllocationError",
     "TrainingAllocationPolicy",
     "allocate_training_methods",
+    "observe_mirror_validation",
 ]
