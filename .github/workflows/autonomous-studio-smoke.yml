@@ -11,6 +11,7 @@ on:
       - 'skeleton/automation/evidence_provenance.py'
       - 'skeleton/automation/autonomous_build.py'
       - 'skeleton/automation/supervised_studio.py'
+      - 'skeleton/automation/supervisor_repair_ingest.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
       - 'skeleton/testing/test_build_*.py'
