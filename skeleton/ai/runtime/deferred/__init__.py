@@ -6,6 +6,14 @@ masterplan completion authority.
 """
 from .catalog import DEFERRED_165_SPECS, build_registry, volume_ids
 from .contracts import CapabilityRegistry, CapabilitySpec, EvidenceReceipt
+from .planner import (
+    DeferredPlan,
+    DeferredPlanExecutionError,
+    DeferredPlanExecutor,
+    DeferredPlanOutcome,
+    DeferredPlanReceipt,
+    DeferredPlanStep,
+)
 from .executor import (
     DeferredExecutionError,
     DeferredExecutor,
@@ -20,6 +28,12 @@ __all__ = [
     "CapabilitySpec",
     "DEFERRED_165_SPECS",
     "DeferredExecutionError",
+    "DeferredPlan",
+    "DeferredPlanExecutionError",
+    "DeferredPlanExecutor",
+    "DeferredPlanOutcome",
+    "DeferredPlanReceipt",
+    "DeferredPlanStep",
     "DeferredExecutor",
     "DeferredInvocation",
     "EvidenceReceipt",
