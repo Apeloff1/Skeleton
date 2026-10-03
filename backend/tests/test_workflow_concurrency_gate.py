@@ -196,6 +196,21 @@ jobs: {}
     assert any("opaque concurrency group expression" in finding for finding in findings)
 
 
+def test_allows_pr_number_or_sha_fallback_with_event_scoped_preemption() -> None:
+    text = """name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs: {}
+"""
+    assert _scan(text, "ci.yml") == []
+
+
 def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
     text = """name: ineffective-preemption
 on:
