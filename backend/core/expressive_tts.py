@@ -84,7 +84,7 @@ def shape_cadence(text: str, tone: Optional[str] = None) -> str:
     if not s:
         return ""
 
-    translation = str.maketrans({ch: " " for ch in "#*_\`~>"})
+    translation = str.maketrans({ch: " " for ch in "#*_`~>"})
     s = s.translate(translation)
     s = " ".join(s.split())
     s = s.replace(" - ", " — ")
