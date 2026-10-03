@@ -1026,6 +1026,7 @@ class MongoConversationAuthority:
             and existing.context_compiler_version == candidate.context_compiler_version
             and existing.attachment_refs == candidate.attachment_refs
             and existing.tool_receipt_refs == candidate.tool_receipt_refs
+            and existing.provider_receipt_refs == candidate.provider_receipt_refs
             and existing.memory_refs == candidate.memory_refs
             and existing.citation_refs == candidate.citation_refs
             and existing.artifact_refs == candidate.artifact_refs
