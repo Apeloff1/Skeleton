@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 import pytest
 
-from skeleton.ai.runtime.deferred import build_registry, volume_ids
+from skeleton.ai.runtime.deferred import (
+    DeferredExecutionError,
+    DeferredExecutor,
+    DeferredInvocation,
+    build_registry,
+    volume_ids,
+)
 from skeleton.ai.runtime.deferred.compute import (
     EthicsReview,
     FarmTask,
@@ -507,4 +514,654 @@ def test_approval_fatigue_window_recovers_without_suppressing_high_impact() -> N
     assert guard.request(False)=="batch_or_defer"
     assert guard.request(False)=="prompt"
     assert guard.request(True)=="prompt"
+
+def _enable_volume(registry, volume_id: str):
+    record=registry.get(volume_id)
+    candidate=EvidenceReceipt(
+        volume_id=volume_id,
+        head_sha=HEAD,
+        artifact_digests=(HEX_A,),
+        tests=("candidate:test",),
+        status="implementation_candidate",
+    )
+    verified=EvidenceReceipt(
+        volume_id=volume_id,
+        head_sha=HEAD,
+        artifact_digests=(HEX_A,HEX_B),
+        tests=("candidate:test","verified:test"),
+        status="verified",
+    )
+    record.candidate(candidate)
+    record.verify(verified)
+    registry.enable(volume_id)
+    return record
+
+
+def _invocation(record, operation_id: str, payload: dict, *, cost: int = 1, latency: int = 1):
+    return DeferredInvocation(
+        operation_id=operation_id,
+        volume_id=record.spec.volume_id,
+        spec_digest=record.spec.digest,
+        authority_digest=DeferredExecutor.authority_digest(record),
+        payload_digest=DeferredExecutor.digest_payload(payload),
+        cost_units=cost,
+        latency_ms=latency,
+    )
+
+
+def test_deferred_executor_refuses_disabled_capability_before_handler() -> None:
+    registry=build_registry()
+    record=registry.get("VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"disabled",payload)
+
+    with pytest.raises(PermissionError,match="not enabled"):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
+
+
+def test_deferred_executor_refuses_handler_identity_drift() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+
+    with pytest.raises(ValueError,match="canonical capability handler"):
+        executor.register_handler(
+            "VOL-160",
+            lambda payload: payload,
+            handler_identity="evil.handler",
+        )
+
+    assert record.state=="enabled"
+
+
+def test_deferred_executor_requires_explicit_budget_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    payload={"value":1}
+
+    with pytest.raises(PermissionError,match="execution budget"):
+        executor.execute(_invocation(record,"no-budget",payload),payload)
+
+    assert calls==[]
+
+
+def test_deferred_executor_rejects_payload_or_spec_drift_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"digest-drift",payload)
+
+    with pytest.raises(ValueError,match="payload digest mismatch"):
+        executor.execute(invocation,{"value":2})
+
+    bad=DeferredInvocation(
+        operation_id="spec-drift",
+        volume_id=record.spec.volume_id,
+        spec_digest=HEX_C,
+        authority_digest=DeferredExecutor.authority_digest(record),
+        payload_digest=DeferredExecutor.digest_payload(payload),
+        cost_units=1,
+        latency_ms=1,
+    )
+    with pytest.raises(PermissionError,match="spec digest drift"):
+        executor.execute(bad,payload)
+
+    assert calls==[]
+
+
+def test_deferred_executor_enforces_budget_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=1,max_latency_ms=5),
+    )
+    payload={"value":1}
+
+    with pytest.raises(RuntimeError,match="cost budget exhausted"):
+        executor.execute(
+            _invocation(record,"over-budget",payload,cost=2,latency=1),
+            payload,
+        )
+
+    assert calls==[]
+
+
+def test_deferred_executor_success_is_idempotent_and_content_bound() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+
+    def handler(payload):
+        calls.append(payload)
+        payload["value"]=999
+        return {"answer":42}
+
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"same-op",payload)
+
+    first=executor.execute(invocation,payload)
+    first.result["answer"]=0
+    second=executor.execute(invocation,payload)
+
+    assert first.receipt==second.receipt
+    assert second.receipt.status=="succeeded"
+    assert second.receipt.attempt==1
+    assert second.receipt.result_digest==DeferredExecutor.digest_payload({"answer":42})
+    assert second.result=={"answer":42}
+    assert calls==[{"value":999}]
+    assert payload=={"value":1}
+
+
+def test_deferred_executor_rejects_operation_identity_collision() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=3,max_latency_ms=10),
+    )
+    one={"value":1}
+    two={"value":2}
+    executor.execute(_invocation(record,"collision",one),one)
+
+    with pytest.raises(ValueError,match="operation identity collision"):
+        executor.execute(_invocation(record,"collision",two),two)
+
+
+def test_deferred_executor_failure_is_terminal_and_message_is_not_stored() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+
+    def broken(payload):
+        calls.append(payload)
+        raise RuntimeError("super secret provider detail")
+
+    executor.register_handler(
+        "VOL-160",
+        broken,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=4,max_latency_ms=20),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"terminal-failure",payload)
+
+    with pytest.raises(DeferredExecutionError) as first:
+        executor.execute(invocation,payload)
+    failure=first.value.receipt
+    assert failure.status=="failed"
+    assert failure.error_type=="RuntimeError"
+    assert "super secret" not in json.dumps(failure.as_dict())
+
+    with pytest.raises(DeferredExecutionError,match="previously failed") as second:
+        executor.execute(invocation,payload)
+
+    assert second.value.receipt==failure
+    assert calls==[{"value":1}]
+
+
+def test_deferred_executor_rejects_noncanonical_result_as_terminal_failure() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"bad":float("nan")},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"nan-result",payload)
+
+    with pytest.raises(DeferredExecutionError) as exc:
+        executor.execute(invocation,payload)
+
+    assert exc.value.receipt.error_type=="ValueError"
+    assert executor.receipt("nan-result")==exc.value.receipt
+
+
+def test_deferred_executor_snapshot_is_deterministic() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"echo":payload["value"]},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=5,max_latency_ms=10),
+    )
+    for operation_id,value in (("b",2),("a",1)):
+        payload={"value":value}
+        executor.execute(_invocation(record,operation_id,payload),payload)
+
+    first=executor.snapshot()
+    second=executor.snapshot()
+    assert first==second
+    assert [row["receipt"]["operation_id"] for row in first["operations"]]==["a","b"]
+    assert len(first["snapshot_digest"])==64
+
+def test_deferred_executor_rejects_multi_attempt_budget_policy() -> None:
+    registry=build_registry()
+    _enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+
+    with pytest.raises(ValueError,match="max_attempts=1"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=2,max_cost_units=4,max_latency_ms=20),
+        )
+
+
+def test_deferred_executor_rejects_stale_authority_evidence_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"authority-drift",payload)
+
+    record.attach(
+        EvidenceReceipt(
+            volume_id="VOL-160",
+            head_sha=HEAD,
+            artifact_digests=(HEX_C,),
+            tests=("late:evidence",),
+            status="verified",
+        )
+    )
+
+    with pytest.raises(PermissionError,match="authority digest drift"):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
+
+def test_deferred_executor_rejects_non_string_json_keys() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+
+    with pytest.raises(TypeError,match="JSON object keys must be strings"):
+        DeferredExecutor.digest_payload({1:"value"})
+
+
+def test_deferred_executor_rejects_oversized_payload_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+        max_payload_bytes=32,
+        max_result_bytes=128,
+    )
+    payload={"value":"x"*64}
+    invocation=_invocation(record,"large-payload",payload)
+
+    with pytest.raises(RuntimeError,match="payload byte limit exceeded"):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
+
+
+def test_deferred_executor_records_oversized_result_as_terminal_failure() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"value":"x"*128},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+        max_payload_bytes=128,
+        max_result_bytes=32,
+    )
+    payload={"value":1}
+    invocation=_invocation(record,"large-result",payload)
+
+    with pytest.raises(DeferredExecutionError) as exc:
+        executor.execute(invocation,payload)
+
+    assert exc.value.receipt.error_type=="RuntimeError"
+    assert calls==[{"value":1}]
+    assert executor.receipt("large-result")==exc.value.receipt
+
+
+def test_deferred_executor_rejects_invalid_byte_limits() -> None:
+    registry=build_registry()
+    _enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+
+    with pytest.raises(ValueError,match="max_payload_bytes"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+            max_payload_bytes=0,
+        )
+    with pytest.raises(ValueError,match="max_result_bytes"):
+        executor.set_budget(
+            "VOL-160",
+            Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+            max_result_bytes=True,
+        )
+
+def test_deferred_executor_prepare_binds_current_authority() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare(
+        "VOL-160",
+        "prepared",
+        payload,
+        cost_units=1,
+        latency_ms=1,
+    )
+    assert invocation.spec_digest==record.spec.digest
+    assert invocation.authority_digest==DeferredExecutor.authority_digest(record)
+    assert invocation.payload_digest==DeferredExecutor.digest_payload(payload)
+
+
+def test_deferred_executor_success_replay_rechecks_current_authority() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","stale-replay",payload)
+    executor.execute(invocation,payload)
+
+    record.transition("verified")
+
+    with pytest.raises(PermissionError,match="authority digest drift"):
+        executor.execute(invocation,payload)
+
+    assert calls==[{"value":1}]
+
+
+def test_deferred_executor_same_operation_cannot_execute_concurrently() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    entered=threading.Event()
+    release=threading.Event()
+    calls=[]
+
+    def handler(payload):
+        calls.append(payload)
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","race-op",payload)
+    worker_errors=[]
+
+    def run_first():
+        try:
+            executor.execute(invocation,payload)
+        except BaseException as exc:
+            worker_errors.append(exc)
+
+    thread=threading.Thread(target=run_first)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    with pytest.raises(RuntimeError,match="already in flight"):
+        executor.execute(invocation,payload)
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert worker_errors==[]
+    assert calls==[{"value":1}]
+
+
+def test_deferred_executor_baseexception_releases_inflight_reservation() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+
+    class StopExecution(BaseException):
+        pass
+
+    def handler(payload):
+        calls.append(payload)
+        if len(calls)==1:
+            raise StopExecution()
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","baseexception",payload)
+
+    with pytest.raises(StopExecution):
+        executor.execute(invocation,payload)
+
+    outcome=executor.execute(invocation,payload)
+    assert outcome.result=={"ok":True}
+    assert calls==[{"value":1},{"value":1}]
+
+def test_deferred_invocation_bounds_operation_identity() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    payload={"value":1}
+
+    with pytest.raises(ValueError,match="at most 256"):
+        DeferredInvocation(
+            operation_id="x"*257,
+            volume_id=record.spec.volume_id,
+            spec_digest=record.spec.digest,
+            authority_digest=DeferredExecutor.authority_digest(record),
+            payload_digest=DeferredExecutor.digest_payload(payload),
+        )
+
+    with pytest.raises(ValueError,match="control characters"):
+        DeferredInvocation(
+            operation_id="bad\noperation",
+            volume_id=record.spec.volume_id,
+            spec_digest=record.spec.digest,
+            authority_digest=DeferredExecutor.authority_digest(record),
+            payload_digest=DeferredExecutor.digest_payload(payload),
+        )
+
+
+def test_execution_outcome_rejects_result_receipt_mismatch() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"answer":42},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    outcome=executor.execute(
+        executor.prepare("VOL-160","outcome-bound",payload),
+        payload,
+    )
+
+    from skeleton.ai.runtime.deferred import ExecutionOutcome
+
+    with pytest.raises(ValueError,match="result digest mismatch"):
+        ExecutionOutcome(receipt=outcome.receipt,result={"answer":43})
+
+def test_deferred_executor_snapshot_is_safe_during_inflight_execution() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    entered=threading.Event()
+    release=threading.Event()
+
+    def handler(payload):
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok":True}
+
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","snapshot-race",payload)
+    errors=[]
+
+    def run():
+        try:
+            executor.execute(invocation,payload)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread=threading.Thread(target=run)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    during=executor.snapshot()
+    assert during["operations"]==[]
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert errors==[]
+
+    after=executor.snapshot()
+    assert [row["receipt"]["operation_id"] for row in after["operations"]]==[
+        "snapshot-race"
+    ]
 
