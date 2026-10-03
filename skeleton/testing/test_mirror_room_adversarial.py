@@ -647,3 +647,39 @@ def test_custom_progressive_bar_can_reject_late_marginal_upgrades() -> None:
     assert receipt.attempts[-1].required_weighted_gain > (
         receipt.attempts[0].required_weighted_gain
     )
+
+class BrokenObservatory:
+    def begin(self, **kwargs):
+        raise RuntimeError("ui unavailable")
+
+    def record_attempt(self, receipt):
+        raise RuntimeError("ui unavailable")
+
+    def finish(self, campaign):
+        raise RuntimeError("ui unavailable")
+
+
+def test_observatory_failure_cannot_block_or_influence_learning() -> None:
+    executor = RatchetExecutor()
+    adversary = FixedAdversarialSuite(
+        adversary_id="independent-red-team",
+        challenges=_challenges(),
+    )
+    room = AdversarialMirrorRoom(
+        _spec(),
+        executor,
+        adversary,
+        policy=AdversarialRatchetPolicy(),
+        observatory=BrokenObservatory(),
+    )
+
+    receipt = room.run(
+        run_id="observer-isolation",
+        generator=HundredStepGenerator(),
+        scenarios=_base_scenarios(),
+        attempts=3,
+    )
+
+    assert receipt.completed_attempts == 3
+    assert receipt.accepted_upgrades == 3
+    assert receipt.final_baseline.candidate_id == "attempt-003"

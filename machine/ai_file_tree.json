@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "cc7aeb8a0dd2643a3a0614330feee053549fd862",
+      "source_git_object_sha": "39ece3553a9f6dfcb82ead023ba08cd13188053f",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",

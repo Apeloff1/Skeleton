@@ -1213,6 +1213,25 @@ class AdversarialMirrorRoom:
                 "Mirror Room generation budget cannot reach 100 attempts"
             )
 
+    def _observe(
+        self,
+        event: str,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        """Publish read-only evidence without granting observer authority.
+
+        Observatory failures are intentionally isolated from learning. A broken
+        dashboard, API projection, or custom observer cannot reject, accept,
+        mutate, or abort a valid adversarial campaign.
+        """
+
+        try:
+            callback = getattr(self.observatory, event)
+            callback(*args, **kwargs)
+        except Exception:
+            return
+
     def _validate_full_campaign_capacity(
         self,
         *,
@@ -1360,7 +1379,8 @@ class AdversarialMirrorRoom:
         evaluator = PairedEvaluator(self.spec, sandbox)
         original_baseline = self.spec.production_baseline
         baseline = original_baseline
-        self.observatory.begin(
+        self._observe(
+            "begin",
             run_id=run_id,
             baseline=original_baseline,
         )
@@ -1589,7 +1609,7 @@ class AdversarialMirrorRoom:
                 standard_after=standard_after,
             )
             receipts.append(receipt)
-            self.observatory.record_attempt(receipt)
+            self._observe("record_attempt", receipt)
 
             new_hard = challenge_report.hard_examples(
                 limit=self.spec.hard_example_limit
@@ -1656,7 +1676,7 @@ class AdversarialMirrorRoom:
             usage=sandbox.usage,
             delivery_ready=delivery_ready,
         )
-        self.observatory.finish(campaign)
+        self._observe("finish", campaign)
         return campaign
 
 

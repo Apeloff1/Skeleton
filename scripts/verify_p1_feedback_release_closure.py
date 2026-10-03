@@ -41,6 +41,8 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "cumulative gauntlet cannot run before attempt 100",
         "challenge_digests",
         "gauntlet_report",
+        "def _observe(",
+        "Observatory failures are intentionally isolated from learning",
     ),
     "skeleton/ai/learning/mirror_room/adversarial.py": (
         "ADVERSARIAL_ATTEMPTS_REQUIRED = 100",
@@ -173,6 +175,7 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "test_ratchet_rejects_candidate_without_meaningful_strict_metric_lift",
         "test_progressive_standard_bar_escalates_across_all_100_attempts",
         "test_every_attempt_retests_entire_discovered_attack_corpus",
+        "test_observatory_failure_cannot_block_or_influence_learning",
         "test_custom_progressive_bar_can_reject_late_marginal_upgrades",
         "gauntlet_report",
     ),
