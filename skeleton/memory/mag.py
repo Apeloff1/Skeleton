@@ -52,6 +52,7 @@ class PreferenceEmbedding:
         self.dimension = dimension
         self.vector: List[float] = [0.0] * dimension
         self.update_count: int = 0
+        self.total_weight: float = 0.0
 
     def update(self, interaction_vector: List[float], weight: float = 1.0) -> None:
         """Online moving-average update."""
@@ -61,10 +62,14 @@ class PreferenceEmbedding:
             raise ValueError("interaction values must be finite")
         if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(float(weight)) or float(weight) <= 0:
             raise ValueError("weight must be positive")
-        self.update_count += 1
-        alpha = weight / self.update_count
+        weight_value=float(weight)
+        next_total=self.total_weight+weight_value
+        alpha=weight_value/next_total
         for i in range(self.dimension):
-            self.vector[i] = (1 - alpha) * self.vector[i] + alpha * interaction_vector[i]
+            observed=float(interaction_vector[i])
+            self.vector[i]=(1.0-alpha)*self.vector[i]+alpha*observed
+        self.total_weight=next_total
+        self.update_count += 1
 
     def similarity(self, other: "PreferenceEmbedding") -> float:
         """Cosine similarity between preference vectors."""
