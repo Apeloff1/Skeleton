@@ -405,6 +405,20 @@ class DecisionCandidate:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidate_id", _text(self.candidate_id, "candidate_id"))
+        objective_scores={}
+        for key,value in self.objective_scores.items():
+            key=_text(key,"objective score key")
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(float(value)):
+                raise ValueError("objective scores must be finite numeric values")
+            objective_scores[key]=float(value)
+        constraint_values={}
+        for key,value in self.constraint_values.items():
+            key=_text(key,"constraint value key")
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(float(value)):
+                raise ValueError("constraint values must be finite numeric values")
+            constraint_values[key]=float(value)
+        object.__setattr__(self,"objective_scores",objective_scores)
+        object.__setattr__(self,"constraint_values",constraint_values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -481,16 +495,19 @@ class ApprovalFatigueGuard:
     def request(self, high_impact: bool) -> str:
         if not isinstance(high_impact, bool):
             raise TypeError("high_impact must be boolean")
+        recent=sum(self.prompts[-self.window:])
         if high_impact:
-            self.prompts.append(True)
-            self.prompts = self.prompts[-self.window:]
-            return "prompt"
-        recent = sum(self.prompts[-self.window:])
-        if recent >= self.max_prompts:
-            return "batch_or_defer"
-        self.prompts.append(True)
-        self.prompts = self.prompts[-self.window:]
-        return "prompt"
+            decision="prompt"
+            prompted=True
+        elif recent>=self.max_prompts:
+            decision="batch_or_defer"
+            prompted=False
+        else:
+            decision="prompt"
+            prompted=True
+        self.prompts.append(prompted)
+        self.prompts=self.prompts[-self.window:]
+        return decision
 
 
 @dataclass(frozen=True, slots=True)
