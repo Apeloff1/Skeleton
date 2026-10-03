@@ -4,6 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from skeleton.eval.firewall import (
+    EvaluationFirewall,
+    EvaluationSet,
+    EvaluatorIdentity,
+)
+from skeleton.learning.mirror_room.promotion import MirrorPromotionEvidence
+
 from skeleton.ai.runtime.inference.training_allocation import (
     MethodValidationObservation,
     TrainingAllocationError,
@@ -469,3 +476,105 @@ def test_qualification_rejects_model_architecture_drift() -> None:
             mirror_promotion_evidence=mirror,
             firewall_promotion_evidence=firewall,
         )
+
+
+def test_real_mirror_and_firewall_evidence_qualify_candidate() -> None:
+    binding, receipt, _mirror, _firewall = _qualification_fixture()
+
+    evaluation_firewall = EvaluationFirewall()
+    holdout = evaluation_firewall.register_set(
+        EvaluationSet(
+            set_id="reverse-product-holdout-v1",
+            eval_class="promotion_holdout",
+            content_digest=_sha("sealed-product-holdout"),
+            population_id="standalone-ai-product-v1",
+            query_budget=2,
+            training_excluded=True,
+            metadata={"sealed": True, "purpose": "candidate-promotion"},
+        )
+    )
+    evaluator = evaluation_firewall.register_evaluator(
+        EvaluatorIdentity(
+            evaluator_id="reverse-product-independent-evaluator",
+            implementation_digest=_sha("firewall-evaluator-implementation"),
+            policy_digest=_sha("firewall-evaluator-policy"),
+        )
+    )
+    evaluation_firewall.assert_training_exclusion(
+        (
+            "training-plan-sha256:" + binding.training_plan_digest,
+            "learning-binding-sha256:" + binding.digest,
+        )
+    )
+    query = evaluation_firewall.query(
+        candidate_id=binding.firewall_candidate_id,
+        set_id=holdout.set_id,
+        evaluator_id=evaluator.evaluator_id,
+        purpose="sealed-promotion-qualification",
+    )
+    firewall_evidence = evaluation_firewall.promotion_evidence(
+        candidate_id=binding.firewall_candidate_id,
+        holdout_set_id=holdout.set_id,
+        evaluator_id=evaluator.evaluator_id,
+    )
+    assert firewall_evidence.query_receipt_digests == (query.digest,)
+    assert firewall_evidence.holdout_queries_used == 1
+    assert firewall_evidence.holdout_query_budget == 2
+
+    mirror_evidence = MirrorPromotionEvidence(
+        experiment_id="reverse-product-learning-v1",
+        run_id="reverse-product-mirror-run-1",
+        run_digest=_sha("mirror-run"),
+        manifest_digest=_sha("mirror-manifest"),
+        baseline_candidate_id=binding.mirror_baseline_candidate_id,
+        baseline_candidate_digest=binding.mirror_baseline_candidate_digest,
+        candidate_id=binding.mirror_candidate_id,
+        candidate_digest=binding.mirror_candidate_digest,
+        candidate_version="candidate-v2",
+        generator_id="mirror-generator-v1",
+        executor_id="mirror-sandbox-executor-v1",
+        holdout_report_digest=_sha("mirror-holdout-report"),
+        sealed_holdout_digest=_sha("mirror-sealed-holdout"),
+        split_integrity_digest=_sha("mirror-split-integrity"),
+        validation_report_digests=(
+            _sha("mirror-validation-report"),
+        ),
+        verifier_id="mirror-independent-verifier",
+        evaluation_refs=(
+            "eval:mirror-validation:v1",
+            "eval:mirror-holdout:v1",
+        ),
+        verified_at=1,
+        rollback_candidate_id=binding.mirror_baseline_candidate_id,
+        rollback_candidate_digest=binding.mirror_baseline_candidate_digest,
+    )
+
+    qualified = qualify_learning_candidate(
+        training_receipt=receipt,
+        binding=binding,
+        mirror_promotion_evidence=mirror_evidence,
+        firewall_promotion_evidence=firewall_evidence,
+    )
+
+    assert qualified.mirror_evidence_digest == mirror_evidence.digest
+    assert qualified.firewall_evidence_digest == firewall_evidence.digest
+    assert (
+        qualified.firewall_evaluator_identity
+        == firewall_evidence.evaluator_identity
+    )
+    assert qualified.production_authority is False
+    assert qualified.direct_self_modify is False
+    lifecycle = qualified.lifecycle_validation_kwargs(
+        verifier_id="lifecycle-independent-verifier"
+    )
+    assert lifecycle["model_digest"] == binding.candidate_model_digest
+    assert any(
+        ref == "mirror-room-evidence-sha256:" + mirror_evidence.digest
+        for ref in lifecycle["evidence_refs"]
+    )
+    assert any(
+        ref
+        == "evaluation-firewall-evidence-sha256:"
+        + firewall_evidence.digest
+        for ref in lifecycle["evidence_refs"]
+    )
