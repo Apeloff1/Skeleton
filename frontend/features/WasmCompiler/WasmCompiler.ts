@@ -326,16 +326,19 @@ sys.stderr = StringIO()
 
     stages[2].duration = performance.now() - execStart;
 
-    // Get a safe AST dump instead of executing the submitted code just to inspect it.
+    // Get a safe AST dump without interpolating caller-controlled source into
+    // Python syntax. Reuse the same explicit globals bridge as the parse stage.
     let ir = '';
+    const irSourceName = '__galaxy_ir_source__';
     try {
+      this.pyodide.globals.set(irSourceName, code);
       await this.pyodide.runPythonAsync(`
 import ast
 from io import StringIO
 
 ast_output = StringIO()
 try:
-    tree = ast.parse(${JSON.stringify(code)})
+    tree = ast.parse(__galaxy_ir_source__)
     ast_output.write(ast.dump(tree, include_attributes=False, indent=2))
 except Exception as exc:
     ast_output.write(f"Could not inspect AST: {exc}")
@@ -343,6 +346,12 @@ except Exception as exc:
       ir = await this.pyodide.runPythonAsync('ast_output.getvalue()');
     } catch {
       ir = 'Disassembly not available';
+    } finally {
+      try {
+        this.pyodide.globals.delete(irSourceName);
+      } catch {
+        // Best-effort cleanup only; the bridged value is caller source.
+      }
     }
 
     return {
