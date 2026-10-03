@@ -23,7 +23,7 @@ class MasterTraceabilityTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["volume_count"], 421)
-        self.assertEqual(result["node_count"], 9115)
+        self.assertEqual(result["node_count"], 9116)
         self.assertEqual(result["edge_count"], 25119)
         self.assertEqual(result["requirement_count"], 963)
         self.assertEqual(result["requirements_without_tests"], [])
