@@ -84,6 +84,45 @@ def _canonical_issue(state: Mapping[str, Any]) -> tuple[str, Mapping[str, Any], 
     return issue_key, canonical[0], issues
 
 
+def plan_progress(raw_plan: object, team: str) -> dict[str, Any]:
+    if not isinstance(raw_plan, list):
+        raise CanonicalPlanError("canonical plan state has no plan_items list")
+    rows = [item for item in raw_plan if isinstance(item, Mapping) and item.get("target_team") == team]
+    counts = {"queued": 0, "done": 0, "rejected": 0, "blocked": 0, "other": 0}
+    ids: list[str] = []
+    for item in rows:
+        item_id = str(item.get("id", "")).strip()
+        if item_id:
+            ids.append(item_id)
+        status = str(item.get("status", "queued")).lower()
+        if status in counts:
+            counts[status] += 1
+        else:
+            counts["other"] += 1
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            [
+                {
+                    "id": str(item.get("id", "")),
+                    "status": str(item.get("status", "")),
+                    "dependencies": item.get("dependencies", []),
+                }
+                for item in rows
+            ],
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "team": team,
+        "total": len(rows),
+        "counts": counts,
+        "terminal": counts["queued"] == 0 and counts["blocked"] == 0 and counts["other"] == 0,
+        "fingerprint_sha256": fingerprint,
+    }
+
+
 def _executable_team_items(raw_plan: object, team: str) -> list[dict[str, Any]]:
     if not isinstance(raw_plan, list):
         raise CanonicalPlanError("canonical plan state has no plan_items list")
@@ -159,6 +198,7 @@ def consume_plan(
     plan_digest = hashlib.sha256(
         json.dumps(team_items[:32], sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     ).hexdigest()
+    progress = plan_progress(durable.get("plan_items", []), team)
     state["_shift_supervisor"] = {
         "source": "canonical-plan-issue",
         "status": "loaded",
@@ -169,6 +209,7 @@ def consume_plan(
         "max_age_minutes": max_age_minutes,
         "team": team,
         "plan_items": team_items[:32],
+        "progress": progress,
     }
 
     state[issue_key] = [
