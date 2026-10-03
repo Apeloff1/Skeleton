@@ -469,6 +469,19 @@ jobs:
           python -m skeleton.automation.completion_campaign --state "$campaign" --repo-state .studio-tmp/repo-state.json "${args[@]}" > "$RUNNER_TEMP/campaign/result.json"
           python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/result.json")); h=open(os.environ["GITHUB_OUTPUT"],"a"); h.write("status="+d["status"]+"\nterminal_reason="+d.get("terminal_reason","")+"\n"); h.close()'
 
+      - name: Persist completion campaign evidence
+        if: always() && steps.continuation.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .studio/audit
+          cp "$RUNNER_TEMP/campaign/state.json" .studio/audit/latest.completion-campaign.json
+          {
+            echo
+            echo '### Completion campaign'
+            python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/state.json")); print("- Status: `"+d["status"]+"`"); print("- Cycle: **"+str(d["cycle"])+"**"); print("- Stagnant cycles: **"+str(d["stagnant_cycles"])+"**"); print("- Validation failures: **"+str(d["failures"])+"**"); print("- Terminal reason: `"+d.get("terminal_reason","")+"`")'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Request bounded continuation
         if: >-
           success() &&
