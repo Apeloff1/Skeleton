@@ -78,6 +78,18 @@ try {
     0,
   );
   runCase(
+    'mitigated-node-forge-high',
+    [advisory({ module: 'node-forge', severity: 'high', ghsa: 'GHSA-86w9-cpqp-85rv' }), summary({ high: 1 })],
+    8,
+    0,
+  );
+  runCase(
+    'mitigated-braces-high',
+    [advisory({ module: 'braces', severity: 'high', ghsa: 'GHSA-vfj7-8cjw-p6xm' }), summary({ high: 1 })],
+    8,
+    0,
+  );
+  runCase(
     'unmitigated-critical',
     [advisory({ module: 'fixture-package', severity: 'critical', ghsa: 'GHSA-test-test-test' }), summary({ critical: 1 })],
     16,
