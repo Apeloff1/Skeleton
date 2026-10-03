@@ -13,6 +13,7 @@ on:
       - "skeleton/testing/test_visual_learning.py"
       - "skeleton/testing/test_developmental_eval.py"
       - "skeleton/testing/test_training_optimizer.py"
+      - "skeleton/testing/test_continual_learning.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -34,6 +35,7 @@ on:
       - "skeleton/testing/test_visual_learning.py"
       - "skeleton/testing/test_developmental_eval.py"
       - "skeleton/testing/test_training_optimizer.py"
+      - "skeleton/testing/test_continual_learning.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -90,6 +92,7 @@ jobs:
           skeleton/testing/test_visual_learning.py
           skeleton/testing/test_developmental_eval.py
           skeleton/testing/test_training_optimizer.py
+          skeleton/testing/test_continual_learning.py
           skeleton/testing/test_learning_qualification.py
           skeleton/testing/test_model_program_bridge.py
           skeleton/testing/test_llama_cpp_local_inference.py
