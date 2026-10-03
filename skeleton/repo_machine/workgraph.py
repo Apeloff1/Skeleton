@@ -61,7 +61,7 @@ class WorkGraph:
     def critical_depth(self)->int:
         return max(self._depth.values(),default=0)
 
-    def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck()}
+    def as_dict(self): return {"nodes":[n.as_dict() for n in self._ordered_nodes],"frontier":[n.identity for n in self.frontier()],"critical_path_depth":self.critical_depth,"max_parallelism":self.max_parallelism(),"bottleneck":self.bottleneck(),"coordination_pressure":self.pressure()}
     def frontier(self,completed:Iterable[str]=()):
         done=set(completed); return tuple(sorted((n for n in self._ordered_nodes if n.identity not in done and all(p in done for p in n.prerequisites)),key=lambda n:(-n.strategic_score,-n.priority,n.identity))
     def ready(self,completed=(),active_conflicts=(),*,limit=8):
@@ -96,6 +96,15 @@ class WorkGraph:
             if set(n.conflict_keys)&used: continue
             used.update(n.conflict_keys); count+=1
         return count
+
+    def pressure(self, completed=()):
+        frontier=self.frontier(completed)
+        if not frontier: return 0
+        return min(100, max(self._pressure(n) for n in frontier))
+
+    @staticmethod
+    def _pressure(node:WorkNode)->int:
+        return min(100, node.unlock_potential*6 + node.blast_radius*3 + len(node.conflict_keys)*2 + (20 if node.critical_path_depth else 0))
 
 def _conflicts(candidate,dependents_by_zone=None):
     keys={f"zone:{candidate.zone}",f"lane:{candidate.lane}"}
