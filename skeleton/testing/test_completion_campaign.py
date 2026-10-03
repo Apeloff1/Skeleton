@@ -259,3 +259,23 @@ def test_campaign_lease_release_requires_owner():
     state = acquire_lease(CampaignState(), owner="run-1")
     with pytest.raises(ValueError, match="release owner mismatch"):
         release_lease(state, owner="run-2")
+
+
+def test_repeated_task_attempts_receive_bounded_backoff():
+    policy = CampaignPolicy(max_task_attempts=10, max_stagnant_cycles=20)
+    state = CampaignState()
+    state = advance_campaign(
+        state, supervisor=supervisor(), validated_patch=True, validation_failed=False,
+        attempted_task_ids=["task"], policy=policy,
+    )
+    assert "task" not in state.task_cooldowns
+    state = advance_campaign(
+        state, supervisor=supervisor(fingerprint="b" * 64), validated_patch=True, validation_failed=False,
+        attempted_task_ids=["task"], policy=policy,
+    )
+    assert state.task_cooldowns["task"] == 2
+    state = advance_campaign(
+        state, supervisor=supervisor(fingerprint="c" * 64), validated_patch=True, validation_failed=False,
+        attempted_task_ids=[], policy=policy,
+    )
+    assert state.task_cooldowns["task"] == 1
