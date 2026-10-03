@@ -502,3 +502,45 @@ def test_canonical_items_rejects_unbounded_plan_item_identity(tmp_path):
     )
     with pytest.raises(ValueError, match="exceeds 160"):
         supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_malformed_digest(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe",
+                    "plan_digest_sha256": "not-a-sha256",
+                    "plan_items": [{"id": "one", "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="digest is malformed"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_unbounded_plan_count(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe",
+                    "plan_items": [
+                        {"id": f"item-{index}", "title": "T", "description": "D"}
+                        for index in range(257)
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exceeds 256 plan items"):
+        supervised_studio._canonical_items(state, 1)
