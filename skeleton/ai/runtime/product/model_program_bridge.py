@@ -208,6 +208,18 @@ def bridge_product_training_to_model_program(
         raise ModelProgramBridgeError(
             "product receipt identity differs from artifact bytes"
         )
+    expected_schema = {
+        "elman_recurrent": "skeleton.numpy_recurrent_lm.v1",
+        "gated_recurrent": "skeleton.numpy_gated_recurrent_lm.v1",
+    }.get(architecture)
+    if expected_schema is None:
+        raise ModelProgramBridgeError(
+            "product receipt declares unsupported model architecture"
+        )
+    if loaded.receipt.schema != expected_schema:
+        raise ModelProgramBridgeError(
+            "product receipt model architecture differs from artifact schema"
+        )
 
     try:
         raw = path.resolve(strict=True).read_bytes()
