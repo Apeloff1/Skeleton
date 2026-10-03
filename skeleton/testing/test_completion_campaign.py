@@ -337,3 +337,16 @@ def test_frontier_rejects_unbounded_limit():
 
     with pytest.raises(ValueError, match="frontier limit"):
         select_frontier([], team="night", limit=33)
+
+
+def test_frontier_digest_changes_when_decision_changes():
+    from skeleton.automation.completion_campaign import select_frontier
+
+    plan = [
+        {"id": "a", "target_team": "night", "status": "queued", "priority": 50, "dependencies": []},
+        {"id": "b", "target_team": "night", "status": "queued", "priority": 40, "dependencies": []},
+    ]
+    first = select_frontier(plan, team="night", limit=1)
+    second = select_frontier(plan, team="night", cooldowns={"a": 1}, limit=1)
+    assert len(first["frontier_sha256"]) == 64
+    assert first["frontier_sha256"] != second["frontier_sha256"]
