@@ -229,3 +229,23 @@ class TokenIssuer:
 
     def is_revoked(self, token_id: str) -> bool:
         return token_id in self._revoked
+
+    # ------------------------------------------------------------------
+    # Capsec wiring (B031, additive — existing methods are unchanged)
+    # ------------------------------------------------------------------
+
+    def gate(self, audit: Optional[Any] = None, *, clock: Optional[Any] = None) -> Any:
+        """Return a deny-by-default capsec gate bound to this issuer.
+
+        The gate (:class:`skeleton.kernel.capsec.KernelCapabilityGate`)
+        verifies with :meth:`verify`, honours capability expiry and
+        revocation, and writes one audit record per decision to ``audit``
+        (an in-memory sink when omitted). Tool and provider calls should go
+        through ``gate().check(token, action)`` rather than :meth:`check`,
+        which predates capsec, is not audited, and never matches a
+        capability that carries an expiry.
+        """
+
+        from .capsec import KernelCapabilityGate  # local import: capsec imports this module
+
+        return KernelCapabilityGate(self, audit, clock=clock)
