@@ -6,6 +6,7 @@ import pytest
 
 from skeleton.ai.runtime.inference.multiview import (
     CameraCoveragePolicy,
+    bind_camera_subset,
     build_camera_coverage,
     stratified_camera_subset,
 )
@@ -137,6 +138,7 @@ def test_cross_view_consistency_compiles_two_real_image_observations() -> None:
         response="The same red object is present in both camera views.",
         source_ref="visual-fixture:two-view",
         camera_coverage_digest=coverage.coverage_digest,
+        camera_selection=bind_camera_subset(coverage, views),
         visual_observations=observations,
         tags=("vision", "cross-view"),
     )
@@ -205,6 +207,7 @@ def test_real_visual_documents_train_local_candidate(tmp_path) -> None:
         prompt="Identify the shared object across camera angles.",
         response="The views show the same red object.",
         camera_coverage_digest=coverage.coverage_digest,
+        camera_selection=bind_camera_subset(coverage, views),
         visual_observations=observations,
         tags=("vision", "identity"),
     )
