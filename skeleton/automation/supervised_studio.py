@@ -15,6 +15,7 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from datetime import datetime, timezone
 
 from .automation_safety import AutomationSafetyError, load_automation_safety
 from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
@@ -178,6 +179,59 @@ def _reject_overlapping_scopes(scoped: Sequence[tuple[str, PlannedTask]]) -> Non
             owners[path] = plan_id
 
 
+def _execution_receipt(
+    *,
+    run_id: str,
+    generation_id: str,
+    plan_digest: str,
+    seed: str,
+    scoped: Sequence[tuple[str, PlannedTask]],
+    patch: str,
+    accepted: int,
+) -> dict[str, Any]:
+    task_payload = [
+        {
+            "plan_item_id": plan_id,
+            "title": task.title,
+            "objective": task.objective,
+            "division": task.division,
+            "paths": list(task.paths),
+        }
+        for plan_id, task in scoped
+    ]
+    receipt = {
+        "schema": "autonomous-studio.execution-receipt.v1",
+        "run_id": run_id,
+        "plan_generation": generation_id,
+        "plan_digest_sha256": plan_digest,
+        "seed": seed,
+        "registry_fingerprint": registry_fingerprint(),
+        "tasks": task_payload,
+        "accepted_tasks": accepted,
+        "patch_sha256": hashlib.sha256(patch.encode("utf-8")).hexdigest(),
+        "patch_chars": len(patch),
+    }
+    canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":"), default=str)
+    receipt["receipt_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return receipt
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    import tempfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def propose(
     *,
     patch_path: Path,
@@ -186,6 +240,7 @@ def propose(
     cohort_size: int,
     seed: str,
     repo_state_path: Path,
+    receipt_path: Path | None = None,
 ) -> int:
     if not 1 <= max_tasks <= 3:
         raise ValueError("max_tasks must be 1-3")
@@ -235,6 +290,8 @@ def propose(
 
     try:
         items, generation_id = _canonical_items(repo_state_path, max_tasks)
+        state_payload = json.loads(repo_state_path.read_text(encoding="utf-8"))
+        plan_digest = str(state_payload["_shift_supervisor"].get("plan_digest_sha256", ""))
         if not items:
             raise ValueError("canonical night plan contains no executable items")
         reasoner = ChatGPTReasoner()
@@ -340,11 +397,23 @@ def propose(
             status="failed_closed",
         )
         raise RuntimeError("final repository diff exceeds aggregate patch budget")
-    patch_path.parent.mkdir(parents=True, exist_ok=True)
-    patch_path.write_text(diff, encoding="utf-8")
+    _atomic_write(patch_path, diff)
+    receipt = _execution_receipt(
+        run_id=run_id,
+        generation_id=generation_id,
+        plan_digest=plan_digest,
+        seed=seed,
+        scoped=scoped,
+        patch=diff,
+        accepted=accepted,
+    )
+    if receipt_path is not None:
+        _atomic_write(receipt_path, json.dumps(receipt, sort_keys=True, indent=2) + "\n")
     _git("reset", "--hard", "HEAD")
     audit.emit(
         "run_finished",
+        receipt_sha256=receipt["receipt_sha256"],
+        patch_sha256=receipt["patch_sha256"],
         accepted_tasks=accepted,
         emitted_patch_chars=len(diff),
         status="proposal_ready" if diff else "no_change",
@@ -374,6 +443,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-tasks", type=int, default=2)
     parser.add_argument("--cohort-size", type=int, default=15)
     parser.add_argument("--seed", default=os.environ.get("GITHUB_RUN_ID") or "supervised-night")
+    parser.add_argument("--receipt-path", default=".studio-tmp/execution-receipt.json")
     args = parser.parse_args(argv)
     return propose(
         patch_path=Path(args.patch_path),
@@ -382,6 +452,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_tasks=args.max_tasks,
         cohort_size=args.cohort_size,
         seed=args.seed,
+        receipt_path=Path(args.receipt_path),
     )
 
 
