@@ -176,3 +176,65 @@ def test_transition_counts_are_immutable() -> None:
 
     with pytest.raises(TypeError):
         receipt.transition_counts["allow->deny"] = 99  # type: ignore[index]
+
+
+def test_policy_simulation_rejects_forged_transition_summary() -> None:
+    delta = PolicyDelta(
+        trace_id="t-1",
+        subject_id="tenant-a",
+        workload_id="assistant",
+        baseline_decision="allow",
+        candidate_decision="deny",
+    )
+    with pytest.raises(PolicySimulationError, match="transition counts"):
+        PolicySimulation(
+            simulation_id="sim-forged-count",
+            baseline_policy_id="policy-v1",
+            candidate_policy_id="policy-v2",
+            baseline_trace_digest="a" * 64,
+            candidate_trace_digest="b" * 64,
+            total_traces=1,
+            deltas=(delta,),
+            transition_counts={"deny->allow": 1},
+            affected_subjects=("tenant-a",),
+            affected_workloads=("assistant",),
+        )
+
+
+def test_policy_simulation_rejects_forged_affected_scope() -> None:
+    delta = PolicyDelta(
+        trace_id="t-1",
+        subject_id="tenant-a",
+        workload_id="assistant",
+        baseline_decision="allow",
+        candidate_decision="deny",
+    )
+    with pytest.raises(PolicySimulationError, match="affected subjects"):
+        PolicySimulation(
+            simulation_id="sim-forged-scope",
+            baseline_policy_id="policy-v1",
+            candidate_policy_id="policy-v2",
+            baseline_trace_digest="a" * 64,
+            candidate_trace_digest="b" * 64,
+            total_traces=1,
+            deltas=(delta,),
+            transition_counts={"allow->deny": 1},
+            affected_subjects=("tenant-b",),
+            affected_workloads=("assistant",),
+        )
+
+
+def test_policy_simulation_rejects_invalid_trace_digest() -> None:
+    with pytest.raises(PolicySimulationError, match="sha256"):
+        PolicySimulation(
+            simulation_id="sim-bad-digest",
+            baseline_policy_id="policy-v1",
+            candidate_policy_id="policy-v2",
+            baseline_trace_digest="not-a-digest",
+            candidate_trace_digest="b" * 64,
+            total_traces=0,
+            deltas=(),
+            transition_counts={},
+            affected_subjects=(),
+            affected_workloads=(),
+        )
