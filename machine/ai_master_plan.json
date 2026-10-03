@@ -8302,10 +8302,11 @@
       ],
       "implementation_paths": [
         "training",
-        "machine"
+        "machine",
+        "skeleton/learning/training_control.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_control_plane.py"
+        "skeleton/testing/test_training_control_plane.py"
       ],
       "evaluations": [
         "planned:training run replay"
@@ -8349,10 +8350,11 @@
       ],
       "implementation_paths": [
         "training",
-        "skeleton/network"
+        "skeleton/network",
+        "skeleton/learning/distributed_training.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_distributed_training.py"
+        "skeleton/testing/test_distributed_training.py"
       ],
       "evaluations": [
         "planned:worker-loss/straggler evaluation"
@@ -8396,10 +8398,11 @@
       ],
       "implementation_paths": [
         "training",
-        "planned:skeleton/artifacts"
+        "planned:skeleton/artifacts",
+        "skeleton/learning/training_checkpointing.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_checkpointing.py"
+        "skeleton/testing/test_training_checkpointing.py"
       ],
       "evaluations": [
         "planned:resume equivalence evaluation"
@@ -8443,10 +8446,11 @@
       ],
       "implementation_paths": [
         "training",
-        "skeleton/reliability"
+        "skeleton/reliability",
+        "skeleton/learning/elastic_training.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_elastic_training_recovery.py"
+        "skeleton/testing/test_elastic_training_recovery.py"
       ],
       "evaluations": [
         "planned:scale-up/down recovery campaign"
@@ -8490,10 +8494,11 @@
       ],
       "implementation_paths": [
         "training",
-        "skeleton/observability"
+        "skeleton/observability",
+        "skeleton/learning/training_observability.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_observability.py"
+        "skeleton/testing/test_training_observability.py"
       ],
       "evaluations": [
         "planned:divergence/stall injection"
@@ -8537,10 +8542,11 @@
       ],
       "implementation_paths": [
         "training",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/learning/training_eval_gates.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_training_eval_gates.py"
+        "skeleton/testing/test_training_eval_gates.py"
       ],
       "evaluations": [
         "planned:champion/challenger evaluation"
@@ -8584,10 +8590,11 @@
       ],
       "implementation_paths": [
         "training/post",
-        "experiments"
+        "experiments",
+        "skeleton/learning/post_training_lab.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_post_training_lab.py"
+        "skeleton/testing/test_post_training_lab.py"
       ],
       "evaluations": [
         "planned:post-training ablation suite"

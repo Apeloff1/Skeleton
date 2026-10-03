@@ -1,0 +1,27 @@
+name: P3 T2 Training Control Plane
+on:
+  pull_request:
+    paths: ["skeleton/learning/**","skeleton/ai/learning/**","skeleton/testing/test_training_*.py","skeleton/testing/test_distributed_training.py","skeleton/testing/test_elastic_training_recovery.py","skeleton/testing/test_post_training_lab.py","machine/ai_master_plan.json","machine/ai_file_tree.json","machine/ai_p3t2_training_candidate.json","scripts/check_p3t2_training_candidate.py","tests/test_p3t2_training_candidate.py",".github/workflows/p3t2-training-control.yml"]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: p3t2-training-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+jobs:
+  training:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env: {PYTHONPATH: ".", PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, ref: "${{ github.event.pull_request.head.sha || github.sha }}"}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: "3.11.16"}
+      - run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - run: python -m compileall -q skeleton/learning skeleton/ai/learning
+      - run: python scripts/check_ai_master_plan.py
+      - run: python scripts/check_p3t2_training_candidate.py --head "$(git rev-parse HEAD)" --json
+      - run: python -m pytest -q --noconftest tests/test_p3t2_training_candidate.py skeleton/testing/test_training_control_plane.py skeleton/testing/test_distributed_training.py skeleton/testing/test_training_checkpointing.py skeleton/testing/test_elastic_training_recovery.py skeleton/testing/test_training_observability.py skeleton/testing/test_training_eval_gates.py skeleton/testing/test_post_training_lab.py skeleton/testing/test_training_integrity.py skeleton/testing/test_training_lineage.py
