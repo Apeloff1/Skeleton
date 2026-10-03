@@ -283,6 +283,16 @@ def test_candidate_artifact_is_trainable_but_remains_unpromoted(
     assert len(receipt["qualification"]["prompt_sha256"]) == 64
     assert len(receipt["qualification"]["output_sha256"]) == 64
     assert len(receipt["qualification"]["receipt_digest"]) == 64
+    manifest = receipt["evaluation_manifest"]
+    assert manifest["candidate_artifact_sha256"] == receipt["artifact_sha256"]
+    assert manifest["candidate_model_digest"] == receipt["model_digest"]
+    assert (
+        manifest["qualification_receipt_digest"]
+        == receipt["qualification"]["receipt_digest"]
+    )
+    assert manifest["baseline"] is None
+    assert manifest["promotion_authority"] is False
+    assert len(manifest["manifest_digest"]) == 64
 
 
 def test_repository_learning_handoff_binds_exact_thread_version() -> None:
@@ -365,3 +375,58 @@ def test_repository_learning_handoff_binds_exact_thread_version() -> None:
             )
     finally:
         conversations.close()
+
+
+def test_candidate_evaluation_manifest_binds_exact_active_baseline(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.inference.train import build_recurrent_artifact
+
+    baseline_corpus = tmp_path / "baseline.txt"
+    baseline_corpus.write_text(
+        "stable baseline answer\nstable baseline behavior",
+        encoding="utf-8",
+    )
+    baseline_path = tmp_path / "baseline.json"
+    baseline_receipt = build_recurrent_artifact(
+        corpus_paths=(baseline_corpus,),
+        output_path=baseline_path,
+        model_id="active-baseline",
+        hidden_size=8,
+        epochs=1,
+        learning_rate=0.03,
+        max_vocab=32,
+        max_document_tokens=64,
+        seed=3,
+        temperature=0.7,
+    )
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(baseline_path))
+
+    user, assistant = _turn()
+    candidate = build_learning_candidate(
+        (user, assistant),
+        accepted_assistant_message_ids=(assistant.message_id,),
+    )
+    candidate_path = tmp_path / "candidate-with-baseline.json"
+    receipt = build_learning_candidate_artifact(
+        candidate,
+        output_path=candidate_path,
+        model_id="candidate-v2",
+        hidden_size=8,
+        epochs=1,
+        learning_rate=0.03,
+        max_vocab=32,
+        max_document_tokens=64,
+        seed=5,
+        temperature=0.7,
+    )
+
+    baseline = receipt["evaluation_manifest"]["baseline"]
+    assert baseline["artifact_sha256"] == baseline_receipt["artifact_sha256"]
+    assert baseline["model_id"] == "active-baseline"
+    assert baseline["model_digest"] == baseline_receipt["model_digest"]
+    assert baseline["reference"].startswith("local-model-artifact:")
+    assert receipt["model_digest"] != baseline["model_digest"]
+    assert receipt["evaluation_manifest"]["promotion_authority"] is False
