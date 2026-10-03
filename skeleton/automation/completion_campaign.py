@@ -45,6 +45,8 @@ class CampaignState:
     task_attempts: dict[str, int] = field(default_factory=dict)
     history: list[dict[str, Any]] = field(default_factory=list)
     terminal_reason: str = ""
+    epoch: int = 0
+    state_sha256: str = ""
 
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
@@ -57,10 +59,22 @@ class CampaignState:
         raw = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(raw, Mapping) or raw.get("schema") != SCHEMA:
             raise ValueError("campaign state schema is unsupported")
+        claimed = str(raw.get("state_sha256", ""))
+        if claimed:
+            payload = dict(raw)
+            payload["state_sha256"] = ""
+            actual = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+            ).hexdigest()
+            if claimed != actual:
+                raise ValueError("campaign state integrity digest mismatch")
         allowed = {field.name for field in __import__("dataclasses").fields(cls)}
         return cls(**{key: value for key, value in raw.items() if key in allowed})
 
     def dump(self, path: Path) -> None:
+        self.state_sha256 = ""
+        canonical = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"), default=str)
+        self.state_sha256 = hashlib.sha256(canonical.encode()).hexdigest()
         payload = json.dumps(asdict(self), sort_keys=True, indent=2) + "\n"
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
@@ -114,6 +128,7 @@ def advance_campaign(
         raise ValueError("supervisor progress fingerprint is malformed")
 
     state.cycle += 1
+    state.epoch += 1
     generation = str(supervisor.get("generation_id", ""))
     progressed = bool(state.last_progress_fingerprint and fingerprint != state.last_progress_fingerprint)
     if progressed:
