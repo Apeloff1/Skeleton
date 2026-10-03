@@ -120,8 +120,9 @@ def test_dedup_and_budgeting_are_fail_bounded() -> None:
             method_repeat_cap=8,
         ),
     )
-    assert len(plan.documents) <= 2
-    assert plan.dropped_duplicate_count >= 3
+    assert len(plan.documents) == 2
+    assert [item.repeat_ordinal for item in plan.documents] == [0, 1]
+    assert plan.dropped_budget_count >= 1
 
 
 def test_curriculum_order_and_length_bucketing_are_stable() -> None:
@@ -215,3 +216,41 @@ def test_stratified_camera_subset_spreads_over_inventory() -> None:
     assert len(subset) == 5
     assert len({item.reference for item in subset}) == 5
     assert subset[0].reference != subset[-1].reference
+
+
+def test_multi_method_builder_trains_compiled_plan(tmp_path) -> None:
+    import pytest
+
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.inference.train import (
+        build_multi_method_recurrent_artifact,
+    )
+
+    output = tmp_path / "multi-method.json"
+    receipt = build_multi_method_recurrent_artifact(
+        examples=(_full_example(),),
+        output_path=output,
+        model_id="multi-method-local",
+        methods=tuple(TrainingMethod),
+        efficiency_policy=TrainingEfficiencyPolicy(
+            deduplicate=True,
+            max_documents=128,
+            max_total_chars=200_000,
+            max_camera_views_per_example=8,
+        ),
+        hidden_size=8,
+        epochs=1,
+        learning_rate=0.03,
+        max_vocab=64,
+        max_document_tokens=96,
+        seed=19,
+        temperature=0.7,
+    )
+
+    assert output.is_file()
+    assert receipt["training_mode"] == "multi_method"
+    assert receipt["training_plan"]["plan_digest"]
+    assert receipt["training_plan"]["document_count"] >= 10
+    assert set(receipt["training_plan"]["method_counts"]) == {
+        method.value for method in TrainingMethod
+    }
