@@ -112,3 +112,44 @@ def test_checkbox_regex_matches_literal_markdown_checkbox_lines() -> None:
         (" ", "ACC-VOL-000"),
         ("x", "ACC-AIQ-X"),
     ]
+
+def test_accountability_rejects_verification_before_implementation() -> None:
+    record = {
+        "started_at_utc": "2026-10-03T18:00:00Z",
+        "completed_at_utc": "2026-10-03T19:00:00Z",
+        "implementation_signoff": {
+            "signed": True,
+            "signed_at_utc": "2026-10-03T18:30:00Z",
+        },
+        "verification_signoff": {
+            "signed": True,
+            "signed_at_utc": "2026-10-03T18:20:00Z",
+        },
+    }
+
+    errors = checker._timeline_errors("ACC-TEST", record)
+
+    assert (
+        "ACC-TEST: verification signoff predates implementation signoff"
+        in errors
+    )
+
+
+def test_accountability_rejects_completion_before_verification() -> None:
+    record = {
+        "started_at_utc": "2026-10-03T18:00:00Z",
+        "completed_at_utc": "2026-10-03T18:40:00Z",
+        "implementation_signoff": {
+            "signed": True,
+            "signed_at_utc": "2026-10-03T18:20:00Z",
+        },
+        "verification_signoff": {
+            "signed": True,
+            "signed_at_utc": "2026-10-03T18:45:00Z",
+        },
+    }
+
+    errors = checker._timeline_errors("ACC-TEST", record)
+
+    assert "ACC-TEST: completed_at_utc predates verification signoff" in errors
+
