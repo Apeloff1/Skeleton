@@ -73,6 +73,10 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
         if stem:
             test_stems.setdefault(stem, []).append(test)
 
+    # Cache the existing substring semantics per capability stem. A large
+    # repository often has many capabilities sharing the same basename.
+    stem_matches: dict[str, tuple[object, ...]] = {}
+
     capabilities: list[CapabilityRecord] = []
     for item in model.files:
         kind = ""
@@ -93,9 +97,16 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
         stem = PurePosixPath(item.path).stem.casefold()
         related_paths = {test.path for test in tests_by_zone.get(item.zone, ())}
         if stem:
-            for test_stem, tests in test_stems.items():
-                if stem in test_stem:
-                    related_paths.update(test.path for test in tests)
+            matches = stem_matches.get(stem)
+            if matches is None:
+                matches = tuple(
+                    test
+                    for test_stem, tests in test_stems.items()
+                    if stem in test_stem
+                    for test in tests
+                )
+                stem_matches[stem] = matches
+            related_paths.update(test.path for test in matches)
         related = tuple(sorted(related_paths)[:32])
         subsystem = subsystem_by_name.get(item.zone)
         dependencies = subsystem.dependencies if subsystem else ()
