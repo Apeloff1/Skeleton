@@ -570,7 +570,10 @@ class NumpyGatedRecurrentLM:
             nonlocal accumulated_sequences, optimizer_steps
             if accumulated_sequences == 0:
                 return
-            step = np.float32(rate)
+            # Accumulation changes optimizer cadence, not the effective
+            # learning rate. Average the micro-batch gradients before applying
+            # the update, including a short final batch at epoch end.
+            step = np.float32(rate / accumulated_sequences)
             for parameter, gradient in zip(
                 parameters,
                 accumulated,
