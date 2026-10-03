@@ -250,6 +250,150 @@ class DevelopmentalCaseResult:
 
 
 @dataclass(frozen=True, slots=True)
+class DevelopmentalModelCaseScore:
+    """Absolute development score for one exact model/case pair."""
+
+    case_digest: str
+    output_digest: str
+    score: float
+    token_count: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "case_digest",
+            _sha(self.case_digest, "case_digest"),
+        )
+        object.__setattr__(
+            self,
+            "output_digest",
+            _sha(self.output_digest, "output_digest"),
+        )
+        if isinstance(self.score, bool) or not isinstance(
+            self.score,
+            (int, float),
+        ):
+            raise DevelopmentalEvaluationError("score must be numeric")
+        score = float(self.score)
+        if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+            raise DevelopmentalEvaluationError(
+                "score must be within [0, 1]"
+            )
+        object.__setattr__(self, "score", score)
+        if (
+            isinstance(self.token_count, bool)
+            or not isinstance(self.token_count, int)
+            or self.token_count < 0
+        ):
+            raise DevelopmentalEvaluationError(
+                "token_count must be a non-negative integer"
+            )
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "case_digest": self.case_digest,
+                "output_digest": self.output_digest,
+                "score": self.score,
+                "token_count": self.token_count,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DevelopmentalModelScoreReport:
+    """Absolute bounded score for one authenticated local model."""
+
+    suite_digest: str
+    model_id: str
+    model_digest: str
+    artifact_sha256: str
+    case_scores: tuple[DevelopmentalModelCaseScore, ...]
+    weighted_score: float
+    compute_units: float
+    production_authority: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "suite_digest",
+            _sha(self.suite_digest, "suite_digest"),
+        )
+        object.__setattr__(
+            self,
+            "model_id",
+            _text(self.model_id, "model_id", maximum=512),
+        )
+        object.__setattr__(
+            self,
+            "model_digest",
+            _sha(self.model_digest, "model_digest"),
+        )
+        object.__setattr__(
+            self,
+            "artifact_sha256",
+            _sha(self.artifact_sha256, "artifact_sha256"),
+        )
+        if not self.case_scores or any(
+            not isinstance(item, DevelopmentalModelCaseScore)
+            for item in self.case_scores
+        ):
+            raise DevelopmentalEvaluationError(
+                "model score report requires case scores"
+            )
+        if isinstance(self.weighted_score, bool) or not isinstance(
+            self.weighted_score,
+            (int, float),
+        ):
+            raise DevelopmentalEvaluationError(
+                "weighted_score must be numeric"
+            )
+        score = float(self.weighted_score)
+        if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+            raise DevelopmentalEvaluationError(
+                "weighted_score must be within [0, 1]"
+            )
+        object.__setattr__(self, "weighted_score", score)
+        if isinstance(self.compute_units, bool) or not isinstance(
+            self.compute_units,
+            (int, float),
+        ):
+            raise DevelopmentalEvaluationError(
+                "compute_units must be numeric"
+            )
+        units = float(self.compute_units)
+        if not math.isfinite(units) or units <= 0.0:
+            raise DevelopmentalEvaluationError(
+                "compute_units must be positive"
+            )
+        object.__setattr__(self, "compute_units", units)
+        if self.production_authority is not False:
+            raise DevelopmentalEvaluationError(
+                "development score cannot grant production authority"
+            )
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "schema_version": "skeleton.local_development_score.v1",
+                "evaluation_class": "development",
+                "suite_digest": self.suite_digest,
+                "model_id": self.model_id,
+                "model_digest": self.model_digest,
+                "artifact_sha256": self.artifact_sha256,
+                "case_score_digests": [
+                    item.digest for item in self.case_scores
+                ],
+                "weighted_score": self.weighted_score,
+                "compute_units": self.compute_units,
+                "production_authority": False,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class DevelopmentalComparisonReport:
     suite_digest: str
     baseline_model_digest: str
@@ -462,6 +606,72 @@ def _score_output(text: str, case: DevelopmentalEvalCase) -> float:
     return max(0.0, min(1.0, required_score - forbidden_penalty))
 
 
+def score_local_model_developmentally(
+    *,
+    model_path: str | Path,
+    suite: DevelopmentalEvalSuite,
+) -> DevelopmentalModelScoreReport:
+    """Score one exact local model on a development-only suite."""
+
+    if not isinstance(suite, DevelopmentalEvalSuite):
+        raise TypeError("suite must be DevelopmentalEvalSuite")
+    try:
+        loaded = load_local_model_artifact(model_path)
+    except LocalModelArtifactError as exc:
+        raise DevelopmentalEvaluationError(
+            "developmental model artifact cannot be authenticated"
+        ) from exc
+
+    scores: list[DevelopmentalModelCaseScore] = []
+    weighted_total = 0.0
+    total_weight = 0.0
+    total_tokens = 0
+    for case in sorted(suite.cases, key=lambda item: item.case_id):
+        request = LocalInferenceRequest(
+            prompt=case.prompt,
+            instructions=(
+                "Offline development scoring. Return only learned local "
+                "model output. No tools or external services."
+            ),
+            max_output_tokens=case.max_output_tokens,
+            seed=case.seed,
+        )
+        result = loaded.model.infer(
+            request,
+            threading.Event(),
+        )
+        if result.model_digest != loaded.receipt.model_digest:
+            raise DevelopmentalEvaluationError(
+                "developmental scoring model identity drift"
+            )
+        text = result.text or ""
+        score = _score_output(text, case)
+        tokens = result.input_tokens + result.output_tokens
+        weighted_total += score * case.weight
+        total_weight += case.weight
+        total_tokens += tokens
+        scores.append(
+            DevelopmentalModelCaseScore(
+                case_digest=case.digest,
+                output_digest=hashlib.sha256(
+                    text.encode("utf-8")
+                ).hexdigest(),
+                score=score,
+                token_count=tokens,
+            )
+        )
+    return DevelopmentalModelScoreReport(
+        suite_digest=suite.digest,
+        model_id=loaded.receipt.model_id,
+        model_digest=loaded.receipt.model_digest,
+        artifact_sha256=loaded.receipt.artifact_sha256,
+        case_scores=tuple(scores),
+        weighted_score=weighted_total / total_weight,
+        compute_units=max(1.0, total_tokens / 1000.0),
+        production_authority=False,
+    )
+
+
 def evaluate_local_candidate_developmentally(
     *,
     baseline_path: str | Path,
@@ -646,9 +856,12 @@ def evaluate_training_receipt_developmentally(
 __all__ = [
     "DevelopmentalCaseResult",
     "DevelopmentalComparisonReport",
+    "DevelopmentalModelCaseScore",
+    "DevelopmentalModelScoreReport",
     "DevelopmentalEvalCase",
     "DevelopmentalEvalSuite",
     "DevelopmentalEvaluationError",
     "evaluate_local_candidate_developmentally",
     "evaluate_training_receipt_developmentally",
+    "score_local_model_developmentally",
 ]
