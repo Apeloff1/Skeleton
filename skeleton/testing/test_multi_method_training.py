@@ -266,6 +266,17 @@ def test_multi_method_builder_trains_compiled_plan(tmp_path) -> None:
     assert receipt["stopped_early"] is True
     assert len(receipt["training_loss_history"]) == receipt["epochs_completed"]
     assert receipt["training_tokens"] > 0
+    assert receipt["gradient_accumulation_steps"] == 4
+    expected_steps_per_epoch = (
+        receipt["training_plan"]["document_count"] + 3
+    ) // 4
+    assert receipt["optimizer_steps"] == (
+        expected_steps_per_epoch * receipt["epochs_completed"]
+    )
+    assert receipt["optimizer_steps"] < (
+        receipt["training_plan"]["document_count"]
+        * receipt["epochs_completed"]
+    )
     assert set(receipt["training_plan"]["method_counts"]) == {
         method.value for method in TrainingMethod
     }
@@ -367,3 +378,38 @@ def test_camera_refs_require_coverage_identity() -> None:
             response="A stable object.",
             camera_coverage_digest="b" * 64,
         )
+
+
+def test_gradient_accumulation_one_preserves_per_document_updates(
+    tmp_path,
+) -> None:
+    import pytest
+
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.inference.train import (
+        build_multi_method_recurrent_artifact,
+    )
+
+    receipt = build_multi_method_recurrent_artifact(
+        examples=(
+            TrainingExample(
+                example_id="acc-one",
+                prompt="Q",
+                response="A",
+            ),
+        ),
+        output_path=tmp_path / "acc-one.json",
+        model_id="acc-one",
+        methods=(
+            TrainingMethod.SUPERVISED_INSTRUCTION,
+            TrainingMethod.CAUSAL_LANGUAGE_MODELING,
+        ),
+        hidden_size=8,
+        epochs=1,
+        max_vocab=32,
+        max_document_tokens=32,
+        gradient_accumulation_steps=1,
+    )
+
+    assert receipt["gradient_accumulation_steps"] == 1
+    assert receipt["optimizer_steps"] == receipt["training_plan"]["document_count"]
