@@ -495,6 +495,7 @@ def propose(
                 try:
                     subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
                     applied_before_validation = _git("diff", "--no-ext-diff", "--binary")
+                    candidate_diff_sha = hashlib.sha256(applied_before_validation.encode("utf-8")).hexdigest()
                     applied_paths = set(_changed_paths(applied_before_validation)) if applied_before_validation else set()
                     if not applied_paths.issubset(set(task.paths)):
                         raise RuntimeError("applied candidate escaped authorized paths")
@@ -535,6 +536,8 @@ def propose(
                     required_checks=reviewed.required_checks,
                     executed_validation=[list(command) for command in validation_commands],
                     validation_output=list(validation_output),
+                    candidate_patch_sha256=candidate_sha,
+                    applied_diff_sha256=candidate_diff_sha,
                     paths=list(task.paths),
                 )
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
