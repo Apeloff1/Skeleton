@@ -5,6 +5,7 @@ from .build_acceptance import Acceptance
 from .build_certificate import BuildCertificate
 from .ci_evidence import CIEvidence
 from .build_completion_proof import CompletionProof
+from .repair_completion import require_repair_closure
 @dataclass(frozen=True)
 class CertificationInput:
  build_id:str;base_sha:str;final_sha:str;cycles:int;accepted:int;outcomes:tuple[str,...];canonical_drained:bool;integration_green:bool;receipts_verified:bool;journal_clear:bool
@@ -13,7 +14,8 @@ def certify(i:CertificationInput,ci:CIEvidence)->BuildCertificate:
  Acceptance(i.canonical_drained,i.integration_green,ci.green(),i.receipts_verified,i.journal_clear).require_complete()
  c=BuildCertificate(i.build_id,i.base_sha,i.final_sha,i.cycles,i.accepted,i.outcomes,"complete");c.validate();return c
 
-def certify_with_proof(i:CertificationInput,ci:CIEvidence,*,canonical_fingerprint:str,build_state_sha256:str,receipt_sha256:tuple[str,...])->tuple[BuildCertificate,CompletionProof]:
+def certify_with_proof(i:CertificationInput,ci:CIEvidence,*,canonical_fingerprint:str,build_state_sha256:str,receipt_sha256:tuple[str,...],repair_states:dict[str,str]|None=None)->tuple[BuildCertificate,CompletionProof]:
+ require_repair_closure(repair_states or {})
  c=certify(i,ci)
  proof=CompletionProof(
   head_sha=i.final_sha,
