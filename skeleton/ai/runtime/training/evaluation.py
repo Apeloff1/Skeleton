@@ -100,7 +100,24 @@ class EvaluationResult:
     def __post_init__(self)->None:
         object.__setattr__(self,"candidate_model_digest",_require_digest(self.candidate_model_digest,field="candidate_model_digest"))
         object.__setattr__(self,"suite_digest",_require_digest(self.suite_digest,field="suite_digest"))
-        object.__setattr__(self,"outputs",dict(self.outputs))
+        passed=tuple(self.passed_case_ids)
+        failed=tuple(self.failed_case_ids)
+        if (
+            any(not isinstance(case_id,str) or not case_id.strip() for case_id in (*passed,*failed))
+            or len(passed)!=len(set(passed))
+            or len(failed)!=len(set(failed))
+            or set(passed)&set(failed)
+        ):
+            raise ValueError("evaluation case partition must be unique and disjoint")
+        outputs=dict(self.outputs)
+        if (
+            set(outputs)!=(set(passed)|set(failed))
+            or any(not isinstance(value,str) for value in outputs.values())
+        ):
+            raise ValueError("evaluation outputs must exactly cover evaluated case ids")
+        object.__setattr__(self,"passed_case_ids",passed)
+        object.__setattr__(self,"failed_case_ids",failed)
+        object.__setattr__(self,"outputs",outputs)
 
     @property
     def total(self)->int:
@@ -182,6 +199,12 @@ class CandidateQualification:
             object.__setattr__(self,name,_require_digest(getattr(self,name),field=name))
         if self.status not in {"qualified_candidate","rejected"}:
             raise ValueError("unsupported qualification status")
+        reasons=tuple(str(reason) for reason in self.reasons)
+        if self.status=="qualified_candidate" and reasons:
+            raise ValueError("qualified candidate cannot carry rejection reasons")
+        if self.status=="rejected" and not reasons:
+            raise ValueError("rejected candidate requires at least one reason")
+        object.__setattr__(self,"reasons",reasons)
 
     @property
     def digest(self)->str:
@@ -296,6 +319,13 @@ class EvaluationLedger:
                 suite_digest TEXT NOT NULL,
                 payload TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS verifier_report (
+                report_digest TEXT PRIMARY KEY,
+                verifier_id TEXT NOT NULL,
+                verifier_model_digest TEXT NOT NULL,
+                candidate_model_digest TEXT NOT NULL,
+                payload TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS qualification (
                 qualification_digest TEXT PRIMARY KEY,
                 candidate_model_digest TEXT NOT NULL,
@@ -330,10 +360,60 @@ class EvaluationLedger:
             self._db.commit()
         return result.digest
 
+    def record_verifier(self,report:VerifierReport)->str:
+        encoded=_canonical(report.as_dict())
+        with self._lock:
+            prior=self._db.execute(
+                "SELECT payload FROM verifier_report WHERE report_digest=?",
+                (report.digest,),
+            ).fetchone()
+            if prior is not None:
+                if prior[0]!=encoded:
+                    raise ValueError("verifier report digest collision")
+                return report.digest
+            self._db.execute(
+                "INSERT INTO verifier_report("
+                "report_digest,verifier_id,verifier_model_digest,"
+                "candidate_model_digest,payload"
+                ") VALUES (?,?,?,?,?)",
+                (
+                    report.digest,
+                    report.verifier_id,
+                    report.verifier_model_digest,
+                    report.candidate_model_digest,
+                    encoded,
+                ),
+            )
+            self._db.commit()
+        return report.digest
+
     def record_qualification(self,qualification:CandidateQualification)->str:
         with self._lock:
-            result=self._db.execute("SELECT 1 FROM eval_result WHERE result_digest=?",(qualification.evaluation_result_digest,)).fetchone()
-            if result is None: raise ValueError("evaluation result is not registered")
+            result=self._db.execute(
+                "SELECT candidate_model_digest FROM eval_result "
+                "WHERE result_digest=?",
+                (qualification.evaluation_result_digest,),
+            ).fetchone()
+            if result is None:
+                raise ValueError("evaluation result is not registered")
+            if result[0]!=qualification.candidate_model_digest:
+                raise ValueError("qualification candidate does not match evaluation result")
+
+            verifier=self._db.execute(
+                "SELECT candidate_model_digest,verifier_model_digest "
+                "FROM verifier_report WHERE report_digest=?",
+                (qualification.verifier_report_digest,),
+            ).fetchone()
+            if verifier is None:
+                raise ValueError("verifier report is not registered")
+            if verifier[0]!=qualification.candidate_model_digest:
+                raise ValueError("qualification candidate does not match verifier report")
+            if (
+                qualification.status=="qualified_candidate"
+                and verifier[1]==qualification.candidate_model_digest
+            ):
+                raise ValueError("qualified candidate requires an independent verifier")
+
             self._db.execute(
                 "INSERT OR IGNORE INTO qualification(qualification_digest,candidate_model_digest,status,payload) VALUES (?,?,?,?)",
                 (qualification.digest,qualification.candidate_model_digest,qualification.status,_canonical(qualification.as_dict())),

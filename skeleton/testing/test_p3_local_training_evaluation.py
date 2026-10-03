@@ -7,6 +7,7 @@ import pytest
 
 from skeleton.ai.runtime.inference import LocalInferenceEngine, LocalInferenceRequest
 from skeleton.ai.runtime.training import (
+    CandidateQualification,
     DataQualityReport,
     DataQualityRule,
     DatasetManifest,
@@ -138,6 +139,7 @@ async def test_candidate_requires_versioned_eval_and_independent_verifier(tmp_pa
     ).qualify(result,verifier)
     assert qualification.status=="qualified_candidate"
     assert qualification.as_dict()["production_promotion_authorized"] is False
+    assert ledger.record_verifier(verifier)==verifier.digest
     ledger.record_qualification(qualification)
 
 
@@ -190,3 +192,94 @@ def test_evaluation_suite_version_is_immutable(tmp_path):
     )
     with pytest.raises(ValueError,match="immutable"):
         ledger.register_suite(drifted)
+
+def test_evaluation_result_requires_exact_disjoint_case_partition():
+    with pytest.raises(ValueError,match="unique and disjoint"):
+        from skeleton.ai.runtime.training import EvaluationResult
+        EvaluationResult(
+            candidate_model_digest=_digest("candidate"),
+            suite_digest=_digest("suite"),
+            passed_case_ids=("same",),
+            failed_case_ids=("same",),
+            outputs={"same":"output"},
+        )
+
+
+def test_qualification_requires_registered_verifier_evidence(tmp_path):
+    ledger=EvaluationLedger(tmp_path/"eval-evidence.sqlite3")
+    suite=EvaluationSuite(
+        suite_id="evidence",
+        version="1",
+        cases=(EvaluationCase("case","prompt","expected"),),
+        population="fixture",
+        contamination_fingerprint=_digest("evidence-suite"),
+    )
+    ledger.register_suite(suite)
+    from skeleton.ai.runtime.training import EvaluationResult
+    result=EvaluationResult(
+        candidate_model_digest=_digest("candidate-evidence"),
+        suite_digest=suite.digest,
+        passed_case_ids=("case",),
+        failed_case_ids=(),
+        outputs={"case":"expected"},
+    )
+    ledger.record_result(result)
+    verifier=VerifierReport(
+        verifier_id="independent",
+        verifier_model_digest=_digest("verifier-evidence"),
+        candidate_model_digest=result.candidate_model_digest,
+        calibration_error=0.0,
+        false_accept_rate=0.0,
+        false_reject_rate=0.0,
+        sample_count=10,
+    )
+    qualification=TrainingEvaluationGate(
+        min_accuracy=1.0,
+        max_calibration_error=0.1,
+        max_false_accept_rate=0.1,
+    ).qualify(result,verifier)
+
+    with pytest.raises(ValueError,match="verifier report is not registered"):
+        ledger.record_qualification(qualification)
+
+
+def test_qualification_candidate_must_match_stored_result(tmp_path):
+    ledger=EvaluationLedger(tmp_path/"eval-join.sqlite3")
+    suite=EvaluationSuite(
+        suite_id="join",
+        version="1",
+        cases=(EvaluationCase("case","prompt","expected"),),
+        population="fixture",
+        contamination_fingerprint=_digest("join-suite"),
+    )
+    ledger.register_suite(suite)
+    from skeleton.ai.runtime.training import EvaluationResult
+    result=EvaluationResult(
+        candidate_model_digest=_digest("candidate-a"),
+        suite_digest=suite.digest,
+        passed_case_ids=("case",),
+        failed_case_ids=(),
+        outputs={"case":"expected"},
+    )
+    ledger.record_result(result)
+    verifier=VerifierReport(
+        verifier_id="join-verifier",
+        verifier_model_digest=_digest("independent-verifier"),
+        candidate_model_digest=_digest("candidate-b"),
+        calibration_error=0.0,
+        false_accept_rate=0.0,
+        false_reject_rate=0.0,
+        sample_count=10,
+    )
+    ledger.record_verifier(verifier)
+    forged=CandidateQualification(
+        candidate_model_digest=_digest("candidate-b"),
+        evaluation_result_digest=result.digest,
+        verifier_report_digest=verifier.digest,
+        status="qualified_candidate",
+        reasons=(),
+    )
+
+    with pytest.raises(ValueError,match="does not match evaluation result"):
+        ledger.record_qualification(forged)
+

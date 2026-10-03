@@ -142,6 +142,7 @@ async def test_p3_t2_provider_independent_training_transaction(tmp_path):
     ).qualify(result,verifier)
     assert qualification.status=="qualified_candidate"
     assert qualification.as_dict()["production_promotion_authorized"] is False
+    assert eval_ledger.record_verifier(verifier)==verifier.digest
     eval_ledger.record_qualification(qualification)
 
     post=PostTrainingLedger(tmp_path/"post.sqlite3")
