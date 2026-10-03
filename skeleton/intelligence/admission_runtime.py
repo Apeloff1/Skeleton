@@ -17,7 +17,7 @@ import hashlib
 import math
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 from skeleton.cognition.telemetry import MetricRegistry
 from skeleton.intelligence.admission import (
@@ -376,9 +376,15 @@ class AdmissionRuntime:
         *,
         now_monotonic: float | None = None,
         now_wall: float | None = None,
+        decision_sink: Callable[
+            [AdmissionDecision, float],
+            None,
+        ] | None = None,
     ) -> AdmissionLease:
         if not isinstance(request, AdmissionRequest):
             raise TypeError("request must be an AdmissionRequest")
+        if decision_sink is not None and not callable(decision_sink):
+            raise TypeError("decision_sink must be callable")
         wall = _wall_time(now_wall, field="now_wall")
         fingerprint = _request_fingerprint(request)
 
@@ -419,6 +425,13 @@ class AdmissionRuntime:
                 evaluated,
                 now_monotonic=now_monotonic,
             )
+            if decision_sink is not None:
+                try:
+                    decision_sink(decision, wall)
+                except Exception as exc:
+                    raise AdmissionRuntimeError(
+                        "admission_decision_persistence_failed"
+                    ) from exc
 
             shared_lease: SharedPressureLease | None = None
             if self.shared_pressure_ledger is not None:
