@@ -13,6 +13,7 @@ import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -86,17 +87,28 @@ class AuditLog:
         self.path = path
         self.run_id = run_id
         path.parent.mkdir(parents=True, exist_ok=True)
+        self._sequence = 0
+        self._previous_hash = "0" * 64
 
     def emit(self, event: str, **fields: object) -> None:
+        self._sequence += 1
         record = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "run_id": self.run_id,
             "event": event,
+            "sequence": self._sequence,
+            "previous_record_sha256": self._previous_hash,
             **fields,
         }
         safe_record = _redact_value(record)
+        canonical = json.dumps(safe_record, sort_keys=True, separators=(",", ":"), default=str)
+        record_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        safe_record["record_sha256"] = record_hash
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(safe_record, sort_keys=True, default=str) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        self._previous_hash = record_hash
 
 
 def _redact_value(value: object) -> object:
