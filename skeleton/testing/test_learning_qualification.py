@@ -206,6 +206,12 @@ def test_qualification_binds_training_mirror_firewall_for_lifecycle() -> None:
         for ref in qualified.lifecycle_evidence_refs
     )
     assert len(qualified.qualification_digest) == 64
+    lifecycle = qualified.lifecycle_validation_kwargs(
+        verifier_id="lifecycle-independent-verifier"
+    )
+    assert lifecycle["model_digest"] == binding.candidate_model_digest
+    assert lifecycle["verifier_id"] == "lifecycle-independent-verifier"
+    assert lifecycle["evidence_refs"] == qualified.lifecycle_evidence_refs
 
 
 def test_qualification_rejects_candidate_identity_drift() -> None:
