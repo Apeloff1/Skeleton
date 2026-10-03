@@ -1,5 +1,14 @@
 """Canonical user-facing standalone-AI composition boundary."""
 
+from .activation import (
+    LoadedLocalModelActivation,
+    LocalModelActivationError,
+    LocalModelActivationManifest,
+    build_local_model_activation_manifest,
+    load_local_model_activation_manifest,
+    local_model_adapter_from_activation_manifest,
+    write_local_model_activation_manifest,
+)
 from .canonical import (
     CANONICAL_PRODUCT_CONTEXT_BUDGET,
     CanonicalAIResponseEnvelope,
@@ -30,6 +39,13 @@ from .qualification import (
 )
 
 __all__ = [
+    "LoadedLocalModelActivation",
+    "LocalModelActivationError",
+    "LocalModelActivationManifest",
+    "build_local_model_activation_manifest",
+    "load_local_model_activation_manifest",
+    "local_model_adapter_from_activation_manifest",
+    "write_local_model_activation_manifest",
     "register_bridged_model_program_artifact",
     "model_promotion_receipt_from_qualification",
     "bridge_product_training_to_model_program",
