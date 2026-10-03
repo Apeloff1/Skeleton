@@ -39,6 +39,7 @@ on:
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_ai_product_learning_handoff.py"
+      - "skeleton/testing/test_multi_method_training.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
@@ -85,6 +86,7 @@ on:
       - "skeleton/intelligence/execution_runtime.py"
       - "skeleton/testing/test_ai_product_canonical.py"
       - "skeleton/testing/test_ai_product_learning_handoff.py"
+      - "skeleton/testing/test_multi_method_training.py"
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
@@ -175,5 +177,6 @@ jobs:
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_ai_product_canonical.py
           skeleton/testing/test_ai_product_learning_handoff.py
+          skeleton/testing/test_multi_method_training.py
           skeleton/testing/test_local_model_artifact.py
           skeleton/testing/test_vs001_functional_ai.py
