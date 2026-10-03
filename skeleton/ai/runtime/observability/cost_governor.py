@@ -898,6 +898,10 @@ class _SqliteCostGovernorJournal:
                     raise CostGovernorConflict(
                         "release journal receipt mismatch"
                     )
+                if existing.completion_intent is not None:
+                    raise CostGovernorConflict(
+                        "completion intent cannot be released as unspent"
+                    )
                 if existing.state == "active":
                     conn.execute(
                         """
@@ -1205,6 +1209,7 @@ class _SqliteCostGovernorJournal:
 class _ActiveCostReservation:
     requested_request_digest: str
     receipt: CostReservation
+    budget: ResourceBudget
 
 
 class CostGovernor:
@@ -1428,6 +1433,7 @@ class CostGovernor:
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
                 receipt=receipt,
+                budget=request.budget,
             )
             return receipt
 
@@ -1551,6 +1557,8 @@ class CostGovernor:
         quota_reservation: QuotaReservation,
         quota_completion: QuotaCompletion,
         refs: tuple[EvidenceRef, ...],
+        operation_overrun_dimensions: tuple[str, ...] = (),
+        extra_reasons: tuple[str, ...] = (),
     ) -> CostDecision:
         ledger = self.runtime.quota_ledger
         if ledger is None:
@@ -1584,6 +1592,12 @@ class CostGovernor:
                 "cost-overrun:"
                 + ",".join(quota_completion.overrun_dimensions)
             )
+        if operation_overrun_dimensions:
+            reasons.append(
+                "operation-budget-overrun:"
+                + ",".join(operation_overrun_dimensions)
+            )
+        reasons.extend(extra_reasons)
         normalized = tuple(sorted(set(reasons)))
         return CostDecision(
             operation_id=operation_id,
