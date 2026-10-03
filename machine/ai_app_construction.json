@@ -1253,6 +1253,7 @@
       ],
       "evidence": [
         "skeleton/learning",
+        "skeleton/ai/runtime/product/learning.py",
         "skeleton/intelligence/adaptive.py",
         "skeleton/intelligence/experiment_tracker.py"
       ],
@@ -1260,10 +1261,17 @@
         "feedback event",
         "experiment assignment",
         "learning proposal",
+        "accepted-turn learning candidate",
+        "candidate execution qualification receipt",
         "promotion receipt"
       ],
       "construction": [
         "capture explicit/implicit feedback",
+        "require explicit acceptance before canonical product turns enter model-training candidates",
+        "bind accepted learning examples to durable conversation version, causal user lineage, execution result, context identity and provider receipts",
+        "admit product-derived learning by explicit data-class policy and separate tool-augmented opt-in",
+        "build content-addressed candidate artifacts without overwriting the active AI_LOCAL_MODEL_PATH",
+        "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
         "require eval before behavior change"
       ],
@@ -1271,6 +1279,9 @@
         "experiment isolation",
         "rollback",
         "data consent",
+        "accepted-turn lineage and thread-version snapshot test",
+        "candidate active-model overwrite denial",
+        "candidate offline executable qualification",
         "promotion gate"
       ],
       "failure_mode": "retain baseline behavior"
@@ -1712,6 +1723,8 @@
       ],
       "recurrent_backend": "skeleton/ai/runtime/inference/neural.py:NumpyRecurrentLM",
       "artifact_builder": "skeleton-train-local-model",
+      "product_learning_candidate_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_artifact",
+      "product_learning_snapshot_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_from_repository",
       "engine_dependency_extra": "local-inference",
       "execution_owner": "skeleton/provider_runtime.py",
       "artifact_owner": "skeleton/ai/runtime/inference/artifact.py",
