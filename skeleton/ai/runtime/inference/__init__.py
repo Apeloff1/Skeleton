@@ -52,6 +52,7 @@ from .training_methods import (
     TrainingMethod,
     TrainingMethodError,
     compile_training_plan,
+    compatible_training_methods,
 )
 from .local import (
     CallableLocalModel,
@@ -67,6 +68,7 @@ from .local import (
 )
 
 __all__ = [
+    "compatible_training_methods",
     "observe_mirror_validation",
     "allocate_training_methods",
     "TrainingAllocationPolicy",
