@@ -1346,6 +1346,7 @@
         "bind exact training-plan, model, artifact, Mirror Room, promotion-firewall, camera and method-allocation identities into non-authoritative lifecycle validation evidence",
         "order candidate registration, independent lifecycle validation, canonical promotion, deployment activation and exact-manifest rollback through ModelLifecycleRegistry",
         "keep lifecycle transitions evidence-only and non-executing; environment target selection remains deployment authority",
+        "persist compact lifecycle authority state atomically and verify the self-digest plus transition chain before restart continuation",
         "bridge candidate-only reverse-training evidence into skeleton.learning.model_program ModelArtifact and TrainingReceipt using the compiled corpus digest as dataset identity",
         "emit ModelPromotionReceipt only after qualification with a verifier distinct from trainer, Mirror verifier and firewall evaluator",
         "bind promoted candidate and exact rollback baseline into one digest-pinned activation manifest carrying explicit operator authorization",
@@ -1385,6 +1386,7 @@
         "cross-plane qualification rejects candidate/baseline/evaluator identity drift",
         "lifecycle validation handoff carries evidence but no production authority",
         "digest-chained lifecycle transition ordering rejects skipped validation/promotion and authority collisions",
+        "lifecycle restart restores exact activated state/history and rejects tampered persisted authority state",
         "canonical model-program bridge preserves exact model/artifact/training/corpus identity",
         "model promotion verifier is independent of trainer and evaluation authorities",
         "governed activation binds exact promoted candidate and exact rollback bytes",
@@ -9945,4 +9947,4 @@
       "independent redundancy verifier"
     ]
   }
-}
+}\n
