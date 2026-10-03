@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.4",
+  "tree_version": "1.6.5",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "cf301feec9ebaf2ca1fcd4c406ca838e50a3cbe9",
+      "source_git_object_sha": "622035f4666dddf0ed77647158d368cd4915ba9c",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
@@ -819,7 +819,16 @@
         "cutover:parity-ready"
       ],
       "move_batch": "B1-core-runtime",
-      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+      "source_disposition": "canonical_learning_tree_exactly_mirrored_with_p3t2_training_control_checkpoint_recovery_observability_eval_post_training_controls",
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149"
+      ]
     },
     {
       "id": "AIFT-RESILIENCE",
@@ -6051,6 +6060,21 @@
         "VOL-142"
       ],
       "policy": "Applied after current-main global mapping reconciliation; preserves all existing mapping identities while extending AIFT-DATA for P3-T2."
+    },
+    "p3t2_training_candidate": {
+      "implementation_head_sha": "6e66b5c1f27615aa1f63e375b588dd2b36553b43",
+      "source_tree_sha": "622035f4666dddf0ed77647158d368cd4915ba9c",
+      "task_id": "P3T2-TRAINING-01",
+      "volume_refs": [
+        "VOL-143",
+        "VOL-144",
+        "VOL-145",
+        "VOL-146",
+        "VOL-147",
+        "VOL-148",
+        "VOL-149"
+      ],
+      "policy": "Applied on the current P3T2-DATA-01 head; preserves the canonical skeleton/learning authority and exact skeleton/ai/learning mirrors without granting closure."
     }
   }
 }
