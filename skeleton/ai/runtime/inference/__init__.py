@@ -25,6 +25,25 @@ from .llama_cpp import (
     build_llama_cpp_adapter,
     inspect_gguf,
 )
+from .multiview import (
+    CameraCoveragePlan,
+    CameraCoveragePolicy,
+    CameraView,
+    CameraViewError,
+    build_camera_coverage,
+    stratified_camera_subset,
+)
+from .training_methods import (
+    DEFAULT_TEXT_METHODS,
+    CompiledTrainingDocument,
+    MethodWeight,
+    MultiMethodTrainingPlan,
+    TrainingEfficiencyPolicy,
+    TrainingExample,
+    TrainingMethod,
+    TrainingMethodError,
+    compile_training_plan,
+)
 from .local import (
     CallableLocalModel,
     LocalInferenceCancelled,
@@ -39,6 +58,21 @@ from .local import (
 )
 
 __all__ = [
+    "stratified_camera_subset",
+    "compile_training_plan",
+    "build_camera_coverage",
+    "TrainingMethodError",
+    "TrainingMethod",
+    "TrainingExample",
+    "TrainingEfficiencyPolicy",
+    "MultiMethodTrainingPlan",
+    "MethodWeight",
+    "DEFAULT_TEXT_METHODS",
+    "CompiledTrainingDocument",
+    "CameraViewError",
+    "CameraView",
+    "CameraCoveragePolicy",
+    "CameraCoveragePlan",
     "ArtifactIdentity",
     "CallableLocalModel",
     "GgufHeader",
