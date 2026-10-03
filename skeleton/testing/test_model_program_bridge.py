@@ -72,6 +72,11 @@ def test_reverse_training_bridges_to_canonical_model_program(tmp_path) -> None:
         == bridged.artifact.model_digest
     )
     assert bridged.training_receipt.digest
+    assert bridged.training_receipt.metrics["optimizer_steps"] > 0
+    assert (
+        bridged.training_receipt.metrics["gradient_accumulation_steps"]
+        == 4.0
+    )
     assert len(bridged.bridge_digest) == 64
 
 
