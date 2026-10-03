@@ -33,6 +33,14 @@ from .multiview import (
     build_camera_coverage,
     stratified_camera_subset,
 )
+from .training_allocation import (
+    AdaptiveMethodAllocation,
+    MethodAllocationScore,
+    MethodValidationObservation,
+    TrainingAllocationError,
+    TrainingAllocationPolicy,
+    allocate_training_methods,
+)
 from .training_methods import (
     DEFAULT_TEXT_METHODS,
     CompiledTrainingDocument,
@@ -58,6 +66,12 @@ from .local import (
 )
 
 __all__ = [
+    "allocate_training_methods",
+    "TrainingAllocationPolicy",
+    "TrainingAllocationError",
+    "MethodValidationObservation",
+    "MethodAllocationScore",
+    "AdaptiveMethodAllocation",
     "stratified_camera_subset",
     "compile_training_plan",
     "build_camera_coverage",
