@@ -28,13 +28,16 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import secrets as _secrets
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 from skeleton.kernel.errors import VaultError
 
 _FIELD_PRIME = 257  # GF(257): the smallest prime field containing a byte
+_COMMITMENT_DOMAIN = b"skeleton.vault.shamir.commitment.v1\x00"
 
 
 class SealingError(VaultError):
@@ -144,6 +147,12 @@ class ShamirSeal:
         if any(len(s.values) != length for s in shares):
             raise SealingError("share length mismatch")
 
+        for s in shares:
+            if not (1 <= s.index <= 255):
+                raise SealingError("share index out of range", context={"index": s.index})
+            if any(not (0 <= v < _FIELD_PRIME) for v in s.values):
+                raise SealingError("share value outside GF(257)", context={"index": s.index})
+
         nonce = shares[0].nonce
         secret = bytearray()
         for byte_i in range(length):
@@ -159,3 +168,39 @@ class ShamirSeal:
                 acc = _add(acc, _mul(sj.values[byte_i], _mul(num, _inv(den))))
             secret.append(_sub(acc, nonce) % 256)
         return bytes(secret)
+
+    # ------------------------------------------------------------------
+    # Authenticated sealing
+    # ------------------------------------------------------------------
+    # Plain Lagrange interpolation cannot tell a correct reconstruction from
+    # garbage: too few shares, a corrupted share, or a share from another
+    # custodian set all "succeed" and silently yield the wrong key. For
+    # high-entropy secrets (vault master keys) we publish a domain-separated
+    # SHA-256 commitment alongside the shares and verify it on combine.
+    # Do NOT use the commitment for low-entropy secrets (passwords): a hash
+    # of a guessable value is an offline-guessing oracle.
+
+    @staticmethod
+    def commitment(secret: bytes) -> str:
+        """Domain-separated SHA-256 commitment to a high-entropy secret."""
+        if not secret:
+            raise SealingError("cannot commit to an empty secret")
+        return hashlib.sha256(_COMMITMENT_DOMAIN + secret).hexdigest()
+
+    @staticmethod
+    def split_with_commitment(secret: bytes, n: int, k: int) -> Tuple[List[Share], str]:
+        """Split like :meth:`split` and also return the verification commitment."""
+        shares = ShamirSeal.split(secret, n=n, k=k)
+        return shares, ShamirSeal.commitment(secret)
+
+    @staticmethod
+    def combine_verified(shares: Sequence[Share], commitment: str) -> bytes:
+        """Combine and verify against ``commitment``; raise on any mismatch."""
+        secret = ShamirSeal.combine(list(shares))
+        if not hmac.compare_digest(ShamirSeal.commitment(secret), str(commitment)):
+            raise SealingError(
+                "reconstructed secret does not match commitment "
+                "(insufficient, corrupted, or foreign shares)",
+                context={"shares": len(shares)},
+            )
+        return secret
