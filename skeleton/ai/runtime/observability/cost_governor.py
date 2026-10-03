@@ -1511,9 +1511,9 @@ class CostGovernor:
             "concurrency",
             "queue_depth",
         }
-        if not required_remaining.issubset(remaining):
+        if set(remaining) != required_remaining:
             raise CostGovernorError(
-                "runtime lease journal is missing remaining-budget fields"
+                "runtime lease journal remaining-budget fields are invalid"
             )
 
         concurrency_remaining = remaining["concurrency"]
