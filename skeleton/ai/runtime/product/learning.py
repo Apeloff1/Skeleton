@@ -545,6 +545,7 @@ def build_learning_candidate_artifact(
     ] = tuple(TrainingMethod),
     efficiency_policy: TrainingEfficiencyPolicy | None = None,
     method_allocation: AdaptiveMethodAllocation | None = None,
+    gradient_accumulation_steps: int = 4,
 ) -> dict[str, object]:
     """Train one *candidate* artifact from an accepted canonical corpus.
 
@@ -642,6 +643,7 @@ def build_learning_candidate_artifact(
             max_document_tokens=max_document_tokens,
             seed=seed,
             temperature=temperature,
+            gradient_accumulation_steps=gradient_accumulation_steps,
         )
         from skeleton.ai.runtime.inference.artifact import (
             load_local_model_artifact,
