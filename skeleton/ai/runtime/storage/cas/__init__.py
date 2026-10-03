@@ -185,14 +185,15 @@ class GovernedContentStore:
                     algorithm TEXT NOT NULL,
                     digest TEXT NOT NULL,
                     is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
-                    PRIMARY KEY (tenant_id, algorithm, digest),
-                    UNIQUE (tenant_id, logical_id, version, algorithm),
+                    PRIMARY KEY (tenant_id, logical_id, version, algorithm),
                     FOREIGN KEY (tenant_id, logical_id, version)
                       REFERENCES governed_object(tenant_id, logical_id, version)
                       ON DELETE CASCADE
                 );
                 CREATE INDEX IF NOT EXISTS idx_governed_digest_identity
                   ON governed_digest(tenant_id, logical_id, version, is_current);
+                CREATE INDEX IF NOT EXISTS idx_governed_digest_address
+                  ON governed_digest(tenant_id, algorithm, digest);
                 """
             )
 
@@ -343,7 +344,7 @@ class GovernedContentStore:
             raise StorageContractError("digest algorithm is not accepted by policy")
         tenant = _text(tenant_id, "tenant_id")
         with self._lock:
-            row = self._db.execute(
+            rows = self._db.execute(
                 """
                 SELECT o.*, current.algorithm, current.digest
                 FROM governed_digest AS requested
@@ -359,11 +360,21 @@ class GovernedContentStore:
                 WHERE requested.tenant_id = ?
                   AND requested.algorithm = ?
                   AND requested.digest = ?
+                ORDER BY o.logical_id, o.version
                 """,
                 (tenant, digest.algorithm, digest.value),
-            ).fetchone()
-            if row is None:
+            ).fetchall()
+            if not rows:
                 raise KeyError("content address not found")
+            identities = {
+                (row["logical_id"], int(row["version"]), row["trust_context"])
+                for row in rows
+            }
+            if len(identities) != 1:
+                raise StorageContractError(
+                    "content address is ambiguous across logical identities"
+                )
+            row = rows[0]
             return self._addressed(row), bytes(row["payload"])
 
     def migrate_digest(
