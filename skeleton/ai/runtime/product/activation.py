@@ -126,7 +126,15 @@ def _reject_constant(value: str) -> None:
 
 
 def _artifact_path(value: object, name: str) -> Path:
-    raw = _text(value, name, maximum=4096)
+    if isinstance(value, Path):
+        raw_value = str(value)
+    elif isinstance(value, str):
+        raw_value = value
+    else:
+        raise LocalModelActivationError(
+            f"{name} must be text or Path"
+        )
+    raw = _text(raw_value, name, maximum=4096)
     path = Path(raw).expanduser()
     if path.is_symlink():
         raise LocalModelActivationError(
