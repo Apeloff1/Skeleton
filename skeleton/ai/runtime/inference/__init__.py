@@ -7,6 +7,7 @@ from .developmental_eval import (
     DevelopmentalEvalSuite,
     DevelopmentalEvaluationError,
     evaluate_local_candidate_developmentally,
+    evaluate_training_receipt_developmentally,
 )
 from .artifact import (
     LoadedLocalModel,
@@ -83,6 +84,7 @@ from .local import (
 )
 
 __all__ = [
+    "evaluate_training_receipt_developmentally",
     "evaluate_local_candidate_developmentally",
     "DevelopmentalEvaluationError",
     "DevelopmentalEvalSuite",
