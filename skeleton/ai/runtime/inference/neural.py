@@ -502,6 +502,32 @@ class NumpyRecurrentLM:
         d_output = np.zeros_like(output)
         d_output_bias = np.zeros_like(output_bias)
         dh_next = np.zeros(hidden, dtype=np.float32)
+        acc_recurrent = np.zeros_like(recurrent)
+        acc_recurrent_bias = np.zeros_like(recurrent_bias)
+        acc_output = np.zeros_like(output)
+        acc_output_bias = np.zeros_like(output_bias)
+        acc_embedding_rows: dict[int, np.ndarray] = {}
+        accumulated_sequences = 0
+        optimizer_steps = 0
+
+        def flush_accumulated_gradients() -> None:
+            nonlocal accumulated_sequences, optimizer_steps
+            if accumulated_sequences == 0:
+                return
+            step_rate = np.float32(rate)
+            recurrent[:] -= step_rate * acc_recurrent
+            recurrent_bias[:] -= step_rate * acc_recurrent_bias
+            output[:] -= step_rate * acc_output
+            output_bias[:] -= step_rate * acc_output_bias
+            for token_index, gradient in acc_embedding_rows.items():
+                embedding[token_index] -= step_rate * gradient
+            acc_recurrent.fill(0.0)
+            acc_recurrent_bias.fill(0.0)
+            acc_output.fill(0.0)
+            acc_output_bias.fill(0.0)
+            acc_embedding_rows.clear()
+            accumulated_sequences = 0
+            optimizer_steps += 1
 
         loss_history: list[float] = []
         best_loss = math.inf
