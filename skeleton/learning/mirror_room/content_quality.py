@@ -913,7 +913,7 @@ def qualify_high_end_content_delivery(
             < constitution.minimum_attack_families_per_dimension
         ):
             raise MirrorRoomError(
-                f"insufficient adversarial family diversity:{dimension_id}"
+                f"insufficient adversarial coverage: family diversity:{dimension_id}"
             )
     if max(counts.values()) - min(counts.values()) > constitution.maximum_attack_imbalance:
         raise MirrorRoomError(
