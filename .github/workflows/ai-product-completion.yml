@@ -45,7 +45,9 @@ on:
       - "skeleton/testing/test_developmental_eval.py"
       - "skeleton/testing/test_training_optimizer.py"
       - "skeleton/testing/test_continual_learning.py"
+      - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_continual_learning.py"
+      - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
@@ -100,7 +102,9 @@ on:
       - "skeleton/testing/test_developmental_eval.py"
       - "skeleton/testing/test_training_optimizer.py"
       - "skeleton/testing/test_continual_learning.py"
+      - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_continual_learning.py"
+      - "skeleton/testing/test_capability_curriculum.py"
       - "skeleton/testing/test_learning_qualification.py"
       - "skeleton/testing/test_model_program_bridge.py"
       - "skeleton/testing/test_local_model_artifact.py"
@@ -199,6 +203,7 @@ jobs:
           skeleton/testing/test_developmental_eval.py
           skeleton/testing/test_training_optimizer.py
           skeleton/testing/test_continual_learning.py
+          skeleton/testing/test_capability_curriculum.py
           skeleton/testing/test_learning_qualification.py
           skeleton/testing/test_model_program_bridge.py
           skeleton/testing/test_local_model_artifact.py
