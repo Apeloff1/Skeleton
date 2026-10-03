@@ -324,8 +324,16 @@ def _related_repository_context(paths: Iterable[str], *, limit: int = 24) -> tup
             candidates.append((-score, path))
     evidence: list[str] = []
     for _, path in sorted(candidates)[:limit]:
-        file_path = Path(path)
-        if not file_path.is_file() or file_path.stat().st_size > 256_000:
+        try:
+            canonical = _canonical_path(path)
+        except ValueError:
+            continue
+        file_path = Path(canonical)
+        try:
+            stat = file_path.stat()
+        except OSError:
+            continue
+        if not file_path.is_file() or stat.st_size > 256_000:
             continue
         try:
             content = file_path.read_text(encoding="utf-8")
@@ -361,15 +369,19 @@ def _discover_validation_commands(paths: Iterable[str]) -> tuple[tuple[str, ...]
 def _read_context(paths: Iterable[str]) -> tuple[str, ...]:
     evidence: list[str] = []
     for path in paths:
-        file_path = Path(path)
+        canonical = _canonical_path(str(path))
+        file_path = Path(canonical)
         if file_path.is_file():
             try:
+                if file_path.stat().st_size > 512_000:
+                    evidence.append(f"FILE {canonical}\n[omitted: file exceeds context safety bound]")
+                    continue
                 content = file_path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 content = "[unreadable text file]"
-            evidence.append(f"FILE {path}\n{content[:MAX_FILE_CONTEXT_CHARS]}")
+            evidence.append(f"FILE {canonical}\n{content[:MAX_FILE_CONTEXT_CHARS]}")
         else:
-            evidence.append(f"FILE {path}\n[missing: authorized additive file candidate]")
+            evidence.append(f"FILE {canonical}\n[missing: authorized additive file candidate]")
     return tuple(evidence)
 
 
