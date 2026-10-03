@@ -32,7 +32,7 @@
       "plane": "cost-capacity",
       "stage": 0,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "ResourceBudget and UsageEstimate contracts",
@@ -129,7 +129,7 @@
       "plane": "governance",
       "stage": 0,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "baseline data class registry",
@@ -218,7 +218,7 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_provider_contract.py",
@@ -272,7 +272,7 @@
       "plane": "data-persistence",
       "stage": 0,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "machine-readable state authority topology",
@@ -330,7 +330,7 @@
       "plane": "application-api",
       "stage": 1,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/conversation.py",
@@ -424,7 +424,7 @@
       "plane": "memory",
       "stage": 1,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/persistence/memory_repository.py provides production MongoMemoryRepository with tenant/namespace isolation, idempotency, optimistic versioning, revisions, tombstones, expiry and projection outbox",
@@ -481,7 +481,7 @@
       "plane": "tool-runtime",
       "stage": 1,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
@@ -551,7 +551,7 @@
       "plane": "prompt-context",
       "stage": 2,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/context.py",
@@ -623,7 +623,7 @@
       "plane": "model-provider",
       "stage": 2,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
@@ -673,7 +673,7 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
@@ -747,7 +747,7 @@
       "plane": "orchestration",
       "stage": 4,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "canonical execution loop ownership selected",
@@ -806,7 +806,7 @@
       "plane": "engine-api",
       "stage": 5,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "deadline/trace/budget propagation test",
@@ -864,7 +864,7 @@
       "plane": "streaming-realtime",
       "stage": 6,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
@@ -958,7 +958,7 @@
       "plane": "product-experience",
       "stage": 7,
       "gap_status": "closed",
-      "implementation_state": "closed",
+      "implementation_state": "complete",
       "closure_decision": "closed",
       "evidence_present": [
         "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
