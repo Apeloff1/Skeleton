@@ -437,3 +437,66 @@ def test_live_shared_pressure_lookup_reaps_expired_lease(tmp_path) -> None:
         tenant_id="tenant-a",
         now=16.0,
     ).active == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("priority", "20"),
+        ("acquired_at", "10.0"),
+        ("expires_at", True),
+    ],
+)
+def test_coercive_shared_pressure_journal_fields_are_rejected(
+    tmp_path,
+    field,
+    value,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-coercive-" + field)
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    with sqlite3.connect(quota_path) as conn:
+        row = conn.execute(
+            """
+            SELECT runtime_lease_json
+            FROM cost_governor_journal
+            WHERE operation_id = ?
+            """,
+            (request.operation_id,),
+        ).fetchone()
+        assert row is not None
+        payload = json.loads(row[0])
+        payload["shared_pressure_lease"][field] = value
+        conn.execute(
+            """
+            UPDATE cost_governor_journal
+            SET runtime_lease_json = ?
+            WHERE operation_id = ?
+            """,
+            (
+                json.dumps(
+                    payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                request.operation_id,
+            ),
+        )
+
+    restarted = _governor(
+        quota_path,
+        SqliteSharedPressureLedger(pressure_path),
+    )
+    with pytest.raises(
+        CostGovernorError,
+        match="shared pressure lease journal payload is invalid",
+    ):
+        restarted.reserve(request, now_wall=20.0)
+
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 1
