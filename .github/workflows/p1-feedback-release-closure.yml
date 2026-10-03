@@ -5,6 +5,10 @@ on:
     branches:
       - main
     paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - ".github/workflows/mirror-room-core.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
@@ -21,6 +25,10 @@ on:
       - "masterplan/p1-provider-redundancy-close-20260927-clean3"
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "skeleton/learning/mirror_room/**"
+      - "skeleton/ai/learning/mirror_room/**"
+      - "skeleton/testing/test_mirror_room_core.py"
+      - ".github/workflows/mirror-room-core.yml"
       - "skeleton/learning/promotion.py"
       - "skeleton/learning/__init__.py"
       - "skeleton/release/slo_promotion.py"
