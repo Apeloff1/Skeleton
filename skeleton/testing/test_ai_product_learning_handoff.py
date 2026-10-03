@@ -264,7 +264,9 @@ def test_candidate_artifact_can_use_adaptive_method_allocation(
         (user, assistant),
         accepted_assistant_message_ids=(assistant.message_id,),
     )
-    digest = lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest()
+    def digest(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
     allocation = allocate_training_methods(
         (
             MethodValidationObservation(
