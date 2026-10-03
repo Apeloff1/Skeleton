@@ -10,6 +10,13 @@ on:
       - ".github/workflows/p3-model-lifecycle.yml"
   push:
     branches: [main, feat/p3-learning-multimodal-t2]
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/lifecycle.py"
+      - "skeleton/ai/runtime/learning_foundation/__init__.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "machine/ai_p3_learning_execution_map.json"
+      - "machine/ai_p3_learning_task_backlog.json"
+      - ".github/workflows/p3-model-lifecycle.yml"
   workflow_dispatch:
 permissions:
   contents: read
