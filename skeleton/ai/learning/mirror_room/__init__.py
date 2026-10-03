@@ -39,6 +39,12 @@ from .contracts import (
     SandboxPolicy,
     ScenarioSplit,
 )
+from .curriculum import (
+    CurriculumItem,
+    CurriculumPlan,
+    CurriculumPolicy,
+    build_curriculum,
+)
 from .engine import (
     CandidateEvaluation,
     CandidateGenerator,
@@ -52,6 +58,13 @@ from .evaluation import (
     MetricComparison,
     PairedEvaluator,
     ScenarioComparison,
+)
+from .integrity import (
+    CrossSplitSimilarity,
+    SplitIntegrityPolicy,
+    SplitIntegrityReport,
+    inspect_split_integrity,
+    validate_split_integrity,
 )
 from .promotion import MirrorPromotionEvidence, qualify_for_external_promotion
 from .observability import (
@@ -76,6 +89,10 @@ __all__ = [
     "AdversarialStandard",
     "CandidateEvaluation",
     "CandidateGenerator",
+    "CrossSplitSimilarity",
+    "CurriculumItem",
+    "CurriculumPlan",
+    "CurriculumPolicy",
     "ComparisonReport",
     "ContentQualityDimension",
     "DeterministicCoordinateLearner",
@@ -112,12 +129,17 @@ __all__ = [
     "SandboxUsage",
     "ScenarioComparison",
     "ScenarioSplit",
+    "SplitIntegrityPolicy",
+    "SplitIntegrityReport",
     "TrainingLearningArchive",
     "TrainingLesson",
+    "build_curriculum",
     "get_default_observatory",
+    "inspect_split_integrity",
     "mirror_room_file_tree",
     "qualify_adversarial_delivery",
     "qualify_for_external_promotion",
     "qualify_high_end_content_delivery",
+    "validate_split_integrity",
     "verify_selected_lineage",
 ]
