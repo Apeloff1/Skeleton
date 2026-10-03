@@ -350,3 +350,50 @@ def test_frontier_digest_changes_when_decision_changes():
     second = select_frontier(plan, team="night", cooldowns={"a": 1}, limit=1)
     assert len(first["frontier_sha256"]) == 64
     assert first["frontier_sha256"] != second["frontier_sha256"]
+
+
+def test_allocation_limits_supervisor_to_authorized_frontier():
+    from skeleton.automation.completion_campaign import allocate_supervisor_state
+
+    items = [
+        {"id": "root", "target_team": "night", "status": "queued", "priority": 20, "dependencies": []},
+        {"id": "leaf", "target_team": "night", "status": "queued", "priority": 90, "dependencies": []},
+        {"id": "child", "target_team": "night", "status": "queued", "dependencies": ["root"]},
+    ]
+    digest = __import__("hashlib").sha256(
+        json.dumps(items[:2], sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    repo = {
+        "_shift_supervisor_all_plan_items": items,
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "generation",
+            "plan_digest_sha256": digest,
+            "plan_items": items[:2],
+        },
+    }
+    allocation = allocate_supervisor_state(repo, CampaignState(campaign_id="campaign"), limit=1)
+    assert allocation["authorized_plan_ids"] == ["root"]
+    assert [x["id"] for x in repo["_shift_supervisor"]["plan_items"]] == ["root"]
+    assert len(allocation["allocation_sha256"]) == 64
+
+
+def test_allocation_fails_if_frontier_is_not_canonical_executable():
+    from skeleton.automation.completion_campaign import allocate_supervisor_state
+
+    all_items = [
+        {"id": "only-full-graph", "target_team": "night", "status": "queued", "dependencies": []},
+    ]
+    repo = {
+        "_shift_supervisor_all_plan_items": all_items,
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "generation",
+            "plan_digest_sha256": "a" * 64,
+            "plan_items": [],
+        },
+    }
+    with pytest.raises(ValueError, match="non-executable"):
+        allocate_supervisor_state(repo, CampaignState(), limit=1)
