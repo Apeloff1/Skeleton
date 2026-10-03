@@ -22,6 +22,7 @@ import json
 import time
 import hashlib
 import threading
+import re
 from pathlib import Path
 from typing import Iterable, Iterator, Any
 
@@ -103,19 +104,27 @@ def _save_manifest() -> None:
 _load_manifest()
 
 
+_SAFE_SHARD_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\\Z")
+
+
 def _safe_name(name: str) -> str:
-    """Accept only a single filename component for shard names."""
-    if not name or Path(name).name != name or name in {".", ".."}:
+    """Accept only a short ASCII identifier, never a path fragment."""
+    if not isinstance(name, str) or not _SAFE_SHARD_NAME.fullmatch(name):
         raise ValueError("invalid shard name")
-    if any(ch in name for ch in ("/", "\\", "\x00")):
+    if name in {".", ".."} or name.endswith("."):
         raise ValueError("invalid shard name")
     return name
 
 
 def _shard_path(name: str, scratch: bool = False) -> Path:
     safe = _safe_name(name)
-    root = SCRATCH_ROOT if scratch else VAULT_ROOT
-    return root / f"{safe}.jsonl.zst"
+    root = (SCRATCH_ROOT if scratch else VAULT_ROOT).resolve()
+    candidate = (root / f"{safe}.jsonl.zst").resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("invalid shard path") from exc
+    return candidate
 
 
 # ── Core write/read ─────────────────────────────────────────────────────
@@ -136,7 +145,7 @@ def write_shard(
     count = 0
     raw_bytes = 0
     hasher = hashlib.sha1()
-    with open(shard_path, "wb") as fh:
+    with shard_path.open("wb") as fh:
         with _COMPRESSOR.stream_writer(fh) as zw:
             for row in rows:
                 line = (json.dumps(row, separators=(",", ":"), ensure_ascii=False, default=_json_default) + "\n").encode("utf-8")
@@ -184,7 +193,7 @@ def _load_full(name: str) -> list[dict]:
     path = _shard_path(name)
     if not path.exists():
         raise FileNotFoundError(f"Archive missing on disk: {path}")
-    with open(path, "rb") as fh:
+    with path.open("rb") as fh:
         with _DECOMPRESSOR.stream_reader(fh) as zr:
             data = zr.read()
     rows: list[dict] = []
