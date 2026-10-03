@@ -215,10 +215,98 @@ def evaluate_secret_use(
     )
 
 
+_REDACTED = "[REDACTED]"
+_SENSITIVE_KEYS = frozenset({
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "private_key",
+})
+_SENSITIVE_SUFFIXES = (
+    "_credential",
+    "_credentials",
+    "_password",
+    "_secret",
+    "_token",
+    "_api_key",
+    "_private_key",
+)
+_MAX_SANITIZE_DEPTH = 32
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = key.strip().lower().replace("-", "_")
+    return normalized in _SENSITIVE_KEYS or normalized.endswith(_SENSITIVE_SUFFIXES)
+
+
+def sanitize_secret_metadata(
+    value: object,
+) -> tuple[object, tuple[str, ...]]:
+    """Return a JSON-like copy with secret-shaped fields redacted.
+
+    Findings contain paths only; the suspected secret values are never copied
+    into the evidence list.
+    """
+
+    findings: list[str] = []
+    active: set[int] = set()
+
+    def walk(item: object, path: str, depth: int) -> object:
+        if depth > _MAX_SANITIZE_DEPTH:
+            raise SecretSecurityError("secret metadata exceeds maximum depth")
+        if item is None or isinstance(item, (bool, int, float, str)):
+            return item
+        if isinstance(item, bytes):
+            raise SecretSecurityError("secret metadata cannot contain bytes")
+        if isinstance(item, dict):
+            identity = id(item)
+            if identity in active:
+                raise SecretSecurityError("secret metadata cannot contain cycles")
+            active.add(identity)
+            try:
+                sanitized: dict[str, object] = {}
+                for key, child in item.items():
+                    if not isinstance(key, str) or not key:
+                        raise SecretSecurityError(
+                            "secret metadata keys must be non-empty strings"
+                        )
+                    child_path = f"{path}.{key}"
+                    if _is_sensitive_key(key):
+                        sanitized[key] = _REDACTED
+                        findings.append(child_path)
+                    else:
+                        sanitized[key] = walk(child, child_path, depth + 1)
+                return sanitized
+            finally:
+                active.remove(identity)
+        if isinstance(item, (list, tuple)):
+            identity = id(item)
+            if identity in active:
+                raise SecretSecurityError("secret metadata cannot contain cycles")
+            active.add(identity)
+            try:
+                return [
+                    walk(child, f"{path}[{index}]", depth + 1)
+                    for index, child in enumerate(item)
+                ]
+            finally:
+                active.remove(identity)
+        raise SecretSecurityError(
+            "secret metadata must contain only JSON-like values"
+        )
+
+    return walk(value, "$", 0), tuple(findings)
+
+
 __all__ = [
     "SecretGrant",
     "SecretRef",
     "SecretSecurityError",
     "SecretUseReceipt",
     "evaluate_secret_use",
+    "sanitize_secret_metadata",
 ]
