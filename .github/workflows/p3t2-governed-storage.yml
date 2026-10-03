@@ -26,6 +26,10 @@ on:
       - "skeleton/testing/test_distributed_transactions.py"
       - "machine/ai_file_tree.json"
       - "machine/ai_master_plan.json"
+      - "machine/ai_masterplan_continuation_frontier.json"
+      - "machine/ai_p3t2_storage_candidate.json"
+      - "scripts/check_p3t2_storage_candidate.py"
+      - "tests/test_p3t2_storage_candidate.py"
       - ".github/workflows/p3t2-governed-storage.yml"
   workflow_dispatch:
 
@@ -72,6 +76,7 @@ jobs:
 
       - name: Validate AI-tree and masterplan authority
         run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
           python scripts/check_ai_file_tree.py
           python scripts/check_ai_master_plan.py
           python scripts/check_p3t2_storage_candidate.py --head "$(git rev-parse HEAD)" --json
@@ -82,3 +87,4 @@ jobs:
           skeleton/testing/test_content_addressing.py
           skeleton/testing/test_cache_architecture.py
           skeleton/testing/test_distributed_transactions.py
+          tests/test_p3t2_storage_candidate.py
