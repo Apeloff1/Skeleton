@@ -42,18 +42,32 @@ jobs:
       - name: Install focused test dependency
         run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
 
-      - name: Enforce provider-only authority boundary
+      - name: Enforce canonical capsec authority boundary
         run: |
           python - <<'PY'
           from pathlib import Path
 
           root = Path("skeleton/integrations/adapters")
-          forbidden = ("capsec.py", "tools.py", "tool_loop.py")
-          present = [name for name in forbidden if (root / name).exists()]
-          if present:
+          capsec = (root / "capsec.py").read_text(encoding="utf-8")
+          tools = (root / "tools.py").read_text(encoding="utf-8")
+          required = (
+              "from skeleton.kernel.capsec import",
+              "KernelToolAuthorizer",
+          )
+          if not all(token in (capsec + tools) for token in required):
+              raise SystemExit("tool adapter does not bind to canonical kernel capsec")
+          forbidden = (
+              "class CapabilityChecker",
+              "class AllowAllChecker",
+              "class AllowListChecker",
+              "class DenyAllChecker",
+              "class CapsecGate",
+              "CapabilityRequest(",
+          )
+          hits = [token for token in forbidden if token in capsec or token in tools]
+          if hits:
               raise SystemExit(
-                  "provider-only slice must not carry parallel tool/capsec authority: "
-                  + ", ".join(present)
+                  "parallel capability authority reintroduced: " + ", ".join(hits)
               )
           PY
 
@@ -71,3 +85,6 @@ jobs:
           skeleton/integrations/adapters/test_provider_registry.py
           skeleton/integrations/adapters/test_offline.py
           skeleton/integrations/adapters/test_client.py
+          skeleton/integrations/adapters/test_schema.py
+          skeleton/integrations/adapters/test_capsec_kernel_bridge.py
+          skeleton/integrations/adapters/test_tools_kernel_capsec.py
