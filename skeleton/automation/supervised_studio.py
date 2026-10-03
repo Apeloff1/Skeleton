@@ -238,6 +238,8 @@ def _replay_key(*, generation_id: str, plan_digest: str, seed: str, base_commit_
 
 
 def verify_execution_receipt(receipt: Mapping[str, Any]) -> None:
+    if receipt.get("schema") != "autonomous-studio.execution-receipt.v1":
+        raise ValueError("execution receipt schema is unsupported")
     claimed = str(receipt.get("receipt_sha256", ""))
     if len(claimed) != 64 or any(ch not in "0123456789abcdef" for ch in claimed):
         raise ValueError("execution receipt digest is malformed")
@@ -247,6 +249,23 @@ def verify_execution_receipt(receipt: Mapping[str, Any]) -> None:
     actual = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     if actual != claimed:
         raise ValueError("execution receipt digest mismatch")
+    patch_sha = str(receipt.get("patch_sha256", ""))
+    if len(patch_sha) != 64 or any(ch not in "0123456789abcdef" for ch in patch_sha):
+        raise ValueError("execution receipt patch digest is malformed")
+    base_sha = str(receipt.get("base_commit_sha", ""))
+    if base_sha and (len(base_sha) != 40 or any(ch not in "0123456789abcdef" for ch in base_sha)):
+        raise ValueError("execution receipt base commit is malformed")
+    replay_sha = str(receipt.get("replay_key_sha256", ""))
+    if len(replay_sha) != 64 or any(ch not in "0123456789abcdef" for ch in replay_sha):
+        raise ValueError("execution receipt replay key is malformed")
+    expected_replay = _replay_key(
+        generation_id=str(receipt.get("plan_generation", "")),
+        plan_digest=str(receipt.get("plan_digest_sha256", "")),
+        seed=str(receipt.get("seed", "")),
+        base_commit_sha=base_sha,
+    )
+    if replay_sha != expected_replay:
+        raise ValueError("execution receipt replay key mismatch")
 
 
 def _atomic_write(path: Path, content: str) -> None:
