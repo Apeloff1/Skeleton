@@ -78,8 +78,6 @@ def _resolve(
         raise LocalModelDeploymentError(
             f"{field} symlinked path component is forbidden"
         )
-    except OSError as exc:
-        raise LocalModelDeploymentError(f"{field} does not exist: {path}") from exc
     if not resolved.is_file():
         raise LocalModelDeploymentError(f"{field} must reference a regular file")
     return resolved
