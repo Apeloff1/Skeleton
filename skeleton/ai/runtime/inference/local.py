@@ -628,6 +628,27 @@ class LocalModelAdapter(ProviderAdapter):
         receipt = getattr(self, "artifact_receipt", None)
         if receipt is not None and hasattr(receipt, "as_dict"):
             payload["artifact"] = receipt.as_dict()
+        activation = getattr(self, "activation_manifest", None)
+        if activation is not None:
+            payload["activation"] = {
+                "manifest_digest": activation.manifest_digest,
+                "promotion_receipt_digest": (
+                    activation.promotion_receipt_digest
+                ),
+                "qualification_digest": activation.qualification_digest,
+                "model_program_bridge_digest": (
+                    activation.model_program_bridge_digest
+                ),
+                "verifier_id": activation.verifier_id,
+                "rollback_artifact_sha256": (
+                    activation.baseline_artifact_sha256
+                ),
+                "rollback_model_digest": (
+                    activation.baseline_model_digest
+                ),
+                "rollback_required": True,
+                "direct_self_modify": False,
+            }
         return payload
 
     @staticmethod
