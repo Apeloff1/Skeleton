@@ -93,3 +93,63 @@ def test_completed_saga_requires_all_prepared_steps_applied() -> None:
 
     with pytest.raises(StorageContractError, match="every prepared step"):
         store.finish(saga_id="saga-3", state="completed")
+
+
+
+def test_compensation_requires_saga_compensating_phase() -> None:
+    store = DurableSagaStateStore()
+    store.begin(
+        saga_id="saga-4",
+        tenant_id="tenant-a",
+        operation_id="op-4",
+    )
+    store.prepare_step(
+        saga_id="saga-4",
+        index=0,
+        name="publish",
+        compensation_ref="publish:undo",
+        compensation_payload=b"token",
+    )
+    store.mark_effect_applied(
+        saga_id="saga-4",
+        index=0,
+        effect_receipt="effect:4",
+    )
+
+    with pytest.raises(StorageContractError, match="while saga is compensating"):
+        store.mark_compensated(saga_id="saga-4", index=0)
+
+    store.begin_compensation(saga_id="saga-4")
+    with pytest.raises(StorageContractError, match="while saga is open"):
+        store.mark_effect_applied(
+            saga_id="saga-4",
+            index=0,
+            effect_receipt="effect:4b",
+        )
+
+
+def test_terminal_saga_transitions_fail_closed() -> None:
+    store = DurableSagaStateStore()
+    store.begin(
+        saga_id="saga-5",
+        tenant_id="tenant-a",
+        operation_id="op-5",
+    )
+    store.prepare_step(
+        saga_id="saga-5",
+        index=0,
+        name="write",
+        compensation_ref="write:undo",
+        compensation_payload=b"undo",
+    )
+    store.mark_effect_applied(
+        saga_id="saga-5",
+        index=0,
+        effect_receipt="effect:5",
+    )
+    store.finish(saga_id="saga-5", state="completed")
+
+    with pytest.raises(StorageContractError, match="cannot transition"):
+        store.finish(saga_id="saga-5", state="failed")
+    with pytest.raises(StorageContractError, match="cannot enter compensation"):
+        store.begin_compensation(saga_id="saga-5")
