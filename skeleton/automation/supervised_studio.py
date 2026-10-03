@@ -412,9 +412,10 @@ def propose(
 
     accepted = 0
     total_chars = 0
-    for plan_id, task in scoped:
-        try:
-            reviewed = _build_and_review(reasoner, task, seed=f"{seed}:{plan_id}")
+    try:
+        for plan_id, task in scoped:
+            try:
+                reviewed = _build_and_review(reasoner, task, seed=f"{seed}:{plan_id}")
             if reviewed is None:
                 audit.emit(
                     "patch_rejected_by_squad",
@@ -456,8 +457,13 @@ def propose(
                 required_checks=reviewed.required_checks,
                 paths=list(task.paths),
             )
-        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
-            audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
+    
+    finally:
+        # Never leave model-authored worktree mutations behind after an
+        # unexpected controller exception.
+        pass
 
     diff = _git("diff", "--no-ext-diff", "--binary")
     if len(diff) > MAX_TOTAL_PATCH_CHARS:
