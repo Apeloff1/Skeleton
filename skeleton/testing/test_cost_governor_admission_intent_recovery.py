@@ -730,3 +730,105 @@ def test_extra_admission_intent_budget_field_is_rejected(
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "active_reservations"
     ] == 1
+
+
+def test_expired_pressure_after_quota_crash_abandons_clean_quota_and_readmits(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    request = _request("op-intent-pressure-expired")
+    first = _governor(quota_path, pressure_path)
+    assert first._journal is not None
+
+    monkeypatch.setattr(
+        first._journal,
+        "record_active",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            SystemExit("crash after quota allocation")
+        ),
+    )
+    with pytest.raises(SystemExit):
+        first.reserve(
+            request,
+            now_monotonic=10.0,
+            now_wall=10.0,
+        )
+
+    # The default admission lease expires at max_wall_seconds=60.
+    restarted = _governor(quota_path, pressure_path)
+    receipt = restarted.reserve(
+        request,
+        now_monotonic=80.0,
+        now_wall=80.0,
+    )
+
+    assert receipt.operation_id == request.operation_id
+    assert _intent_count(quota_path) == 0
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["usage_events"] == 0
+    assert _pressure(pressure_path).snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=80.5,
+    ).active == 1
+
+
+def test_pressure_loss_cannot_abandon_quota_after_metered_usage(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    request = _request("op-intent-pressure-metered")
+    first = _governor(quota_path, pressure_path)
+    assert first._journal is not None
+
+    monkeypatch.setattr(
+        first._journal,
+        "record_active",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            SystemExit("crash after quota allocation")
+        ),
+    )
+    with pytest.raises(SystemExit):
+        first.reserve(
+            request,
+            now_monotonic=10.0,
+            now_wall=10.0,
+        )
+
+    reservation = first.runtime.quota_ledger.reservation_for_operation(
+        request.tenant_id,
+        request.operation_id,
+    )
+    assert reservation is not None
+    first.runtime.quota_ledger.record_usage_event(
+        reservation.reservation_id,
+        "adversarial-prejournal-usage",
+        "provider",
+        UsageEstimate(
+            input_tokens=1,
+            output_tokens=1,
+            cost_usd=0.01,
+        ),
+        now=11.0,
+    )
+
+    restarted = _governor(quota_path, pressure_path)
+    with pytest.raises(
+        CostGovernorConflict,
+        match="orphan admission quota cannot be safely abandoned",
+    ):
+        restarted.reserve(
+            request,
+            now_monotonic=80.0,
+            now_wall=80.0,
+        )
+
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["usage_events"] == 1
+    assert _intent_count(quota_path) == 1
