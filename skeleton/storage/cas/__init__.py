@@ -672,6 +672,7 @@ class DurableSagaStateStore:
         with self._db:
             self._db.executescript(
                 """
+                PRAGMA foreign_keys = ON;
                 CREATE TABLE IF NOT EXISTS durable_saga (
                     saga_id TEXT PRIMARY KEY,
                     tenant_id TEXT NOT NULL,
@@ -761,6 +762,14 @@ class DurableSagaStateStore:
         sid = _text(saga_id, "saga_id")
         receipt = _text(effect_receipt, "effect_receipt", maximum=1024)
         with self._lock, self._db:
+            saga = self._db.execute(
+                "SELECT state FROM durable_saga WHERE saga_id = ?",
+                (sid,),
+            ).fetchone()
+            if saga is None:
+                raise KeyError("saga not found")
+            if saga["state"] != "open":
+                raise StorageContractError("effect can only apply while saga is open")
             row = self._db.execute(
                 "SELECT state FROM durable_saga_step WHERE saga_id = ? AND step_index = ?",
                 (sid, index),
@@ -793,6 +802,16 @@ class DurableSagaStateStore:
     def mark_compensated(self, *, saga_id: str, index: int) -> None:
         sid = _text(saga_id, "saga_id")
         with self._lock, self._db:
+            saga = self._db.execute(
+                "SELECT state FROM durable_saga WHERE saga_id = ?",
+                (sid,),
+            ).fetchone()
+            if saga is None:
+                raise KeyError("saga not found")
+            if saga["state"] != "compensating":
+                raise StorageContractError(
+                    "effects can only be compensated while saga is compensating"
+                )
             row = self._db.execute(
                 "SELECT state FROM durable_saga_step WHERE saga_id = ? AND step_index = ?",
                 (sid, index),
@@ -815,6 +834,16 @@ class DurableSagaStateStore:
             ).fetchone()
             if saga is None:
                 raise KeyError("saga not found")
+            current_state = saga["state"]
+            allowed_from = {
+                "completed": {"open"},
+                "compensated": {"compensating"},
+                "failed": {"open", "compensating"},
+            }
+            if current_state not in allowed_from[state]:
+                raise StorageContractError(
+                    f"saga cannot transition from {current_state} to {state}"
+                )
             if state == "completed":
                 unresolved = self._db.execute(
                     """
