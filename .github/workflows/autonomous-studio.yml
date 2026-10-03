@@ -213,7 +213,8 @@ jobs:
             --repo-state-path .studio-tmp/repo-state.json \
             --max-tasks "$max_tasks" \
             --cohort-size "$cohort_size" \
-            --seed "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --seed "${GITHUB_RUN_ID}" \
+            "${prior_args[@]}"
 
           if [[ -s .studio-tmp/studio.patch ]]; then
             echo 'has_patch=true' >> "$GITHUB_OUTPUT"
