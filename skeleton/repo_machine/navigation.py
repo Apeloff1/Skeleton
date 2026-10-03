@@ -42,6 +42,7 @@ class NavigationIndex:
         self.model = model
         self._root = _Node("")
         self._paths = {item.path: item for item in model.files}
+        self._zones_by_prefix = {}
         self._build()
 
     def _build(self) -> None:
@@ -50,7 +51,10 @@ class NavigationIndex:
             node.files += 1
             node.source += int(record.kind == "source")
             node.tests += int(record.kind == "test")
+            prefix = ""
             for part in PurePosixPath(record.path).parts[:-1]:
+                prefix = f"{prefix}/{part}".strip("/")
+                self._zones_by_prefix.setdefault(prefix, set()).add(record.zone)
                 node = node.children.setdefault(part, _Node(part))
                 node.files += 1
                 node.source += int(record.kind == "source")
@@ -65,11 +69,7 @@ class NavigationIndex:
                     return NavigationEntry(normalized, 0, 0, 0, (), ())
                 node = node.children[part]
         path_prefix = normalized + "/" if normalized else ""
-        zones = tuple(sorted({
-            record.zone
-            for path, record in self._paths.items()
-            if path.startswith(path_prefix)
-        }))
+        zones = tuple(sorted(self._zones_by_prefix.get(normalized, set())))
         return NavigationEntry(
             prefix=normalized,
             files=node.files,
