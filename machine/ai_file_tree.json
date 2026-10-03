@@ -6020,7 +6020,6 @@
       "policy": "Persisted compensation payloads are recoverable only while a saga is compensating and are returned in reverse applied-effect order; canonical and AI-runtime storage mirrors remain byte-identical."
     },
     "p3t2_data_candidate": {
-      "head_sha": "7ac2cbd52bbbbdbc0dbb8cabab96864a2ce85f5c",
       "source_tree_sha": "4ac1adb3c773ec9986e6b036388487a5e98d06f8",
       "task_id": "P3T2-DATA-01",
       "volume_refs": [
@@ -6031,7 +6030,9 @@
         "VOL-141",
         "VOL-142"
       ],
-      "policy": "Current-main data authority remains skeleton/data with exact AI-runtime mirrors; candidate carries implementation evidence only and no closure authority."
+      "policy": "Current-main data authority remains skeleton/data with exact AI-runtime mirrors; candidate carries implementation evidence only and no closure authority.",
+      "implementation_head_sha": "11bcbbbcae7dd3de03d565414ed4cc7d72e8c6e1",
+      "evidence_rule": "The recorded implementation head identifies the tree-bearing replay commit; exact PR-head CI is supplied separately by the candidate gate and must not be self-embedded."
     }
   }
 }
