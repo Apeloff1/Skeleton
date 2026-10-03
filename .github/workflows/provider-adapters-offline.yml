@@ -88,3 +88,4 @@ jobs:
           skeleton/integrations/adapters/test_schema.py
           skeleton/integrations/adapters/test_capsec_kernel_bridge.py
           skeleton/integrations/adapters/test_tools_kernel_capsec.py
+          skeleton/integrations/adapters/test_tool_loop.py
