@@ -274,6 +274,24 @@ def qualify_learning_candidate(
         raise LearningQualificationError(
             "training receipt plan identity drift"
         )
+    camera_digests = plan.get("camera_coverage_digests", [])
+    if not isinstance(camera_digests, list):
+        raise LearningQualificationError(
+            "training plan camera coverage digests must be a list"
+        )
+    normalized_camera_digests = tuple(
+        _sha(item, "training plan camera coverage digest")
+        for item in camera_digests
+    )
+    if binding.camera_coverage_digest is not None:
+        if binding.camera_coverage_digest not in normalized_camera_digests:
+            raise LearningQualificationError(
+                "training plan camera coverage identity drift"
+            )
+    elif normalized_camera_digests:
+        raise LearningQualificationError(
+            "camera-trained candidate requires explicit camera binding"
+        )
 
     evaluation_manifest = training_receipt.get("evaluation_manifest")
     if not isinstance(evaluation_manifest, Mapping):
@@ -292,14 +310,30 @@ def qualify_learning_candidate(
         evaluation_manifest.get("training_plan_digest"),
         "evaluation manifest training plan digest",
     )
+    manifest_allocation = evaluation_manifest.get("method_allocation_digest")
+    if manifest_allocation is not None:
+        manifest_allocation = _sha(
+            manifest_allocation,
+            "evaluation manifest method allocation digest",
+        )
     if (
         manifest_candidate != binding.candidate_model_digest
         or manifest_artifact != binding.candidate_artifact_sha256
         or manifest_plan != binding.training_plan_digest
+        or manifest_allocation != binding.method_allocation_digest
     ):
         raise LearningQualificationError(
             "training evaluation manifest candidate identity drift"
         )
+    if evaluation_manifest.get("promotion_authority") is not False:
+        raise LearningQualificationError(
+            "training evaluation manifest must not grant promotion authority"
+        )
+    if training_receipt.get("promotion_state") != "candidate_only":
+        raise LearningQualificationError(
+            "training receipt must remain candidate_only"
+        )
+
     baseline = evaluation_manifest.get("baseline")
     if not isinstance(baseline, Mapping):
         raise LearningQualificationError(
