@@ -25,7 +25,6 @@ from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
     AdmissionError,
     AdmissionRequest,
-    ResourceBudget,
     UsageEstimate,
 )
 from skeleton.intelligence.admission_runtime import (
@@ -72,6 +71,14 @@ _USAGE_FIELDS = (
 
 class CostGovernorError(RuntimeError):
     """The cost-governor contract or integrated runtime transition failed."""
+
+
+class CostGovernorDenied(CostGovernorError):
+    """The requested or fallback work was denied by a governed budget."""
+
+
+class CostGovernorConflict(CostGovernorError):
+    """An idempotency, lease, or durable accounting conflict occurred."""
 
 
 def _token(name: str, value: object) -> str:
@@ -613,12 +620,12 @@ class CostGovernor:
             except AdmissionError as original_exc:
                 reason = str(original_exc)
                 if fallback is None:
-                    raise
+                    raise CostGovernorDenied(reason) from original_exc
                 if not _fallback_reason_allowed(
                     reason,
                     fallback.allowed_failure_reasons,
                 ):
-                    raise
+                    raise CostGovernorDenied(reason) from original_exc
                 selected = self._fallback_request(
                     request,
                     fallback,
@@ -629,13 +636,17 @@ class CostGovernor:
                         now_monotonic=now_monotonic,
                         now_wall=now_wall,
                     )
-                except (
-                    AdmissionError,
-                    AdmissionRuntimeConflict,
-                    AdmissionRuntimeError,
-                ) as fallback_exc:
+                except AdmissionError as fallback_exc:
+                    raise CostGovernorDenied(
+                        f"declared_cost_fallback_denied:{fallback_exc}"
+                    ) from fallback_exc
+                except AdmissionRuntimeConflict as fallback_exc:
+                    raise CostGovernorConflict(
+                        f"declared_cost_fallback_conflict:{fallback_exc}"
+                    ) from fallback_exc
+                except AdmissionRuntimeError as fallback_exc:
                     raise CostGovernorError(
-                        f"declared cost fallback failed:{fallback_exc}"
+                        f"declared_cost_fallback_runtime_error:{fallback_exc}"
                     ) from fallback_exc
                 receipt = self._receipt(
                     requested=request,
@@ -644,11 +655,10 @@ class CostGovernor:
                     fallback=fallback,
                     fallback_reason=reason,
                 )
-            except (
-                AdmissionRuntimeConflict,
-                AdmissionRuntimeError,
-            ):
-                raise
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
 
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
@@ -675,13 +685,20 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
                 )
-            recorded = self.runtime.record_usage_event(
-                operation,
-                event,
-                clean_category,
-                delta,
-                now_wall=now_wall,
-            )
+            try:
+                recorded = self.runtime.record_usage_event(
+                    operation,
+                    event,
+                    clean_category,
+                    delta,
+                    now_wall=now_wall,
+                )
+            except AdmissionError as exc:
+                raise CostGovernorDenied(str(exc)) from exc
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
         return CostCharge(
             operation_id=operation,
             event_id=event,
@@ -707,13 +724,18 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
                 )
-            return self.runtime.mark_usage_unknown(
-                operation,
-                event_id,
-                category,
-                reason,
-                now_wall=now_wall,
-            )
+            try:
+                return self.runtime.mark_usage_unknown(
+                    operation,
+                    event_id,
+                    category,
+                    reason,
+                    now_wall=now_wall,
+                )
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
 
     def resolve_unknown_usage(
         self,
@@ -732,12 +754,19 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
                 )
-            recorded = self.runtime.resolve_unknown_usage(
-                operation,
-                event,
-                delta,
-                now_wall=now_wall,
-            )
+            try:
+                recorded = self.runtime.resolve_unknown_usage(
+                    operation,
+                    event,
+                    delta,
+                    now_wall=now_wall,
+                )
+            except AdmissionError as exc:
+                raise CostGovernorDenied(str(exc)) from exc
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
         return CostCharge(
             operation_id=operation,
             event_id=event,
@@ -767,50 +796,64 @@ class CostGovernor:
                 raise CostGovernorError(
                     "operation has no active cost reservation"
                 )
-            completion: AdmissionCompletion = self.runtime.complete(
-                operation,
-                actual,
-                now_wall=now_wall,
-            )
-            quota_completion = completion.quota_completion
-            quota_reservation = completion.lease.quota_reservation
-            if quota_completion is None or quota_reservation is None:
-                raise CostGovernorError(
-                    "cost completion requires durable quota accounting"
+            try:
+                completion: AdmissionCompletion = self.runtime.complete(
+                    operation,
+                    actual,
+                    now_wall=now_wall,
                 )
-            ledger = self.runtime.quota_ledger
-            if ledger is None:
-                raise CostGovernorError(
-                    "cost completion requires quota ledger"
-                )
-            snapshot = ledger.snapshot(completion.lease.tenant_id)
-            accounting: BudgetAccountingDecision = qualify_budget_accounting(
-                tenant_id=completion.lease.tenant_id,
-                operation_id=operation,
-                reservation=quota_reservation,
-                completion=quota_completion,
-                snapshot=snapshot,
-                evidence_refs=refs,
-            )
-            reasons = list(accounting.reasons)
-            if quota_completion.overrun:
-                reasons.append(
-                    "cost-overrun:"
-                    + ",".join(quota_completion.overrun_dimensions)
-                )
-            normalized = tuple(sorted(set(reasons)))
-            decision = CostDecision(
-                operation_id=operation,
-                tenant_id=completion.lease.tenant_id,
-                state="completed",
-                reservation_digest=active.receipt.digest,
-                completion_digest=_completion_digest(quota_completion),
-                accounting_decision_digest=accounting.decision_digest,
-                accepted=not normalized,
-                reasons=normalized,
-            )
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
+
+            # The runtime lease is terminal after complete(). From this point on
+            # the governor must never retain a stale active reservation.
             self._active.pop(operation, None)
-            return decision
+            try:
+                quota_completion = completion.quota_completion
+                quota_reservation = completion.lease.quota_reservation
+                if quota_completion is None or quota_reservation is None:
+                    raise CostGovernorError(
+                        "cost completion requires durable quota accounting"
+                    )
+                ledger = self.runtime.quota_ledger
+                if ledger is None:
+                    raise CostGovernorError(
+                        "cost completion requires quota ledger"
+                    )
+                snapshot = ledger.snapshot(completion.lease.tenant_id)
+                accounting: BudgetAccountingDecision = qualify_budget_accounting(
+                    tenant_id=completion.lease.tenant_id,
+                    operation_id=operation,
+                    reservation=quota_reservation,
+                    completion=quota_completion,
+                    snapshot=snapshot,
+                    evidence_refs=refs,
+                )
+                reasons = list(accounting.reasons)
+                if quota_completion.overrun:
+                    reasons.append(
+                        "cost-overrun:"
+                        + ",".join(quota_completion.overrun_dimensions)
+                    )
+                normalized = tuple(sorted(set(reasons)))
+                return CostDecision(
+                    operation_id=operation,
+                    tenant_id=completion.lease.tenant_id,
+                    state="completed",
+                    reservation_digest=active.receipt.digest,
+                    completion_digest=_completion_digest(quota_completion),
+                    accounting_decision_digest=accounting.decision_digest,
+                    accepted=not normalized,
+                    reasons=normalized,
+                )
+            except CostGovernorError:
+                raise
+            except Exception as exc:
+                raise CostGovernorError(
+                    "terminal_accounting_qualification_failed"
+                ) from exc
 
     def release_unspent(
         self,
@@ -825,12 +868,9 @@ class CostGovernor:
                 )
             try:
                 lease = self.runtime.release(operation)
-            except (
-                AdmissionRuntimeConflict,
-                AdmissionRuntimeError,
-                QuotaConflict,
-                QuotaError,
-            ) as exc:
+            except (AdmissionRuntimeConflict, QuotaConflict) as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except (AdmissionRuntimeError, QuotaError) as exc:
                 raise CostGovernorError(str(exc)) from exc
             decision = CostDecision(
                 operation_id=operation,
@@ -854,6 +894,8 @@ __all__ = [
     "CostCharge",
     "CostDecision",
     "CostGovernor",
+    "CostGovernorConflict",
+    "CostGovernorDenied",
     "CostGovernorError",
     "CostReservation",
     "SafeCostFallback",
