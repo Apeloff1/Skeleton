@@ -142,6 +142,10 @@ from skeleton.persistence.spine_bind_hold_release import SpineBindHoldRelease
 from skeleton.persistence.spine_bind_hold_ticket import SpineBindHoldTicket
 from skeleton.persistence.spine_bind_hold_fence import SpineBindHoldFence
 from skeleton.persistence.spine_bind_hold_release_journal import SpineBindHoldReleaseJournal
+from skeleton.persistence.spine_bind_hold_agree import SpineBindHoldAgree
+from skeleton.persistence.spine_bind_hold_agree_journal import SpineBindHoldAgreeJournal
+from skeleton.persistence.spine_bind_hold_agree_read import SpineBindHoldAgreeRead
+from skeleton.persistence.spine_bind_hold_agree_chain import SpineBindHoldAgreeChain
 from skeleton.persistence.spine_bind_snapshot import SpineBindSnapshot
 from skeleton.persistence.spine_bind_recovery import SpineBindRecovery
 from skeleton.persistence.spine_bind_checkpoint import SpineBindCheckpoint
@@ -358,6 +362,10 @@ __all__ = [
     "SpineBindHoldTicket",
     "SpineBindHoldFence",
     "SpineBindHoldReleaseJournal",
+    "SpineBindHoldAgree",
+    "SpineBindHoldAgreeJournal",
+    "SpineBindHoldAgreeRead",
+    "SpineBindHoldAgreeChain",
     "SpineBindSnapshot",
     "SpineBindRecovery",
     "SpineBindCheckpoint",
