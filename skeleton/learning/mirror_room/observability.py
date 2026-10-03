@@ -345,7 +345,7 @@ def get_default_observatory() -> MirrorRoomObservatory:
 
 
 def mirror_room_file_tree() -> Mapping[str, object]:
-    """Governed logical file tree for the landed Mirror Room extension surface."""
+    """Governed logical file tree for the landed Mirror Room product surface."""
 
     return {
         "name": "Mirror Room",
@@ -373,6 +373,31 @@ def mirror_room_file_tree() -> Mapping[str, object]:
                 "name": "Governed AI Mirror",
                 "path": "skeleton/ai/learning/mirror_room",
                 "kind": "mirror",
+            },
+            {
+                "name": "Read-only Observatory API",
+                "path": "backend/routes/mirror_room.py",
+                "kind": "api",
+            },
+            {
+                "name": "Observatory UI",
+                "path": "frontend/features/MirrorRoom",
+                "kind": "ui",
+                "children": [
+                    {
+                        "name": "MirrorRoomObservatory.tsx",
+                        "kind": "screen",
+                    },
+                    {
+                        "name": "types.ts",
+                        "kind": "contracts",
+                    },
+                ],
+            },
+            {
+                "name": "Observatory Route",
+                "path": "frontend/app/mirror-room.tsx",
+                "kind": "route",
             },
             {
                 "name": "Focused Tests",
