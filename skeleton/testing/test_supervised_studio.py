@@ -377,3 +377,509 @@ def test_supervised_night_operator_pause_preempts_model_work(tmp_path, monkeypat
     assert blocked["event"] == "run_blocked_by_operator"
     assert blocked["hold_status"] == "paused"
     assert blocked["reason"] == "maintenance"
+
+
+def test_canonical_items_tolerates_malformed_priority_and_clamps_order(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-priority",
+                    "plan_items": [
+                        {"id": "bad", "title": "Bad priority", "description": "Fallback.", "priority": "oops"},
+                        {"id": "high", "title": "High priority", "description": "First.", "priority": 999},
+                        {"id": "low", "title": "Low priority", "description": "Last.", "priority": -100},
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    items, generation = supervised_studio._canonical_items(state, 3)
+    assert generation == "gen-priority"
+    assert [item["id"] for item in items] == ["high", "bad", "low"]
+
+
+def test_canonical_items_rejects_duplicate_ids(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-duplicate",
+                    "plan_items": [
+                        {"id": "same", "title": "One", "description": "One."},
+                        {"id": "same", "title": "Two", "description": "Two."},
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicate plan item ids"):
+        supervised_studio._canonical_items(state, 2)
+
+
+def test_canonical_items_rejects_invalid_json_with_stable_error(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text("{broken", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid JSON"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_oversized_snapshot(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(" " * 5_000_001, encoding="utf-8")
+    with pytest.raises(ValueError, match="exceeds 5 MB"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_plan_digest_tampering(tmp_path):
+    import hashlib
+
+    items = [{"id": "one", "title": "One", "description": "Original", "priority": 50}]
+    digest = hashlib.sha256(
+        json.dumps(items, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    items[0]["description"] = "Tampered"
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-tamper",
+                    "plan_digest_sha256": digest,
+                    "plan_items": items,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="plan digest mismatch"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_malformed_generation_identity(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "../escape",
+                    "plan_items": [{"id": "one", "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="generation id is malformed"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_unbounded_plan_item_identity(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe-generation",
+                    "plan_items": [{"id": "x" * 161, "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exceeds 160"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_malformed_digest(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe",
+                    "plan_digest_sha256": "not-a-sha256",
+                    "plan_items": [{"id": "one", "title": "One", "description": "One"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="digest is malformed"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_canonical_items_rejects_unbounded_plan_count(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "safe",
+                    "plan_items": [
+                        {"id": f"item-{index}", "title": "T", "description": "D"}
+                        for index in range(257)
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exceeds 256 plan items"):
+        supervised_studio._canonical_items(state, 1)
+
+
+def test_execution_receipt_is_deterministic_and_patch_bound():
+    from skeleton.automation.studio_director import PlannedTask
+
+    task = PlannedTask(
+        title="Receipt",
+        objective="Bind exact execution.",
+        division="qa_verification",
+        paths=("docs/example.md",),
+    )
+    kwargs = dict(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[("plan-1", task)],
+        patch="diff-body",
+        accepted=1,
+    )
+    first = supervised_studio._execution_receipt(**kwargs)
+    second = supervised_studio._execution_receipt(**kwargs)
+    assert first == second
+    assert first["patch_sha256"] == hashlib.sha256(b"diff-body").hexdigest()
+    assert len(first["receipt_sha256"]) == 64
+
+    changed = supervised_studio._execution_receipt(**{**kwargs, "patch": "different"})
+    assert changed["receipt_sha256"] != first["receipt_sha256"]
+
+
+def test_replay_key_binds_generation_plan_registry_and_seed():
+    first = supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert len(first) == 64
+    assert first == supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-2",
+        plan_digest="a" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="b" * 64,
+        seed="seed-1",
+    )
+    assert first != supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed-2",
+    )
+
+
+def test_verify_execution_receipt_rejects_mutation():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "plan-1",
+            PlannedTask(
+                title="Receipt",
+                objective="Bind execution.",
+                division="qa_verification",
+                paths=("docs/example.md",),
+            ),
+        )],
+        patch="patch",
+        accepted=1,
+    )
+    supervised_studio.verify_execution_receipt(receipt)
+    receipt["patch_chars"] = 999
+    with pytest.raises(ValueError, match="digest mismatch"):
+        supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_execution_receipt_contains_replay_key():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run-1",
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "plan-1",
+            PlannedTask(
+                title="Receipt",
+                objective="Bind execution.",
+                division="qa_verification",
+                paths=("docs/example.md",),
+            ),
+        )],
+        patch="patch",
+        accepted=1,
+    )
+    assert receipt["replay_key_sha256"] == supervised_studio._replay_key(
+        generation_id="gen-1",
+        plan_digest="a" * 64,
+        seed="seed",
+    )
+
+
+def test_replay_key_changes_with_repository_base():
+    first = supervised_studio._replay_key(
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        base_commit_sha="1" * 40,
+    )
+    second = supervised_studio._replay_key(
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        base_commit_sha="2" * 40,
+    )
+    assert first != second
+
+
+def test_verify_execution_receipt_rejects_wrong_schema():
+    receipt = {
+        "schema": "unknown",
+        "receipt_sha256": "a" * 64,
+    }
+    with pytest.raises(ValueError, match="schema is unsupported"):
+        supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_verify_execution_receipt_rejects_forged_replay_key():
+    from skeleton.automation.studio_director import PlannedTask
+
+    receipt = supervised_studio._execution_receipt(
+        run_id="run",
+        generation_id="gen",
+        plan_digest="a" * 64,
+        seed="seed",
+        scoped=[(
+            "p",
+            PlannedTask("T", "O", "qa_verification", ("docs/example.md",)),
+        )],
+        patch="patch",
+        accepted=1,
+        base_commit_sha="1" * 40,
+    )
+    receipt["replay_key_sha256"] = "f" * 64
+    payload = dict(receipt)
+    payload.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    with pytest.raises(ValueError, match="replay key mismatch"):
+        supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_canonical_items_rejects_tampered_frontier_allocation(tmp_path):
+    state = {
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "gen",
+            "plan_digest_sha256": "a" * 64,
+            "plan_items": [],
+            "allocation": {
+                "schema": "autonomous-studio.frontier-allocation.v1",
+                "generation_id": "gen",
+                "plan_digest_sha256": "a" * 64,
+                "authorized_plan_ids": [],
+                "allocation_sha256": "f" * 64,
+            },
+        }
+    }
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="allocation digest mismatch"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_allocation_authorization_mismatch(tmp_path):
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign",
+        "campaign_epoch": 1,
+        "generation_id": "gen",
+        "plan_digest_sha256": "a" * 64,
+        "frontier_sha256": "b" * 64,
+        "authorized_plan_ids": ["different"],
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "gen",
+            "plan_digest_sha256": "a" * 64,
+            "plan_items": [{"id": "actual", "title": "A", "description": "D", "status": "queued"}],
+            "allocation": allocation,
+        }
+    }
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match executable plan"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_allocation_without_lane_coverage(tmp_path):
+    item = {"id": "actual", "title": "A", "description": "D", "status": "queued"}
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign",
+        "campaign_epoch": 1,
+        "allocation_nonce": "a" * 24,
+        "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64,
+        "frontier_sha256": "c" * 64,
+        "authorized_plan_ids": ["actual"],
+        "lane_assignments": {},
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {"_shift_supervisor": {
+        "status": "loaded", "team": "night", "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64, "plan_items": [item], "allocation": allocation,
+    }}
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="lane assignments do not cover"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_malformed_allocation_nonce(tmp_path):
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign", "campaign_epoch": 1, "allocation_nonce": "bad",
+        "generation_id": "gen", "plan_digest_sha256": "b" * 64,
+        "frontier_sha256": "c" * 64, "authorized_plan_ids": [], "lane_assignments": {},
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {"_shift_supervisor": {
+        "status": "loaded", "team": "night", "generation_id": "gen",
+        "plan_digest_sha256": "b" * 64, "plan_items": [], "allocation": allocation,
+    }}
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="nonce is malformed"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_transaction_journal_detects_tampering(tmp_path):
+    path = tmp_path / "tx.json"
+    payload = {"schema": "autonomous-studio.transaction.v1", "phase": "prepared", "base_commit_sha": "a" * 40}
+    supervised_studio._write_transaction(path, payload)
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    loaded["phase"] = "validated"
+    path.write_text(json.dumps(loaded), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="integrity mismatch"):
+        supervised_studio._load_transaction(path)
+
+
+def test_transaction_journal_round_trip(tmp_path):
+    path = tmp_path / "tx.json"
+    payload = {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "validating",
+        "base_commit_sha": "a" * 40,
+        "new_paths": ["skeleton/new.py"],
+    }
+    supervised_studio._write_transaction(path, payload)
+    loaded = supervised_studio._load_transaction(path)
+    assert loaded["phase"] == "validating"
+    assert len(loaded["journal_sha256"]) == 64
+
+
+def test_recovery_refuses_changed_head(tmp_path, monkeypatch):
+    path = tmp_path / "tx.json"
+    supervised_studio._write_transaction(path, {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "applied",
+        "base_commit_sha": "a" * 40,
+        "new_paths": [],
+    })
+    monkeypatch.setattr(supervised_studio, "_git", lambda *args, **kwargs: "b" * 40 if args[:2] == ("rev-parse", "HEAD") else "")
+    with pytest.raises(RuntimeError, match="HEAD changed"):
+        supervised_studio._recover_interrupted_transaction(path)
+
+
+def test_committed_transaction_is_cleaned_without_reset(tmp_path, monkeypatch):
+    path = tmp_path / "tx.json"
+    supervised_studio._write_transaction(path, {
+        "schema": "autonomous-studio.transaction.v1",
+        "phase": "committed",
+        "base_commit_sha": "a" * 40,
+        "new_paths": [],
+    })
+    calls = []
+    monkeypatch.setattr(supervised_studio, "_git", lambda *args, **kwargs: calls.append(args) or "")
+    supervised_studio._recover_interrupted_transaction(path)
+    assert not path.exists()
+    assert calls == []
+
+
+def test_empirical_repair_is_bounded_to_two_attempts(monkeypatch, tmp_path):
+    # Contract guard: the live executor's empirical loop is intentionally
+    # bounded even when every replacement continues to fail validation.
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "for empirical_attempt in range(2):" in source
+    assert "repair_from_validation(" in source
+
+
+def test_execution_receipt_path_is_supported_by_cli():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "--receipt-path" in source
+
+
+def test_live_executor_requires_aggregate_integration_validation():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "integration_commands(aggregate_paths)" in source
+    assert 'stage="aggregate_integration_validation"' in source
+    assert '"aggregate_integration_validated"' in source
+
+
+def test_aggregate_build_is_bound_to_accepted_receipts():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "accepted_receipts.append((plan_id, candidate_diff_sha))" in source
+    assert "composition_digest(tuple(accepted_receipts))" in source
+    assert '"aggregate_build_composed"' in source
