@@ -203,7 +203,7 @@ async def product_control_deployment_checkpoint_proof(sequence: int, token: str 
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint not found") from exc
     except (DeploymentCheckpointLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="deployment state conflict") from exc
 
 
 @router.get("/product-control/deployments/proof/{authorization_id}")
@@ -249,7 +249,7 @@ async def product_control_deployment_proof(authorization_id: str,
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment authorization proof not found") from exc
     except (DeploymentCheckpointLedgerError, DeploymentGatewayError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="deployment state conflict") from exc
 
 
 @router.post("/product-control/deployments/prepare")
@@ -261,7 +261,7 @@ async def product_control_prepare_deployment(body: DeploymentPrepareInput, token
         )
         return _control_plane().deployments.prepared_dict(prepared)
     except (DeploymentGatewayError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="deployment state conflict") from exc
 
 
 @router.post("/product-control/deployments/execute")
@@ -273,7 +273,7 @@ async def product_control_execute_deployment(body: DeploymentExecuteInput, token
         )
         return _control_plane().deployments.execution_dict(execution)
     except (DeploymentGatewayError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="deployment state conflict") from exc
 
 
 @router.get("/product-control/deployments/current")
@@ -314,7 +314,7 @@ async def product_control_receipts(limit: int = Query(50, ge=0, le=500), token: 
 async def product_control_receipt(operation_id: str, token: str = Query("")):
     _require_ops(token)
     try: receipt = _control_plane().receipt(operation_id)
-    except (ReceiptIntegrityError, ValueError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (ReceiptIntegrityError, ValueError) as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
     if receipt is None: raise HTTPException(status_code=404, detail="receipt not found")
     return receipt
 
@@ -323,7 +323,7 @@ async def product_control_receipt(operation_id: str, token: str = Query("")):
 async def product_control_receipt_result(operation_id: str, token: str = Query("")):
     _require_ops(token)
     try: return _control_plane().receipt_result(operation_id)
-    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
     except ReceiptIntegrityError as exc:
         if "not found" in str(exc).lower():
             raise HTTPException(status_code=404, detail="receipt not found") from None
@@ -334,7 +334,7 @@ async def product_control_receipt_result(operation_id: str, token: str = Query("
 async def product_control_operation_lifecycle(operation_id: str, token: str = Query("")):
     _require_ops(token)
     try: return _control_plane().operation_lifecycle(operation_id)
-    except (ValueError, ReceiptIntegrityError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (ValueError, ReceiptIntegrityError) as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
 
 
 @router.post("/product-control/execute/{seq}")
@@ -355,7 +355,7 @@ async def product_control_execute_pending(limit: int = Query(32, ge=0, le=256), 
 async def product_control_ratify(body: RatifyInput, token: str = Query("")):
     _require_ops(token)
     try: charter = _control_plane().ratify(body.domain, [Rule(r.id, r.action, r.min_weight, r.requires_quorum) for r in body.rules])
-    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
     return {"charter_id": charter.id, "domain": charter.domain, "rules": len(charter.rules)}
 
 
@@ -367,7 +367,7 @@ async def product_control_admit(body: AdmitInput, token: str = Query("")):
             principal=body.principal, actor_weight=body.actor_weight, payload=body.payload,
             quorum_approved=body.quorum_approved, idempotency_key=body.idempotency_key)
     except OutboxFullError as exc: raise public_http_error(503, "outbox_full", exc) from None
-    except OperationRejected as exc: raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OperationRejected as exc: raise HTTPException(status_code=403, detail="operation rejected") from exc
+    except ValueError as exc: raise HTTPException(status_code=400, detail="invalid operations request") from exc
     return {"operation_id": admitted.id, "capability_id": admitted.capability_id, "pillar": admitted.pillar,
             "outbox_seq": admitted.outbox_seq, "admitted_at": admitted.admitted_at, "audit_hash": admitted.audit_hash}
