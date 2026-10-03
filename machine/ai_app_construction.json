@@ -1282,6 +1282,7 @@
         "skeleton/ai/runtime/multimodal/intake.py",
         "skeleton/ai/runtime/product/qualification.py",
         "skeleton/ai/runtime/product/model_program_bridge.py",
+        "skeleton/ai/runtime/product/activation.py",
         "skeleton/intelligence/adaptive.py",
         "skeleton/intelligence/experiment_tracker.py",
         "skeleton/learning/mirror_room",
@@ -1309,6 +1310,8 @@
         "Mirror/firewall/lifecycle qualification bundle",
         "canonical model-program TrainingReceipt and ModelArtifact bridge",
         "independently verified ModelPromotionReceipt",
+        "digest-pinned LocalModelActivationManifest",
+        "operator-selected authenticated candidate/rollback target",
         "promotion receipt",
         "MirrorRoomSpec",
         "MirrorRunReceipt",
@@ -1341,6 +1344,8 @@
         "bind exact training-plan, model, artifact, Mirror Room, promotion-firewall, camera and method-allocation identities into non-authoritative lifecycle validation evidence",
         "bridge candidate-only reverse-training evidence into skeleton.learning.model_program ModelArtifact and TrainingReceipt using the compiled corpus digest as dataset identity",
         "emit ModelPromotionReceipt only after qualification with a verifier distinct from trainer, Mirror verifier and firewall evaluator",
+        "bind promoted candidate and exact rollback baseline into one digest-pinned activation manifest carrying explicit operator authorization",
+        "allow operator selection of candidate or rollback only through the authenticated activation manifest; reject loose activation-target selection",
         "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
         "require eval before behavior change",
@@ -1377,6 +1382,9 @@
         "lifecycle validation handoff carries evidence but no production authority",
         "canonical model-program bridge preserves exact model/artifact/training/corpus identity",
         "model promotion verifier is independent of trainer and evaluation authorities",
+        "governed activation binds exact promoted candidate and exact rollback bytes",
+        "operator-selected rollback executes from the same digest-pinned manifest",
+        "activation target fails closed without activation manifest plus digest",
         "promotion gate",
         "Mirror Room generator/executor/verifier independence",
         "hermetic sandbox side-effect denial and deterministic replay",
@@ -1812,8 +1820,19 @@
       ],
       "optional_configuration": [
         "AI_LOCAL_MODEL_CACHE_SIZE",
-        "AI_LOCAL_MODEL_SEED"
+        "AI_LOCAL_MODEL_SEED",
+        "AI_LOCAL_ACTIVATION_TARGET"
       ],
+      "activation_configuration": {
+        "compatibility_direct": [
+          "AI_LOCAL_MODEL_PATH"
+        ],
+        "governed_promoted": [
+          "AI_LOCAL_ACTIVATION_MANIFEST",
+          "AI_LOCAL_ACTIVATION_DIGEST"
+        ],
+        "target": "AI_LOCAL_ACTIVATION_TARGET=candidate|rollback; default candidate; target is invalid without governed_promoted configuration"
+      },
       "capabilities": [
         "text-generation"
       ],
@@ -1843,6 +1862,9 @@
       "learning_qualification_bridge": "skeleton/ai/runtime/product/qualification.py:qualify_learning_candidate",
       "model_program_bridge": "skeleton/ai/runtime/product/model_program_bridge.py:bridge_product_training_to_model_program",
       "model_promotion_evidence": "skeleton/ai/runtime/product/model_program_bridge.py:model_promotion_receipt_from_qualification",
+      "activation_manifest_builder": "skeleton/ai/runtime/product/activation.py:build_local_model_activation_manifest",
+      "activation_manifest_loader": "skeleton/ai/runtime/product/activation.py:load_local_model_activation_manifest",
+      "authenticated_activation_adapter": "skeleton/ai/runtime/product/activation.py:local_model_adapter_from_activation_manifest",
       "training_method_families": [
         "causal_language_modeling",
         "supervised_instruction",
@@ -1881,7 +1903,7 @@
       "engine_dependency_extra": "local-inference",
       "execution_owner": "skeleton/provider_runtime.py",
       "artifact_owner": "skeleton/ai/runtime/inference/artifact.py",
-      "activation_rule": "AI_PROVIDER=local registers only the local adapter; external secondary and semantic-verifier configuration fail closed"
+      "activation_rule": "AI_PROVIDER=local registers only the local adapter; direct compatibility bootstrap uses AI_LOCAL_MODEL_PATH, while governed promotion uses AI_LOCAL_ACTIVATION_MANIFEST plus AI_LOCAL_ACTIVATION_DIGEST and an optional candidate|rollback target; external secondary and semantic-verifier configuration fail closed"
     },
     {
       "id": "openai-compatible-secondary",
