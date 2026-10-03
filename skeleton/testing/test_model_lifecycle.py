@@ -561,3 +561,202 @@ def test_lifecycle_state_tamper_fails_closed(
         match="state digest mismatch",
     ):
         ModelLifecycleRegistry(state_path)
+
+
+def _fail_lifecycle_persist() -> None:
+    raise ModelLifecycleError("injected lifecycle persistence failure")
+
+
+def test_candidate_registration_rolls_back_memory_when_persist_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _, _, bridged, _qualification, _promotion = _fixture(tmp_path)
+    state_path = tmp_path / "candidate-failure.json"
+    registry = ModelLifecycleRegistry(state_path)
+    monkeypatch.setattr(registry, "_persist", _fail_lifecycle_persist)
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="injected lifecycle persistence failure",
+    ):
+        registry.register_candidate(
+            bridged,
+            authority_id="training-registration-authority",
+        )
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="not registered",
+    ):
+        registry.snapshot(bridged.artifact.model_digest)
+    assert not state_path.exists()
+
+
+def test_validation_rolls_back_memory_when_persist_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _, _, bridged, qualification, _promotion = _fixture(tmp_path)
+    state_path = tmp_path / "validation-failure.json"
+    registry = ModelLifecycleRegistry(state_path)
+    registry.register_candidate(
+        bridged,
+        authority_id="training-registration-authority",
+    )
+    before = registry.snapshot(bridged.artifact.model_digest)
+    durable_before = state_path.read_bytes()
+    monkeypatch.setattr(registry, "_persist", _fail_lifecycle_persist)
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="injected lifecycle persistence failure",
+    ):
+        registry.validate(
+            bridged.artifact.model_digest,
+            qualification,
+            verifier_id="lifecycle-validation-verifier",
+        )
+
+    after = registry.snapshot(bridged.artifact.model_digest)
+    assert after.state is ModelLifecycleState.CANDIDATE
+    assert after.digest == before.digest
+    assert registry.verify_history(bridged.artifact.model_digest) is True
+    assert state_path.read_bytes() == durable_before
+
+
+def test_promotion_rolls_back_memory_when_persist_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _, _, bridged, qualification, promotion = _fixture(tmp_path)
+    state_path = tmp_path / "promotion-failure.json"
+    registry = ModelLifecycleRegistry(state_path)
+    registry.register_candidate(
+        bridged,
+        authority_id="training-registration-authority",
+    )
+    registry.validate(
+        bridged.artifact.model_digest,
+        qualification,
+        verifier_id="lifecycle-validation-verifier",
+    )
+    before = registry.snapshot(bridged.artifact.model_digest)
+    durable_before = state_path.read_bytes()
+    monkeypatch.setattr(registry, "_persist", _fail_lifecycle_persist)
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="injected lifecycle persistence failure",
+    ):
+        registry.promote(
+            bridged.artifact.model_digest,
+            promotion,
+        )
+
+    after = registry.snapshot(bridged.artifact.model_digest)
+    assert after.state is ModelLifecycleState.VALIDATED
+    assert after.digest == before.digest
+    assert registry.verify_history(bridged.artifact.model_digest) is True
+    assert state_path.read_bytes() == durable_before
+
+
+def test_activation_rolls_back_memory_when_persist_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
+    state_path = tmp_path / "activation-failure.json"
+    registry = ModelLifecycleRegistry(state_path)
+    promoted = _promote(
+        registry,
+        bridged,
+        qualification,
+        promotion,
+    )
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=promoted,
+    )
+    before = registry.snapshot(bridged.artifact.model_digest)
+    durable_before = state_path.read_bytes()
+    monkeypatch.setattr(registry, "_persist", _fail_lifecycle_persist)
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="injected lifecycle persistence failure",
+    ):
+        registry.activate(
+            bridged.artifact.model_digest,
+            activation,
+            deployment_authority_id="deployment-authority",
+        )
+
+    after = registry.snapshot(bridged.artifact.model_digest)
+    assert after.state is ModelLifecycleState.PROMOTED
+    assert after.digest == before.digest
+    assert registry.verify_history(bridged.artifact.model_digest) is True
+    assert state_path.read_bytes() == durable_before
+
+
+def test_rollback_rolls_back_memory_when_persist_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    (
+        baseline_path,
+        candidate_path,
+        bridged,
+        qualification,
+        promotion,
+    ) = _fixture(tmp_path)
+    state_path = tmp_path / "rollback-failure.json"
+    registry = ModelLifecycleRegistry(state_path)
+    promoted = _promote(
+        registry,
+        bridged,
+        qualification,
+        promotion,
+    )
+    activation = _activation(
+        baseline_path=baseline_path,
+        candidate_path=candidate_path,
+        bridged=bridged,
+        qualification=qualification,
+        promotion=promotion,
+        promoted_transition=promoted,
+    )
+    registry.activate(
+        bridged.artifact.model_digest,
+        activation,
+        deployment_authority_id="deployment-authority",
+    )
+    before = registry.snapshot(bridged.artifact.model_digest)
+    durable_before = state_path.read_bytes()
+    monkeypatch.setattr(registry, "_persist", _fail_lifecycle_persist)
+
+    with pytest.raises(
+        ModelLifecycleError,
+        match="injected lifecycle persistence failure",
+    ):
+        registry.rollback(
+            bridged.artifact.model_digest,
+            activation,
+            deployment_authority_id="deployment-authority",
+        )
+
+    after = registry.snapshot(bridged.artifact.model_digest)
+    assert after.state is ModelLifecycleState.ACTIVATED
+    assert after.digest == before.digest
+    assert registry.verify_history(bridged.artifact.model_digest) is True
+    assert state_path.read_bytes() == durable_before
