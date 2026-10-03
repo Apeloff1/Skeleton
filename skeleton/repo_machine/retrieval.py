@@ -63,10 +63,14 @@ class RepositoryRetrievalIndex:
         self._postings: dict[str, set[str]] = {}
         self._records = {item.path: item for item in model.files}
         self._path_tokens: dict[str, set[str]] = {}
+        self._prefix_postings: dict[str, set[str]] = {}
         self._build()
 
     def _add(self, term: str, path: str) -> None:
         self._postings.setdefault(term, set()).add(path)
+        prefix = term[:3]
+        if prefix:
+            self._prefix_postings.setdefault(prefix, set()).add(term)
 
     def _build(self) -> None:
         for record in self.model.files:
@@ -140,7 +144,8 @@ class RepositoryRetrievalIndex:
         # Avoid rescanning every posting for every query term.
         if not candidates:
             for term in sorted(terms, key=len):
-                for indexed_term in self._postings:
+                prefix = term[:3]
+                for indexed_term in self._prefix_postings.get(prefix, ()):
                     if indexed_term.startswith(term) or term.startswith(indexed_term):
                         candidates.update(self._postings[indexed_term])
                 if candidates:
