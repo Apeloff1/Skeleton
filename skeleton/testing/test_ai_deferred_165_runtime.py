@@ -39,6 +39,7 @@ from skeleton.ai.runtime.deferred.operations_experience import (
     TrustSignal,
 )
 from skeleton.ai.runtime.deferred.platform_control import (
+    ApprovalFatigueGuard,
     Constraint,
     DecisionCandidate,
     DecisionEngine,
@@ -65,6 +66,8 @@ from skeleton.ai.runtime.deferred.research_evaluation import (
     EvalCase,
     EvalOutcome,
     EvaluationHarness,
+    HumanEvaluation,
+    HumanJudgment,
     ProviderFailover,
     ProviderRisk,
 )
@@ -485,3 +488,23 @@ def test_audit_log_is_gapless_and_trust_signal_is_evidence_bounded() -> None:
 def test_fuzz_reproducer_identity_is_stable() -> None:
     repro = FuzzReproducer("contract", 42, HEX_A, HEX_B)
     assert repro.digest == FuzzReproducer("contract", 42, HEX_A, HEX_B).digest
+
+def test_human_evaluation_rejects_duplicate_rater_weighting() -> None:
+    judgments=(
+        HumanJudgment("r1","case","rubric-1",0.9),
+        HumanJudgment("r1","case","rubric-1",0.1),
+        HumanJudgment("r2","case","rubric-1",0.8),
+    )
+    with pytest.raises(ValueError,match="duplicate evaluator"):
+        HumanEvaluation.aggregate(judgments,min_raters=2)
+
+
+def test_approval_fatigue_window_recovers_without_suppressing_high_impact() -> None:
+    guard=ApprovalFatigueGuard(window=3,max_prompts=2)
+    assert guard.request(False)=="prompt"
+    assert guard.request(False)=="prompt"
+    assert guard.request(False)=="batch_or_defer"
+    assert guard.request(False)=="batch_or_defer"
+    assert guard.request(False)=="prompt"
+    assert guard.request(True)=="prompt"
+
