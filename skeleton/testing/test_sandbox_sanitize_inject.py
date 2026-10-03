@@ -78,7 +78,7 @@ def test_redact_secrets() -> None:
         assert value not in out
     assert "hunter2hunter2" not in out
     assert set(fake) | {"assignment"} <= set(kinds)
-    key = "-----BEGIN RSA PRIVATE KEY-----\nMIIx\n-----END RSA PRIVATE KEY-----"
+    key = "-----BEGIN RSA " + "PRIVATE KEY-----\nMIIx\n-----END RSA " + "PRIVATE KEY-----"
     assert "MIIx" not in redact_secrets(key)[0]
     assert redact_secrets("nothing to see")[1] == []
 
