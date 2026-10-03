@@ -283,6 +283,14 @@ def bridge_product_training_to_model_program(
             product_receipt.get("epochs_completed", 0),
             "epochs_completed",
         ),
+        "optimizer_steps": _positive_metric(
+            product_receipt.get("optimizer_steps", 0),
+            "optimizer_steps",
+        ),
+        "gradient_accumulation_steps": _positive_metric(
+            product_receipt.get("gradient_accumulation_steps", 1),
+            "gradient_accumulation_steps",
+        ),
     }
     losses = product_receipt.get("training_loss_history", [])
     if not isinstance(losses, list):
