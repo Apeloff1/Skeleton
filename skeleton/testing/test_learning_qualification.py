@@ -93,10 +93,14 @@ def test_adaptive_allocation_favors_validation_gain_per_compute() -> None:
     assert by_method[TrainingMethod.SELF_SUPERVISED_SPAN] >= 1
     assert sum(by_method.values()) <= 10
     assert len(allocation.allocation_digest) == 64
-    assert allocation.source_plan_digests == (
-        _sha("plan-1"),
-        _sha("plan-2"),
-        _sha("plan-3"),
+    assert allocation.source_plan_digests == tuple(
+        sorted(
+            (
+                _sha("plan-1"),
+                _sha("plan-2"),
+                _sha("plan-3"),
+            )
+        )
     )
 
 
