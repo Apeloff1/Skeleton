@@ -332,10 +332,15 @@ class TrainingRepository:
         if lease.epoch!=current:
             raise TrainingStateError("stale worker epoch rejected")
         row=self._db.execute(
-            "SELECT epoch FROM worker_lease WHERE run_id=? AND worker_id=?",
+            "SELECT epoch,lease_json FROM worker_lease "
+            "WHERE run_id=? AND worker_id=?",
             (lease.run_id,lease.worker_id),
         ).fetchone()
-        if row is None or int(row[0])!=lease.epoch:
+        if (
+            row is None
+            or int(row[0])!=lease.epoch
+            or row[1]!=_canonical(lease.as_dict())
+        ):
             raise TrainingStateError("worker lease is not current")
 
     def checkpoint(self,checkpoint:TrainingCheckpoint,lease:WorkerLease)->str:
