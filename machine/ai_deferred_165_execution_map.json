@@ -4303,5 +4303,7 @@
       "completion_claim": false,
       "promotion_authority": false
     }
-  ]
+  ],
+  "source_main_sha_at_materialization": "3c94df04b12f3d9a7bf81c3fea485cff84a7abf8",
+  "source_main_note": "Observed repaired main after #2590; informational only and not completion authority."
 }
