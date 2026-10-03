@@ -212,7 +212,7 @@ async def curiosity_transparency_inclusion(checkpoint_sha256: str = Query(min_le
 @router.get("/curiosity/transparency/consistency")
 async def curiosity_transparency_consistency(old_size: int = Query(ge=0)):
     try: return curiosity_service().transparency_consistency(old_size)
-    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc: raise HTTPException(status_code=422, detail="invalid transparency request") from exc
 
 
 @router.post("/curiosity/transparency/gossip")
@@ -221,7 +221,7 @@ async def curiosity_transparency_gossip(body: TransparencyHeadBody):
         return curiosity_service().observe_transparency_head(
             log_id=body.log_id, tree_size=body.tree_size, root_sha256=body.root_sha256, source=body.source,
         )
-    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc: raise HTTPException(status_code=422, detail="invalid transparency request") from exc
 
 
 @router.get("/curiosity/truth")
