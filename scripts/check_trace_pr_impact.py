@@ -45,6 +45,7 @@ _TRACE_CONTROL_PREFIXES = (
 # master trace. Keep those exact bindings explicit and fail-closed here.
 _TRACE_EXACT_IMPLEMENTATION_BINDINGS = {
     "Dockerfile": ("VOL-060",),
+    "setup.cfg": ("VOL-060",),
 }
 
 
