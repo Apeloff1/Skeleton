@@ -25,7 +25,7 @@ _MAX_EXAMPLES = 4_096
 _MAX_TEXT = 200_000
 _MAX_OUTPUT_DOCUMENTS = 16_384
 _MAX_OUTPUT_CHARS = 32_000_000
-_TOKEN = re.compile(r"\S+", re.UNICODE)
+_TOKEN = re.compile(r"\S+", re.UNICODE)\n_CAMERA_VIEW_REF = re.compile(r"^camera-view-sha256:[0-9a-f]{64}$")
 
 
 class TrainingMethodError(RuntimeError):
@@ -227,6 +227,10 @@ class TrainingExample:
         if any(not item for item in views):
             raise TrainingMethodError(
                 "camera_view_refs must be non-empty normalized strings"
+            )
+        if any(_CAMERA_VIEW_REF.fullmatch(item) is None for item in views):
+            raise TrainingMethodError(
+                "camera_view_refs must use canonical camera-view-sha256 identity"
             )
         if len(views) > 2_048:
             raise TrainingMethodError(
