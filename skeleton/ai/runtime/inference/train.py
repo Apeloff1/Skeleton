@@ -126,6 +126,9 @@ def _train_and_write(
     max_document_tokens: int,
     seed: int,
     temperature: float,
+    early_stopping_patience: int,
+    min_relative_improvement: float,
+    shuffle_each_epoch: bool,
     extra_receipt: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Train one model and atomically promote only verified bytes."""
@@ -154,6 +157,9 @@ def _train_and_write(
         max_document_tokens=max_document_tokens,
         seed=seed,
         temperature=temperature,
+        early_stopping_patience=early_stopping_patience,
+        min_relative_improvement=min_relative_improvement,
+        shuffle_each_epoch=shuffle_each_epoch,
     )
     raw = _stable_json_bytes(model.to_dict())
 
@@ -214,6 +220,18 @@ def _train_and_write(
             "hidden_size": model.hidden_size,
             "vocab_size": model.vocab_size,
             "epochs": int(epochs),
+            "epochs_completed": int(
+                getattr(model, "training_epochs_completed", epochs)
+            ),
+            "stopped_early": bool(
+                getattr(model, "training_stopped_early", False)
+            ),
+            "training_loss_history": list(
+                getattr(model, "training_loss_history", ())
+            ),
+            "training_tokens": int(
+                getattr(model, "training_tokens", 0)
+            ),
             "seed": int(seed),
         }
         if extra_receipt:
@@ -248,6 +266,9 @@ def build_recurrent_artifact(
     max_document_tokens: int = 1_024,
     seed: int = 0,
     temperature: float = 0.8,
+    early_stopping_patience: int = 0,
+    min_relative_improvement: float = 0.0,
+    shuffle_each_epoch: bool = True,
 ) -> dict[str, object]:
     """Train, atomically write, reload, and attest one recurrent artifact."""
 
@@ -263,6 +284,9 @@ def build_recurrent_artifact(
         max_document_tokens=max_document_tokens,
         seed=seed,
         temperature=temperature,
+        early_stopping_patience=early_stopping_patience,
+        min_relative_improvement=min_relative_improvement,
+        shuffle_each_epoch=shuffle_each_epoch,
         extra_receipt={"training_mode": "plain_corpus"},
     )
 
@@ -281,6 +305,9 @@ def build_multi_method_recurrent_artifact(
     max_document_tokens: int = 1_024,
     seed: int = 0,
     temperature: float = 0.8,
+    early_stopping_patience: int = 2,
+    min_relative_improvement: float = 1e-4,
+    shuffle_each_epoch: bool = True,
 ) -> dict[str, object]:
     """Compile multiple learning families and train one bounded local artifact."""
 
@@ -311,6 +338,9 @@ def build_multi_method_recurrent_artifact(
         max_document_tokens=max_document_tokens,
         seed=seed,
         temperature=temperature,
+        early_stopping_patience=early_stopping_patience,
+        min_relative_improvement=min_relative_improvement,
+        shuffle_each_epoch=shuffle_each_epoch,
         extra_receipt={
             "training_mode": "multi_method",
             "training_plan": plan.as_dict(),
@@ -346,6 +376,21 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-document-tokens", type=int, default=1_024)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--temperature", type=float, default=0.8)
+    parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
+        "--min-relative-improvement",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--no-shuffle",
+        action="store_true",
+        help="Disable deterministic per-epoch sequence shuffling",
+    )
     return parser
 
 
@@ -362,6 +407,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_document_tokens=args.max_document_tokens,
         seed=args.seed,
         temperature=args.temperature,
+        early_stopping_patience=args.early_stopping_patience,
+        min_relative_improvement=args.min_relative_improvement,
+        shuffle_each_epoch=not args.no_shuffle,
     )
     print(
         json.dumps(
