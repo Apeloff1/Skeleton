@@ -35,7 +35,14 @@ const summary = (overrides = {}) => ({
   },
 });
 
-function runCase(name, records, status, expectedExit, imageVerifier = 'success') {
+function runCase(
+  name,
+  records,
+  status,
+  expectedExit,
+  imageVerifier = 'success',
+  npmVerifier = 'success',
+) {
   const report = path.join(tempDir, `${name}.json`);
   fs.writeFileSync(
     report,
@@ -46,6 +53,7 @@ function runCase(name, records, status, expectedExit, imageVerifier = 'success')
     env: {
       ...process.env,
       IMAGE_SIZE_SECURITY_VERIFIED: imageVerifier,
+      NPM_COMPENSATING_SECURITY_VERIFIED: npmVerifier,
       YARN_AUDIT_STATUS: String(status),
     },
     encoding: 'utf8',
@@ -78,6 +86,30 @@ try {
     0,
   );
   runCase(
+    'mitigated-braces-no-release',
+    [advisory({ module: 'braces', severity: 'high', ghsa: 'GHSA-vfj7-8cjw-p6xm' }), summary({ high: 1 })],
+    8,
+    0,
+  );
+  runCase(
+    'mitigated-http-cache-no-release',
+    [advisory({ module: 'http-cache-semantics', severity: 'high', ghsa: 'GHSA-ch52-4w7c-c8xp' }), summary({ high: 1 })],
+    8,
+    0,
+  );
+  runCase(
+    'mitigated-node-forge-no-release',
+    [advisory({ module: 'node-forge', severity: 'high', ghsa: 'GHSA-86w9-cpqp-85rv' }), summary({ high: 1 })],
+    8,
+    0,
+  );
+  runCase(
+    'mitigation-is-package-bound',
+    [advisory({ module: 'fixture-package', severity: 'high', ghsa: 'GHSA-vfj7-8cjw-p6xm' }), summary({ high: 1 })],
+    8,
+    1,
+  );
+  runCase(
     'unmitigated-critical',
     [advisory({ module: 'fixture-package', severity: 'critical', ghsa: 'GHSA-test-test-test' }), summary({ critical: 1 })],
     16,
@@ -104,7 +136,8 @@ try {
   runCase('summary-status-mismatch', [summary({ high: 1 })], 0, 2);
   runCase('malformed-record-shape', ['null'], 0, 2);
   runCase('malformed-json', ['{not-json'], 0, 2);
-  runCase('verifier-failure', [summary()], 0, 1, 'failure');
+  runCase('image-verifier-failure', [summary()], 0, 1, 'failure');
+  runCase('npm-verifier-failure', [summary()], 0, 1, 'success', 'failure');
   console.log('[yarn-audit-policy-test] all regression cases passed');
 } finally {
   fs.rmSync(tempDir, { recursive: true, force: true });
