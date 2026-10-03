@@ -57,7 +57,11 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
     raw = supervisor.get("plan_items")
     if not isinstance(raw, list):
         raise ValueError("canonical supervisor snapshot has no plan_items")
+    if len(raw) > 256:
+        raise ValueError("canonical supervisor snapshot exceeds 256 plan items")
     expected_digest = str(supervisor.get("plan_digest_sha256", "")).strip()
+    if expected_digest and (len(expected_digest) != 64 or any(ch not in "0123456789abcdef" for ch in expected_digest)):
+        raise ValueError("canonical supervisor plan digest is malformed")
     if expected_digest:
         actual_digest = hashlib.sha256(
             json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
@@ -326,6 +330,16 @@ def propose(
             audit.emit("task_failed_closed", task=plan_id, stage="build_review", error=str(exc)[:2000])
 
     diff = _git("diff", "--no-ext-diff", "--binary")
+    if len(diff) > MAX_TOTAL_PATCH_CHARS:
+        _git("reset", "--hard", "HEAD", check=False)
+        audit.emit(
+            "run_failed_closed",
+            stage="final_patch_budget",
+            accepted_tasks=accepted,
+            emitted_patch_chars=len(diff),
+            status="failed_closed",
+        )
+        raise RuntimeError("final repository diff exceeds aggregate patch budget")
     patch_path.parent.mkdir(parents=True, exist_ok=True)
     patch_path.write_text(diff, encoding="utf-8")
     _git("reset", "--hard", "HEAD")
