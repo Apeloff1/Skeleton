@@ -8,6 +8,8 @@ on:
       - "skeleton/testing/test_mirror_room_adversarial.py"
       - "skeleton/testing/test_mirror_room_content_delivery.py"
       - "skeleton/testing/test_mirror_room_observability.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
       - ".github/workflows/mirror-room-extensions.yml"
   push:
     branches:
@@ -18,6 +20,8 @@ on:
       - "skeleton/testing/test_mirror_room_adversarial.py"
       - "skeleton/testing/test_mirror_room_content_delivery.py"
       - "skeleton/testing/test_mirror_room_observability.py"
+      - "frontend/features/MirrorRoom/**"
+      - "frontend/app/mirror-room.tsx"
       - ".github/workflows/mirror-room-extensions.yml"
   workflow_dispatch:
 
