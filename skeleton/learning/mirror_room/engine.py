@@ -22,7 +22,7 @@ from .contracts import (
 )
 from .curriculum import build_curriculum
 from .evaluation import ComparisonReport, PairedEvaluator
-from .integrity import SplitIntegrityReport, validate_split_integrity
+from .integrity import validate_split_integrity
 from .sandbox import MirrorSandbox, SandboxExecutor, SandboxUsage
 
 
@@ -230,14 +230,13 @@ class MirrorRoom:
         tuple[MirrorScenario, ...],
         tuple[MirrorScenario, ...],
         tuple[MirrorScenario, ...],
-        SplitIntegrityReport,
     ]:
         items = tuple(scenarios)
         if not items:
             raise MirrorRoomError("Mirror Room requires scenarios")
         if any(not isinstance(item, MirrorScenario) for item in items):
             raise MirrorRoomError("scenarios must contain MirrorScenario")
-        integrity = validate_split_integrity(items)
+        validate_split_integrity(items)
         ids = [item.scenario_id for item in items]
         if len(ids) != len(set(ids)):
             raise MirrorRoomError("scenario IDs must be globally unique")
@@ -265,7 +264,7 @@ class MirrorRoom:
             raise MirrorRoomError("validation split does not meet experiment minimum samples")
         if len(holdout) < min_samples:
             raise MirrorRoomError("holdout split does not meet experiment minimum samples")
-        return train, validation, holdout, integrity
+        return train, validation, holdout
 
     @staticmethod
     def _generator_identity(generator: CandidateGenerator) -> str:
@@ -337,7 +336,8 @@ class MirrorRoom:
             raise MirrorRoomError(
                 "candidate generator and sandbox evaluator must be independent"
             )
-        train, validation, holdout, split_integrity = self._partition(scenarios)
+        split_integrity = validate_split_integrity(scenarios)
+        train, validation, holdout = self._partition(scenarios)
         generation_limit = (
             self.spec.budget.max_generations if generations is None else generations
         )
