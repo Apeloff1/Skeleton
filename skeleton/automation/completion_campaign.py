@@ -189,6 +189,7 @@ def select_frontier(
         and item.get("target_team") == team
         and str(item.get("id", "")).strip()
     }
+    assignments = lane_assignments(plan_items, team)
     reverse: dict[str, set[str]] = {key: set() for key in rows}
     for item_id, item in rows.items():
         deps = item.get("dependencies", [])
@@ -236,20 +237,25 @@ def select_frontier(
         unlock = descendants(item_id)
         attempt_count = max(0, int(attempts.get(item_id, 0)))
         score = (-unlock, -priority, attempt_count, item_id)
-        eligible.append((score, dict(item)))
+        enriched = dict(item)
+        enriched["_campaign_lane"] = assignments.get(item_id, "")
+        eligible.append((score, enriched))
 
     eligible.sort(key=lambda row: row[0])
     selected: list[dict[str, Any]] = []
     used_roots: set[str] = set()
+    used_lanes: set[str] = set()
     remaining = eligible[:]
     # First pass favors independent top-level dependency lanes.
     for score, item in eligible:
         deps = item.get("dependencies", [])
         root = str(deps[0]) if isinstance(deps, list) and deps else str(item.get("id", ""))
-        if root in used_roots:
+        lane = str(item.get("_campaign_lane", ""))
+        if root in used_roots or lane in used_lanes:
             continue
         selected.append(item)
         used_roots.add(root)
+        used_lanes.add(lane)
         remaining.remove((score, item))
         if len(selected) >= limit:
             break
