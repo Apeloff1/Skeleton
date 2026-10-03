@@ -291,12 +291,13 @@ class DeferredExecutor:
                 "handler identity must match canonical capability handler"
             )
         candidate = _Handler(identity=identity, fn=handler)
-        prior = self._handlers.get(volume_id)
-        if prior is not None:
-            if prior.identity != candidate.identity or prior.fn is not handler:
-                raise ValueError("volume handler is already registered")
-            return
-        self._handlers[volume_id] = candidate
+        with self._lock:
+            prior = self._handlers.get(volume_id)
+            if prior is not None:
+                if prior.identity != candidate.identity or prior.fn is not handler:
+                    raise ValueError("volume handler is already registered")
+                return
+            self._handlers[volume_id] = candidate
 
     def set_budget(
         self,
@@ -320,9 +321,10 @@ class DeferredExecutor:
         ):
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
-        self._budgets[volume_id] = budget
-        self._payload_limits[volume_id] = max_payload_bytes
-        self._result_limits[volume_id] = max_result_bytes
+        with self._lock:
+            self._budgets[volume_id] = budget
+            self._payload_limits[volume_id] = max_payload_bytes
+            self._result_limits[volume_id] = max_result_bytes
 
     @staticmethod
     def digest_payload(payload: Mapping[str, Any]) -> str:
@@ -353,12 +355,13 @@ class DeferredExecutor:
         latency_ms: int = 0,
     ) -> DeferredInvocation:
         record = self.registry.get(volume_id)
-        if record.state != "enabled":
-            raise PermissionError(f"capability {volume_id} is not enabled")
-        if volume_id not in self._handlers:
-            raise PermissionError("no host-registered handler")
-        if volume_id not in self._budgets:
-            raise PermissionError("no explicit execution budget")
+        with self._lock:
+            if record.state != "enabled":
+                raise PermissionError(f"capability {volume_id} is not enabled")
+            if volume_id not in self._handlers:
+                raise PermissionError("no host-registered handler")
+            if volume_id not in self._budgets:
+                raise PermissionError("no explicit execution budget")
         return DeferredInvocation(
             operation_id=operation_id,
             volume_id=volume_id,
@@ -497,6 +500,10 @@ class DeferredExecutor:
                 "deferred capability execution failed",
                 failure,
             ) from exc
+        except BaseException:
+            with self._lock:
+                self._in_flight.discard(invocation.operation_id)
+            raise
 
         receipt = ExecutionReceipt(
             operation_id=invocation.operation_id,
