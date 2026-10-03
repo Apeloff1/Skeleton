@@ -757,6 +757,35 @@ def _runtime_lease_journal(
     admitted_at = float(lease.admitted_at)
     if not math.isfinite(admitted_at) or admitted_at < 0:
         raise CostGovernorError("runtime lease admitted_at is invalid")
+
+    pressure = lease.shared_pressure_lease
+    if pressure is not None:
+        for field_name in (
+            "lease_id",
+            "scope",
+            "operation_id",
+            "tenant_id",
+            "owner_id",
+        ):
+            _token(
+                "shared pressure " + field_name,
+                getattr(pressure, field_name),
+            )
+        if (
+            pressure.operation_id != lease.operation_id
+            or pressure.tenant_id != lease.tenant_id
+            or isinstance(pressure.priority, bool)
+            or not isinstance(pressure.priority, int)
+            or not 0 <= pressure.priority <= 1000
+            or not math.isfinite(float(pressure.acquired_at))
+            or float(pressure.acquired_at) < 0
+            or not math.isfinite(float(pressure.expires_at))
+            or float(pressure.expires_at) <= float(pressure.acquired_at)
+        ):
+            raise CostGovernorError(
+                "runtime shared pressure lease is invalid"
+            )
+
     return _RuntimeLeaseJournal(
         lease_id=_token("lease_id", lease.lease_id),
         decision_id=_token(
