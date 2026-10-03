@@ -28,6 +28,8 @@ from .studio_director import (
     _canonical_path,
     _git,
     _repo_manifest,
+    _discover_validation_commands,
+    _run_validation_commands,
 )
 from .studio_registry import STUDIO, STUDIO_SIZE, registry_fingerprint, select_cohort
 
@@ -480,6 +482,17 @@ def propose(
                     audit.emit("patch_rejected_by_git", task=plan_id, error=checked.stderr[-2000:])
                     continue
                 subprocess.run(["git", "apply", str(candidate)], check=True, timeout=20)
+                validation_commands = _discover_validation_commands(task.paths)
+                validation_ok, validation_output = _run_validation_commands(validation_commands)
+                if not validation_ok:
+                    audit.emit(
+                        "patch_rejected_by_validation",
+                        task=plan_id,
+                        commands=list(validation_commands),
+                        output=list(validation_output),
+                    )
+                    _git("reset", "--hard", "HEAD", check=False)
+                    continue
                 accepted += 1
                 audit.emit(
                     "patch_accepted",
@@ -494,6 +507,8 @@ def propose(
                     review_reasons=reviewed.review_reasons,
                     verification_reasons=reviewed.verification_reasons,
                     required_checks=reviewed.required_checks,
+                    executed_validation=list(validation_commands),
+                    validation_output=list(validation_output),
                     paths=list(task.paths),
                 )
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
