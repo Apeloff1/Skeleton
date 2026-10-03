@@ -54,7 +54,17 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
         and str(item.get("description", "")).strip()
         and item.get("status") not in {"done", "rejected"}
     ]
-    items.sort(key=lambda item: (-int(item.get("priority", 50) or 50), str(item.get("id"))))
+    def priority(item: Mapping[str, Any]) -> int:
+        try:
+            value = int(item.get("priority", 50) or 50)
+        except (TypeError, ValueError):
+            value = 50
+        return max(1, min(100, value))
+
+    ids = [str(item.get("id", "")).strip() for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValueError("canonical supervisor snapshot contains duplicate plan item ids")
+    items.sort(key=lambda item: (-priority(item), str(item.get("id"))))
     return items[:max_tasks], generation
 
 
