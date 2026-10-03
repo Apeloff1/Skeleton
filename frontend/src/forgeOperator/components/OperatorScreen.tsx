@@ -128,6 +128,11 @@ export default function OperatorScreen({ initialTab = null }: OperatorScreenProp
         loading: catalog.loading,
         error: catalog.error,
         onReload: catalog.reload,
+        onApplyAnswers: (cleaned) => {
+          const pinned = cleaned.era_explicit;
+          if (pinned) setEra(pinned);
+          setTab('compose');
+        },
       }}
       report={{
         payload: run.enginePayload,
