@@ -22,3 +22,16 @@ class CIEvidence:
   return all(g.status=="completed" and g.conclusion in SUCCESS for g in self.gates if g.name in self.required)
  def digest(self):
   self.validate(); return hashlib.sha256(json.dumps(asdict(self),sort_keys=True,separators=(",",":")).encode()).hexdigest()
+
+def from_workflow_runs(head_sha:str,runs,required:tuple[str,...])->CIEvidence:
+ latest={}
+ for raw in runs:
+  name=str(raw.get("name",""))
+  if not name:continue
+  run_id=int(raw.get("id",0) or 0)
+  previous=latest.get(name)
+  if previous is None or run_id>previous.run_id:
+   latest[name]=Gate(name,str(raw.get("status","")),raw.get("conclusion"),run_id)
+ evidence=CIEvidence(head_sha,tuple(latest[k] for k in sorted(latest)),required)
+ evidence.validate()
+ return evidence
