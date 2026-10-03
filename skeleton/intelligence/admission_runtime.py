@@ -714,6 +714,65 @@ class AdmissionRuntime:
             self.metrics_registry.inc("admission.reattached_total")
             return lease
 
+    def settle_shared_pressure_recovery(
+        self,
+        lease: SharedPressureLease | None,
+        *,
+        now_wall: float | None = None,
+    ) -> SharedPressureLease | None:
+        """Release exact durable pressure authority during terminal recovery."""
+
+        ledger = self.shared_pressure_ledger
+        owner = self.shared_pressure_owner_id
+        scope = self.shared_pressure_scope
+        if lease is None:
+            if ledger is None:
+                return None
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_metadata_missing"
+            )
+        if ledger is None or owner is None or scope is None:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_runtime_missing"
+            )
+        if (
+            lease.scope != scope
+            or lease.owner_id != owner
+        ):
+            raise AdmissionRuntimeConflict(
+                "shared pressure recovery lease identity does not match runtime"
+            )
+        finder = getattr(ledger, "lease_for_operation", None)
+        if not callable(finder):
+            raise AdmissionRuntimeError(
+                "shared pressure ledger does not support durable lease lookup"
+            )
+        try:
+            persisted = finder(
+                scope,
+                lease.operation_id,
+                now=_wall_time(now_wall, field="now_wall"),
+            )
+        except SharedPressureError as exc:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_lookup_failed"
+            ) from exc
+        if persisted is None:
+            # Expiry/reaping is already a terminal release of shared capacity.
+            return None
+        if persisted != lease:
+            raise AdmissionRuntimeConflict(
+                "shared pressure recovery lease does not match durable ledger"
+            )
+        try:
+            return ledger.release(lease.lease_id, owner)
+        except SharedPressureConflict as exc:
+            raise AdmissionRuntimeConflict(str(exc)) from exc
+        except SharedPressureError as exc:
+            raise AdmissionRuntimeError(
+                "shared_pressure_recovery_release_failed"
+            ) from exc
+
     def _release_shared_pressure(
         self,
         lease: SharedPressureLease,
