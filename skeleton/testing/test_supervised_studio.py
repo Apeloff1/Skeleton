@@ -705,3 +705,55 @@ def test_verify_execution_receipt_rejects_forged_replay_key():
     ).hexdigest()
     with pytest.raises(ValueError, match="replay key mismatch"):
         supervised_studio.verify_execution_receipt(receipt)
+
+
+def test_canonical_items_rejects_tampered_frontier_allocation(tmp_path):
+    state = {
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "gen",
+            "plan_digest_sha256": "a" * 64,
+            "plan_items": [],
+            "allocation": {
+                "schema": "autonomous-studio.frontier-allocation.v1",
+                "generation_id": "gen",
+                "plan_digest_sha256": "a" * 64,
+                "authorized_plan_ids": [],
+                "allocation_sha256": "f" * 64,
+            },
+        }
+    }
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="allocation digest mismatch"):
+        supervised_studio._canonical_items(path, 1)
+
+
+def test_canonical_items_rejects_allocation_authorization_mismatch(tmp_path):
+    allocation = {
+        "schema": "autonomous-studio.frontier-allocation.v1",
+        "campaign_id": "campaign",
+        "campaign_epoch": 1,
+        "generation_id": "gen",
+        "plan_digest_sha256": "a" * 64,
+        "frontier_sha256": "b" * 64,
+        "authorized_plan_ids": ["different"],
+    }
+    allocation["allocation_sha256"] = hashlib.sha256(
+        json.dumps(allocation, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    state = {
+        "_shift_supervisor": {
+            "status": "loaded",
+            "team": "night",
+            "generation_id": "gen",
+            "plan_digest_sha256": "a" * 64,
+            "plan_items": [{"id": "actual", "title": "A", "description": "D", "status": "queued"}],
+            "allocation": allocation,
+        }
+    }
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match executable plan"):
+        supervised_studio._canonical_items(path, 1)
