@@ -329,25 +329,26 @@ class CostReservation:
                 "non-fallback reservation cannot carry fallback metadata"
             )
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "requested_capability": self.requested_capability,
+            "selected_capability": self.selected_capability,
+            "requested_request_digest": self.requested_request_digest,
+            "selected_request_digest": self.selected_request_digest,
+            "admission_decision_id": self.admission_decision_id,
+            "lease_id": self.lease_id,
+            "quota_reservation_digest": self.quota_reservation_digest,
+            "selected_estimate_digest": self.selected_estimate_digest,
+            "fallback_used": self.fallback_used,
+            "fallback_id": self.fallback_id,
+            "fallback_reason": self.fallback_reason,
+        }
+
     @property
     def digest(self) -> str:
-        return _canonical_digest(
-            {
-                "operation_id": self.operation_id,
-                "tenant_id": self.tenant_id,
-                "requested_capability": self.requested_capability,
-                "selected_capability": self.selected_capability,
-                "requested_request_digest": self.requested_request_digest,
-                "selected_request_digest": self.selected_request_digest,
-                "admission_decision_id": self.admission_decision_id,
-                "lease_id": self.lease_id,
-                "quota_reservation_digest": self.quota_reservation_digest,
-                "selected_estimate_digest": self.selected_estimate_digest,
-                "fallback_used": self.fallback_used,
-                "fallback_id": self.fallback_id,
-                "fallback_reason": self.fallback_reason,
-            }
-        )
+        return _canonical_digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,21 +484,348 @@ class CostDecision:
                 "cost governor has no promotion authority"
             )
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "state": self.state,
+            "reservation_digest": self.reservation_digest,
+            "completion_digest": self.completion_digest,
+            "accounting_decision_digest": self.accounting_decision_digest,
+            "accepted": self.accepted,
+            "reasons": list(self.reasons),
+            "promotion_authority": False,
+        }
+
     @property
     def digest(self) -> str:
-        return _canonical_digest(
-            {
-                "operation_id": self.operation_id,
-                "tenant_id": self.tenant_id,
-                "state": self.state,
-                "reservation_digest": self.reservation_digest,
-                "completion_digest": self.completion_digest,
-                "accounting_decision_digest": self.accounting_decision_digest,
-                "accepted": self.accepted,
-                "reasons": list(self.reasons),
-                "promotion_authority": False,
-            }
+        return _canonical_digest(self.as_dict())
+
+
+def _quota_usage_from_payload(value: object) -> QuotaUsage:
+    if not isinstance(value, dict):
+        raise CostGovernorError("quota usage journal payload is invalid")
+    try:
+        return QuotaUsage(
+            operations=int(value["operations"]),
+            input_tokens=int(value["input_tokens"]),
+            output_tokens=int(value["output_tokens"]),
+            cost_usd=float(value["cost_usd"]),
+            tool_calls=int(value["tool_calls"]),
+            artifact_bytes=int(value["artifact_bytes"]),
+            storage_bytes=int(value["storage_bytes"]),
         )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "quota usage journal payload is invalid"
+        ) from exc
+
+
+def _quota_reservation_from_payload(value: object) -> QuotaReservation:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "quota reservation journal payload is invalid"
+        )
+    try:
+        return QuotaReservation(
+            reservation_id=str(value["reservation_id"]),
+            tenant_id=str(value["tenant_id"]),
+            window_id=str(value["window_id"]),
+            operation_id=str(value["operation_id"]),
+            estimate=_quota_usage_from_payload(value["estimate"]),
+            reserved_at=float(value["reserved_at"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "quota reservation journal payload is invalid"
+        ) from exc
+
+
+def _cost_reservation_from_payload(value: object) -> CostReservation:
+    if not isinstance(value, dict):
+        raise CostGovernorError("cost reservation journal payload is invalid")
+    try:
+        return CostReservation(
+            operation_id=value["operation_id"],
+            tenant_id=value["tenant_id"],
+            requested_capability=value["requested_capability"],
+            selected_capability=value["selected_capability"],
+            requested_request_digest=value["requested_request_digest"],
+            selected_request_digest=value["selected_request_digest"],
+            admission_decision_id=value["admission_decision_id"],
+            lease_id=value["lease_id"],
+            quota_reservation_digest=value.get("quota_reservation_digest"),
+            selected_estimate_digest=value["selected_estimate_digest"],
+            fallback_used=value["fallback_used"],
+            fallback_id=value.get("fallback_id"),
+            fallback_reason=value.get("fallback_reason"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "cost reservation journal payload is invalid"
+        ) from exc
+
+
+def _cost_decision_from_payload(value: object) -> CostDecision:
+    if not isinstance(value, dict):
+        raise CostGovernorError("cost decision journal payload is invalid")
+    try:
+        return CostDecision(
+            operation_id=value["operation_id"],
+            tenant_id=value["tenant_id"],
+            state=value["state"],
+            reservation_digest=value["reservation_digest"],
+            completion_digest=value.get("completion_digest"),
+            accounting_decision_digest=value.get(
+                "accounting_decision_digest"
+            ),
+            accepted=value["accepted"],
+            reasons=tuple(value["reasons"]),
+            promotion_authority=value.get(
+                "promotion_authority",
+                False,
+            ),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "cost decision journal payload is invalid"
+        ) from exc
+
+
+def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
+    return _canonical_digest(
+        [
+            {
+                "source": item.source,
+                "digest": item.digest,
+                "category": item.category,
+            }
+            for item in refs
+        ]
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _CostJournalRecord:
+    operation_id: str
+    tenant_id: str
+    requested_request_digest: str
+    reservation: CostReservation
+    quota_reservation: QuotaReservation
+    state: str
+    terminal: CostDecision | None
+    evidence_digest: str | None
+
+
+class _SqliteCostGovernorJournal:
+    """Durable metadata journal; spend authority stays in quota tables."""
+
+    _SCHEMA = """
+    CREATE TABLE IF NOT EXISTS cost_governor_journal (
+        operation_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        requested_request_digest TEXT NOT NULL,
+        reservation_json TEXT NOT NULL,
+        quota_reservation_json TEXT NOT NULL,
+        state TEXT NOT NULL,
+        terminal_json TEXT,
+        evidence_digest TEXT,
+        CHECK (state IN ('active', 'completed', 'released_unspent'))
+    );
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        with self._connect() as conn:
+            conn.execute(self._SCHEMA)
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.path), isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 10000")
+        return conn
+
+    @staticmethod
+    def _decode_json(raw: object, field: str) -> dict[str, Any]:
+        if not isinstance(raw, str):
+            raise CostGovernorError(f"{field} journal value is invalid")
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise CostGovernorError(
+                f"{field} journal value is invalid"
+            ) from exc
+        if not isinstance(value, dict):
+            raise CostGovernorError(f"{field} journal value is invalid")
+        return value
+
+    @classmethod
+    def _record(cls, row: sqlite3.Row) -> _CostJournalRecord:
+        terminal = (
+            None
+            if row["terminal_json"] is None
+            else _cost_decision_from_payload(
+                cls._decode_json(row["terminal_json"], "terminal")
+            )
+        )
+        return _CostJournalRecord(
+            operation_id=str(row["operation_id"]),
+            tenant_id=str(row["tenant_id"]),
+            requested_request_digest=str(
+                row["requested_request_digest"]
+            ),
+            reservation=_cost_reservation_from_payload(
+                cls._decode_json(row["reservation_json"], "reservation")
+            ),
+            quota_reservation=_quota_reservation_from_payload(
+                cls._decode_json(
+                    row["quota_reservation_json"],
+                    "quota_reservation",
+                )
+            ),
+            state=str(row["state"]),
+            terminal=terminal,
+            evidence_digest=(
+                None
+                if row["evidence_digest"] is None
+                else str(row["evidence_digest"])
+            ),
+        )
+
+    def load(self, operation_id: str) -> _CostJournalRecord | None:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM cost_governor_journal
+                WHERE operation_id = ?
+                """,
+                (operation,),
+            ).fetchone()
+        return None if row is None else self._record(row)
+
+    def record_active(
+        self,
+        *,
+        requested_request_digest: str,
+        reservation: CostReservation,
+        quota_reservation: QuotaReservation,
+    ) -> _CostJournalRecord:
+        requested = _sha256(
+            "requested_request_digest",
+            requested_request_digest,
+        )
+        reservation_json = _canonical_json_text(reservation.as_dict())
+        quota_json = _canonical_json_text(quota_reservation.as_dict())
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (reservation.operation_id,),
+                ).fetchone()
+                if row is None:
+                    conn.execute(
+                        """
+                        INSERT INTO cost_governor_journal (
+                            operation_id, tenant_id,
+                            requested_request_digest,
+                            reservation_json, quota_reservation_json,
+                            state, terminal_json, evidence_digest
+                        ) VALUES (?, ?, ?, ?, ?, 'active', NULL, NULL)
+                        """,
+                        (
+                            reservation.operation_id,
+                            reservation.tenant_id,
+                            requested,
+                            reservation_json,
+                            quota_json,
+                        ),
+                    )
+                else:
+                    existing = self._record(row)
+                    if existing.state != "active":
+                        raise CostGovernorConflict(
+                            "operation already has terminal cost journal state"
+                        )
+                    if (
+                        existing.requested_request_digest != requested
+                        or existing.reservation != reservation
+                        or existing.quota_reservation != quota_reservation
+                    ):
+                        raise CostGovernorConflict(
+                            "active cost journal replayed with different inputs"
+                        )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(reservation.operation_id)
+        if loaded is None:
+            raise CostGovernorError("cost journal active write was lost")
+        return loaded
+
+    def record_terminal(
+        self,
+        decision: CostDecision,
+        *,
+        evidence_digest: str | None,
+    ) -> _CostJournalRecord:
+        evidence = (
+            None
+            if evidence_digest is None
+            else _sha256("evidence_digest", evidence_digest)
+        )
+        terminal_json = _canonical_json_text(decision.as_dict())
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT * FROM cost_governor_journal
+                    WHERE operation_id = ?
+                    """,
+                    (decision.operation_id,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "terminal cost journal requires active reservation"
+                    )
+                existing = self._record(row)
+                if existing.state == "active":
+                    conn.execute(
+                        """
+                        UPDATE cost_governor_journal
+                        SET state = ?, terminal_json = ?,
+                            evidence_digest = ?
+                        WHERE operation_id = ?
+                        """,
+                        (
+                            decision.state,
+                            terminal_json,
+                            evidence,
+                            decision.operation_id,
+                        ),
+                    )
+                elif (
+                    existing.state != decision.state
+                    or existing.terminal != decision
+                    or existing.evidence_digest != evidence
+                ):
+                    raise CostGovernorConflict(
+                        "terminal cost journal replayed with different inputs"
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load(decision.operation_id)
+        if loaded is None:
+            raise CostGovernorError("cost journal terminal write was lost")
+        return loaded
 
 
 @dataclass(slots=True)
