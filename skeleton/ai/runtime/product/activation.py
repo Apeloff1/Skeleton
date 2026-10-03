@@ -714,22 +714,39 @@ def local_model_adapter_from_activation_manifest(
     path: str | Path,
     *,
     expected_manifest_digest: str,
+    target: str = "candidate",
 ) -> LocalModelAdapter:
-    """Build the local provider adapter only after activation verification."""
+    """Build a digest-pinned candidate or rollback adapter.
+
+    Target selection is operator-controlled. The activation manifest itself
+    authenticates both artifacts, so rollback never depends on a mutable loose
+    path and does not grant the learning process production mutation authority.
+    """
 
     loaded = load_local_model_activation_manifest(
         path,
         expected_manifest_digest=expected_manifest_digest,
     )
+    selected_target = _text(target, "activation target", maximum=32).lower()
+    if selected_target not in {"candidate", "rollback"}:
+        raise LocalModelActivationError(
+            "activation target must be candidate or rollback"
+        )
+    selected = (
+        loaded.candidate
+        if selected_target == "candidate"
+        else loaded.baseline
+    )
     adapter = LocalModelAdapter(
         LocalInferenceEngine(
-            loaded.candidate.model,  # type: ignore[arg-type]
+            selected.model,  # type: ignore[arg-type]
             cache_size=loaded.manifest.cache_size,
         ),
         default_seed=loaded.manifest.default_seed,
     )
-    adapter.artifact_receipt = loaded.candidate.receipt
+    adapter.artifact_receipt = selected.receipt
     adapter.activation_manifest = loaded.manifest
+    adapter.activation_target = selected_target
     return adapter
 
 
