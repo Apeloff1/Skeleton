@@ -452,6 +452,31 @@ jobs:
             echo '- Canonical plan and final patch bound by execution receipt: yes'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Request bounded continuation
+        if: >-
+          success() &&
+          steps.proposal.outputs.has_patch == 'true' &&
+          steps.validation.outcome == 'success' &&
+          (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Do not self-loop inside one hosted job. The next finite run is
+          # requested only after validated work was published, so the canonical
+          # supervisor can retire completed IDs and expose newly unblocked work.
+          active=$(gh run list --repo "$REPO" --workflow autonomous-studio.yml --status queued --limit 20 --json databaseId --jq 'length')
+          in_progress=$(gh run list --repo "$REPO" --workflow autonomous-studio.yml --status in_progress --limit 20 --json databaseId --jq '[.[] | select((.databaseId|tostring) != env.CURRENT_RUN_ID)] | length')
+          if (( active == 0 && in_progress == 0 )); then
+            gh workflow run autonomous-studio.yml --repo "$REPO" -f max_tasks=2 -f cohort_size=15 -f dry_run=false
+            echo 'Bounded continuation requested after validated publication.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Continuation already queued/in progress; duplicate dispatch suppressed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Summarize Autonomous Studio run
         if: always()
         shell: bash
