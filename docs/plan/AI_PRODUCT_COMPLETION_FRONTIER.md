@@ -281,7 +281,10 @@ The recurrent trainer now removes avoidable inner-loop work: multi-method
 corpora are compiled in memory, gradient buffers are reused, embedding updates
 are sparse by touched token row, epoch loss is collected from the existing
 forward pass, and the multi-method builder uses bounded early stopping when
-improvement plateaus. Exact artifact validation and candidate-only promotion
+improvement plateaus. Multi-method training also accumulates gradients across
+four documents by default, reducing optimizer-update overhead while plain
+corpus training keeps one-document updates for compatibility. Receipts expose
+the accumulation factor and exact optimizer-step count. Exact artifact validation and candidate-only promotion
 semantics remain unchanged.
 
 ### 19. Adaptive training allocation and qualification evidence
