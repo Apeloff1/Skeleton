@@ -1,4 +1,11 @@
-"""Offline builder for content-addressed local recurrent model artifacts."""
+"""Offline builders for content-addressed local recurrent model artifacts.
+
+The base builder accepts plain UTF-8 corpora.  The multi-method builder accepts
+structured TrainingExample values, compiles them through the deterministic
+training-method planner, and trains the exact same local recurrent backend.
+
+Both paths converge on one atomic artifact writer and one model identity.
+"""
 
 from __future__ import annotations
 
@@ -7,15 +14,26 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from .artifact import load_local_model_artifact
 from .neural import NumpyRecurrentLM
+from .training_methods import (
+    DEFAULT_TEXT_METHODS,
+    MethodWeight,
+    MultiMethodTrainingPlan,
+    TrainingEfficiencyPolicy,
+    TrainingExample,
+    TrainingMethod,
+    TrainingMethodError,
+    compile_training_plan,
+)
 
 
 _MAX_CORPUS_FILES = 1_024
 _MAX_CORPUS_FILE_BYTES = 16 * 1024 * 1024
 _MAX_CORPUS_TOTAL_BYTES = 128 * 1024 * 1024
+_MAX_LOCAL_TRAINING_DOCUMENTS = 4_096
 
 
 class LocalModelBuildError(RuntimeError):
@@ -68,8 +86,6 @@ def _read_corpus(paths: Sequence[str | Path]) -> tuple[str, ...]:
             raise LocalModelBuildError(
                 f"corpus file contains no text: {raw}"
             )
-        # Blank-line blocks are independent training documents. This keeps
-        # unrelated files/sections from being concatenated into false sequences.
         blocks = tuple(
             block.strip()
             for block in text.replace("\r\n", "\n").split("\n\n")
@@ -98,24 +114,38 @@ def _stable_json_bytes(payload: object) -> bytes:
     return text.encode("utf-8")
 
 
-def build_recurrent_artifact(
+def _train_and_write(
     *,
-    corpus_paths: Sequence[str | Path],
+    documents: Sequence[str],
     output_path: str | Path,
     model_id: str,
-    hidden_size: int = 32,
-    epochs: int = 4,
-    learning_rate: float = 0.05,
-    max_vocab: int = 4_096,
-    max_document_tokens: int = 1_024,
-    seed: int = 0,
-    temperature: float = 0.8,
+    hidden_size: int,
+    epochs: int,
+    learning_rate: float,
+    max_vocab: int,
+    max_document_tokens: int,
+    seed: int,
+    temperature: float,
+    extra_receipt: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Train, atomically write, reload, and attest one recurrent artifact."""
+    """Train one model and atomically promote only verified bytes."""
 
-    documents = _read_corpus(corpus_paths)
+    rows = tuple(documents)
+    if not rows:
+        raise LocalModelBuildError(
+            "training documents must be non-empty"
+        )
+    if len(rows) > _MAX_LOCAL_TRAINING_DOCUMENTS:
+        raise LocalModelBuildError(
+            "training document count exceeds local backend hard bound"
+        )
+    if any(not isinstance(item, str) or not item.strip() for item in rows):
+        raise LocalModelBuildError(
+            "training documents must contain non-empty text"
+        )
+
     model = NumpyRecurrentLM.train(
-        documents,
+        rows,
         model_id=model_id,
         hidden_size=hidden_size,
         epochs=epochs,
@@ -152,7 +182,6 @@ def build_recurrent_artifact(
             temp_path = Path(handle.name)
 
         os.chmod(temp_path, 0o600)
-        # Validate the exact bytes that will be promoted before replacement.
         loaded = load_local_model_artifact(temp_path)
         if (
             loaded.receipt.model_id != model.model_id
@@ -164,10 +193,7 @@ def build_recurrent_artifact(
         os.replace(temp_path, destination)
         temp_path = None
         try:
-            directory_fd = os.open(
-                str(parent),
-                os.O_RDONLY,
-            )
+            directory_fd = os.open(str(parent), os.O_RDONLY)
         except OSError:
             directory_fd = None
         if directory_fd is not None:
@@ -181,15 +207,23 @@ def build_recurrent_artifact(
             raise LocalModelBuildError(
                 "promoted artifact identity changed after atomic replace"
             )
-        return {
+        receipt: dict[str, object] = {
             **final.receipt.as_dict(),
             "output_path": str(destination.resolve()),
-            "training_documents": len(documents),
+            "training_documents": len(rows),
             "hidden_size": model.hidden_size,
             "vocab_size": model.vocab_size,
             "epochs": int(epochs),
             "seed": int(seed),
         }
+        if extra_receipt:
+            for key, value in extra_receipt.items():
+                if key in receipt:
+                    raise LocalModelBuildError(
+                        "extra receipt cannot replace canonical field"
+                    )
+                receipt[str(key)] = value
+        return receipt
     except OSError as exc:
         raise LocalModelBuildError(
             "model artifact could not be written atomically"
@@ -200,6 +234,88 @@ def build_recurrent_artifact(
                 temp_path.unlink(missing_ok=True)
             except OSError:
                 pass
+
+
+def build_recurrent_artifact(
+    *,
+    corpus_paths: Sequence[str | Path],
+    output_path: str | Path,
+    model_id: str,
+    hidden_size: int = 32,
+    epochs: int = 4,
+    learning_rate: float = 0.05,
+    max_vocab: int = 4_096,
+    max_document_tokens: int = 1_024,
+    seed: int = 0,
+    temperature: float = 0.8,
+) -> dict[str, object]:
+    """Train, atomically write, reload, and attest one recurrent artifact."""
+
+    documents = _read_corpus(corpus_paths)
+    return _train_and_write(
+        documents=documents,
+        output_path=output_path,
+        model_id=model_id,
+        hidden_size=hidden_size,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        max_vocab=max_vocab,
+        max_document_tokens=max_document_tokens,
+        seed=seed,
+        temperature=temperature,
+        extra_receipt={"training_mode": "plain_corpus"},
+    )
+
+
+def build_multi_method_recurrent_artifact(
+    *,
+    examples: Sequence[TrainingExample],
+    output_path: str | Path,
+    model_id: str,
+    methods: Sequence[TrainingMethod | MethodWeight] = DEFAULT_TEXT_METHODS,
+    efficiency_policy: TrainingEfficiencyPolicy | None = None,
+    hidden_size: int = 32,
+    epochs: int = 4,
+    learning_rate: float = 0.05,
+    max_vocab: int = 4_096,
+    max_document_tokens: int = 1_024,
+    seed: int = 0,
+    temperature: float = 0.8,
+) -> dict[str, object]:
+    """Compile multiple learning families and train one bounded local artifact."""
+
+    try:
+        plan: MultiMethodTrainingPlan = compile_training_plan(
+            examples,
+            methods=methods,
+            policy=efficiency_policy,
+        )
+    except TrainingMethodError as exc:
+        raise LocalModelBuildError(
+            "multi-method training plan could not be compiled"
+        ) from exc
+
+    if len(plan.documents) > _MAX_LOCAL_TRAINING_DOCUMENTS:
+        raise LocalModelBuildError(
+            "multi-method plan exceeds local backend document limit"
+        )
+
+    return _train_and_write(
+        documents=plan.corpus,
+        output_path=output_path,
+        model_id=model_id,
+        hidden_size=hidden_size,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        max_vocab=max_vocab,
+        max_document_tokens=max_document_tokens,
+        seed=seed,
+        temperature=temperature,
+        extra_receipt={
+            "training_mode": "multi_method",
+            "training_plan": plan.as_dict(),
+        },
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -222,45 +338,14 @@ def _parser() -> argparse.ArgumentParser:
         required=True,
         help="Destination JSON artifact path",
     )
-    parser.add_argument(
-        "--model-id",
-        default="skeleton-local-rnn",
-    )
-    parser.add_argument(
-        "--hidden-size",
-        type=int,
-        default=32,
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=4,
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-        default=0.05,
-    )
-    parser.add_argument(
-        "--max-vocab",
-        type=int,
-        default=4_096,
-    )
-    parser.add_argument(
-        "--max-document-tokens",
-        type=int,
-        default=1_024,
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.8,
-    )
+    parser.add_argument("--model-id", default="skeleton-local-rnn")
+    parser.add_argument("--hidden-size", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=4)
+    parser.add_argument("--learning-rate", type=float, default=0.05)
+    parser.add_argument("--max-vocab", type=int, default=4_096)
+    parser.add_argument("--max-document-tokens", type=int, default=1_024)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--temperature", type=float, default=0.8)
     return parser
 
 
@@ -296,6 +381,7 @@ if __name__ == "__main__":
 
 __all__ = [
     "LocalModelBuildError",
+    "build_multi_method_recurrent_artifact",
     "build_recurrent_artifact",
     "main",
 ]
