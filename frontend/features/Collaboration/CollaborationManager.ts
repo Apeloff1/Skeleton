@@ -65,6 +65,25 @@ const COLLABORATOR_COLORS = [
   '#8B5CF6', '#EC4899', '#2563EB', '#84CC16',
 ];
 
+let collaborationIdSequence = 0;
+
+function createCollaborationId(prefix: string): string {
+  const cryptoObject = (globalThis as any).crypto;
+  if (cryptoObject && typeof cryptoObject.randomUUID === 'function') {
+    return `${prefix}-${cryptoObject.randomUUID()}`;
+  }
+  collaborationIdSequence += 1;
+  return `${prefix}-${Date.now().toString(36)}-${collaborationIdSequence.toString(36)}`;
+}
+
+function stableColorIndex(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash * 31) + value.charCodeAt(index)) >>> 0;
+  }
+  return hash % COLLABORATOR_COLORS.length;
+}
+
 // ============================================================================
 // COLLABORATION MANAGER CLASS (Lightweight Stub)
 // ============================================================================
@@ -85,14 +104,14 @@ export class CollaborationManager {
   constructor() {
     this.userId = this.generateUserId();
     this.userName = 'Anonymous';
-    this.userColor = COLLABORATOR_COLORS[Math.floor(Math.random() * COLLABORATOR_COLORS.length)];
+    this.userColor = COLLABORATOR_COLORS[stableColorIndex(this.userId)];
   }
 
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
   private generateUserId(): string {
-    return `user-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`;
+    return createCollaborationId('user');
   }
 
   setUserInfo(name: string, color?: string): void {
@@ -104,7 +123,7 @@ export class CollaborationManager {
   // SESSION MANAGEMENT
   // ============================================================================
   async createSession(name: string, initialCode: string = '', language: string = 'python'): Promise<string> {
-    const sessionId = `codedock-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+    const sessionId = createCollaborationId('codedock');
     await this.joinSession(sessionId, name, initialCode, language);
     return sessionId;
   }
@@ -180,7 +199,7 @@ export class CollaborationManager {
   // ============================================================================
   sendMessage(content: string, type: ChatMessage['type'] = 'message'): void {
     const message: ChatMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: createCollaborationId('msg'),
       authorId: this.userId,
       authorName: this.userName,
       content,
