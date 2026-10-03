@@ -571,6 +571,15 @@ class ModelLifecycleRegistry:
             deployment_authority_id,
             "deployment_authority_id",
         )
+        forbidden = {
+            record.bridged.training_receipt.trainer_id,
+            record.validation_verifier_id,
+            record.promotion_verifier_id,
+        }
+        if authority in forbidden:
+            raise ModelLifecycleError(
+                "rollback authority must be independent of training and verification"
+            )
         receipt = self._next_receipt(
             record,
             bridged=record.bridged,
