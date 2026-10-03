@@ -4887,7 +4887,7 @@
       "source": "skeleton/storage",
       "destination": "skeleton/ai/runtime/storage",
       "kind": "tree",
-      "source_git_object_sha": "b83e3c83ef04a87e71c82a9fd7c6df2a37668db8",
+      "source_git_object_sha": "d1f46cc03da625048f00cc653856b030fa2eed79",
       "role": "governed content addressing, cache identity, and durable saga compensation state",
       "work_package_refs": [
         "WP-W03",
@@ -6008,6 +6008,11 @@
       "head_sha": "299c7ed0b2aa0bf767b9adacd51f7e4cb1e672e1",
       "refreshed_mapping_count": 11,
       "policy": "Current-main semantic mapping metadata preserved; #2441 readiness/version corrections merged and all source identities recomputed against the reconciled repair tree."
+    },
+    "p3t2_storage_compensation_recovery": {
+      "base_storage_head_sha": "eff5e6952834c8cd86a57eed5975b476a9302b88",
+      "refreshed_source_tree_sha": "d1f46cc03da625048f00cc653856b030fa2eed79",
+      "policy": "Persisted compensation payloads are recoverable only while a saga is compensating and are returned in reverse applied-effect order; canonical and AI-runtime storage mirrors remain byte-identical."
     }
   }
 }

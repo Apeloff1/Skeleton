@@ -641,6 +641,17 @@ class GovernedContentCache:
 
 
 @dataclass(frozen=True, slots=True)
+class CompensationAction:
+    """Executable recovery material for one applied saga effect."""
+
+    index: int
+    name: str
+    compensation_ref: str
+    compensation_payload: bytes
+    effect_receipt: str
+
+
+@dataclass(frozen=True, slots=True)
 class SagaStepSnapshot:
     index: int
     name: str
@@ -799,6 +810,41 @@ class DurableSagaStateStore:
             if updated != 1:
                 raise StorageContractError("saga cannot enter compensation")
 
+    def pending_compensations(self, *, saga_id: str) -> tuple[CompensationAction, ...]:
+        """Return outstanding compensation work in reverse effect order."""
+        sid = _text(saga_id, "saga_id")
+        with self._lock:
+            saga = self._db.execute(
+                "SELECT state FROM durable_saga WHERE saga_id = ?",
+                (sid,),
+            ).fetchone()
+            if saga is None:
+                raise KeyError("saga not found")
+            if saga["state"] != "compensating":
+                raise StorageContractError(
+                    "pending compensations are available only while saga is compensating"
+                )
+            rows = self._db.execute(
+                """
+                SELECT step_index, step_name, compensation_ref,
+                       compensation_payload, effect_receipt
+                FROM durable_saga_step
+                WHERE saga_id = ? AND state = 'applied'
+                ORDER BY step_index DESC
+                """,
+                (sid,),
+            ).fetchall()
+        return tuple(
+            CompensationAction(
+                index=int(row["step_index"]),
+                name=row["step_name"],
+                compensation_ref=row["compensation_ref"],
+                compensation_payload=bytes(row["compensation_payload"]),
+                effect_receipt=row["effect_receipt"],
+            )
+            for row in rows
+        )
+
     def mark_compensated(self, *, saga_id: str, index: int) -> None:
         sid = _text(saga_id, "saga_id")
         with self._lock, self._db:
@@ -916,6 +962,7 @@ __all__ = [
     "CacheEntry",
     "CacheKey",
     "CachePolicy",
+    "CompensationAction",
     "ContentDigest",
     "DigestPolicy",
     "DurableSagaStateStore",
