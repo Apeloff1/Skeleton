@@ -509,8 +509,10 @@ def _relationship_summary(
     target = nodes[edge.target]
     positive, negative = _EDGE_VERBS[edge.kind]
     verb = positive if added else negative
+    source_phrase = _entity_phrase(source.kind, source.label)
+    source_phrase = source_phrase[:1].upper() + source_phrase[1:]
     return (
-        f'{_entity_phrase(source.kind, source.label).capitalize()} '
+        f'{source_phrase} '
         f'{verb} {_entity_phrase(target.kind, target.label)}.'
     )
 
