@@ -22494,10 +22494,10 @@
     "accountability_authority": "machine/ai_build_accountability.json",
     "baseline_git_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0",
     "queue_snapshot": {
-      "done": 1,
-      "evidence_pending": 6,
-      "in_progress": 1,
-      "pending": 34,
+      "done": 42,
+      "evidence_pending": 0,
+      "in_progress": 0,
+      "pending": 0,
       "total": 42
     },
     "wave_order": [
