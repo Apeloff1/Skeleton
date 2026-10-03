@@ -34,6 +34,7 @@ from .offline import OfflineProvider
 from .provider import BaseProvider, CallContext, HealthStatus, Provider, ProviderInfo
 from .registry import ProviderRegistry, SelectionPolicy
 from .retry import NO_RETRY, Jitter, RetryPolicy
+from .tool_loop import LoopResult, ToolLoop, ToolLoopConfig
 from .tools import FunctionTool, ToolAdapter, ToolContext, ToolExecutor, ToolExecutorConfig, ToolRegistry, tool
 from .types import (
     ChatRequest,
@@ -77,6 +78,7 @@ __all__ = [
     "InvalidRequestError",
     "Jitter",
     "ManualClock",
+    "LoopResult",
     "Message",
     "MetricsRecorder",
     "ModelClient",
@@ -101,6 +103,8 @@ __all__ = [
     "StreamAccumulator",
     "StreamChunk",
     "ToolAdapter",
+    "ToolLoop",
+    "ToolLoopConfig",
     "ToolAuthorization",
     "ToolContext",
     "ToolExecutor",
