@@ -1,6 +1,7 @@
 import base64
 import gzip
 import json
+import hashlib
 from datetime import datetime, timezone
 
 import pytest
@@ -264,3 +265,21 @@ def test_prepare_state_replaces_state_atomically(tmp_path):
     assert payload["_shift_supervisor"]["team"] == "night"
     assert summary_path.read_text(encoding="utf-8").startswith("## Shift supervisor")
     assert list(tmp_path.glob(".repo-state.json.*.tmp")) == []
+
+
+def test_consumer_binds_loaded_plan_to_sha256_digest():
+    state, _ = consume_plan(
+        _state(),
+        team="night",
+        now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+    )
+    supervisor = state["_shift_supervisor"]
+    expected = hashlib.sha256(
+        json.dumps(
+            supervisor["plan_items"],
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+    assert supervisor["plan_digest_sha256"] == expected
