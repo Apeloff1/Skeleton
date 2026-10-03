@@ -40,7 +40,7 @@ def make_plan(req: PlanReq) -> dict:
             game_ctx=req.game_ctx,
         )
     except ValueError as ex:
-        raise HTTPException(400, str(ex))
+        raise HTTPException(400, "invalid swarm planning request")
 
 
 class VerifyReq(BaseModel):
