@@ -40,6 +40,7 @@ from .training_allocation import (
     TrainingAllocationError,
     TrainingAllocationPolicy,
     allocate_training_methods,
+    observe_mirror_validation,
 )
 from .training_methods import (
     DEFAULT_TEXT_METHODS,
@@ -66,6 +67,7 @@ from .local import (
 )
 
 __all__ = [
+    "observe_mirror_validation",
     "allocate_training_methods",
     "TrainingAllocationPolicy",
     "TrainingAllocationError",
