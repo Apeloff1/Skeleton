@@ -22,6 +22,7 @@ from skeleton.forge.creator.design_graph import (
     parse_design_graph,
 )
 from skeleton.forge.creator.semantic_diff import (
+    MAX_CHANGES as MAX_SEMANTIC_CHANGES,
     SemanticDiff,
     semantic_diff,
 )
@@ -680,7 +681,7 @@ def _validate_transition(
         transition.change_count,
         field="transition.change_count",
         minimum=0,
-        maximum=MAX_HISTORY_ENTRIES * MAX_SUMMARIES,
+        maximum=MAX_SEMANTIC_CHANGES,
     )
     if change_count != len(diff.changes):
         _fail("transition change count mismatch", reason="transition_integrity")
