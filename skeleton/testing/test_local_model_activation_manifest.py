@@ -371,6 +371,10 @@ def test_activation_rejects_wrong_rollback_baseline(
             baseline_path=baseline_path,
             promotion_receipt=promotion,
             qualification=qualification,
+            lifecycle_promotion_transition=_lifecycle_promotion(
+                promotion=promotion,
+                artifact_digest=candidate_sha,
+            ),
             model_program_bridge_digest=bridge_digest,
             operator_authorization_ref="operator-approval:wrong-baseline",
         )
