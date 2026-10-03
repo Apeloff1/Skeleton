@@ -188,9 +188,6 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(
                 f"invalid llama.cpp deployment config: {exc}"
             ) from exc
-        # Authenticate the exact artifacts named by the manifest before
-        # interpreting their contents. A post-signoff mutation must fail as an
-        # integrity error even when the mutated bytes no longer parse as GGUF.
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
