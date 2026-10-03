@@ -443,12 +443,20 @@ class GovernedContentStore:
 class CachePolicy:
     ttl_generations: int = 1
     stale_behavior: str = "miss"
+    max_entries: int = 4096
 
     def __post_init__(self) -> None:
         ttl = _generation(self.ttl_generations)
         object.__setattr__(self, "ttl_generations", ttl)
         if self.stale_behavior not in {"miss", "rebuild"}:
             raise StorageContractError("stale_behavior must be miss or rebuild")
+        if (
+            isinstance(self.max_entries, bool)
+            or not isinstance(self.max_entries, int)
+            or self.max_entries < 1
+            or self.max_entries > 100_000
+        ):
+            raise StorageContractError("max_entries must be between 1 and 100000")
 
 
 @dataclass(frozen=True, slots=True)
@@ -538,8 +546,24 @@ class GovernedContentCache:
             version=version,
         )
         entry = CacheEntry(key=key, payload=payload, stored_generation=_generation(generation))
+        fingerprint = key.fingerprint()
         with self._lock:
-            self._entries[key.fingerprint()] = entry
+            obsolete = [
+                candidate
+                for candidate, existing in self._entries.items()
+                if existing.key.tenant_id == key.tenant_id
+                and existing.key.namespace == key.namespace
+                and existing.key.logical_id == key.logical_id
+                and existing.key.version == key.version
+                and candidate != fingerprint
+            ]
+            for candidate in obsolete:
+                self._entries.pop(candidate, None)
+            self._entries.pop(fingerprint, None)
+            self._entries[fingerprint] = entry
+            while len(self._entries) > self.policy.max_entries:
+                oldest = next(iter(self._entries))
+                self._entries.pop(oldest, None)
         return entry
 
     def get(
