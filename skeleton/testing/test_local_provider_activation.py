@@ -481,8 +481,10 @@ async def test_engine_coordinator_interrupts_running_local_inference_and_finaliz
         tenant_id=operation.tenant_id,
     )
     assert status.execution_state == "cancelled"
-    assert status.result is not None
-    assert status.result["status"] == "cancelled"
+    assert status.result_ref == (
+        "execution-result:" + command.execution_request.execution_id
+    )
+    assert result.status == "cancelled"
 
     await coordinator.shutdown()
     service.repository.close()
