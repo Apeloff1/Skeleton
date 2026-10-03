@@ -589,3 +589,223 @@ def test_failed_unspent_release_preserves_shared_pressure_authority(
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["usage_events"] == 1
+
+
+def test_recover_completed_settles_live_shared_pressure_after_crash(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-shared-recover-completed")
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    def crash_before_pressure_release(_lease) -> None:
+        raise SystemExit("simulated crash after quota completion")
+
+    monkeypatch.setattr(
+        first.runtime,
+        "_release_shared_pressure",
+        crash_before_pressure_release,
+    )
+
+    with pytest.raises(SystemExit):
+        first.complete(
+            request.operation_id,
+            UsageEstimate(
+                input_tokens=120,
+                output_tokens=25,
+                cost_usd=0.7,
+                wall_seconds=3.0,
+                provider_attempts=1,
+            ),
+            evidence_refs=_evidence("recover-completed"),
+            now_wall=20.0,
+        )
+
+    assert first.runtime.quota_ledger.snapshot("tenant-a")[
+        "completions"
+    ] == 1
+    assert pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=20.5,
+    ).active == 1
+
+    restarted_pressure = SqliteSharedPressureLedger(pressure_path)
+    restarted = _governor(quota_path, restarted_pressure)
+    recovered = restarted.recover_completed(
+        request.operation_id,
+        evidence_refs=_evidence("recover-completed"),
+        now_wall=21.0,
+    )
+
+    assert recovered.state == "completed"
+    assert restarted_pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=21.5,
+    ).active == 0
+
+
+def test_recover_released_settles_live_shared_pressure_after_crash(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-shared-recover-release")
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    def crash_before_pressure_release(_lease) -> None:
+        raise SystemExit("simulated crash after quota release")
+
+    monkeypatch.setattr(
+        first.runtime,
+        "_release_shared_pressure",
+        crash_before_pressure_release,
+    )
+
+    with pytest.raises(SystemExit):
+        first.release_unspent(request.operation_id)
+
+    assert first.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 0
+    assert pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=20.0,
+    ).active == 1
+
+    restarted_pressure = SqliteSharedPressureLedger(pressure_path)
+    restarted = _governor(quota_path, restarted_pressure)
+    recovered = restarted.recover_released(
+        request.operation_id,
+        now_wall=20.5,
+    )
+
+    assert recovered.state == "released_unspent"
+    assert restarted_pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=21.0,
+    ).active == 0
+
+
+def test_terminal_recovery_accepts_already_expired_pressure_as_settled(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request(
+        "op-shared-recover-expired",
+        max_wall_seconds=5.0,
+    )
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    def crash_before_pressure_release(_lease) -> None:
+        raise SystemExit("simulated crash before pressure cleanup")
+
+    monkeypatch.setattr(
+        first.runtime,
+        "_release_shared_pressure",
+        crash_before_pressure_release,
+    )
+    with pytest.raises(SystemExit):
+        first.complete(
+            request.operation_id,
+            UsageEstimate(
+                input_tokens=120,
+                output_tokens=25,
+                cost_usd=0.7,
+                wall_seconds=3.0,
+                provider_attempts=1,
+            ),
+            evidence_refs=_evidence("recover-expired"),
+            now_wall=12.0,
+        )
+
+    restarted_pressure = SqliteSharedPressureLedger(pressure_path)
+    restarted = _governor(quota_path, restarted_pressure)
+    recovered = restarted.recover_completed(
+        request.operation_id,
+        evidence_refs=_evidence("recover-expired"),
+        now_wall=20.0,
+    )
+
+    assert recovered.state == "completed"
+    assert restarted_pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=20.5,
+    ).active == 0
+
+
+def test_terminal_recovery_rejects_tampered_live_pressure_ledger(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-shared-recover-tampered")
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    def crash_before_pressure_release(_lease) -> None:
+        raise SystemExit("simulated crash after quota completion")
+
+    monkeypatch.setattr(
+        first.runtime,
+        "_release_shared_pressure",
+        crash_before_pressure_release,
+    )
+    with pytest.raises(SystemExit):
+        first.complete(
+            request.operation_id,
+            UsageEstimate(
+                input_tokens=120,
+                output_tokens=25,
+                cost_usd=0.7,
+                wall_seconds=3.0,
+                provider_attempts=1,
+            ),
+            evidence_refs=_evidence("recover-tampered"),
+            now_wall=20.0,
+        )
+
+    with sqlite3.connect(pressure_path) as conn:
+        conn.execute(
+            """
+            UPDATE shared_pressure_lease
+            SET expires_at = expires_at + 1
+            WHERE operation_id = ?
+            """,
+            (request.operation_id,),
+        )
+
+    restarted = _governor(
+        quota_path,
+        SqliteSharedPressureLedger(pressure_path),
+    )
+    with pytest.raises(
+        CostGovernorConflict,
+        match="shared pressure recovery lease does not match durable ledger",
+    ):
+        restarted.recover_completed(
+            request.operation_id,
+            evidence_refs=_evidence("recover-tampered"),
+            now_wall=21.0,
+        )
+
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
+        "completions"
+    ] == 1
