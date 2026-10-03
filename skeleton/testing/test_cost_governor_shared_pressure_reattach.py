@@ -500,3 +500,92 @@ def test_coercive_shared_pressure_journal_fields_are_rejected(
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "active_reservations"
     ] == 1
+
+
+def test_failed_completion_preserves_shared_pressure_authority(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-shared-failed-complete")
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    restarted_pressure = SqliteSharedPressureLedger(pressure_path)
+    restarted = _governor(quota_path, restarted_pressure)
+    restarted.reserve(request, now_wall=20.0)
+    restarted.mark_usage_unknown(
+        request.operation_id,
+        "provider-unknown-shared",
+        "provider",
+        "provider usage unresolved",
+        now_wall=20.5,
+    )
+
+    with pytest.raises(
+        CostGovernorError,
+        match="actual_usage_unknown:provider",
+    ):
+        restarted.complete(
+            request.operation_id,
+            UsageEstimate(
+                input_tokens=120,
+                output_tokens=25,
+                cost_usd=0.7,
+                wall_seconds=3.0,
+                provider_attempts=1,
+            ),
+            evidence_refs=_evidence("failed-complete"),
+            now_wall=21.0,
+        )
+
+    assert restarted_pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=21.5,
+    ).active == 1
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
+        "active_reservations"
+    ] == 1
+
+
+def test_failed_unspent_release_preserves_shared_pressure_authority(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    pressure_path = tmp_path / "pressure.sqlite3"
+    pressure = _configure_pressure(pressure_path)
+    request = _request("op-shared-failed-release")
+    first = _governor(quota_path, pressure)
+    first.reserve(request, now_wall=10.0)
+
+    restarted_pressure = SqliteSharedPressureLedger(pressure_path)
+    restarted = _governor(quota_path, restarted_pressure)
+    restarted.reserve(request, now_wall=20.0)
+    restarted.charge(
+        request.operation_id,
+        "provider-metered-shared",
+        "provider",
+        UsageEstimate(
+            input_tokens=20,
+            output_tokens=5,
+            cost_usd=0.1,
+        ),
+        now_wall=20.5,
+    )
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="cannot release reservation after metered usage",
+    ):
+        restarted.release_unspent(request.operation_id)
+
+    assert restarted_pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=21.0,
+    ).active == 1
+    snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["usage_events"] == 1
