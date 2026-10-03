@@ -255,21 +255,39 @@ class Claim:
 class ClaimReconciler:
     @staticmethod
     def deduplicate(claims:Sequence[Claim])->tuple[Claim,...]:
-        groups:dict[tuple[str,ClaimScope],list[Claim]]={}
+        groups:dict[tuple[str,ClaimScope,str],list[Claim]]={}
         for claim in claims:
-            groups.setdefault((claim.equivalence_key,claim.scope),[]).append(claim)
+            groups.setdefault(
+                (claim.equivalence_key,claim.scope,claim.statement_digest),
+                [],
+            ).append(claim)
         chosen=[]
-        for _,items in sorted(groups.items(),key=lambda item:(item[0][0],repr(item[0][1]))):
-            chosen.append(max(items,key=lambda claim:(claim.confidence,len(claim.source_ids),claim.claim_id)))
+        for _,items in sorted(
+            groups.items(),
+            key=lambda item:(item[0][0],repr(item[0][1]),item[0][2]),
+        ):
+            chosen.append(
+                max(
+                    items,
+                    key=lambda claim:(
+                        claim.confidence,
+                        len(claim.source_ids),
+                        claim.claim_id,
+                    ),
+                )
+            )
         return tuple(chosen)
 
     @staticmethod
     def conflicts(claims:Sequence[Claim])->tuple[tuple[str,...],...]:
-        by_key:dict[str,list[Claim]]={}
+        by_key:dict[tuple[str,ClaimScope],list[Claim]]={}
         for claim in claims:
-            by_key.setdefault(claim.equivalence_key,[]).append(claim)
+            by_key.setdefault((claim.equivalence_key,claim.scope),[]).append(claim)
         conflicts=[]
-        for _,items in sorted(by_key.items()):
+        for _,items in sorted(
+            by_key.items(),
+            key=lambda item:(item[0][0],repr(item[0][1])),
+        ):
             digests={item.statement_digest for item in items}
             if len(digests)>1:
                 conflicts.append(tuple(sorted(item.claim_id for item in items)))
