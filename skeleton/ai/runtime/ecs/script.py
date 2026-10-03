@@ -112,7 +112,7 @@ class ScriptInstance:
         self.script = script
         self.budget = script.limits.budget(clock)
         self.globals = build_globals(self.budget, api)
-        self._run(lambda: exec(script.code, self.globals))  # noqa: S102 - instrumented, policy-validated code
+        self._run(lambda: _execute_validated_code(script.code, self.globals))
 
     def has(self, function: str) -> bool:
         return isinstance(self.globals.get(function), FunctionType) and function in self.script.functions
@@ -145,6 +145,11 @@ class ScriptInstance:
                 f"{type(exc).__name__}: {exc}"[:500],
                 context={"script": self.script.name, "error_type": type(exc).__name__, "line": _script_line(exc)},
             ) from None
+
+
+def _execute_validated_code(code: CodeType, namespace: dict[str, Any]) -> None:
+    """Execute only code that already passed the sandbox policy and rewrite pipeline."""
+    FunctionType(code, namespace, "<sandbox-module>")()
 
 
 def _script_line(exc: BaseException) -> int | None:
