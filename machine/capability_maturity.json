@@ -6,7 +6,7 @@
   "sources": {
     "master_plan": {
       "path": "machine/ai_master_plan.json",
-      "git_blob_sha": "2fdd74be113360ba79072a1c1268adb7612b8efb"
+      "git_blob_sha": "d1ca61b763881fb105cf9f34b923b191df55dd02"
     },
     "accountability": {
       "path": "machine/ai_build_accountability.json",
