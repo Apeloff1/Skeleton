@@ -49,6 +49,7 @@ class CampaignState:
     state_sha256: str = ""
     lease_owner: str = ""
     lease_epoch: int = 0
+    task_cooldowns: dict[str, int] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
@@ -228,12 +229,22 @@ def advance_campaign(
 
     if len(attempted_task_ids) > 32:
         raise ValueError("campaign cycle exceeds 32 attempted tasks")
+    for key in list(state.task_cooldowns):
+        remaining = max(0, int(state.task_cooldowns[key]) - 1)
+        if remaining:
+            state.task_cooldowns[key] = remaining
+        else:
+            state.task_cooldowns.pop(key, None)
+
     for task_id in attempted_task_ids:
         key = str(task_id).strip()
         if len(key) > 160:
             raise ValueError("campaign task id exceeds 160 characters")
         if key:
             state.task_attempts[key] = state.task_attempts.get(key, 0) + 1
+            attempts = state.task_attempts[key]
+            if attempts > 1:
+                state.task_cooldowns[key] = min(8, 2 ** min(3, attempts - 1))
 
     diagnostics = dependency_diagnostics(plan_items, str(supervisor.get("team", "")))
     terminal = bool(progress.get("terminal", False)) or supervisor.get("status") == "complete"
@@ -281,6 +292,9 @@ def advance_campaign(
     if len(state.task_attempts) > 512:
         active = sorted(state.task_attempts.items(), key=lambda pair: (-pair[1], pair[0]))[:512]
         state.task_attempts = dict(active)
+    state.task_cooldowns = {
+        key: value for key, value in state.task_cooldowns.items() if key in state.task_attempts
+    }
     return state
 
 
