@@ -48,8 +48,26 @@ audience = "internal"
 lifecycle = "transitional"
 
 [[zone]]
+name = "ecs-script-runtime"
+prefixes = ["skeleton/ecs/"]
+owner = "simulation-runtime"
+criticality = "high"
+purpose = "Blueprint-to-ECS adapter and policy-instrumented game-logic scripting layered on the canonical deterministic simulation ECS."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "execution-sandbox"
+prefixes = ["skeleton/sandbox/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Process and filesystem containment, sanitization, and injection enforcement for untrusted tools, generated code and model input."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/sandbox/"]
+prefixes = ["skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -463,7 +481,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "simulation"
-prefixes = ["skeleton/simulation/", "skeleton/ecs/", "godot.pointer"]
+prefixes = ["skeleton/simulation/", "godot.pointer"]
 owner = "simulation-runtime"
 criticality = "medium"
 purpose = "Deterministic simulation, game/world systems, scene state and engine-adapter execution."
