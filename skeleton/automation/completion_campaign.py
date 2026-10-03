@@ -51,6 +51,8 @@ class CampaignState:
     lease_epoch: int = 0
     task_cooldowns: dict[str, int] = field(default_factory=dict)
     lane_health: dict[str, dict[str, Any]] = field(default_factory=dict)
+    task_age: dict[str, int] = field(default_factory=dict)
+    last_allocation_sha256: str = ""
 
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
@@ -98,6 +100,42 @@ class CampaignState:
 
 
 
+
+
+def validate_lane_invariants(plan_items: object, team: str) -> None:
+    if not isinstance(plan_items, list):
+        raise ValueError("canonical plan items must be a list")
+    seen: set[str] = set()
+    for item in plan_items:
+        if not isinstance(item, Mapping) or item.get("target_team") != team:
+            continue
+        item_id = str(item.get("id", "")).strip()
+        if not item_id:
+            raise ValueError("canonical team item has empty id")
+        if item_id in seen:
+            raise ValueError(f"canonical team item id is duplicated: {item_id}")
+        seen.add(item_id)
+    assignments = lane_assignments(plan_items, team)
+    if set(assignments) != seen:
+        raise ValueError("lane assignment coverage does not match canonical team graph")
+
+
+def update_task_age(state: CampaignState, *, plan_items: object, team: str, attempted_task_ids: Sequence[str]) -> None:
+    if not isinstance(plan_items, list):
+        return
+    active = {
+        str(item.get("id", "")).strip()
+        for item in plan_items
+        if isinstance(item, Mapping)
+        and item.get("target_team") == team
+        and str(item.get("status", "")).lower() == "queued"
+        and str(item.get("id", "")).strip()
+    }
+    attempted = {str(item_id).strip() for item_id in attempted_task_ids}
+    next_age: dict[str, int] = {}
+    for item_id in sorted(active):
+        next_age[item_id] = 0 if item_id in attempted else min(1000, int(state.task_age.get(item_id, 0)) + 1)
+    state.task_age = next_age
 
 def dependency_components(plan_items: object, team: str) -> list[list[str]]:
     if not isinstance(plan_items, list):
