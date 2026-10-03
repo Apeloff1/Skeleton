@@ -122,6 +122,69 @@ def test_assistant_memory_refs_round_trip_through_sqlite_authority() -> None:
     assert loaded[-1].memory_refs == stored.memory_refs
 
 
+def test_assistant_provider_receipts_round_trip_and_deduplicate() -> None:
+    repo = SQLiteConversationRepository()
+    thread = repo.create_thread(
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=_now(),
+    )
+    user = _message(
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author=ConversationAuthorType.USER,
+        content="which model answered?",
+        idempotency_key="user-provider",
+    )
+    thread, _ = repo.append_message(
+        user,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="assistant-provider",
+        content="local answer",
+        parent_message_id=user.message_id,
+        causal_user_message_id=user.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:provider",
+        provider_receipt_refs=(
+            "provider:local:model-a:receipt-1",
+            "provider:local:model-a:receipt-1",
+            "provider:local:model-a:receipt-2",
+        ),
+    )
+    thread, stored = repo.append_message(
+        assistant,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+
+    loaded = repo.list_messages(
+        thread.thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+
+    assert stored.provider_receipt_refs == (
+        "provider:local:model-a:receipt-1",
+        "provider:local:model-a:receipt-2",
+    )
+    assert loaded[-1].provider_receipt_refs == stored.provider_receipt_refs
+    assert loaded[-1].as_dict()["provider_receipt_refs"] == list(
+        stored.provider_receipt_refs
+    )
+
+
 def test_thread_authorization_is_fail_closed() -> None:
     repo = SQLiteConversationRepository()
     thread = repo.create_thread(
