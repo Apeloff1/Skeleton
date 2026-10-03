@@ -767,6 +767,22 @@ class TenantQuotaLedger:
             matched_state.completions.append(completion)
             return completion
 
+    def reservation_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaReservation | None:
+        """Return the active reservation for an operation without mutation."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            reservation_id = state.by_operation.get(operation)
+            if reservation_id is None:
+                return None
+            return state.reservations.get(reservation_id)
+
     def completion_for_operation(
         self,
         tenant_id: str,
