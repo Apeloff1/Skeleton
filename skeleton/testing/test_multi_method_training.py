@@ -11,6 +11,7 @@ from skeleton.ai.runtime.inference.training_methods import (
     TrainingEfficiencyPolicy,
     TrainingExample,
     TrainingMethod,
+    TrainingMethodError,
     compile_training_plan,
 )
 
@@ -305,7 +306,7 @@ def test_training_example_rejects_noncanonical_camera_view_identity() -> None:
     import pytest
 
     with pytest.raises(
-        Exception,
+        TrainingMethodError,
         match="camera_view_refs must use canonical camera-view-sha256 identity",
     ):
         TrainingExample(
