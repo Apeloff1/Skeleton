@@ -412,6 +412,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("canonical supervisor state missing")
     state_path = Path(args.state)
     state = CampaignState.load(state_path)
+    if args.frontier:
+        frontier = select_frontier(
+            repo_state.get("_shift_supervisor_all_plan_items", []),
+            team=str(supervisor.get("team", "")),
+            cooldowns=state.task_cooldowns,
+            attempts=state.task_attempts,
+            limit=args.frontier_limit,
+        )
+        Path(args.frontier).write_text(json.dumps(frontier, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     state = acquire_lease(state, owner=args.lease_owner, expected_epoch=args.expected_epoch)
     state = advance_campaign(
         state,
