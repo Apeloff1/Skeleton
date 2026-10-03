@@ -240,3 +240,19 @@ def test_zero_baseline_nonzero_candidate_is_explicit_large_regression() -> None:
 
     assert finding.regressed is True
     assert finding.regression_ppm == 1_000_000_000
+
+
+def test_performance_finding_rejects_forged_regression_summary() -> None:
+    with pytest.raises(
+        ProfileRecordError,
+        match="must match baseline/candidate measurements",
+    ):
+        PerformanceFinding(
+            baseline_run_digest="a" * 64,
+            candidate_run_digest="b" * 64,
+            metric="mean_ms",
+            baseline_value_ms=10.0,
+            candidate_value_ms=12.0,
+            regression_ppm=100_000,
+            regressed=True,
+        )
