@@ -154,6 +154,27 @@ jobs:
             --summary "$RUNNER_TEMP/shift-supervisor-summary.md" \
             --max-age-minutes 20
 
+      - name: Apply authoritative completion frontier
+        if: steps.pressure.outputs.proceed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/campaign"
+          campaign="$RUNNER_TEMP/campaign/state.json"
+          prior_campaign=".studio/audit/latest.completion-campaign.json"
+          if [[ -s "$prior_campaign" ]]; then cp "$prior_campaign" "$campaign"; fi
+          python -m skeleton.automation.completion_campaign \
+            --state "$campaign" \
+            --repo-state .studio-tmp/repo-state.json \
+            --allocate \
+            --frontier "$RUNNER_TEMP/campaign/frontier.json" \
+            --frontier-limit 8 \
+            --max-cycles 40 \
+            --max-stagnant-cycles 3 \
+            --max-failures 5 \
+            --max-task-attempts 4
+          cp "$RUNNER_TEMP/campaign/frontier.json" "$RUNNER_TEMP/studio-frontier.json"
+
       - name: Recover prior deterministic execution receipt
         id: prior_receipt
         env:
