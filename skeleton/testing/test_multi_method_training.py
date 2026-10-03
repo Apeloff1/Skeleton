@@ -299,3 +299,18 @@ def test_full_camera_coverage_feeds_bounded_multiview_training() -> None:
         for item in plan.documents
     }
     assert len(refs) == 32
+
+
+def test_training_example_rejects_noncanonical_camera_view_identity() -> None:
+    import pytest
+
+    with pytest.raises(
+        Exception,
+        match="camera_view_refs must use canonical camera-view-sha256 identity",
+    ):
+        TrainingExample(
+            example_id="bad-camera-ref",
+            prompt="Describe the view.",
+            response="A stable object.",
+            camera_view_refs=("camera-view:mutable-alias",),
+        )
