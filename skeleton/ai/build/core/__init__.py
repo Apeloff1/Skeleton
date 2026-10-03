@@ -46,6 +46,18 @@ from skeleton.build.parallel_scheduler import (
     plan_parallel_build,
 )
 
+from skeleton.build.build_observability import (
+    OBSERVABILITY_SCHEMA,
+    BuildBudgetDecision,
+    BuildObservabilityError,
+    BuildRegressionBudget,
+    BuildTelemetry,
+    NodeObservation,
+    NodeRegressionBudget,
+    evaluate_build_budget,
+    observe_build,
+)
+
 from skeleton.build.network_audit import (
     CLASSIFICATION_NETWORK_REQUIRED,
     CLASSIFICATION_NETWORK_UNKNOWN,
@@ -63,6 +75,15 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "observe_build",
+    "evaluate_build_budget",
+    "NodeRegressionBudget",
+    "NodeObservation",
+    "BuildTelemetry",
+    "BuildRegressionBudget",
+    "BuildObservabilityError",
+    "BuildBudgetDecision",
+    "OBSERVABILITY_SCHEMA",
     "aggregate_build_evidence",
     "plan_parallel_build",
     "TargetEvidence",
