@@ -15,6 +15,11 @@ on:
       - ".github/workflows/p0-unicode-authority-identity.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-unicode-authority-identity-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

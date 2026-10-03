@@ -11,6 +11,11 @@ on:
       - ".github/workflows/p0-policy-retention-context-pressure.yml"
   workflow_dispatch:
 
+
+concurrency:
+  group: p0-policy-retention-context-pressure-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

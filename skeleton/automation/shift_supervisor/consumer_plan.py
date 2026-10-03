@@ -3,9 +3,12 @@ from __future__ import annotations
 import argparse
 import base64
 import gzip
+import io
 import hashlib
 import json
 import re
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -36,6 +39,8 @@ def _parse_time(value: object) -> datetime | None:
 
 
 def decode_durable_state(body: str) -> Mapping[str, Any]:
+    if len(body) > 2_000_000:
+        raise CanonicalPlanError("canonical plan issue body exceeds 2 MB safety bound")
     match = _STATE_PATTERN.search(body)
     if not match:
         raise CanonicalPlanError("canonical plan issue has no durable machine state")
@@ -44,7 +49,13 @@ def decode_durable_state(body: str) -> Mapping[str, Any]:
         raise CanonicalPlanError("canonical plan state encoding is unsupported")
     try:
         packed = base64.b64decode(encoded[len("gz:v1:") :], validate=True)
-        value = json.loads(gzip.decompress(packed).decode("utf-8"))
+        if len(packed) > 1_000_000:
+            raise CanonicalPlanError("canonical plan compressed state exceeds 1 MB safety bound")
+        with gzip.GzipFile(fileobj=io.BytesIO(packed), mode="rb") as handle:
+            decoded = handle.read(5_000_001)
+        if len(decoded) > 5_000_000:
+            raise CanonicalPlanError("canonical plan expanded state exceeds 5 MB safety bound")
+        value = json.loads(decoded.decode("utf-8"))
     except (ValueError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CanonicalPlanError("canonical plan machine state is corrupt") from exc
     if not isinstance(value, Mapping) or value.get("version") != 1:
@@ -65,21 +76,61 @@ def _issue_rows(state: Mapping[str, Any]) -> tuple[str, list[Mapping[str, Any]]]
 
 def _canonical_issue(state: Mapping[str, Any]) -> tuple[str, Mapping[str, Any], list[Mapping[str, Any]]]:
     issue_key, issues = _issue_rows(state)
-    canonical = next((item for item in issues if str(item.get("title", "")) == PLAN_TITLE), None)
-    if canonical is None:
+    canonical = [item for item in issues if str(item.get("title", "")) == PLAN_TITLE]
+    if not canonical:
         raise CanonicalPlanError("canonical supervisor plan issue is missing")
-    return issue_key, canonical, issues
+    if len(canonical) != 1:
+        raise CanonicalPlanError("repository snapshot contains multiple canonical supervisor plan issues")
+    return issue_key, canonical[0], issues
+
+
+def plan_progress(raw_plan: object, team: str) -> dict[str, Any]:
+    if not isinstance(raw_plan, list):
+        raise CanonicalPlanError("canonical plan state has no plan_items list")
+    rows = [item for item in raw_plan if isinstance(item, Mapping) and item.get("target_team") == team]
+    counts = {"queued": 0, "done": 0, "rejected": 0, "blocked": 0, "other": 0}
+    ids: list[str] = []
+    for item in rows:
+        item_id = str(item.get("id", "")).strip()
+        if item_id:
+            ids.append(item_id)
+        status = str(item.get("status", "queued")).lower()
+        if status in counts:
+            counts[status] += 1
+        else:
+            counts["other"] += 1
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            [
+                {
+                    "id": str(item.get("id", "")),
+                    "status": str(item.get("status", "")),
+                    "dependencies": item.get("dependencies", []),
+                }
+                for item in rows
+            ],
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "team": team,
+        "total": len(rows),
+        "counts": counts,
+        "terminal": counts["queued"] == 0 and counts["blocked"] == 0 and counts["other"] == 0,
+        "fingerprint_sha256": fingerprint,
+    }
 
 
 def _executable_team_items(raw_plan: object, team: str) -> list[dict[str, Any]]:
     if not isinstance(raw_plan, list):
         raise CanonicalPlanError("canonical plan state has no plan_items list")
     rows = [item for item in raw_plan if isinstance(item, Mapping)]
-    by_id = {
-        str(item.get("id", "")).strip(): item
-        for item in rows
-        if str(item.get("id", "")).strip()
-    }
+    ids = [str(item.get("id", "")).strip() for item in rows if str(item.get("id", "")).strip()]
+    if len(ids) != len(set(ids)):
+        raise CanonicalPlanError("canonical plan contains duplicate plan item ids")
+    by_id = {str(item.get("id", "")).strip(): item for item in rows if str(item.get("id", "")).strip()}
     executable: list[dict[str, Any]] = []
     for item in rows:
         if item.get("target_team") != team or str(item.get("status", "queued")).lower() != "queued":
@@ -129,8 +180,31 @@ def consume_plan(
         )
 
     durable = decode_durable_state(str(canonical.get("body", "")))
+    progress = plan_progress(durable.get("plan_items", []), team)
     team_items = _executable_team_items(durable.get("plan_items", []), team)
     if not team_items:
+        if progress["terminal"]:
+            state["_shift_supervisor_all_plan_items"] = [
+                dict(item) for item in durable.get("plan_items", []) if isinstance(item, Mapping)
+            ][:512]
+            state["_shift_supervisor"] = {
+                "source": "canonical-plan-issue",
+                "status": "complete",
+                "generation_id": "",
+                "plan_digest_sha256": hashlib.sha256(b"[]").hexdigest(),
+                "issue_number": canonical.get("number"),
+                "updated_at": updated.isoformat(),
+                "max_age_minutes": max_age_minutes,
+                "team": team,
+                "plan_items": [],
+                "progress": progress,
+            }
+            state[issue_key] = [
+                dict(item)
+                for item in issues
+                if str(item.get("title", "")) not in ({PLAN_TITLE} | STATUS_TITLES)
+            ]
+            return state, {}
         raise CanonicalPlanError(f"canonical supervisor plan has no executable {team} items")
 
     issue_number = canonical.get("number")
@@ -144,15 +218,23 @@ def consume_plan(
         separators=(",", ":"),
     )
     generation_id = hashlib.sha256(generation_seed.encode("utf-8")).hexdigest()[:20]
+    plan_digest = hashlib.sha256(
+        json.dumps(team_items[:32], sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    state["_shift_supervisor_all_plan_items"] = [
+        dict(item) for item in durable.get("plan_items", []) if isinstance(item, Mapping)
+    ][:512]
     state["_shift_supervisor"] = {
         "source": "canonical-plan-issue",
         "status": "loaded",
         "generation_id": generation_id,
+        "plan_digest_sha256": plan_digest,
         "issue_number": issue_number,
         "updated_at": updated.isoformat(),
         "max_age_minutes": max_age_minutes,
         "team": team,
         "plan_items": team_items[:32],
+        "progress": progress,
     }
 
     state[issue_key] = [
@@ -223,6 +305,13 @@ def _summary(team: str, state: Mapping[str, Any], *, error: str | None = None) -
         return "\n".join(lines) + "\n"
     supervisor = state.get("_shift_supervisor", {})
     items = supervisor.get("plan_items", []) if isinstance(supervisor, Mapping) else []
+    if supervisor.get("status") == "complete":
+        lines += [
+            "Status: **canonical plan complete**",
+            "",
+            f"{team.title()} canonical queue: **drained**",
+        ]
+        return "\n".join(lines) + "\n"
     lines += [
         "Status: **canonical plan loaded**",
         "",
@@ -231,6 +320,21 @@ def _summary(team: str, state: Mapping[str, Any], *, error: str | None = None) -
         f"{team.title()} plan items available: **{len(items) if isinstance(items, list) else 0}**",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def prepare_state(
@@ -257,12 +361,10 @@ def prepare_state(
         summary_path.write_text(_summary(team, {}, error=str(exc)), encoding="utf-8")
         raise CanonicalPlanError(str(exc)) from exc
 
-    state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding="utf-8")
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(_summary(team, state), encoding="utf-8")
+    _atomic_write_text(state_path, json.dumps(state, sort_keys=True, indent=2) + "\n")
+    _atomic_write_text(summary_path, _summary(team, state))
     if plan_map_path is not None:
-        plan_map_path.parent.mkdir(parents=True, exist_ok=True)
-        plan_map_path.write_text(json.dumps(plan_map, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        _atomic_write_text(plan_map_path, json.dumps(plan_map, sort_keys=True, indent=2) + "\n")
 
 
 def normalize_worker_status(status_path: Path, plan_map_path: Path) -> None:

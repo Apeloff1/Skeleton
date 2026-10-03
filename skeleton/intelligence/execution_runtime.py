@@ -2330,6 +2330,91 @@ class CognitiveExecutionRuntime:
             externally_observable,
         )
 
+    def _external_verification_effect_guard(
+        self,
+        execution: AIExecution,
+        payload: Mapping[str, object],
+    ) -> ExecutionVerificationDecision | None:
+        """Fail closed when an external verifier would bypass effect proof.
+
+        A custom verification hook may independently judge model output, but it
+        must not turn an unverified side effect into a publishable success.
+        Every non-read-only tool receipt therefore needs a positively observed
+        postcondition before control reaches the external hook.
+        """
+        raw_rows = payload.get("tool_verification_evidence", [])
+        if not isinstance(raw_rows, list):
+            raise CognitiveExecutionError(
+                "tool verification evidence checkpoint is corrupt"
+            )
+
+        effect_rank = {
+            "read_only": 1,
+            "reversible": 2,
+            "irreversible": 3,
+        }
+        strongest_effect: str | None = None
+        missing: list[str] = []
+        observed: list[str] = []
+        externally_observable = False
+
+        for raw in raw_rows:
+            if not isinstance(raw, Mapping):
+                raise CognitiveExecutionError(
+                    "tool verification evidence entry is corrupt"
+                )
+            effect = str(raw.get("effect") or "").strip().lower()
+            if effect not in effect_rank:
+                raise CognitiveExecutionError(
+                    "tool verification evidence effect is invalid"
+                )
+            if (
+                strongest_effect is None
+                or effect_rank[effect] > effect_rank[strongest_effect]
+            ):
+                strongest_effect = effect
+
+            side_effect = str(
+                raw.get("side_effect_class") or "none"
+            ).strip().lower()
+            if side_effect != "none":
+                externally_observable = True
+
+            if effect == "read_only":
+                continue
+            receipt_id = str(raw.get("receipt_id") or "").strip()
+            if not receipt_id:
+                raise CognitiveExecutionError(
+                    "effect verification evidence is missing receipt identity"
+                )
+            if raw.get("postcondition_observed") is True:
+                observed.append(receipt_id)
+            else:
+                missing.append(receipt_id)
+
+        if not missing:
+            return None
+
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "schema_version": "skeleton.execution.effect_guard.v1",
+                "outcome": "failed",
+                "policy_satisfied": False,
+                "verifier_id": "execution-runtime:effect-postcondition-guard",
+                "verification_profile": "external_hook_effect_guard",
+                "claim_kind": ClaimKind.ACTION_OUTCOME.value,
+                "disposition": "block",
+                "action_effect": strongest_effect,
+                "externally_observable_action": externally_observable,
+                "required_modes": ["postcondition"],
+                "postcondition_receipt_ids": sorted(observed),
+                "missing_postcondition_receipt_ids": sorted(missing),
+                "execution_id": execution.execution_id,
+            },
+            disposition="block",
+        )
+
     async def _verify_candidate(
         self,
         execution: AIExecution,
@@ -2339,6 +2424,13 @@ class CognitiveExecutionRuntime:
         now: datetime | None,
     ) -> ExecutionVerificationDecision:
         if self.verification_hook is not None:
+            effect_guard = self._external_verification_effect_guard(
+                execution,
+                self._checkpoint_payload(execution.execution_id),
+            )
+            if effect_guard is not None:
+                return effect_guard
+
             decision = await _await_maybe(
                 self.verification_hook(
                     execution.request,

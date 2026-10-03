@@ -689,7 +689,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "f16c68ccbdc4a75a04a2c5dd0c7a3248ff4a6c29",
+      "source_git_object_sha": "30b6045013f404b15acb400641139e7d57e3fcdb",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -791,7 +791,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "f3299a9a20df339b4161bf23a563e5b7eb8625c9",
+      "source_git_object_sha": "cf301feec9ebaf2ca1fcd4c406ca838e50a3cbe9",
       "role": "controlled learning support",
       "work_package_refs": [
         "WP-W00",
