@@ -463,6 +463,10 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/campaign"
           campaign="$RUNNER_TEMP/campaign/state.json"
+          prior_campaign=".studio/audit/latest.completion-campaign.json"
+          if [[ -s "$prior_campaign" ]]; then
+            cp "$prior_campaign" "$campaign"
+          fi
           args=()
           if [[ "${HAS_PATCH:-}" == "true" && "${VALIDATION_OUTCOME:-}" == "success" ]]; then args+=(--validated-patch); fi
           if [[ "${VALIDATION_OUTCOME:-}" == "failure" ]]; then args+=(--validation-failed); fi
