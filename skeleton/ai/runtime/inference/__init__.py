@@ -28,8 +28,10 @@ from .llama_cpp import (
 from .multiview import (
     CameraCoveragePlan,
     CameraCoveragePolicy,
+    CameraCoverageSelection,
     CameraView,
     CameraViewError,
+    bind_camera_subset,
     build_camera_coverage,
     stratified_camera_subset,
 )
@@ -73,6 +75,8 @@ from .local import (
 )
 
 __all__ = [
+    "bind_camera_subset",
+    "CameraCoverageSelection",
     "extract_visual_training_observation",
     "VisualTrainingObservation",
     "VisualLearningError",
