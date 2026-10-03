@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.automation.studio_report import render_report
+from skeleton.automation.studio_report import render_report, verify_audit_chain
 
 
 def test_report_explains_planned_accepted_and_rejected_work() -> None:
@@ -93,3 +93,48 @@ def test_report_marks_missing_terminal_record() -> None:
         [{"ts": "2026-01-01T00:00:00+00:00", "run_id": "9", "event": "run_started"}]
     )
     assert "Audit lifecycle: **incomplete/ambiguous** (0 terminal records)" in report
+
+
+def test_audit_chain_rejects_mutated_record():
+    import hashlib
+    import json
+
+    rows = []
+    previous = "0" * 64
+    for sequence, event in enumerate(("run_started", "run_finished"), start=1):
+        row = {
+            "ts": f"2026-01-01T00:00:0{sequence}+00:00",
+            "run_id": "chain",
+            "event": event,
+            "sequence": sequence,
+            "previous_record_sha256": previous,
+        }
+        canonical = json.dumps(row, sort_keys=True, separators=(",", ":"), default=str)
+        row["record_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        previous = row["record_sha256"]
+        rows.append(row)
+    rows[0]["event"] = "tampered"
+    with pytest.raises(ValueError, match="hash mismatch"):
+        verify_audit_chain(rows)
+
+
+def test_audit_chain_rejects_reordered_records():
+    import hashlib
+    import json
+
+    rows = []
+    previous = "0" * 64
+    for sequence, event in enumerate(("run_started", "run_finished"), start=1):
+        row = {
+            "ts": f"2026-01-01T00:00:0{sequence}+00:00",
+            "run_id": "chain",
+            "event": event,
+            "sequence": sequence,
+            "previous_record_sha256": previous,
+        }
+        canonical = json.dumps(row, sort_keys=True, separators=(",", ":"), default=str)
+        row["record_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        previous = row["record_sha256"]
+        rows.append(row)
+    with pytest.raises(ValueError, match="sequence is discontinuous"):
+        verify_audit_chain(list(reversed(rows)))
