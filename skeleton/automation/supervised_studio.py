@@ -151,7 +151,7 @@ Return JSON only:
 Allowed divisions: {', '.join(divisions)}
 Rules:
 - Echo plan_item_id exactly.
-- Choose 1-5 EXISTING files only.
+- Choose 1-8 EXISTING files only.
 - Paths must be under skeleton/, backend/, scripts/, or docs/.
 - Never choose .github, secrets, dependency manifests, lockfiles, deployment,
   release-trust, or security-policy files.
@@ -175,8 +175,8 @@ def _scope_task(reasoner: ChatGPTReasoner, item: Mapping[str, Any]) -> PlannedTa
     if division not in {bot.division for bot in STUDIO}:
         raise ValueError("scope mapper returned an unknown division")
     raw_paths = payload.get("paths")
-    if not isinstance(raw_paths, list) or not 1 <= len(raw_paths) <= 5:
-        raise ValueError("scope mapper must return 1-5 paths")
+    if not isinstance(raw_paths, list) or not 1 <= len(raw_paths) <= 8:
+        raise ValueError("scope mapper must return 1-8 paths")
     paths: list[str] = []
     for raw in raw_paths:
         path = _canonical_path(raw)
