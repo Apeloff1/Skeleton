@@ -97,6 +97,16 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "class CurriculumPlan",
         "def build_curriculum(",
     ),
+    "skeleton/learning/mirror_room/evaluation.py": (
+        "class MetricComparison",
+        "worst_case_delta",
+        "comparison_family_size",
+        "and worst_case_delta >= -policy.max_regression",
+    ),
+    "skeleton/ai/learning/mirror_room/evaluation.py": (
+        "class MetricComparison",
+        "worst_case_delta",
+    ),
     "skeleton/learning/mirror_room/engine.py": (
         "candidate generator and sandbox evaluator must be independent",
         "duplicate scenario payload detected across Mirror Room corpus",
@@ -227,6 +237,7 @@ SURFACES: dict[str, tuple[str, ...]] = {
         "test_curriculum_is_training_only_deterministic_and_hard_example_weighted",
         "test_validation_candidate_search_budget_fails_closed",
         "test_run_and_promotion_bind_split_integrity_and_sealed_holdout",
+        "test_worst_case_guardrail_blocks_locally_unsafe_candidate",
     ),
     "skeleton/testing/test_mirror_room_content_delivery.py": (
         "test_high_end_content_dossier_requires_full_ratchet_gauntlet_and_holdout",
