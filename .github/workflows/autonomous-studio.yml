@@ -544,11 +544,41 @@ jobs:
             python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/state.json")); print("- Status: `"+d["status"]+"`"); print("- Cycle: **"+str(d["cycle"])+"**"); print("- Stagnant cycles: **"+str(d["stagnant_cycles"])+"**"); print("- Validation failures: **"+str(d["failures"])+"**"); print("- Terminal reason: `"+d.get("terminal_reason","")+"`")'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Require fresh supervisor authority before continuation
+        id: authority_refresh
+        if: >-
+          success() &&
+          steps.continuation.outputs.status == 'continue' &&
+          steps.build_campaign.outputs.status == 'continue'
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=""
+          if [[ -s .studio/audit/latest.execution-receipt.json ]]; then
+            previous=$(python -c 'import json; print(json.load(open(".studio/audit/latest.execution-receipt.json")).get("plan_generation",""))')
+          fi
+          current=$(python -c 'import json; print(json.load(open(".studio-tmp/repo-state.json")).get("_shift_supervisor",{}).get("generation_id",""))')
+          accepted=0
+          if [[ -s "$RUNNER_TEMP/studio-execution-receipt.json" ]]; then
+            accepted=$(python -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/studio-execution-receipt.json")).get("accepted_tasks",0))')
+          fi
+          python - "$previous" "$current" "$accepted" <<'PY'
+          import sys
+          from skeleton.automation.supervisor_refresh import require_fresh
+          d=require_fresh(previous_generation=sys.argv[1],current_generation=sys.argv[2],accepted=int(sys.argv[3]),terminal=False)
+          if not d.ready:
+              print(d.reason)
+              raise SystemExit(1)
+          print(d.reason)
+          PY
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
       - name: Request bounded continuation
         if: >-
           success() &&
           steps.continuation.outputs.status == 'continue' &&
           steps.build_campaign.outputs.status == 'continue' &&
+          steps.authority_refresh.outputs.ready == 'true' &&
           (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
         env:
           GH_TOKEN: ${{ github.token }}
