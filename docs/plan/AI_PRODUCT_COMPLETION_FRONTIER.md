@@ -362,6 +362,28 @@ plan while preserving exact supplemental-example, visual-observation and camera
 coverage digests in the evaluation manifest. Supplemental examples are rejected
 without opt-in and may not collide with conversation-derived example ids.
 
+### 22. Closed local train-evaluate-reallocate loop
+
+The local learning plane now has a separate developmental evaluator for training
+feedback. It authenticates exact baseline and candidate artifacts, runs the same
+bounded offline prompts against both models with no tools or network access, and
+scores only explicitly declared required/forbidden output terms. Raw outputs are
+not promoted into allocator state; content digests, scores, token work and exact
+model identities form the deterministic report.
+
+Developmental reports are explicitly non-production and are not promotion
+holdouts. A report converts directly into the existing
+`MethodValidationObservation` with `evaluation_class="development"`, allowing
+measured candidate gain per compute unit to drive the adaptive method allocator.
+This closes an executable local loop:
+
+`train candidate -> developmental compare vs baseline -> allocator observation
+-> next method weights -> retrain`
+
+Promotion evaluation, Mirror holdout, lifecycle validation and activation remain
+separate authorities, so optimizing the training loop cannot consume or tune
+against the final promotion oracle.
+
 ## Acceptance gate
 
 `AI Product Completion Acceptance` now compiles the product bridge and executes:
@@ -402,7 +424,9 @@ without opt-in and may not collide with conversation-derived example ids.
 - real authenticated pixel observations in multiview training;
 - authenticated camera coverage subsets and tamper rejection;
 - cross-view consistency training across multiple camera images;
-- explicit supplemental multimodal examples in the same product candidate.
+- explicit supplemental multimodal examples in the same product candidate;
+- executable local baseline-vs-candidate development evaluation feeding
+  holdout-safe adaptive reallocation.
 
 This frontier closes the product-edge seam by using existing authorities more
 deeply, not by building a parallel chat stack. It is an engineering completion
