@@ -514,7 +514,10 @@ class NumpyRecurrentLM:
             nonlocal accumulated_sequences, optimizer_steps
             if accumulated_sequences == 0:
                 return
-            step_rate = np.float32(rate)
+            # Gradient accumulation is a memory/optimizer-cadence knob,
+            # not an implicit learning-rate multiplier. Average over the
+            # actual micro-batch, including a short final batch.
+            step_rate = np.float32(rate / accumulated_sequences)
             recurrent[:] -= step_rate * acc_recurrent
             recurrent_bias[:] -= step_rate * acc_recurrent_bias
             output[:] -= step_rate * acc_output
