@@ -5,6 +5,8 @@ import hashlib
 
 import pytest
 
+import skeleton.ai.runtime.training.trainer as trainer_module
+
 from skeleton.ai.runtime.inference import LocalInferenceEngine, LocalInferenceRequest
 from skeleton.ai.runtime.training import (
     DataQualityReport,
@@ -277,4 +279,29 @@ def test_reference_trainer_enforces_document_and_byte_budgets(tmp_path):
                 order=2,
                 now=NOW,
             )
+
+def test_reference_trainer_marks_run_failed_on_execution_crash(
+    tmp_path,
+    monkeypatch,
+):
+    corpus,datasets,runs,manifest=_fixture(tmp_path)
+
+    def crash(*args,**kwargs):
+        raise RuntimeError("injected trainer crash")
+
+    monkeypatch.setattr(
+        trainer_module.ReferenceNGramModel,
+        "train",
+        staticmethod(crash),
+    )
+
+    with pytest.raises(RuntimeError,match="injected trainer crash"):
+        ReferenceLocalTrainer(datasets,runs).train(
+            manifest,
+            corpus,
+            order=2,
+            now=NOW,
+        )
+
+    assert runs.state(manifest.run_id)=="failed"
 
