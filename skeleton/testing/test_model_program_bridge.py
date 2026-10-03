@@ -118,8 +118,10 @@ def _qualification_for(bridged) -> LearningQualificationBundle:
             allow_nan=False,
         ).encode("utf-8")
     ).hexdigest()
+    constructor_payload = dict(payload)
+    constructor_payload.pop("schema_version")
     return LearningQualificationBundle(
-        **payload,
+        **constructor_payload,
         qualification_digest=digest,
     )
 
