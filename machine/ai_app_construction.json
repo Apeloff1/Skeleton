@@ -1255,7 +1255,9 @@
         "skeleton/learning",
         "skeleton/ai/runtime/product/learning.py",
         "skeleton/ai/runtime/inference/training_methods.py",
+        "skeleton/ai/runtime/inference/training_allocation.py",
         "skeleton/ai/runtime/inference/multiview.py",
+        "skeleton/ai/runtime/product/qualification.py",
         "skeleton/intelligence/adaptive.py",
         "skeleton/intelligence/experiment_tracker.py"
       ],
@@ -1266,7 +1268,9 @@
         "accepted-turn learning candidate",
         "candidate execution qualification receipt",
         "multi-method training plan receipt",
+        "adaptive method-allocation receipt",
         "360-degree camera coverage identity",
+        "Mirror/firewall/lifecycle qualification bundle",
         "promotion receipt"
       ],
       "construction": [
@@ -1277,7 +1281,9 @@
         "build content-addressed candidate artifacts without overwriting the active AI_LOCAL_MODEL_PATH",
         "compile compatible supervised, causal, self-supervised, preference, distillation, contrastive, replay, curriculum, adversarial, multiview, denoising, sequence-to-sequence, reward, reinforcement-trace, imitation, retrieval-grounded, pseudo-label, multitask and active-learning views",
         "bound training by document/character budgets, length buckets, sparse embedding updates, reusable gradient buffers and deterministic early stopping",
+        "adapt method repeats from development/regression/Mirror-validation gain per compute while rejecting promotion-holdout and production-observation feedback as training oracles",
         "represent complete spherical camera pose coverage across azimuth/elevation/roll plus bounded FOV, distance and exposure variants without fabricating pixels",
+        "bind exact training-plan, model, artifact, Mirror Room, promotion-firewall, camera and method-allocation identities into non-authoritative lifecycle validation evidence",
         "execute-qualify each trained candidate offline before returning a candidate receipt",
         "separate production data from promotion",
         "require eval before behavior change"
@@ -1292,6 +1298,9 @@
         "multi-method plan determinism and missing-signal skipping",
         "all-angle camera coverage with bounded stratified training subset",
         "early-stop and training-work efficiency receipt",
+        "adaptive method allocation is deterministic and promotion-holdout excluded",
+        "cross-plane qualification rejects candidate/baseline/evaluator identity drift",
+        "lifecycle validation handoff carries evidence but no production authority",
         "promotion gate"
       ],
       "failure_mode": "retain baseline behavior"
@@ -1736,7 +1745,9 @@
       "product_learning_candidate_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_artifact",
       "product_learning_snapshot_builder": "skeleton/ai/runtime/product/learning.py:build_learning_candidate_from_repository",
       "multi_method_training_compiler": "skeleton/ai/runtime/inference/training_methods.py:compile_training_plan",
+      "adaptive_training_allocator": "skeleton/ai/runtime/inference/training_allocation.py:allocate_training_methods",
       "camera_training_coverage": "skeleton/ai/runtime/inference/multiview.py:build_camera_coverage",
+      "learning_qualification_bridge": "skeleton/ai/runtime/product/qualification.py:qualify_learning_candidate",
       "training_method_families": [
         "causal_language_modeling",
         "supervised_instruction",
