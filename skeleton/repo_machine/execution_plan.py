@@ -50,21 +50,16 @@ class ExecutionPlan:
 
     @property
     def fingerprint(self) -> str:
-        payload = {
-            "repository_fingerprint": self.repository_fingerprint,
-            "steps": [step.as_dict() for step in self.steps],
-            "ready_work": list(self.ready_work),
-            "blocked_work": list(self.blocked_work),
-        }
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload = {"repository_fingerprint": self.repository_fingerprint,
+                   "steps": [step.as_dict() for step in self.steps],
+                   "ready_work": list(self.ready_work), "blocked_work": list(self.blocked_work)}
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 
     def as_dict(self) -> dict[str, object]:
-        return {"repository_fingerprint": self.repository_fingerprint,
-                "plan_fingerprint": self.fingerprint,
-                "steps": [item.as_dict() for item in self.steps],
-                "ready_work": list(self.ready_work), "blocked_work": list(self.blocked_work),
-                "state": self.state.as_dict()}
+        return {"repository_fingerprint": self.repository_fingerprint, "plan_fingerprint": self.fingerprint,
+                "steps": [item.as_dict() for item in self.steps], "ready_work": list(self.ready_work),
+                "blocked_work": list(self.blocked_work), "state": self.state.as_dict()}
 
 
 def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outcome,
@@ -74,14 +69,11 @@ def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outco
         raise ValueError("execution plan fingerprint mismatch")
     if repository_fingerprint != plan.repository_fingerprint:
         return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
-                             ExecutionState(plan.state.completed_steps, plan.state.failed_work,
-                                            plan.state.verified_work, True))
+                             ExecutionState(plan.state.completed_steps, plan.state.failed_work, plan.state.verified_work, True))
     step = next((item for item in plan.steps if item.identity == step_identity), None)
     if step is None:
         raise ValueError("unknown execution step")
-    completed = set(plan.state.completed_steps)
-    failed = set(plan.state.failed_work)
-    verified = set(plan.state.verified_work)
+    completed, failed, verified = set(plan.state.completed_steps), set(plan.state.failed_work), set(plan.state.verified_work)
     if step.identity in completed:
         raise ValueError("execution step already completed")
     if any(dependency not in completed for dependency in step.depends_on):
@@ -94,19 +86,19 @@ def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outco
         failed.add(step.work_identity)
     elif outcome == "stale":
         return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
-                             ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
-                                            tuple(sorted(verified)), True))
+                             ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)), tuple(sorted(verified)), True))
     elif outcome == "blocked":
         return plan
     return ExecutionPlan(plan.repository_fingerprint, plan.steps, plan.ready_work, plan.blocked_work,
-                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
-                                        tuple(sorted(verified)), False))
+                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)), tuple(sorted(verified)), False))
 
 
 def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (),
-                         active_conflicts: Iterable[str] = (), limit: int = 8) -> ExecutionPlan:
+                         active_conflicts: Iterable[str] = (), limit: int = 8,
+                         state: ExecutionState | None = None) -> ExecutionPlan:
     graph = build_work_graph(model, limit=max(limit, 32))
-    completed_set = set(completed)
+    inherited = state or ExecutionState()
+    completed_set = set(completed) | set(inherited.verified_work)
     ready = graph.ready(completed_set, active_conflicts, limit=limit)
     ready_ids = {node.identity for node in ready}
     steps: list[PlanStep] = []
@@ -119,7 +111,18 @@ def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (
             PlanStep(unlock, "unlock", "Recompute downstream readiness from the updated repository state.", (verify,), work_identity=node.identity),
         ))
     blocked = tuple(node.identity for node in graph._ordered_nodes if node.identity not in ready_ids and node.identity not in completed_set)
-    return ExecutionPlan(model.fingerprint, tuple(steps), tuple(node.identity for node in ready), blocked)
+    return ExecutionPlan(model.fingerprint, tuple(steps), tuple(node.identity for node in ready), blocked, inherited)
 
 
-__all__ = ["ExecutionPlan", "ExecutionState", "Outcome", "Phase", "PlanStep", "advance_execution", "build_execution_plan"]
+def replan_execution(model: RepositoryModel, previous: ExecutionPlan, *,
+                     active_conflicts: Iterable[str] = (), limit: int = 8) -> ExecutionPlan:
+    """Rebuild readiness after repository change without carrying stale steps forward."""
+    if previous.repository_fingerprint == model.fingerprint and not previous.state.stale:
+        return build_execution_plan(model, completed=previous.state.verified_work,
+                                     active_conflicts=active_conflicts, limit=limit, state=previous.state)
+    state = ExecutionState(verified_work=previous.state.verified_work)
+    return build_execution_plan(model, active_conflicts=active_conflicts, limit=limit, state=state)
+
+
+__all__ = ["ExecutionPlan", "ExecutionState", "Outcome", "Phase", "PlanStep",
+           "advance_execution", "build_execution_plan", "replan_execution"]
