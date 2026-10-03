@@ -50,6 +50,7 @@ class CampaignState:
     lease_owner: str = ""
     lease_epoch: int = 0
     task_cooldowns: dict[str, int] = field(default_factory=dict)
+    lane_health: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
@@ -96,6 +97,58 @@ class CampaignState:
 
 
 
+
+
+def dependency_components(plan_items: object, team: str) -> list[list[str]]:
+    if not isinstance(plan_items, list):
+        return []
+    rows = {
+        str(item.get("id", "")).strip(): item
+        for item in plan_items
+        if isinstance(item, Mapping)
+        and item.get("target_team") == team
+        and str(item.get("id", "")).strip()
+    }
+    adjacency: dict[str, set[str]] = {key: set() for key in rows}
+    for item_id, item in rows.items():
+        deps = item.get("dependencies", [])
+        if not isinstance(deps, list):
+            continue
+        for dep in deps:
+            dep_id = str(dep).strip()
+            if dep_id in rows:
+                adjacency[item_id].add(dep_id)
+                adjacency[dep_id].add(item_id)
+    components: list[list[str]] = []
+    unseen = set(rows)
+    while unseen:
+        root = min(unseen)
+        stack = [root]
+        component: set[str] = set()
+        while stack:
+            node = stack.pop()
+            if node in component:
+                continue
+            component.add(node)
+            unseen.discard(node)
+            stack.extend(sorted(adjacency[node] - component, reverse=True))
+        components.append(sorted(component))
+    return sorted(components, key=lambda component: component[0] if component else "")
+
+
+def lane_id(component: Sequence[str]) -> str:
+    return hashlib.sha256(
+        json.dumps(sorted(component), separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+
+
+def lane_assignments(plan_items: object, team: str) -> dict[str, str]:
+    assignments: dict[str, str] = {}
+    for component in dependency_components(plan_items, team):
+        identifier = lane_id(component)
+        for item_id in component:
+            assignments[item_id] = identifier
+    return assignments
 
 def frontier_digest(frontier: Mapping[str, Any]) -> str:
     payload = {
