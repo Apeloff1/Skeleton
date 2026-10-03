@@ -4005,6 +4005,12 @@
       "value": ".github/workflows/p1-release-evidence-bundle.yml"
     },
     {
+      "id": "PATH:VOL-060:006",
+      "type": "implementation_path",
+      "volume_ref": "VOL-060",
+      "value": "Dockerfile"
+    },
+    {
       "id": "PATH:VOL-061:001",
       "type": "implementation_path",
       "volume_ref": "VOL-061",
@@ -11076,6 +11082,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-060:001",
+      "to": "PATH:VOL-060:006",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-060:002",
       "to": "PATH:VOL-060:001",
       "type": "contract_materialized_at"
@@ -11101,6 +11112,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-060:002",
+      "to": "PATH:VOL-060:006",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-060:003",
       "to": "PATH:VOL-060:001",
       "type": "contract_materialized_at"
@@ -11123,6 +11139,11 @@
     {
       "from": "CON:VOL-060:003",
       "to": "PATH:VOL-060:005",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-060:003",
+      "to": "PATH:VOL-060:006",
       "type": "contract_materialized_at"
     },
     {
@@ -15547,6 +15568,11 @@
     },
     {
       "from": "PATH:VOL-060:005",
+      "to": "TEST:VOL-060:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-060:006",
       "to": "TEST:VOL-060:001",
       "type": "implementation_validated_by_test"
     },
@@ -23318,6 +23344,11 @@
     {
       "from": "VOL:VOL-060",
       "to": "PATH:VOL-060:005",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-060",
+      "to": "PATH:VOL-060:006",
       "type": "volume_implementation_path"
     },
     {

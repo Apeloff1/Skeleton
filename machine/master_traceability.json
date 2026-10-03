@@ -23,8 +23,8 @@
     "impact_rule": "Changed repository paths resolve through implementation_path nodes using exact/prefix/glob matching."
   },
   "summary": {
-    "node_count": 9115,
-    "edge_count": 25119,
+    "node_count": 9116,
+    "edge_count": 25124,
     "requirement_count": 963,
     "requirements_without_evidence": 688,
     "shard_count": 11
@@ -41,8 +41,8 @@
       "depth_pass": "DP-041-080",
       "path": "machine/traceability/DP-041-080.json",
       "volume_count": 40,
-      "node_count": 1149,
-      "edge_count": 3790
+      "node_count": 1150,
+      "edge_count": 3795
     },
     {
       "depth_pass": "DP-081-120",
