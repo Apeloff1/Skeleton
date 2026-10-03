@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  vulnerability-alerts: read
 
 concurrency:
   group: archive-code-scanning-reconcile
@@ -23,6 +21,10 @@ concurrency:
 jobs:
   reconcile:
     if: github.repository == 'Apeloff1/Skeleton'
+    permissions:
+      contents: read
+      security-events: write
+      vulnerability-alerts: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
