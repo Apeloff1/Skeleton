@@ -15,6 +15,12 @@ from .learning import (
     build_learning_candidate_artifact,
     build_learning_candidate_from_repository,
 )
+from .model_program_bridge import (
+    BridgedModelProgramArtifact,
+    ModelProgramBridgeError,
+    bridge_product_training_to_model_program,
+    model_promotion_receipt_from_qualification,
+)
 from .qualification import (
     LearningQualificationBundle,
     LearningQualificationError,
@@ -23,6 +29,10 @@ from .qualification import (
 )
 
 __all__ = [
+    "model_promotion_receipt_from_qualification",
+    "bridge_product_training_to_model_program",
+    "ModelProgramBridgeError",
+    "BridgedModelProgramArtifact",
     "CANONICAL_PRODUCT_CONTEXT_BUDGET",
     "CanonicalAIResponseEnvelope",
     "CanonicalAITurnRequest",
