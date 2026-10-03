@@ -19,6 +19,7 @@ from skeleton.ai.runtime.training import (
     EvaluationCase,
     EvaluationHarness,
     EvaluationLedger,
+    EvaluationResult,
     EvaluationSuite,
     IngestEnvelope,
     PostTrainingExperiment,
@@ -185,3 +186,81 @@ async def test_p3_t2_provider_independent_training_transaction(tmp_path):
     advanced=curriculum.decide("post",metrics={"accuracy":result.accuracy},completed=("foundation",))
     assert advanced.status=="advance"
     post.record_curriculum(advanced)
+
+def test_evaluation_ledger_rejects_selective_suite_omission(tmp_path):
+    suite=EvaluationSuite(
+        suite_id="full-suite",
+        version="1",
+        cases=(
+            EvaluationCase("easy","easy prompt","ok"),
+            EvaluationCase("hard","hard prompt","hard"),
+        ),
+        population="coverage regression",
+        contamination_fingerprint=_digest("full-suite"),
+    )
+    ledger=EvaluationLedger(tmp_path/"coverage.sqlite3")
+    ledger.register_suite(suite)
+    cherry_picked=EvaluationResult(
+        candidate_model_digest=_digest("candidate"),
+        suite_digest=suite.digest,
+        passed_case_ids=("easy",),
+        failed_case_ids=(),
+        outputs={"easy":"ok"},
+    )
+
+    assert cherry_picked.accuracy==1.0
+    with pytest.raises(ValueError,match="cover every registered suite case"):
+        ledger.record_result(cherry_picked)
+
+
+def test_evaluation_ledger_rejects_unknown_case_substitution(tmp_path):
+    suite=EvaluationSuite(
+        suite_id="identity-suite",
+        version="1",
+        cases=(EvaluationCase("canonical","prompt","expected"),),
+        population="identity regression",
+        contamination_fingerprint=_digest("identity-suite"),
+    )
+    ledger=EvaluationLedger(tmp_path/"identity.sqlite3")
+    ledger.register_suite(suite)
+    substituted=EvaluationResult(
+        candidate_model_digest=_digest("candidate"),
+        suite_digest=suite.digest,
+        passed_case_ids=("easier-substitute",),
+        failed_case_ids=(),
+        outputs={"easier-substitute":"expected"},
+    )
+
+    with pytest.raises(ValueError,match="cover every registered suite case"):
+        ledger.record_result(substituted)
+
+
+def test_evaluation_ledger_detects_stored_suite_corruption(tmp_path):
+    suite=EvaluationSuite(
+        suite_id="durable-suite",
+        version="1",
+        cases=(EvaluationCase("case","prompt","expected"),),
+        population="durable regression",
+        contamination_fingerprint=_digest("durable-suite"),
+    )
+    ledger=EvaluationLedger(tmp_path/"durable.sqlite3")
+    ledger.register_suite(suite)
+    result=EvaluationResult(
+        candidate_model_digest=_digest("candidate"),
+        suite_digest=suite.digest,
+        passed_case_ids=("case",),
+        failed_case_ids=(),
+        outputs={"case":"expected"},
+    )
+    import json
+    payload=suite.as_dict()
+    payload["population"]="tampered population"
+    ledger._db.execute(
+        "UPDATE eval_suite SET payload=? WHERE suite_digest=?",
+        (json.dumps(payload,sort_keys=True,separators=(",",":")),suite.digest),
+    )
+    ledger._db.commit()
+
+    with pytest.raises(ValueError,match="suite digest mismatch"):
+        ledger.record_result(result)
+
