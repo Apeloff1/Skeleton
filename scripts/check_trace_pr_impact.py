@@ -40,6 +40,13 @@ _TRACE_CONTROL_PREFIXES = (
     "machine/traceability/",
 )
 
+# Small root-level implementation surfaces cannot be represented by a
+# directory-prefix implementation path without over-broadening the canonical
+# master trace. Keep those exact bindings explicit and fail-closed here.
+_TRACE_EXACT_IMPLEMENTATION_BINDINGS = {
+    "Dockerfile": ("VOL-060",),
+}
+
 
 class TraceImpactError(RuntimeError):
     pass
@@ -101,12 +108,18 @@ def validate(root: Path, base: str, head: str) -> dict[str, object]:
     if not isinstance(impact, dict):
         raise TraceImpactError("traceability validator did not return impact data")
 
+    exact_bindings = {
+        path: list(_TRACE_EXACT_IMPLEMENTATION_BINDINGS[path])
+        for path in changed
+        if path in _TRACE_EXACT_IMPLEMENTATION_BINDINGS
+    }
     master_unmapped = set(impact.get("unmapped_changed_files", []))
     unresolved = sorted(
         path
         for path in master_unmapped
         if not _is_control_path(path)
         and path not in impact.get("maturity_invalidation_by_file", {})
+        and path not in exact_bindings
     )
     if unresolved:
         raise TraceImpactError(
@@ -116,6 +129,9 @@ def validate(root: Path, base: str, head: str) -> dict[str, object]:
 
     control = sorted(path for path in changed if _is_control_path(path))
     resolved = sorted(set(changed) - set(unresolved))
+    impacted_refs = set(impact.get("combined_impacted_volume_refs", []))
+    for refs in exact_bindings.values():
+        impacted_refs.update(refs)
     return {
         "status": "valid",
         "base": base.lower(),
@@ -125,9 +141,8 @@ def validate(root: Path, base: str, head: str) -> dict[str, object]:
         "resolved_file_count": len(resolved),
         "control_file_count": len(control),
         "control_files": control,
-        "combined_impacted_volume_refs": impact.get(
-            "combined_impacted_volume_refs", []
-        ),
+        "exact_implementation_bindings": exact_bindings,
+        "combined_impacted_volume_refs": sorted(impacted_refs),
         "maturity_invalidated_volume_refs": impact.get(
             "maturity_invalidated_volume_refs", []
         ),
