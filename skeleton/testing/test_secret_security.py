@@ -155,9 +155,9 @@ def test_secret_metadata_redacts_nested_secret_shaped_fields() -> None:
     }
     assert findings == (
         "$.authorization",
+        "$.items[0].refresh_token",
         "$.nested.api-key",
         "$.nested.password",
-        "$.items[0].refresh_token",
     )
     evidence_text = repr((sanitized, findings))
     for raw in (
@@ -186,3 +186,23 @@ def test_secret_contracts_reject_unbounded_or_empty_identity() -> None:
         SecretRef(handle_id="h" * 257, provider_id="vault", version_id="v1")
     with pytest.raises(SecretSecurityError, match="scopes must be non-empty"):
         _grant(scopes=())
+
+
+def test_secret_redaction_findings_are_input_order_independent() -> None:
+    first = {
+        "password": "example-password",
+        "nested": {"api_key": "example-api-key"},
+    }
+    second = {
+        "nested": {"api_key": "example-api-key"},
+        "password": "example-password",
+    }
+
+    first_sanitized, first_findings = sanitize_secret_metadata(first)
+    second_sanitized, second_findings = sanitize_secret_metadata(second)
+
+    assert first_sanitized == second_sanitized
+    assert first_findings == second_findings == (
+        "$.nested.api_key",
+        "$.password",
+    )
