@@ -111,6 +111,10 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
+      - name: Syntax-check local node_modules patcher
+        working-directory: frontend
+        run: node --check scripts/patch-node-modules.js
+
       - name: Install frozen frontend dependency graph without lifecycle scripts
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
