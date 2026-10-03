@@ -75,9 +75,9 @@ Existing large/binary tracked files are migration debt until moved to the correc
 
 A PR introducing a new large asset must explain why the chosen storage lane is correct. For LFS/external assets, reviewers should verify provenance and license before merge. For generated release outputs, the PR should change the build recipeâ€”not commit the output itself.
 
-## Restoring referenced satellite artifacts
+## Restoring referenced historical artifacts
 
-Nine historical satellite binaries now use immutable records in
+Nine historical satellite binaries plus the canonical oversized BSON backup now use immutable records in
 `satellites/ARTIFACT_REFERENCES.json`. The records bind the original Git commit
 and blob, SHA-256, size, mode, license and redistribution status. A full-history
 checkout is required to resolve those objects; restoring a historical binary
