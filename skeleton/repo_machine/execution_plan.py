@@ -1,164 +1,76 @@
-"""Closed-loop execution planning with validated, indexed state transitions."""
+"""Closed-loop execution planning with reusable validated graph state."""
 from __future__ import annotations
-
-import hashlib
-import json
-from dataclasses import dataclass, field
-from typing import Iterable, Literal
-
+import hashlib,json
+from dataclasses import dataclass,field
+from typing import Iterable,Literal
 from .model import RepositoryModel
-from .workgraph import build_work_graph
-
-Phase = Literal["prepare", "modify", "verify", "unlock"]
-Outcome = Literal["success", "failed", "blocked", "stale"]
-
-
-@dataclass(frozen=True, slots=True)
+from .workgraph import WorkGraph,build_work_graph
+Phase=Literal["prepare","modify","verify","unlock"]; Outcome=Literal["success","failed","blocked","stale"]
+@dataclass(frozen=True,slots=True)
 class PlanStep:
-    identity: str
-    phase: Phase
-    action: str
-    depends_on: tuple[str, ...] = ()
-    verification_paths: tuple[str, ...] = ()
-    work_identity: str = ""
-
-    def as_dict(self) -> dict[str, object]:
-        return {"identity": self.identity, "phase": self.phase, "action": self.action,
-                "depends_on": list(self.depends_on), "verification_paths": list(self.verification_paths),
-                "work_identity": self.work_identity}
-
-
-@dataclass(frozen=True, slots=True)
+    identity:str; phase:Phase; action:str; depends_on:tuple[str,...]=(); verification_paths:tuple[str,...]=(); work_identity:str=""
+    def as_dict(self): return {"identity":self.identity,"phase":self.phase,"action":self.action,"depends_on":list(self.depends_on),"verification_paths":list(self.verification_paths),"work_identity":self.work_identity}
+@dataclass(frozen=True,slots=True)
 class ExecutionState:
-    completed_steps: tuple[str, ...] = ()
-    failed_work: tuple[str, ...] = ()
-    verified_work: tuple[str, ...] = ()
-    released_work: tuple[str, ...] = ()
-    stale: bool = False
-
-    def as_dict(self) -> dict[str, object]:
-        return {"completed_steps": list(self.completed_steps), "failed_work": list(self.failed_work),
-                "verified_work": list(self.verified_work), "released_work": list(self.released_work),
-                "stale": self.stale}
-
-
-@dataclass(frozen=True, slots=True)
+    completed_steps:tuple[str,...]=(); failed_work:tuple[str,...]=(); verified_work:tuple[str,...]=(); released_work:tuple[str,...]=(); stale:bool=False
+    def as_dict(self): return {"completed_steps":list(self.completed_steps),"failed_work":list(self.failed_work),"verified_work":list(self.verified_work),"released_work":list(self.released_work),"stale":self.stale}
+@dataclass(frozen=True,slots=True)
 class ExecutionPlan:
-    repository_fingerprint: str
-    steps: tuple[PlanStep, ...]
-    ready_work: tuple[str, ...]
-    blocked_work: tuple[str, ...]
-    state: ExecutionState = ExecutionState()
-    _steps_by_identity: dict[str, PlanStep] = field(init=False, repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        by_identity: dict[str, PlanStep] = {}
-        for step in self.steps:
-            if step.identity in by_identity:
-                raise ValueError(f"duplicate execution step: {step.identity}")
-            by_identity[step.identity] = step
-        for step in self.steps:
-            if any(dep not in by_identity for dep in step.depends_on):
-                raise ValueError(f"unknown step dependency for {step.identity}")
-        object.__setattr__(self, "_steps_by_identity", by_identity)
-
+    repository_fingerprint:str; steps:tuple[PlanStep,...]; ready_work:tuple[str,...]; blocked_work:tuple[str,...]; state:ExecutionState=ExecutionState()
+    _steps_by_identity:dict[str,PlanStep]=field(init=False,repr=False,compare=False)
+    def __post_init__(self):
+        by={}
+        for s in self.steps:
+            if s.identity in by: raise ValueError(f"duplicate execution step: {s.identity}")
+            by[s.identity]=s
+        for s in self.steps:
+            if any(d not in by for d in s.depends_on): raise ValueError(f"unknown step dependency for {s.identity}")
+        object.__setattr__(self,"_steps_by_identity",by)
     @property
-    def definition_fingerprint(self) -> str:
-        payload = {"repository_fingerprint": self.repository_fingerprint,
-                   "steps": [step.as_dict() for step in self.steps],
-                   "ready_work": list(self.ready_work), "blocked_work": list(self.blocked_work)}
-        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
+    def definition_fingerprint(self):
+        p={"repository_fingerprint":self.repository_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work)}
+        return hashlib.sha256(json.dumps(p,sort_keys=True,separators=(",",":")).encode()).hexdigest()
     @property
-    def fingerprint(self) -> str:
-        payload = {"definition": self.definition_fingerprint, "state": self.state.as_dict()}
-        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    def fingerprint(self):
+        return hashlib.sha256(json.dumps({"definition":self.definition_fingerprint,"state":self.state.as_dict()},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    def as_dict(self): return {"repository_fingerprint":self.repository_fingerprint,"plan_fingerprint":self.fingerprint,"definition_fingerprint":self.definition_fingerprint,"steps":[s.as_dict() for s in self.steps],"ready_work":list(self.ready_work),"blocked_work":list(self.blocked_work),"state":self.state.as_dict()}
 
-    def as_dict(self) -> dict[str, object]:
-        return {"repository_fingerprint": self.repository_fingerprint,
-                "plan_fingerprint": self.fingerprint,
-                "definition_fingerprint": self.definition_fingerprint,
-                "steps": [item.as_dict() for item in self.steps], "ready_work": list(self.ready_work),
-                "blocked_work": list(self.blocked_work), "state": self.state.as_dict()}
+def _stale_plan(plan,completed,failed,verified,released):
+    return ExecutionPlan(plan.repository_fingerprint,plan.steps,(),plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),True))
 
-
-def _stale_plan(plan: ExecutionPlan, completed: set[str], failed: set[str], verified: set[str], released: set[str]) -> ExecutionPlan:
-    return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
-                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
-                                        tuple(sorted(verified)), tuple(sorted(released)), True))
-
-
-def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outcome,
-                      repository_fingerprint: str, expected_plan_fingerprint: str | None = None) -> ExecutionPlan:
-    if expected_plan_fingerprint is not None and expected_plan_fingerprint != plan.fingerprint:
-        raise ValueError("execution plan fingerprint mismatch")
-    if repository_fingerprint != plan.repository_fingerprint:
-        return _stale_plan(plan, set(plan.state.completed_steps), set(plan.state.failed_work),
-                           set(plan.state.verified_work), set(plan.state.released_work))
-    step = plan._steps_by_identity.get(step_identity)
-    if step is None:
-        raise ValueError("unknown execution step")
-    completed = set(plan.state.completed_steps)
-    failed = set(plan.state.failed_work)
-    verified = set(plan.state.verified_work)
-    released = set(plan.state.released_work)
-    if step.identity in completed:
-        raise ValueError("execution step already completed")
-    if any(dependency not in completed for dependency in step.depends_on):
-        raise ValueError("execution step prerequisites are incomplete")
-    if outcome == "success":
+def advance_execution(plan,*,step_identity:str,outcome:Outcome,repository_fingerprint:str,expected_plan_fingerprint:str|None=None):
+    if expected_plan_fingerprint is not None and expected_plan_fingerprint!=plan.fingerprint: raise ValueError("execution plan fingerprint mismatch")
+    if repository_fingerprint!=plan.repository_fingerprint: return _stale_plan(plan,set(plan.state.completed_steps),set(plan.state.failed_work),set(plan.state.verified_work),set(plan.state.released_work))
+    step=plan._steps_by_identity.get(step_identity)
+    if step is None: raise ValueError("unknown execution step")
+    completed=set(plan.state.completed_steps); failed=set(plan.state.failed_work); verified=set(plan.state.verified_work); released=set(plan.state.released_work)
+    if step.identity in completed: raise ValueError("execution step already completed")
+    if any(d not in completed for d in step.depends_on): raise ValueError("execution step prerequisites are incomplete")
+    if outcome=="success":
         completed.add(step.identity)
-        if step.phase == "verify":
-            verified.add(step.work_identity)
-        elif step.phase == "unlock":
-            if step.work_identity not in verified:
-                raise ValueError("work must be verified before unlock")
-            released.add(step.work_identity)
-            failed.discard(step.work_identity)
-    elif outcome == "failed":
-        failed.add(step.work_identity)
-        verified.discard(step.work_identity)
-        released.discard(step.work_identity)
-    elif outcome == "stale":
-        return _stale_plan(plan, completed, failed, verified, released)
-    elif outcome == "blocked":
-        return plan
-    return ExecutionPlan(plan.repository_fingerprint, plan.steps, plan.ready_work, plan.blocked_work,
-                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
-                                        tuple(sorted(verified)), tuple(sorted(released)), False))
+        if step.phase=="verify": verified.add(step.work_identity)
+        elif step.phase=="unlock":
+            if step.work_identity not in verified: raise ValueError("work must be verified before unlock")
+            released.add(step.work_identity); failed.discard(step.work_identity)
+    elif outcome=="failed": failed.add(step.work_identity); verified.discard(step.work_identity); released.discard(step.work_identity)
+    elif outcome=="stale": return _stale_plan(plan,completed,failed,verified,released)
+    elif outcome=="blocked": return plan
+    return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False))
 
+def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),active_conflicts:Iterable[str]=(),limit:int=8,state:ExecutionState|None=None,retry_failed:bool=False,graph:WorkGraph|None=None):
+    graph=graph or build_work_graph(model,limit=max(limit,32)); inherited=state or ExecutionState(); completed_set=set(completed)|set(inherited.released_work)
+    ready=graph.ready(completed_set,active_conflicts,limit=limit); failed=set(inherited.failed_work)
+    if not retry_failed: ready=tuple(n for n in ready if n.identity not in failed)
+    ready_ids={n.identity for n in ready}; steps=[]
+    for n in ready:
+        prepare,modify,verify,unlock=(f"{n.identity}:{p}" for p in ("prepare","modify","verify","unlock"))
+        steps.extend((PlanStep(prepare,"prepare",f"Inspect evidence and establish the bounded change scope for {n.identity}.",work_identity=n.identity),
+                      PlanStep(modify,"modify",n.objective,(prepare,),work_identity=n.identity),
+                      PlanStep(verify,"verify","Run the smallest relevant verification surface before considering the work complete.",(modify,),n.verification_paths,n.identity),
+                      PlanStep(unlock,"unlock","Release the verified work and recompute downstream readiness.",(verify,),work_identity=n.identity)))
+    blocked=tuple(n.identity for n in graph._ordered_nodes if n.identity not in ready_ids and n.identity not in completed_set)
+    return ExecutionPlan(model.fingerprint,tuple(steps),tuple(n.identity for n in ready),blocked,inherited)
 
-def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (),
-                         active_conflicts: Iterable[str] = (), limit: int = 8,
-                         state: ExecutionState | None = None,
-                         retry_failed: bool = False) -> ExecutionPlan:
-    graph = build_work_graph(model, limit=max(limit, 32))
-    inherited = state or ExecutionState()
-    completed_set = set(completed) | set(inherited.released_work)
-    ready = graph.ready(completed_set, active_conflicts, limit=limit)
-    failed = set(inherited.failed_work)
-    if not retry_failed:
-        ready = tuple(node for node in ready if node.identity not in failed)
-    ready_ids = {node.identity for node in ready}
-    steps: list[PlanStep] = []
-    for node in ready:
-        prepare, modify, verify, unlock = (f"{node.identity}:{phase}" for phase in ("prepare", "modify", "verify", "unlock"))
-        steps.extend((
-            PlanStep(prepare, "prepare", f"Inspect evidence and establish the bounded change scope for {node.identity}.", work_identity=node.identity),
-            PlanStep(modify, "modify", node.objective, (prepare,), work_identity=node.identity),
-            PlanStep(verify, "verify", "Run the smallest relevant verification surface before considering the work complete.", (modify,), node.verification_paths, node.identity),
-            PlanStep(unlock, "unlock", "Release the verified work and recompute downstream readiness.", (verify,), work_identity=node.identity),
-        ))
-    blocked = tuple(node.identity for node in graph._ordered_nodes if node.identity not in ready_ids and node.identity not in completed_set)
-    return ExecutionPlan(model.fingerprint, tuple(steps), tuple(node.identity for node in ready), blocked, inherited)
-
-
-def replan_execution(model: RepositoryModel, previous: ExecutionPlan, *,
-                     active_conflicts: Iterable[str] = (), limit: int = 8,
-                     retry_failed: bool = False) -> ExecutionPlan:
-    return build_execution_plan(model, active_conflicts=active_conflicts, limit=limit,
-                                state=previous.state, retry_failed=retry_failed)
-
-
-__all__ = ["ExecutionPlan", "ExecutionState", "Outcome", "Phase", "PlanStep",
-           "advance_execution", "build_execution_plan", "replan_execution"]
+def replan_execution(model,previous,*,active_conflicts=(),limit=8,retry_failed=False,graph=None):
+    return build_execution_plan(model,active_conflicts=active_conflicts,limit=limit,state=previous.state,retry_failed=retry_failed,graph=graph)
+__all__=["ExecutionPlan","ExecutionState","Outcome","Phase","PlanStep","advance_execution","build_execution_plan","replan_execution"]
