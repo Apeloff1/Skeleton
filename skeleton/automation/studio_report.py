@@ -36,6 +36,11 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
     events = Counter(str(row.get("event", "unknown")) for row in rows)
     first = rows[0]
     last = rows[-1]
+    run_ids = {str(row.get("run_id", "")).strip() for row in rows if str(row.get("run_id", "")).strip()}
+    if len(run_ids) > 1:
+        raise ValueError("audit log contains records from multiple run ids")
+    terminal_events = {"run_finished", "run_failed_closed", "run_blocked_by_operator", "shift_skipped_queue_pressure"}
+    terminal = [row for row in rows if str(row.get("event", "")) in terminal_events]
     cohort = _as_list(first.get("cohort"))
     plan_rows = [
         task
@@ -63,6 +68,15 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
         f"- Planned tasks: **{len(plan_rows)}**",
         f"- Accepted patches: **{len(accepted)}**",
         f"- Rejected/failed-closed tasks or runs: **{len(rejected)}**",
+        f"- Terminal controller records: **{len(terminal)}**",
+        "",
+        "## Controller integrity",
+        "",
+        (
+            "- Audit lifecycle: **complete**"
+            if len(terminal) == 1
+            else f"- Audit lifecycle: **incomplete/ambiguous** ({len(terminal)} terminal records)"
+        ),
         "",
         "## Planned work",
         "",
