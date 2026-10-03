@@ -1,0 +1,73 @@
+name: Provider Adapter Offline Runtime
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/integrations/adapters/**"
+      - ".github/workflows/provider-adapters-offline.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/integrations/adapters/**"
+      - ".github/workflows/provider-adapters-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-adapters-offline-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  provider-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+
+      - name: Enforce provider-only authority boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path("skeleton/integrations/adapters")
+          forbidden = ("capsec.py", "tools.py", "tool_loop.py")
+          present = [name for name in forbidden if (root / name).exists()]
+          if present:
+              raise SystemExit(
+                  "provider-only slice must not carry parallel tool/capsec authority: "
+                  + ", ".join(present)
+              )
+          PY
+
+      - name: Compile provider runtime
+        run: python -m compileall -q skeleton/integrations/adapters
+
+      - name: Run provider adapter acceptance
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/integrations/adapters/test_types.py
+          skeleton/integrations/adapters/test_errors.py
+          skeleton/integrations/adapters/test_deadline.py
+          skeleton/integrations/adapters/test_retry.py
+          skeleton/integrations/adapters/test_circuit.py
+          skeleton/integrations/adapters/test_provider_registry.py
+          skeleton/integrations/adapters/test_offline.py
+          skeleton/integrations/adapters/test_client.py
