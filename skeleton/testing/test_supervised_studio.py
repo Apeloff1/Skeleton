@@ -869,3 +869,10 @@ def test_empirical_repair_is_bounded_to_two_attempts(monkeypatch, tmp_path):
 def test_execution_receipt_path_is_supported_by_cli():
     source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
     assert "--receipt-path" in source
+
+
+def test_live_executor_requires_aggregate_integration_validation():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "integration_commands(aggregate_paths)" in source
+    assert 'stage="aggregate_integration_validation"' in source
+    assert '"aggregate_integration_validated"' in source
