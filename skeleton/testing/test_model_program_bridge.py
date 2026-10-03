@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 import pytest
 
@@ -81,22 +82,35 @@ def _qualification_for(bridged) -> LearningQualificationBundle:
         "mirror-room-evidence-sha256:" + _sha("mirror-ref"),
         "evaluation-firewall-evidence-sha256:" + _sha("firewall-ref"),
     )
+    payload = {
+        "schema_version": "skeleton.learning_qualification.v1",
+        "binding_digest": _sha("binding"),
+        "candidate_model_digest": bridged.artifact.model_digest,
+        "baseline_model_digest": _sha("baseline-model"),
+        "candidate_artifact_sha256": bridged.artifact.artifact_digest,
+        "training_plan_digest": bridged.training_plan_digest,
+        "mirror_evidence_digest": _sha("mirror-evidence"),
+        "firewall_evidence_digest": _sha("firewall-evidence"),
+        "mirror_verifier_id": "mirror-independent-verifier",
+        "firewall_evaluator_identity": "firewall-independent-evaluator",
+        "lifecycle_evidence_refs": list(refs),
+        "camera_coverage_digest": None,
+        "method_allocation_digest": None,
+        "production_authority": False,
+        "direct_self_modify": False,
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
     return LearningQualificationBundle(
-        binding_digest=_sha("binding"),
-        candidate_model_digest=bridged.artifact.model_digest,
-        baseline_model_digest=_sha("baseline-model"),
-        candidate_artifact_sha256=bridged.artifact.artifact_digest,
-        training_plan_digest=bridged.training_plan_digest,
-        mirror_evidence_digest=_sha("mirror-evidence"),
-        firewall_evidence_digest=_sha("firewall-evidence"),
-        mirror_verifier_id="mirror-independent-verifier",
-        firewall_evaluator_identity="firewall-independent-evaluator",
-        lifecycle_evidence_refs=refs,
-        camera_coverage_digest=None,
-        method_allocation_digest=None,
-        production_authority=False,
-        direct_self_modify=False,
-        qualification_digest=_sha("qualification"),
+        **payload,
+        qualification_digest=digest,
     )
 
 
