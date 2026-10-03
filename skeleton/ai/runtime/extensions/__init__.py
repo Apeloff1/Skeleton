@@ -53,3 +53,41 @@ __all__ = [
     "digest_bytes",
     "fuse_scores",
 ]
+
+from .ecosystem import (
+    ConnectorDefinition,
+    ConnectorRegistry,
+    ConnectorResult,
+    ConnectorSession,
+    MarketplacePackage,
+    MarketplaceVerifier,
+    PackageAttestation,
+    PluginGrant,
+    PluginLifecycle,
+    PluginManifest,
+    PluginRegistry,
+    RevocationRecord,
+    ToolDefinition,
+    ToolInvocation,
+    ToolRegistry,
+    ToolResult,
+)
+
+__all__ += [
+    "ConnectorDefinition",
+    "ConnectorRegistry",
+    "ConnectorResult",
+    "ConnectorSession",
+    "MarketplacePackage",
+    "MarketplaceVerifier",
+    "PackageAttestation",
+    "PluginGrant",
+    "PluginLifecycle",
+    "PluginManifest",
+    "PluginRegistry",
+    "RevocationRecord",
+    "ToolDefinition",
+    "ToolInvocation",
+    "ToolRegistry",
+    "ToolResult",
+]
