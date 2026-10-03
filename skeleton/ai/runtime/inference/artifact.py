@@ -268,6 +268,14 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
                 "AI_LOCAL_ACTIVATION_MANIFEST and "
                 "AI_LOCAL_ACTIVATION_DIGEST must be configured together"
             )
+        target = os.getenv(
+            "AI_LOCAL_ACTIVATION_TARGET",
+            "candidate",
+        ).strip().lower()
+        if target not in {"candidate", "rollback"}:
+            raise LocalModelArtifactError(
+                "AI_LOCAL_ACTIVATION_TARGET must be candidate or rollback"
+            )
         try:
             from skeleton.ai.runtime.product.activation import (
                 LocalModelActivationError,
@@ -277,6 +285,7 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
             adapter = local_model_adapter_from_activation_manifest(
                 activation_path,
                 expected_manifest_digest=activation_digest,
+                target=target,
             )
         except LocalModelActivationError as exc:
             raise LocalModelArtifactError(
@@ -292,9 +301,14 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
                 raise LocalModelArtifactError(
                     "AI_LOCAL_MODEL_PATH is unavailable"
                 ) from exc
-            if str(direct) != manifest.candidate_path:
+            selected_path = (
+                manifest.candidate_path
+                if adapter.activation_target == "candidate"
+                else manifest.baseline_path
+            )
+            if str(direct) != selected_path:
                 raise LocalModelArtifactError(
-                    "AI_LOCAL_MODEL_PATH conflicts with activation manifest"
+                    "AI_LOCAL_MODEL_PATH conflicts with selected activation target"
                 )
 
         cache_raw = os.getenv("AI_LOCAL_MODEL_CACHE_SIZE")
@@ -322,6 +336,12 @@ def local_model_adapter_from_env() -> LocalModelAdapter:
                     "AI_LOCAL_MODEL_SEED conflicts with activation manifest"
                 )
         return adapter
+
+    loose_target = os.getenv("AI_LOCAL_ACTIVATION_TARGET", "").strip()
+    if loose_target:
+        raise LocalModelArtifactError(
+            "AI_LOCAL_ACTIVATION_TARGET requires an activation manifest"
+        )
 
     path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
     if not path:
