@@ -10,6 +10,7 @@ on:
       - "skeleton/testing/test_mirror_room_observability.py"
       - "frontend/features/MirrorRoom/**"
       - "frontend/app/mirror-room.tsx"
+      - "backend/routes/mirror_room.py"
       - ".github/workflows/mirror-room-extensions.yml"
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - "skeleton/testing/test_mirror_room_observability.py"
       - "frontend/features/MirrorRoom/**"
       - "frontend/app/mirror-room.tsx"
+      - "backend/routes/mirror_room.py"
       - ".github/workflows/mirror-room-extensions.yml"
   workflow_dispatch:
 
