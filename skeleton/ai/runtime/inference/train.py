@@ -129,6 +129,7 @@ def _train_and_write(
     early_stopping_patience: int,
     min_relative_improvement: float,
     shuffle_each_epoch: bool,
+    gradient_accumulation_steps: int,
     extra_receipt: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Train one model and atomically promote only verified bytes."""
@@ -160,6 +161,7 @@ def _train_and_write(
         early_stopping_patience=early_stopping_patience,
         min_relative_improvement=min_relative_improvement,
         shuffle_each_epoch=shuffle_each_epoch,
+        gradient_accumulation_steps=gradient_accumulation_steps,
     )
     raw = _stable_json_bytes(model.to_dict())
 
@@ -232,6 +234,16 @@ def _train_and_write(
             "training_tokens": int(
                 getattr(model, "training_tokens", 0)
             ),
+            "optimizer_steps": int(
+                getattr(model, "training_optimizer_steps", 0)
+            ),
+            "gradient_accumulation_steps": int(
+                getattr(
+                    model,
+                    "training_gradient_accumulation_steps",
+                    gradient_accumulation_steps,
+                )
+            ),
             "seed": int(seed),
         }
         if extra_receipt:
@@ -269,6 +281,7 @@ def build_recurrent_artifact(
     early_stopping_patience: int = 0,
     min_relative_improvement: float = 0.0,
     shuffle_each_epoch: bool = True,
+    gradient_accumulation_steps: int = 1,
 ) -> dict[str, object]:
     """Train, atomically write, reload, and attest one recurrent artifact."""
 
@@ -287,6 +300,7 @@ def build_recurrent_artifact(
         early_stopping_patience=early_stopping_patience,
         min_relative_improvement=min_relative_improvement,
         shuffle_each_epoch=shuffle_each_epoch,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         extra_receipt={"training_mode": "plain_corpus"},
     )
 
@@ -308,6 +322,7 @@ def build_multi_method_recurrent_artifact(
     early_stopping_patience: int = 2,
     min_relative_improvement: float = 1e-4,
     shuffle_each_epoch: bool = True,
+    gradient_accumulation_steps: int = 4,
 ) -> dict[str, object]:
     """Compile multiple learning families and train one bounded local artifact."""
 
@@ -341,6 +356,7 @@ def build_multi_method_recurrent_artifact(
         early_stopping_patience=early_stopping_patience,
         min_relative_improvement=min_relative_improvement,
         shuffle_each_epoch=shuffle_each_epoch,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         extra_receipt={
             "training_mode": "multi_method",
             "training_plan": plan.as_dict(),
@@ -391,6 +407,12 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable deterministic per-epoch sequence shuffling",
     )
+    parser.add_argument(
+        "--gradient-accumulation-steps",
+        type=int,
+        default=1,
+        help="Accumulate this many document gradients per optimizer update",
+    )
     return parser
 
 
@@ -410,6 +432,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         early_stopping_patience=args.early_stopping_patience,
         min_relative_improvement=args.min_relative_improvement,
         shuffle_each_epoch=not args.no_shuffle,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
     )
     print(
         json.dumps(
