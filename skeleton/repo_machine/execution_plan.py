@@ -68,7 +68,7 @@ def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),acti
                       PlanStep(modify,"modify",n.objective,(prepare,),work_identity=n.identity),
                       PlanStep(verify,"verify","Run the smallest relevant verification surface before considering the work complete.",(modify,),n.verification_paths,n.identity),
                       PlanStep(unlock,"unlock","Release the verified work and recompute downstream readiness.",(verify,),work_identity=n.identity)))
-    blocked=tuple(n.identity for n in graph._ordered_nodes if n.identity not in ready_ids and n.identity not in completed_set)
+    blocked=tuple(n.identity for n in graph.ordered_nodes if n.identity not in ready_ids and n.identity not in completed_set)
     return ExecutionPlan(model.fingerprint,tuple(steps),tuple(n.identity for n in ready),blocked,inherited)
 
 def replan_execution(model,previous,*,active_conflicts=(),limit=8,retry_failed=False,graph=None):
