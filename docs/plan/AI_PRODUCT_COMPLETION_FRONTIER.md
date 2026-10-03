@@ -242,10 +242,15 @@ The handoff is fail-closed for missing inline content, mixed threads/branches,
 unauthorized data classes, duplicate identities, oversized corpora, and tool-
 augmented turns unless the caller separately opts those turns into learning.
 
-The resulting corpus is content-addressed and deterministic. It can train the
-credential-free local recurrent backend into a **candidate-only** artifact. The
-builder refuses to overwrite the exact path named by `AI_LOCAL_MODEL_PATH`, so a
-successful runtime response cannot silently replace the active production model.
+The resulting corpus is content-addressed and deterministic. Repository-backed
+handoff binds the corpus to an exact durable thread version and rejects a moving
+or over-window transcript instead of learning from an ambiguous snapshot. It can
+train the credential-free local recurrent backend into a **candidate-only**
+artifact. The builder refuses to overwrite the exact path named by
+`AI_LOCAL_MODEL_PATH`, reloads the exact candidate bytes, performs one bounded
+offline inference qualification, and emits a digest-bound qualification receipt.
+A broken candidate is deleted rather than left behind as a plausible artifact.
+
 Evaluation firewall, Mirror Room qualification, promotion, rollout and rollback
 remain distinct authorities.
 
