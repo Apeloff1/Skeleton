@@ -5,6 +5,7 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
+    creator     Canonical typed creator command surface (create/edit/test/preview/export)
     run         Start the skeleton runtime / GameForge vision run
     forge       Blueprint compilation and materialization
     test        Run test suites
@@ -460,6 +461,32 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
     return 0 if payload.get("succeeded") else 1
 
 
+
+def _cmd_creator(rest: List[str]) -> int:
+    """Compile one CLI creator request into the canonical B014 envelope."""
+    from skeleton.forge.creator.command_surface import (
+        CreatorCommandError,
+        creator_cli_payload,
+    )
+
+    try:
+        payload = creator_cli_payload(rest)
+    except CreatorCommandError as exc:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": exc.code,
+                    "message": str(exc),
+                    "context": dict(getattr(exc, "context", {})),
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
 def _cmd_test(_rest: List[str]) -> int:
     """Run the configured pytest suite, with unittest discovery as a fallback."""
     try:
@@ -491,6 +518,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             bp = forge.new_blueprint(rest[0])
             print(f"Blueprint '{rest[0]}' created with {len(bp.components)} components.")
         return 0
+    if cmd == "creator": return _cmd_creator(rest)
     if cmd == "test": return _cmd_test(rest)
     if cmd == "dev":
         from skeleton.developer.cli import dev_exit_code, run_dev_cli
