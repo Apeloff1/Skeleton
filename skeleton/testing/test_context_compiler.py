@@ -677,6 +677,53 @@ def test_duplicate_evidence_is_deterministically_omitted() -> None:
     assert dict(envelope.omission_reasons)[second.segment_id] == "duplicate_content"
 
 
+def test_repeated_conversation_text_preserves_distinct_turn_identity() -> None:
+    first_user = _segment(
+        "Repeat this exact question.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="first-user",
+        priority=700,
+        relevance=1.0,
+        created_at=BASE,
+        provenance=("conversation-sequence:1",),
+    )
+    first_assistant = _segment(
+        "First answer.",
+        kind=ContextKind.ASSISTANT_MESSAGE,
+        trust=ContextTrust.DERIVED_UNTRUSTED,
+        source_type="conversation",
+        source_id="first-assistant",
+        priority=700,
+        relevance=1.0,
+        created_at=BASE + timedelta(seconds=1),
+        provenance=("conversation-sequence:2",),
+    )
+    second_user = _segment(
+        "Repeat this exact question.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="second-user",
+        priority=700,
+        relevance=1.0,
+        created_at=BASE + timedelta(seconds=2),
+        provenance=("conversation-sequence:3",),
+    )
+
+    envelope = _compile([second_user, first_assistant, first_user])
+    projection = project_provider_context(envelope)
+
+    assert second_user.segment_id not in envelope.omitted_segment_ids
+    assert first_user.segment_id not in envelope.omitted_segment_ids
+    assert projection.prompt == "Repeat this exact question."
+    assert projection.history == (
+        {"role": "user", "content": "Repeat this exact question."},
+        {"role": "assistant", "content": "First answer."},
+    )
+
+
 def test_policy_can_raise_clearance_for_explicit_authorized_flow() -> None:
     restricted = _segment(
         "restricted but explicitly approved",
