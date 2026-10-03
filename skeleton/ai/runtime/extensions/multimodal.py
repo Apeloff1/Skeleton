@@ -64,6 +64,47 @@ class ResourceLimits:
 
 
 @dataclass(frozen=True, slots=True)
+class MediaMetadata:
+    media_type: str
+    format: str
+    width: int | None = None
+    height: int | None = None
+    duration_seconds: float | None = None
+    sample_rate_hz: int | None = None
+    channels: int | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "media_type", _require_nonempty(self.media_type, field_name="media_type"))
+        object.__setattr__(self, "format", _require_nonempty(self.format, field_name="format"))
+        if (self.width is None) != (self.height is None):
+            raise ValueError("width and height must be supplied together")
+        if self.width is not None and (self.width <= 0 or self.height is None or self.height <= 0):
+            raise ValueError("media dimensions must be positive")
+        if self.duration_seconds is not None and (
+            not math.isfinite(self.duration_seconds) or self.duration_seconds < 0
+        ):
+            raise ValueError("duration_seconds must be finite and non-negative")
+        if self.sample_rate_hz is not None and self.sample_rate_hz <= 0:
+            raise ValueError("sample_rate_hz must be positive")
+        if self.channels is not None and self.channels <= 0:
+            raise ValueError("channels must be positive")
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "media_type": self.media_type,
+                "format": self.format,
+                "width": self.width,
+                "height": self.height,
+                "duration_seconds": self.duration_seconds,
+                "sample_rate_hz": self.sample_rate_hz,
+                "channels": self.channels,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MultimodalAsset:
     asset_id: str
     media_type: str
@@ -344,8 +385,11 @@ class SpeechSession:
         "cancelled": set(),
     }
 
-    def __init__(self, session_id: str) -> None:
+    def __init__(self, session_id: str, *, max_segments: int = 4096) -> None:
         self.session_id = _require_nonempty(session_id, field_name="session_id")
+        if max_segments <= 0:
+            raise ValueError("max_segments must be positive")
+        self.max_segments = max_segments
         self.state = "new"
         self._segments: list[TranscriptSegment] = []
 
@@ -368,9 +412,13 @@ class SpeechSession:
             raise ValueError("transcripts may only be appended while active")
         if segment.session_id != self.session_id:
             raise ValueError("segment belongs to another speech session")
+        if len(self._segments) >= self.max_segments:
+            raise BufferError("speech transcript backpressure limit reached")
         expected = len(self._segments)
         if segment.sequence != expected:
             raise ValueError(f"segment sequence must be {expected}")
+        if self._segments and segment.start_seconds < self._segments[-1].start_seconds:
+            raise ValueError("transcript timestamps must be monotonic")
         self._segments.append(segment)
 
     def replace_provisional(self, segment: TranscriptSegment) -> None:
@@ -430,6 +478,46 @@ class FrameSample:
             raise ValueError("source_frame_index must be non-negative")
         if not math.isfinite(self.timestamp_seconds) or self.timestamp_seconds < 0:
             raise ValueError("frame timestamp must be finite and non-negative")
+
+
+def detect_document_text_conflict(
+    ocr_text: str,
+    text_layer: str,
+    *,
+    normalize_whitespace: bool = True,
+) -> bool:
+    """Return True when independent OCR and embedded text materially disagree."""
+
+    left = _require_nonempty(ocr_text, field_name="ocr_text")
+    right = _require_nonempty(text_layer, field_name="text_layer")
+    if normalize_whitespace:
+        left = " ".join(left.split())
+        right = " ".join(right.split())
+    return left != right
+
+
+def sample_video_timestamps(
+    asset: VideoAsset,
+    *,
+    interval_seconds: float,
+    max_samples: int,
+) -> tuple[float, ...]:
+    """Build a deterministic bounded temporal sampling plan before decoding frames."""
+
+    if not math.isfinite(interval_seconds) or interval_seconds <= 0:
+        raise ValueError("interval_seconds must be finite and positive")
+    if max_samples <= 0:
+        raise ValueError("max_samples must be positive")
+    if asset.duration_seconds == 0:
+        return (0.0,)
+    timestamps: list[float] = []
+    cursor = 0.0
+    while cursor < asset.duration_seconds and len(timestamps) < max_samples:
+        timestamps.append(round(cursor, 9))
+        cursor += interval_seconds
+    if cursor < asset.duration_seconds:
+        raise ValueError("sampling plan exceeds max_samples budget")
+    return tuple(timestamps)
 
 
 @dataclass(frozen=True, slots=True)
