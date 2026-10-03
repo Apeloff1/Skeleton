@@ -10,6 +10,7 @@ The surface here is safe to use for provider selection, retry/circuit/deadline
 handling, deterministic offline fallback, and provider-neutral chat types.
 """
 
+from .capsec import KernelToolAuthorizer, ToolAuthorization, declared_capability_action, tool_actions
 from .circuit import BreakerBoard, CircuitBreaker, CircuitBreakerConfig, CircuitState
 from .client import ClientConfig, ModelClient
 from .deadline import CancellationToken, Deadline, ManualClock, MonotonicClock
@@ -33,6 +34,7 @@ from .offline import OfflineProvider
 from .provider import BaseProvider, CallContext, HealthStatus, Provider, ProviderInfo
 from .registry import ProviderRegistry, SelectionPolicy
 from .retry import NO_RETRY, Jitter, RetryPolicy
+from .tools import FunctionTool, ToolAdapter, ToolContext, ToolExecutor, ToolExecutorConfig, ToolRegistry, tool
 from .types import (
     ChatRequest,
     ChatResponse,
@@ -71,6 +73,7 @@ __all__ = [
     "FinishReason",
     "HealthStatus",
     "IntegrationError",
+    "KernelToolAuthorizer",
     "InvalidRequestError",
     "Jitter",
     "ManualClock",
@@ -97,8 +100,18 @@ __all__ = [
     "SelectionPolicy",
     "StreamAccumulator",
     "StreamChunk",
+    "ToolAdapter",
+    "ToolAuthorization",
+    "ToolContext",
+    "ToolExecutor",
+    "ToolExecutorConfig",
+    "ToolRegistry",
     "ToolCall",
+    "FunctionTool",
     "ToolResult",
     "ToolSpec",
     "Usage",
+    "declared_capability_action",
+    "tool",
+    "tool_actions",
 ]
