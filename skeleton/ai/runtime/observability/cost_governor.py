@@ -2391,6 +2391,32 @@ class CostGovernor:
             selected,
             intent,
         )
+
+        if (
+            self.runtime.shared_pressure_ledger is not None
+            and pressure is None
+        ):
+            # The admission never reached the active Cost Governor journal, so
+            # callers never received authority to begin work. If the global
+            # pressure lease has expired/disappeared, abandon the untouched
+            # quota reservation rather than inventing replacement authority.
+            # The quota ledger itself refuses release after any metered or
+            # unresolved usage, which keeps ambiguous spend fail-closed.
+            try:
+                ledger.release(reservation.reservation_id)
+            except QuotaConflict as exc:
+                raise CostGovernorConflict(
+                    "orphan admission quota cannot be safely abandoned"
+                ) from exc
+            except QuotaError as exc:
+                raise CostGovernorError(
+                    "orphan admission quota abandonment failed"
+                ) from exc
+            journal.clear_admission_intent(
+                request.operation_id
+            )
+            return None
+
         lease = AdmissionLease(
             lease_id=admission_lease_id(
                 decision,
@@ -2404,13 +2430,6 @@ class CostGovernor:
                 else reservation.reserved_at
             ),
         )
-        if (
-            self.runtime.shared_pressure_ledger is not None
-            and pressure is None
-        ):
-            raise CostGovernorConflict(
-                "durable quota authority lost shared pressure lease"
-            )
         try:
             self.runtime.reattach(
                 selected,
