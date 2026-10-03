@@ -157,6 +157,7 @@ def _qualification_fixture():
         "model_digest": candidate_model,
         "artifact_sha256": artifact,
         "training_plan": {"plan_digest": plan},
+        "method_allocation": {"allocation_digest": allocation},
     }
     mirror = SimpleNamespace(
         candidate_id="mirror-candidate-v2",
@@ -253,6 +254,27 @@ def test_qualification_rejects_exhausted_or_invalid_holdout_budget() -> None:
     with pytest.raises(
         LearningQualificationError,
         match="query budget evidence",
+    ):
+        qualify_learning_candidate(
+            training_receipt=receipt,
+            binding=binding,
+            mirror_promotion_evidence=mirror,
+            firewall_promotion_evidence=firewall,
+        )
+
+
+
+def test_qualification_rejects_method_allocation_identity_drift() -> None:
+    binding, receipt, mirror, firewall = _qualification_fixture()
+    receipt = {
+        **receipt,
+        "method_allocation": {
+            "allocation_digest": _sha("different-allocation")
+        },
+    }
+    with pytest.raises(
+        LearningQualificationError,
+        match="method allocation identity drift",
     ):
         qualify_learning_candidate(
             training_receipt=receipt,
