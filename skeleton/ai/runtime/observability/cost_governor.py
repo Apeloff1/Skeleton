@@ -1945,11 +1945,39 @@ class CostGovernor:
             reasons=normalized,
         )
 
+    def _settle_recovered_shared_pressure(
+        self,
+        record: _CostJournalRecord,
+        *,
+        now_wall: float | None = None,
+    ) -> None:
+        metadata = record.runtime_lease
+        pressure = (
+            None
+            if metadata is None
+            else metadata.shared_pressure_lease
+        )
+        if (
+            pressure is None
+            and self.runtime.shared_pressure_ledger is None
+        ):
+            return
+        try:
+            self.runtime.settle_shared_pressure_recovery(
+                pressure,
+                now_wall=now_wall,
+            )
+        except AdmissionRuntimeConflict as exc:
+            raise CostGovernorConflict(str(exc)) from exc
+        except AdmissionRuntimeError as exc:
+            raise CostGovernorError(str(exc)) from exc
+
     def recover_completed(
         self,
         operation_id: str,
         *,
         evidence_refs: Iterable[EvidenceRef],
+        now_wall: float | None = None,
     ) -> CostDecision:
         """Recover terminal qualification after a post-completion process loss."""
 
@@ -2041,6 +2069,11 @@ class CostGovernor:
                     effective_actual,
                 )
                 recovery_reasons = ()
+
+            self._settle_recovered_shared_pressure(
+                record,
+                now_wall=now_wall,
+            )
 
             decision = self._completed_decision(
                 operation_id=operation,
@@ -2140,6 +2173,8 @@ class CostGovernor:
     def recover_released(
         self,
         operation_id: str,
+        *,
+        now_wall: float | None = None,
     ) -> CostDecision:
         """Finish an unspent release interrupted by process loss."""
 
@@ -2195,6 +2230,11 @@ class CostGovernor:
                     raise CostGovernorError(
                         "durable release recovery failed"
                     ) from exc
+
+            self._settle_recovered_shared_pressure(
+                record,
+                now_wall=now_wall,
+            )
 
             decision = CostDecision(
                 operation_id=operation,
