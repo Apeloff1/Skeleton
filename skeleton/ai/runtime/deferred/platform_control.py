@@ -553,3 +553,89 @@ class SDKSurface:
             "source_schema_digest": self.source_schema_digest,
             "exports": list(self.exports),
         })
+
+@dataclass(frozen=True, slots=True)
+class StableIdentifier:
+    namespace: str
+    local_id: str
+    version: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "namespace", _text(self.namespace, "namespace"))
+        object.__setattr__(self, "local_id", _text(self.local_id, "local_id"))
+        if ":" in self.namespace or ":" in self.local_id:
+            raise ValueError("identifier components cannot contain ':'")
+        if isinstance(self.version, bool) or not isinstance(self.version, int) or self.version < 1:
+            raise ValueError("identifier version must be positive integer")
+
+    @property
+    def value(self) -> str:
+        return f"{self.namespace}:{self.local_id}:v{self.version}"
+
+
+@dataclass(frozen=True, slots=True)
+class FederatedIdentity:
+    issuer: str
+    subject: str
+    tenant_id: str
+    assurance_level: int
+    claims_digest: str
+
+    def __post_init__(self) -> None:
+        for name in ("issuer", "subject", "tenant_id"):
+            object.__setattr__(self, name, _text(getattr(self, name), name))
+        if isinstance(self.assurance_level, bool) or not isinstance(self.assurance_level, int) or not 1 <= self.assurance_level <= 4:
+            raise ValueError("assurance_level must be in [1,4]")
+        object.__setattr__(self, "claims_digest", _sha(self.claims_digest, "claims_digest"))
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentTarget:
+    target_id: str
+    region: str
+    capacity_units: int
+    current_load: int
+    healthy: bool
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "target_id", _text(self.target_id, "target_id"))
+        object.__setattr__(self, "region", _text(self.region, "region"))
+        for name in ("capacity_units", "current_load"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative integer")
+        if self.capacity_units < 1 or self.current_load > self.capacity_units:
+            raise ValueError("invalid deployment target capacity")
+        if not isinstance(self.healthy, bool):
+            raise TypeError("healthy must be boolean")
+
+
+class DeploymentPlanner:
+    @staticmethod
+    def choose(
+        targets: Sequence[DeploymentTarget],
+        *,
+        required_units: int,
+        allowed_regions: Iterable[str],
+    ) -> DeploymentTarget:
+        if isinstance(required_units, bool) or not isinstance(required_units, int) or required_units < 1:
+            raise ValueError("required_units must be positive integer")
+        allowed = set(allowed_regions)
+        candidates = [
+            item
+            for item in targets
+            if item.healthy
+            and item.region in allowed
+            and item.capacity_units - item.current_load >= required_units
+        ]
+        if not candidates:
+            raise RuntimeError("no deployment target satisfies constraints")
+        return max(
+            candidates,
+            key=lambda item: (
+                item.capacity_units - item.current_load,
+                -item.current_load,
+                item.target_id,
+            ),
+        )
+
