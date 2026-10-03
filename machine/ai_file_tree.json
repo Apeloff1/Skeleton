@@ -1139,8 +1139,8 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "5badce616e249e811c1f6785223469da45b8f7d7",
-      "role": "Incremental build graph and network audit are repository-engineering/build-control support for autonomous AI work.",
+      "source_git_object_sha": "35b5e3d37b97ac35a4ab2cb54162470f3ce7f470",
+      "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
         "WP-W30"

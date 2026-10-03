@@ -33,6 +33,43 @@ from skeleton.build.incremental_graph import (
     build_incremental_graph,
 )
 
+from skeleton.build.parallel_scheduler import (
+    BuildEvidence,
+    ParallelBuildPlan,
+    ParallelSchedulerError,
+    ResourceCapacity,
+    ResourceRequest,
+    ScheduleWave,
+    ScheduledTarget,
+    TargetEvidence,
+    aggregate_build_evidence,
+    plan_parallel_build,
+)
+
+from skeleton.build.asset_pipeline import (
+    ASSET_PIPELINE_ALGORITHM,
+    ASSET_PIPELINE_SCHEMA,
+    AssetDescriptor,
+    AssetPipeline,
+    AssetPipelineError,
+    AssetRebuildPlan,
+    AssetSpec,
+    build_asset_pipeline,
+    plan_asset_rebuild,
+)
+
+from skeleton.build.build_observability import (
+    OBSERVABILITY_SCHEMA,
+    BuildBudgetDecision,
+    BuildObservabilityError,
+    BuildRegressionBudget,
+    BuildTelemetry,
+    NodeObservation,
+    NodeRegressionBudget,
+    evaluate_build_budget,
+    observe_build,
+)
+
 from skeleton.build.release_graph import (
     MAX_NAMED_DIGESTS,
     MAX_OUTPUTS,
@@ -92,6 +129,34 @@ from skeleton.build.network_audit import (
 )
 
 __all__ = [
+    "plan_asset_rebuild",
+    "build_asset_pipeline",
+    "AssetSpec",
+    "AssetRebuildPlan",
+    "AssetPipelineError",
+    "AssetPipeline",
+    "AssetDescriptor",
+    "ASSET_PIPELINE_SCHEMA",
+    "ASSET_PIPELINE_ALGORITHM",
+    "observe_build",
+    "evaluate_build_budget",
+    "NodeRegressionBudget",
+    "NodeObservation",
+    "BuildTelemetry",
+    "BuildRegressionBudget",
+    "BuildObservabilityError",
+    "BuildBudgetDecision",
+    "OBSERVABILITY_SCHEMA",
+    "aggregate_build_evidence",
+    "plan_parallel_build",
+    "TargetEvidence",
+    "ScheduledTarget",
+    "ScheduleWave",
+    "ResourceRequest",
+    "ResourceCapacity",
+    "ParallelSchedulerError",
+    "ParallelBuildPlan",
+    "BuildEvidence",
     "validate_release_run",
     "validate_release_graph",
     "serialize_release_graph",
