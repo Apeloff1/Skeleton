@@ -573,6 +573,32 @@ def _plan(
     return tasks
 
 
+def _run_validation_commands(commands: Sequence[str]) -> tuple[bool, tuple[str, ...]]:
+    outputs: list[str] = []
+    allowed_prefixes = (("python", "-m", "pytest"), ("python", "-m", "compileall"))
+    for command in commands[:3]:
+        import shlex
+        argv = tuple(shlex.split(command))
+        if not any(argv[: len(prefix)] == prefix for prefix in allowed_prefixes):
+            raise ValueError(f"validation command is not allowlisted: {command}")
+        try:
+            completed = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+        except subprocess.TimeoutExpired:
+            outputs.append(f"$ {command}\nTIMEOUT")
+            return False, tuple(outputs)
+        output = (completed.stdout + "\n" + completed.stderr)[-12000:]
+        outputs.append(f"$ {command}\nexit={completed.returncode}\n{output}")
+        if completed.returncode != 0:
+            return False, tuple(outputs)
+    return True, tuple(outputs)
+
+
 def _build_and_review(
     reasoner: ChatGPTReasoner,
     task: PlannedTask,
