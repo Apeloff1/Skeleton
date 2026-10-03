@@ -470,7 +470,12 @@ jobs:
           args=()
           if [[ "${HAS_PATCH:-}" == "true" && "${VALIDATION_OUTCOME:-}" == "success" ]]; then args+=(--validated-patch); fi
           if [[ "${VALIDATION_OUTCOME:-}" == "failure" ]]; then args+=(--validation-failed); fi
-          python -m skeleton.automation.completion_campaign --state "$campaign" --repo-state .studio-tmp/repo-state.json "${args[@]}" > "$RUNNER_TEMP/campaign/result.json"
+          python -m skeleton.automation.completion_campaign \
+            --state "$campaign" \
+            --repo-state .studio-tmp/repo-state.json \
+            --frontier "$RUNNER_TEMP/campaign/frontier.json" \
+            --frontier-limit 8 \
+            "${args[@]}" > "$RUNNER_TEMP/campaign/result.json"
           python -c 'import json,os; d=json.load(open(os.environ["RUNNER_TEMP"]+"/campaign/result.json")); h=open(os.environ["GITHUB_OUTPUT"],"a"); h.write("status="+d["status"]+"\nterminal_reason="+d.get("terminal_reason","")+"\n"); h.close()'
 
       - name: Persist completion campaign evidence
@@ -480,6 +485,7 @@ jobs:
           set -euo pipefail
           mkdir -p .studio/audit
           cp "$RUNNER_TEMP/campaign/state.json" .studio/audit/latest.completion-campaign.json
+          cp "$RUNNER_TEMP/campaign/frontier.json" .studio/audit/latest.completion-frontier.json
           {
             echo
             echo '### Completion campaign'
