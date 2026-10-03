@@ -7,6 +7,7 @@ from skeleton.storage.cas import (
     DigestPolicy,
     GovernedContentCache,
     GovernedContentStore,
+    StorageContractError,
 )
 
 
@@ -193,7 +194,7 @@ def test_cache_is_bounded_and_rebuild_replaces_superseded_digest_identity() -> N
 
 
 def test_cache_entry_limit_is_fail_closed() -> None:
-    with pytest.raises(Exception, match="max_entries"):
+    with pytest.raises(StorageContractError, match="max_entries"):
         CachePolicy(max_entries=0)
 
 
