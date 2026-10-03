@@ -5527,6 +5527,7 @@
         "watch_refs": [
           ".github/workflows",
           ".github/workflows/p1-release-evidence-bundle.yml",
+          "Dockerfile",
           "git-head:45abb1484cc6dc78863fbd47cfc3f9cb1db9c1f5",
           "github-actions-job:109098309453",
           "machine",
