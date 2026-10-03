@@ -162,3 +162,148 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
     assert response.finish_reason.value == "tool_calls"
     assert response.tool_calls[0].tool_id == "repo.read"
     assert response.tool_calls[0].arguments == {"path": "README.md"}
+
+@pytest.mark.asyncio
+async def test_local_engine_rejects_undeclared_tool_call():
+    digest=hashlib.sha256(b"undeclared-tool").hexdigest()
+
+    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+        return LocalInferenceResult(
+            text=None,
+            model_id="tool-boundary",
+            model_digest=digest,
+            input_tokens=1,
+            output_tokens=1,
+            finish_reason="tool_calls",
+            tool_calls=(
+                LocalToolCall(
+                    call_id="call-1",
+                    tool_id="repo.write",
+                    arguments={"path":"README.md"},
+                ),
+            ),
+        )
+
+    engine=LocalInferenceEngine(
+        CallableLocalModel(
+            model_id="tool-boundary",
+            model_digest=digest,
+            runner=runner,
+        )
+    )
+    request=LocalInferenceRequest(
+        prompt="use a tool",
+        tools=(
+            {
+                "tool_id":"repo.read",
+                "description":"read only",
+                "input_schema":{
+                    "type":"object",
+                    "required":["path"],
+                    "properties":{"path":{"type":"string"}},
+                    "additionalProperties":False,
+                },
+            },
+        ),
+    )
+    with pytest.raises(ValueError,match="undeclared tool_id"):
+        await engine.generate(request)
+
+
+@pytest.mark.asyncio
+async def test_local_engine_validates_tool_argument_schema():
+    digest=hashlib.sha256(b"tool-schema").hexdigest()
+
+    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+        return LocalInferenceResult(
+            text=None,
+            model_id="schema-boundary",
+            model_digest=digest,
+            input_tokens=1,
+            output_tokens=1,
+            finish_reason="tool_calls",
+            tool_calls=(
+                LocalToolCall(
+                    call_id="call-1",
+                    tool_id="calculator",
+                    arguments={"value":"not-an-integer"},
+                ),
+            ),
+        )
+
+    engine=LocalInferenceEngine(
+        CallableLocalModel(
+            model_id="schema-boundary",
+            model_digest=digest,
+            runner=runner,
+        )
+    )
+    request=LocalInferenceRequest(
+        prompt="calculate",
+        tools=(
+            {
+                "tool_id":"calculator",
+                "input_schema":{
+                    "type":"object",
+                    "required":["value"],
+                    "properties":{"value":{"type":"integer"}},
+                    "additionalProperties":False,
+                },
+            },
+        ),
+    )
+    with pytest.raises(ValueError,match="tool arguments violate schema"):
+        await engine.generate(request)
+
+
+@pytest.mark.asyncio
+async def test_local_engine_validates_structured_output_schema():
+    digest=hashlib.sha256(b"structured-schema").hexdigest()
+
+    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+        return LocalInferenceResult(
+            text=None,
+            model_id="structured-boundary",
+            model_digest=digest,
+            input_tokens=1,
+            output_tokens=1,
+            structured_output={"answer":"wrong-type"},
+        )
+
+    engine=LocalInferenceEngine(
+        CallableLocalModel(
+            model_id="structured-boundary",
+            model_digest=digest,
+            runner=runner,
+        )
+    )
+    request=LocalInferenceRequest(
+        prompt="return structured output",
+        structured_output_schema={
+            "type":"object",
+            "required":["answer"],
+            "properties":{"answer":{"type":"integer"}},
+            "additionalProperties":False,
+        },
+    )
+    with pytest.raises(ValueError,match="structured output violates request schema"):
+        await engine.generate(request)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_close_during_batch_window_does_not_deadlock():
+    scheduler=LocalInferenceScheduler(
+        LocalInferenceEngine(_math_model()),
+        max_batch_size=4,
+        batch_window_ms=500,
+    )
+    pending=asyncio.create_task(
+        scheduler.submit(LocalInferenceRequest(prompt="two plus two",seed=9))
+    )
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    await asyncio.wait_for(scheduler.close(),timeout=1.0)
+    result=await asyncio.wait_for(pending,timeout=1.0)
+    assert result.model_id=="skeleton-reference-ngram-v1"
+
