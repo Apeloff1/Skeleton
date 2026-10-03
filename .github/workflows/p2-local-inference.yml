@@ -8,6 +8,7 @@ on:
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_numpy_recurrent_lm.py"
       - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_multi_method_training.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_local_model_deployment.py"
       - "scripts/qualify_local_model_runtime.py"
@@ -22,6 +23,7 @@ on:
       - "skeleton/testing/test_local_model_artifact.py"
       - "skeleton/testing/test_numpy_recurrent_lm.py"
       - "skeleton/testing/test_local_model_builder.py"
+      - "skeleton/testing/test_multi_method_training.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
       - "skeleton/testing/test_local_model_deployment.py"
       - "scripts/qualify_local_model_runtime.py"
@@ -71,5 +73,6 @@ jobs:
           skeleton/testing/test_local_model_artifact.py
           skeleton/testing/test_numpy_recurrent_lm.py
           skeleton/testing/test_local_model_builder.py
+          skeleton/testing/test_multi_method_training.py
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
