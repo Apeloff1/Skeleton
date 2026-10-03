@@ -5,8 +5,15 @@ on:
     types: [opened, synchronize, reopened, closed]
     paths:
       - 'skeleton/automation/studio_*.py'
+      - 'skeleton/automation/build_*.py'
+      - 'skeleton/automation/ci_*.py'
+      - 'skeleton/automation/autonomous_build.py'
+      - 'skeleton/automation/supervised_studio.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
+      - 'skeleton/testing/test_build_*.py'
+      - 'skeleton/testing/test_ci_*.py'
+      - 'skeleton/testing/test_autonomous_build.py'
       - 'skeleton/testing/test_supervised_studio.py'
       - 'skeleton/testing/test_completion_campaign.py'
       - 'core/shift_supervisor/**'
@@ -76,6 +83,9 @@ jobs:
             skeleton/testing/test_completion_campaign.py \
             skeleton/testing/test_studio_pipeline_smoke.py \
             skeleton/testing/test_supervised_studio.py \
+            skeleton/testing/test_autonomous_build.py \
+            skeleton/testing/test_build_*.py \
+            skeleton/testing/test_ci_*.py \
             -q --tb=short --maxfail=1
 
       - name: Run deterministic Shift Supervisor planning suite
