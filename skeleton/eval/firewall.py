@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 import json
+from types import MappingProxyType
 from typing import Mapping
 
 
@@ -97,7 +98,7 @@ class EvaluationSet:
             raise TypeError("training_excluded must be boolean")
         frozen = dict(self.metadata)
         _stable_json(frozen)
-        object.__setattr__(self, "metadata", frozen)
+        object.__setattr__(self, "metadata", MappingProxyType(frozen))
 
     @property
     def identity(self) -> str:
@@ -153,6 +154,36 @@ class EvaluationQueryReceipt:
     query_index: int
     purpose: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "candidate_id",
+            _text("candidate_id", self.candidate_id),
+        )
+        object.__setattr__(
+            self,
+            "set_identity",
+            _text("set_identity", self.set_identity, maximum=2048),
+        )
+        object.__setattr__(
+            self,
+            "evaluator_identity",
+            _text("evaluator_identity", self.evaluator_identity, maximum=2048),
+        )
+        if (
+            isinstance(self.query_index, bool)
+            or not isinstance(self.query_index, int)
+            or self.query_index < 1
+        ):
+            raise EvaluationFirewallError(
+                "query_index must be a positive integer"
+            )
+        object.__setattr__(
+            self,
+            "purpose",
+            _text("purpose", self.purpose),
+        )
+
     @property
     def digest(self) -> str:
         return _digest(
@@ -175,6 +206,72 @@ class PromotionEvidence:
     query_receipt_digests: tuple[str, ...]
     holdout_queries_used: int
     holdout_query_budget: int
+    production_authority: bool = False
+    direct_self_modify: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "candidate_id",
+            _text("candidate_id", self.candidate_id),
+        )
+        object.__setattr__(
+            self,
+            "holdout_set_identity",
+            _text(
+                "holdout_set_identity",
+                self.holdout_set_identity,
+                maximum=2048,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "evaluator_identity",
+            _text(
+                "evaluator_identity",
+                self.evaluator_identity,
+                maximum=2048,
+            ),
+        )
+        receipts = tuple(
+            _sha("query_receipt_digest", item)
+            for item in self.query_receipt_digests
+        )
+        if not receipts:
+            raise EvaluationFirewallError(
+                "promotion evidence requires query receipts"
+            )
+        if len(receipts) != len(set(receipts)):
+            raise EvaluationFirewallError(
+                "promotion query receipt digests must be unique"
+            )
+        object.__setattr__(self, "query_receipt_digests", receipts)
+        for name in ("holdout_queries_used", "holdout_query_budget"):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+            ):
+                raise EvaluationFirewallError(
+                    f"{name} must be a positive integer"
+                )
+        if self.holdout_queries_used != len(receipts):
+            raise EvaluationFirewallError(
+                "holdout query count must match receipt lineage"
+            )
+        if self.holdout_queries_used > self.holdout_query_budget:
+            raise EvaluationFirewallError(
+                "holdout query use exceeds budget"
+            )
+        if self.production_authority is not False:
+            raise EvaluationFirewallError(
+                "promotion evidence cannot grant production authority"
+            )
+        if self.direct_self_modify is not False:
+            raise EvaluationFirewallError(
+                "promotion evidence cannot grant direct self-modification"
+            )
 
     @property
     def digest(self) -> str:
@@ -187,6 +284,8 @@ class PromotionEvidence:
                 "query_receipt_digests": list(self.query_receipt_digests),
                 "holdout_queries_used": self.holdout_queries_used,
                 "holdout_query_budget": self.holdout_query_budget,
+                "production_authority": False,
+                "direct_self_modify": False,
             }
         )
 

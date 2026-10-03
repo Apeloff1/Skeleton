@@ -6,8 +6,10 @@ import unittest
 from skeleton.ai.evaluation.firewall import (
     EvaluationFirewall,
     EvaluationFirewallError,
+    EvaluationQueryReceipt,
     EvaluationSet,
     EvaluatorIdentity,
+    PromotionEvidence,
 )
 
 
@@ -140,6 +142,65 @@ class EvaluationFirewallTests(unittest.TestCase):
                     implementation_digest=sha("changed-code"),
                     policy_digest=sha("evaluation-policy"),
                 )
+            )
+
+    def test_evaluation_metadata_is_structurally_immutable(self) -> None:
+        metadata = {"sealed": True}
+        evaluation_set = EvaluationSet(
+            set_id="immutable-holdout",
+            eval_class="promotion_holdout",
+            content_digest=sha("immutable"),
+            population_id="general-code",
+            query_budget=1,
+            training_excluded=True,
+            metadata=metadata,
+        )
+        metadata["sealed"] = False
+        self.assertTrue(evaluation_set.metadata["sealed"])
+        with self.assertRaises(TypeError):
+            evaluation_set.metadata["sealed"] = False  # type: ignore[index]
+
+    def test_forged_query_receipt_index_is_rejected(self) -> None:
+        with self.assertRaisesRegex(EvaluationFirewallError, "positive integer"):
+            EvaluationQueryReceipt(
+                candidate_id="candidate",
+                set_identity="evalset:" + sha("set"),
+                evaluator_identity="evaluator:" + sha("evaluator"),
+                query_index=0,
+                purpose="promotion",
+            )
+
+    def test_promotion_evidence_is_non_authoritative_and_receipt_bound(self) -> None:
+        receipt = sha("query-receipt")
+        evidence = PromotionEvidence(
+            candidate_id="candidate",
+            holdout_set_identity="evalset:" + sha("set"),
+            evaluator_identity="evaluator:" + sha("evaluator"),
+            query_receipt_digests=(receipt,),
+            holdout_queries_used=1,
+            holdout_query_budget=2,
+        )
+        self.assertFalse(evidence.production_authority)
+        self.assertFalse(evidence.direct_self_modify)
+        self.assertEqual(evidence.query_receipt_digests, (receipt,))
+        with self.assertRaisesRegex(EvaluationFirewallError, "match receipt lineage"):
+            PromotionEvidence(
+                candidate_id="candidate",
+                holdout_set_identity="evalset:" + sha("set"),
+                evaluator_identity="evaluator:" + sha("evaluator"),
+                query_receipt_digests=(receipt,),
+                holdout_queries_used=2,
+                holdout_query_budget=2,
+            )
+        with self.assertRaisesRegex(EvaluationFirewallError, "production authority"):
+            PromotionEvidence(
+                candidate_id="candidate",
+                holdout_set_identity="evalset:" + sha("set"),
+                evaluator_identity="evaluator:" + sha("evaluator"),
+                query_receipt_digests=(receipt,),
+                holdout_queries_used=1,
+                holdout_query_budget=2,
+                production_authority=True,
             )
 
 
