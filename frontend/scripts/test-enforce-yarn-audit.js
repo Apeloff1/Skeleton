@@ -9,6 +9,44 @@ const { spawnSync } = require('child_process');
 const policy = path.join(__dirname, 'enforce-yarn-audit.js');
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarn-audit-policy-'));
 
+function assertBraceExpansionResolutionLock() {
+  const frontendRoot = path.resolve(__dirname, '..');
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(frontendRoot, 'package.json'), 'utf8'),
+  );
+  const lock = fs.readFileSync(path.join(frontendRoot, 'yarn.lock'), 'utf8');
+  const expectedVersion = '1.1.21';
+  const expectedIntegrity =
+    'sha512-9zeA+KLZNNzglF2TPKRQEDyx6Yby7daAkuy8MiPzpXPsYDWi/DRM8jmwUDxokQjYqBpv5DgPiwD4h4ZZSy1Ujw==';
+
+  assert.strictEqual(
+    packageJson.resolutions['**/minimatch/brace-expansion'],
+    expectedVersion,
+    'brace-expansion resolution must stay on the reviewed patched release',
+  );
+
+  const selector =
+    'brace-expansion@1.1.21, brace-expansion@^1.1.7, brace-expansion@^2.0.2, brace-expansion@^5.0.5:';
+  const start = lock.indexOf(selector);
+  assert.notStrictEqual(start, -1, 'brace-expansion lock selector missing');
+  const nextEntry = lock.indexOf('\n\n', start);
+  const block = lock.slice(start, nextEntry === -1 ? undefined : nextEntry);
+
+  assert.match(block, /version "1\.1\.21"/);
+  assert.match(
+    block,
+    /resolved "https:\/\/registry\.yarnpkg\.com\/brace-expansion\/-\/brace-expansion-1\.1\.21\.tgz"/,
+  );
+  assert.ok(
+    block.includes(`integrity ${expectedIntegrity}`),
+    'brace-expansion lock integrity must match the reviewed 1.1.21 artifact',
+  );
+  assert.ok(
+    !block.includes('brace-expansion-1.1.20.tgz') && !block.includes('version "1.1.20"'),
+    'brace-expansion lock must not silently retain the vulnerable 1.1.20 payload',
+  );
+}
+
 const advisory = ({ module, severity, ghsa, title = 'fixture advisory' }) => ({
   type: 'auditAdvisory',
   data: {
@@ -66,6 +104,7 @@ function runCase(
 }
 
 try {
+  assertBraceExpansionResolutionLock();
   runCase('clean', [summary()], 0, 0);
   runCase('filtered-low-mask', [summary({ low: 1 })], 2, 0);
   runCase('filtered-moderate-mask', [summary({ moderate: 1 })], 4, 0);
