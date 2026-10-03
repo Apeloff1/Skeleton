@@ -302,6 +302,7 @@ class ModelLifecycleSnapshot:
     qualification_digest: str | None = None
     promotion_verifier_id: str | None = None
     promotion_receipt_digest: str | None = None
+    promotion_transition_digest: str | None = None
     activation_manifest_digest: str | None = None
     rollback_model_digest: str | None = None
 
@@ -322,6 +323,7 @@ class ModelLifecycleSnapshot:
                 "qualification_digest": self.qualification_digest,
                 "promotion_verifier_id": self.promotion_verifier_id,
                 "promotion_receipt_digest": self.promotion_receipt_digest,
+                "promotion_transition_digest": self.promotion_transition_digest,
                 "activation_manifest_digest": self.activation_manifest_digest,
                 "rollback_model_digest": self.rollback_model_digest,
             }
@@ -345,6 +347,7 @@ class _Record:
     qualification_refs: tuple[str, ...] = ()
     promotion_verifier_id: str | None = None
     promotion_receipt_digest: str | None = None
+    promotion_transition_digest: str | None = None
     activation_manifest_digest: str | None = None
     rollback_model_digest: str | None = None
 
@@ -384,6 +387,7 @@ class _Record:
             "qualification_refs": list(self.qualification_refs),
             "promotion_verifier_id": self.promotion_verifier_id,
             "promotion_receipt_digest": self.promotion_receipt_digest,
+            "promotion_transition_digest": self.promotion_transition_digest,
             "activation_manifest_digest": self.activation_manifest_digest,
             "rollback_model_digest": self.rollback_model_digest,
         }
@@ -655,6 +659,7 @@ class ModelLifecycleRegistry:
         record.state = ModelLifecycleState.PROMOTED
         record.promotion_verifier_id = verifier
         record.promotion_receipt_digest = promotion_receipt.digest
+        record.promotion_transition_digest = receipt.digest
         record.history.append(receipt)
         self._persist()
         return receipt
@@ -691,6 +696,14 @@ class ModelLifecycleRegistry:
         ):
             raise ModelLifecycleError(
                 "activation manifest promotion identity drift"
+            )
+        if (
+            record.promotion_transition_digest is None
+            or manifest.lifecycle_promotion_transition_digest
+            != record.promotion_transition_digest
+        ):
+            raise ModelLifecycleError(
+                "activation manifest lifecycle promotion transition drift"
             )
         if (
             record.qualification_digest is None
@@ -831,6 +844,7 @@ class ModelLifecycleRegistry:
             qualification_digest=record.qualification_digest,
             promotion_verifier_id=record.promotion_verifier_id,
             promotion_receipt_digest=record.promotion_receipt_digest,
+            promotion_transition_digest=record.promotion_transition_digest,
             activation_manifest_digest=record.activation_manifest_digest,
             rollback_model_digest=record.rollback_model_digest,
         )
@@ -966,6 +980,7 @@ class ModelLifecycleRegistry:
             "qualification_refs",
             "promotion_verifier_id",
             "promotion_receipt_digest",
+            "promotion_transition_digest",
             "activation_manifest_digest",
             "rollback_model_digest",
         }
@@ -1033,6 +1048,10 @@ class ModelLifecycleRegistry:
                 value.get("promotion_receipt_digest"),
                 "promotion_receipt_digest",
             ),
+            promotion_transition_digest=_optional_sha(
+                value.get("promotion_transition_digest"),
+                "promotion_transition_digest",
+            ),
             activation_manifest_digest=_optional_sha(
                 value.get("activation_manifest_digest"),
                 "activation_manifest_digest",
@@ -1061,6 +1080,7 @@ class ModelLifecycleRegistry:
             if (
                 record.promotion_verifier_id is None
                 or record.promotion_receipt_digest is None
+                or record.promotion_transition_digest is None
             ):
                 raise ModelLifecycleError(
                     "promoted lifecycle state lacks promotion identity"
