@@ -1,4 +1,4 @@
-"""Deterministic lexical retrieval over machine-indexed repository metadata.
+"""Deterministic intent-aware retrieval over machine-indexed repository metadata.
 
 The index is intentionally small and metadata-only: paths, zones, file kinds,
 languages, imports and Python symbol names already extracted by the static
@@ -15,6 +15,15 @@ from .model import FileRecord, RepositoryModel
 
 _TOKEN = re.compile(r"[A-Za-z0-9_./:-]{2,}")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+_INTENT_KINDS = {
+    "test": frozenset({"test", "tests", "testing", "pytest", "coverage", "regression"}),
+    "workflow": frozenset({"workflow", "workflows", "ci", "action", "actions", "pipeline"}),
+    "security": frozenset({"security", "secure", "vuln", "vulnerability", "auth", "permission", "sandbox"}),
+    "performance": frozenset({"performance", "perf", "slow", "latency", "cache", "optimize", "optimization"}),
+    "configuration": frozenset({"config", "configuration", "settings", "toml", "yaml", "json"}),
+    "documentation": frozenset({"docs", "documentation", "readme", "guide"}),
+}
 
 
 @lru_cache(maxsize=8192)
@@ -56,7 +65,7 @@ class SearchHit:
 
 
 class RepositoryRetrievalIndex:
-    """Inverted lexical index for bounded agent navigation."""
+    """Inverted lexical index with bounded intent-aware ranking."""
 
     def __init__(self, model: RepositoryModel) -> None:
         self.model = model
@@ -64,6 +73,7 @@ class RepositoryRetrievalIndex:
         self._records = {item.path: item for item in model.files}
         self._path_tokens: dict[str, set[str]] = {}
         self._prefix_postings: dict[str, set[str]] = {}
+        self._zones_by_intent: dict[str, set[str]] = {}
         self._build()
 
     def _add(self, term: str, path: str) -> None:
@@ -85,6 +95,20 @@ class RepositoryRetrievalIndex:
             for term in tokens:
                 self._add(term, record.path)
 
+        zones = {item.zone for item in self.model.files}
+        for intent, vocabulary in _INTENT_KINDS.items():
+            self._zones_by_intent[intent] = {
+                zone for zone in zones
+                if _tokens(zone).intersection(vocabulary)
+            }
+
+    def _infer_intents(self, terms: set[str]) -> tuple[str, ...]:
+        return tuple(sorted(
+            intent
+            for intent, vocabulary in _INTENT_KINDS.items()
+            if terms.intersection(vocabulary)
+        ))
+
     def related(self, path: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         """Return files sharing indexed metadata with a known path."""
         if path not in self._records:
@@ -100,10 +124,13 @@ class RepositoryRetrievalIndex:
             other = self._records[candidate]
             overlap = len(terms.intersection(self._path_tokens[candidate]))
             score = overlap * 10
+            reasons = ["shared indexed metadata"]
             if other.zone == record.zone:
                 score += 25
+                reasons.append("same subsystem zone")
             if other.kind == record.kind:
                 score += 5
+                reasons.append("same file kind")
             hits.append(SearchHit(
                 path=other.path,
                 zone=other.zone,
@@ -111,7 +138,7 @@ class RepositoryRetrievalIndex:
                 language=other.language,
                 score=score,
                 matched_terms=tuple(sorted(terms.intersection(self._path_tokens[candidate]))),
-                reasons=("shared indexed metadata",),
+                reasons=tuple(reasons),
             ))
         hits.sort(key=lambda item: (-item.score, item.zone, item.path))
         return tuple(hits[:limit])
@@ -132,16 +159,17 @@ class RepositoryRetrievalIndex:
         terms = set(_tokens(query))
         if not terms:
             return ()
+
         zone_set = {str(item).casefold() for item in zones}
         kind_set = {str(item).casefold() for item in kinds}
         language_set = {str(item).casefold() for item in languages}
+        intents = self._infer_intents(terms)
 
         candidates: set[str] = set()
         for term in terms:
             candidates.update(self._postings.get(term, ()))
 
         # Fuzzy fallback is bounded by the smaller side of the comparison.
-        # Avoid rescanning every posting for every query term.
         if not candidates:
             for term in sorted(terms, key=len):
                 prefix = term[:3]
@@ -182,6 +210,24 @@ class RepositoryRetrievalIndex:
             if record.language in terms:
                 score += 3
                 reasons.append("query matches language")
+
+            for intent in intents:
+                if intent == "test" and record.kind == "test":
+                    score += 24
+                    reasons.append("query intent favors test surface")
+                elif intent == "workflow" and record.kind == "workflow":
+                    score += 24
+                    reasons.append("query intent favors workflow surface")
+                elif intent == "configuration" and record.kind == "config":
+                    score += 20
+                    reasons.append("query intent favors configuration surface")
+                elif intent == "documentation" and record.kind == "docs":
+                    score += 20
+                    reasons.append("query intent favors documentation surface")
+                elif intent in {"security", "performance"} and record.zone in self._zones_by_intent.get(intent, ()):
+                    score += 18
+                    reasons.append(f"query intent matches {intent} zone")
+
             if record.kind in {"source", "test", "workflow"}:
                 score += 2
             hits.append(SearchHit(
