@@ -4887,7 +4887,7 @@
       "source": "skeleton/storage",
       "destination": "skeleton/ai/runtime/storage",
       "kind": "tree",
-      "source_git_object_sha": "6c7bcc55ad8638b570ffce5ec06bb91846cb632e",
+      "source_git_object_sha": "3314a35fdcb1c26f03cf161c5e9a4a28c57b380b",
       "role": "governed content addressing, cache identity, and durable saga compensation state",
       "work_package_refs": [
         "WP-W03",
