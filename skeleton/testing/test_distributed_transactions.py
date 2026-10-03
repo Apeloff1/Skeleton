@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from skeleton.storage.cas import (
+    CompensationAction,
     DurableSagaStateStore,
     StorageContractError,
     TransactionMode,
@@ -69,7 +70,18 @@ def test_saga_compensation_state_survives_process_reopen(tmp_path) -> None:
     assert snapshot.steps[0].effect_receipt == "registry-write:abc"
 
     reopened.begin_compensation(saga_id="saga-2")
+    pending = reopened.pending_compensations(saga_id="saga-2")
+    assert pending == (
+        CompensationAction(
+            index=0,
+            name="publish-model",
+            compensation_ref="model-registry:deactivate",
+            compensation_payload=b'{"model_id":"model-7"}',
+            effect_receipt="registry-write:abc",
+        ),
+    )
     reopened.mark_compensated(saga_id="saga-2", index=0)
+    assert reopened.pending_compensations(saga_id="saga-2") == ()
     reopened.finish(saga_id="saga-2", state="compensated")
     final = reopened.snapshot(saga_id="saga-2")
     assert final.state == "compensated"
@@ -153,3 +165,41 @@ def test_terminal_saga_transitions_fail_closed() -> None:
         store.finish(saga_id="saga-5", state="failed")
     with pytest.raises(StorageContractError, match="cannot enter compensation"):
         store.begin_compensation(saga_id="saga-5")
+
+
+def test_pending_compensations_are_reverse_order_and_payload_bound() -> None:
+    store = DurableSagaStateStore()
+    store.begin(
+        saga_id="saga-recovery",
+        tenant_id="tenant-a",
+        operation_id="op-recovery",
+    )
+    for index, name in enumerate(("reserve", "publish")):
+        store.prepare_step(
+            saga_id="saga-recovery",
+            index=index,
+            name=name,
+            compensation_ref=f"undo:{name}",
+            compensation_payload=f"payload:{name}",
+        )
+        store.mark_effect_applied(
+            saga_id="saga-recovery",
+            index=index,
+            effect_receipt=f"effect:{name}",
+        )
+
+    with pytest.raises(StorageContractError, match="only while saga is compensating"):
+        store.pending_compensations(saga_id="saga-recovery")
+
+    store.begin_compensation(saga_id="saga-recovery")
+    actions = store.pending_compensations(saga_id="saga-recovery")
+    assert [action.index for action in actions] == [1, 0]
+    assert [action.compensation_ref for action in actions] == ["undo:publish", "undo:reserve"]
+    assert [action.compensation_payload for action in actions] == [
+        b"payload:publish",
+        b"payload:reserve",
+    ]
+    assert [action.effect_receipt for action in actions] == [
+        "effect:publish",
+        "effect:reserve",
+    ]
