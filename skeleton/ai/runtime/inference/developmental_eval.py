@@ -18,7 +18,7 @@ import math
 from pathlib import Path
 import re
 import threading
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from .artifact import LocalModelArtifactError, load_local_model_artifact
 from .local import LocalInferenceRequest
@@ -261,6 +261,7 @@ class DevelopmentalComparisonReport:
     candidate_score: float
     validation_gain: float
     compute_units: float
+    attribution_verified: bool = False
     production_authority: bool = False
 
     def __post_init__(self) -> None:
@@ -314,9 +315,18 @@ class DevelopmentalComparisonReport:
             raise DevelopmentalEvaluationError(
                 "compute_units must be positive"
             )
+        if not isinstance(self.attribution_verified, bool):
+            raise DevelopmentalEvaluationError(
+                "attribution_verified must be boolean"
+            )
         if self.production_authority is not False:
             raise DevelopmentalEvaluationError(
                 "developmental evaluation cannot grant production authority"
+            )
+        expected_gain = self.candidate_score - self.baseline_score
+        if abs(self.validation_gain - expected_gain) > 1e-12:
+            raise DevelopmentalEvaluationError(
+                "validation_gain must equal candidate minus baseline score"
             )
 
     @property
@@ -337,11 +347,16 @@ class DevelopmentalComparisonReport:
                 "candidate_score": self.candidate_score,
                 "validation_gain": self.validation_gain,
                 "compute_units": self.compute_units,
+                "attribution_verified": self.attribution_verified,
                 "production_authority": False,
             }
         )
 
     def allocation_observation(self) -> MethodValidationObservation:
+        if self.attribution_verified is not True:
+            raise DevelopmentalEvaluationError(
+                "allocator feedback requires verified training-method attribution"
+            )
         return MethodValidationObservation(
             method=self.method,
             evaluation_class="development",
@@ -351,6 +366,77 @@ class DevelopmentalComparisonReport:
             plan_digest=self.training_plan_digest,
             sample_count=len(self.case_results),
         )
+
+
+def _verified_training_plan(
+    plan: Mapping[str, object],
+    *,
+    method: TrainingMethod,
+) -> str:
+    if not isinstance(plan, Mapping):
+        raise DevelopmentalEvaluationError(
+            "candidate receipt training_plan must be a mapping"
+        )
+    try:
+        actual_method = TrainingMethod(method)
+    except ValueError as exc:
+        raise DevelopmentalEvaluationError(
+            "unsupported training method"
+        ) from exc
+    methods = plan.get("methods")
+    method_counts = plan.get("method_counts")
+    if not isinstance(methods, list) or not isinstance(
+        method_counts,
+        Mapping,
+    ):
+        raise DevelopmentalEvaluationError(
+            "training plan lacks method evidence"
+        )
+    configured = {
+        str(item.get("method"))
+        for item in methods
+        if isinstance(item, Mapping)
+    }
+    if actual_method.value not in configured:
+        raise DevelopmentalEvaluationError(
+            "attributed method is not configured in training plan"
+        )
+    raw_count = method_counts.get(actual_method.value, 0)
+    if (
+        isinstance(raw_count, bool)
+        or not isinstance(raw_count, int)
+        or raw_count < 1
+    ):
+        raise DevelopmentalEvaluationError(
+            "attributed method did not materialize training documents"
+        )
+
+    payload = {
+        "schema_version": "skeleton.multi_method_training_plan.v1",
+        "methods": methods,
+        "source_example_digests": plan.get("source_example_digests"),
+        "camera_coverage_digests": plan.get("camera_coverage_digests"),
+        "visual_observation_digests": plan.get(
+            "visual_observation_digests"
+        ),
+        "efficiency_policy_digest": plan.get(
+            "efficiency_policy_digest"
+        ),
+        "document_ids": plan.get("document_ids"),
+        "corpus_digest": plan.get("corpus_digest"),
+        "method_counts": dict(method_counts),
+        "total_chars": plan.get("total_chars"),
+        "dropped_duplicate_count": plan.get(
+            "dropped_duplicate_count"
+        ),
+        "dropped_budget_count": plan.get("dropped_budget_count"),
+    }
+    claimed = _sha(plan.get("plan_digest"), "training plan digest")
+    if _digest(payload) != claimed:
+        raise DevelopmentalEvaluationError(
+            "training plan digest does not match plan payload"
+        )
+    return claimed
 
 
 def _score_output(text: str, case: DevelopmentalEvalCase) -> float:
@@ -474,6 +560,75 @@ def evaluate_local_candidate_developmentally(
         candidate_score=candidate_score,
         validation_gain=candidate_score - baseline_score,
         compute_units=compute_units,
+        attribution_verified=False,
+        production_authority=False,
+    )
+
+
+def evaluate_training_receipt_developmentally(
+    *,
+    baseline_path: str | Path,
+    candidate_receipt: Mapping[str, object],
+    suite: DevelopmentalEvalSuite,
+    method: TrainingMethod,
+) -> DevelopmentalComparisonReport:
+    """Evaluate one exact candidate receipt with verified method attribution."""
+
+    if not isinstance(candidate_receipt, Mapping):
+        raise TypeError("candidate_receipt must be a mapping")
+    plan = candidate_receipt.get("training_plan")
+    if not isinstance(plan, Mapping):
+        raise DevelopmentalEvaluationError(
+            "candidate receipt lacks training_plan"
+        )
+    plan_digest = _verified_training_plan(plan, method=method)
+    raw_path = candidate_receipt.get("output_path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise DevelopmentalEvaluationError(
+            "candidate receipt lacks output_path"
+        )
+    try:
+        candidate = load_local_model_artifact(raw_path)
+    except LocalModelArtifactError as exc:
+        raise DevelopmentalEvaluationError(
+            "candidate receipt artifact cannot be authenticated"
+        ) from exc
+    receipt_model = _sha(
+        candidate_receipt.get("model_digest"),
+        "candidate receipt model_digest",
+    )
+    receipt_artifact = _sha(
+        candidate_receipt.get("artifact_sha256"),
+        "candidate receipt artifact_sha256",
+    )
+    if candidate.receipt.model_digest != receipt_model:
+        raise DevelopmentalEvaluationError(
+            "candidate receipt model identity drift"
+        )
+    if candidate.receipt.artifact_sha256 != receipt_artifact:
+        raise DevelopmentalEvaluationError(
+            "candidate receipt artifact identity drift"
+        )
+
+    generic = evaluate_local_candidate_developmentally(
+        baseline_path=baseline_path,
+        candidate_path=raw_path,
+        suite=suite,
+        training_plan_digest=plan_digest,
+        method=method,
+    )
+    return DevelopmentalComparisonReport(
+        suite_digest=generic.suite_digest,
+        baseline_model_digest=generic.baseline_model_digest,
+        candidate_model_digest=generic.candidate_model_digest,
+        training_plan_digest=generic.training_plan_digest,
+        method=generic.method,
+        case_results=generic.case_results,
+        baseline_score=generic.baseline_score,
+        candidate_score=generic.candidate_score,
+        validation_gain=generic.validation_gain,
+        compute_units=generic.compute_units,
+        attribution_verified=True,
         production_authority=False,
     )
 
@@ -485,4 +640,5 @@ __all__ = [
     "DevelopmentalEvalSuite",
     "DevelopmentalEvaluationError",
     "evaluate_local_candidate_developmentally",
+    "evaluate_training_receipt_developmentally",
 ]
