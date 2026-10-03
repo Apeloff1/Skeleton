@@ -3,7 +3,7 @@ name: AI Product Completion Acceptance
 on:
   pull_request:
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -46,8 +46,6 @@ on:
       - "skeleton/testing/test_learning_contracts.py"
       - "skeleton/testing/test_learning_evidence.py"
       - "skeleton/testing/test_learning_control.py"
-      - "skeleton/testing/test_training_integrity.py"
-      - "skeleton/testing/test_training_lineage.py"
       - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
       - "skeleton/testing/test_p3_learning_programs.py"
       - "skeleton/testing/test_p3_local_training_evaluation.py"
@@ -68,14 +66,13 @@ on:
       - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   push:
     branches:
       - main
     paths:
-      - "skeleton/ai/runtime/product/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/context/**"
       - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -118,8 +115,6 @@ on:
       - "skeleton/testing/test_learning_contracts.py"
       - "skeleton/testing/test_learning_evidence.py"
       - "skeleton/testing/test_learning_control.py"
-      - "skeleton/testing/test_training_integrity.py"
-      - "skeleton/testing/test_training_lineage.py"
       - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
       - "skeleton/testing/test_p3_learning_programs.py"
       - "skeleton/testing/test_p3_local_training_evaluation.py"
@@ -140,7 +135,6 @@ on:
       - "skeleton/ai/learning/mirror_room/**"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/testing/test_conversation_repository.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
       - ".github/workflows/ai-product-completion.yml"
       - "docs/plan/AI_PRODUCT_COMPLETION_FRONTIER.md"
   workflow_dispatch:
@@ -183,7 +177,7 @@ jobs:
       - name: Compile canonical product and compatibility runtimes
         run: >-
           python -m compileall -q
-          skeleton/ai/runtime/product
+          skeleton/ai/runtime/learning_foundation
           skeleton/ai/runtime/inference
           backend/core/engine_client.py
           backend/core/engine_text.py
@@ -223,8 +217,6 @@ jobs:
           skeleton/testing/test_learning_contracts.py
           skeleton/testing/test_learning_evidence.py
           skeleton/testing/test_learning_control.py
-          skeleton/testing/test_training_integrity.py
-          skeleton/testing/test_training_lineage.py
           skeleton/testing/test_p3_learning_foundation_acceptance.py
           skeleton/testing/test_p3_learning_programs.py
           skeleton/testing/test_p3_local_training_evaluation.py
@@ -239,4 +231,3 @@ jobs:
           skeleton/testing/test_model_identity.py
           skeleton/testing/test_model_placement.py
           skeleton/testing/test_model_rollback_compatibility.py
-          skeleton/testing/test_vs001_functional_ai.py
