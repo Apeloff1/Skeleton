@@ -909,6 +909,167 @@ def _runtime_lease_journal_from_payload(
 
 
 @dataclass(frozen=True, slots=True)
+class _AdmissionIntentJournal:
+    operation_id: str
+    tenant_id: str
+    requested_request_digest: str
+    selected_request_digest: str
+    selected_capability: str
+    fallback_used: bool
+    fallback_id: str | None
+    fallback_reason: str | None
+    decision_id: str | None = None
+    reason_code: str | None = None
+    remaining: tuple[tuple[str, int | float], ...] | None = None
+    admitted_at: float | None = None
+
+    @property
+    def has_decision(self) -> bool:
+        return self.decision_id is not None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "requested_request_digest": self.requested_request_digest,
+            "selected_request_digest": self.selected_request_digest,
+            "selected_capability": self.selected_capability,
+            "fallback_used": self.fallback_used,
+            "fallback_id": self.fallback_id,
+            "fallback_reason": self.fallback_reason,
+            "decision_id": self.decision_id,
+            "reason_code": self.reason_code,
+            "remaining": (
+                None if self.remaining is None else dict(self.remaining)
+            ),
+            "admitted_at": self.admitted_at,
+        }
+
+
+def _admission_intent_from_payload(
+    value: object,
+) -> _AdmissionIntentJournal:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        )
+    try:
+        operation_id = _token("operation_id", value["operation_id"])
+        tenant_id = _token("tenant_id", value["tenant_id"])
+        requested_digest = _sha256(
+            "requested_request_digest",
+            value["requested_request_digest"],
+        )
+        selected_digest = _sha256(
+            "selected_request_digest",
+            value["selected_request_digest"],
+        )
+        selected_capability = _token(
+            "selected_capability",
+            value["selected_capability"],
+        )
+        fallback_used = value["fallback_used"]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        ) from exc
+    if not isinstance(fallback_used, bool):
+        raise CostGovernorError(
+            "admission intent fallback_used must be boolean"
+        )
+
+    fallback_id_raw = value.get("fallback_id")
+    fallback_reason_raw = value.get("fallback_reason")
+    if fallback_used:
+        fallback_id = _token("fallback_id", fallback_id_raw)
+        fallback_reason = _token(
+            "fallback_reason",
+            fallback_reason_raw,
+        )
+    else:
+        if fallback_id_raw is not None or fallback_reason_raw is not None:
+            raise CostGovernorError(
+                "non-fallback admission intent carries fallback metadata"
+            )
+        fallback_id = None
+        fallback_reason = None
+
+    decision_id_raw = value.get("decision_id")
+    reason_code_raw = value.get("reason_code")
+    remaining_raw = value.get("remaining")
+    admitted_at_raw = value.get("admitted_at")
+    decision_fields = (
+        decision_id_raw,
+        reason_code_raw,
+        remaining_raw,
+        admitted_at_raw,
+    )
+    if all(item is None for item in decision_fields):
+        decision_id = None
+        reason_code = None
+        remaining = None
+        admitted_at = None
+    elif any(item is None for item in decision_fields):
+        raise CostGovernorError(
+            "admission intent decision payload is incomplete"
+        )
+    else:
+        decision_id = _token(
+            "admission_decision_id",
+            decision_id_raw,
+        )
+        reason_code = _token(
+            "admission_reason_code",
+            reason_code_raw,
+        )
+        if not isinstance(remaining_raw, dict):
+            raise CostGovernorError(
+                "admission intent remaining payload is invalid"
+            )
+        remaining_items: list[tuple[str, int | float]] = []
+        for key, item in sorted(remaining_raw.items()):
+            clean_key = _token("remaining key", key)
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isfinite(float(item))
+                or float(item) < 0
+            ):
+                raise CostGovernorError(
+                    "admission intent remaining payload is invalid"
+                )
+            remaining_items.append((clean_key, item))
+        if (
+            isinstance(admitted_at_raw, bool)
+            or not isinstance(admitted_at_raw, (int, float))
+        ):
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
+        admitted_at = float(admitted_at_raw)
+        if not math.isfinite(admitted_at) or admitted_at < 0:
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
+        remaining = tuple(remaining_items)
+
+    return _AdmissionIntentJournal(
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        requested_request_digest=requested_digest,
+        selected_request_digest=selected_digest,
+        selected_capability=selected_capability,
+        fallback_used=fallback_used,
+        fallback_id=fallback_id,
+        fallback_reason=fallback_reason,
+        decision_id=decision_id,
+        reason_code=reason_code,
+        remaining=remaining,
+        admitted_at=admitted_at,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class _CostCompletionIntent:
     actual: UsageEstimate
     budget: ResourceBudget
@@ -955,6 +1116,13 @@ class _CostJournalRecord:
 class _SqliteCostGovernorJournal:
     """Durable metadata journal; spend authority stays in quota tables."""
 
+    _INTENT_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS cost_governor_admission_intent (
+        operation_id TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL
+    );
+    """
+
     _SCHEMA = """
     CREATE TABLE IF NOT EXISTS cost_governor_journal (
         operation_id TEXT PRIMARY KEY,
@@ -982,6 +1150,7 @@ class _SqliteCostGovernorJournal:
         self.path = Path(path)
         with self._connect() as conn:
             conn.execute(self._SCHEMA)
+            conn.execute(self._INTENT_SCHEMA)
             columns = {
                 str(row["name"])
                 for row in conn.execute(
@@ -1075,6 +1244,190 @@ class _SqliteCostGovernorJournal:
                 )
             ),
         )
+
+    def load_admission_intent(
+        self,
+        operation_id: str,
+    ) -> _AdmissionIntentJournal | None:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT payload_json
+                FROM cost_governor_admission_intent
+                WHERE operation_id = ?
+                """,
+                (operation,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _admission_intent_from_payload(
+            self._decode_json(
+                row["payload_json"],
+                "admission_intent",
+            )
+        )
+
+    def begin_admission_intent(
+        self,
+        intent: _AdmissionIntentJournal,
+    ) -> _AdmissionIntentJournal:
+        if not isinstance(intent, _AdmissionIntentJournal):
+            raise TypeError(
+                "intent must be _AdmissionIntentJournal"
+            )
+        payload = _canonical_json_text(intent.as_dict())
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT payload_json
+                    FROM cost_governor_admission_intent
+                    WHERE operation_id = ?
+                    """,
+                    (intent.operation_id,),
+                ).fetchone()
+                if row is None:
+                    conn.execute(
+                        """
+                        INSERT INTO cost_governor_admission_intent (
+                            operation_id, payload_json
+                        ) VALUES (?, ?)
+                        """,
+                        (intent.operation_id, payload),
+                    )
+                else:
+                    existing = _admission_intent_from_payload(
+                        self._decode_json(
+                            row["payload_json"],
+                            "admission_intent",
+                        )
+                    )
+                    if existing == intent:
+                        pass
+                    elif not existing.has_decision:
+                        conn.execute(
+                            """
+                            UPDATE cost_governor_admission_intent
+                            SET payload_json = ?
+                            WHERE operation_id = ?
+                            """,
+                            (payload, intent.operation_id),
+                        )
+                    else:
+                        raise CostGovernorConflict(
+                            "admission intent replayed with different inputs"
+                        )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load_admission_intent(intent.operation_id)
+        if loaded is None:
+            raise CostGovernorError("admission intent write was lost")
+        return loaded
+
+    def record_admission_decision(
+        self,
+        operation_id: str,
+        decision: AdmissionDecision,
+        admitted_at: float,
+    ) -> _AdmissionIntentJournal:
+        operation = _token("operation_id", operation_id)
+        if not isinstance(decision, AdmissionDecision):
+            raise TypeError("decision must be AdmissionDecision")
+        if not decision.admitted:
+            raise CostGovernorConflict(
+                "admission intent can only persist admitted decisions"
+            )
+        if (
+            isinstance(admitted_at, bool)
+            or not isinstance(admitted_at, (int, float))
+            or not math.isfinite(float(admitted_at))
+            or float(admitted_at) < 0
+        ):
+            raise CostGovernorError("admitted_at is invalid")
+
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT payload_json
+                    FROM cost_governor_admission_intent
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "admission decision requires durable intent"
+                    )
+                existing = _admission_intent_from_payload(
+                    self._decode_json(
+                        row["payload_json"],
+                        "admission_intent",
+                    )
+                )
+                if (
+                    decision.operation_id != existing.operation_id
+                    or decision.tenant_id != existing.tenant_id
+                    or decision.capability
+                    != existing.selected_capability
+                ):
+                    raise CostGovernorConflict(
+                        "admission decision does not match intent identity"
+                    )
+                remaining = tuple(
+                    sorted(decision.remaining.items())
+                )
+                updated = replace(
+                    existing,
+                    decision_id=decision.decision_id,
+                    reason_code=decision.reason_code,
+                    remaining=remaining,
+                    admitted_at=float(admitted_at),
+                )
+                if existing.has_decision and existing != updated:
+                    raise CostGovernorConflict(
+                        "admission decision replayed with different inputs"
+                    )
+                conn.execute(
+                    """
+                    UPDATE cost_governor_admission_intent
+                    SET payload_json = ?
+                    WHERE operation_id = ?
+                    """,
+                    (
+                        _canonical_json_text(updated.as_dict()),
+                        operation,
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load_admission_intent(operation)
+        if loaded is None:
+            raise CostGovernorError(
+                "admission decision journal write was lost"
+            )
+        return loaded
+
+    def clear_admission_intent(
+        self,
+        operation_id: str,
+    ) -> None:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM cost_governor_admission_intent
+                WHERE operation_id = ?
+                """,
+                (operation,),
+            )
 
     def load(self, operation_id: str) -> _CostJournalRecord | None:
         operation = _token("operation_id", operation_id)
