@@ -577,6 +577,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-stagnant-cycles", type=int, default=3)
     parser.add_argument("--max-failures", type=int, default=5)
     parser.add_argument("--max-task-attempts", type=int, default=4)
+    parser.add_argument("--frontier")
+    parser.add_argument("--frontier-limit", type=int, default=8)
+    parser.add_argument("--allocate", action="store_true")
+    parser.add_argument("--advance", action="store_true")
+    parser.add_argument("--lease-owner", default=os.environ.get("GITHUB_RUN_ID", "local"))
+    parser.add_argument("--expected-epoch", type=int)
     args = parser.parse_args(argv)
 
     repo_state = json.loads(Path(args.repo_state).read_text(encoding="utf-8"))
@@ -599,6 +605,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             limit=args.frontier_limit,
         )
         Path(args.frontier).write_text(json.dumps(frontier, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    if not args.advance:
+        state.dump(state_path)
+        print(json.dumps(asdict(state), sort_keys=True))
+        return 0
+
     state = acquire_lease(state, owner=args.lease_owner, expected_epoch=args.expected_epoch)
     state = advance_campaign(
         state,
