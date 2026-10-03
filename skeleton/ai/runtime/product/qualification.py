@@ -511,6 +511,48 @@ def qualify_learning_candidate(
             "Mirror Room candidate/baseline binding drift"
         )
 
+    mirror_rollback_id = _text(
+        _attribute(mirror_promotion_evidence, "rollback_candidate_id"),
+        "mirror rollback_candidate_id",
+    )
+    mirror_rollback_digest = _sha(
+        _attribute(mirror_promotion_evidence, "rollback_candidate_digest"),
+        "mirror rollback_candidate_digest",
+    )
+    if (
+        mirror_rollback_id != binding.mirror_baseline_candidate_id
+        or mirror_rollback_digest
+        != binding.mirror_baseline_candidate_digest
+    ):
+        raise LearningQualificationError(
+            "Mirror Room rollback baseline binding drift"
+        )
+    for field_name in (
+        "holdout_report_digest",
+        "sealed_holdout_digest",
+        "split_integrity_digest",
+    ):
+        _sha(
+            _attribute(mirror_promotion_evidence, field_name),
+            "mirror " + field_name,
+        )
+    validation_report_digests = _attribute(
+        mirror_promotion_evidence,
+        "validation_report_digests",
+    )
+    if (
+        isinstance(validation_report_digests, (str, bytes))
+        or not isinstance(validation_report_digests, (tuple, list))
+        or not validation_report_digests
+    ):
+        raise LearningQualificationError(
+            "Mirror promotion requires validation report lineage"
+        )
+    tuple(
+        _sha(item, "mirror validation report digest")
+        for item in validation_report_digests
+    )
+
     firewall_candidate = _text(
         _attribute(firewall_promotion_evidence, "candidate_id"),
         "firewall candidate_id",
@@ -549,12 +591,45 @@ def qualify_learning_candidate(
         raise LearningQualificationError(
             "evaluation firewall candidate identity drift"
         )
+    holdout_set_identity = _text(
+        _attribute(
+            firewall_promotion_evidence,
+            "holdout_set_identity",
+        ),
+        "firewall holdout_set_identity",
+        maximum=2048,
+    )
+    query_receipt_digests = _attribute(
+        firewall_promotion_evidence,
+        "query_receipt_digests",
+    )
+    if (
+        isinstance(query_receipt_digests, (str, bytes))
+        or not isinstance(query_receipt_digests, (tuple, list))
+        or not query_receipt_digests
+    ):
+        raise LearningQualificationError(
+            "firewall promotion requires query receipt lineage"
+        )
+    normalized_query_receipts = tuple(
+        _sha(item, "firewall query receipt digest")
+        for item in query_receipt_digests
+    )
+    if len(normalized_query_receipts) != holdout_used:
+        raise LearningQualificationError(
+            "firewall query count differs from bound receipt lineage"
+        )
+    if mirror_verifier == firewall_evaluator:
+        raise LearningQualificationError(
+            "Mirror verifier and firewall evaluator must remain independent"
+        )
 
     refs = [
         "learning-binding-sha256:" + binding.digest,
         "training-plan-sha256:" + binding.training_plan_digest,
         "mirror-room-evidence-sha256:" + mirror_digest,
         "evaluation-firewall-evidence-sha256:" + firewall_digest,
+        "evaluation-holdout:" + holdout_set_identity,
     ]
     if binding.camera_coverage_digest is not None:
         refs.append(
