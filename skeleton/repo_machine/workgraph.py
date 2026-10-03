@@ -111,7 +111,9 @@ class WorkGraph:
             unlock=sum(self.counterfactual_unlock(n.identity,completed) for n in nodes)
             verification=sum(1 for n in nodes if n.verification_paths)
             pressure=max((self.node_pressure(n.identity) for n in nodes),default=0)
-            rows.append({"batch":index,"identities":list(group),"size":len(group),"risk_adjusted_influence":min(100,influence),"counterfactual_unlock":min(100,unlock),"verification_coverage":verification*100//max(1,len(group)),"pressure":pressure})
+            conflict_density=sum(self.conflict_density(n.identity) for n in nodes)//max(1,len(nodes))
+            decision_margin=sum(self.decision_margin(n.identity,completed) for n in nodes)//max(1,len(nodes))
+            rows.append({"batch":index,"identities":list(group),"size":len(group),"risk_adjusted_influence":min(100,influence),"counterfactual_unlock":min(100,unlock),"verification_coverage":verification*100//max(1,len(group)),"pressure":pressure,"conflict_density":min(100,conflict_density),"decision_margin":min(100,decision_margin)})
         return tuple(rows)
     def influence(self,identity):
         node=self.node(identity);return min(100,self.downstream_value(identity)*2//3+self.conflict_density(identity)//2+min(25,node.blast_radius*5))
