@@ -40,3 +40,18 @@ def test_safe_parallel_groups_and_bridge_candidates_are_bounded():
     assert len(groups) <= 2
     assert all(len(group) > 0 for group in groups)
     assert len(graph.bridge_candidates(limit=2)) <= 2
+
+
+def test_decision_surface_is_bounded_and_consistent():
+    graph = WorkGraph((
+        _node("a", conflicts=("x",), confidence=100),
+        _node("b", conflicts=("y",), confidence=80),
+        _node("c", prerequisites=("a",)),
+    ))
+    surface = graph.decision_surface(limit=2)
+    assert len(surface) <= 2
+    assert all(0 <= row["risk_adjusted_influence"] <= 100 for row in surface)
+    assert all(0 <= row["verification_efficiency"] <= 100 for row in surface)
+    assert all(row["counterfactual_unlock"] >= 0 for row in surface)
+    assert all(row["decision_margin"] >= 0 for row in surface)
+    assert {row["identity"] for row in surface} <= {"a", "b"}
