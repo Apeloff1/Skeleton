@@ -69,7 +69,8 @@ def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outco
         raise ValueError("execution plan fingerprint mismatch")
     if repository_fingerprint != plan.repository_fingerprint:
         return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
-                             ExecutionState(plan.state.completed_steps, plan.state.failed_work, plan.state.verified_work, True))
+                             ExecutionState(plan.state.completed_steps, plan.state.failed_work,
+                                            plan.state.verified_work, True))
     step = next((item for item in plan.steps if item.identity == step_identity), None)
     if step is None:
         raise ValueError("unknown execution step")
@@ -82,23 +83,31 @@ def advance_execution(plan: ExecutionPlan, *, step_identity: str, outcome: Outco
         completed.add(step.identity)
         if step.phase == "verify":
             verified.add(step.work_identity)
+            failed.discard(step.work_identity)
     elif outcome == "failed":
         failed.add(step.work_identity)
     elif outcome == "stale":
         return ExecutionPlan(plan.repository_fingerprint, plan.steps, (), plan.blocked_work,
-                             ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)), tuple(sorted(verified)), True))
+                             ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
+                                            tuple(sorted(verified)), True))
     elif outcome == "blocked":
         return plan
     return ExecutionPlan(plan.repository_fingerprint, plan.steps, plan.ready_work, plan.blocked_work,
-                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)), tuple(sorted(verified)), False))
+                         ExecutionState(tuple(sorted(completed)), tuple(sorted(failed)),
+                                        tuple(sorted(verified)), False))
 
 
 def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (),
                          active_conflicts: Iterable[str] = (), limit: int = 8,
-                         state: ExecutionState | None = None) -> ExecutionPlan:
+                         state: ExecutionState | None = None,
+                         retry_failed: bool = False) -> ExecutionPlan:
     graph = build_work_graph(model, limit=max(limit, 32))
     inherited = state or ExecutionState()
     completed_set = set(completed) | set(inherited.verified_work)
+    if retry_failed:
+        completed_set -= set(inherited.failed_work)
+    else:
+        completed_set |= set(inherited.failed_work)
     ready = graph.ready(completed_set, active_conflicts, limit=limit)
     ready_ids = {node.identity for node in ready}
     steps: list[PlanStep] = []
@@ -110,18 +119,22 @@ def build_execution_plan(model: RepositoryModel, *, completed: Iterable[str] = (
             PlanStep(verify, "verify", "Run the smallest relevant verification surface before considering the work complete.", (modify,), node.verification_paths, node.identity),
             PlanStep(unlock, "unlock", "Recompute downstream readiness from the updated repository state.", (verify,), work_identity=node.identity),
         ))
-    blocked = tuple(node.identity for node in graph._ordered_nodes if node.identity not in ready_ids and node.identity not in completed_set)
+    blocked = tuple(node.identity for node in graph._ordered_nodes
+                    if node.identity not in ready_ids and node.identity not in completed_set)
     return ExecutionPlan(model.fingerprint, tuple(steps), tuple(node.identity for node in ready), blocked, inherited)
 
 
 def replan_execution(model: RepositoryModel, previous: ExecutionPlan, *,
-                     active_conflicts: Iterable[str] = (), limit: int = 8) -> ExecutionPlan:
+                     active_conflicts: Iterable[str] = (), limit: int = 8,
+                     retry_failed: bool = False) -> ExecutionPlan:
     """Rebuild readiness after repository change without carrying stale steps forward."""
-    if previous.repository_fingerprint == model.fingerprint and not previous.state.stale:
-        return build_execution_plan(model, completed=previous.state.verified_work,
-                                     active_conflicts=active_conflicts, limit=limit, state=previous.state)
-    state = ExecutionState(verified_work=previous.state.verified_work)
-    return build_execution_plan(model, active_conflicts=active_conflicts, limit=limit, state=state)
+    return build_execution_plan(
+        model,
+        active_conflicts=active_conflicts,
+        limit=limit,
+        state=previous.state,
+        retry_failed=retry_failed,
+    )
 
 
 __all__ = ["ExecutionPlan", "ExecutionState", "Outcome", "Phase", "PlanStep",
