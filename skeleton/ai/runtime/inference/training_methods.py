@@ -413,6 +413,25 @@ class MultiMethodTrainingPlan:
     def corpus(self) -> tuple[str, ...]:
         return tuple(item.text for item in self.documents)
 
+    @property
+    def materialized_methods(self) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                method
+                for method, count in self.method_counts.items()
+                if count > 0
+            )
+        )
+
+    @property
+    def skipped_methods(self) -> tuple[str, ...]:
+        materialized = set(self.materialized_methods)
+        return tuple(
+            item.method.value
+            for item in self.methods
+            if item.method.value not in materialized
+        )
+
     def as_dict(self) -> dict[str, object]:
         return {
             "schema_version": "skeleton.multi_method_training_plan.v1",
@@ -428,6 +447,8 @@ class MultiMethodTrainingPlan:
             "document_ids": [item.document_id for item in self.documents],
             "document_count": len(self.documents),
             "method_counts": dict(self.method_counts),
+            "materialized_methods": list(self.materialized_methods),
+            "skipped_methods": list(self.skipped_methods),
             "total_chars": self.total_chars,
             "dropped_duplicate_count": self.dropped_duplicate_count,
             "dropped_budget_count": self.dropped_budget_count,
