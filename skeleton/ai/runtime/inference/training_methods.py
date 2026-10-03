@@ -18,7 +18,7 @@ import hashlib
 import json
 import math
 import re
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 
 
 _MAX_EXAMPLES = 4_096
