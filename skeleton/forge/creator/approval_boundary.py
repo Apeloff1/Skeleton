@@ -582,6 +582,15 @@ def authorize_action(
             reason="lease_changed",
             lease_id=lease.lease_id,
         )
+    if (
+        checkpoint.batch_ids != lease.scope.batch_ids
+        or checkpoint.paths != lease.scope.paths
+    ):
+        _fail(
+            "checkpoint scope differs from bound work lease",
+            reason="lease_scope_drift",
+            lease_id=lease.lease_id,
+        )
 
     decision_digest: str | None = None
     if checkpoint.requires_human:
