@@ -20,6 +20,7 @@ import math
 import re
 from typing import Mapping, Sequence
 
+from .multiview import CameraCoverageSelection
 from .visual_learning import VisualTrainingObservation
 
 
@@ -149,6 +150,7 @@ class TrainingExample:
     replay: bool = False
     camera_view_refs: tuple[str, ...] = ()
     camera_coverage_digest: str | None = None
+    camera_selection: CameraCoverageSelection | None = None
     visual_observations: tuple[VisualTrainingObservation, ...] = ()
     tags: tuple[str, ...] = ()
 
@@ -229,6 +231,26 @@ class TrainingExample:
                 maximum=1.0,
             ),
         )
+        selection = self.camera_selection
+        if selection is not None:
+            if not isinstance(selection, CameraCoverageSelection):
+                raise TypeError(
+                    "camera_selection must be CameraCoverageSelection"
+                )
+            if (
+                self.camera_coverage_digest is not None
+                and self.camera_coverage_digest
+                != selection.coverage_digest
+            ):
+                raise TrainingMethodError(
+                    "camera selection coverage differs from example coverage"
+                )
+            object.__setattr__(
+                self,
+                "camera_coverage_digest",
+                selection.coverage_digest,
+            )
+
         observations = tuple(self.visual_observations)
         if any(
             not isinstance(item, VisualTrainingObservation)
@@ -238,6 +260,16 @@ class TrainingExample:
                 "visual_observations must contain VisualTrainingObservation values"
             )
         observation_refs = tuple(item.camera_view_ref for item in observations)
+        if observations and selection is None:
+            raise TrainingMethodError(
+                "visual observations require authenticated camera selection"
+            )
+        if selection is not None:
+            selected = set(selection.view_refs)
+            if any(ref not in selected for ref in observation_refs):
+                raise TrainingMethodError(
+                    "visual observation camera view is outside authenticated selection"
+                )
         if len(observation_refs) != len(set(observation_refs)):
             raise TrainingMethodError(
                 "visual observations must have unique camera views"
@@ -325,6 +357,11 @@ class TrainingExample:
                 "replay": self.replay,
                 "camera_view_refs": list(self.camera_view_refs),
                 "camera_coverage_digest": self.camera_coverage_digest,
+                "camera_selection_digest": (
+                    None
+                    if self.camera_selection is None
+                    else self.camera_selection.digest
+                ),
                 "visual_observation_digests": [
                     item.feature_digest for item in self.visual_observations
                 ],
