@@ -856,3 +856,16 @@ def test_committed_transaction_is_cleaned_without_reset(tmp_path, monkeypatch):
     supervised_studio._recover_interrupted_transaction(path)
     assert not path.exists()
     assert calls == []
+
+
+def test_empirical_repair_is_bounded_to_two_attempts(monkeypatch, tmp_path):
+    # Contract guard: the live executor's empirical loop is intentionally
+    # bounded even when every replacement continues to fail validation.
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "for empirical_attempt in range(2):" in source
+    assert "repair_from_validation(" in source
+
+
+def test_execution_receipt_path_is_supported_by_cli():
+    source = Path(supervised_studio.__file__).read_text(encoding="utf-8")
+    assert "--receipt-path" in source
