@@ -7,6 +7,7 @@ import pytest
 from skeleton.ai.runtime.observability.cost_governor import (
     CostGovernor,
     CostGovernorConflict,
+    CostGovernorError,
 )
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
@@ -395,7 +396,10 @@ def test_failed_runtime_completion_clears_intent_for_safe_retry(
         now_wall=10.5,
     )
 
-    with pytest.raises(Exception, match="actual_usage_unknown:provider"):
+    with pytest.raises(
+        CostGovernorError,
+        match="actual_usage_unknown:provider",
+    ):
         governor.complete(
             operation,
             UsageEstimate(),
