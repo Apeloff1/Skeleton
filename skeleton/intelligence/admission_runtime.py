@@ -615,14 +615,14 @@ class AdmissionRuntime:
                 "durable quota estimate does not match request"
             )
 
-        finder = getattr(
+        recovery_reader = getattr(
             self.quota_ledger,
-            "reservation_for_operation",
+            "recovery_state_for_operation",
             None,
         )
-        if not callable(finder):
+        if not callable(recovery_reader):
             raise AdmissionRuntimeError(
-                "quota ledger does not support durable reservation lookup"
+                "quota ledger does not support atomic durable recovery lookup"
             )
 
         fingerprint = _request_fingerprint(request)
@@ -639,40 +639,23 @@ class AdmissionRuntime:
                 return current.lease
 
             try:
-                persisted = finder(
+                recovery_state = recovery_reader(
                     request.tenant_id,
                     request.operation_id,
                 )
             except QuotaError as exc:
                 raise AdmissionRuntimeError(
-                    "durable_reservation_unavailable"
+                    "durable_recovery_state_unavailable"
                 ) from exc
-            if persisted is None:
+            if recovery_state is None:
                 raise AdmissionRuntimeConflict(
                     "durable quota reservation is no longer active"
                 )
+            persisted, unresolved = recovery_state
             if persisted != reservation:
                 raise AdmissionRuntimeConflict(
                     "durable quota reservation does not match lease"
                 )
-
-            unresolved_reader = getattr(
-                self.quota_ledger,
-                "unresolved_usage",
-                None,
-            )
-            if not callable(unresolved_reader):
-                raise AdmissionRuntimeError(
-                    "quota ledger does not support durable unresolved usage lookup"
-                )
-            try:
-                unresolved = unresolved_reader(
-                    reservation.reservation_id
-                )
-            except QuotaError as exc:
-                raise AdmissionRuntimeError(
-                    "durable_unresolved_usage_unavailable"
-                ) from exc
 
             recovered_unknown: dict[str, UnknownUsageMarker] = {}
             for event in unresolved:
