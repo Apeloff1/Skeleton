@@ -143,6 +143,9 @@ def test_durable_sync_success_with_incomplete_token_usage_is_quarantined(
     assert runtime.snapshot()["unknown_usage_operations"] == (
         "sync-usage-incomplete",
     )
+    counters = runtime.telemetry_snapshot()["metrics"]["counters"]
+    assert counters["provider.unknown_usage_quarantined_total"] == 1
+    assert "provider.unknown_usage_marker_error_total" not in counters
 
 
 def test_durable_sync_complete_provider_usage_reconciles_normally(
