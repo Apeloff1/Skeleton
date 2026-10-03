@@ -168,8 +168,7 @@ jobs:
           "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.1"
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
-      - name: Backend correctness lint
-        run: ruff check backend --output-format=github
+      # Full repository Ruff lint runs in the canonical quality gate below; avoid a second backend-only pass.
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
       - name: Full-history secret scan
