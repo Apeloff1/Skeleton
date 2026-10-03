@@ -69,6 +69,12 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
             raise ValueError("canonical frontier allocation digest mismatch")
         if str(allocation.get("generation_id", "")) != generation:
             raise ValueError("canonical frontier allocation generation mismatch")
+        nonce = str(allocation.get("allocation_nonce", ""))
+        if len(nonce) != 24 or any(ch not in "0123456789abcdef" for ch in nonce):
+            raise ValueError("canonical frontier allocation nonce is malformed")
+        lanes = allocation.get("lane_assignments", {})
+        if not isinstance(lanes, Mapping):
+            raise ValueError("canonical frontier lane assignments are malformed")
 
     raw = supervisor.get("plan_items")
     if not isinstance(raw, list):
@@ -93,6 +99,10 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
         actual_ids = sorted(str(item.get("id", "")) for item in raw if isinstance(item, Mapping))
         if actual_ids != sorted(str(value) for value in authorized):
             raise ValueError("canonical frontier allocation does not match executable plan")
+        if set(str(key) for key in lanes) != set(actual_ids):
+            raise ValueError("canonical frontier lane assignments do not cover authorization")
+        if any(len(str(value)) != 16 for value in lanes.values()):
+            raise ValueError("canonical frontier lane identity is malformed")
 
     items = [
         item
