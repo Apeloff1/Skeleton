@@ -108,32 +108,22 @@ def test_observatory_rejected_attempt_cannot_move_visible_baseline() -> None:
     assert attempt["rejection_reasons"] == ["validation-gate"]
 
 
-def test_observatory_file_tree_exposes_full_product_surface() -> None:
+def test_observatory_file_tree_exposes_landed_extension_surface() -> None:
     encoded = repr(mirror_room_file_tree())
 
     assert "skeleton/learning/mirror_room" in encoded
     assert "skeleton/ai/learning/mirror_room" in encoded
-    assert "backend/routes/mirror_room.py" in encoded
-    assert "frontend/features/MirrorRoom" in encoded
-    assert "frontend/app/mirror-room.tsx" in encoded
-    assert "p1-feedback-release-closure.yml" in encoded
+    assert "test_mirror_room_observability.py" in encoded
+    assert "mirror-room-extensions.yml" in encoded
 
 
-def test_visual_observatory_is_real_route_and_not_mock_dashboard() -> None:
-    screen = (
-        ROOT
-        / "frontend/features/MirrorRoom/MirrorRoomObservatory.tsx"
-    ).read_text(encoding="utf-8")
-    route = (ROOT / "frontend/app/mirror-room.tsx").read_text(
-        encoding="utf-8"
-    )
-    api_route = (ROOT / "backend/routes/mirror_room.py").read_text(
-        encoding="utf-8"
-    )
+def test_observatory_file_tree_does_not_claim_unlanded_product_routes() -> None:
+    encoded = repr(mirror_room_file_tree())
 
-    assert "/api/mirror-room/observatory" in screen
-    assert "100-attempt ratchet" in screen
-    assert "Quality anatomy" in screen
-    assert "Integrated file tree" in screen
-    assert "features/MirrorRoom/MirrorRoomObservatory" in route
-    assert "get_default_observatory().snapshot()" in api_route
+    assert "backend/routes/mirror_room.py" not in encoded
+    assert "frontend/features/MirrorRoom" not in encoded
+    assert "frontend/app/mirror-room.tsx" not in encoded
+
+    assert (ROOT / "skeleton/learning/mirror_room/observability.py").is_file()
+    assert (ROOT / "skeleton/ai/learning/mirror_room/observability.py").is_file()
+    assert (ROOT / ".github/workflows/mirror-room-extensions.yml").is_file()
