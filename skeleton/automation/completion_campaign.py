@@ -47,6 +47,8 @@ class CampaignState:
     terminal_reason: str = ""
     epoch: int = 0
     state_sha256: str = ""
+    lease_owner: str = ""
+    lease_epoch: int = 0
 
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
@@ -90,6 +92,27 @@ class CampaignState:
             raise
 
 
+
+
+def acquire_lease(state: CampaignState, *, owner: str, expected_epoch: int | None = None) -> CampaignState:
+    owner = str(owner).strip()
+    if not owner or len(owner) > 160 or any(ord(ch) < 32 for ch in owner):
+        raise ValueError("campaign lease owner is malformed")
+    if expected_epoch is not None and state.epoch != expected_epoch:
+        raise ValueError("campaign epoch compare-and-swap failed")
+    if state.lease_owner and state.lease_owner != owner:
+        raise ValueError("campaign lease is owned by another controller")
+    state.lease_owner = owner
+    state.lease_epoch = state.epoch
+    return state
+
+
+def release_lease(state: CampaignState, *, owner: str) -> CampaignState:
+    if state.lease_owner != owner:
+        raise ValueError("campaign lease release owner mismatch")
+    state.lease_owner = ""
+    state.lease_epoch = state.epoch
+    return state
 
 def dependency_diagnostics(plan_items: object, team: str) -> dict[str, Any]:
     if not isinstance(plan_items, list):
@@ -280,6 +303,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("canonical supervisor state missing")
     state_path = Path(args.state)
     state = CampaignState.load(state_path)
+    state = acquire_lease(state, owner=args.lease_owner, expected_epoch=args.expected_epoch)
     state = advance_campaign(
         state,
         supervisor=supervisor,
@@ -294,6 +318,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_task_attempts=args.max_task_attempts,
         ),
     )
+    state = release_lease(state, owner=args.lease_owner)
     state.dump(state_path)
     print(json.dumps(asdict(state), sort_keys=True))
     return 0
