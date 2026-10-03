@@ -444,6 +444,21 @@ class MultiMethodTrainingPlan:
         return tuple(item.text for item in self.documents)
 
     @property
+    def corpus_digest(self) -> str:
+        return _digest(
+            {
+                "schema_version": "skeleton.multi_method_corpus.v1",
+                "documents": [
+                    {
+                        "document_id": item.document_id,
+                        "content_digest": item.content_digest,
+                    }
+                    for item in self.documents
+                ],
+            }
+        )
+
+    @property
     def materialized_methods(self) -> tuple[str, ...]:
         return tuple(
             sorted(
@@ -477,6 +492,7 @@ class MultiMethodTrainingPlan:
             "camera_coverage_digests": list(self.camera_coverage_digests),
             "document_ids": [item.document_id for item in self.documents],
             "document_count": len(self.documents),
+            "corpus_digest": self.corpus_digest,
             "method_counts": dict(self.method_counts),
             "materialized_methods": list(self.materialized_methods),
             "skipped_methods": list(self.skipped_methods),
@@ -1076,6 +1092,18 @@ def compile_training_plan(
         "camera_coverage_digests": list(camera_coverage_digests),
         "efficiency_policy_digest": actual.digest,
         "document_ids": [item.document_id for item in emitted],
+        "corpus_digest": _digest(
+            {
+                "schema_version": "skeleton.multi_method_corpus.v1",
+                "documents": [
+                    {
+                        "document_id": item.document_id,
+                        "content_digest": item.content_digest,
+                    }
+                    for item in emitted
+                ],
+            }
+        ),
         "method_counts": dict(sorted(method_counts.items())),
         "total_chars": total_chars,
         "dropped_duplicate_count": dropped_duplicate,
