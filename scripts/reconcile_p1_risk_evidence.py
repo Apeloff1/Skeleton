@@ -47,6 +47,10 @@ RETIRED_OBLIGATION_IDS = frozenset({
     "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143",
     "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910",
 })
+RETIRED_GAP_STATEMENTS = {
+    "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143": "bind UI/explanations",
+    "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910": "define uncertainty taxonomy",
+}
 
 
 class RiskReconciliationError(RuntimeError):
@@ -207,6 +211,34 @@ def derive_obligations(
                     rule=gap_rule,
                 )
             )
+
+    retired_volume = volume_by_key.get("VOL-248")
+    if retired_volume is not None:
+        current_gaps = set(retired_volume.get("gaps") or [])
+        for obligation_id, statement in sorted(
+            RETIRED_GAP_STATEMENTS.items()
+        ):
+            if statement in current_gaps:
+                continue
+            suffix = canonical_digest(statement)[:10]
+            source_ref = f"VOL-248:gap:{suffix}"
+            retired = _obligation(
+                kind=RiskKind.GAP,
+                source_ref=source_ref,
+                statement=statement,
+                source_payload={
+                    "volume": "VOL-248",
+                    "kind": "gap",
+                    "statement": statement,
+                },
+                rule=gap_rule,
+            )
+            if retired.obligation_id != obligation_id:
+                raise RiskReconciliationError(
+                    "retired VOL-248 obligation identity drift: "
+                    + obligation_id
+                )
+            obligations.append(retired)
 
     for axis in axes:
         if not isinstance(axis, dict):
@@ -415,7 +447,14 @@ def reconcile_repository(
             "baseline closure evidence entries must be non-empty"
         )
 
-    obligations = derive_obligations(master, p1_map, adversarial, policy)
+    historical_obligations = derive_obligations(
+        master, p1_map, adversarial, policy
+    )
+    obligations = tuple(
+        item
+        for item in historical_obligations
+        if item.obligation_id not in RETIRED_OBLIGATION_IDS
+    )
     expectations = policy.get("inventory_expectations")
     if not isinstance(expectations, dict):
         raise RiskReconciliationError("inventory_expectations must be an object")
@@ -439,9 +478,25 @@ def reconcile_repository(
         ),
         "total_obligation_count": len(obligations),
     }
-    counts = dict(live_counts)
-    counts["volume_gap_count"] += len(RETIRED_OBLIGATION_IDS)
-    counts["total_obligation_count"] += len(RETIRED_OBLIGATION_IDS)
+    counts = {
+        "p1_primary_volume_count": live_counts["p1_primary_volume_count"],
+        "volume_risk_count": sum(
+            1
+            for item in historical_obligations
+            if item.kind is RiskKind.RISK
+        ),
+        "volume_gap_count": sum(
+            1
+            for item in historical_obligations
+            if item.kind is RiskKind.GAP
+        ),
+        "applicable_adversarial_axis_count": sum(
+            1
+            for item in historical_obligations
+            if item.kind is RiskKind.ADVERSARIAL
+        ),
+        "total_obligation_count": len(historical_obligations),
+    }
     for key, actual in counts.items():
         if expectations.get(key) != actual:
             raise RiskReconciliationError(
