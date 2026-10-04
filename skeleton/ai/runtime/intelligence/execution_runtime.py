@@ -1203,7 +1203,8 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        cooperative_cancellation = bool(
+        cooperative_cancellation = True
+        provider_supports_cooperative_cancellation = bool(
             getattr(
                 self.provider,
                 "supports_cooperative_cancellation",
@@ -1290,21 +1291,64 @@ class CognitiveExecutionRuntime:
                             execution.execution_id
                         )
                         if durable_poll.cancellation_requested:
+                            if provider_supports_cooperative_cancellation:
+                                # Cooperative providers have an explicit
+                                # cancellation bridge (for example the local
+                                # inference thread event). Signal it immediately
+                                # once the durable request is visible instead of
+                                # spending the late-result grace interval first.
+                                provider_task.cancel()
+                                try:
+                                    await provider_task
+                                except asyncio.CancelledError:
+                                    pass
+                                cancel_payload = self._checkpoint_payload(
+                                    execution.execution_id
+                                )
+                                return self._finalize_non_success(
+                                    durable_poll,
+                                    cancel_payload,
+                                    status="cancelled",
+                                    error_code="cancellation_requested",
+                                    now=now,
+                                )
+
+                            # Cancellation is already durable. Give provider I/O
+                            # one bounded poll interval to finish so its receipt
+                            # can be checkpointed and explicitly fenced from
+                            # user-visible success. Providers without a
+                            # cooperative cancellation contract are then
+                            # interrupted, but their eventual response remains
+                            # auditable if they cannot be recalled after dispatch.
+                            done, _ = await asyncio.wait(
+                                {provider_task},
+                                timeout=0.05,
+                            )
+                            if provider_task in done:
+                                response = await provider_task
+                                break
                             provider_task.cancel()
                             try:
-                                await provider_task
+                                response = await provider_task
                             except asyncio.CancelledError:
-                                pass
-                            cancel_payload = self._checkpoint_payload(
-                                execution.execution_id
-                            )
-                            return self._finalize_non_success(
-                                durable_poll,
-                                cancel_payload,
-                                status="cancelled",
-                                error_code="cancellation_requested",
-                                now=now,
-                            )
+                                cancel_payload = self._checkpoint_payload(
+                                    execution.execution_id
+                                )
+                                return self._finalize_non_success(
+                                    durable_poll,
+                                    cancel_payload,
+                                    status="cancelled",
+                                    error_code="cancellation_requested",
+                                    now=now,
+                                )
+                            else:
+                                # A provider without a cooperative cancellation
+                                # contract may swallow task cancellation because
+                                # the upstream dispatch cannot be recalled.  Its
+                                # eventual response must continue through the
+                                # common late-result fence below so usage and the
+                                # provider receipt remain auditable.
+                                break
             except asyncio.CancelledError:
                 provider_task.cancel()
                 try:

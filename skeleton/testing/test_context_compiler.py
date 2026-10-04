@@ -657,6 +657,115 @@ def test_provider_projection_uses_canonical_sequence_for_equal_timestamp_history
     )
 
 
+
+def test_repeated_user_text_preserves_distinct_conversation_turn_identity() -> None:
+    operation_id, execution_id, _ = _ids()
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    thread = ConversationThread(
+        thread_id=thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=BASE,
+        updated_at=BASE + timedelta(seconds=2),
+        version=3,
+        message_sequence=3,
+        active_branch_id=branch_id,
+        data_class="internal",
+    )
+    repeated = "Repeat the same question."
+    first_user = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE,
+        idempotency_key="u-repeat-1",
+        content=repeated,
+        data_class="internal",
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=BASE + timedelta(seconds=1),
+        idempotency_key="a-repeat-1",
+        content="First answer.",
+        parent_message_id=first_user.message_id,
+        causal_user_message_id=first_user.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:repeat-1",
+        data_class="internal",
+    )
+    current_user = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=3,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE + timedelta(seconds=2),
+        idempotency_key="u-repeat-2",
+        content=repeated,
+        parent_message_id=assistant.message_id,
+        data_class="internal",
+    )
+    policy = _segment(
+        "Canonical instruction.",
+        kind=ContextKind.PRODUCT_INSTRUCTION,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="product-policy",
+        source_id="policy:repeat-turn",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+        purpose="model-inference",
+    )
+    segments = tuple(
+        conversation_message_segment(
+            thread,
+            message,
+            purpose="model-inference",
+        )
+        for message in (current_user, assistant, first_user)
+    )
+
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=current_user.message_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=ContextBudget(
+            max_context_tokens=4096,
+            reserved_output_tokens=512,
+            reserved_tool_result_tokens=0,
+            reserved_policy_tokens=512,
+            safety_margin_tokens=128,
+            max_segment_tokens=2048,
+            max_artifact_tokens=1024,
+            max_tool_result_tokens=1024,
+        ),
+        segments=(policy, *segments),
+        compiled_at=BASE + timedelta(seconds=2),
+    )
+    projection = project_provider_context(envelope)
+
+    assert projection.prompt == repeated
+    assert tuple(
+        (item["role"], item["content"])
+        for item in projection.history
+    ) == (
+        ("user", repeated),
+        ("assistant", "First answer."),
+    )
+    assert not any(
+        reason == "duplicate_content"
+        for _segment_id, reason in envelope.omission_reasons
+    )
+
 def test_duplicate_evidence_is_deterministically_omitted() -> None:
     first = _segment(
         "same content",

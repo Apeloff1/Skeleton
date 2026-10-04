@@ -163,8 +163,24 @@ class EngineExecutionCoordinator:
             await self.ensure_execution(execution_id)
             async with self._lock:
                 task = self._tasks.get(execution_id)
+        # Cancellation acknowledgement must not wait for the entire
+        # execution driver.  It should, however, give cooperative providers a
+        # short bounded window to observe the durable bit and persist the
+        # terminal cancellation result.  This keeps local cancellation
+        # deterministic without deadlocking providers whose response can only
+        # arrive after the caller regains control.
         if task is not None:
-            await asyncio.shield(task)
+            done, _ = await asyncio.wait({task}, timeout=0.15)
+            if task in done:
+                # _drive is fail-closed and normally consumes its own errors.
+                # Observe the task result so an unexpected terminal exception
+                # can never become an un-retrieved task warning.
+                try:
+                    task.result()
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    pass
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
