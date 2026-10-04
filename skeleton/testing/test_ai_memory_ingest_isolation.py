@@ -31,9 +31,12 @@ def test_cag_duplicate_persona_identity_is_rejected(store_type) -> None:
 
     with pytest.raises(ValueError,match="already registered"):
         store.create_persona("assistant","Replacement","Replacement prompt")
+    with pytest.raises(ValueError,match="already registered"):
+        store.create_persona(" assistant ","Alias","Alias prompt")
 
     assert store.health()["active_persona"]=="assistant"
     assert original.system_prompt=="Original prompt"
+    assert store.personas()==("assistant",)
 
 
 @pytest.mark.parametrize("store_type",[CanonicalMAG,AIMAG])
