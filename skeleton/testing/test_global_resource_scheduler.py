@@ -141,7 +141,7 @@ class GlobalResourceSchedulerTests(unittest.TestCase):
     def test_two_phase_preemption_never_frees_capacity_before_ack(self) -> None:
         scheduler = GlobalResourceScheduler(policy())
         scheduler.submit(
-            request("low", "background", cpu=80, priority=9, preemptible=True)
+            request("low", "background", cpu=90, priority=9, preemptible=True)
         )
         low = scheduler.admit_next()
         self.assertIsNotNone(low)
@@ -165,7 +165,7 @@ class GlobalResourceSchedulerTests(unittest.TestCase):
     def test_nonpreemptible_lower_priority_work_is_not_falsely_released(self) -> None:
         scheduler = GlobalResourceScheduler(policy())
         scheduler.submit(
-            request("low", "background", cpu=80, priority=9, preemptible=False)
+            request("low", "background", cpu=90, priority=9, preemptible=False)
         )
         scheduler.admit_next()
         scheduler.submit(
