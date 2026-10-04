@@ -66,7 +66,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-risk-evidence-${{ github.event.pull_request.number || github.ref }}
+  group: p1-risk-evidence-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
