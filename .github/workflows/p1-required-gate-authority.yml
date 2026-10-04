@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p1-required-gate-authority-${{ github.event.pull_request.number || github.ref }}
+  group: p1-required-gate-authority-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
