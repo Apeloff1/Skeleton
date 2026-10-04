@@ -1,3 +1,4 @@
+# Evidence refresh trigger: VOL-016 current-main delegation verification.
 name: P1 Agent Delegation Qualification Gate
 
 on:
