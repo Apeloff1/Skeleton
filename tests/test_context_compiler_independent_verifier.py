@@ -91,3 +91,35 @@ def test_context_compiler_independent_verifier_detects_dependency_drift(
 
     assert receipt["valid"] is False
     assert "context compiler dependency graph is invalid" in receipt["errors"]
+
+
+def test_context_compiler_rejects_nonterminal_implementation_state(
+    tmp_path: Path,
+) -> None:
+    for canonical, mirror in MIRROR_PAIRS:
+        for relative in (canonical, mirror):
+            source = ROOT / relative
+            target = tmp_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+    for relative in BOUNDARY_FILES:
+        source = ROOT / relative
+        target = tmp_path / relative
+        if target.exists():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+    path = tmp_path / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(
+        item for item in payload["entries"]
+        if item["gap"] == "gap-context-compiler-convergence"
+    )
+    entry["implementation_state"] = "pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify(tmp_path)
+
+    assert receipt["valid"] is False
+    assert any("implementation_state=closed" in item for item in receipt["errors"])
