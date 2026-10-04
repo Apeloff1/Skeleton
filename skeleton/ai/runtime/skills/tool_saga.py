@@ -497,6 +497,7 @@ class SQLiteToolSagaStore:
         tenant_id: str,
         operation_id: str,
         plan_digest: str,
+        expected_owner_token: str,
         now: datetime | None = None,
     ) -> ToolSagaReceipt:
         """Release a crashed saga owner after the caller proves it is gone.
@@ -507,6 +508,10 @@ class SQLiteToolSagaStore:
         """
 
         _uuid(saga_id, "saga_id")
+        expected_owner_token = _uuid(
+            expected_owner_token,
+            "expected_owner_token",
+        )
         instant = (
             datetime.now(timezone.utc)
             if now is None
@@ -525,14 +530,30 @@ class SQLiteToolSagaStore:
                     plan_digest=plan_digest,
                 )
                 if row["state"] not in _TERMINAL_STATES:
-                    self._connection.execute(
-                        """
-                        UPDATE tool_saga
-                        SET owner_token = NULL, updated_at = ?
-                        WHERE namespace = ? AND saga_id = ?
-                        """,
-                        (instant.isoformat(), self.namespace, saga_id),
-                    )
+                    current_owner = row["owner_token"]
+                    if current_owner is not None and current_owner != expected_owner_token:
+                        raise ToolSagaInDoubt(
+                            "saga owner changed before orphan recovery"
+                        )
+                    if current_owner is not None:
+                        cursor = self._connection.execute(
+                            """
+                            UPDATE tool_saga
+                            SET owner_token = NULL, updated_at = ?
+                            WHERE namespace = ? AND saga_id = ?
+                              AND owner_token = ?
+                            """,
+                            (
+                                instant.isoformat(),
+                                self.namespace,
+                                saga_id,
+                                expected_owner_token,
+                            ),
+                        )
+                        if cursor.rowcount != 1:
+                            raise ToolSagaInDoubt(
+                                "saga owner changed during orphan recovery"
+                            )
                 row = self._select(saga_id)
                 assert row is not None
                 self._connection.execute("COMMIT")
@@ -820,6 +841,7 @@ class AsyncToolSagaRuntime:
         saga_id: str,
         steps: Iterable[ToolSagaStep],
         *,
+        expected_owner_token: str,
         now: datetime | None = None,
     ) -> ToolSagaReceipt:
         """Explicitly release a crashed saga owner for a content-identical plan."""
@@ -831,6 +853,7 @@ class AsyncToolSagaRuntime:
             tenant_id=normalized[0].forward.tenant_id,
             operation_id=normalized[0].forward.operation_id,
             plan_digest=tool_saga_plan_digest(normalized),
+            expected_owner_token=expected_owner_token,
             now=now,
         )
 
