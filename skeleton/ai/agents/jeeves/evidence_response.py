@@ -318,8 +318,10 @@ class JeevesEvidenceAuthority:
         _require_digest(response.receipt_digest, field="receipt_digest")
         generated_at = _parse_timestamp(response.generated_at, field="generated_at")
         rebuilt = self.assemble(response.records(), now=generated_at)
-        if rebuilt.receipt_digest != response.receipt_digest:
-            raise JeevesEvidenceError("response receipt does not bind the supplied evidence")
+        if rebuilt != response:
+            raise JeevesEvidenceError(
+                "response receipt does not bind canonical grouping, ordering, and evidence"
+            )
 
     def _validate_market_fact(self, record: JeevesEvidenceRecord, now: datetime) -> None:
         observed = _parse_timestamp(record.observed_at or "", field="observed_at")
