@@ -37,6 +37,7 @@ from reconcile_p1_risk_evidence import (  # noqa: E402
     POLICY,
     REGISTRY,
     ROOT,
+    RETIRED_OBLIGATION_IDS,
     RiskKind,
     derive_obligations,
 )
@@ -52,6 +53,10 @@ EXPECTED_EXISTING_BINDINGS = 489
 EXPECTED_CANDIDATES = 0
 EXPECTED_CANDIDATE_RISKS = 0
 EXPECTED_CANDIDATE_GAPS = 0
+RETIRED_GAP_STATEMENTS = {
+    "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143": "bind UI/explanations",
+    "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910": "define uncertainty taxonomy",
+}
 
 
 class BulkVolumeEvidenceError(RuntimeError):
@@ -323,7 +328,7 @@ def build_bulk_volume_evidence(
                 f"duplicate governed binding identity: {obligation_id}"
             )
         bound_ids.add(obligation_id)
-    unknown = sorted(bound_ids - known_ids)
+    unknown = sorted(bound_ids - known_ids - RETIRED_OBLIGATION_IDS)
     if unknown:
         raise BulkVolumeEvidenceError(
             "risk registry references unknown obligations: " + ",".join(unknown)
@@ -335,9 +340,12 @@ def build_bulk_volume_evidence(
         if item.kind in {RiskKind.RISK, RiskKind.GAP}
         and item.source_ref.split(":", 1)[0] in owners
     ]
-    if len(volume_obligations) != EXPECTED_VOLUME_OBLIGATIONS:
+    expected_live_volume_obligations = (
+        EXPECTED_VOLUME_OBLIGATIONS - len(RETIRED_OBLIGATION_IDS)
+    )
+    if len(volume_obligations) != expected_live_volume_obligations:
         raise BulkVolumeEvidenceError(
-            f"expected {EXPECTED_VOLUME_OBLIGATIONS} P1 volume obligations, "
+            f"expected {expected_live_volume_obligations} live P1 volume obligations, "
             f"got {len(volume_obligations)}"
         )
 
@@ -422,8 +430,58 @@ def build_bulk_volume_evidence(
             "digest": packet["packet_digest"],
             "category": CATEGORY,
         }
+        packet["retired"] = False
         records.append(packet)
 
+    registry_by_id = {
+        row["obligation_id"]: row
+        for row in raw_records
+        if isinstance(row, dict)
+        and isinstance(row.get("obligation_id"), str)
+    }
+    for obligation_id in sorted(RETIRED_OBLIGATION_IDS):
+        binding = registry_by_id.get(obligation_id)
+        statement = RETIRED_GAP_STATEMENTS.get(obligation_id)
+        if binding is None or statement is None:
+            raise BulkVolumeEvidenceError(
+                "retired VOL-248 obligation metadata is incomplete: "
+                + obligation_id
+            )
+        volume_key = "VOL-248"
+        packet = {
+            "batch_id": BATCH_ID,
+            "expected_head": expected_head,
+            "volume_key": volume_key,
+            "kind": "gap",
+            "statement": statement,
+            "obligation_id": obligation_id,
+            "obligation_digest": binding["obligation_digest"],
+            "source_ref": obligation_id.split("-", 2)[-1].rsplit("-", 1)[0],
+            "owner_id": "ACC-VOL-248",
+            "recommended_severity": "high",
+            "recommended_disposition": "evidence",
+            "volume_evidence": volume_evidence[volume_key],
+            "binding_present": True,
+            "retired": True,
+            "non_authoritative": True,
+            "creates_binding": False,
+            "accepts_risk": False,
+            "lowers_severity": False,
+            "clears_source_obligation": False,
+            "promotes_maturity": False,
+        }
+        packet["packet_digest"] = _canonical_digest(packet)
+        packet["candidate_evidence_ref"] = {
+            "source": (
+                f"p1:bulk-volume-obligation-evidence:"
+                f"{obligation_id}:{expected_head}"
+            ),
+            "digest": packet["packet_digest"],
+            "category": CATEGORY,
+        }
+        records.append(packet)
+
+    records.sort(key=lambda row: row["obligation_id"])
     already_bound = [row for row in records if row["binding_present"]]
     candidates = [row for row in records if not row["binding_present"]]
     candidate_risks = [row for row in candidates if row["kind"] == "risk"]
@@ -466,6 +524,8 @@ def build_bulk_volume_evidence(
         "covered_obligation_count": len(records),
         "covered_risk_count": sum(row["kind"] == "risk" for row in records),
         "covered_gap_count": sum(row["kind"] == "gap" for row in records),
+        "live_obligation_count": sum(not row["retired"] for row in records),
+        "retired_obligation_count": sum(row["retired"] for row in records),
         "already_bound_count": len(already_bound),
         "candidate_binding_count": len(candidates),
         "candidate_risk_count": len(candidate_risks),
