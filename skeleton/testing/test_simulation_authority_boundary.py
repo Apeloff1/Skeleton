@@ -8,6 +8,7 @@ import pytest
 from skeleton.simulation.environment import (
     DeterministicEnvironmentAdapter,
     EnvironmentTransition,
+    SimulationBoundaryError,
     SimulationEvidence,
 )
 from skeleton.simulation.world_model import (
@@ -220,5 +221,8 @@ def test_rollout_and_counterfactual_bounds_fail_before_unbounded_work() -> None:
 def test_non_json_action_is_rejected_before_transition() -> None:
     engine = _engine()
 
-    with pytest.raises(Exception):
+    with pytest.raises(
+        SimulationBoundaryError,
+        match="deterministic JSON",
+    ):
         engine.rollout([{"bad": object()}])
