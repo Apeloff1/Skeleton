@@ -134,6 +134,38 @@ class EngineExecutionCoordinator:
             )
         await self.ensure_started(stored.command)
 
+    async def interrupt_cancelled_execution(self, execution_id: str) -> None:
+        """Wake a running execution after durable cancellation is requested.
+
+        Cooperative providers observe the repository cancellation bit from the
+        canonical runtime. Cancelling the coordinator task would bypass that
+        terminalization path, so this method waits for the running driver to
+        consume the durable request and only restarts recovery when no driver
+        is active.
+        """
+        execution_id = str(execution_id)
+        try:
+            execution = self.service.repository.get(execution_id)
+        except Exception as exc:
+            raise EngineExecutionCoordinatorError(
+                "engine execution is unavailable for cancellation"
+            ) from exc
+        if not execution.cancellation_requested:
+            raise EngineExecutionCoordinatorError(
+                "execution cancellation has not been requested"
+            )
+        if execution.terminal or self.service.repository.result(execution_id) is not None:
+            return
+
+        async with self._lock:
+            task = self._tasks.get(execution_id)
+        if task is None or task.done():
+            await self.ensure_execution(execution_id)
+            async with self._lock:
+                task = self._tasks.get(execution_id)
+        if task is not None:
+            await asyncio.shield(task)
+
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
