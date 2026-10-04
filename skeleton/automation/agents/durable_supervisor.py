@@ -84,12 +84,13 @@ class AgentSupervisorCommit:
 
 @dataclass(frozen=True, slots=True)
 class AgentSupervisorStatus:
-    """Read-only status across durable ownership, runtime and recovery."""
+    """Read-only status across durable ownership, runtime, policy and recovery."""
 
     run: RunRecord
     resources: Usage
     runtime: RuntimeSnapshot
     recovery: RecoveryStatus
+    policy: dict[str, object]
 
 
 def measure_agent_resources(runtime: SwarmRuntime) -> AgentResourceMeasurement:
@@ -186,6 +187,8 @@ class DurableAgentSupervisor:
     swaps the candidate into the authoritative runtime slot.
     """
 
+    POLICY_EXTENSION = "durable_agent_supervisor.policy.v1"
+
     def __init__(
         self,
         *,
@@ -202,8 +205,8 @@ class DurableAgentSupervisor:
     ) -> None:
         if not isinstance(store, SQLiteRunStore):
             raise TypeError("store must be SQLiteRunStore")
-        if not isinstance(runtime, SwarmRuntime):
-            raise TypeError("runtime must be SwarmRuntime")
+        if not isinstance(runtime, HardenedSwarmRuntime):
+            raise TypeError("runtime must be HardenedSwarmRuntime")
         if not isinstance(recovery, SwarmRecoveryManager):
             raise TypeError("recovery must be SwarmRecoveryManager")
         if isinstance(lease_seconds, bool) or lease_seconds <= 0:
@@ -219,7 +222,7 @@ class DurableAgentSupervisor:
         self.bridge = SwarmDurableBridge(store)
         self.ledger = ledger
         self.accountant = AgentResourceAccountant(ledger, scope)
-        self.policy = policy or SwarmSupervisor()
+        self.policy = policy or SwarmSupervisor(clock=runtime_clock)
         self._runtime = runtime
         self._last_commit: AgentSupervisorCommit | None = None
         self._lock = RLock()
