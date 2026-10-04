@@ -130,7 +130,7 @@ def test_batch2_registry_contains_exact_verified_control_plane_bindings() -> Non
         }
 
 
-def test_batch2_bindings_match_live_canonical_gap_obligations() -> None:
+def test_batch2_bindings_are_retired_from_live_gap_inventory() -> None:
     obligations = {
         item.obligation_id: item
         for item in derive_obligations(
@@ -143,13 +143,11 @@ def test_batch2_bindings_match_live_canonical_gap_obligations() -> None:
 
     for row in _batch2_records():
         expected = EXPECTED[row["obligation_id"]]
-        obligation = obligations[row["obligation_id"]]
-        assert obligation.statement == expected["statement"]
-        assert obligation.obligation_digest == expected["obligation_digest"]
-        assert row["obligation_digest"] == obligation.obligation_digest
-        assert obligation.kind.value == "gap"
-        assert obligation.default_severity.value == "high"
-        assert obligation.blocking_by_default is True
+        assert row["obligation_id"] not in obligations
+        assert row["owner_id"] == "ACC-" + expected["volume"]
+        assert row["obligation_digest"] == expected["obligation_digest"]
+        assert row["disposition"] == "evidence"
+        assert row["accepted_risk"] is None
 
 
 def test_batch2_verifier_identity_is_exact_and_auditable() -> None:
@@ -183,7 +181,7 @@ def test_combined_risk_reconciliation_resolves_twenty_two_obligations() -> None:
     }
 
 
-def test_batch2_does_not_delete_canonical_masterplan_gaps() -> None:
+def test_batch2_preserves_historical_bindings_after_gap_retirement() -> None:
     master = _load(ROOT / MASTER)
     by_key = {row["key"]: row for row in master["volumes"]}
 
@@ -209,5 +207,13 @@ def test_batch2_does_not_delete_canonical_masterplan_gaps() -> None:
             "maintain ADR exception workflow",
         },
     }
+    records = _batch2_records()
+    assert len(records) == 10
     for key, statements in expected.items():
-        assert statements <= set(by_key[key]["gaps"])
+        assert statements.isdisjoint(set(by_key[key]["gaps"]))
+        assert by_key[key]["implementation_status"] == "verified"
+        assert sum(
+            1
+            for row in records
+            if row["owner_id"] == "ACC-" + key
+        ) == len(statements)
