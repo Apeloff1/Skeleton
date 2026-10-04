@@ -107,14 +107,14 @@ class GlobalResourceSchedulerTests(unittest.TestCase):
 
     def test_queued_owner_demand_reprotects_its_reserve(self) -> None:
         scheduler = GlobalResourceScheduler(policy())
-        scheduler.submit(request("control", "control", cpu=20, priority=0))
         scheduler.submit(request("bg", "background", cpu=90, priority=5))
-        first = scheduler.admit_next()
+        scheduler.submit(request("control", "control", cpu=20, priority=5))
+        self.assertIsNone(scheduler.admit_request("bg"))
+        first = scheduler.admit_request("control")
         self.assertIsNotNone(first)
         assert first is not None
         self.assertEqual(first.request_id, "control")
-        second = scheduler.admit_next()
-        self.assertIsNone(second)
+        self.assertIsNone(scheduler.admit_request("bg"))
 
     def test_same_priority_prefers_under_served_weighted_plane(self) -> None:
         scheduler = GlobalResourceScheduler(policy())
