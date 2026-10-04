@@ -111,6 +111,7 @@ class CAGStore(MemoryStore):
     ) -> PersonaContext:
         if not isinstance(persona_id,str) or not persona_id.strip():
             raise ValueError("persona_id must be non-empty")
+        persona_id=persona_id.strip()
         if persona_id in self._personas:
             raise ValueError("persona_id is already registered")
         if not isinstance(name,str) or not name.strip():
@@ -119,7 +120,6 @@ class CAGStore(MemoryStore):
             raise ValueError("system_prompt must be non-empty")
         if isinstance(max_tokens,bool) or not isinstance(max_tokens,int) or max_tokens < 1:
             raise ValueError("max_tokens must be a positive integer")
-        persona_id=persona_id.strip()
         persona = PersonaContext(
             persona_id=persona_id,
             name=name.strip(),
