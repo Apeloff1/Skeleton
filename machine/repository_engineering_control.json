@@ -284,10 +284,10 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 1816,
-      "gap_count": 836,
+      "item_count": 1814,
+      "gap_count": 834,
       "risk_count": 980,
-      "open_count": 1816,
+      "open_count": 1814,
       "closed_count": 0
     },
     "items": [
@@ -7908,36 +7908,6 @@
         "state": "open",
         "closure_evidence_refs": [],
         "deduplication_key": "gap:bind retrieval freshness"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-248-001",
-        "source_kind": "gap",
-        "source_ref": "VOL-248:gap:001",
-        "volume_ref": "VOL-248",
-        "statement": "define uncertainty taxonomy",
-        "accountability_id": "ACC-VOL-248",
-        "requirement_refs": [
-          "REQ:VOL-248:001",
-          "REQ:VOL-248:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:define uncertainty taxonomy"
-      },
-      {
-        "backlog_id": "BL-GAP-VOL-248-002",
-        "source_kind": "gap",
-        "source_ref": "VOL-248:gap:002",
-        "volume_ref": "VOL-248",
-        "statement": "bind UI/explanations",
-        "accountability_id": "ACC-VOL-248",
-        "requirement_refs": [
-          "REQ:VOL-248:001",
-          "REQ:VOL-248:002"
-        ],
-        "state": "open",
-        "closure_evidence_refs": [],
-        "deduplication_key": "gap:bind ui/explanations"
       },
       {
         "backlog_id": "BL-GAP-VOL-249-001",
