@@ -1306,18 +1306,11 @@ class _SqliteCostGovernorJournal:
                             "admission_intent",
                         )
                     )
-                    if existing == intent:
-                        pass
-                    elif not existing.has_decision:
-                        conn.execute(
-                            """
-                            UPDATE cost_governor_admission_intent
-                            SET payload_json = ?
-                            WHERE operation_id = ?
-                            """,
-                            (payload, intent.operation_id),
-                        )
-                    else:
+                    if existing != intent:
+                        # The first durable intent owns this operation id.
+                        # Never rebind it, even before a decision exists:
+                        # another process may have observed the intent and
+                        # may be about to persist authority derived from it.
                         raise CostGovernorConflict(
                             "admission intent replayed with different inputs"
                         )
