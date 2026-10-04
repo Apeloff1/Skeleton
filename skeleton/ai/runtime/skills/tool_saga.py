@@ -23,6 +23,7 @@ from typing import Iterable
 from uuid import UUID, uuid4
 
 from skeleton.skills.tool_contract import (
+    ToolAuthorityClass,
     ToolEffect,
     ToolExecutionRequest,
     ToolExecutionReceipt,
@@ -787,17 +788,24 @@ class AsyncToolSagaRuntime:
                 compensation_manifest.input_schema,
                 step.compensation.arguments,
             )
-            if compensation_manifest.effect is ToolEffect.IRREVERSIBLE:
+            if compensation_manifest.effect is not ToolEffect.REVERSIBLE:
                 raise ToolSagaDenied(
-                    f"step {index} compensation tool cannot be irreversible"
+                    f"step {index} compensation tool must be reversible"
+                )
+            if compensation_manifest.authority_class is ToolAuthorityClass.READ:
+                raise ToolSagaDenied(
+                    f"step {index} compensation tool requires mutation authority"
                 )
             if compensation_manifest.side_effect_class not in {
-                ToolSideEffectClass.NONE,
                 ToolSideEffectClass.LOCAL_REVERSIBLE,
                 ToolSideEffectClass.EXTERNAL_REVERSIBLE,
             }:
                 raise ToolSagaDenied(
                     f"step {index} compensation side-effect class is unsafe"
+                )
+            if compensation_manifest.idempotency_mode is ToolIdempotencyMode.NOT_REQUIRED:
+                raise ToolSagaDenied(
+                    f"step {index} compensation tool must be replay-safe"
                 )
             if not _approval_is_bound(
                 compensation_manifest,
