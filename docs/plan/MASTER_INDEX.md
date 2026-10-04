@@ -44,6 +44,10 @@ Current continuation frontier: [`MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md`
 
 Machine continuation frontier: [`machine/ai_masterplan_continuation_frontier.json`](../../machine/ai_masterplan_continuation_frontier.json)
 
+Continuation implementation depth: [`AI_MASTERPLAN_IMPLEMENTATION_2026-10-04.md`](AI_MASTERPLAN_IMPLEMENTATION_2026-10-04.md)
+
+Bounded native resume contract: [`machine/ai_training_resume_contract.json`](../../machine/ai_training_resume_contract.json)
+
 P1 trustworthy-production execution map: [`P1_EXECUTION_MAP.md`](P1_EXECUTION_MAP.md)
 
 Machine P1 execution map: [`machine/ai_p1_execution_map.json`](../../machine/ai_p1_execution_map.json)

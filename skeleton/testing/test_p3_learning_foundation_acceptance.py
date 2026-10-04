@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 from skeleton.ai.runtime.learning_foundation.data import DatasetRegistry
@@ -17,6 +18,7 @@ from skeleton.ai.runtime.learning_foundation.training import (
     LocalTrainingControlPlane,
     MetricGate,
 )
+from skeleton.ai.runtime.training.evaluation import EvaluationCase, EvaluationSuite
 from skeleton.learning.model_program import ReferenceNGramTrainer, TrainingSpec
 
 
@@ -43,14 +45,16 @@ def test_p3_t2_provider_independent_learning_to_multimodal_acceptance() -> None:
     assert train.quality.quality_score == 1.0
     assert ingest.committed_version == 1
 
-    corpus = {train.identity: tuple(
-        payload.decode("utf-8")
-        for payload in (
-            b"local models preserve evidence identity",
-            b"training recovery preserves checkpoints",
-            b"multimodal retrieval preserves provenance",
+    corpus = {
+        train.identity: tuple(
+            payload.decode("utf-8")
+            for payload in (
+                b"local models preserve evidence identity",
+                b"training recovery preserves checkpoints",
+                b"multimodal retrieval preserves provenance",
+            )
         )
-    )}
+    }
     spec = TrainingSpec(
         run_id="p3-t2-acceptance-run",
         model_id="p3-t2-local-model",
@@ -118,17 +122,38 @@ def test_p3_t2_provider_independent_learning_to_multimodal_acceptance() -> None:
         episode_ids=(episode.episode_id,),
     )
     assert stage.passed is True
+    candidate = VerifierCandidate(
+        candidate_id="p3-t2-verifier-candidate",
+        model_digest=run.artifact.model_digest,
+        training_receipt_digest=run.receipt.digest,
+        benchmark_refs=("benchmark:p3-t2-heldout",),
+        intended_claims=("claim:bounded-local-learning",),
+    )
+    evaluation_refs = []
+    for version in ("1", "2"):
+        suite = EvaluationSuite(
+            suite_id="local-evidence",
+            version=version,
+            cases=(EvaluationCase("evidence", "local models preserve", "evidence", 1),),
+            population="heldout",
+            contamination_fingerprint=_sha("independent-local-evidence-" + version),
+        )
+        measured = asyncio.run(
+            learning.evaluate_benchmark(
+                candidate,
+                model=run.artifact.load_reference_model(),
+                training_receipt=run.receipt,
+                benchmark_ref="benchmark:p3-t2-heldout",
+                suite=suite,
+                verifier_id="p3-t2-independent-model-verifier",
+            )
+        )
+        evaluation_refs.append(measured.digest)
     verifier = learning.evaluate_verifier_candidate(
-        VerifierCandidate(
-            candidate_id="p3-t2-verifier-candidate",
-            model_digest=run.artifact.model_digest,
-            training_receipt_digest=run.receipt.digest,
-            benchmark_refs=("benchmark:p3-t2-heldout",),
-            intended_claims=("claim:bounded-local-learning",),
-        ),
+        candidate,
         verifier_id="p3-t2-independent-model-verifier",
         trainer_id=run.receipt.trainer_id,
-        evaluation_refs=("eval:training-gate", "eval:curriculum-gate"),
+        evaluation_refs=tuple(evaluation_refs),
         curriculum_decision_refs=(stage.decision_digest,),
     )
     assert verifier.passed is True

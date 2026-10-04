@@ -50,13 +50,17 @@ The 32 scheduled volumes now have exactly one planning owner each. These are sch
 | Task | Lane | Planned volumes | Depends on | Evidence state |
 | --- | --- | --- | --- | --- |
 | `P3T2-STORAGE-01` | `P3T2-L0` | VOL-133, VOL-135, VOL-136 | — | PR #2477 landed implementation candidate; exact-head validation pending |
-| `P3T2-DATA-01` | `P3T2-L1` | VOL-137, VOL-138, VOL-139, VOL-140, VOL-141, VOL-142 | `P3T2-STORAGE-01` | planned only |
+| `P3T2-DATA-01` | `P3T2-L1` | VOL-137, VOL-138, VOL-139, VOL-140, VOL-141, VOL-142 | `P3T2-STORAGE-01` | PR #2484 landed implementation candidate; exact-head validation pending |
 | `P3T2-TRAINING-01` | `P3T2-L2` | VOL-143, VOL-144, VOL-145, VOL-146, VOL-147, VOL-148, VOL-149 | `P3T2-DATA-01` | planned only |
 | `P3T2-LEARNING-01` | `P3T2-L3` | VOL-150, VOL-151, VOL-152 | `P3T2-TRAINING-01` | planned only |
 | `P3T2-MULTIMODAL-01` | `P3T2-L4` | VOL-153, VOL-154, VOL-155, VOL-156, VOL-157, VOL-158, VOL-159 | `P3T2-DATA-01`, `P3T2-TRAINING-01`, `P3T2-LEARNING-01` | planned only |
 | `P3T2-LIFECYCLE-01` | `P3T2-L5` | VOL-179, VOL-407, VOL-408, VOL-411, VOL-412, VOL-413 | `P3T2-TRAINING-01`, `P3T2-LEARNING-01` | planned only |
 
 The owner union is exactly the 32-volume scheduled set, with no duplicated or orphaned volume identity.
+
+The [2026-10-04 implementation depth pass](AI_MASTERPLAN_IMPLEMENTATION_2026-10-04.md)
+adds bounded native training resume and deeper training, learning, multimodal and
+model lifecycle evidence. It grants no planning-owner promotion or sign-off.
 
 ## Promotion boundary
 
