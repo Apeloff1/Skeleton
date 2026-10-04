@@ -431,6 +431,124 @@ async def test_saga_preflight_rejects_irreversible_forward_tool(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
+async def test_saga_rejects_read_only_noop_compensation(tmp_path) -> None:
+    tool_store = SQLiteToolReceiptStore(tmp_path / "tool.sqlite3")
+    saga_store = SQLiteToolSagaStore(tmp_path / "saga.sqlite3")
+    runtime = AsyncToolRuntime(receipt_store=tool_store)
+
+    async def forward(_request: ToolExecutionRequest) -> str:
+        return "artifact:write"
+
+    async def noop(_request: ToolExecutionRequest) -> str:
+        return "artifact:noop"
+
+    await runtime.register(_write_manifest(), forward)
+    await runtime.register(
+        ToolManifest(
+            tool_id="repo.undo",
+            version="1.0.0",
+            description="invalid no-op compensation",
+            input_schema={
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.READ,
+            side_effect_class=ToolSideEffectClass.NONE,
+            idempotency_mode=ToolIdempotencyMode.NOT_REQUIRED,
+            effect=ToolEffect.READ_ONLY,
+        ),
+        noop,
+    )
+    operation_id = _uid(64)
+    saga = AsyncToolSagaRuntime(runtime, saga_store)
+
+    with pytest.raises(ToolSagaDenied, match="compensation tool must be reversible"):
+        await saga.execute(
+            _uid(65),
+            (
+                ToolSagaStep(
+                    forward=_request(
+                        request_id=66,
+                        operation_id=operation_id,
+                        tool_id="repo.write",
+                        key="write",
+                        name="a",
+                    ),
+                    compensation=_request(
+                        request_id=67,
+                        operation_id=operation_id,
+                        tool_id="repo.undo",
+                        key="undo",
+                        name="a",
+                    ),
+                ),
+            ),
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_saga_rejects_compensation_without_mutation_authority(tmp_path) -> None:
+    tool_store = SQLiteToolReceiptStore(tmp_path / "tool.sqlite3")
+    saga_store = SQLiteToolSagaStore(tmp_path / "saga.sqlite3")
+    runtime = AsyncToolRuntime(receipt_store=tool_store)
+
+    async def forward(_request: ToolExecutionRequest) -> str:
+        return "artifact:write"
+
+    async def weak_undo(_request: ToolExecutionRequest) -> str:
+        return "artifact:undo"
+
+    await runtime.register(_write_manifest(), forward)
+    await runtime.register(
+        ToolManifest(
+            tool_id="repo.undo",
+            version="1.0.0",
+            description="invalid read-authority compensation",
+            input_schema={
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.READ,
+            side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+            idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+            effect=ToolEffect.REVERSIBLE,
+        ),
+        weak_undo,
+    )
+    operation_id = _uid(68)
+    saga = AsyncToolSagaRuntime(runtime, saga_store)
+
+    with pytest.raises(ToolSagaDenied, match="requires mutation authority"):
+        await saga.execute(
+            _uid(69),
+            (
+                ToolSagaStep(
+                    forward=_request(
+                        request_id=70,
+                        operation_id=operation_id,
+                        tool_id="repo.write",
+                        key="write",
+                        name="a",
+                    ),
+                    compensation=_request(
+                        request_id=71,
+                        operation_id=operation_id,
+                        tool_id="repo.undo",
+                        key="undo",
+                        name="a",
+                    ),
+                ),
+            ),
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
 async def test_reversible_saga_tool_requires_compensatable_contract(
     tmp_path,
 ) -> None:
