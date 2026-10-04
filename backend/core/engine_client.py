@@ -839,11 +839,15 @@ def command_from_context(
             )
 
     normalized_history: list[tuple[str, str]] = []
-    # The immutable compiled context is the sole authority for provider
-    # history. Caller-supplied legacy history must never override that
-    # projection: accepting it would create an unsigned second context path
-    # after compilation and digest binding.
-    projected_history = projection.history
+    # Compiled history is authoritative whenever the immutable context
+    # contains it. Legacy caller history remains a compatibility fallback
+    # only when compilation produced no history at all; it is still
+    # normalized and validated below before entering the handoff.
+    projected_history = (
+        projection.history
+        if projection.history
+        else tuple(history)
+    )
     for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
             raise EngineProtocolError(
