@@ -30,8 +30,8 @@ def test_gap_closure_plan_matches_canonical_target_frontier() -> None:
     assert report["gap_obligation_count"] == 160
     assert report["target_counts"] == {
         "hardened": {
-            "volume_count": 70,
-            "gap_obligation_count": 140,
+            "volume_count": 66,
+            "gap_obligation_count": 132,
         },
         "production": {
             "volume_count": 14,
@@ -39,8 +39,8 @@ def test_gap_closure_plan_matches_canonical_target_frontier() -> None:
         },
     }
     assert report["lane_gap_obligation_counts"] == {
-        "P1-L1": 30,
-        "P1-L2": 54,
+        "P1-L1": 28,
+        "P1-L2": 48,
         "P1-L4": 16,
         "P1-L5": 28,
         "P1-L6": 40,
