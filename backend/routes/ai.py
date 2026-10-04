@@ -390,7 +390,7 @@ def _provider_history(messages, *, before_sequence: int | None = None) -> List[D
     }
     history: List[Dict[str, str]] = []
     for message in messages:
-        if exclude_message_id is not None and message.message_id == exclude_message_id:
+        if before_sequence is not None and message.sequence >= before_sequence:
             continue
         if message.message_id in abandoned_user_ids:
             continue
