@@ -1,3 +1,4 @@
+# Evidence refresh trigger: VOL-015 current-main independent verification.
 name: Tool Runtime Closure Gate
 
 on:
