@@ -14,6 +14,7 @@ from scripts.reconcile_p1_risk_evidence import (
     P1_MAP,
     POLICY,
     REGISTRY,
+    RETIRED_OBLIGATION_IDS,
     RiskReconciliationError,
     derive_obligations,
     reconcile_repository,
@@ -98,8 +99,21 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 513,
     }
+    assert report["live_inventory"] == {
+        "p1_primary_volume_count": 107,
+        "volume_risk_count": 281,
+        "volume_gap_count": 206,
+        "applicable_adversarial_axis_count": 24,
+        "total_obligation_count": 511,
+    }
     assert report["binding_count"] == 513
+    assert report["live_binding_count"] == 511
+    assert report["historical_binding_count"] == 513
+    assert report["retired_binding_count"] == 2
+    assert report["retired_obligation_ids"] == sorted(RETIRED_OBLIGATION_IDS)
     assert report["resolved_count"] == 513
+    assert report["live_resolved_count"] == 511
+    assert report["historical_resolved_count"] == 513
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
@@ -232,7 +246,7 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 512
+    assert report["unresolved_blocking_count"] == 510
     assert report["unclassified_count"] == 280
 
 
