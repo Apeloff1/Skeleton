@@ -7,6 +7,8 @@ on:
     paths:
       - "machine/p1_reproducibility_policy.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"
@@ -22,6 +24,8 @@ on:
     paths:
       - "machine/p1_reproducibility_policy.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "skeleton/contracts/reproducibility.py"
       - "skeleton/ai/runtime/contracts/reproducibility.py"
       - "scripts/check_p1_reproducibility.py"
