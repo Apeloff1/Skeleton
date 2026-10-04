@@ -2856,7 +2856,6 @@ class EngineExecutionService:
             verified_service_principal=verified_service_principal,
             scope="engine:cancel",
             now=now,
-            require_live_delegation=True,
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
@@ -2869,6 +2868,18 @@ class EngineExecutionService:
             )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
+            # A new cancellation mutates execution authority and therefore
+            # requires the original delegated authority to remain live.
+            # Retries after the durable cancellation bit is set are read-only
+            # idempotent acknowledgements: the verified service grant plus
+            # actor/tenant binding above remains authoritative even if the
+            # short-lived delegation expires while cancellation drains.
+            self._validate(
+                stored.command,
+                verified_service_principal=verified_service_principal,
+                required_scope="engine:cancel",
+                now=now,
+            )
             self.repository.request_cancel(
                 execution_id,
                 expected_version=current.version,
