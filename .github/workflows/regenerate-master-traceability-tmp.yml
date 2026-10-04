@@ -1,0 +1,50 @@
+name: Temporary regenerate master traceability
+
+on:
+  push:
+    branches:
+      - "fix/p2-traceability-after-retrosign-20261004"
+    paths:
+      - ".github/workflows/regenerate-master-traceability-tmp.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: regenerate-master-traceability-fix/p2-traceability-after-retrosign-20261004
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Regenerate canonical traceability shards
+        run: |
+          set -euo pipefail
+          python scripts/generate_master_traceability.py --json
+          python scripts/generate_master_traceability.py --check --json
+          python scripts/check_master_traceability.py --json
+          python -m unittest -v tests.test_master_traceability
+
+      - name: Commit regenerated state and remove temporary workflow
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/regenerate-master-traceability-tmp.yml
+          git add machine/master_traceability.json machine/traceability
+          git diff --cached --quiet && { echo "no traceability changes"; exit 1; }
+          git commit -m "fix(trace): regenerate master traceability after retro-sign"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
