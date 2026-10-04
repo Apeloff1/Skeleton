@@ -325,3 +325,18 @@ def test_main_handles_archive_root_runtime_failure_cleanly(
     monkeypatch.setattr(MODULE, "find_installable_manifests", explode)
     assert MODULE.main() == 2
     assert "cannot inspect archive safely" in capsys.readouterr().err
+
+
+def test_archive_map_rejects_unmapped_snapshot_payload(tmp_path: Path) -> None:
+    map_path = _write_map(tmp_path)
+    extra = (
+        tmp_path
+        / "satellites"
+        / "branch-snapshots"
+        / "sample"
+        / "historical_runtime.py"
+    )
+    extra.parent.mkdir(parents=True, exist_ok=True)
+    extra.write_text("print('archived')\n", encoding="utf-8")
+    errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
+    assert any("unmapped archival snapshot payload" in error for error in errors)
