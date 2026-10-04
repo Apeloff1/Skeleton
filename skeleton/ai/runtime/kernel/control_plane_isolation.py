@@ -385,6 +385,19 @@ class ControlDataPlaneIsolator:
             self._assert_state()
             return permit
 
+    def authorize(self, permit: AdmissionPermit) -> AdmissionPermit:
+        """Revalidate a permit immediately before crossing an execution boundary."""
+        self._validate_permit_shape(permit)
+        with self._lock:
+            active = self._active.get(permit.permit_id)
+            if active is None or active != permit:
+                raise PermitRejected("permit is not active")
+            if permit.plane == _DATA and not self._data_plane_open:
+                raise DataPlaneUnavailable(
+                    "data-plane permit is fenced by isolation state"
+                )
+            return active
+
     def complete(self, permit: AdmissionPermit) -> None:
         self._validate_permit_shape(permit)
         with self._lock:
