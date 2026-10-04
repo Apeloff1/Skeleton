@@ -261,7 +261,9 @@
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
         "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034204451",
-        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810"
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "human/machine plan divergence",
@@ -2336,7 +2338,9 @@
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604824",
         "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199166",
-        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716"
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604716",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "secret leakage in telemetry",
@@ -2411,7 +2415,9 @@
         "git-head:5cd48394f45623b057228a26bbee7ca9c7b27676",
         "github-actions-job:109096147549",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36471954538",
-        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676"
+        "https://github.com/Apeloff1/Skeleton/commit/5cd48394f45623b057228a26bbee7ca9c7b27676",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "benchmark cherry-picking",
@@ -2475,7 +2481,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199375",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "evaluator leakage",
@@ -2535,7 +2543,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199390",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "self-confidence treated as proof",
@@ -2614,7 +2624,9 @@
         "github-actions-job:108713003767",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
         "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
-        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "canonicalization mismatch",
@@ -3712,7 +3724,9 @@
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
         "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199375",
-        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812"
+        "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "orphan gaps",
@@ -3774,7 +3788,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199375",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604812",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "critical risk hidden by aggregate status",
@@ -3887,7 +3903,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199390",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604787",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "false green aggregation",
@@ -4976,7 +4994,9 @@
         "github-actions-job:108713003767",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
         "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
-        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "hidden dependency",
@@ -5039,7 +5059,9 @@
         "github-actions-job:108713003767",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36352236430",
         "https://github.com/Apeloff1/Skeleton/commit/52acf3c531af849e8793e8c88ff663c4ddd1bef8",
-        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625"
+        "https://github.com/Apeloff1/Skeleton/commit/ffdff9cd5f32cf83001ea06d5794395324c62625",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "false confidence from static gates",
@@ -5110,7 +5132,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034199519",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604802",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "implementation-coupled tests",
@@ -22048,7 +22072,9 @@
         "git-head:1a66b2212c438cdc8d77ba912160d46682775a94",
         "github-actions-job:109034204451",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810",
-        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+        "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "breadth inflation",
