@@ -223,3 +223,27 @@ def test_bridge_rejects_verifier_script_digest_drift(tmp_path: Path) -> None:
         "S2-CTX: verifier script digest drift" in error
         for error in receipt["errors"]
     )
+
+
+def test_bridge_rejects_nonterminal_closure_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _copy_bridge_tree(tmp_path)
+    path = root / CLOSURE.relative_to(ROOT)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(
+        item
+        for item in payload["entries"]
+        if item["gap"] == "gap-memory-durable-authority"
+    )
+    entry["implementation_state"] = "pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "closure implementation_state for gap-memory-durable-authority is not closed"
+        in error
+        for error in receipt["errors"]
+    )
