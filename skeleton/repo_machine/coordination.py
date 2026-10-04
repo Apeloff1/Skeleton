@@ -18,7 +18,8 @@ class CoordinationDecision:
 class CoordinationPlan:
     repository_fingerprint:str; decisions:tuple[CoordinationDecision,...]; bottleneck:str|None; frontier_size:int; max_parallelism:int=0; coordination_pressure:int=0; graph_fingerprint:str=""; safe_parallel_groups:tuple[tuple[str,...],...]=()
     def as_dict(self)->dict[str,object]:
-        return {"repository_fingerprint":self.repository_fingerprint,"decisions":[d.as_dict() for d in self.decisions],"bottleneck":self.bottleneck,
+        ranked=rank_decisions(self,limit=len(self.decisions)) if self.decisions else ()
+        return {"repository_fingerprint":self.repository_fingerprint,"decisions":[d.as_dict() for d in self.decisions],"ranked_decisions":[d.as_dict() for d in ranked],"bottleneck":self.bottleneck,
                 "frontier_size":self.frontier_size,"max_parallelism":self.max_parallelism,"coordination_pressure":self.coordination_pressure,"graph_fingerprint":self.graph_fingerprint,
                 "safe_parallel_groups":[list(group) for group in self.safe_parallel_groups]}
 
@@ -42,6 +43,11 @@ def _decision(node:WorkNode,graph:WorkGraph,blocked=False)->CoordinationDecision
     return CoordinationDecision(node.identity,action,node.strategic_score,node.unlock_potential,confidence,blocked,tuple(reasons),
                                  pressure,parallel,downstream,conflicts,influence,risk_adjusted,efficiency,counterfactual,margin)
 
+def rank_decisions(plan:CoordinationPlan,*,limit:int=8)->tuple[CoordinationDecision,...]:
+    """Return bounded decisions ordered by independent counterfactual value signals."""
+    if isinstance(limit,bool) or not isinstance(limit,int) or not 1<=limit<=64: raise ValueError("limit must be in [1,64]")
+    return tuple(sorted(plan.decisions,key=lambda d:(d.blocked,-d.risk_adjusted_influence,-d.counterfactual_unlock,-d.decision_margin,-d.verification_efficiency,-d.downstream_value,d.work_identity))[:limit])
+
 def select_next_work(model:RepositoryModel,*,completed:tuple[str,...]=(),active_conflicts:tuple[str,...]=(),limit:int=8,graph:WorkGraph|None=None)->CoordinationPlan:
     if isinstance(limit,bool) or not isinstance(limit,int) or not 1<=limit<=64: raise ValueError("limit must be in [1,64]")
     graph=graph or build_work_graph(model,limit=max(limit,32))
@@ -55,4 +61,4 @@ def select_next_work(model:RepositoryModel,*,completed:tuple[str,...]=(),active_
 def build_coordination_plan(model:RepositoryModel,*,limit:int=8,graph:WorkGraph|None=None)->dict[str,object]:
     return select_next_work(model,limit=limit,graph=graph).as_dict()
 
-__all__=["CoordinationDecision","CoordinationPlan","build_coordination_plan","select_next_work"]
+__all__=["CoordinationDecision","CoordinationPlan","build_coordination_plan","rank_decisions","select_next_work"]
