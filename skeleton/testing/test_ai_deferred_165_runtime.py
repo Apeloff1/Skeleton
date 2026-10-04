@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import threading
 from pathlib import Path
 
@@ -9,7 +10,10 @@ import pytest
 
 from skeleton.ai.runtime.deferred import (
     DeferredExecutionError,
+    DeferredExecutionPendingError,
     DeferredExecutor,
+    DeferredJournalConflict,
+    SqliteDeferredExecutionJournal,
     DeferredInvocation,
     build_registry,
     volume_ids,
@@ -29,6 +33,8 @@ from skeleton.ai.runtime.deferred.contracts import (
     Budget,
     BudgetLedger,
     EvidenceReceipt,
+    canonical_json,
+    sha256_json,
 )
 from skeleton.ai.runtime.deferred.knowledge import (
     Claim,
@@ -1165,3 +1171,444 @@ def test_deferred_executor_snapshot_is_safe_during_inflight_execution() -> None:
         "snapshot-race"
     ]
 
+
+
+
+def _durable_deferred_registry():
+    registry = build_registry()
+    record = registry.get("VOL-160")
+    record.candidate(
+        EvidenceReceipt(
+            volume_id="VOL-160",
+            head_sha=HEAD,
+            artifact_digests=(HEX_A,),
+            tests=("durable:candidate",),
+            status="implementation_candidate",
+            created_at="2026-10-04T00:00:00+00:00",
+        )
+    )
+    record.verify(
+        EvidenceReceipt(
+            volume_id="VOL-160",
+            head_sha=HEAD,
+            artifact_digests=(HEX_A, HEX_B),
+            tests=("durable:candidate", "durable:verified"),
+            status="verified",
+            created_at="2026-10-04T00:00:01+00:00",
+        )
+    )
+    registry.enable("VOL-160")
+    return registry, record
+
+
+def _durable_deferred_executor(journal, handler):
+    registry, record = _durable_deferred_registry()
+    executor = DeferredExecutor(registry, journal=journal)
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1, max_cost_units=4, max_latency_ms=20),
+    )
+    return executor, record
+
+
+def test_deferred_effect_journal_replays_success_without_second_effect(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-effects.sqlite3"
+    calls = []
+
+    def handler(payload):
+        calls.append(dict(payload))
+        return {"answer": 42}
+
+    first, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        handler,
+    )
+    payload = {"value": 1}
+    invocation = first.prepare(
+        "VOL-160",
+        "durable-success",
+        payload,
+        cost_units=1,
+        latency_ms=2,
+    )
+    initial = first.execute(invocation, payload)
+
+    second_journal = SqliteDeferredExecutionJournal(path)
+    second, _ = _durable_deferred_executor(second_journal, handler)
+    replay_invocation = second.prepare(
+        "VOL-160",
+        "durable-success",
+        payload,
+        cost_units=1,
+        latency_ms=2,
+    )
+    replay = second.execute(replay_invocation, payload)
+
+    assert replay.receipt == initial.receipt
+    assert replay.result == {"answer": 42}
+    assert calls == [{"value": 1}]
+    record = second_journal.load("durable-success")
+    assert record is not None
+    assert record.state == "succeeded"
+
+
+def test_deferred_effect_journal_started_state_blocks_blind_retry(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-started.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    calls = []
+    first, record = _durable_deferred_executor(
+        journal,
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-started", payload)
+
+    started, created = journal.record_started(
+        operation_id=invocation.operation_id,
+        fingerprint=invocation.fingerprint,
+        invocation=invocation.as_dict(),
+        handler_identity=record.spec.handler,
+    )
+    assert created
+    assert started.state == "started"
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    with pytest.raises(
+        DeferredExecutionPendingError,
+        match="durable started state",
+    ):
+        restarted.execute(invocation, payload)
+
+    assert calls == []
+
+
+def test_deferred_effect_journal_explicit_unknown_fence_survives_restart(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-fence.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    calls = []
+    first, record = _durable_deferred_executor(
+        journal,
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-unknown", payload)
+    journal.record_started(
+        operation_id=invocation.operation_id,
+        fingerprint=invocation.fingerprint,
+        invocation=invocation.as_dict(),
+        handler_identity=record.spec.handler,
+    )
+
+    recovery, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    failure = recovery.fence_incomplete("durable-unknown")
+    assert failure.error_type == "DeferredOutcomeUnknown"
+    assert failure.status == "failed"
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    with pytest.raises(DeferredExecutionError, match="previously failed") as exc:
+        restarted.execute(invocation, payload)
+
+    assert exc.value.receipt == failure
+    assert calls == []
+
+
+def test_two_executors_never_run_same_durable_operation_concurrently(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-race.sqlite3"
+    entered = threading.Event()
+    release = threading.Event()
+    calls = []
+    worker_errors = []
+
+    def handler(payload):
+        calls.append(dict(payload))
+        entered.set()
+        assert release.wait(timeout=5)
+        return {"ok": True}
+
+    first, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        handler,
+    )
+    second, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        handler,
+    )
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-race", payload)
+
+    def run_first():
+        try:
+            first.execute(invocation, payload)
+        except BaseException as exc:
+            worker_errors.append(exc)
+
+    thread = threading.Thread(target=run_first)
+    thread.start()
+    assert entered.wait(timeout=5)
+
+    with pytest.raises(DeferredExecutionPendingError):
+        second.execute(invocation, payload)
+
+    release.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert worker_errors == []
+    assert calls == [{"value": 1}]
+
+    replay = second.execute(invocation, payload)
+    assert replay.result == {"ok": True}
+    assert calls == [{"value": 1}]
+
+
+def test_deferred_handler_failure_is_terminal_across_journal_restart(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-failure.sqlite3"
+    calls = []
+
+    def handler(payload):
+        calls.append(dict(payload))
+        raise RuntimeError("provider private detail")
+
+    first, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        handler,
+    )
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-failure", payload)
+
+    with pytest.raises(DeferredExecutionError) as initial:
+        first.execute(invocation, payload)
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        handler,
+    )
+    with pytest.raises(DeferredExecutionError, match="previously failed") as replay:
+        restarted.execute(invocation, payload)
+
+    assert replay.value.receipt == initial.value.receipt
+    assert calls == [{"value": 1}]
+
+
+def test_success_commit_failure_leaves_durable_started_fence(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-commit-failure.sqlite3"
+    inner = SqliteDeferredExecutionJournal(path)
+    calls = []
+
+    class FailingTerminalJournal:
+        def load(self, operation_id):
+            return inner.load(operation_id)
+
+        def records(self):
+            return inner.records()
+
+        def record_started(self, **kwargs):
+            return inner.record_started(**kwargs)
+
+        def record_terminal(self, **kwargs):
+            raise RuntimeError("simulated terminal journal outage")
+
+    def handler(payload):
+        calls.append(dict(payload))
+        return {"ok": True}
+
+    first, _ = _durable_deferred_executor(
+        FailingTerminalJournal(),
+        handler,
+    )
+    payload = {"value": 1}
+    invocation = first.prepare(
+        "VOL-160",
+        "durable-terminal-outage",
+        payload,
+    )
+
+    with pytest.raises(
+        DeferredExecutionError,
+        match="could not be durably committed",
+    ) as failed_commit:
+        first.execute(invocation, payload)
+
+    assert failed_commit.value.receipt.error_type == "DeferredJournalCommitError"
+    durable = inner.load("durable-terminal-outage")
+    assert durable is not None
+    assert durable.state == "started"
+
+    restarted, _ = _durable_deferred_executor(inner, handler)
+    with pytest.raises(DeferredExecutionPendingError):
+        restarted.execute(invocation, payload)
+
+    assert calls == [{"value": 1}]
+
+
+def test_deferred_effect_journal_rejects_resealed_result_tamper(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-tamper.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    first, _ = _durable_deferred_executor(
+        journal,
+        lambda payload: {"answer": 42},
+    )
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-tamper", payload)
+    first.execute(invocation, payload)
+
+    record = journal.load("durable-tamper")
+    assert record is not None
+    terminal = record.terminal
+    assert terminal is not None
+    terminal["result"] = {"answer": 43}
+    material = record.digest_material()
+    material["terminal"] = terminal
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            """
+            UPDATE deferred_execution_journal
+            SET terminal_json = ?, record_digest = ?
+            WHERE operation_id = ?
+            """,
+            (
+                canonical_json(terminal),
+                sha256_json(material),
+                "durable-tamper",
+            ),
+        )
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: {"answer": 42},
+    )
+    with pytest.raises(
+        DeferredJournalConflict,
+        match="result digest mismatch",
+    ):
+        restarted.execute(invocation, payload)
+
+
+def test_deferred_effect_journal_rejects_operation_identity_collision(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-collision.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    calls = []
+    first, record = _durable_deferred_executor(
+        journal,
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    one = {"value": 1}
+    two = {"value": 2}
+    original = first.prepare("VOL-160", "durable-collision", one)
+    journal.record_started(
+        operation_id=original.operation_id,
+        fingerprint=original.fingerprint,
+        invocation=original.as_dict(),
+        handler_identity=record.spec.handler,
+    )
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: calls.append(dict(payload)) or {"ok": True},
+    )
+    collision = restarted.prepare("VOL-160", "durable-collision", two)
+    with pytest.raises(ValueError, match="operation identity collision"):
+        restarted.execute(collision, two)
+
+    assert calls == []
+
+
+def test_recover_journal_hydrates_terminal_and_reports_pending(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-recover.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    first, record = _durable_deferred_executor(
+        journal,
+        lambda payload: {"ok": True},
+    )
+    payload = {"value": 1}
+    complete = first.prepare("VOL-160", "durable-complete", payload)
+    first.execute(complete, payload)
+
+    pending = first.prepare("VOL-160", "durable-pending", payload)
+    journal.record_started(
+        operation_id=pending.operation_id,
+        fingerprint=pending.fingerprint,
+        invocation=pending.as_dict(),
+        handler_identity=record.spec.handler,
+    )
+
+    restarted, _ = _durable_deferred_executor(
+        SqliteDeferredExecutionJournal(path),
+        lambda payload: {"ok": True},
+    )
+    unresolved = restarted.recover_journal()
+    assert unresolved == ("durable-pending",)
+    assert restarted.receipt("durable-complete").status == "succeeded"
+
+    fenced = restarted.fence_incomplete("durable-pending")
+    assert fenced.error_type == "DeferredOutcomeUnknown"
+    assert restarted.receipt("durable-pending") == fenced
+
+
+def test_durable_success_replay_still_requires_current_authority(
+    tmp_path,
+) -> None:
+    path = tmp_path / "deferred-authority.sqlite3"
+    journal = SqliteDeferredExecutionJournal(path)
+    calls = []
+
+    def handler(payload):
+        calls.append(dict(payload))
+        return {"ok": True}
+
+    first, _ = _durable_deferred_executor(journal, handler)
+    payload = {"value": 1}
+    invocation = first.prepare("VOL-160", "durable-authority", payload)
+    first.execute(invocation, payload)
+
+    registry, record = _durable_deferred_registry()
+    record.transition("verified")
+    restarted = DeferredExecutor(
+        registry,
+        journal=SqliteDeferredExecutionJournal(path),
+    )
+    restarted.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+    )
+    restarted.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1, max_cost_units=4, max_latency_ms=20),
+    )
+
+    with pytest.raises(PermissionError, match="authority digest drift"):
+        restarted.execute(invocation, payload)
+
+    assert calls == [{"value": 1}]
