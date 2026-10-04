@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 import pytest
 
 from skeleton.jeeves.agent.associative_memory import (
@@ -198,3 +200,60 @@ def test_retrieval_competition_favors_more_activated_candidate() -> None:
     assert 0.0 < p_first < 1.0
     assert 0.0 < p_second < 1.0
     assert p_first > p_second
+
+
+def test_prediction_uses_prefix_index_without_scanning_global_ngrams() -> None:
+    clock = FakeClock()
+    mesh = AssociativeMemoryMesh(clock=clock)
+    alice = _namespace("alice")
+    bob = _namespace("bob")
+
+    mesh.observe_sequence(alice, ("a", "b", "c"))
+    for number in range(100):
+        mesh.observe_sequence(
+            bob,
+            (f"x{number}", f"y{number}", f"z{number}"),
+        )
+
+    expected = mesh.predict_next(alice, ("a", "b"))
+
+    class _NoGlobalNgramScan(Counter):
+        def items(self):
+            raise AssertionError("prediction scanned the global n-gram corpus")
+
+    mesh._ngrams = _NoGlobalNgramScan(mesh._ngrams)
+    indexed = mesh.predict_next(alice, ("a", "b"))
+
+    assert indexed.candidates == expected.candidates
+    assert indexed.evidence_count == expected.evidence_count == 2
+    assert indexed.entropy_bits == pytest.approx(expected.entropy_bits)
+    assert indexed.fingerprint == expected.fingerprint
+
+
+def test_neighbor_limit_uses_deterministic_bounded_ranking() -> None:
+    clock = FakeClock()
+    mesh = AssociativeMemoryMesh(clock=clock)
+    namespace = _namespace()
+    for number in range(20):
+        mesh.observe(
+            namespace,
+            "source",
+            f"target-{number}",
+            kind=AssociationKind.TASK_SEQUENCE,
+            strength=number / 20.0,
+            direction_confidence=0.8,
+        )
+
+    hits = mesh.neighbors(namespace, "source", limit=5)
+    ordering = [
+        (
+            hit.score,
+            hit.association.observations,
+            hit.association.updated_at,
+            hit.association.association_id,
+        )
+        for hit in hits
+    ]
+
+    assert len(hits) == 5
+    assert ordering == sorted(ordering, reverse=True)
