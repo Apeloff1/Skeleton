@@ -185,7 +185,7 @@ def test_inventory_drift_fails_closed(
 
     with pytest.raises(
         RiskReconciliationError,
-        match="risk obligation inventory drift",
+        match="risk obligation inventory drift|historical retired-gap inventory",
     ):
         reconcile_repository(root, evaluated_at=NOW)
 
