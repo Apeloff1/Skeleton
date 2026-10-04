@@ -1,0 +1,96 @@
+name: P0 G013-G016 Control Integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/kernel/plane_isolation.py"
+      - "skeleton/ai/runtime/kernel/plane_isolation.py"
+      - "skeleton/config/authority.py"
+      - "skeleton/ai/runtime/config/authority.py"
+      - "skeleton/skills/effect_compensation.py"
+      - "skeleton/ai/runtime/skills/effect_compensation.py"
+      - "skeleton/persistence/deletion_tombstones.py"
+      - "skeleton/ai/runtime/persistence/deletion_tombstones.py"
+      - "skeleton/testing/test_plane_isolation.py"
+      - "skeleton/testing/test_configuration_authority.py"
+      - "skeleton/testing/test_effect_compensation.py"
+      - "skeleton/testing/test_deletion_tombstones.py"
+      - ".github/workflows/hostile-p0-control-integrity.yml"
+  push:
+    branches:
+      - main
+      - ai/g013-g016-control-integrity
+    paths:
+      - "skeleton/kernel/plane_isolation.py"
+      - "skeleton/ai/runtime/kernel/plane_isolation.py"
+      - "skeleton/config/authority.py"
+      - "skeleton/ai/runtime/config/authority.py"
+      - "skeleton/skills/effect_compensation.py"
+      - "skeleton/ai/runtime/skills/effect_compensation.py"
+      - "skeleton/persistence/deletion_tombstones.py"
+      - "skeleton/ai/runtime/persistence/deletion_tombstones.py"
+      - "skeleton/testing/test_plane_isolation.py"
+      - "skeleton/testing/test_configuration_authority.py"
+      - "skeleton/testing/test_effect_compensation.py"
+      - "skeleton/testing/test_deletion_tombstones.py"
+      - ".github/workflows/hostile-p0-control-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hostile-p0-control-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-regression:
+    name: Validate G013-G016 P0 contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Compile new authority surfaces
+        run: >-
+          python -m py_compile
+          skeleton/kernel/plane_isolation.py
+          skeleton/ai/runtime/kernel/plane_isolation.py
+          skeleton/config/authority.py
+          skeleton/ai/runtime/config/authority.py
+          skeleton/skills/effect_compensation.py
+          skeleton/ai/runtime/skills/effect_compensation.py
+          skeleton/persistence/deletion_tombstones.py
+          skeleton/ai/runtime/persistence/deletion_tombstones.py
+
+      - name: Verify governed AI mirror parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp -s skeleton/kernel/plane_isolation.py skeleton/ai/runtime/kernel/plane_isolation.py
+          cmp -s skeleton/config/authority.py skeleton/ai/runtime/config/authority.py
+          cmp -s skeleton/skills/effect_compensation.py skeleton/ai/runtime/skills/effect_compensation.py
+          cmp -s skeleton/persistence/deletion_tombstones.py skeleton/ai/runtime/persistence/deletion_tombstones.py
+
+      - name: Run P0 contract regressions
+        run: >-
+          python -m unittest -v
+          skeleton.testing.test_plane_isolation
+          skeleton.testing.test_configuration_authority
+          skeleton.testing.test_effect_compensation
+          skeleton.testing.test_deletion_tombstones
