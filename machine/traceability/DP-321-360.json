@@ -4376,7 +4376,7 @@
       "volume_ref": "VOL-321",
       "title": "Human Override Plane",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-321-360"
     },
     {
@@ -4385,7 +4385,7 @@
       "volume_ref": "VOL-322",
       "title": "Interrupt Handling",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-321-360"
     },
     {
@@ -4394,7 +4394,7 @@
       "volume_ref": "VOL-323",
       "title": "Goal Drift Detector",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-321-360"
     },
     {
@@ -4403,7 +4403,7 @@
       "volume_ref": "VOL-324",
       "title": "Specification Gaming Tests",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-321-360"
     },
     {
@@ -4412,7 +4412,7 @@
       "volume_ref": "VOL-325",
       "title": "Alignment Between Plan and Execution",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-321-360"
     },
     {

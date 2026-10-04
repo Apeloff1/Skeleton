@@ -4355,7 +4355,7 @@
       "volume_ref": "VOL-318",
       "title": "Autonomy Levels",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     },
     {
@@ -4373,7 +4373,7 @@
       "volume_ref": "VOL-320",
       "title": "Autonomy De-Escalation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-281-320"
     }
   ],

@@ -5168,7 +5168,7 @@
       "volume_ref": "VOL-361",
       "title": "Memory Garbage Collection",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5177,7 +5177,7 @@
       "volume_ref": "VOL-362",
       "title": "Memory Quality Evaluation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5186,7 +5186,7 @@
       "volume_ref": "VOL-363",
       "title": "Memory Interference Testing",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5240,7 +5240,7 @@
       "volume_ref": "VOL-369",
       "title": "Reasoning Regression Tests",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5249,7 +5249,7 @@
       "volume_ref": "VOL-370",
       "title": "Plan Verifier",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5348,7 +5348,7 @@
       "volume_ref": "VOL-381",
       "title": "Distributed Inference Control Plane",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5357,7 +5357,7 @@
       "volume_ref": "VOL-382",
       "title": "Model Placement",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5384,7 +5384,7 @@
       "volume_ref": "VOL-385",
       "title": "Model Warming",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5393,7 +5393,7 @@
       "volume_ref": "VOL-386",
       "title": "Continuous Batching Scheduler",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5429,7 +5429,7 @@
       "volume_ref": "VOL-390",
       "title": "Inference Autoscaling",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5438,7 +5438,7 @@
       "volume_ref": "VOL-391",
       "title": "Inference Load Testing",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5447,7 +5447,7 @@
       "volume_ref": "VOL-392",
       "title": "Hardware Topology Model",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5492,7 +5492,7 @@
       "volume_ref": "VOL-397",
       "title": "Network Topology Awareness",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5501,7 +5501,7 @@
       "volume_ref": "VOL-398",
       "title": "Remote Execution Protocol",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {
@@ -5510,7 +5510,7 @@
       "volume_ref": "VOL-399",
       "title": "Worker Attestation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-361-400"
     },
     {

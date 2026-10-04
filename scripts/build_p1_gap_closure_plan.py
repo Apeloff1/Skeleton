@@ -169,9 +169,9 @@ def build_gap_closure_plan(root: Path = ROOT) -> dict[str, Any]:
         if "gap_closure_or_governed_disposition"
         in row["required_review_actions"]
     }
-    if len(gap_candidates) != 84:
+    if len(gap_candidates) != 80:
         raise GapClosurePlanError(
-            "expected 84 target-floor gap-blocked volumes, got "
+            "expected 80 target-floor gap-blocked volumes, got "
             f"{len(gap_candidates)}"
         )
 
@@ -193,9 +193,9 @@ def build_gap_closure_plan(root: Path = ROOT) -> dict[str, Any]:
         if obligation.kind is RiskKind.GAP
         and obligation.source_ref.split(":", 1)[0] in gap_candidates
     ]
-    if len(gap_obligations) != 168:
+    if len(gap_obligations) != 160:
         raise GapClosurePlanError(
-            "expected 168 target-floor gap obligations, got "
+            "expected 160 target-floor gap obligations, got "
             f"{len(gap_obligations)}"
         )
 

@@ -1060,25 +1060,193 @@
       "id": "EVID:VOL-420:001",
       "type": "evidence",
       "volume_ref": "VOL-420",
-      "value": "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+      "value": ".github/workflows/p1-evidence-identity.yml"
     },
     {
       "id": "EVID:VOL-420:002",
       "type": "evidence",
       "volume_ref": "VOL-420",
-      "value": "github-actions-job:109034204451"
+      "value": ".github/workflows/p1-reproducibility-bundle.yml"
     },
     {
       "id": "EVID:VOL-420:003",
       "type": "evidence",
       "volume_ref": "VOL-420",
-      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810"
+      "value": ".github/workflows/p1-required-gate-authority.yml"
     },
     {
       "id": "EVID:VOL-420:004",
       "type": "evidence",
       "volume_ref": "VOL-420",
+      "value": ".github/workflows/p1-scope-freeze.yml"
+    },
+    {
+      "id": "EVID:VOL-420:005",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "P1-GAP-VOL-420:gap:380b4042e4-aec1dd0a17dab20a"
+    },
+    {
+      "id": "EVID:VOL-420:006",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "P1-GAP-VOL-420:gap:7777365012-f77a419f1e16f459"
+    },
+    {
+      "id": "EVID:VOL-420:007",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "git-head:1a66b2212c438cdc8d77ba912160d46682775a94"
+    },
+    {
+      "id": "EVID:VOL-420:008",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "git-head:de1c7870e4c231eaa4d74b25f79b88c09af75fbc"
+    },
+    {
+      "id": "EVID:VOL-420:009",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "github-actions-job:109034204451"
+    },
+    {
+      "id": "EVID:VOL-420:010",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "github-actions-job:111356405473"
+    },
+    {
+      "id": "EVID:VOL-420:011",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "github-actions-job:111356405755"
+    },
+    {
+      "id": "EVID:VOL-420:012",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "github-actions-job:111356405817"
+    },
+    {
+      "id": "EVID:VOL-420:013",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "github-actions-job:111356405831"
+    },
+    {
+      "id": "EVID:VOL-420:014",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/36453604810"
+    },
+    {
+      "id": "EVID:VOL-420:015",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37175244818"
+    },
+    {
+      "id": "EVID:VOL-420:016",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37175244907"
+    },
+    {
+      "id": "EVID:VOL-420:017",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37175244918"
+    },
+    {
+      "id": "EVID:VOL-420:018",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37175244962"
+    },
+    {
+      "id": "EVID:VOL-420:019",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
       "value": "https://github.com/Apeloff1/Skeleton/commit/1a66b2212c438cdc8d77ba912160d46682775a94"
+    },
+    {
+      "id": "EVID:VOL-420:020",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/49f6454cd20dd3b24a60b1a41fb809bf854a62e8"
+    },
+    {
+      "id": "EVID:VOL-420:021",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/de1c7870e4c231eaa4d74b25f79b88c09af75fbc"
+    },
+    {
+      "id": "EVID:VOL-420:022",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "machine/ai_p1_execution_map.json"
+    },
+    {
+      "id": "EVID:VOL-420:023",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "machine/ai_p1_terminal_closure.json"
+    },
+    {
+      "id": "EVID:VOL-420:024",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "machine/p1_risk_evidence_bindings.json"
+    },
+    {
+      "id": "EVID:VOL-420:025",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "machine/p1_risk_evidence_policy.json"
+    },
+    {
+      "id": "EVID:VOL-420:026",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "p1:control-plane-gap-batch2:P1-GAP-VOL-420:gap:380b4042e4-aec1dd0a17dab20a:82cc895b21128a24c19e7214e15e1c8823267c25"
+    },
+    {
+      "id": "EVID:VOL-420:027",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "p1:control-plane-gap-batch2:P1-GAP-VOL-420:gap:7777365012-f77a419f1e16f459:82cc895b21128a24c19e7214e15e1c8823267c25"
+    },
+    {
+      "id": "EVID:VOL-420:028",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "scripts/check_ai_master_plan.py"
+    },
+    {
+      "id": "EVID:VOL-420:029",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "skeleton/testing/test_ai_master_plan.py"
+    },
+    {
+      "id": "EVID:VOL-420:030",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "skeleton/testing/test_architecture_scope_freeze.py"
+    },
+    {
+      "id": "EVID:VOL-420:031",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "machine/accountability_events/P1-L0/implementation_reconciliation.json"
+    },
+    {
+      "id": "EVID:VOL-420:032",
+      "type": "evidence",
+      "volume_ref": "VOL-420",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
     },
     {
       "id": "GAP:VOL-401:001",
@@ -1307,18 +1475,6 @@
       "type": "gap",
       "volume_ref": "VOL-419",
       "value": "bind risk/test generation"
-    },
-    {
-      "id": "GAP:VOL-420:001",
-      "type": "gap",
-      "volume_ref": "VOL-420",
-      "value": "enforce freeze in validator"
-    },
-    {
-      "id": "GAP:VOL-420:002",
-      "type": "gap",
-      "volume_ref": "VOL-420",
-      "value": "maintain ADR exception workflow"
     },
     {
       "id": "PATH:VOL-401:001",
@@ -2424,7 +2580,7 @@
       "volume_ref": "VOL-403",
       "title": "Compute Quotas",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2433,7 +2589,7 @@
       "volume_ref": "VOL-404",
       "title": "Budget Accounting Ledger",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2442,7 +2598,7 @@
       "volume_ref": "VOL-405",
       "title": "Forecasting Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2451,7 +2607,7 @@
       "volume_ref": "VOL-406",
       "title": "Cost Anomaly Detection",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2478,7 +2634,7 @@
       "volume_ref": "VOL-409",
       "title": "Attribution Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2523,7 +2679,7 @@
       "volume_ref": "VOL-414",
       "title": "Shadow Traffic",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2532,7 +2688,7 @@
       "volume_ref": "VOL-415",
       "title": "Champion / Challenger Registry",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2568,7 +2724,7 @@
       "volume_ref": "VOL-419",
       "title": "Knowledge of Failure",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-401-420"
     },
     {
@@ -2577,7 +2733,7 @@
       "volume_ref": "VOL-420",
       "title": "Architecture Scope Freeze",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "verified",
       "depth_pass": "DP-401-420"
     }
   ],
@@ -5763,6 +5919,146 @@
       "type": "requirement_supported_by_evidence"
     },
     {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:005",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:006",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:007",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:008",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:009",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:010",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:011",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:012",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:013",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:014",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:015",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:016",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:017",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:018",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:019",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:020",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:021",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:022",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:023",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:024",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:025",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:026",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:027",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:028",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:029",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:030",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:031",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:001",
+      "to": "EVID:VOL-420:032",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
       "from": "REQ:VOL-420:002",
       "to": "TEST:VOL-420:001",
       "type": "requirement_accepted_by_test"
@@ -5795,6 +6091,146 @@
     {
       "from": "REQ:VOL-420:002",
       "to": "EVID:VOL-420:004",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:005",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:006",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:007",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:008",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:009",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:010",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:011",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:012",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:013",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:014",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:015",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:016",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:017",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:018",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:019",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:020",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:021",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:022",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:023",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:024",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:025",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:026",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:027",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:028",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:029",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:030",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:031",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-420:002",
+      "to": "EVID:VOL-420:032",
       "type": "requirement_supported_by_evidence"
     },
     {
@@ -7694,13 +8130,143 @@
     },
     {
       "from": "VOL:VOL-420",
-      "to": "GAP:VOL-420:001",
-      "type": "volume_gap"
+      "to": "EVID:VOL-420:005",
+      "type": "volume_evidence"
     },
     {
       "from": "VOL:VOL-420",
-      "to": "GAP:VOL-420:002",
-      "type": "volume_gap"
+      "to": "EVID:VOL-420:006",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:007",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:008",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:009",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:010",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:011",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:012",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:013",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:014",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:015",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:016",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:017",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:018",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:019",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:020",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:021",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:022",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:023",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:024",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:025",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:026",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:027",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:028",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:029",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:030",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:031",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-420",
+      "to": "EVID:VOL-420:032",
+      "type": "volume_evidence"
     },
     {
       "from": "VOL:VOL-420",

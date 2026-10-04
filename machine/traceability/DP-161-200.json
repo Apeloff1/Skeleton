@@ -4289,7 +4289,7 @@
       "volume_ref": "VOL-164",
       "title": "Sandbox Runtime",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-161-200"
     },
     {
@@ -4298,7 +4298,7 @@
       "volume_ref": "VOL-165",
       "title": "Policy Language",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-161-200"
     },
     {
@@ -4325,7 +4325,7 @@
       "volume_ref": "VOL-168",
       "title": "AI-Specific Threats",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-161-200"
     },
     {
@@ -4343,7 +4343,7 @@
       "volume_ref": "VOL-170",
       "title": "Zero-Trust Internal Model",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-161-200"
     },
     {

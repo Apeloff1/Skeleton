@@ -23,8 +23,8 @@
     "impact_rule": "Changed repository paths resolve through implementation_path nodes using exact/prefix/glob matching."
   },
   "summary": {
-    "node_count": 9115,
-    "edge_count": 25119,
+    "node_count": 9598,
+    "edge_count": 27260,
     "requirement_count": 963,
     "requirements_without_evidence": 688,
     "shard_count": 11
@@ -34,15 +34,15 @@
       "depth_pass": "DP-000-040",
       "path": "machine/traceability/DP-000-040.json",
       "volume_count": 41,
-      "node_count": 1295,
-      "edge_count": 4937
+      "node_count": 1566,
+      "edge_count": 6219
     },
     {
       "depth_pass": "DP-041-080",
       "path": "machine/traceability/DP-041-080.json",
       "volume_count": 40,
-      "node_count": 1149,
-      "edge_count": 3790
+      "node_count": 1308,
+      "edge_count": 4462
     },
     {
       "depth_pass": "DP-081-120",
@@ -55,8 +55,8 @@
       "depth_pass": "DP-121-160",
       "path": "machine/traceability/DP-121-160.json",
       "volume_count": 40,
-      "node_count": 680,
-      "edge_count": 1400
+      "node_count": 688,
+      "edge_count": 1440
     },
     {
       "depth_pass": "DP-161-200",
@@ -76,8 +76,8 @@
       "depth_pass": "DP-241-280",
       "path": "machine/traceability/DP-241-280.json",
       "volume_count": 40,
-      "node_count": 815,
-      "edge_count": 2079
+      "node_count": 834,
+      "edge_count": 2144
     },
     {
       "depth_pass": "DP-281-320",
@@ -104,8 +104,8 @@
       "depth_pass": "DP-401-420",
       "path": "machine/traceability/DP-401-420.json",
       "volume_count": 20,
-      "node_count": 416,
-      "edge_count": 1039
+      "node_count": 442,
+      "edge_count": 1121
     }
   ]
 }
