@@ -767,6 +767,52 @@ class TenantQuotaLedger:
             matched_state.completions.append(completion)
             return completion
 
+    def recovery_state_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> tuple[QuotaReservation, tuple[QuotaUsageEvent, ...]] | None:
+        """Read active reservation and unresolved usage under one lock."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            reservation_id = state.by_operation.get(operation)
+            if reservation_id is None:
+                return None
+            reservation = state.reservations.get(reservation_id)
+            if reservation is None:
+                return None
+            unresolved = tuple(
+                sorted(
+                    (
+                        event
+                        for event in state.usage_events.values()
+                        if event.reservation_id == reservation_id
+                        and event.category.startswith(_UNKNOWN_USAGE_PREFIX)
+                    ),
+                    key=lambda item: item.event_id,
+                )
+            )
+            return reservation, unresolved
+
+    def reservation_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaReservation | None:
+        """Return the active reservation for an operation without mutation."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            reservation_id = state.by_operation.get(operation)
+            if reservation_id is None:
+                return None
+            return state.reservations.get(reservation_id)
+
     def completion_for_operation(
         self,
         tenant_id: str,
