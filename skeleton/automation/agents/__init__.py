@@ -27,6 +27,18 @@ from skeleton.automation.agents.autonomy_control import (
     TransitionDisposition,
     evaluate_autonomy_transition,
 )
+from skeleton.automation.agents.long_horizon import (
+    Checkpoint as LongHorizonCheckpoint,
+    LongHorizonConflict,
+    LongHorizonError,
+    LongRunningOperation,
+    LongRunningState,
+    OverrideDecision,
+    PersistentLongHorizonScheduler,
+    ReauthorizationRequired,
+    ResumeToken,
+    SqliteLongHorizonStore,
+)
 from skeleton.automation.agents.human_control import (
     HUMAN_CONTROL_ACCOUNTABILITY_ID,
     HUMAN_CONTROL_SCHEMA_VERSION,
@@ -114,6 +126,10 @@ __all__ = [
     "HUMAN_CONTROL_TASK_ID", "HumanControlAction", "HumanControlCommand",
     "HumanControlDecision", "HumanControlError", "HumanControlState",
     "evaluate_human_control",
+    "LongHorizonCheckpoint", "LongHorizonConflict", "LongHorizonError",
+    "LongRunningOperation", "LongRunningState", "OverrideDecision",
+    "PersistentLongHorizonScheduler", "ReauthorizationRequired",
+    "ResumeToken", "SqliteLongHorizonStore",
     "BLAST_RADIUS_ACCOUNTABILITY_ID", "BLAST_RADIUS_SCHEMA_VERSION",
     "BLAST_RADIUS_TASK_ID", "ActionRiskProfile", "AdversarialAlignmentReport",
     "BlastRadiusDecision", "BlastRadiusError", "BlastRadiusPolicy", "ImpactClass",
