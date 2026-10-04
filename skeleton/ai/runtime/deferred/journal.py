@@ -18,7 +18,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from .contracts import canonical_json, sha256_json
 
@@ -203,6 +203,38 @@ def _record(
         terminal_json=terminal_json,
         record_digest=sha256_json(material),
     )
+
+
+class DeferredExecutionJournal(Protocol):
+    """Storage contract consumed by DeferredExecutor."""
+
+    def load(self, operation_id: str) -> DeferredJournalRecord | None:
+        ...
+
+    def records(self) -> tuple[DeferredJournalRecord, ...]:
+        ...
+
+    def record_started(
+        self,
+        *,
+        operation_id: str,
+        fingerprint: str,
+        invocation: Mapping[str, Any],
+        handler_identity: str,
+    ) -> tuple[DeferredJournalRecord, bool]:
+        ...
+
+    def record_terminal(
+        self,
+        *,
+        operation_id: str,
+        fingerprint: str,
+        state: str,
+        terminal: Mapping[str, Any],
+    ) -> DeferredJournalRecord:
+        ...
+
+
 
 
 class SqliteDeferredExecutionJournal:
@@ -442,6 +474,7 @@ class SqliteDeferredExecutionJournal:
 
 
 __all__ = [
+    "DeferredExecutionJournal",
     "DeferredJournalConflict",
     "DeferredJournalError",
     "DeferredJournalRecord",
