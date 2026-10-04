@@ -10246,22 +10246,29 @@
       "id": "ACC-VOL-248",
       "type": "volume",
       "title": "VOL-248 Uncertainty Representation",
-      "status": "unverified",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-10-04T01:05:31Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-10-04T01:05:31Z",
+        "git_sha": "fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+          "https://github.com/Apeloff1/Skeleton/pull/2645",
+          "skeleton/intelligence/uncertainty.py",
+          "skeleton/ai/runtime/intelligence/uncertainty.py",
+          "skeleton/testing/test_reasoning_strategy_registry.py",
+          ".github/workflows/p1-reasoning-search-stop-policy.yml"
+        ],
+        "statement": "Implemented typed uncertainty semantics separating confidence, probability, unknown, and ambiguous evidence; deterministic UI-safe explanations; fail-closed unknown-reason handling; canonical/AI-runtime mirror parity; and exact-head verifier digest binding.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687"
       },
       "verification_signoff": {
         "signed": false,
@@ -10277,9 +10284,56 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-10-04T01:05:31Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-04T01:05:31Z",
+          "git_sha": "fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+          "statement": "Begin evidence-backed VOL-248 maturity reconciliation from the merged uncertainty implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+          "from_status": "unverified",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-10-04T01:05:31Z",
+          "git_sha": "fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+          "statement": "Implemented typed uncertainty semantics separating confidence, probability, unknown, and ambiguous evidence; deterministic UI-safe explanations; fail-closed unknown-reason handling; canonical/AI-runtime mirror parity; and exact-head verifier digest binding.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+            "https://github.com/Apeloff1/Skeleton/pull/2645",
+            "skeleton/intelligence/uncertainty.py",
+            "skeleton/ai/runtime/intelligence/uncertainty.py",
+            "skeleton/testing/test_reasoning_strategy_registry.py",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml"
+          ]
+        }
+      ],
+      "evidence": [
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
+        "https://github.com/Apeloff1/Skeleton/pull/2645",
+        "skeleton/ai/runtime/intelligence/uncertainty.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py"
+      ],
       "baseline_status": "unverified"
     },
     {

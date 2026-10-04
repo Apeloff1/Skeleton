@@ -563,3 +563,48 @@ def test_uncertainty_explanation_fails_closed_for_unknown_reason() -> None:
 
     with pytest.raises(UncertaintyError, match="unknown gate reason"):
         explain_decision(decision)
+
+
+
+def test_uncertainty_explanation_mirror_parity() -> None:
+    from skeleton.ai.runtime.intelligence.uncertainty import (
+        Candidate as RuntimeCandidate,
+        UncertaintyGate as RuntimeUncertaintyGate,
+        explain_decision as runtime_explain_decision,
+    )
+
+    cases = (
+        (),
+        (
+            ("same answer", 0.95),
+            ("same answer", 0.90),
+        ),
+        (
+            ("alpha", 0.60),
+            ("beta", 0.60),
+        ),
+        (
+            ("low", 0.15),
+            ("low", 0.20),
+        ),
+    )
+
+    for raw in cases:
+        canonical_candidates = tuple(
+            UncertaintyCandidate(text, confidence)
+            for text, confidence in raw
+        )
+        runtime_candidates = tuple(
+            RuntimeCandidate(text, confidence)
+            for text, confidence in raw
+        )
+
+        canonical = explain_decision(
+            UncertaintyGate().decide(canonical_candidates)
+        ).to_dict()
+        runtime = runtime_explain_decision(
+            RuntimeUncertaintyGate().decide(runtime_candidates)
+        ).to_dict()
+
+        assert runtime == canonical
+        assert runtime["probability_semantics"] is False
