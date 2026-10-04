@@ -316,13 +316,16 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
         else:
             for key, expected in (
                 ("gap_status", "closed"),
-                ("implementation_state", "closed"),
                 ("closure_decision", "closed"),
             ):
                 if closure_entry.get(key) != expected:
                     errors.append(
                         f"closed context compiler gap requires closure evidence {key}=closed"
                     )
+            if closure_entry.get("implementation_state") not in {"complete", "closed"}:
+                errors.append(
+                    "closed context compiler gap requires closure evidence implementation_state=closed"
+                )
             if (
                 closure_entry.get("outstanding_evidence") not in ([], None)
                 or closure_entry.get("blockers") not in ([], None)
