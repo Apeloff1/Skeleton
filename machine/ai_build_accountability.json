@@ -605,8 +605,8 @@
       "type": "volume",
       "title": "VOL-013 Cognitive Core",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-27T22:54:07Z",
       "implementation_signoff": {
@@ -648,8 +648,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-27T22:57:02Z",
+      "completed_at_utc": "2026-10-04T00:48:31Z",
+      "last_event_at_utc": "2026-10-04T00:48:31Z",
       "history": [
         {
           "sequence": 1,
@@ -711,6 +711,30 @@
             "skeleton/testing/test_reasoning_strategy_registry.py",
             "skeleton/testing/test_core_intelligence_bundle.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-04T00:48:31Z",
+          "git_sha": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "statement": "Close an already implementation-signed and independently verified hardened masterplan volume without reducing its maturity.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "machine/ai_p1_terminal_closure.json",
+            "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+            "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml",
+            ".github/workflows/p1-core-intelligence-bundle.yml",
+            "skeleton/testing/test_reasoning_strategy_registry.py",
+            "skeleton/testing/test_core_intelligence_bundle.py"
+          ]
         }
       ],
       "evidence": [
@@ -719,7 +743,9 @@
         "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
         "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
+        "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "machine/ai_p1_terminal_closure.json",
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/core_intelligence.py",
         "skeleton/intelligence/strategy_registry.py",
@@ -733,8 +759,8 @@
       "type": "volume",
       "title": "VOL-014 Planning Engine",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-28T01:17:23Z",
       "implementation_signoff": {
@@ -781,8 +807,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-28T01:22:42Z",
+      "completed_at_utc": "2026-10-04T00:48:31Z",
+      "last_event_at_utc": "2026-10-04T00:48:31Z",
       "history": [
         {
           "sequence": 1,
@@ -849,6 +875,33 @@
             "skeleton/testing/test_plan_simulation.py",
             "skeleton/testing/test_plan_qualification.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-04T00:48:31Z",
+          "git_sha": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "statement": "Close an already implementation-signed and independently verified hardened masterplan volume without reducing its maturity.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "machine/ai_p1_terminal_closure.json",
+            "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
+            "git-head:8dc9e313566284c83b2401783015fb5638536f6e",
+            ".github/workflows/p1-plan-verification.yml",
+            "skeleton/testing/test_plan_simulation.py",
+            "skeleton/testing/test_plan_qualification.py",
+            "skeleton/testing/test_plan_static_analyzer.py",
+            "skeleton/testing/test_plan_cycles.py",
+            "skeleton/testing/test_plan_simulation.py",
+            "skeleton/testing/test_plan_qualification.py"
+          ]
         }
       ],
       "evidence": [
@@ -857,6 +910,8 @@
         "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
         "https://github.com/Apeloff1/Skeleton/commit/54bc9871f5516ab5593754786ddb1d327fed1088",
         "https://github.com/Apeloff1/Skeleton/commit/8dc9e313566284c83b2401783015fb5638536f6e",
+        "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+        "machine/ai_p1_terminal_closure.json",
         "skeleton/ai/runtime/intelligence/plan_verifier.py",
         "skeleton/intelligence/plan_verifier.py",
         "skeleton/intelligence/strategy_registry.py",
@@ -10392,8 +10447,8 @@
       "type": "volume",
       "title": "VOL-253 Stopping Policies",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-27T22:54:07Z",
       "implementation_signoff": {
@@ -10431,8 +10486,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-27T22:57:02Z",
+      "completed_at_utc": "2026-10-04T00:48:31Z",
+      "last_event_at_utc": "2026-10-04T00:48:31Z",
       "history": [
         {
           "sequence": 1,
@@ -10490,13 +10545,37 @@
             ".github/workflows/p1-reasoning-search-stop-policy.yml",
             "skeleton/testing/test_reasoning_strategy_registry.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-04T00:48:31Z",
+          "git_sha": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "statement": "Close an already implementation-signed and independently verified hardened masterplan volume without reducing its maturity.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "machine/ai_p1_terminal_closure.json",
+            "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+            "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml",
+            "skeleton/testing/test_reasoning_strategy_registry.py"
+          ]
         }
       ],
       "evidence": [
         ".github/workflows/p1-reasoning-search-stop-policy.yml",
         "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
+        "machine/ai_p1_terminal_closure.json",
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/strategy_registry.py",
         "skeleton/testing/test_reasoning_strategy_registry.py"
