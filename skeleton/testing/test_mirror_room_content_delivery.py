@@ -390,7 +390,7 @@ def test_high_end_delivery_rejects_attack_family_monoculture() -> None:
     campaign, catalog = _campaign(challenges=monoculture)
     with pytest.raises(
         MirrorRoomError,
-        match="insufficient adversarial family diversity",
+        match="insufficient adversarial coverage: family diversity",
     ):
         qualify_high_end_content_delivery(
             campaign,
