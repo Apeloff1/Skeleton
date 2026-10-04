@@ -13417,7 +13417,10 @@
         "false precision",
         "uncertainty dropped in summaries"
       ],
-      "gaps": [],
+      "gaps": [
+        "propagate explicit unknown/ambiguous/abstention state through all runtime, provider, tool and product summaries without coercing missing evidence into numeric confidence",
+        "complete calibration and coverage evaluation with evidence-backed promotion criteria for uncertainty semantics across canonical and AI-mirror execution paths"
+      ],
       "accountability_id": "ACC-VOL-248",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
