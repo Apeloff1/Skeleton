@@ -142,3 +142,29 @@ def test_tenant_restore_enforces_target_terminal_capacity() -> None:
     restored_runtime = HardenedSwarmRuntime.from_state(runtime.export_state())
     with pytest.raises(ValueError, match="terminal record capacity"):
         store.restore(_broker(restored_runtime, max_terminal_records=1), 1)
+
+
+def test_tenant_checkpoint_discard_restores_provisionally_evicted_history() -> None:
+    runtime = HardenedSwarmRuntime()
+    broker = _broker(runtime)
+    store = TenantCheckpointStore(max_checkpoints=2)
+    store.capture(1, broker)
+    store.capture(2, broker)
+    third = store.capture(3, broker)
+
+    assert store.sequences() == (2, 3)
+    assert store.discard(third.sequence) is True
+    assert store.sequences() == (1, 2)
+
+
+def test_tenant_checkpoint_commit_finalizes_bounded_eviction() -> None:
+    runtime = HardenedSwarmRuntime()
+    broker = _broker(runtime)
+    store = TenantCheckpointStore(max_checkpoints=2)
+    store.capture(1, broker)
+    store.capture(2, broker)
+    third = store.capture(3, broker)
+
+    store.commit(third.sequence)
+    assert store.discard(third.sequence) is True
+    assert store.sequences() == (2,)
