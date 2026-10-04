@@ -536,7 +536,7 @@ class SQLiteToolSagaStore:
                             "saga owner changed before orphan recovery"
                         )
                     if current_owner is not None:
-                        self._connection.execute(
+                        cursor = self._connection.execute(
                             """
                             UPDATE tool_saga
                             SET owner_token = NULL, updated_at = ?
@@ -550,7 +550,7 @@ class SQLiteToolSagaStore:
                                 expected_owner_token,
                             ),
                         )
-                        if self._connection.total_changes < 1:
+                        if cursor.rowcount != 1:
                             raise ToolSagaInDoubt(
                                 "saga owner changed during orphan recovery"
                             )
