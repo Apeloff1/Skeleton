@@ -6,6 +6,14 @@ on:
       - main
     paths:
       - "machine/privacy_deletion_contract.json"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/testing/test_deletion_propagation.py"
       - "scripts/verify_privacy_deletion_contract.py"
       - "skeleton/persistence/privacy_deletion.py"
       - "skeleton/ai/runtime/persistence/privacy_deletion.py"
@@ -71,6 +79,9 @@ jobs:
           scripts/verify_privacy_deletion_contract.py
           skeleton/testing/test_privacy_deletion_authority.py
           skeleton/testing/test_privacy_deletion_jeeves_integration.py
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
+          skeleton/testing/test_deletion_propagation.py
       - name: Verify G016 contract
         run: python scripts/verify_privacy_deletion_contract.py --json
       - name: Run privacy deletion regressions
@@ -78,6 +89,15 @@ jobs:
           python -m unittest -q
           skeleton.testing.test_privacy_deletion_authority
           skeleton.testing.test_privacy_deletion_jeeves_integration
+      - name: Run anti-resurrection generation regressions
+        run: >-
+          python -m pytest -q -p no:cacheprovider
+          skeleton/testing/test_deletion_propagation.py
+      - name: Verify anti-resurrection AI mirror
+        run: >-
+          cmp
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
       - name: Run Jeeves regression coverage
         run: >-
           python -m unittest -q
