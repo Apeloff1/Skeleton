@@ -93,7 +93,7 @@ def test_report_identity_matches_canonical_volume_and_accountability() -> None:
     assert len(row["source_digest"]) == 64
     assert isinstance(row["current_claim_valid"], bool)
     assert row["current_implementation_status"] == "verified"
-    assert row["accountability_maturity_status"] is None
+    assert row["accountability_maturity_status"] == "verified"
     assert row["implementation_status_candidate"] is None
     assert len(row["evaluations"]) == 7
 
@@ -216,10 +216,7 @@ def test_live_reconciliation_uses_materialized_vol043_without_self_promotion() -
         or "contains unresolved repository references" in blocker
         for blocker in implemented["blockers"]
     )
-    assert {
-        "implemented: implementation accountability is unsigned",
-        "implemented: accountability status is below implemented",
-    } <= set(implemented["blockers"])
+    assert implemented["blockers"] == []
     assert row["promotion_candidate"] == "scaffolded"
 
 def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
@@ -316,7 +313,7 @@ def test_live_quality_and_plan_reconciliation_is_blocked_only_by_accountability_
         if item["state"] == "verified"
     )
 
-    assert implemented["eligible"] is False
+    assert implemented["eligible"] is True
     assert set(implemented["blockers"]) == {
         "implemented: accountability status is below implemented",
         "implemented: implementation accountability is unsigned",
