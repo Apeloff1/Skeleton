@@ -30,3 +30,27 @@ def test_checkpoint_restore_recovers_tasks() -> None:
     store.capture(runtime)
     restored = store.restore()
     assert restored.task("a") is not None
+
+
+def test_checkpoint_discard_restores_provisionally_evicted_history() -> None:
+    runtime = SwarmRuntime()
+    store = CheckpointStore(max_checkpoints=2)
+    store.capture(runtime)
+    store.capture(runtime)
+    third = store.capture(runtime)
+
+    assert store.sequences() == (2, 3)
+    assert store.discard(third.sequence) is True
+    assert store.sequences() == (1, 2)
+
+
+def test_checkpoint_commit_finalizes_bounded_eviction() -> None:
+    runtime = SwarmRuntime()
+    store = CheckpointStore(max_checkpoints=2)
+    store.capture(runtime)
+    store.capture(runtime)
+    third = store.capture(runtime)
+
+    store.commit(third.sequence)
+    assert store.discard(third.sequence) is True
+    assert store.sequences() == (2,)
