@@ -57,10 +57,17 @@ def advance_execution(plan,*,step_identity:str,outcome:Outcome,repository_finger
     elif outcome=="blocked": return plan
     return ExecutionPlan(plan.repository_fingerprint,plan.steps,plan.ready_work,plan.blocked_work,ExecutionState(tuple(sorted(completed)),tuple(sorted(failed)),tuple(sorted(verified)),tuple(sorted(released)),False),plan.graph_fingerprint,plan.parallel_batches)
 
+def _counterfactual_order(graph:WorkGraph,ready,completed):
+    surface=graph.counterfactual_surface(completed,limit=max(1,len(ready))) if ready else ()
+    scores={row["identity"]:(row["pressure_reduction"],row["newly_unblocked_count"],row["risk_adjusted_influence"],row["strategic_value"]) for row in surface}
+    return tuple(sorted(ready,key=lambda n:(scores.get(n.identity,(0,0,0,0))[0],scores.get(n.identity,(0,0,0,0))[1],scores.get(n.identity,(0,0,0,0))[2],scores.get(n.identity,(0,0,0,0))[3],n.identity),reverse=True))
+
 def build_execution_plan(model:RepositoryModel,*,completed:Iterable[str]=(),active_conflicts:Iterable[str]=(),limit:int=8,state:ExecutionState|None=None,retry_failed:bool=False,graph:WorkGraph|None=None):
+    if isinstance(limit,bool) or not isinstance(limit,int) or not 1<=limit<=64: raise ValueError("limit must be in [1,64]")
     graph=graph or build_work_graph(model,limit=max(limit,32)); inherited=state or ExecutionState(); completed_set=set(completed)|set(inherited.released_work)
     ready=graph.ready(completed_set,active_conflicts,limit=limit); failed=set(inherited.failed_work)
     if not retry_failed: ready=tuple(n for n in ready if n.identity not in failed)
+    ready=_counterfactual_order(graph,ready,completed_set)
     ready_ids={n.identity for n in ready}; steps=[]
     for n in ready:
         prepare,modify,verify,unlock=(f"{n.identity}:{p}" for p in ("prepare","modify","verify","unlock"))
