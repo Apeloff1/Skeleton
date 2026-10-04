@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ai-delta-memory-recovery-${{ github.event.pull_request.number || github.sha }}
+  group: ai-delta-memory-recovery-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
