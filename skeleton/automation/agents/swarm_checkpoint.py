@@ -34,6 +34,7 @@ class CheckpointStore:
         self._clock = clock
         self._sequence = 0
         self._items: Deque[Checkpoint] = deque(maxlen=max_checkpoints)
+        self._rollback_evicted: dict[int, Checkpoint] = {}
         self._lock = RLock()
 
     @staticmethod
@@ -85,7 +86,14 @@ class CheckpointStore:
                 self._checksum(state),
                 deepcopy(state),
             )
+            evicted = (
+                self._clone(self._items[0])
+                if len(self._items) == self.max_checkpoints
+                else None
+            )
             self._items.append(checkpoint)
+            if evicted is not None:
+                self._rollback_evicted[checkpoint.sequence] = evicted
             return self._clone(checkpoint)
 
     def load_verified(self, checkpoint: Checkpoint) -> Checkpoint:
@@ -116,12 +124,20 @@ class CheckpointStore:
         with self._lock:
             return tuple(self._clone(item) for item in self._items)
 
+    def commit(self, sequence: int) -> None:
+        """Finalize one provisional bounded capture after outer persistence."""
+        with self._lock:
+            self._rollback_evicted.pop(sequence, None)
+
     def discard(self, sequence: int) -> bool:
-        """Discard one checkpoint without rewinding the monotonic sequence counter."""
+        """Rollback one provisional capture without losing an evicted predecessor."""
         with self._lock:
             retained = [item for item in self._items if item.sequence != sequence]
             if len(retained) == len(self._items):
                 return False
+            evicted = self._rollback_evicted.pop(sequence, None)
+            if evicted is not None:
+                retained.insert(0, evicted)
             self._items = deque(retained, maxlen=self.max_checkpoints)
             return True
 
