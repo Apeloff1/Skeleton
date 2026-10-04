@@ -1,4 +1,4 @@
-# Evidence refresh trigger: VOL-017 current-main independent verification.
+# Evidence refresh trigger: VOL-017 current-head closure verification.
 name: P1 Multi-Agent Orchestration Gate
 
 on:
