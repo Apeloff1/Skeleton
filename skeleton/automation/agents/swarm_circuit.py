@@ -52,7 +52,7 @@ class CircuitBreaker:
         with self._lock:
             c = self._circuits.setdefault(key, Circuit())
             if c.state is CircuitState.OPEN:
-                if c.opened_at is None or self.clock() - c.opened_at < self.recovery_seconds:
+                if c.opened_at is None or self._now() - c.opened_at < self.recovery_seconds:
                     return False
                 c.state = CircuitState.HALF_OPEN
                 c.probe_in_flight = False
@@ -79,7 +79,7 @@ class CircuitBreaker:
             c.failures += 1
             if c.state is CircuitState.HALF_OPEN or c.failures >= self.failure_threshold:
                 c.state = CircuitState.OPEN
-                c.opened_at = self.clock()
+                c.opened_at = self._now()
                 c.probe_in_flight = False
             return c
 
