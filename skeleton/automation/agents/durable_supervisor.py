@@ -279,18 +279,67 @@ class DurableAgentSupervisor:
         loaded = bridge.load(run_id)
         if loaded is None:
             recovery = SwarmRecoveryManager(max_checkpoints=max_checkpoints)
-            runtime: SwarmRuntime = HardenedSwarmRuntime(clock=runtime_clock)
+            runtime = HardenedSwarmRuntime(clock=runtime_clock)
         else:
             recovery = loaded.manager
             restored = loaded.restore_runtime()
             if restored is None:
                 runtime = HardenedSwarmRuntime(clock=runtime_clock)
             else:
-                runtime = type(restored).from_state(
+                runtime = HardenedSwarmRuntime.from_state(
                     restored.export_state(),
                     clock=runtime_clock,
                     requeue_leased=False,
                 )
+
+        configured_policy = (
+            None
+            if policy is None
+            else SwarmSupervisor.from_state(
+                policy.export_state(),
+                clock=runtime_clock,
+            )
+        )
+        persisted_policy = runtime.checkpoint_extension(cls.POLICY_EXTENSION)
+        if persisted_policy is None:
+            effective_policy = configured_policy or SwarmSupervisor(
+                clock=runtime_clock
+            )
+        else:
+            if not isinstance(persisted_policy, dict):
+                raise AgentSupervisorError(
+                    "durable supervisor policy checkpoint is invalid"
+                )
+            restored_policy = SwarmSupervisor.from_state(
+                persisted_policy,
+                clock=runtime_clock,
+            )
+            if configured_policy is not None:
+                expected = configured_policy.export_state()
+                actual = restored_policy.export_state()
+                expected_static = {
+                    "shed_policy": expected["shed_policy"],
+                    "failure_threshold": expected["circuit_breaker"][
+                        "failure_threshold"
+                    ],
+                    "recovery_seconds": expected["circuit_breaker"][
+                        "recovery_seconds"
+                    ],
+                }
+                actual_static = {
+                    "shed_policy": actual["shed_policy"],
+                    "failure_threshold": actual["circuit_breaker"][
+                        "failure_threshold"
+                    ],
+                    "recovery_seconds": actual["circuit_breaker"][
+                        "recovery_seconds"
+                    ],
+                }
+                if expected_static != actual_static:
+                    raise AgentSupervisorError(
+                        "configured supervisor policy conflicts with durable state"
+                    )
+            effective_policy = restored_policy
 
         quota_ledger = ledger or QuotaLedger()
         scope = resource_scope or f"agent-runtime:{run_id}"
@@ -307,7 +356,7 @@ class DurableAgentSupervisor:
             scope=scope,
             lease_seconds=lease_seconds,
             runtime_clock=runtime_clock,
-            policy=policy,
+            policy=effective_policy,
         )
         supervisor._commit(runtime, renew_outer_lease=False)
         return supervisor
