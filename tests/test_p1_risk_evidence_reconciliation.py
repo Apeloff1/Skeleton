@@ -105,14 +105,19 @@ def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None
         "applicable_adversarial_axis_count": 24,
         "total_obligation_count": 511,
     }
-    assert report["binding_count"] == 511
+    assert report["binding_count"] == 513
+    assert report["live_binding_count"] == 511
     assert report["historical_binding_count"] == 513
     assert report["retired_binding_count"] == 2
-    assert report["resolved_count"] == 511
+    assert report["resolved_count"] == 513
+    assert report["live_resolved_count"] == 511
     assert report["historical_resolved_count"] == 513
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
+        "evidence": 513,
+    }
+    assert report["live_disposition_counts"] == {
         "evidence": 511,
     }
     assert report["historical_disposition_counts"] == {
@@ -244,9 +249,11 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
     report = reconcile_repository(root, evaluated_at=NOW)
 
     assert report["binding_count"] == 1
+    assert report["live_binding_count"] == 1
     assert report["historical_binding_count"] == 1
     assert report["retired_binding_count"] == 0
     assert report["resolved_count"] == 1
+    assert report["live_resolved_count"] == 1
     assert report["unresolved_blocking_count"] == 510
     assert report["unclassified_count"] == 280
 
