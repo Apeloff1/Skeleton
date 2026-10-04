@@ -1081,8 +1081,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040"
     },
@@ -1155,8 +1155,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-000-040"
     },
@@ -13687,8 +13687,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-253",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-241-280"
     },

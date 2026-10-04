@@ -120,6 +120,10 @@ def type_status(record: dict[str, Any], phase: str) -> str:
             return "done"
         if typ == "catalog_entry":
             return "closed"
+        # Completion is orthogonal to maturity. Never demote a volume/work
+        # package/slice that already carries stronger verified maturity.
+        if record.get("status") in {"verified", "hardened", "production"}:
+            return str(record["status"])
         return "verified"
     if phase == "accepted_risk":
         if typ != "catalog_entry":
