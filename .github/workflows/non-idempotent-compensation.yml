@@ -55,6 +55,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Install focused test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.23,<1"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
       - name: Compile compensation authority
         run: >-
           python -m compileall -q
@@ -64,10 +71,12 @@ jobs:
       - name: Verify canonical G015 compensation contract
         run: python scripts/verify_non_idempotent_compensation_contract.py --json
       - name: Run durable saga regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "0"
         run: >-
-          python -m unittest -q
-          skeleton.testing.test_tool_saga
-          skeleton.testing.test_distributed_transactions
+          python -m pytest -q --noconftest
+          skeleton/testing/test_tool_saga.py
+          skeleton/testing/test_distributed_transactions.py
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
