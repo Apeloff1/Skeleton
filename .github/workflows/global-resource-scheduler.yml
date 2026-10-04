@@ -9,7 +9,10 @@ on:
       - "scripts/verify_global_resource_scheduler_contract.py"
       - "skeleton/kernel/global_resource_scheduler.py"
       - "skeleton/ai/runtime/kernel/global_resource_scheduler.py"
+      - "skeleton/automation/agents/scheduler.py"
+      - "skeleton/ai/agents/core/scheduler.py"
       - "skeleton/testing/test_global_resource_scheduler.py"
+      - "skeleton/testing/test_global_resource_swarm_integration.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/global-resource-scheduler.yml"
   push:
@@ -20,7 +23,10 @@ on:
       - "scripts/verify_global_resource_scheduler_contract.py"
       - "skeleton/kernel/global_resource_scheduler.py"
       - "skeleton/ai/runtime/kernel/global_resource_scheduler.py"
+      - "skeleton/automation/agents/scheduler.py"
+      - "skeleton/ai/agents/core/scheduler.py"
       - "skeleton/testing/test_global_resource_scheduler.py"
+      - "skeleton/testing/test_global_resource_swarm_integration.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/global-resource-scheduler.yml"
   workflow_dispatch:
@@ -35,7 +41,7 @@ concurrency:
 jobs:
   global-resource-scheduler:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -54,12 +60,19 @@ jobs:
           python -m compileall -q
           skeleton/kernel/global_resource_scheduler.py
           skeleton/ai/runtime/kernel/global_resource_scheduler.py
+          skeleton/automation/agents/scheduler.py
+          skeleton/ai/agents/core/scheduler.py
           scripts/verify_global_resource_scheduler_contract.py
           skeleton/testing/test_global_resource_scheduler.py
+          skeleton/testing/test_global_resource_swarm_integration.py
       - name: Verify G021 contract
         run: python scripts/verify_global_resource_scheduler_contract.py --json
       - name: Run global scheduler regressions
-        run: python -m unittest -q skeleton.testing.test_global_resource_scheduler
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_global_resource_scheduler
+          skeleton.testing.test_global_resource_swarm_integration
+          tests.test_scheduler
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
