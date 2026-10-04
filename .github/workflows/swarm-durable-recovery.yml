@@ -8,9 +8,21 @@ on:
       - "skeleton/agents/swarm_recovery.py"
       - "skeleton/agents/swarm_checkpoint.py"
       - "skeleton/agents/swarm_runtime.py"
+      - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/automation/agents/swarm_checkpoint.py"
+      - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
+      - "skeleton/automation/agents/swarm_runtime.py"
+      - "skeleton/ai/agents/core/swarm_durable.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_runtime.py"
       - "skeleton/state/**"
       - "skeleton/testing/test_durable_run_store.py"
       - "skeleton/testing/test_swarm_durable.py"
+      - "skeleton/testing/test_swarm_checkpoint.py"
+      - "skeleton/testing/test_swarm_tenant_checkpoint.py"
       - ".github/workflows/swarm-durable-recovery.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -19,9 +31,21 @@ on:
       - "skeleton/agents/swarm_recovery.py"
       - "skeleton/agents/swarm_checkpoint.py"
       - "skeleton/agents/swarm_runtime.py"
+      - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/automation/agents/swarm_checkpoint.py"
+      - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
+      - "skeleton/automation/agents/swarm_runtime.py"
+      - "skeleton/ai/agents/core/swarm_durable.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_runtime.py"
       - "skeleton/state/**"
       - "skeleton/testing/test_durable_run_store.py"
       - "skeleton/testing/test_swarm_durable.py"
+      - "skeleton/testing/test_swarm_checkpoint.py"
+      - "skeleton/testing/test_swarm_tenant_checkpoint.py"
       - ".github/workflows/swarm-durable-recovery.yml"
 
 permissions:
@@ -52,9 +76,14 @@ jobs:
         run: >-
           python -m compileall -q
           skeleton/state
-          skeleton/agents/swarm_durable.py
-          skeleton/agents/swarm_recovery.py
-          skeleton/agents/swarm_checkpoint.py
+          skeleton/automation/agents/swarm_durable.py
+          skeleton/automation/agents/swarm_recovery.py
+          skeleton/automation/agents/swarm_checkpoint.py
+          skeleton/automation/agents/swarm_tenant_checkpoint.py
+          skeleton/ai/agents/core/swarm_durable.py
+          skeleton/ai/agents/core/swarm_recovery.py
+          skeleton/ai/agents/core/swarm_checkpoint.py
+          skeleton/ai/agents/core/swarm_tenant_checkpoint.py
       - name: Run durable swarm integration contracts
         env:
           PYTHONPATH: "."
@@ -62,3 +91,5 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_durable_run_store.py
           skeleton/testing/test_swarm_durable.py
+          skeleton/testing/test_swarm_checkpoint.py
+          skeleton/testing/test_swarm_tenant_checkpoint.py
