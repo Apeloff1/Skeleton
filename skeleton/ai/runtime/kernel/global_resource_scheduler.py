@@ -332,6 +332,7 @@ class ResourceGrant:
     borrowed: bool
     granted_tick: int
     state: str = ACTIVE
+    revoking_for_request_id: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -345,6 +346,7 @@ class ResourceGrant:
             "borrowed": self.borrowed,
             "granted_tick": self.granted_tick,
             "state": self.state,
+            "revoking_for_request_id": self.revoking_for_request_id,
         }
 
 
@@ -404,6 +406,16 @@ class GlobalResourceScheduler:
             if ticket.status == QUEUED:
                 ticket = replace(ticket, status=CANCELLED)
                 self._requests[request_id] = ticket
+                for grant_id, grant in tuple(self._grants.items()):
+                    if (
+                        grant.state == REVOKING
+                        and grant.revoking_for_request_id == request_id
+                    ):
+                        self._grants[grant_id] = replace(
+                            grant,
+                            state=ACTIVE,
+                            revoking_for_request_id=None,
+                        )
                 return ticket
             if ticket.status == CANCELLED:
                 return ticket
@@ -499,7 +511,11 @@ class GlobalResourceScheduler:
 
             marked: list[ResourceGrant] = []
             for grant in selected:
-                revoking = replace(grant, state=REVOKING)
+                revoking = replace(
+                    grant,
+                    state=REVOKING,
+                    revoking_for_request_id=request_id,
+                )
                 self._grants[grant.grant_id] = revoking
                 marked.append(revoking)
             return tuple(marked)
@@ -510,6 +526,14 @@ class GlobalResourceScheduler:
             grant = self._require_grant(grant_id)
             if grant.state != REVOKING:
                 raise ResourceConflict("grant is not awaiting preemption ack")
+            target_id = grant.revoking_for_request_id
+            if target_id is None:
+                raise ResourceConflict("revoking grant lacks target request")
+            target = self._require_ticket(target_id)
+            if target.status != QUEUED:
+                raise ResourceConflict(
+                    "preemption target is no longer queued"
+                )
         return self.release(grant_id)
 
     def queued(self) -> tuple[RequestTicket, ...]:
