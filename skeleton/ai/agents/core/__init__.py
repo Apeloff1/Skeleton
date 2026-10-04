@@ -2,6 +2,18 @@
 
 from skeleton.automation.agents.mesh import AgentMesh
 
+from skeleton.automation.agents.durable_supervisor import (
+    AgentResourceAccountant,
+    AgentResourceAccountingDrift,
+    AgentResourceAccountingError,
+    AgentResourceMeasurement,
+    AgentSupervisorCommit,
+    AgentSupervisorError,
+    AgentSupervisorStatus,
+    DurableAgentSupervisor,
+    measure_agent_resources,
+)
+
 from skeleton.automation.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 from skeleton.automation.agents.delegation_qualification import (
     AGENT_DELEGATION_ACCOUNTABILITY_ID,
@@ -105,6 +117,10 @@ from skeleton.automation.agents.swarm_runtime import AdmissionError, LeaseError,
 
 __all__ = [
     "AgentMesh",
+    "AgentResourceAccountant", "AgentResourceAccountingDrift",
+    "AgentResourceAccountingError", "AgentResourceMeasurement",
+    "AgentSupervisorCommit", "AgentSupervisorError", "AgentSupervisorStatus",
+    "DurableAgentSupervisor", "measure_agent_resources",
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
     "AUTONOMY_CONTROL_ACCOUNTABILITY_ID", "AUTONOMY_CONTROL_SCHEMA_VERSION",
     "AUTONOMY_CONTROL_TASK_ID", "AutonomyAuthorization", "AutonomyControlError",
