@@ -16,7 +16,7 @@
     "p0": 26,
     "p1": 164,
     "p2": 10,
-    "implementation_pr_open": 19,
+    "implementation_pr_open": 20,
     "verified_closed": 0
   },
   "gaps": [
@@ -258,8 +258,10 @@
       "id": "G023",
       "severity": "P1",
       "title": "Observability integrity",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2736"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
