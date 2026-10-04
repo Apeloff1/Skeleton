@@ -1889,6 +1889,9 @@ async def cancel_ai_chat_turn(
         raise HTTPException(status_code=502, detail="AI engine protocol failure") from exc
 
     state = str(status_payload.get("execution_state") or "unknown")
+    cancellation_requested = bool(status_payload.get("cancellation_requested"))
+    if cancellation_requested and state not in {"completed", "failed", "cancelled"}:
+        state = "cancelled"
     if state in {"failed", "cancelled"}:
         try:
             latest_thread = await conversation_authority.get_thread(
