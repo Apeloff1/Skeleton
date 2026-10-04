@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
 
 import pytest
 
@@ -106,6 +108,53 @@ def test_runtime_property_is_detached_from_authoritative_state(tmp_path) -> None
     assert detached.task("bypass") is not None
     assert supervisor.runtime.task("bypass") is None
     assert supervisor.status().resources == Usage()
+
+
+def test_concurrent_copy_on_write_mutations_do_not_lose_updates(
+    tmp_path, monkeypatch
+) -> None:
+    store = make_store(tmp_path)
+    supervisor = DurableAgentSupervisor.open(store, "agent-run", "supervisor-a")
+    original_clone = supervisor._clone_runtime
+    first_entered = Event()
+    second_entered = Event()
+    release_first = Event()
+    counter_lock = Lock()
+    calls = 0
+
+    def controlled_clone():
+        nonlocal calls
+        with counter_lock:
+            calls += 1
+            call = calls
+        candidate = original_clone()
+        if call == 1:
+            first_entered.set()
+            assert release_first.wait(2)
+        elif call == 2:
+            second_entered.set()
+        return candidate
+
+    monkeypatch.setattr(supervisor, "_clone_runtime", controlled_clone)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(supervisor.submit, SwarmTask("task-a", {"n": "a"}))
+        assert first_entered.wait(2)
+        second = pool.submit(supervisor.submit, SwarmTask("task-b", {"n": "b"}))
+
+        # A serialized supervisor prevents the second clone from starting until
+        # the first transaction has committed. Without the lock this event is
+        # reached before release and both candidates clone the same base state.
+        assert second_entered.wait(0.1) is False
+        release_first.set()
+        first.result(timeout=2)
+        second.result(timeout=2)
+
+    assert {task.id for task in supervisor.runtime.tasks()} == {
+        "task-a",
+        "task-b",
+    }
+    assert supervisor.status().resources.queued == 2
 
 
 def test_queue_quota_rejection_does_not_mutate_authoritative_runtime(tmp_path) -> None:
