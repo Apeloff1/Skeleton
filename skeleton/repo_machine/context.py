@@ -25,7 +25,7 @@ def _bounded(payload,limit):
                 if key=="topology":
                     e=value.get("edges",[]); compact[key]={"edges":e[:max(1,len(e)//2)],"cycles":value.get("cycles",[])[:4]}; changed=True
                 elif key=="intelligence":
-                    compact[key]={"graph_fingerprint":value.get("graph_fingerprint"),"strategic_value":value.get("strategic_value",0),"bridge_candidates":value.get("bridge_candidates",[])[:8],"safe_parallel_groups":value.get("safe_parallel_groups",[])[:4]}; changed=True
+                    compact[key]={"graph_fingerprint":value.get("graph_fingerprint"),"strategic_value":value.get("strategic_value",0),"decision_surface":value.get("decision_surface",[])[:8],"counterfactual_surface":value.get("counterfactual_surface",[])[:8],"bridge_candidates":value.get("bridge_candidates",[])[:8],"safe_parallel_groups":value.get("safe_parallel_groups",[])[:4]}; changed=True
                 elif key=="coordination":
                     d=value.get("decisions",[]); compact[key]={"decisions":d[:max(1,len(d)//2)],"bottleneck":value.get("bottleneck"),"frontier_size":value.get("frontier_size",0),"max_parallelism":value.get("max_parallelism",0),"coordination_pressure":value.get("coordination_pressure",0),"safe_parallel_groups":value.get("safe_parallel_groups",[])[:4]}; changed=True
             if _fits(compact,limit): return compact
@@ -38,7 +38,7 @@ def context_for_intent(model:RepositoryModel,intent:Intent="overview",*,byte_lim
     if isinstance(byte_limit,bool) or not isinstance(byte_limit,int) or not 4096<=byte_limit<=256000: raise ValueError("byte_limit must be in [4096,256000]")
     query=RepositoryQuery(model); graph=build_work_graph(model,limit=32)
     coordination=build_coordination_plan(model,limit=8,graph=graph); execution=build_execution_plan(model,limit=8,graph=graph)
-    intelligence={"graph_fingerprint":graph.fingerprint,"strategic_value":graph.strategic_value(),"coordination_pressure":graph.pressure(),"critical_path_depth":graph.critical_depth,"bottleneck":graph.bottleneck(),"safe_parallel_groups":[list(x) for x in graph.safe_parallel_groups(limit=4)],"bridge_candidates":list(graph.bridge_candidates(limit=12))}
+    intelligence={"graph_fingerprint":graph.fingerprint,"strategic_value":graph.strategic_value(),"coordination_pressure":graph.pressure(),"critical_path_depth":graph.critical_depth,"bottleneck":graph.bottleneck(),"safe_parallel_groups":[list(x) for x in graph.safe_parallel_groups(limit=4)],"decision_surface":list(graph.decision_surface(limit=8)),"counterfactual_surface":list(graph.counterfactual_surface(limit=8)),"bridge_candidates":list(graph.bridge_candidates(limit=12))}
     base={"intent":intent,"fingerprint":model.fingerprint,"health":repository_health(model).as_dict(),"metrics":structural_metrics(model).as_dict(),
           "subsystems":[x.as_dict() for x in model.subsystems],"work":[x.as_dict() for x in graph.ordered_nodes],
           "coordination":coordination,"execution":execution.as_dict(),"intelligence":intelligence,
