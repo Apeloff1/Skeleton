@@ -57,7 +57,7 @@ def _valid_repo(tmp_path: Path) -> Path:
             {
                 "gap": gap_id,
                 "gap_status": "closed",
-                "implementation_state": "closed",
+                "implementation_state": "complete",
                 "closure_decision": "closed",
                 "outstanding_evidence": [],
                 "blockers": [],
@@ -188,3 +188,21 @@ def test_completion_verifier_rejects_closed_gap_with_pending_machine_state(
     assert any("verification_state" in item for item in receipt["errors"])
     assert any("progress.state" in item for item in receipt["errors"])
     assert any("progress.remaining" in item for item in receipt["errors"])
+
+
+def test_completion_verifier_rejects_nonterminal_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["entries"][0]["implementation_state"] = "pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "implementation_state is not closed" in item
+        for item in receipt["errors"]
+    )
