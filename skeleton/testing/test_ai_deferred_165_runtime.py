@@ -1041,7 +1041,7 @@ def test_deferred_executor_same_operation_cannot_execute_concurrently() -> None:
     assert calls==[{"value":1}]
 
 
-def test_deferred_executor_baseexception_releases_inflight_reservation() -> None:
+def test_deferred_executor_baseexception_is_terminal_and_not_replayed() -> None:
     registry=build_registry()
     record=_enable_volume(registry,"VOL-160")
     calls=[]
@@ -1051,9 +1051,7 @@ def test_deferred_executor_baseexception_releases_inflight_reservation() -> None
 
     def handler(payload):
         calls.append(payload)
-        if len(calls)==1:
-            raise StopExecution()
-        return {"ok":True}
+        raise StopExecution()
 
     executor=DeferredExecutor(registry)
     executor.register_handler(
@@ -1071,9 +1069,16 @@ def test_deferred_executor_baseexception_releases_inflight_reservation() -> None
     with pytest.raises(StopExecution):
         executor.execute(invocation,payload)
 
-    outcome=executor.execute(invocation,payload)
-    assert outcome.result=={"ok":True}
-    assert calls==[{"value":1},{"value":1}]
+    receipt=executor.receipt("baseexception")
+    assert receipt.status=="failed"
+    assert receipt.error_type=="StopExecution"
+
+    with pytest.raises(DeferredExecutionError,match="previously failed") as retry:
+        executor.execute(invocation,payload)
+
+    assert retry.value.receipt==receipt
+    assert calls==[{"value":1}]
+
 
 def test_deferred_invocation_bounds_operation_identity() -> None:
     registry=build_registry()
@@ -1689,3 +1694,179 @@ def test_durable_effect_journal_uses_wal_and_full_sync(tmp_path) -> None:
         synchronous = conn.execute("PRAGMA synchronous").fetchone()
         assert synchronous is not None
         assert int(synchronous[0]) == 2
+
+
+
+def test_effect_authority_is_checked_after_durable_start_before_handler(
+    tmp_path,
+) -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    journal=SqliteDeferredExecutionJournal(
+        tmp_path / "effect-authority-order.sqlite3"
+    )
+    events=[]
+
+    class Authority:
+        def require_effect_authority(self, operation_id):
+            durable=journal.load(operation_id)
+            assert durable is not None
+            assert durable.state=="started"
+            events.append(("authority",operation_id))
+            return object()
+
+    executor=DeferredExecutor(
+        registry,
+        journal=journal,
+        effect_authority=Authority(),
+    )
+
+    def handler(payload):
+        events.append(("handler",payload["value"]))
+        return {"ok":True}
+
+    executor.register_handler(
+        "VOL-160",
+        handler,
+        handler_identity=record.spec.handler,
+        requires_effect_authority=True,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","effect-order",payload)
+
+    outcome=executor.execute(invocation,payload)
+
+    assert outcome.result=={"ok":True}
+    assert events==[
+        ("authority","effect-order"),
+        ("handler",1),
+    ]
+
+
+def test_effectful_handler_without_live_authority_fails_before_effect() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    calls=[]
+    executor=DeferredExecutor(registry)
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+        requires_effect_authority=True,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","missing-live-authority",payload)
+
+    with pytest.raises(
+        PermissionError,
+        match="live effect authority is required",
+    ):
+        executor.execute(invocation,payload)
+
+    assert calls==[]
+
+
+def test_effect_authority_denial_is_terminal_and_never_dispatches(
+    tmp_path,
+) -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    journal=SqliteDeferredExecutionJournal(
+        tmp_path / "effect-authority-denial.sqlite3"
+    )
+    authority_calls=[]
+    handler_calls=[]
+
+    class Authority:
+        def require_effect_authority(self, operation_id):
+            authority_calls.append(operation_id)
+            raise RuntimeError("effect authority expired")
+
+    executor=DeferredExecutor(
+        registry,
+        journal=journal,
+        effect_authority=Authority(),
+    )
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: handler_calls.append(payload) or {"ok":True},
+        handler_identity=record.spec.handler,
+        requires_effect_authority=True,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    invocation=executor.prepare("VOL-160","authority-denied",payload)
+
+    with pytest.raises(DeferredExecutionError) as denied:
+        executor.execute(invocation,payload)
+
+    assert denied.value.receipt.error_type=="RuntimeError"
+    assert authority_calls==["authority-denied"]
+    assert handler_calls==[]
+    durable=journal.load("authority-denied")
+    assert durable is not None
+    assert durable.state=="failed"
+
+    with pytest.raises(DeferredExecutionError,match="previously failed") as retry:
+        executor.execute(invocation,payload)
+
+    assert retry.value.receipt==denied.value.receipt
+    assert authority_calls==["authority-denied"]
+    assert handler_calls==[]
+
+
+def test_non_effectful_handler_does_not_consume_live_authority() -> None:
+    registry=build_registry()
+    record=_enable_volume(registry,"VOL-160")
+    authority_calls=[]
+
+    class Authority:
+        def require_effect_authority(self, operation_id):
+            authority_calls.append(operation_id)
+            raise AssertionError("non-effectful handler must not request authority")
+
+    executor=DeferredExecutor(
+        registry,
+        effect_authority=Authority(),
+    )
+    executor.register_handler(
+        "VOL-160",
+        lambda payload: {"ok":True},
+        handler_identity=record.spec.handler,
+    )
+    executor.set_budget(
+        "VOL-160",
+        Budget(max_attempts=1,max_cost_units=2,max_latency_ms=10),
+    )
+    payload={"value":1}
+    outcome=executor.execute(
+        executor.prepare("VOL-160","pure-handler",payload),
+        payload,
+    )
+
+    assert outcome.result=={"ok":True}
+    assert authority_calls==[]
+
+
+def test_effect_authority_constructor_rejects_invalid_provider() -> None:
+    registry=build_registry()
+
+    with pytest.raises(
+        TypeError,
+        match="require_effect_authority",
+    ):
+        DeferredExecutor(
+            registry,
+            effect_authority=object(),
+        )
