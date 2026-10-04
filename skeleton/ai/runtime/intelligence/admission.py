@@ -11,11 +11,11 @@ usage accounting can layer on this receipt without changing the decision shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 import hashlib
 import math
 import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 
@@ -29,7 +29,7 @@ class AdmissionStatus(str, Enum):
     REJECT = "reject"
 
 
-def _finite_nonnegative(value: float | int, *, field: str) -> float:
+def _finite_nonnegative(value: float, *, field: str) -> float:
     if isinstance(value, bool):
         raise AdmissionError(f"{field} must be finite and non-negative")
     number = float(value)
@@ -202,20 +202,35 @@ class AdmissionDecision:
         }
 
 
-def _decision_id(request: AdmissionRequest, status: AdmissionStatus, reason: str) -> str:
+def admission_decision_id(
+    request: AdmissionRequest,
+    status: AdmissionStatus,
+    reason: str,
+) -> str:
+    """Return the deterministic identity of one evaluated admission outcome."""
+
+    if not isinstance(request, AdmissionRequest):
+        raise TypeError("request must be AdmissionRequest")
+    if not isinstance(status, AdmissionStatus):
+        raise TypeError("status must be AdmissionStatus")
+    normalized_reason = _identifier(reason, field="reason")
     material = "\x1f".join(
         (
             request.operation_id,
             request.tenant_id,
             request.capability,
             status.value,
-            reason,
+            normalized_reason,
             str(request.budget.as_dict()),
             str(request.estimate),
             str(request.pressure),
         )
     ).encode("utf-8")
     return "adm-" + hashlib.sha256(material).hexdigest()[:24]
+
+
+def _decision_id(request: AdmissionRequest, status: AdmissionStatus, reason: str) -> str:
+    return admission_decision_id(request, status, reason)
 
 
 def _remaining(request: AdmissionRequest) -> dict[str, float | int]:
@@ -359,6 +374,7 @@ __all__ = [
     "ResourceBudget",
     "RuntimePressure",
     "UsageEstimate",
+    "admission_decision_id",
     "evaluate_admission",
     "require_admission",
 ]

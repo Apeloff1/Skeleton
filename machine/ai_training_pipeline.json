@@ -1,0 +1,33 @@
+{
+  "schema_version": "skeleton.ai.training_pipeline.v1",
+  "status": "implementation_candidate",
+  "scope": "bounded_local_governed_model_development",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "distributed_execution_supported": false,
+  "contracts": [
+    "machine/ai_governed_training_data.json",
+    "machine/ai_multimodal_training_projection.json",
+    "machine/ai_neural_training_resume_contract.json",
+    "machine/ai_model_lifecycle_persistence.json",
+    "machine/ai_post_training_execution.json",
+    "machine/ai_governed_training_cli.json",
+    "machine/ai_local_provider_activation.json",
+    "machine/ai_engine_provider_inventory.json",
+    "machine/ai_engine_handoff_recovery.json"
+  ],
+  "composition": [
+    "Observed source bytes or verified multimodal projections enter the existing DatasetRegistry with explicit rights and lineage",
+    "Computed observations and quality gates admit exact stored document sequences",
+    "Existing TrainingRepository fences worker identity and cumulative reference or neural model progress",
+    "EvaluationHarness executes declared local suites against the reloaded learned model",
+    "PostTrainingLedger commits local episode execution and derives curriculum and qualification evidence from issued receipts",
+    "ModelLifecycleRegistry persists candidate evidence, measured parity, exact transition lineage and compensating rollback",
+    "Explicit local ProviderRegistry activation loads the derived model artifact through the existing governed provider owner with mandatory architecture acknowledgement, admission and cancellation"
+  ],
+  "restart_acceptance": "skeleton/testing/test_governed_multimodal_model_lifecycle.py",
+  "operator_acceptance": "skeleton/testing/test_governed_training_cli.py",
+  "engine_acceptance": "skeleton/testing/test_governed_model_engine_acceptance.py",
+  "validator": "scripts/check_ai_training_pipeline.py",
+  "rollback": "Withdraw CLI and new execution adapters while retaining immutable datasets, full learned checkpoints, issued learning evidence and lifecycle backups; never restore deleted content or revoked rights"
+}

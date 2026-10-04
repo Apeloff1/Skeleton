@@ -1,0 +1,41 @@
+{
+  "schema_version": "skeleton.ai.governed_training_cli.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/ai/runtime/training/cli.py",
+  "entrypoint": "skeleton-train-governed-model",
+  "scope": "Bounded local operator composition of existing dataset, training and inference artifact owners",
+  "source_contracts": [
+    "machine/ai_governed_training_data.json",
+    "machine/ai_neural_training_resume_contract.json",
+    "machine/ai_training_resume_contract.json"
+  ],
+  "boundaries": {
+    "new_service": false,
+    "new_provider_transport": false,
+    "new_runtime_root": false,
+    "production_promotion": false,
+    "masterplan_signoff": false
+  },
+  "input": "Explicit regular UTF-8 local files, operator-supplied rights references, classification, immutable run ID and bounded model/configuration/resource policy",
+  "admission": "The existing TrainingRepository database receives an additive governed_cli_request table. Its canonical request binds source paths and observed byte digests, rights, configuration, code/environment digests, initial dataset CAS version and the original operator acquisition timestamp before any ingestion or training work. Same request returns the original timestamp/version; changed request under the same run ID rejects. Reused source bytes retain their original immutable acquired_at and require unchanged source metadata.",
+  "dataset": "DatasetRegistry.ingest_materialized computes dataset splits and quality from original bytes. Only DatasetRegistry.training_corpus supplies model input; digest-only legacy dataset APIs cannot provide CLI content.",
+  "training": "ReferenceLocalTrainer or NeuralLocalTrainer persists full learned state and cumulative cursors through the existing TrainingRepository. Retries resume committed work or reload completed weights.",
+  "artifact": "Existing write_local_model_artifact atomically emits content-addressed reloadable model JSON after training has completed. The receipt binds dataset/quality/source sequence, immutable run, checkpoint and serialized model artifact without printing training text.",
+  "limits": {
+    "max_files": 4096,
+    "max_reference_document_bytes": 1048576,
+    "max_reference_corpus_bytes": 67108864,
+    "max_neural_document_bytes": 4096,
+    "max_neural_corpus_bytes": 1048576,
+    "max_request_bytes": 1048576
+  },
+  "failures": [
+    "Reject symlinks, nonregular files, duplicate paths/inodes, empty or invalid UTF-8 content and inputs exceeding byte bounds before dataset writes",
+    "Reject input/output/database aliasing before overwriting an operator input or authoritative database",
+    "Reject changed content, rights, model configuration, code, environment or budget under an admitted run identity",
+    "Dataset rights revocation, deletion or quality drift blocks continuation and completed retry publication",
+    "Interrupted artifact publication retries from completed checkpoint without replaying model training"
+  ],
+  "rollback": "Remove the CLI entrypoint to stop new admission while retaining DatasetRegistry and TrainingRepository authorities; delete only derived output artifacts, never regenerate revoked training content",
+  "tests": ["skeleton/testing/test_governed_training_cli.py"]
+}

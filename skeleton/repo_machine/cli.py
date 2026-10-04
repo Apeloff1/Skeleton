@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from .atlas import build_repository_atlas
 from .budgets import derive_zone_budgets

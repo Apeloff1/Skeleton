@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "3e336c2b6992a9f71eb0741fa6f594dedec6d10f",
+      "source_git_object_sha": "8b3f12f72da1d92b692dee266c93c19a9a94f9eb",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -222,7 +222,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a0ba0bd7a2cd17513f43c17463e00a7d55d31299",
+      "source_git_object_sha": "a64459d2e839324e2211f623c37dc5fc731e4888",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -352,7 +352,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "8f62d6938c25b374310940e98a87867f3e6487dd",
+      "source_git_object_sha": "8a3d9a230da9181c02171dbd8aad77ffeb10b22f",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -454,7 +454,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "e9e5cddc61cdfe9d76cd550b7a3106e61c65452f",
+      "source_git_object_sha": "cb61fec5409f6ebc40553bd0ca082ae352e23a18",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -578,7 +578,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "3f7f261ac997a6e7f2381b1f952643b444838cd3",
+      "source_git_object_sha": "d651dee7fed319154d8d242a2f081e500cb813cc",
       "role": "AI runtime observability audit and telemetry plane",
       "work_package_refs": [
         "WP-W00",
@@ -643,7 +643,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "2f46e62b5a76e6fe053d16aa751fcee099bb9a6e",
+      "source_git_object_sha": "b20021abdf17e1390dae474248b3662c73367e0f",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -1696,7 +1696,7 @@
       "source": "skeleton/repo_machine",
       "destination": "skeleton/ai/build/repo_machine",
       "kind": "tree",
-      "source_git_object_sha": "1f4854df16014f163a44a7b2bb52a5495d26879d",
+      "source_git_object_sha": "f0a8beb312683bed1100557c30892424aa3daa3e",
       "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
       "work_package_refs": [
         "WP-W11",
@@ -2544,7 +2544,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -6057,6 +6057,41 @@
         "VOL-142"
       ],
       "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority."
+    },
+    "p3t2_global_contract_reconciliation": {
+      "base_head_sha": "1fc8bb703f4f6829f5fe512ab0298e41909402f1",
+      "status": "implementation_candidate",
+      "refreshed_mapping_ids": [
+        "AIFT-INTELLIGENCE",
+        "AIFT-AUTOMATION",
+        "AIFT-OBSERVABILITY",
+        "AIFT-SECURITY",
+        "AIFT-REPO-MACHINE"
+      ],
+      "source_tree_shas": {
+        "AIFT-INTELLIGENCE": "a64459d2e839324e2211f623c37dc5fc731e4888",
+        "AIFT-AUTOMATION": "cb61fec5409f6ebc40553bd0ca082ae352e23a18",
+        "AIFT-OBSERVABILITY": "d651dee7fed319154d8d242a2f081e500cb813cc",
+        "AIFT-SECURITY": "b20021abdf17e1390dae474248b3662c73367e0f",
+        "AIFT-REPO-MACHINE": "f0a8beb312683bed1100557c30892424aa3daa3e"
+      },
+      "promotion_authority": false,
+      "policy": "Reconcile existing canonical and staged AI owners after current-main admission/recovery/planning fixes, preserve destination-only bounded observability/security extensions as matching canonical source members, and repair bounded repository context, transitive dependency metrics, normalized path analysis and metadata retrieval in both governed paths. Preserve provider compatibility facades, all cutover constraints, and every unclosed masterplan obligation. Staged Git object identities describe source content only and grant no completion, maturity, signatures, cutover, or production promotion authority.",
+      "lint_reconciliation": "Canonical sources and their declared mirrors pass scoped Ruff after import/annotation and equivalent collection cleanup; malformed manifest types remain rejected, quota/governance/lease and cleanup error fences remain enforced. Source content identities refreshed after executable regression verification; no closure or signature authority."
+    },
+    "local_provider_activation_reconciliation": {
+      "base_head_sha": "1fc8bb703f4f6829f5fe512ab0298e41909402f1",
+      "status": "implementation_candidate",
+      "refreshed_mapping_ids": [
+        "AIFT-PROVIDER-RUNTIME",
+        "AIFT-ENGINE-API"
+      ],
+      "source_object_shas": {
+        "AIFT-PROVIDER-RUNTIME": "8b3f12f72da1d92b692dee266c93c19a9a94f9eb",
+        "AIFT-ENGINE-API": "8a3d9a230da9181c02171dbd8aad77ffeb10b22f"
+      },
+      "promotion_authority": false,
+      "policy": "Bind the existing canonical provider owner to explicit optional local artifact activation with mandatory architecture receipt, conservative governance, exact bounded local input admission, actual-usage reconciliation and cooperative cancellation. Preserve the provider facades and legacy byte mirror. Bind the existing engine API source tree to cancellation drain with the same governed mirror. These content identities grant no owner cutover, model promotion, closure or implementation/verification signatures."
     }
   }
 }

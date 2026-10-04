@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from threading import RLock
 from types import MappingProxyType
@@ -17,6 +17,7 @@ from skeleton.ai.runtime.learning_foundation.data import (
     DataPlaneError,
 )
 from skeleton.ai.runtime.multimodal.intake import (
+    _INSTRUCTION_PATTERNS,
     Modality,
     MultimodalAsset,
     MultimodalIntake,
@@ -44,6 +45,11 @@ _BASE_MODALITY = {
     LearningModality.VIDEO: Modality.VIDEO,
 }
 _TOKEN = re.compile(r"[\w-]+", re.UNICODE)
+_TRAINING_PURPOSES = frozenset({"training", "evaluation", "simulation_training", "simulation_evaluation"})
+_MAX_TRAINING_DOCUMENTS = 4096
+_MAX_TRAINING_DOCUMENT_BYTES = 1024 * 1024
+_MAX_TRAINING_TOTAL_BYTES = 64 * 1024 * 1024
+_MAX_TRAINING_SOURCE_BYTES = 512 * 1024 * 1024
 
 
 def _json(value: object) -> str:
@@ -98,6 +104,205 @@ class TextProjection:
         object.__setattr__(self, "language", _text("language", self.language, maximum=64))
         if self.instruction_trusted is not False:
             raise MultimodalFoundationError("derived multimodal text never receives instruction authority")
+
+    @property
+    def digest(self) -> str:
+        return _digest(
+            {
+                "text_digest": self.text_digest,
+                "extractor_ref": self.extractor_ref,
+                "language": self.language,
+                "instruction_trusted": self.instruction_trusted,
+            }
+        )
+
+
+def _training_purpose(value: object) -> str:
+    purpose = _text("purpose", value, maximum=64)
+    if purpose not in _TRAINING_PURPOSES:
+        raise MultimodalFoundationError("unsupported multimodal export purpose")
+    return purpose
+
+
+def _ordered_refs(name: str, values: Sequence[str], *, minimum: int = 1) -> tuple[str, ...]:
+    if isinstance(values, (str, bytes)) or not isinstance(values, Sequence):
+        raise MultimodalFoundationError(f"{name} requires an explicit ordered sequence")
+    return _refs(name, values, minimum=minimum)
+
+
+def _training_limit(name: str, value: int, ceiling: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= ceiling:
+        raise MultimodalFoundationError(f"{name} must be in [1, {ceiling}]")
+    return value
+
+
+def _document_bytes(document: str) -> bytes:
+    if not isinstance(document, str) or not document.strip():
+        raise MultimodalFoundationError("training documents must contain nonempty text")
+    try:
+        return document.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise MultimodalFoundationError("training text must be valid UTF-8") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class MultimodalTrainingSample:
+    ordinal: int
+    record_id: str
+    record_digest: str
+    asset_digest: str
+    projection_digest: str
+    text_digest: str
+    extractor_ref: str
+    language: str
+    modality: LearningModality
+    media_type: str
+    source_refs: tuple[str, ...]
+    rights_refs: tuple[str, ...]
+    lineage_refs: tuple[str, ...]
+    simulated: bool
+    embedded_instruction_detected: bool
+    instruction_trusted: bool = False
+
+    def __post_init__(self) -> None:
+        if isinstance(self.ordinal, bool) or not isinstance(self.ordinal, int) or self.ordinal < 0:
+            raise MultimodalFoundationError("sample ordinal must be non-negative")
+        object.__setattr__(self, "record_id", _text("record_id", self.record_id))
+        for name in ("record_digest", "asset_digest", "projection_digest", "text_digest"):
+            object.__setattr__(self, name, _sha(name, getattr(self, name)))
+        object.__setattr__(self, "extractor_ref", _text("extractor_ref", self.extractor_ref))
+        object.__setattr__(self, "language", _text("language", self.language, maximum=64))
+        object.__setattr__(self, "media_type", _text("media_type", self.media_type, maximum=255).lower())
+        if not isinstance(self.modality, LearningModality) or not isinstance(self.simulated, bool):
+            raise MultimodalFoundationError("sample modality and simulation flag are invalid")
+        object.__setattr__(self, "source_refs", _ordered_refs("source_ref", self.source_refs))
+        object.__setattr__(self, "rights_refs", _ordered_refs("rights_ref", self.rights_refs))
+        object.__setattr__(self, "lineage_refs", _ordered_refs("lineage_ref", self.lineage_refs, minimum=0))
+        if self.instruction_trusted is not False:
+            raise MultimodalFoundationError("training samples never receive instruction authority")
+        if self.embedded_instruction_detected is not False:
+            raise MultimodalFoundationError("instruction-shaped evidence is not eligible for training export")
+        projection = TextProjection(self.text_digest, self.extractor_ref, self.language)
+        if self.projection_digest != projection.digest:
+            raise MultimodalFoundationError("training projection identity drift")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "ordinal": self.ordinal,
+            "record_id": self.record_id,
+            "record_digest": self.record_digest,
+            "asset_digest": self.asset_digest,
+            "projection_digest": self.projection_digest,
+            "text_digest": self.text_digest,
+            "extractor_ref": self.extractor_ref,
+            "language": self.language,
+            "modality": self.modality.value,
+            "media_type": self.media_type,
+            "source_refs": list(self.source_refs),
+            "rights_refs": list(self.rights_refs),
+            "lineage_refs": list(self.lineage_refs),
+            "simulated": self.simulated,
+            "embedded_instruction_detected": self.embedded_instruction_detected,
+            "instruction_trusted": self.instruction_trusted,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MultimodalTrainingManifest:
+    export_id: str
+    purpose: str
+    samples: tuple[MultimodalTrainingSample, ...]
+    allowed_rights_refs: tuple[str, ...]
+    rights_policy_digest: str
+    allow_simulated: bool
+    corpus_digest: str
+    document_sequence_digest: str
+    total_bytes: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "export_id", _text("export_id", self.export_id))
+        object.__setattr__(self, "purpose", _training_purpose(self.purpose))
+        if not isinstance(self.allow_simulated, bool) or self.allow_simulated != self.purpose.startswith(
+            "simulation_"
+        ):
+            raise MultimodalFoundationError("simulation exports require explicit isolated purpose and opt-in")
+        if (
+            not isinstance(self.samples, Sequence)
+            or not self.samples
+            or len(self.samples) > _MAX_TRAINING_DOCUMENTS
+        ):
+            raise MultimodalFoundationError("training export sample count exceeds bounds")
+        samples = tuple(self.samples)
+        if any(not isinstance(sample, MultimodalTrainingSample) for sample in samples):
+            raise MultimodalFoundationError("training export requires typed samples")
+        object.__setattr__(self, "samples", samples)
+        object.__setattr__(
+            self, "allowed_rights_refs", _ordered_refs("allowed_rights_ref", self.allowed_rights_refs)
+        )
+        for name in ("rights_policy_digest", "corpus_digest", "document_sequence_digest"):
+            object.__setattr__(self, name, _sha(name, getattr(self, name)))
+        if (
+            isinstance(self.total_bytes, bool)
+            or not isinstance(self.total_bytes, int)
+            or not len(samples) <= self.total_bytes <= _MAX_TRAINING_TOTAL_BYTES
+        ):
+            raise MultimodalFoundationError("training export total_bytes exceeds bounds")
+        if tuple(sample.ordinal for sample in samples) != tuple(range(len(samples))):
+            raise MultimodalFoundationError("training sample ordering is ambiguous")
+        for name in ("record_id", "asset_digest"):
+            identities = [getattr(sample, name) for sample in samples]
+            if len(identities) != len(set(identities)):
+                raise MultimodalFoundationError(f"duplicate training sample {name}")
+        for sample in samples:
+            if sample.simulated != self.allow_simulated:
+                raise MultimodalFoundationError("training exports cannot mix simulated and real evidence")
+            if set(sample.rights_refs) - set(self.allowed_rights_refs):
+                raise MultimodalFoundationError("training export contains disallowed rights")
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.ai.multimodal_training_projection.v1",
+            "export_id": self.export_id,
+            "purpose": self.purpose,
+            "samples": [sample.as_dict() for sample in self.samples],
+            "allowed_rights_refs": list(self.allowed_rights_refs),
+            "rights_policy_digest": self.rights_policy_digest,
+            "allow_simulated": self.allow_simulated,
+            "corpus_digest": self.corpus_digest,
+            "document_sequence_digest": self.document_sequence_digest,
+            "total_bytes": self.total_bytes,
+        }
+
+    def validate_documents(self, documents: Sequence[str]) -> None:
+        # Revalidate public frozen instances as well as fresh constructors; an
+        # unsafe object-level mutation must not become valid training evidence.
+        replace(self, samples=tuple(replace(sample) for sample in self.samples))
+        if isinstance(documents, (str, bytes)) or not isinstance(documents, Sequence):
+            raise MultimodalFoundationError("training documents require an explicit ordered sequence")
+        if len(documents) != len(self.samples):
+            raise MultimodalFoundationError("training document count drift")
+        total_bytes = 0
+        for sample, document in zip(self.samples, documents, strict=True):
+            encoded = _document_bytes(document)
+            if len(encoded) > _MAX_TRAINING_DOCUMENT_BYTES:
+                raise MultimodalFoundationError("training document exceeds byte limit")
+            total_bytes += len(encoded)
+            if hashlib.sha256(encoded).hexdigest() != sample.text_digest:
+                raise MultimodalFoundationError("training document projection digest drift")
+            if any(pattern.search(encoded) is not None for pattern in _INSTRUCTION_PATTERNS):
+                raise MultimodalFoundationError(
+                    "instruction-shaped evidence is not eligible for training export"
+                )
+        if (
+            total_bytes != self.total_bytes
+            or hashlib.sha256("\n".join(documents).encode("utf-8")).hexdigest() != self.corpus_digest
+            or _digest(tuple(documents)) != self.document_sequence_digest
+        ):
+            raise MultimodalFoundationError("training document sequence identity drift")
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,7 +426,169 @@ class MultimodalCorpus:
         self._speech_chain_digests: dict[tuple[str, int], str] = {}
         self._speech_tail_sequences: dict[str, int] = {}
         self._speech_record_keys: dict[str, tuple[str, int]] = {}
+        self._training_exports: dict[str, tuple[MultimodalTrainingManifest, tuple[str, ...]]] = {}
+        self._training_export_digests: dict[str, str] = {}
         self._lock = RLock()
+
+    def export_text_training(
+        self,
+        record_ids: Sequence[str],
+        *,
+        export_id: str,
+        purpose: str,
+        rights_policy: Mapping[str, Sequence[str]],
+        allow_simulated: bool = False,
+        max_documents: int = _MAX_TRAINING_DOCUMENTS,
+        max_document_bytes: int = _MAX_TRAINING_DOCUMENT_BYTES,
+        max_total_bytes: int = _MAX_TRAINING_TOTAL_BYTES,
+    ) -> tuple[MultimodalTrainingManifest, tuple[str, ...]]:
+        """Export issued text evidence for the governed native dataset owner."""
+        with self._lock:
+            eid = _text("export_id", export_id)
+            declared_purpose = _training_purpose(purpose)
+            ids = _ordered_refs("record_id", record_ids)
+            document_limit = _training_limit("max_documents", max_documents, _MAX_TRAINING_DOCUMENTS)
+            byte_limit = _training_limit(
+                "max_document_bytes", max_document_bytes, _MAX_TRAINING_DOCUMENT_BYTES
+            )
+            total_limit = _training_limit("max_total_bytes", max_total_bytes, _MAX_TRAINING_TOTAL_BYTES)
+            if len(ids) > document_limit:
+                raise MultimodalFoundationError("training export exceeds document count limit")
+            if not isinstance(allow_simulated, bool) or allow_simulated != declared_purpose.startswith(
+                "simulation_"
+            ):
+                raise MultimodalFoundationError(
+                    "simulation exports require explicit isolated purpose and opt-in"
+                )
+            if (
+                not isinstance(rights_policy, Mapping)
+                or not rights_policy
+                or len(rights_policy) > _MAX_TRAINING_DOCUMENTS
+            ):
+                raise MultimodalFoundationError("training export rights_policy must be explicit and bounded")
+            normalized_policy: dict[str, tuple[str, ...]] = {}
+            for reference, uses in rights_policy.items():
+                ref = _text("rights_ref", reference)
+                if ref in normalized_policy:
+                    raise MultimodalFoundationError("ambiguous normalized rights policy")
+                normalized_policy[ref] = tuple(
+                    _training_purpose(use) for use in _ordered_refs("permitted_purpose", uses)
+                )
+            allowed_rights = tuple(
+                sorted(ref for ref, uses in normalized_policy.items() if declared_purpose in uses)
+            )
+            if not allowed_rights:
+                raise MultimodalFoundationError("rights policy does not permit requested export purpose")
+
+            # Admit cheap byte bounds before hashing or scanning original media.
+            # These checks only deny work; canonical identity is verified below.
+            source_bytes = 0
+            projected_bytes = 0
+            for rid in ids:
+                candidate = self._records.get(rid)
+                if not isinstance(candidate, MultimodalRecord):
+                    raise MultimodalFoundationError(f"training source record is missing: {rid}")
+                if candidate.text_projection is None:
+                    raise MultimodalFoundationError("training source requires a verified text projection")
+                text = self._text.get(rid)
+                if isinstance(text, str):
+                    size = len(_document_bytes(text))
+                    if size > byte_limit:
+                        raise MultimodalFoundationError("training document exceeds byte limit")
+                    projected_bytes += size
+                    if projected_bytes > total_limit:
+                        raise MultimodalFoundationError("training export exceeds total byte limit")
+                original = self.store._objects.get(candidate.asset_digest)
+                if isinstance(original, bytes):
+                    source_bytes += len(original)
+                    if source_bytes > _MAX_TRAINING_SOURCE_BYTES:
+                        raise MultimodalFoundationError("training export exceeds original source byte limit")
+
+            documents: list[str] = []
+            samples: list[MultimodalTrainingSample] = []
+            total_bytes = 0
+            asset_digests: set[str] = set()
+            for ordinal, rid in enumerate(ids):
+                try:
+                    record = self.get(rid)
+                except KeyError as exc:
+                    raise MultimodalFoundationError(f"training source record is missing: {rid}") from exc
+                if record.text_projection is None:
+                    raise MultimodalFoundationError("training source requires a verified text projection")
+                if record.asset_digest in asset_digests:
+                    raise MultimodalFoundationError("duplicate training source asset")
+                asset_digests.add(record.asset_digest)
+                if record.simulated != allow_simulated:
+                    raise MultimodalFoundationError("training exports cannot mix simulated and real evidence")
+                if set(record.rights_refs) - set(allowed_rights):
+                    raise MultimodalFoundationError("training source rights do not permit export purpose")
+                text = self._text[rid]
+                encoded = _document_bytes(text)
+                if len(encoded) > byte_limit:
+                    raise MultimodalFoundationError("training document exceeds byte limit")
+                total_bytes += len(encoded)
+                if total_bytes > total_limit:
+                    raise MultimodalFoundationError("training export exceeds total byte limit")
+                source_instruction_detected = record.embedded_instruction_detected
+                if record.media_type in {"text/plain", "text/markdown", "application/json"}:
+                    # Intake deliberately scans a prefix. Export scans the full
+                    # bounded textual source before admitting training evidence.
+                    original = self.store.get(record.asset_digest)
+                    source_instruction_detected = source_instruction_detected or any(
+                        pattern.search(original) is not None for pattern in _INSTRUCTION_PATTERNS
+                    )
+                if source_instruction_detected or any(
+                    pattern.search(encoded) is not None for pattern in _INSTRUCTION_PATTERNS
+                ):
+                    raise MultimodalFoundationError(
+                        "instruction-shaped evidence is not eligible for training export"
+                    )
+                projection = record.text_projection
+                samples.append(
+                    MultimodalTrainingSample(
+                        ordinal=ordinal,
+                        record_id=rid,
+                        record_digest=record.digest,
+                        asset_digest=record.asset_digest,
+                        projection_digest=projection.digest,
+                        text_digest=projection.text_digest,
+                        extractor_ref=projection.extractor_ref,
+                        language=projection.language,
+                        modality=record.modality,
+                        media_type=record.media_type,
+                        source_refs=record.source_refs,
+                        rights_refs=record.rights_refs,
+                        lineage_refs=record.lineage_refs,
+                        simulated=record.simulated,
+                        embedded_instruction_detected=record.embedded_instruction_detected,
+                        instruction_trusted=projection.instruction_trusted,
+                    )
+                )
+                documents.append(text)
+
+            sequence = tuple(documents)
+            manifest = MultimodalTrainingManifest(
+                export_id=eid,
+                purpose=declared_purpose,
+                samples=tuple(samples),
+                allowed_rights_refs=allowed_rights,
+                rights_policy_digest=_digest({ref: sorted(uses) for ref, uses in normalized_policy.items()}),
+                allow_simulated=allow_simulated,
+                corpus_digest=hashlib.sha256("\n".join(sequence).encode("utf-8")).hexdigest(),
+                document_sequence_digest=_digest(sequence),
+                total_bytes=total_bytes,
+            )
+            manifest.validate_documents(sequence)
+            prior = self._training_exports.get(eid)
+            if prior is not None:
+                if self._training_export_digests.get(eid) != prior[0].digest:
+                    raise MultimodalFoundationError("issued training export identity drift")
+                if prior != (manifest, sequence):
+                    raise MultimodalFoundationError("training export identity conflict")
+                return prior
+            self._training_exports[eid] = (manifest, sequence)
+            self._training_export_digests[eid] = manifest.digest
+            return manifest, sequence
 
     def ingest(
         self,
@@ -611,6 +978,8 @@ __all__ = [
     "MultimodalCorpus",
     "MultimodalFoundationError",
     "MultimodalRecord",
+    "MultimodalTrainingManifest",
+    "MultimodalTrainingSample",
     "RetrievalHit",
     "SpeechChunkReceipt",
     "TextProjection",

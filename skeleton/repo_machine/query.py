@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Iterable
 
 from .model import FileRecord, RepositoryModel
 

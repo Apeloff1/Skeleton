@@ -85,10 +85,12 @@
         "AI execution submit",
         "AI execution status/result",
         "AI execution cancel",
+        "optional authenticated provider inventory per machine/ai_engine_provider_inventory.json",
         "delegated authority envelope",
         "idempotent service command",
         "operation event replay",
-        "capability readiness endpoint/projection"
+        "capability readiness endpoint/projection",
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -107,12 +109,14 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
       ],
       "status": "present"
     },
@@ -916,10 +920,12 @@
         "AI execution submit",
         "AI execution status/result",
         "AI execution cancel",
+        "optional authenticated provider inventory per machine/ai_engine_provider_inventory.json",
         "delegated authority envelope",
         "idempotent service command",
         "operation event replay",
-        "capability readiness endpoint/projection"
+        "capability readiness endpoint/projection",
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -938,12 +944,14 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
       ],
       "status": "present"
     },
@@ -2744,10 +2752,12 @@
         "AI execution submit",
         "AI execution status/result",
         "AI execution cancel",
+        "optional authenticated provider inventory per machine/ai_engine_provider_inventory.json",
         "delegated authority envelope",
         "idempotent service command",
         "operation event replay",
-        "capability readiness endpoint/projection"
+        "capability readiness endpoint/projection",
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -2772,12 +2782,14 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
       ],
       "status": "present"
     },
@@ -3681,10 +3693,12 @@
         "AI execution submit",
         "AI execution status/result",
         "AI execution cancel",
+        "optional authenticated provider inventory per machine/ai_engine_provider_inventory.json",
         "delegated authority envelope",
         "idempotent service command",
         "operation event replay",
-        "capability readiness endpoint/projection"
+        "capability readiness endpoint/projection",
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -3697,12 +3711,14 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
       ],
       "status": "present"
     },

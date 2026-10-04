@@ -8,13 +8,14 @@ architectures can implement the same LocalModelBackend contract.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
 import math
 import threading
 import time
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -23,7 +24,6 @@ from skeleton.ai.runtime.inference.local import (
     LocalInferenceRequest,
     LocalInferenceResult,
 )
-
 
 BOS = 256
 EOS = 257
@@ -215,9 +215,7 @@ class NumpyRecurrentLM:
                 raise NeuralLMError("training documents must be non-empty text")
             docs.append(document)
         return hashlib.sha256(
-            _stable_json(
-                {"schema_version": "skeleton.neural_corpus.v1", "documents": docs}
-            ).encode("utf-8")
+            _stable_json({"schema_version": "skeleton.neural_corpus.v1", "documents": docs}).encode("utf-8")
         ).hexdigest()
 
     def _sequence(self, document: str) -> tuple[int, ...]:
@@ -279,63 +277,7 @@ class NumpyRecurrentLM:
 
         for _ in range(epochs):
             for document in documents:
-                seq = self._sequence(document)
-                inputs = seq[:-1]
-                targets = seq[1:]
-                states, probabilities = self._forward(inputs)
-
-                grad_embedding = np.zeros_like(self.embedding)
-                grad_recurrent = np.zeros_like(self.recurrent)
-                grad_hidden_bias = np.zeros_like(self.hidden_bias)
-                grad_output = np.zeros_like(self.output)
-                grad_output_bias = np.zeros_like(self.output_bias)
-                dh_next = np.zeros((self.config.hidden_size,), dtype=np.float64)
-
-                for step in range(len(inputs) - 1, -1, -1):
-                    probs = probabilities[step].copy()
-                    probs[targets[step]] -= 1.0
-                    hidden = states[step + 1]
-                    prev_hidden = states[step]
-
-                    grad_output += np.outer(hidden, probs)
-                    grad_output_bias += probs
-
-                    dh = probs @ self.output.T + dh_next
-                    dz = dh * (1.0 - hidden * hidden)
-                    grad_embedding[inputs[step]] += dz
-                    grad_recurrent += np.outer(prev_hidden, dz)
-                    grad_hidden_bias += dz
-                    dh_next = dz @ self.recurrent.T
-
-                norm_sq = 0.0
-                grads = (
-                    grad_embedding,
-                    grad_recurrent,
-                    grad_hidden_bias,
-                    grad_output,
-                    grad_output_bias,
-                )
-                for grad in grads:
-                    norm_sq += float(np.sum(grad * grad))
-                norm = math.sqrt(norm_sq)
-                scale = 1.0 if norm <= clip else clip / max(norm, 1e-300)
-
-                self.embedding -= lr * scale * grad_embedding
-                self.recurrent -= lr * scale * grad_recurrent
-                self.hidden_bias -= lr * scale * grad_hidden_bias
-                self.output -= lr * scale * grad_output
-                self.output_bias -= lr * scale * grad_output_bias
-
-                for value in (
-                    self.embedding,
-                    self.recurrent,
-                    self.hidden_bias,
-                    self.output,
-                    self.output_bias,
-                ):
-                    if not np.all(np.isfinite(value)):
-                        raise NeuralLMError("training produced non-finite parameters")
-
+                self.train_document(document, learning_rate=lr, gradient_clip=clip)
         final_loss = self.loss(documents)
         return NeuralTrainingReceipt(
             model_id=self.model_id,
@@ -351,9 +293,90 @@ class NumpyRecurrentLM:
             gradient_clip=clip,
         )
 
-    def _prime(self, tokens: Sequence[int]) -> np.ndarray:
+    def train_document(
+        self,
+        document: str,
+        *,
+        learning_rate: float = 0.05,
+        gradient_clip: float = 1.0,
+    ) -> int:
+        """Perform one deterministic SGD update and return observed byte/EOS targets."""
+        self._corpus_digest((document,))
+        if not isinstance(learning_rate, (int, float)) or isinstance(learning_rate, bool):
+            raise NeuralLMError("learning_rate must be numeric")
+        if not 0.0 < float(learning_rate) <= 10.0:
+            raise NeuralLMError("learning_rate must be in (0, 10]")
+        if not isinstance(gradient_clip, (int, float)) or isinstance(gradient_clip, bool):
+            raise NeuralLMError("gradient_clip must be numeric")
+        if not 0.0 < float(gradient_clip) <= 1000.0:
+            raise NeuralLMError("gradient_clip must be in (0, 1000]")
+
+        lr = float(learning_rate)
+        clip = float(gradient_clip)
+        seq = self._sequence(document)
+        inputs = seq[:-1]
+        targets = seq[1:]
+        states, probabilities = self._forward(inputs)
+
+        grad_embedding = np.zeros_like(self.embedding)
+        grad_recurrent = np.zeros_like(self.recurrent)
+        grad_hidden_bias = np.zeros_like(self.hidden_bias)
+        grad_output = np.zeros_like(self.output)
+        grad_output_bias = np.zeros_like(self.output_bias)
+        dh_next = np.zeros((self.config.hidden_size,), dtype=np.float64)
+
+        for step in range(len(inputs) - 1, -1, -1):
+            probs = probabilities[step].copy()
+            probs[targets[step]] -= 1.0
+            hidden = states[step + 1]
+            prev_hidden = states[step]
+
+            grad_output += np.outer(hidden, probs)
+            grad_output_bias += probs
+
+            dh = probs @ self.output.T + dh_next
+            dz = dh * (1.0 - hidden * hidden)
+            grad_embedding[inputs[step]] += dz
+            grad_recurrent += np.outer(prev_hidden, dz)
+            grad_hidden_bias += dz
+            dh_next = dz @ self.recurrent.T
+
+        norm_sq = 0.0
+        grads = (
+            grad_embedding,
+            grad_recurrent,
+            grad_hidden_bias,
+            grad_output,
+            grad_output_bias,
+        )
+        for grad in grads:
+            norm_sq += float(np.sum(grad * grad))
+        norm = math.sqrt(norm_sq)
+        scale = 1.0 if norm <= clip else clip / max(norm, 1e-300)
+
+        self.embedding -= lr * scale * grad_embedding
+        self.recurrent -= lr * scale * grad_recurrent
+        self.hidden_bias -= lr * scale * grad_hidden_bias
+        self.output -= lr * scale * grad_output
+        self.output_bias -= lr * scale * grad_output_bias
+
+        for value in (
+            self.embedding,
+            self.recurrent,
+            self.hidden_bias,
+            self.output,
+            self.output_bias,
+        ):
+            if not np.all(np.isfinite(value)):
+                raise NeuralLMError("training produced non-finite parameters")
+
+        return len(targets)
+
+    def _prime(self, tokens: Sequence[int], *, cancel: threading.Event | None = None) -> np.ndarray:
         h = np.zeros((self.config.hidden_size,), dtype=np.float64)
         for token in tokens:
+            if cancel is not None and cancel.is_set():
+                raise LocalInferenceCancelled("native neural input priming cancelled")
             h = np.tanh(self.embedding[token] + h @ self.recurrent + self.hidden_bias)
         return h
 
@@ -365,11 +388,11 @@ class NumpyRecurrentLM:
         if not isinstance(request, LocalInferenceRequest):
             raise TypeError("request must be LocalInferenceRequest")
         start = time.perf_counter()
+        if cancel.is_set():
+            raise LocalInferenceCancelled("native neural generation cancelled")
         prompt_tokens = (BOS,) + _encode(request.prompt)
-        hidden = self._prime(prompt_tokens)
-        rng = np.random.default_rng(
-            (request.seed ^ int(self.model_digest[:16], 16)) & ((1 << 63) - 1)
-        )
+        hidden = self._prime(prompt_tokens, cancel=cancel)
+        rng = np.random.default_rng((request.seed ^ int(self.model_digest[:16], 16)) & ((1 << 63) - 1))
         output_tokens: list[int] = []
         finish = "length"
 
@@ -383,9 +406,7 @@ class NumpyRecurrentLM:
                 break
             if token != BOS:
                 output_tokens.append(token)
-            hidden = np.tanh(
-                self.embedding[token] + hidden @ self.recurrent + self.hidden_bias
-            )
+            hidden = np.tanh(self.embedding[token] + hidden @ self.recurrent + self.hidden_bias)
             text = _decode(output_tokens)
             if any(text.endswith(marker) for marker in request.stop):
                 finish = "completed"
@@ -394,15 +415,18 @@ class NumpyRecurrentLM:
         text = _decode(output_tokens)
         if not text:
             text = " "
-        response_id = "local-neural:" + hashlib.sha256(
-            _stable_json(
-                {
-                    "model": self.model_digest,
-                    "request": request.digest,
-                    "output": output_tokens,
-                }
-            ).encode("utf-8")
-        ).hexdigest()[:32]
+        response_id = (
+            "local-neural:"
+            + hashlib.sha256(
+                _stable_json(
+                    {
+                        "model": self.model_digest,
+                        "request": request.digest,
+                        "output": output_tokens,
+                    }
+                ).encode("utf-8")
+            ).hexdigest()[:32]
+        )
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
@@ -430,7 +454,7 @@ class NumpyRecurrentLM:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "NumpyRecurrentLM":
+    def from_dict(cls, payload: Mapping[str, Any]) -> NumpyRecurrentLM:
         if not isinstance(payload, Mapping):
             raise TypeError("payload must be a mapping")
         if payload.get("schema_version") != "skeleton.numpy_recurrent_lm.v1":
@@ -476,10 +500,7 @@ class NumpyRecurrentLM:
         model = cls(
             model_id=model_id,
             config=config,
-            parameters={
-                name: np.asarray(value, dtype=np.float64)
-                for name, value in raw_params.items()
-            },
+            parameters={name: np.asarray(value, dtype=np.float64) for name, value in raw_params.items()},
         )
         claimed = payload.get("model_digest")
         if not isinstance(claimed, str) or claimed != model.model_digest:

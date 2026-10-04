@@ -11,11 +11,11 @@ usage accounting can layer on this receipt without changing the decision shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 import hashlib
 import math
 import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 
@@ -29,7 +29,7 @@ class AdmissionStatus(str, Enum):
     REJECT = "reject"
 
 
-def _finite_nonnegative(value: float | int, *, field: str) -> float:
+def _finite_nonnegative(value: float, *, field: str) -> float:
     if isinstance(value, bool):
         raise AdmissionError(f"{field} must be finite and non-negative")
     number = float(value)

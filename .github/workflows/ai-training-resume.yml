@@ -1,4 +1,4 @@
-name: AI Training Resume and Evidence Integrity
+name: AI Governed Training Pipeline
 
 on:
   pull_request:
@@ -10,7 +10,30 @@ on:
       - "skeleton/learning/model_program.py"
       - "skeleton/ai/learning/model_program.py"
       - "skeleton/testing/test_p3_*.py"
+      - "skeleton/testing/test_governed_multimodal_model_lifecycle.py"
       - "machine/ai_training_resume_contract.json"
+      - "machine/ai_governed_training*.json"
+      - "machine/ai_neural_training_resume_contract.json"
+      - "machine/ai_model_lifecycle_persistence.json"
+      - "machine/ai_local_provider_activation.json"
+      - "machine/ai_engine_provider_inventory.json"
+      - "machine/ai_engine_handoff_recovery.json"
+      - "machine/capability_interfaces.json"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/api/engine_*.py"
+      - "skeleton/ai/runtime/api/engine_*.py"
+      - "backend/core/engine_client.py"
+      - "skeleton/testing/test_local_provider*.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_multimodal_training_projection.json"
+      - "machine/ai_post_training_execution.json"
+      - "machine/ai_training_pipeline.json"
+      - "skeleton/testing/test_governed_*.py"
+      - "skeleton/testing/test_local_model_artifact_intake.py"
+      - "skeleton/testing/test_native_neural_lm.py"
+      - "pyproject.toml"
+      - "scripts/check_ai_training_pipeline.py"
+      - "tests/test_ai_training_pipeline_contract.py"
       - "scripts/check_ai_training_resume.py"
       - "tests/test_ai_training_resume_contract.py"
       - ".github/workflows/ai-training-resume.yml"
@@ -24,7 +47,30 @@ on:
       - "skeleton/learning/model_program.py"
       - "skeleton/ai/learning/model_program.py"
       - "skeleton/testing/test_p3_*.py"
+      - "skeleton/testing/test_governed_multimodal_model_lifecycle.py"
       - "machine/ai_training_resume_contract.json"
+      - "machine/ai_governed_training*.json"
+      - "machine/ai_neural_training_resume_contract.json"
+      - "machine/ai_model_lifecycle_persistence.json"
+      - "machine/ai_local_provider_activation.json"
+      - "machine/ai_engine_provider_inventory.json"
+      - "machine/ai_engine_handoff_recovery.json"
+      - "machine/capability_interfaces.json"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/api/engine_*.py"
+      - "skeleton/ai/runtime/api/engine_*.py"
+      - "backend/core/engine_client.py"
+      - "skeleton/testing/test_local_provider*.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_multimodal_training_projection.json"
+      - "machine/ai_post_training_execution.json"
+      - "machine/ai_training_pipeline.json"
+      - "skeleton/testing/test_governed_*.py"
+      - "skeleton/testing/test_local_model_artifact_intake.py"
+      - "skeleton/testing/test_native_neural_lm.py"
+      - "pyproject.toml"
+      - "scripts/check_ai_training_pipeline.py"
+      - "tests/test_ai_training_pipeline_contract.py"
       - "scripts/check_ai_training_resume.py"
       - "tests/test_ai_training_resume_contract.py"
       - ".github/workflows/ai-training-resume.yml"
@@ -39,7 +85,7 @@ concurrency:
 
 jobs:
   resume-and-evidence:
-    name: Bounded resume and independent evidence
+    name: Governed neural training and durable evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -67,6 +113,8 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
+          "numpy==2.3.5"
+          "httpx>=0.27,<1"
       - name: Compile canonical runtime
         run: python -m compileall -q skeleton/ai/runtime/training skeleton/ai/runtime/learning_foundation
       - name: Validate bounded contract on exact checked-out head
@@ -75,10 +123,27 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           python scripts/check_ai_training_resume.py --head "$EXPECTED_HEAD" --json
+          python scripts/check_ai_training_pipeline.py --head "$EXPECTED_HEAD" --json
       - name: Run resume and evidence regressions
         run: >-
           python -m pytest -p pytest_asyncio.plugin -q --noconftest
           tests/test_ai_training_resume_contract.py
+          tests/test_ai_training_pipeline_contract.py
+          skeleton/testing/test_governed_training_cli.py
+          skeleton/testing/test_governed_training_data.py
+          skeleton/testing/test_governed_multimodal_model_lifecycle.py
+          skeleton/testing/test_governed_model_engine_acceptance.py
+          skeleton/testing/test_local_model_artifact_intake.py
+          skeleton/testing/test_local_provider_activation.py
+          skeleton/testing/test_local_provider_runtime_guards.py
+          skeleton/testing/test_local_inference_cancellation.py
+          skeleton/testing/test_engine_handoff_recovery.py
+          skeleton/testing/test_engine_cross_service_boundary.py
+          skeleton/testing/test_native_neural_lm.py
+          skeleton/testing/test_p3_neural_training_resume.py
+          skeleton/testing/test_p3_multimodal_training_projection.py
+          skeleton/testing/test_p3_model_lifecycle_persistence.py
+          skeleton/testing/test_p3_post_training_execution.py
           skeleton/testing/test_p3_training_resume.py
           skeleton/testing/test_p3_training_evidence_integrity.py
           skeleton/testing/test_p3_training_lifecycle_acceptance.py

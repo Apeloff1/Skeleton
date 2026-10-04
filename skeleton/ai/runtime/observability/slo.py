@@ -13,9 +13,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Tuple
 
 from skeleton.kernel.errors import KernelError
 
@@ -50,8 +49,8 @@ class SLOTracker:
     """Registers SLOs and records outcomes per SLO."""
 
     def __init__(self) -> None:
-        self._slos: Dict[str, ServiceLevelObjective] = {}
-        self._budgets: Dict[str, ErrorBudget] = {}
+        self._slos: dict[str, ServiceLevelObjective] = {}
+        self._budgets: dict[str, ErrorBudget] = {}
 
     def register(self, slo: ServiceLevelObjective) -> None:
         self._slos[slo.name] = slo
@@ -83,7 +82,7 @@ class SLOTracker:
             return 0.0
         return budget.bad_events / budget.total_events
 
-    def status(self) -> Dict[str, float]:
+    def status(self) -> dict[str, float]:
         return {name: self.remaining(name) for name in self._slos}
 
 
@@ -298,13 +297,8 @@ def assess_slo(*, slo: SLO, sli: SLI) -> SLOAssessment:
         raise TypeError("sli must be SLI")
     if sli.slo_id != slo.slo_id:
         raise SLOError("SLI observation belongs to a different SLO")
-    if (
-        sli.observed_start_ns < slo.window.start_ns
-        or sli.observed_end_ns > slo.window.end_ns
-    ):
-        raise SLOError(
-            "SLI observation must be contained in declared SLO window"
-        )
+    if sli.observed_start_ns < slo.window.start_ns or sli.observed_end_ns > slo.window.end_ns:
+        raise SLOError("SLI observation must be contained in declared SLO window")
     value = sli.value
     return SLOAssessment(
         slo_digest=slo.digest,

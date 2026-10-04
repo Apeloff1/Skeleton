@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.check_ai_app_construction import CONTRACT_PATH, ROOT, validate_construction
 from scripts.check_provider_bootstrap import validate_provider_bootstrap
 
@@ -22,6 +24,7 @@ def test_complete_ai_construction_contract_is_valid() -> None:
     assert summary["runtime_providers"] == [
         "openai",
         "openai-compatible-secondary",
+        "local",
     ]
     assert summary["automation_providers"] == ["repository-automation"]
     assert summary["provider_surfaces"] >= 6
@@ -38,13 +41,132 @@ def test_provider_bootstrap_is_fail_closed_and_materialized() -> None:
     assert validate_provider_bootstrap(ROOT) == []
 
 
+def test_local_provider_declaration_retains_mandatory_receipt_and_capability_ceiling() -> (
+    None
+):
+    from skeleton.providers.contract import load_provider_architecture
+
+    contract = _contract()
+    local = next(
+        item for item in contract["runtime_model_providers"] if item["id"] == "local"
+    )
+    matrix = next(
+        item
+        for item in contract["provider_capability_matrix"]
+        if item["provider_id"] == "local"
+    )
+    assert local["state"] == "optional"
+    assert (
+        local["adapter"] == "skeleton/provider_runtime.py:LocalArtifactProviderAdapter"
+    )
+    assert (
+        local["execution_owner"]
+        == matrix["execution_owner"]
+        == "skeleton/provider_runtime.py"
+    )
+    assert local["credentials"] == []
+    assert local["required_configuration"] == ["AI_LOCAL_MODEL_PATH"]
+    assert local["capabilities"] == ["text-generation"]
+    assert local["undeclared_capability_policy"] == "deny"
+    assert local["network_policy"].startswith("none;")
+    assert matrix["capabilities"]["text_generation"] == "optional"
+    assert all(
+        status == "undeclared"
+        for name, status in matrix["capabilities"].items()
+        if name != "text_generation"
+    )
+    receipt = load_provider_architecture("local", root=ROOT)
+    assert receipt.provider_id == "local"
+    assert receipt.provider_family == "runtime_model"
+    assert receipt.required_documents == tuple(
+        contract["provider_bootstrap"]["must_read"]
+    )
+    assert receipt.manual_path in receipt.required_documents
+
+
+@pytest.mark.parametrize(
+    "acknowledgement",
+    (
+        "architecture_read_required",
+        "construction_manual_read_required",
+        "activation_receipt_required",
+    ),
+)
+def test_local_activation_rejects_removing_any_mandatory_acknowledgement(
+    tmp_path: Path,
+    acknowledgement: str,
+) -> None:
+    from skeleton.providers.contract import (
+        ProviderArchitectureError,
+        load_provider_architecture,
+    )
+
+    contract = _contract()
+    documents = set(contract["provider_bootstrap"]["must_read"]) | {
+        "machine/manifest.json",
+        "machine/architecture.json",
+        str(CONTRACT_PATH),
+        contract["human_manual"],
+    }
+    for relative in documents:
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((ROOT / relative).read_bytes())
+    local = next(
+        item for item in contract["runtime_model_providers"] if item["id"] == "local"
+    )
+    local[acknowledgement] = False
+    (tmp_path / CONTRACT_PATH).write_text(json.dumps(contract), encoding="utf-8")
+    with pytest.raises(ProviderArchitectureError, match=acknowledgement):
+        load_provider_architecture("local", root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "configuration",
+    (
+        "AI_SECONDARY_API_KEY",
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL",
+        "AI_VERIFICATION_MODEL",
+    ),
+)
+def test_local_activation_rejects_hosted_configuration_before_any_hosted_adapter(
+    tmp_path: Path,
+    monkeypatch,
+    configuration: str,
+) -> None:
+    from skeleton import provider_runtime
+
+    for name in (
+        "AI_SECONDARY_API_KEY",
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL",
+        "AI_VERIFICATION_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(tmp_path / "unloaded.json"))
+    monkeypatch.setenv(configuration, "forbidden-hosted-configuration")
+
+    def forbidden_hosted_adapter(*_args, **_kwargs):
+        raise AssertionError("local mode instantiated a hosted adapter")
+
+    monkeypatch.setattr(
+        provider_runtime, "OpenAIProviderAdapter", forbidden_hosted_adapter
+    )
+    with pytest.raises(
+        provider_runtime.ProviderUnavailableError, match="local mode forbids"
+    ):
+        provider_runtime.ProviderRegistry.from_env()
+
+
 def test_every_partial_plane_has_an_explicit_gap() -> None:
     contract = _contract()
-    partial = {plane["id"] for plane in contract["planes"] if plane["state"] == "partial"}
+    partial = {
+        plane["id"] for plane in contract["planes"] if plane["state"] == "partial"
+    }
     gap_planes = {
-        gap["plane"]
-        for gap in contract["gap_register"]
-        if gap["status"] == "open"
+        gap["plane"] for gap in contract["gap_register"] if gap["status"] == "open"
     }
 
     assert partial <= gap_planes
@@ -54,11 +176,7 @@ def test_every_partial_plane_has_an_explicit_gap() -> None:
 
 def test_p0_gaps_remain_explicit_after_sota_closure() -> None:
     contract = _contract()
-    p0 = [
-        gap
-        for gap in contract["gap_register"]
-        if gap["priority"] == "P0"
-    ]
+    p0 = [gap for gap in contract["gap_register"] if gap["priority"] == "P0"]
 
     assert p0
     assert contract["gap_closure_policy"]["p0_gaps_block_sota_complete"] is True
@@ -108,10 +226,7 @@ def test_credential_bearing_provider_surfaces_are_declared_and_receipt_gated() -
     ]
 
     assert credential_surfaces
-    credential_owners = {
-        surface["owner"]
-        for surface in credential_surfaces
-    }
+    credential_owners = {surface["owner"] for surface in credential_surfaces}
     assert credential_owners >= {
         "skeleton/provider_runtime.py",
         "skeleton/automation/free_model.py",
@@ -153,7 +268,10 @@ def test_model_provider_plane_is_engine_owned() -> None:
     assert provider_plane["owner"] == "skeleton/provider_runtime.py"
     assert "skeleton/provider_runtime.py" in provider_plane["evidence"]
     assert openai["adapter"] == "skeleton/provider_runtime.py:OpenAIProviderAdapter"
-    assert openai["sync_adapter"] == "skeleton/provider_runtime.py:OpenAISyncProviderAdapter"
+    assert (
+        openai["sync_adapter"]
+        == "skeleton/provider_runtime.py:OpenAISyncProviderAdapter"
+    )
     assert openai["compatibility_facade"] == "backend/core/ai_provider.py"
 
 
@@ -239,18 +357,9 @@ def test_stream_gap_and_work_package_are_closed_consistently() -> None:
         in completed
     )
     assert "shared-network Mongo operation and stream authority" in completed
-    assert (
-        "production browser session reconnect/resync/cancel runtime"
-        in completed
-    )
-    assert (
-        "browser disconnect/reconnect assembled-transport journey"
-        in completed
-    )
-    assert (
-        "browser slow-client replay-gap/backpressure recovery journey"
-        in completed
-    )
+    assert "production browser session reconnect/resync/cancel runtime" in completed
+    assert "browser disconnect/reconnect assembled-transport journey" in completed
+    assert "browser slow-client replay-gap/backpressure recovery journey" in completed
     assert "browser cancel-complete terminal race journey" in completed
     assert (
         "exact-head frontend typecheck and test:operation-stream closure evidence"
@@ -263,9 +372,16 @@ def test_dependency_and_acceptance_relationships_are_separate() -> None:
     contract = _contract()
     planes = {plane["id"]: plane for plane in contract["planes"]}
 
-    assert contract["relationship_semantics"]["runtime_dependency"]["field"] == "depends_on"
-    assert contract["relationship_semantics"]["acceptance_target"]["field"] == "validates"
-    assert planes["model-routing"]["owner"] == "skeleton/frontier/runtime/model_routing.py"
+    assert (
+        contract["relationship_semantics"]["runtime_dependency"]["field"]
+        == "depends_on"
+    )
+    assert (
+        contract["relationship_semantics"]["acceptance_target"]["field"] == "validates"
+    )
+    assert (
+        planes["model-routing"]["owner"] == "skeleton/frontier/runtime/model_routing.py"
+    )
     assert "model-routing" in planes["orchestration"]["depends_on"]
 
     release = planes["deployment-release"]
@@ -284,17 +400,11 @@ def test_functional_ai_closure_matches_exact_p0_set_and_dependency_dag() -> None
     graph = contract["functional_ai_dependency_graph"]
 
     declared_p0 = {
-        gap["id"]
-        for gap in contract["gap_register"]
-        if gap["priority"] == "P0"
+        gap["id"] for gap in contract["gap_register"] if gap["priority"] == "P0"
     }
     required_p0 = set(closure["required_p0_gaps"])
     graph_p0 = {node["gap"] for node in graph["nodes"]}
-    staged_p0 = {
-        gap_id
-        for stage in graph["stages"]
-        for gap_id in stage["closes"]
-    }
+    staged_p0 = {gap_id for stage in graph["stages"] for gap_id in stage["closes"]}
 
     assert declared_p0
     assert required_p0 == declared_p0
@@ -313,8 +423,7 @@ def test_functional_ai_blueprints_are_bound_to_p0_gaps_and_work_packages() -> No
     closure = contract["functional_ai_closure"]
     gaps = {gap["id"]: gap for gap in contract["gap_register"]}
     packages = {
-        package["id"]: package
-        for package in contract["construction_work_packages"]
+        package["id"]: package for package in contract["construction_work_packages"]
     }
     planes = {plane["id"]: plane for plane in contract["planes"]}
 
@@ -352,15 +461,13 @@ def test_functional_ai_dependency_stage_contract_is_contiguous_and_unique() -> N
     numbers = [stage["stage"] for stage in stages]
     assert numbers == list(range(len(stages)))
 
-    closed = [
-        gap_id
-        for stage in stages
-        for gap_id in stage["closes"]
-    ]
+    closed = [gap_id for stage in stages for gap_id in stage["closes"]]
     assert len(closed) == len(set(closed))
 
 
-def test_fully_functional_ai_core_planes_remain_partial_while_p0_gaps_are_open() -> None:
+def test_fully_functional_ai_core_planes_remain_partial_while_p0_gaps_are_open() -> (
+    None
+):
     contract = _contract()
     closure_p0 = set(contract["functional_ai_closure"]["required_p0_gaps"])
     planes = {plane["id"]: plane for plane in contract["planes"]}

@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-from typing import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from skeleton.contracts.ai_execution import (
+    AgentTurn,
     AIExecution,
     AIExecutionRequest,
     AIExecutionResult,
-    AgentTurn,
     ExecutionState,
 )
 from skeleton.contracts.verification import (
@@ -41,8 +41,8 @@ from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderReques
 from skeleton.skills.tool_contract import (
     ToolContractError,
     ToolEffect,
-    ToolExecutionRequest,
     ToolExecutionReceipt,
+    ToolExecutionRequest,
     ToolExecutionStatus,
     approval_ref_for_request,
     validate_json_schema,
@@ -283,7 +283,7 @@ def _parse_deadline(
             raise CognitiveExecutionError(
                 "stop_policy.deadline must be timezone-aware"
             )
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
 
     elapsed = request.resource_budget.get("max_elapsed_seconds")
     if elapsed is None:
@@ -711,7 +711,7 @@ class CognitiveExecutionRuntime:
         parsed = datetime.fromisoformat(raw)
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise CognitiveExecutionError("checkpoint deadline is not aware")
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
 
     def _deadline_expired(
         self,
@@ -722,7 +722,7 @@ class CognitiveExecutionRuntime:
         deadline = self._deadline(payload)
         if deadline is None:
             return False
-        instant = datetime.now(timezone.utc) if now is None else now.astimezone(timezone.utc)
+        instant = datetime.now(UTC) if now is None else now.astimezone(UTC)
         return instant >= deadline
 
     async def start(
@@ -1214,9 +1214,9 @@ class CognitiveExecutionRuntime:
             response = await self.provider.generate(provider_request)
         else:
             logical_now = (
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             )
             deadline_budget = (
                 None
@@ -1738,7 +1738,7 @@ class CognitiveExecutionRuntime:
         approval_refs: Mapping[str, str],
         now: datetime | None,
     ) -> ExecutionRunResult:
-        allowed = set(str(item) for item in payload.get("allowed_tool_ids", []))
+        allowed = {str(item) for item in payload.get("allowed_tool_ids", [])}
         if any(call.tool_id not in allowed for call in calls):
             return self._finalize_non_success(
                 execution,
@@ -1935,7 +1935,7 @@ class CognitiveExecutionRuntime:
         raw_calls = payload.get("pending_tool_calls", [])
         if not isinstance(raw_ids, list) or not isinstance(raw_calls, list):
             raise CognitiveExecutionError("approval checkpoint is corrupt")
-        wanted = set(str(item) for item in raw_ids)
+        wanted = {str(item) for item in raw_ids}
         pending: list[PendingApproval] = []
         for raw in raw_calls:
             if not isinstance(raw, dict):
@@ -2027,9 +2027,9 @@ class CognitiveExecutionRuntime:
                 ),
                 arguments=dict(call.arguments),
                 requested_at=(
-                    datetime.now(timezone.utc)
+                    datetime.now(UTC)
                     if now is None
-                    else now.astimezone(timezone.utc)
+                    else now.astimezone(UTC)
                 ),
                 approval_ref=approval_refs.get(call.call_id),
                 delegated_authority_ref=(
@@ -2328,7 +2328,7 @@ class CognitiveExecutionRuntime:
                 raise CognitiveExecutionError(
                     "tool verification evidence time must be timezone-aware"
                 )
-            observed_at = observed_at.astimezone(timezone.utc)
+            observed_at = observed_at.astimezone(UTC)
 
             try:
                 tool_risk = VerificationRisk(raw_tool_risk)
@@ -2542,9 +2542,9 @@ class CognitiveExecutionRuntime:
             raise CognitiveExecutionError("execution tenant_id is invalid")
         tenant_id = tenant_id.strip()
         instant = (
-            datetime.now(timezone.utc)
+            datetime.now(UTC)
             if now is None
-            else now.astimezone(timezone.utc)
+            else now.astimezone(UTC)
         )
         turns = self.repository.turns(execution.execution_id)
         turn_id = (
@@ -2926,9 +2926,9 @@ class CognitiveExecutionRuntime:
                 },
                 stream_terminal_event=terminal_event,
                 completed_at=(
-                    datetime.now(timezone.utc)
+                    datetime.now(UTC)
                     if now is None
-                    else now.astimezone(timezone.utc)
+                    else now.astimezone(UTC)
                 ),
             )
             return self._commit_terminal_result(
@@ -2978,9 +2978,9 @@ class CognitiveExecutionRuntime:
             },
             stream_terminal_event=terminal_event,
             completed_at=(
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             ),
         )
         return self._commit_terminal_result(
@@ -3037,9 +3037,9 @@ class CognitiveExecutionRuntime:
             },
             stream_terminal_event=terminal_event,
             completed_at=(
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             ),
         )
         return self._commit_terminal_result(

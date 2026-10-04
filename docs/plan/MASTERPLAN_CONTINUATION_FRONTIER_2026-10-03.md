@@ -59,8 +59,10 @@ The 32 scheduled volumes now have exactly one planning owner each. These are sch
 The owner union is exactly the 32-volume scheduled set, with no duplicated or orphaned volume identity.
 
 The [2026-10-04 implementation depth pass](AI_MASTERPLAN_IMPLEMENTATION_2026-10-04.md)
-adds bounded native training resume and deeper training, learning, multimodal and
-model lifecycle evidence. It grants no planning-owner promotion or sign-off.
+adds stored governed data, resumable recurrent SGD, executable post-training,
+multimodal text exports, durable candidate migration/rollback and a local training
+CLI/provider path. The [operator guide](GOVERNED_LOCAL_MODEL_DEVELOPMENT.md)
+documents the assembled flow. It grants no planning-owner promotion or sign-off.
 
 ## Promotion boundary
 

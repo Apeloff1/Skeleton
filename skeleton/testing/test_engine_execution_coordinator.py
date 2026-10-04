@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from datetime import datetime, timedelta, timezone
+import threading
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 
+from skeleton.ai.runtime.inference.artifact import write_local_model_artifact
+from skeleton.ai.runtime.inference.local import (
+    LocalInferenceCancelled,
+    ReferenceNGramModel,
+)
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
     EngineAuthorityRegistry,
@@ -15,6 +21,7 @@ from skeleton.api.engine_authority import (
 )
 from skeleton.api.engine_runtime import (
     EngineExecutionCoordinator,
+    EngineExecutionCoordinatorError,
     build_engine_tool_runtime,
 )
 from skeleton.api.engine_service import (
@@ -28,6 +35,7 @@ from skeleton.contracts.operation import OperationEnvelope
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
+from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -35,14 +43,14 @@ from skeleton.provider_contract import (
     ProviderToolDefinition,
     ProviderUsage,
 )
-from skeleton.provider_runtime import ProviderResponse
+from skeleton.provider_runtime import ProviderRegistry, ProviderResponse
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+    return datetime(2026, 9, 23, 20, 30, tzinfo=UTC)
 
 
 def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
@@ -70,9 +78,7 @@ def _verified_execution(
             "outcome": "passed",
             "policy_satisfied": True,
             "verifier_id": "test:engine-coordinator",
-            "candidate_digest": hashlib.sha256(
-                candidate.encode("utf-8")
-            ).hexdigest(),
+            "candidate_digest": hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
             "context_digest": context_digest,
         },
         evidence_refs=("evidence:test-engine-coordinator",),
@@ -127,7 +133,7 @@ class FakeRegistry:
 
 
 def _bundle(*, execution_id: str = "exec-golden"):
-    runtime_deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
+    runtime_deadline = datetime.now(UTC) + timedelta(minutes=10)
     operation = OperationEnvelope(
         operation_id=str(uuid4()),
         tenant_id="tenant-a",
@@ -179,10 +185,7 @@ def _bundle(*, execution_id: str = "exec-golden"):
             "context_digest": handoff.context_digest,
             "compiler_version": handoff.compiler_version,
             "handoff_digest": handoff.handoff_digest,
-            "source_snapshot": [
-                [segment_id, digest]
-                for segment_id, digest in handoff.source_snapshot
-            ],
+            "source_snapshot": [[segment_id, digest] for segment_id, digest in handoff.source_snapshot],
         },
         tool_policy={
             "tenant_id": operation.tenant_id,
@@ -220,10 +223,7 @@ def _bundle(*, execution_id: str = "exec-golden"):
         execution_request=request,
         delegated_authority=authority,
         compiled_context=handoff,
-        context_seed_refs=tuple(
-            "context-segment:" + segment_id
-            for segment_id, _ in snapshot
-        ),
+        context_seed_refs=tuple("context-segment:" + segment_id for segment_id, _ in snapshot),
         resource_budget=dict(request.resource_budget),
         stream_preferences={"mode": "events"},
     )
@@ -232,9 +232,7 @@ def _bundle(*, execution_id: str = "exec-golden"):
 
 def _service(tmp_path):
     repo = SQLiteExecutionRepository(tmp_path / "execution.sqlite3")
-    submissions = SQLiteEngineSubmissionStore(
-        tmp_path / "submissions.sqlite3"
-    )
+    submissions = SQLiteEngineSubmissionStore(tmp_path / "submissions.sqlite3")
     registry = EngineAuthorityRegistry(
         [
             EngineServiceGrant(
@@ -256,14 +254,9 @@ def _service(tmp_path):
     return EngineExecutionService(repo, submissions, registry)
 
 
-
 def _admitted_service(tmp_path):
-    repo = SQLiteExecutionRepository(
-        tmp_path / "execution-admitted.sqlite3"
-    )
-    submissions = SQLiteEngineSubmissionStore(
-        tmp_path / "submissions-admitted.sqlite3"
-    )
+    repo = SQLiteExecutionRepository(tmp_path / "execution-admitted.sqlite3")
+    submissions = SQLiteEngineSubmissionStore(tmp_path / "submissions-admitted.sqlite3")
     registry = EngineAuthorityRegistry(
         [
             EngineServiceGrant(
@@ -357,14 +350,8 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
     assert request.execution_id == command.execution_request.execution_id
     assert request.context_id == command.compiled_context.context_id
     assert request.context_digest == command.compiled_context.context_digest
-    assert (
-        request.context_source_snapshot
-        == command.compiled_context.source_snapshot
-    )
-    assert (
-        request.context_compiler_version
-        == command.compiled_context.compiler_version
-    )
+    assert request.context_source_snapshot == command.compiled_context.source_snapshot
+    assert request.context_compiler_version == command.compiled_context.compiler_version
 
     status = service.status(
         command.execution_request.execution_id,
@@ -420,7 +407,9 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
 
 
 @pytest.mark.asyncio
-async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) -> None:
+async def test_coordinator_interrupt_waits_for_late_provider_usage_after_cancel(
+    tmp_path,
+) -> None:
     service = _service(tmp_path)
     _, command = _bundle(execution_id="exec-cancel-race")
     service.submit(
@@ -457,7 +446,15 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
     )
     assert cancelled.cancellation_requested is True
 
+    interruption = asyncio.create_task(
+        coordinator.interrupt_cancelled_execution(command.execution_request.execution_id)
+    )
+    await asyncio.sleep(0)
+    assert not interruption.done()
+    assert service.repository.result(command.execution_request.execution_id) is None
+
     gate.set()
+    await asyncio.wait_for(interruption, timeout=2.0)
     result = await _wait_result(
         service,
         command.execution_request.execution_id,
@@ -468,10 +465,11 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
     assert result.usage["error_code"] == "cancellation_requested"
     assert len(provider.requests) == 1
     assert result.provider_receipts
+    assert result.usage["provider_usage"][0]["input_tokens"] == 10
+    assert result.usage["provider_usage"][0]["output_tokens"] == 5
+    assert result.usage["provider_usage"][0]["total_tokens"] == 15
 
-    checkpoint = service.repository.latest_checkpoint(
-        command.execution_request.execution_id
-    )
+    checkpoint = service.repository.latest_checkpoint(command.execution_request.execution_id)
     assert checkpoint is not None
     last_provider = checkpoint.payload["last_provider"]
     assert last_provider["late_result_fenced"] is True
@@ -487,7 +485,318 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
     assert status.execution_state == "cancelled"
     assert status.failure_code == "cancellation_requested"
 
+    before = service.repository.get(command.execution_request.execution_id)
+    await coordinator.interrupt_cancelled_execution(before.execution_id)
+    assert service.repository.get(before.execution_id) == before
     await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_interrupt_requires_durable_cancel_authority(tmp_path) -> None:
+    service = _service(tmp_path)
+    _, command = _bundle(execution_id="exec-cancel-authority")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    gate = asyncio.Event()
+    provider = FakeProvider(gate=gate)
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+        verification_hook=_verified_execution,
+    )
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
+    assert len(provider.requests) == 1
+
+    before = service.repository.get(command.execution_request.execution_id)
+    with pytest.raises(EngineExecutionCoordinatorError, match="durably requested"):
+        await coordinator.interrupt_cancelled_execution(before.execution_id)
+    assert service.repository.get(before.execution_id) == before
+
+    gate.set()
+    result = await _wait_result(service, before.execution_id)
+    assert result.status == "completed"
+    before = service.repository.get(before.execution_id)
+    await coordinator.interrupt_cancelled_execution(before.execution_id)
+    assert service.repository.get(before.execution_id) == before
+    assert len(provider.requests) == 1
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_interrupt_rehydrates_cancel_without_provider_dispatch(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    _, command = _bundle(execution_id="exec-cancel-before-recovery")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    provider = FakeProvider()
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+    )
+    await asyncio.wait_for(
+        coordinator.interrupt_cancelled_execution(command.execution_request.execution_id),
+        timeout=2.0,
+    )
+    result = service.repository.result(command.execution_request.execution_id)
+    assert result is not None
+    assert result.status == "cancelled"
+    assert result.usage["error_code"] == "cancellation_requested"
+    assert result.usage["model_turns"] == 0
+    assert provider.requests == []
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_interrupt_waiter_preserves_driver_and_actual_usage(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    _, command = _bundle(execution_id="exec-cancel-waiter")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    gate = asyncio.Event()
+    provider = FakeProvider(gate=gate)
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+    )
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
+    assert len(provider.requests) == 1
+    service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    interruption = asyncio.create_task(
+        coordinator.interrupt_cancelled_execution(command.execution_request.execution_id)
+    )
+    await asyncio.sleep(0)
+    interruption.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await interruption
+    assert service.repository.result(command.execution_request.execution_id) is None
+
+    gate.set()
+    await asyncio.wait_for(
+        coordinator.interrupt_cancelled_execution(command.execution_request.execution_id),
+        timeout=2.0,
+    )
+    result = service.repository.result(command.execution_request.execution_id)
+    assert result.status == "cancelled"
+    assert len(provider.requests) == 1
+    assert result.usage["provider_usage"][0]["total_tokens"] == 15
+    assert (
+        service.repository.latest_checkpoint(result.execution_id).payload["last_provider"][
+            "late_result_fenced"
+        ]
+        is True
+    )
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_interrupts_drain_cooperative_provider_and_release_admission(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    _, command = _bundle(execution_id="exec-cooperative-cancel")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    cancellation_seen = asyncio.Event()
+    drained = asyncio.Event()
+
+    class CooperativeProvider(FakeProvider):
+        supports_cooperative_cancellation = True
+
+        async def generate(self, request):
+            try:
+                return await super().generate(request)
+            except asyncio.CancelledError:
+                cancellation_seen.set()
+                await drained.wait()
+                raise
+
+    provider = CooperativeProvider(gate=asyncio.Event())
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+    )
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
+    assert len(provider.requests) == 1
+    service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    interruptions = [
+        asyncio.create_task(coordinator.interrupt_cancelled_execution(command.execution_request.execution_id))
+        for _ in range(2)
+    ]
+    await asyncio.wait_for(cancellation_seen.wait(), timeout=2.0)
+    assert all(not task.done() for task in interruptions)
+    assert service.repository.result(command.execution_request.execution_id) is None
+    drained.set()
+    await asyncio.wait_for(asyncio.gather(*interruptions), timeout=2.0)
+
+    result = service.repository.result(command.execution_request.execution_id)
+    assert result.status == "cancelled"
+    assert result.final_output is None
+    assert result.usage["error_code"] == "cancellation_requested"
+    assert result.usage["provider_usage"] == []
+    assert len(provider.requests) == 1
+    assert ledger.snapshot("tenant-a")["active_reservations"] == 0
+    assert ledger.snapshot("tenant-a")["completions"] == 1
+    assert runtime.snapshot()["active_operations"] == ()
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_local_thread_exit_precedes_cancelled_result_and_admission_completion(
+    tmp_path, monkeypatch
+) -> None:
+    service, engine_runtime, ledger = _admitted_service(tmp_path)
+    _, command = _bundle(execution_id="exec-local-thread-drain")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    artifact = tmp_path / "drain-model.json"
+    write_local_model_artifact(ReferenceNGramModel.train(("engine local cancellation drain",)), artifact)
+    monkeypatch.setenv("AI_PROVIDER", "local")
+    monkeypatch.setenv("AI_LOCAL_MODEL_PATH", str(artifact))
+    for name in (
+        "AI_SECONDARY_API_KEY",
+        "AI_SECONDARY_BASE_URL",
+        "AI_SECONDARY_MODEL",
+        "AI_VERIFICATION_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    provider_ledger = SqliteTenantQuotaLedger(tmp_path / "provider-drain-quota.sqlite3")
+    provider_runtime = AdmissionRuntime(
+        quota_ledger=provider_ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="local-provider-drain",
+            max_operations=10,
+            max_input_tokens=10000,
+            max_output_tokens=10000,
+            max_cost_usd=0.0,
+            max_tool_calls=0,
+            max_artifact_bytes=0,
+            max_storage_bytes=0,
+            max_concurrent_operations=2,
+        ),
+    )
+    registry = ProviderRegistry.from_env(admission_runtime=provider_runtime)
+    entered = threading.Event()
+    cancellation_seen = threading.Event()
+    release_cleanup = threading.Event()
+    exited = threading.Event()
+
+    def infer(_request, cancel):
+        entered.set()
+        try:
+            assert cancel.wait(2.0)
+            cancellation_seen.set()
+            assert release_cleanup.wait(2.0)
+            raise LocalInferenceCancelled("actual local worker cleanup complete")
+        finally:
+            exited.set()
+
+    monkeypatch.setattr(registry.require_active().engine.model, "infer", infer)
+    coordinator = EngineExecutionCoordinator(service, provider_registry=registry)
+    interruption = None
+    try:
+        await coordinator.ensure_started(command)
+        assert await asyncio.to_thread(entered.wait, 2.0)
+        service.cancel(
+            command.execution_request.execution_id,
+            verified_service_principal="codedock-backend",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+            now=_now(),
+        )
+        interruption = asyncio.create_task(
+            coordinator.interrupt_cancelled_execution(command.execution_request.execution_id)
+        )
+        assert await asyncio.to_thread(cancellation_seen.wait, 2.0)
+        assert not exited.is_set()
+        assert not interruption.done()
+        assert service.repository.result(command.execution_request.execution_id) is None
+        assert ledger.snapshot("tenant-a")["active_reservations"] == 1
+        assert ledger.snapshot("tenant-a")["completions"] == 0
+        assert engine_runtime.snapshot()["active_operations"]
+        assert provider_runtime.snapshot()["active_operations"]
+        assert provider_runtime.snapshot()["unknown_usage_operations"] == ()
+        assert provider_ledger.snapshot("tenant-a")["active_reservations"] == 1
+        assert provider_ledger.snapshot("tenant-a")["unknown_usage_events"] == 0
+
+        release_cleanup.set()
+        await asyncio.wait_for(interruption, timeout=2.0)
+        result = service.repository.result(command.execution_request.execution_id)
+        assert exited.is_set()
+        assert result.status == "cancelled"
+        assert result.usage["provider_usage"] == []
+        assert ledger.snapshot("tenant-a")["active_reservations"] == 0
+        assert ledger.snapshot("tenant-a")["completions"] == 1
+        assert engine_runtime.snapshot()["active_operations"] == ()
+        # Cancelled local compute has no invented token/wall actuals. Its
+        # separate provider admission remains conservatively quarantined.
+        assert len(provider_runtime.snapshot()["unknown_usage_operations"]) == 1
+        assert provider_ledger.snapshot("tenant-a")["active_reservations"] == 1
+        assert provider_ledger.snapshot("tenant-a")["unknown_usage_events"] == 1
+    finally:
+        release_cleanup.set()
+        if interruption is not None:
+            await asyncio.gather(interruption, return_exceptions=True)
+        await coordinator.shutdown()
 
 
 @pytest.mark.asyncio
@@ -540,9 +849,7 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
     assert len(provider.requests) == 1
     assert result.provider_receipts
 
-    checkpoint = service.repository.latest_checkpoint(
-        command.execution_request.execution_id
-    )
+    checkpoint = service.repository.latest_checkpoint(command.execution_request.execution_id)
     assert checkpoint is not None
     last_provider = checkpoint.payload["last_provider"]
     assert last_provider["late_result_fenced"] is True
@@ -615,7 +922,6 @@ async def test_coordinator_provider_unavailable_becomes_durable_failure(
     assert result.status == "failed"
     assert result.usage["error_code"] == "provider_unavailable"
     await coordinator.shutdown()
-
 
 
 class SequenceProvider:
@@ -756,9 +1062,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
 
     receipt_path = tmp_path / "tool-receipts.sqlite3"
     effects: list[str | None] = []
-    tools = AsyncToolRuntime(
-        receipt_store=SQLiteToolReceiptStore(receipt_path)
-    )
+    tools = AsyncToolRuntime(receipt_store=SQLiteToolReceiptStore(receipt_path))
 
     async def handler(tool_request):
         effects.append(tool_request.approval_ref)
@@ -810,13 +1114,12 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         expires_at=min(
             operation.deadline,
             command.delegated_authority.expires_at,
-        ) - timedelta(seconds=1),
+        )
+        - timedelta(seconds=1),
         now=_now(),
     )
 
-    restarted_tools = AsyncToolRuntime(
-        receipt_store=SQLiteToolReceiptStore(receipt_path)
-    )
+    restarted_tools = AsyncToolRuntime(receipt_store=SQLiteToolReceiptStore(receipt_path))
 
     async def restarted_handler(tool_request):
         effects.append(tool_request.approval_ref)
@@ -864,6 +1167,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     assert final_provider.requests
     await restarted.shutdown()
 
+
 @pytest.mark.asyncio
 async def test_coordinator_completes_execution_admission_at_terminal_state(
     tmp_path,
@@ -906,7 +1210,7 @@ async def test_coordinator_completes_execution_admission_at_terminal_state(
 async def test_coordinator_rehydrates_execution_admission_after_local_restart(
     tmp_path,
 ) -> None:
-    service, runtime, ledger = _admitted_service(tmp_path)
+    service, _runtime, ledger = _admitted_service(tmp_path)
     _, command = _bundle(execution_id="exec-admission-restart")
     service.submit(
         command,
@@ -939,8 +1243,5 @@ async def test_coordinator_rehydrates_execution_admission_after_local_restart(
     assert recovered_lease is not None
     assert recovered_lease.quota_reservation is not None
     assert first_lease.quota_reservation is not None
-    assert (
-        recovered_lease.quota_reservation.reservation_id
-        == first_lease.quota_reservation.reservation_id
-    )
+    assert recovered_lease.quota_reservation.reservation_id == first_lease.quota_reservation.reservation_id
     assert ledger.snapshot("tenant-a")["active_reservations"] == 1

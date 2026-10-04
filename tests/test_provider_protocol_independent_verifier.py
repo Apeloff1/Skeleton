@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
+from pathlib import Path
+
+import pytest
 
 from scripts.verify_provider_protocol_closure import (
     SOURCE_TOKENS,
@@ -70,3 +72,59 @@ def test_provider_protocol_verifier_rejects_unoffered_tool_guard_loss(
         "test_sync_openai_rejects_unoffered_tool_call" in error
         for error in receipt["errors"]
     )
+
+
+@pytest.mark.parametrize(
+    "implementation_state", ("planned", "in_progress", "implemented", "closed")
+)
+def test_provider_protocol_verifier_requires_complete_implementation_state(
+    tmp_path: Path,
+    implementation_state: str,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(
+        item
+        for item in payload["entries"]
+        if item["gap"] == "gap-provider-interaction-protocol"
+    )
+    assert entry["implementation_state"] == "complete"
+    entry["implementation_state"] = implementation_state
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert "provider protocol implementation_state is not complete" in receipt["errors"]
+
+
+@pytest.mark.parametrize("closure_field", ("gap_status", "closure_decision"))
+def test_complete_protocol_implementation_does_not_replace_closed_authority(
+    tmp_path: Path,
+    closure_field: str,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(
+        item
+        for item in payload["entries"]
+        if item["gap"] == "gap-provider-interaction-protocol"
+    )
+    entry[closure_field] = "ready_for_closure"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert f"provider protocol {closure_field} is not closed" in receipt["errors"]
+
+
+def test_protocol_verifier_rejects_closed_as_a_blueprint_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_app_construction.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["provider_interaction_protocol"]["status"] = "closed"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    receipt = verify_repository(root)
+    assert receipt["valid"] is False
+    assert "provider protocol blueprint is not complete" in receipt["errors"]

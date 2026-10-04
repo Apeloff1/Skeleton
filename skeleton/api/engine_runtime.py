@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
@@ -84,9 +83,7 @@ class EngineExecutionCoordinator:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
         if self._closed:
-            raise EngineExecutionCoordinatorError(
-                "engine execution coordinator is closed"
-            )
+            raise EngineExecutionCoordinatorError("engine execution coordinator is closed")
         execution_id = command.execution_request.execution_id
         if self.service.repository.result(execution_id) is not None:
             return
@@ -129,17 +126,41 @@ class EngineExecutionCoordinator:
             str(execution_id),
         )
         if stored is None:
-            raise EngineExecutionCoordinatorError(
-                "engine submission is unavailable for execution"
-            )
+            raise EngineExecutionCoordinatorError("engine submission is unavailable for execution")
         await self.ensure_started(stored.command)
+
+    async def interrupt_cancelled_execution(self, execution_id: str) -> None:
+        """Drain an execution after its authorized cancellation was committed.
+
+        The cognitive runtime interrupts cooperative provider work and fences
+        late noncooperative responses, including their actual usage. Cancelling
+        its driver task here would bypass that durable finalization. Shield the
+        driver so cancellation of this waiter cannot revoke execution authority.
+        """
+
+        if not isinstance(execution_id, str) or not execution_id.strip():
+            raise ValueError("execution_id must be a nonempty string")
+        while True:
+            execution = self.service.repository.get(execution_id)
+            if execution.terminal:
+                return
+            if not execution.cancellation_requested:
+                raise EngineExecutionCoordinatorError("execution cancellation has not been durably requested")
+
+            await self.ensure_execution(execution_id)
+            async with self._lock:
+                task = self._tasks.get(execution_id)
+            if task is not None:
+                await asyncio.shield(task)
+            # A driver may have stopped at an approval checkpoint just as the
+            # durable flag was committed. Resume that checkpoint until the
+            # canonical runtime records a terminal result, without dispatching
+            # another provider turn after observing cancellation.
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
-            stored = self.service.submissions.get_by_execution_id(
-                execution.execution_id
-            )
+            stored = self.service.submissions.get_by_execution_id(execution.execution_id)
             if stored is None:
                 await self._finalize_failure(
                     execution.execution_id,
@@ -196,7 +217,7 @@ class EngineExecutionCoordinator:
         for tool_id in allowed_tool_ids:
             try:
                 await self.tool_runtime.manifest(tool_id)
-            except Exception:
+            except Exception:  # noqa: BLE001 - Fail closed at the tool owner boundary.
                 await self._finalize_failure(
                     execution_id,
                     "tool_handler_unavailable",
@@ -208,11 +229,7 @@ class EngineExecutionCoordinator:
             "verification_adapter_for",
             None,
         )
-        semantic_verification_adapter = (
-            verifier_selector(provider)
-            if callable(verifier_selector)
-            else None
-        )
+        semantic_verification_adapter = verifier_selector(provider) if callable(verifier_selector) else None
 
         runtime = CognitiveExecutionRuntime(
             self.service.repository,
@@ -233,15 +250,10 @@ class EngineExecutionCoordinator:
                 )
             ),
         )
-        history = tuple(
-            AIMessage(role=role, content=content)
-            for role, content in handoff.history
-        )
+        history = tuple(AIMessage(role=role, content=content) for role, content in handoff.history)
 
         try:
-            checkpoint = self.service.repository.latest_checkpoint(
-                execution_id
-            )
+            checkpoint = self.service.repository.latest_checkpoint(execution_id)
             approval_refs = self.service.active_approval_refs(
                 execution_id,
             )
@@ -260,12 +272,10 @@ class EngineExecutionCoordinator:
                     approval_refs=approval_refs,
                 )
             if self.service.repository.result(execution_id) is not None:
-                self.service.complete_execution_admission(
-                    execution_id
-                )
+                self.service.complete_execution_admission(execution_id)
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - Finalize any driver or hook failure.
             await self._finalize_failure(
                 execution_id,
                 "engine_execution_exception",
@@ -282,11 +292,11 @@ class EngineExecutionCoordinator:
             return
         try:
             current = repository.get(execution_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Reconciliation needs a readable snapshot.
             return
         if current.terminal:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = AIExecutionResult(
             operation_id=current.operation_id,
             execution_id=current.execution_id,
@@ -296,12 +306,7 @@ class EngineExecutionCoordinator:
                 "model_turns": 0,
                 "tool_calls": 0,
             },
-            stream_terminal_event=(
-                "stream-terminal:"
-                + current.execution_id
-                + ":failed:"
-                + str(error_code)
-            ),
+            stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
             completed_at=now,
         )
         try:

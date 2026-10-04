@@ -11,11 +11,11 @@ this in-memory implementation without changing the reservation contract.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import math
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from skeleton.intelligence.admission import UsageEstimate
@@ -130,7 +130,7 @@ class QuotaUsage:
         estimate: UsageEstimate,
         *,
         operations: int = 1,
-    ) -> "QuotaUsage":
+    ) -> QuotaUsage:
         if not isinstance(estimate, UsageEstimate):
             raise QuotaError("estimate must be UsageEstimate")
         return cls(
@@ -143,7 +143,7 @@ class QuotaUsage:
             storage_bytes=estimate.storage_bytes,
         )
 
-    def plus(self, other: "QuotaUsage") -> "QuotaUsage":
+    def plus(self, other: QuotaUsage) -> QuotaUsage:
         return QuotaUsage(
             operations=self.operations + other.operations,
             input_tokens=self.input_tokens + other.input_tokens,
@@ -766,6 +766,52 @@ class TenantQuotaLedger:
             matched_state.committed = projected
             matched_state.completions.append(completion)
             return completion
+
+    def recovery_state_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> tuple[QuotaReservation, tuple[QuotaUsageEvent, ...]] | None:
+        """Read active reservation and unresolved usage under one lock."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            reservation_id = state.by_operation.get(operation)
+            if reservation_id is None:
+                return None
+            reservation = state.reservations.get(reservation_id)
+            if reservation is None:
+                return None
+            unresolved = tuple(
+                sorted(
+                    (
+                        event
+                        for event in state.usage_events.values()
+                        if event.reservation_id == reservation_id
+                        and event.category.startswith(_UNKNOWN_USAGE_PREFIX)
+                    ),
+                    key=lambda item: item.event_id,
+                )
+            )
+            return reservation, unresolved
+
+    def reservation_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaReservation | None:
+        """Return the active reservation for an operation without mutation."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            reservation_id = state.by_operation.get(operation)
+            if reservation_id is None:
+                return None
+            return state.reservations.get(reservation_id)
 
     def completion_for_operation(
         self,

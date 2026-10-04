@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import ast
-from collections import defaultdict
 import hashlib
 import os
-from pathlib import Path, PurePosixPath
 import posixpath
 import re
 import stat
-from typing import Iterable
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path, PurePosixPath
 
 from .config import MachineConfig, load_machine_config
 from .model import (
@@ -93,9 +93,9 @@ def _python_metadata(content: str) -> tuple[int, tuple[str, ...]]:
 
 def _generic_imports(language: str, content: str) -> tuple[str, ...]:
     if language in {"javascript", "typescript"}:
-        return tuple(sorted(set(match.group(1) for match in _JS_IMPORT.finditer(content))))
+        return tuple(sorted({match.group(1) for match in _JS_IMPORT.finditer(content)}))
     if language == "java":
-        return tuple(sorted(set(match.group(1) for match in _JAVA_IMPORT.finditer(content))))
+        return tuple(sorted({match.group(1) for match in _JAVA_IMPORT.finditer(content)}))
     return ()
 
 
@@ -225,9 +225,12 @@ class RepositoryModelBuilder:
                 if self._ignored(rel):
                     continue
                 result.append(path)
-                if len(result) >= self.config.max_files:
+                # Look one file past the limit so an exactly-at-limit repository
+                # is not falsely reported as truncated. The returned inventory
+                # remains bounded to max_files.
+                if len(result) > self.config.max_files:
                     truncated = True
-                    return result, truncated
+                    return result[: self.config.max_files], truncated
         return result, truncated
 
     def _record(self, path: Path) -> FileRecord:
@@ -353,8 +356,13 @@ class RepositoryModelBuilder:
             dependents[edge.target].add(edge.source)
 
         subsystems: list[SubsystemRecord] = []
+        # Group records once instead of rescanning the complete repository for
+        # every zone. This keeps machine topology construction close to O(files).
+        members_by_zone: dict[str, list[FileRecord]] = defaultdict(list)
+        for record in records:
+            members_by_zone[record.zone].append(record)
         for zone in zones:
-            members = [record for record in records if record.zone == zone]
+            members = members_by_zone.get(zone, [])
             rule = zone_rules.get(zone)
             owner = rule.owner if rule else self.config.default_owner
             criticality = rule.criticality if rule else "medium"

@@ -18,6 +18,7 @@ from skeleton.ai.runtime.inference import (
     ReferenceNGramModel,
 )
 from skeleton.provider_runtime import ProviderRequest
+from skeleton.providers.contract import ProviderToolDefinition
 
 
 def _math_model() -> ReferenceNGramModel:
@@ -39,7 +40,9 @@ def test_reference_model_learns_and_round_trips_identity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_adapter_executes_without_network_or_credentials(monkeypatch) -> None:
+async def test_local_adapter_executes_without_network_or_credentials(
+    monkeypatch,
+) -> None:
     original_socket = socket.socket
 
     def guarded_socket(*args, **kwargs):
@@ -101,7 +104,9 @@ async def test_scheduler_batches_multiple_local_requests() -> None:
 async def test_callable_open_weight_backend_preserves_model_identity() -> None:
     digest = hashlib.sha256(b"weights").hexdigest()
 
-    def runner(request: LocalInferenceRequest, cancel: threading.Event) -> LocalInferenceResult:
+    def runner(
+        request: LocalInferenceRequest, cancel: threading.Event
+    ) -> LocalInferenceResult:
         assert not cancel.is_set()
         return LocalInferenceResult(
             text="local open-weight answer",
@@ -128,7 +133,9 @@ async def test_callable_open_weight_backend_preserves_model_identity() -> None:
 async def test_local_adapter_preserves_tool_call_contract() -> None:
     digest = hashlib.sha256(b"tool-weights").hexdigest()
 
-    def runner(request: LocalInferenceRequest, cancel: threading.Event) -> LocalInferenceResult:
+    def runner(
+        request: LocalInferenceRequest, cancel: threading.Event
+    ) -> LocalInferenceResult:
         return LocalInferenceResult(
             text=None,
             model_id="tool-local",
@@ -156,18 +163,36 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
         )
     )
     response = await adapter.generate(
-        ProviderRequest(instructions="Use allowed tools.", prompt="read")
+        ProviderRequest(
+            instructions="Use allowed tools.",
+            prompt="read",
+            tools=(
+                ProviderToolDefinition(
+                    tool_id="repo.read",
+                    description="Read an admitted repository file",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                        "additionalProperties": False,
+                    },
+                ),
+            ),
+        )
     )
     assert response.provider == "local"
     assert response.finish_reason.value == "tool_calls"
     assert response.tool_calls[0].tool_id == "repo.read"
     assert response.tool_calls[0].arguments == {"path": "README.md"}
 
+
 @pytest.mark.asyncio
 async def test_local_engine_rejects_undeclared_tool_call():
-    digest=hashlib.sha256(b"undeclared-tool").hexdigest()
+    digest = hashlib.sha256(b"undeclared-tool").hexdigest()
 
-    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+    def runner(
+        request: LocalInferenceRequest, cancel: threading.Event
+    ) -> LocalInferenceResult:
         return LocalInferenceResult(
             text=None,
             model_id="tool-boundary",
@@ -179,42 +204,44 @@ async def test_local_engine_rejects_undeclared_tool_call():
                 LocalToolCall(
                     call_id="call-1",
                     tool_id="repo.write",
-                    arguments={"path":"README.md"},
+                    arguments={"path": "README.md"},
                 ),
             ),
         )
 
-    engine=LocalInferenceEngine(
+    engine = LocalInferenceEngine(
         CallableLocalModel(
             model_id="tool-boundary",
             model_digest=digest,
             runner=runner,
         )
     )
-    request=LocalInferenceRequest(
+    request = LocalInferenceRequest(
         prompt="use a tool",
         tools=(
             {
-                "tool_id":"repo.read",
-                "description":"read only",
-                "input_schema":{
-                    "type":"object",
-                    "required":["path"],
-                    "properties":{"path":{"type":"string"}},
-                    "additionalProperties":False,
+                "tool_id": "repo.read",
+                "description": "read only",
+                "input_schema": {
+                    "type": "object",
+                    "required": ["path"],
+                    "properties": {"path": {"type": "string"}},
+                    "additionalProperties": False,
                 },
             },
         ),
     )
-    with pytest.raises(ValueError,match="undeclared tool_id"):
+    with pytest.raises(ValueError, match="undeclared tool_id"):
         await engine.generate(request)
 
 
 @pytest.mark.asyncio
 async def test_local_engine_validates_tool_argument_schema():
-    digest=hashlib.sha256(b"tool-schema").hexdigest()
+    digest = hashlib.sha256(b"tool-schema").hexdigest()
 
-    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+    def runner(
+        request: LocalInferenceRequest, cancel: threading.Event
+    ) -> LocalInferenceResult:
         return LocalInferenceResult(
             text=None,
             model_id="schema-boundary",
@@ -226,155 +253,157 @@ async def test_local_engine_validates_tool_argument_schema():
                 LocalToolCall(
                     call_id="call-1",
                     tool_id="calculator",
-                    arguments={"value":"not-an-integer"},
+                    arguments={"value": "not-an-integer"},
                 ),
             ),
         )
 
-    engine=LocalInferenceEngine(
+    engine = LocalInferenceEngine(
         CallableLocalModel(
             model_id="schema-boundary",
             model_digest=digest,
             runner=runner,
         )
     )
-    request=LocalInferenceRequest(
+    request = LocalInferenceRequest(
         prompt="calculate",
         tools=(
             {
-                "tool_id":"calculator",
-                "input_schema":{
-                    "type":"object",
-                    "required":["value"],
-                    "properties":{"value":{"type":"integer"}},
-                    "additionalProperties":False,
+                "tool_id": "calculator",
+                "input_schema": {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {"value": {"type": "integer"}},
+                    "additionalProperties": False,
                 },
             },
         ),
     )
-    with pytest.raises(ValueError,match="tool arguments violate schema"):
+    with pytest.raises(ValueError, match="tool arguments violate schema"):
         await engine.generate(request)
 
 
 @pytest.mark.asyncio
 async def test_local_engine_validates_structured_output_schema():
-    digest=hashlib.sha256(b"structured-schema").hexdigest()
+    digest = hashlib.sha256(b"structured-schema").hexdigest()
 
-    def runner(request:LocalInferenceRequest,cancel:threading.Event)->LocalInferenceResult:
+    def runner(
+        request: LocalInferenceRequest, cancel: threading.Event
+    ) -> LocalInferenceResult:
         return LocalInferenceResult(
             text=None,
             model_id="structured-boundary",
             model_digest=digest,
             input_tokens=1,
             output_tokens=1,
-            structured_output={"answer":"wrong-type"},
+            structured_output={"answer": "wrong-type"},
         )
 
-    engine=LocalInferenceEngine(
+    engine = LocalInferenceEngine(
         CallableLocalModel(
             model_id="structured-boundary",
             model_digest=digest,
             runner=runner,
         )
     )
-    request=LocalInferenceRequest(
+    request = LocalInferenceRequest(
         prompt="return structured output",
         structured_output_schema={
-            "type":"object",
-            "required":["answer"],
-            "properties":{"answer":{"type":"integer"}},
-            "additionalProperties":False,
+            "type": "object",
+            "required": ["answer"],
+            "properties": {"answer": {"type": "integer"}},
+            "additionalProperties": False,
         },
     )
-    with pytest.raises(ValueError,match="structured output violates request schema"):
+    with pytest.raises(ValueError, match="structured output violates request schema"):
         await engine.generate(request)
 
 
 @pytest.mark.asyncio
 async def test_scheduler_close_during_batch_window_does_not_deadlock():
-    scheduler=LocalInferenceScheduler(
+    scheduler = LocalInferenceScheduler(
         LocalInferenceEngine(_math_model()),
         max_batch_size=4,
         batch_window_ms=500,
     )
-    pending=asyncio.create_task(
-        scheduler.submit(LocalInferenceRequest(prompt="two plus two",seed=9))
+    pending = asyncio.create_task(
+        scheduler.submit(LocalInferenceRequest(prompt="two plus two", seed=9))
     )
     await asyncio.sleep(0)
     await asyncio.sleep(0)
 
-    await asyncio.wait_for(scheduler.close(),timeout=1.0)
-    result=await asyncio.wait_for(pending,timeout=1.0)
-    assert result.model_id=="skeleton-reference-ngram-v1"
+    await asyncio.wait_for(scheduler.close(), timeout=1.0)
+    result = await asyncio.wait_for(pending, timeout=1.0)
+    assert result.model_id == "skeleton-reference-ngram-v1"
+
 
 def test_reference_model_artifact_rejects_boolean_numeric_coercion() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    payload["order"]=True
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    payload["order"] = True
 
-    with pytest.raises(ValueError,match="order must be an integer"):
+    with pytest.raises(ValueError, match="order must be an integer"):
         ReferenceNGramModel.from_dict(payload)
 
-    payload=model.to_dict()
+    payload = model.to_dict()
     payload["transitions"][0]["counts"][
         next(iter(payload["transitions"][0]["counts"]))
-    ]=True
-    with pytest.raises(ValueError,match="counts must be positive integers"):
+    ] = True
+    with pytest.raises(ValueError, match="counts must be positive integers"):
         ReferenceNGramModel.from_dict(payload)
 
 
 def test_reference_model_artifact_rejects_fractional_count_coercion() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    token=next(iter(payload["transitions"][0]["counts"]))
-    payload["transitions"][0]["counts"][token]=1.9
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    token = next(iter(payload["transitions"][0]["counts"]))
+    payload["transitions"][0]["counts"][token] = 1.9
 
-    with pytest.raises(ValueError,match="counts must be positive integers"):
+    with pytest.raises(ValueError, match="counts must be positive integers"):
         ReferenceNGramModel.from_dict(payload)
 
 
 def test_reference_model_artifact_rejects_duplicate_context_rows() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
     payload["transitions"].append(dict(payload["transitions"][0]))
 
-    with pytest.raises(ValueError,match="duplicate transition context"):
+    with pytest.raises(ValueError, match="duplicate transition context"):
         ReferenceNGramModel.from_dict(payload)
 
 
 def test_reference_model_artifact_requires_schema_version() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    payload["schema_version"]=2
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    payload["schema_version"] = 2
 
-    with pytest.raises(ValueError,match="schema_version"):
+    with pytest.raises(ValueError, match="schema_version"):
         ReferenceNGramModel.from_dict(payload)
 
 
 def test_reference_model_artifact_rejects_non_string_context_token() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    row=next(item for item in payload["transitions"] if item["context"])
-    row["context"][0]=7
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    row = next(item for item in payload["transitions"] if item["context"])
+    row["context"][0] = 7
 
-    with pytest.raises(ValueError,match="context must contain only strings"):
+    with pytest.raises(ValueError, match="context must contain only strings"):
         ReferenceNGramModel.from_dict(payload)
 
 
-
 def test_reference_model_artifact_rejects_unknown_top_level_fields() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    payload["download_url"]="https://example.invalid/model.bin"
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    payload["download_url"] = "https://example.invalid/model.bin"
 
-    with pytest.raises(ValueError,match="unsupported local model artifact key"):
+    with pytest.raises(ValueError, match="unsupported local model artifact key"):
         ReferenceNGramModel.from_dict(payload)
 
 
 def test_reference_model_artifact_rejects_unknown_transition_row_fields() -> None:
-    model=ReferenceNGramModel.train(("alpha beta",),order=2)
-    payload=model.to_dict()
-    payload["transitions"][0]["weight"]=1
+    model = ReferenceNGramModel.train(("alpha beta",), order=2)
+    payload = model.to_dict()
+    payload["transitions"][0]["weight"] = 1
 
-    with pytest.raises(ValueError,match="contains unsupported key"):
+    with pytest.raises(ValueError, match="contains unsupported key"):
         ReferenceNGramModel.from_dict(payload)

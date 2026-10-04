@@ -6,7 +6,6 @@ from skeleton.repo_machine.atlas import placement_for_path
 from skeleton.repo_machine.builder import build_repository_model
 from skeleton.repo_machine.config import load_machine_config
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -97,3 +96,11 @@ def test_runtime_journals_do_not_hide_canonical_provenance_sources() -> None:
     assert builder._ignored(".skeleton/organism/chronicle/index.json")
     assert not builder._ignored("skeleton/provenance/chronicle/store.py")
     assert placement_for_path(builder.config, "skeleton/provenance/chronicle/store.py").zone == "provenance"
+
+
+def test_governed_storage_and_release_cockpit_retain_existing_owners() -> None:
+    config = load_machine_config(ROOT)
+    storage = placement_for_path(config, "skeleton/storage/cas/__init__.py")
+    cockpit = placement_for_path(config, "skeleton/ops/cockpit/smoke_verdict.py")
+    assert (storage.zone, storage.owner) == ("platform", "platform-runtime")
+    assert (cockpit.zone, cockpit.owner) == ("build-delivery", "delivery-plane")

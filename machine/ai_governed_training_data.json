@@ -1,0 +1,78 @@
+{
+  "schema_version": "skeleton.ai.governed_training_data.v1",
+  "status": "implementation_candidate",
+  "owner_task": "P3T2-DATA-01",
+  "canonical_owner": "skeleton/ai/runtime/training/data.py",
+  "authority": "Existing DatasetRegistry SQLite authority; provider-independent local training inputs only",
+  "source_contracts": [
+    "machine/ai_app_construction.json",
+    "machine/state_topology.json",
+    "machine/ai_masterplan_continuation_frontier.json",
+    "machine/ai_multimodal_training_projection.json"
+  ],
+  "runtime_root": "skeleton/ai/runtime/training",
+  "runtime_boundary": {
+    "creates_service": false,
+    "creates_provider_transport": false,
+    "grants_production_model_promotion": false,
+    "grants_masterplan_completion": false,
+    "canonical_product_user_state": false
+  },
+  "materialized_ingestion": {
+    "source_record": "MaterializedTrainingSource",
+    "source_fields": [
+      "envelope",
+      "payload",
+      "format",
+      "rights_refs",
+      "lineage_refs",
+      "evidence"
+    ],
+    "formats": ["utf8_text", "json_documents", "multimodal_projection"],
+    "permitted_uses": ["training", "evaluation", "simulation_training", "simulation_evaluation"],
+    "identity": "SHA256 of original immutable bytes; exact ordered document sequence additionally binds SHA256 of canonical UTF-8 JSON string array",
+    "legacy_split_identity": "SHA256 of newline-joined documents is retained for declared legacy trainer compatibility and cannot substitute for materialized document-sequence identity",
+    "receipt": "MaterializedDatasetReceipt",
+    "transaction": "One SQLite BEGIN IMMEDIATE transaction commits source envelopes, original bytes, immutable dataset/version and split document rows, observations, computed quality and idempotency receipt",
+    "optimistic_version": "Positive monotonically assigned integer versions; expected_version equals the current materialized version for that dataset ID",
+    "idempotency": "Same ingestion identity and exact request returns the original committed receipt; changed content, rights, classification, source metadata, split order or policy under that identity rejects",
+    "bounds": {
+      "max_documents": 4096,
+      "max_splits": 64,
+      "max_document_bytes": 1048576,
+      "max_total_bytes": 67108864,
+      "max_source_bytes": 67108864,
+      "max_source_evidence_bytes": 4194304,
+      "max_materialization_identity_bytes": 16777216
+    },
+    "quality": "Baseline nonempty-document and exact observed count gates are mandatory; optional additional rules use stored observations and cannot supply success booleans or fabricated metrics",
+    "failure": "Malformed bytes, missing rights, quarantine, stale version, conflicting identity or failed critical quality gate leaves no ingestion/dataset/content commit"
+  },
+  "multimodal_ingestion": {
+    "api": "DatasetRegistry.ingest_export",
+    "input": "Typed MultimodalTrainingManifest plus exact ordered documents",
+    "validation": "Verify exported manifest and every projected text digest before transaction; preserve original asset, record, projection, extractor, source, rights, lineage, simulated-origin and instruction-untrusted identities",
+    "authority": "The existing multimodal corpus owns original assets; DatasetRegistry owns the materialized training text sequence and immutable export evidence",
+    "simulation_rule": "simulation_training never silently grants ordinary training permission"
+  },
+  "readiness": {
+    "api": [
+      "DatasetRegistry.training_corpus",
+      "DatasetRegistry.validate_training_corpus",
+      "DatasetRegistry.dataset_authority_epoch",
+      "DatasetRegistry.assert_dataset_authority"
+    ],
+    "materialized": "Training requires restart-readable original content, exact document sequence, matching split observations, an observation-bound computed quality report and active source/dataset rights",
+    "legacy": "register_ingest/register_dataset remain explicit digest-only compatibility APIs; training_corpus refuses to invent bytes for those datasets",
+    "fencing": "Monotonic durable dataset/source epochs fence rights revocation, deletion and changed quality admission during native and neural training",
+    "deletion": "Canonical local training content is removed or access-blocked and affected inputs cannot be exported or reused for new/restarted training"
+  },
+  "rollback": "Disable new materialized ingestion and retain immutable legacy manifests and authoritative receipts; never restore revoked rights or silently regenerate deleted source content",
+  "executable_tests": ["skeleton/testing/test_governed_training_data.py"],
+  "promotion_state": {
+    "completion_checkbox": false,
+    "implementation_signed": false,
+    "verification_signed": false,
+    "may_self_close": false
+  }
+}

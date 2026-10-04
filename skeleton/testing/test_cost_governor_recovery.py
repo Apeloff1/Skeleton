@@ -15,6 +15,7 @@ from skeleton.intelligence.admission import (
     ResourceBudget,
     UsageEstimate,
 )
+from skeleton.intelligence.admission_runtime import AdmissionRuntimeConflict
 from skeleton.intelligence.quota import TenantQuota
 
 
@@ -107,6 +108,7 @@ def test_active_reservation_replays_across_process_restart(tmp_path) -> None:
 
 def test_completed_decision_recovers_after_crash_between_reconcile_and_qualification(
     tmp_path,
+    monkeypatch,
 ) -> None:
     path = tmp_path / "quota.sqlite3"
     operation = "op-completion-crash"
@@ -128,14 +130,25 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         now_wall=10.5,
     )
 
-    # Crash injection: the spend ledger commits terminal accounting, but the
-    # governor never reaches qualification/journal terminalization.
-    completion = first.runtime.complete(
-        operation,
-        actual,
-        now_wall=11.0,
+    # Crash through the public boundary so the exact operation budget and
+    # evidence intent are durable before the spend ledger commits accounting.
+    def crash_before_qualification(**_kwargs):
+        raise SystemExit("simulated process loss after quota completion")
+
+    monkeypatch.setattr(first, "_completed_decision", crash_before_qualification)
+    with pytest.raises(SystemExit):
+        first.complete(
+            operation,
+            actual,
+            evidence_refs=_refs("completion"),
+            now_wall=11.0,
+        )
+    assert (
+        first.runtime.quota_ledger.completion_for_operation(
+            request.tenant_id, operation
+        )
+        is not None
     )
-    assert completion.quota_completion is not None
 
     restarted = _governor(path)
     recovered = restarted.recover_completed(
@@ -157,9 +170,7 @@ def test_completed_decision_recovers_after_crash_between_reconcile_and_qualifica
         evidence_refs=_refs("completion"),
     )
     assert replay == recovered
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "completions"
-    ] == 1
+    assert restarted.runtime.quota_ledger.snapshot("tenant-a")["completions"] == 1
 
 
 def test_completed_recovery_rejects_different_evidence_replay(tmp_path) -> None:
@@ -239,9 +250,7 @@ def test_release_recovers_if_process_dies_before_quota_release(
         first.release_unspent(operation)
 
     # The durable reservation is still present and the journal is pending.
-    assert first.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
 
     restarted = _governor(path)
     recovered = restarted.recover_released(operation)
@@ -278,18 +287,16 @@ def test_release_recovers_if_process_dies_after_quota_release(
         first.release_unspent(operation)
 
     # The quota release committed, but the durable governor transition did not.
-    assert first.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 0
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 0
 
     restarted = _governor(path)
     recovered = restarted.recover_released(operation)
 
     assert recovered.state == "released_unspent"
     assert recovered.accepted is False
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 0
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 0
+    )
 
 
 def test_release_pending_blocks_new_operation_replay(tmp_path, monkeypatch) -> None:
@@ -365,10 +372,11 @@ def test_release_recovery_rejects_completed_accounting(tmp_path) -> None:
         evidence_refs=_refs("completion-wins"),
     )
     assert completed.state == "completed"
-    assert completed.accepted is True
+    assert completed.accepted is False
+    assert completed.reasons == ("operation-budget-recovery-intent-missing",)
 
 
-def test_restart_journal_conflict_never_releases_preexisting_reservation(
+def test_restart_lease_conflict_never_releases_preexisting_reservation(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -381,18 +389,18 @@ def test_restart_journal_conflict_never_releases_preexisting_reservation(
     restarted = _governor(path)
     assert restarted._journal is not None
 
-    def reject_replay(**_kwargs):
-        raise CostGovernorConflict("simulated journal replay conflict")
+    def reject_replay(*_args, **_kwargs):
+        raise AdmissionRuntimeConflict("simulated durable lease replay conflict")
 
     monkeypatch.setattr(
-        restarted._journal,
-        "record_active",
+        restarted.runtime,
+        "reattach",
         reject_replay,
     )
 
     with pytest.raises(
         CostGovernorConflict,
-        match="simulated journal replay conflict",
+        match="simulated durable lease replay conflict",
     ):
         restarted.reserve(request, now_wall=20.0)
 

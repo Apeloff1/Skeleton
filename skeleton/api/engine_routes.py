@@ -1,11 +1,14 @@
 """Sealed engine execution endpoints backed by durable cognitive state."""
 
+# FastAPI resolves these dependency declarations when handling a request.
+# ruff: noqa: B008
+
 from __future__ import annotations
 
 import base64
 import binascii
-from datetime import datetime
 import hmac
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -18,6 +21,7 @@ from skeleton.api.engine_service import (
     EngineServiceError,
     EngineSubmissionConflict,
 )
+from skeleton.contracts.ai_execution import execution_payload_digest
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
@@ -28,7 +32,6 @@ from skeleton.provider_runtime import (
     ProviderSpeechRequest,
     ProviderUnavailableError,
 )
-
 
 router = APIRouter(prefix="/engine", tags=["engine"])
 
@@ -301,9 +304,7 @@ def _raise_engine_error(exc: Exception) -> None:
     if isinstance(exc, (EngineServiceError, ExecutionRepositoryError)):
         detail = str(exc)
         code = (
-            status.HTTP_404_NOT_FOUND
-            if "unknown" in detail.lower()
-            else status.HTTP_422_UNPROCESSABLE_ENTITY
+            status.HTTP_404_NOT_FOUND if "unknown" in detail.lower() else status.HTTP_422_UNPROCESSABLE_ENTITY
         )
         raise HTTPException(status_code=code, detail=detail) from exc
     if isinstance(exc, (ValueError, TypeError)):
@@ -337,6 +338,51 @@ async def submit_execution(
         _raise_engine_error(exc)
         raise
     return ack.as_dict()
+
+
+@router.get("/providers")
+def provider_inventory(
+    request: Request,
+    tenant_id: str | None = Query(default=None, min_length=1, max_length=512),
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    """Read global non-secret provider readiness under an existing service grant."""
+
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        _raise_engine_error(exc)
+        raise
+    if "engine:read" not in grant.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine provider inventory scope denied",
+        )
+    if tenant_id is not None and not grant.allows_tenant(tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine provider inventory tenant denied",
+        )
+    registry = getattr(coordinator, "provider_registry", None)
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine provider runtime unavailable",
+        )
+    providers = registry.statuses()
+    if not any(item["id"] == registry.active_id for item in providers):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine provider inventory unavailable",
+        )
+    return {
+        "active": registry.active_id,
+        "available": registry.available,
+        "providers": providers,
+    }
 
 
 @router.post("/admission/storage")
@@ -380,11 +426,7 @@ def reconcile_governed_write(
             source_ref=body.source_ref,
             data_class=body.data_class,
             purposes=tuple(body.purposes),
-            deletion_targets=(
-                None
-                if body.deletion_targets is None
-                else tuple(body.deletion_targets)
-            ),
+            deletion_targets=(None if body.deletion_targets is None else tuple(body.deletion_targets)),
             created_at=body.created_at,
             retention_until=body.retention_until,
             exportable=body.exportable,
@@ -425,11 +467,7 @@ def request_governance_deletion(
         return service.request_external_governance_deletion(
             verified_service_principal=principal,
             tenant_id=body.tenant_id,
-            record_ids=(
-                None
-                if body.record_ids is None
-                else tuple(body.record_ids)
-            ),
+            record_ids=(None if body.record_ids is None else tuple(body.record_ids)),
             reason=body.reason,
         )
     except Exception as exc:
@@ -437,9 +475,7 @@ def request_governance_deletion(
         raise
 
 
-@router.post(
-    "/governance/deletions/{plan_id}/execute-engine-targets"
-)
+@router.post("/governance/deletions/{plan_id}/execute-engine-targets")
 async def execute_governance_engine_targets(
     plan_id: str,
     body: EngineGovernancePlanExecutionBody,
@@ -515,6 +551,83 @@ def execution_status(
             actor_id=actor_id,
             tenant_id=tenant_id,
         ).as_dict()
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.get("/executions/{execution_id}/handoff")
+def execution_handoff(
+    execution_id: str,
+    request: Request,
+    actor_id: str = Query(..., min_length=1, max_length=512),
+    tenant_id: str = Query(..., min_length=1, max_length=512),
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    """Read the original accepted context lineage without reconstructing content."""
+
+    principal = _verified_service_principal(request, service_token)
+    try:
+        stored = service._stored_for_access(
+            execution_id,
+            verified_service_principal=principal,
+            scope="engine:read",
+        )
+        command = stored.command
+        operation = command.operation
+        handoff = command.compiled_context
+        if actor_id.strip() != operation.actor_id or tenant_id.strip() != operation.tenant_id:
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
+        execution = service.repository.get(execution_id)
+        expected_idempotency = execution_payload_digest(
+            {
+                "service_principal": principal,
+                "tenant_id": operation.tenant_id,
+                "operation_id": operation.operation_id,
+                "idempotency_key": operation.idempotency_key,
+                "submission_digest": command.submission_digest,
+            }
+        )
+        if (
+            command.execution_request.execution_id != execution_id
+            or execution.request.as_dict() != command.execution_request.as_dict()
+            or stored.ack.execution_id != execution_id
+            or stored.ack.operation_id != operation.operation_id
+            or stored.ack.trace_id != operation.trace_id
+            or stored.ack.idempotency_digest != expected_idempotency
+        ):
+            raise EngineServiceError("durable engine handoff identity is corrupt")
+        checkpoint = service.repository.latest_checkpoint(execution_id)
+        if checkpoint is not None and (
+            checkpoint.execution_id != execution_id
+            or checkpoint.operation_id != operation.operation_id
+            or checkpoint.payload.get("context_digest") != handoff.context_digest
+            or checkpoint.payload.get("tenant_id") != operation.tenant_id
+        ):
+            raise EngineServiceError("durable engine handoff checkpoint identity is corrupt")
+        return {
+            "operation_id": operation.operation_id,
+            "execution_id": execution_id,
+            "turn_id": handoff.turn_id,
+            "tenant_id": operation.tenant_id,
+            "actor_id": operation.actor_id,
+            "context_id": handoff.context_id,
+            "context_digest": handoff.context_digest,
+            "compiler_version": handoff.compiler_version,
+            "source_snapshot": [[segment, digest] for segment, digest in handoff.source_snapshot],
+            "data_class": handoff.data_class,
+            "purpose": handoff.purpose,
+            "handoff_digest": handoff.handoff_digest,
+            "capability": operation.capability,
+            "idempotency_key": operation.idempotency_key,
+            "trace_id": operation.trace_id,
+        }
+    except (KeyError, IndexError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="durable engine handoff identity is corrupt",
+        ) from exc
     except Exception as exc:
         _raise_engine_error(exc)
         raise
@@ -705,11 +818,7 @@ async def edit_engine_image(
     )
     adapter = _media_adapter(coordinator)
     image = _decode_media(body.image_base64, "image_base64")
-    mask = (
-        None
-        if body.mask_base64 is None
-        else _decode_media(body.mask_base64, "mask_base64")
-    )
+    mask = None if body.mask_base64 is None else _decode_media(body.mask_base64, "mask_base64")
     try:
         result = await adapter.edit_image(
             image,
@@ -811,8 +920,8 @@ def execution_events(
 
 
 __all__ = [
-    "router",
     "_engine_coordinator",
     "_engine_service",
     "_engine_service_token",
+    "router",
 ]

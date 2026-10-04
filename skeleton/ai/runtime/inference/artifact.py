@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
 import os
-from pathlib import Path
+import stat
 import tempfile
-from typing import Any, Mapping
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from .local import ReferenceNGramModel
-
 
 _MAX_ARTIFACT_BYTES = 128 * 1024 * 1024
 
@@ -24,15 +25,13 @@ def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise LocalModelArtifactError(f"duplicate artifact key: {key}")
+            raise LocalModelArtifactError(f"duplicate JSON key in artifact: {key}")
         result[key] = value
     return result
 
 
 def _reject_constant(value: str) -> None:
-    raise LocalModelArtifactError(
-        "artifact contains non-finite JSON constant: " + value
-    )
+    raise LocalModelArtifactError("artifact contains non-finite JSON constant: " + value)
 
 
 def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
@@ -48,9 +47,7 @@ def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
             + "\n"
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise LocalModelArtifactError(
-            "local model artifact is not canonical JSON"
-        ) from exc
+        raise LocalModelArtifactError("local model artifact is not canonical JSON") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,45 +85,94 @@ def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
         try:
             from .neural import NumpyRecurrentLM
         except ModuleNotFoundError as exc:
-            raise LocalModelArtifactError(
-                "NumPy is required to load a native neural artifact"
-            ) from exc
+            raise LocalModelArtifactError("NumPy is required to load a native neural artifact") from exc
         try:
             return NumpyRecurrentLM.from_dict(payload), schema
         except (TypeError, ValueError, RuntimeError) as exc:
-            raise LocalModelArtifactError(
-                "native neural artifact failed identity validation"
-            ) from exc
+            raise LocalModelArtifactError("native neural artifact failed identity validation") from exc
 
     if payload.get("kind") == "reference_ngram":
         try:
-            return ReferenceNGramModel.from_dict(payload), (
-                "skeleton.reference_ngram.v1"
-            )
+            return ReferenceNGramModel.from_dict(payload), "reference_ngram"
         except (TypeError, ValueError) as exc:
             raise LocalModelArtifactError(
-                "reference model artifact failed identity validation"
+                "reference model artifact is invalid: identity validation failed"
             ) from exc
 
     raise LocalModelArtifactError("unsupported local model artifact schema")
 
 
-def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
-    source = Path(os.fspath(path)).expanduser()
-    if source.is_symlink():
-        raise LocalModelArtifactError("local model artifact symlink is forbidden")
+def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_nlink,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
+def _checked_path(source: Path) -> os.stat_result:
+    for component in reversed((source, *source.parents)):
+        info = component.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            raise LocalModelArtifactError("local model artifact symlink is forbidden")
+        if component != source and not stat.S_ISDIR(info.st_mode):
+            raise LocalModelArtifactError("local model artifact parent must be a directory")
+    if not stat.S_ISREG(info.st_mode):
+        raise LocalModelArtifactError("local model artifact must be a regular file")
+    return info
+
+
+def _read_artifact_bytes(source: Path) -> bytes:
+    """Bound allocation and verify the opened descriptor still owns the named file."""
+    descriptor = None
     try:
-        resolved = source.resolve(strict=True)
-        stat = resolved.stat()
-        raw = resolved.read_bytes()
+        before = _checked_path(source)
+        if not 1 <= before.st_size <= _MAX_ARTIFACT_BYTES:
+            raise LocalModelArtifactError("local model artifact violates byte bounds")
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        descriptor = os.open(source, flags)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise LocalModelArtifactError("local model artifact must be a regular file")
+        if _file_identity(opened) != _file_identity(before):
+            raise LocalModelArtifactError("local model artifact changed before reading")
+        remaining = before.st_size + 1
+        chunks = []
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        named = _checked_path(source)
+        raw = b"".join(chunks)
+        if (
+            len(raw) != before.st_size
+            or _file_identity(after) != _file_identity(before)
+            or _file_identity(named) != _file_identity(before)
+        ):
+            raise LocalModelArtifactError("local model artifact changed while reading")
+        return raw
     except OSError as exc:
         raise LocalModelArtifactError("local model artifact is unavailable") from exc
-    if not resolved.is_file():
-        raise LocalModelArtifactError("local model artifact must be a regular file")
-    if stat.st_size < 1 or stat.st_size > _MAX_ARTIFACT_BYTES:
-        raise LocalModelArtifactError("local model artifact violates byte bounds")
-    if len(raw) != stat.st_size:
-        raise LocalModelArtifactError("local model artifact changed while reading")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
+    source = Path(os.fspath(path)).expanduser().absolute()
+    raw = _read_artifact_bytes(source)
     try:
         payload = json.loads(
             raw.decode("utf-8", errors="strict"),
@@ -134,13 +180,9 @@ def load_local_model_artifact(path: str | os.PathLike[str]) -> LoadedLocalModel:
             parse_constant=_reject_constant,
         )
     except UnicodeDecodeError as exc:
-        raise LocalModelArtifactError(
-            "local model artifact must be UTF-8 JSON"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise LocalModelArtifactError(
-            "local model artifact contains invalid JSON"
-        ) from exc
+        raise LocalModelArtifactError("local model artifact must be UTF-8 JSON") from exc
+    except (ValueError, RecursionError) as exc:
+        raise LocalModelArtifactError("local model artifact contains invalid JSON") from exc
     if not isinstance(payload, Mapping):
         raise LocalModelArtifactError("local model artifact root must be an object")
 
@@ -187,13 +229,9 @@ def write_local_model_artifact(
     try:
         parent = destination.parent.resolve(strict=True)
     except OSError as exc:
-        raise LocalModelArtifactError(
-            "local model output parent is unavailable"
-        ) from exc
+        raise LocalModelArtifactError("local model output parent is unavailable") from exc
     if not parent.is_dir():
-        raise LocalModelArtifactError(
-            "local model output parent must be a directory"
-        )
+        raise LocalModelArtifactError("local model output parent must be a directory")
 
     temp_path: Path | None = None
     try:
@@ -212,9 +250,7 @@ def write_local_model_artifact(
         os.replace(temp_path, destination)
         temp_path = None
     except OSError as exc:
-        raise LocalModelArtifactError(
-            "local model artifact could not be written atomically"
-        ) from exc
+        raise LocalModelArtifactError("local model artifact could not be written atomically") from exc
     finally:
         if temp_path is not None:
             try:
@@ -223,10 +259,8 @@ def write_local_model_artifact(
                 pass
 
     loaded = load_local_model_artifact(destination)
-    if loaded.receipt.model_digest != getattr(model, "model_digest"):
-        raise LocalModelArtifactError(
-            "written artifact model identity differs from in-memory model"
-        )
+    if loaded.receipt.model_digest != model.model_digest:
+        raise LocalModelArtifactError("written artifact model identity differs from in-memory model")
     return loaded.receipt
 
 

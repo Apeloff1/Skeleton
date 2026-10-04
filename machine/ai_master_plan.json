@@ -13417,7 +13417,9 @@
         "false precision",
         "uncertainty dropped in summaries"
       ],
-      "gaps": [],
+      "gaps": [
+        "independently verify typed uncertainty taxonomy and UI/explanation propagation against the exact signed implementation head"
+      ],
       "accountability_id": "ACC-VOL-248",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",

@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-from typing import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from skeleton.contracts.ai_execution import (
+    AgentTurn,
     AIExecution,
     AIExecutionRequest,
     AIExecutionResult,
-    AgentTurn,
     ExecutionState,
 )
 from skeleton.contracts.verification import (
@@ -41,8 +41,8 @@ from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderReques
 from skeleton.skills.tool_contract import (
     ToolContractError,
     ToolEffect,
-    ToolExecutionRequest,
     ToolExecutionReceipt,
+    ToolExecutionRequest,
     ToolExecutionStatus,
     approval_ref_for_request,
     validate_json_schema,
@@ -283,7 +283,7 @@ def _parse_deadline(
             raise CognitiveExecutionError(
                 "stop_policy.deadline must be timezone-aware"
             )
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
 
     elapsed = request.resource_budget.get("max_elapsed_seconds")
     if elapsed is None:
@@ -349,6 +349,60 @@ def _tool_batch_signature(calls: tuple[ProviderToolCall, ...]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _provider_response_binding(
+    response,
+    turn_id: str,
+) -> tuple[str, str]:
+    provider=str(response.provider).strip()
+    if not provider:
+        raise CognitiveExecutionError("provider response identity is empty")
+    external_id=str(
+        response.response_id
+        or response.request_id
+        or turn_id
+    ).strip()
+    if not external_id:
+        raise CognitiveExecutionError("provider response external identity is empty")
+    payload={
+        "provider":provider,
+        "model":response.model,
+        "request_id":response.request_id,
+        "response_id":response.response_id,
+        "text":response.text,
+        "structured_output":(
+            None
+            if response.structured_output is None
+            else dict(response.structured_output)
+        ),
+        "tool_calls":[call.as_dict() for call in response.tool_calls],
+        "finish_reason":response.finish_reason.value,
+        "usage":response.usage.as_dict(),
+        "governance_decision_id":response.governance_decision_id,
+        "admission_decision_id":response.admission_decision_id,
+        "data_class":response.data_class,
+        "context_id":response.context_id,
+        "context_digest":response.context_digest,
+        "context_source_snapshot":list(response.context_source_snapshot),
+        "context_compiler_version":response.context_compiler_version,
+    }
+    try:
+        encoded=json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",",":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError,ValueError) as exc:
+        raise CognitiveExecutionError(
+            "provider response is not deterministic JSON"
+        ) from exc
+    return (
+        f"provider:{provider}:{external_id}",
+        hashlib.sha256(encoded).hexdigest(),
+    )
+
+
 def _verification_ref(receipt: ExecutionVerificationDecision) -> str:
     encoded = json.dumps(
         receipt.as_dict(),
@@ -399,6 +453,50 @@ class CognitiveExecutionRuntime:
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
         self._verification_runtime = VerificationRuntime()
+
+    def _bind_provider_response(
+        self,
+        payload: dict[str, object],
+        response,
+        turn_id: str,
+    ) -> str:
+        expected_provider=getattr(self.provider,"provider_id",None)
+        if (
+            isinstance(expected_provider,str)
+            and expected_provider.strip()
+            and response.provider!=expected_provider
+        ):
+            raise CognitiveExecutionError(
+                "provider response identity does not match bound adapter"
+            )
+        expected_context=payload.get("context_digest")
+        if (
+            response.context_digest is not None
+            and response.context_digest!=expected_context
+        ):
+            raise CognitiveExecutionError(
+                "provider response context digest drift"
+            )
+
+        provider_ref,fingerprint=_provider_response_binding(response,turn_id)
+        raw=payload.get("provider_response_bindings",{})
+        if not isinstance(raw,Mapping):
+            raise CognitiveExecutionError(
+                "provider response binding checkpoint is corrupt"
+            )
+        bindings=dict(raw)
+        prior=bindings.get(provider_ref)
+        if prior is not None:
+            if prior!=fingerprint:
+                raise CognitiveExecutionError(
+                    "provider response identity reused with different payload"
+                )
+            raise CognitiveExecutionError(
+                "provider response identity replayed"
+            )
+        bindings[provider_ref]=fingerprint
+        payload["provider_response_bindings"]=bindings
+        return provider_ref
 
     def _meter_storage(
         self,
@@ -543,6 +641,7 @@ class CognitiveExecutionRuntime:
             "model_turns": 0,
             "tool_calls": 0,
             "provider_receipts": [],
+            "provider_response_bindings": {},
             "tool_receipts": [],
             "tool_verification_evidence": [],
             "usage_events": [],
@@ -612,7 +711,7 @@ class CognitiveExecutionRuntime:
         parsed = datetime.fromisoformat(raw)
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise CognitiveExecutionError("checkpoint deadline is not aware")
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)
 
     def _deadline_expired(
         self,
@@ -623,7 +722,7 @@ class CognitiveExecutionRuntime:
         deadline = self._deadline(payload)
         if deadline is None:
             return False
-        instant = datetime.now(timezone.utc) if now is None else now.astimezone(timezone.utc)
+        instant = datetime.now(UTC) if now is None else now.astimezone(UTC)
         return instant >= deadline
 
     async def start(
@@ -1115,9 +1214,9 @@ class CognitiveExecutionRuntime:
             response = await self.provider.generate(provider_request)
         else:
             logical_now = (
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             )
             deadline_budget = (
                 None
@@ -1226,15 +1325,10 @@ class CognitiveExecutionRuntime:
             durable_after_provider.cancellation_requested
             or self._deadline_expired(payload, now=now)
         ):
-            late_provider_ref = (
-                "provider:"
-                + response.provider
-                + ":"
-                + str(
-                    response.response_id
-                    or response.request_id
-                    or turn_id
-                )
+            late_provider_ref = self._bind_provider_response(
+                payload,
+                response,
+                turn_id,
             )
             late_receipts = list(
                 payload.get("provider_receipts", [])
@@ -1314,15 +1408,10 @@ class CognitiveExecutionRuntime:
                 }
             )
 
-        provider_ref = (
-            "provider:"
-            + response.provider
-            + ":"
-            + str(
-                response.response_id
-                or response.request_id
-                or turn_id
-            )
+        provider_ref = self._bind_provider_response(
+            payload,
+            response,
+            turn_id,
         )
         provider_receipts = list(payload.get("provider_receipts", []))
         provider_receipts.append(provider_ref)
@@ -1649,7 +1738,7 @@ class CognitiveExecutionRuntime:
         approval_refs: Mapping[str, str],
         now: datetime | None,
     ) -> ExecutionRunResult:
-        allowed = set(str(item) for item in payload.get("allowed_tool_ids", []))
+        allowed = {str(item) for item in payload.get("allowed_tool_ids", [])}
         if any(call.tool_id not in allowed for call in calls):
             return self._finalize_non_success(
                 execution,
@@ -1846,7 +1935,7 @@ class CognitiveExecutionRuntime:
         raw_calls = payload.get("pending_tool_calls", [])
         if not isinstance(raw_ids, list) or not isinstance(raw_calls, list):
             raise CognitiveExecutionError("approval checkpoint is corrupt")
-        wanted = set(str(item) for item in raw_ids)
+        wanted = {str(item) for item in raw_ids}
         pending: list[PendingApproval] = []
         for raw in raw_calls:
             if not isinstance(raw, dict):
@@ -1938,9 +2027,9 @@ class CognitiveExecutionRuntime:
                 ),
                 arguments=dict(call.arguments),
                 requested_at=(
-                    datetime.now(timezone.utc)
+                    datetime.now(UTC)
                     if now is None
-                    else now.astimezone(timezone.utc)
+                    else now.astimezone(UTC)
                 ),
                 approval_ref=approval_refs.get(call.call_id),
                 delegated_authority_ref=(
@@ -2239,7 +2328,7 @@ class CognitiveExecutionRuntime:
                 raise CognitiveExecutionError(
                     "tool verification evidence time must be timezone-aware"
                 )
-            observed_at = observed_at.astimezone(timezone.utc)
+            observed_at = observed_at.astimezone(UTC)
 
             try:
                 tool_risk = VerificationRisk(raw_tool_risk)
@@ -2453,9 +2542,9 @@ class CognitiveExecutionRuntime:
             raise CognitiveExecutionError("execution tenant_id is invalid")
         tenant_id = tenant_id.strip()
         instant = (
-            datetime.now(timezone.utc)
+            datetime.now(UTC)
             if now is None
-            else now.astimezone(timezone.utc)
+            else now.astimezone(UTC)
         )
         turns = self.repository.turns(execution.execution_id)
         turn_id = (
@@ -2837,9 +2926,9 @@ class CognitiveExecutionRuntime:
                 },
                 stream_terminal_event=terminal_event,
                 completed_at=(
-                    datetime.now(timezone.utc)
+                    datetime.now(UTC)
                     if now is None
-                    else now.astimezone(timezone.utc)
+                    else now.astimezone(UTC)
                 ),
             )
             return self._commit_terminal_result(
@@ -2889,9 +2978,9 @@ class CognitiveExecutionRuntime:
             },
             stream_terminal_event=terminal_event,
             completed_at=(
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             ),
         )
         return self._commit_terminal_result(
@@ -2948,9 +3037,9 @@ class CognitiveExecutionRuntime:
             },
             stream_terminal_event=terminal_event,
             completed_at=(
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if now is None
-                else now.astimezone(timezone.utc)
+                else now.astimezone(UTC)
             ),
         )
         return self._commit_terminal_result(

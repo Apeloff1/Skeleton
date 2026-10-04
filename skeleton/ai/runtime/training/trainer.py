@@ -224,7 +224,8 @@ class ReferenceLocalTrainer:
             created_at=instant.isoformat(),
             payload_digest=_digest(payload),
         )
-        self.runs.checkpoint(checkpoint, lease, payload=payload)
+        with self.datasets.training_authority(manifest.dataset_digest, binding["dataset_authority_epoch"]):
+            self.runs.checkpoint(checkpoint, lease, payload=payload)
         return checkpoint
 
     @staticmethod
@@ -292,10 +293,14 @@ class ReferenceLocalTrainer:
         if split.record_count != len(documents):
             raise ValueError("training document count does not match registered split")
         token_count, corpus_bytes = self._enforce_execution_boundary(manifest, documents)
+        self.datasets.validate_training_corpus(manifest.dataset_digest, documents, split_name=split_name)
+        authority_epoch = self.datasets.dataset_authority_epoch(manifest.dataset_digest)
+        self.datasets.assert_dataset_authority(manifest.dataset_digest, authority_epoch)
         binding = {
             "schema_version": _BINDING_SCHEMA,
             "manifest_digest": manifest.digest,
             "dataset_digest": manifest.dataset_digest,
+            "dataset_authority_epoch": authority_epoch,
             "split_name": split_name,
             "split_digest": split.digest,
             "corpus_digest": actual_corpus_digest,
@@ -343,6 +348,7 @@ class ReferenceLocalTrainer:
             )
             while usage["documents"] < len(documents):
                 self.runs.assert_worker_current(lease)
+                self.datasets.assert_dataset_authority(manifest.dataset_digest, authority_epoch)
                 start = usage["documents"]
                 end = min(len(documents), start + checkpoint_every_documents)
                 batch = documents[start:end]
@@ -375,7 +381,8 @@ class ReferenceLocalTrainer:
                     ),
                     lease,
                 )
-            terminal = self.runs.complete(manifest.run_id, lease)
+            with self.datasets.training_authority(manifest.dataset_digest, authority_epoch):
+                terminal = self.runs.complete(manifest.run_id, lease)
             if terminal.digest != checkpoint.digest:
                 raise TrainingStateError("training completion did not bind latest checkpoint")
         except Exception:

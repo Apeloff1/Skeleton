@@ -14,6 +14,26 @@ reviewable candidate; local tests do not establish landed or production evidence
 | `P3T2-LEARNING-01` | Curriculum evidence binds stage thresholds, registered episode traces and one exact policy. Verifier candidates consume measured local benchmark receipts with the same model and training identity. Arbitrary evaluation strings, mixed policies and altered results fail closed. | `test_p3_learning_programs.py`, `test_p3_learning_foundation_acceptance.py` |
 | `P3T2-MULTIMODAL-01` | Ingestion stages validation before publishing the asset, blob, record or text projection. Rejected conflicts cannot poison retrieval. Reads verify issued record, content and text identity; speech receipts retain a verified ordered chain. | `test_p3_multimodal_integrity.py`, `test_p3_multimodal_foundation.py` |
 | `P3T2-LIFECYCLE-01` | Bounded reported per-input output comparisons produce registry-issued migration evidence. Applying a migration atomically activates the target and deprecates the source; rollback restores the captured baseline under the exact migration history. Numeric proposals alone cannot apply a migration. | `test_p3_model_migration.py`, `test_p3_model_lifecycle.py` |
+| `P3T2-DATA-01` | Materialized ingestion stores original source bytes and exact document sequences, computes observed quality, versions datasets transactionally and durably fences source revocation/deletion. | `test_governed_training_data.py` |
+| `P3T2-TRAINING-01` | Real NumPy recurrent SGD persists full weights, optimizer settings, epoch/document cursor, cumulative budgets and observed loss. Interrupted training resumes to bit-identical weights. | `test_p3_neural_training_resume.py` |
+| `P3T2-LEARNING-01` | Executable local episodes commit actual policy/environment effects, receipts and cursors together; curriculum and qualification derive from issued execution and measured evaluation. | `test_p3_post_training_execution.py` |
+| `P3T2-MULTIMODAL-01` | Bounded text exports bind actual projected documents to assets, projections, rights, lineage and simulation purpose; native dataset ingestion preserves the complete source manifest. | `test_p3_multimodal_training_projection.py` |
+| `P3T2-LIFECYCLE-01` | SQLite persists and validates the complete lifecycle evidence graph, reconstructs issued decisions after restart, serializes independent connections and supports validated backup/restore. | `test_p3_model_lifecycle_persistence.py` |
+| Existing provider owner | Derived artifacts activate through an explicitly declared local provider with architecture acknowledgement, conservative governance, admission, actual usage and cancellation. | `test_local_provider_activation.py`, `test_local_provider_runtime_guards.py` |
+| Existing engine API owner | Authenticated inventory exposes provider availability; durable handoff recovery reconstructs the original accepted lineage under current read authority. Cancellation waits for the actual local worker to exit before terminalization. | `test_engine_routes.py`, `test_engine_handoff_recovery.py`, `test_local_inference_cancellation.py` |
+
+The [operator guide](GOVERNED_LOCAL_MODEL_DEVELOPMENT.md) documents the new
+`skeleton-train-governed-model` command and the concrete restart/deletion/rollback
+path. The assembled multimodal/neural/lifecycle acceptance test closes and reopens
+all durable authorities, executes held-out local suites, applies and compensates
+a migration, then proves revoked/deleted/corrupt/failed-quality sources cannot
+be reused.
+
+`test_governed_model_engine_acceptance.py` also runs the reference and neural
+CLI through an authenticated HTTP engine with network sockets blocked. It
+reopens both training databases, replays completed training without updates,
+checks actual governance/admission/usage receipts and provider inventory, then
+reopens the engine database and verifies execution replay and cancellation.
 
 `test_p3_training_lifecycle_acceptance.py` assembles the durable native trainer,
 close/reopen artifact reload, actual local model evaluation, MBOM identities,
@@ -30,7 +50,8 @@ identity; legacy digest-only checkpoints remain readable but cannot provide
 resumable model state. No separate service, state owner or provider boundary is
 introduced.
 
-Native execution remains a single-worker reference n-gram count estimator.
+Reference execution remains a single-worker n-gram count estimator; the second
+implementation wave also adds a real single-worker NumPy recurrent SGD trainer.
 Document batches, individual document bytes, total corpus bytes and checkpoint
 payload size are bounded before execution or commit. Immutable execution
 bindings preserve document boundaries, model order and split identity. Budgets
@@ -48,7 +69,8 @@ remain declarations; they do not prove real-world dataset disjointness.
 Lifecycle parity comparisons record verifier-reported observations. The assembled
 test supplies actual local evaluation outputs, but the registry itself does not
 authenticate external observation provenance or execute production routing.
-Its migration and rollback state remains bounded, process-local candidate control.
+Its migration and rollback state is now optionally durable SQLite candidate
+control, with full graph validation and version fences across connections.
 
 ## Failure, observation and rollback
 
@@ -72,7 +94,7 @@ promotes a model, release or masterplan owner.
 
 ## Validation and remaining work
 
-The new **AI Training Resume and Evidence Integrity** workflow checks out the
+The expanded **AI Governed Training Pipeline** workflow checks out the
 exact source head, validates the bounded contract, compiles both runtime packages,
 runs focused and assembled regressions, and separately runs the canonical
 architecture, construction, capability-interface, state-topology and provider
@@ -91,10 +113,23 @@ candidate tree. The original branch implementation SHA is retained separately.
 Continuation tests now expect the validator's task-qualified rejection messages.
 These repairs confer no closure authority.
 
-Pre-existing global blockers identified during this pass include unrelated
-AI-file-tree mirror drift, a depth-pass gap inventory violation at `VOL-248`,
-and historical native-training backlog obligation drift at `VOL-133`. They require
-their own reconciliation and cannot be treated as green because bounded domain
-tests pass. Neural optimizer resume, distributed collectives, independently
-authenticated production evaluation and durable model-routing migration remain
-outside this bounded implementation.
+The second wave repairs the global AI-file-tree mirror drift, restores an honest
+remaining independent verification gap at `VOL-248`, and refreshes both native
+and learning obligation snapshots from the authoritative masterplan. It also
+repairs inherited repository traversal, dependency, retrieval, taxonomy and
+budget/recovery fixture failures while preserving authority fences. Global
+validators and those reconciled domain suites now pass locally. The consolidated
+second-wave run passed **1,675 tests and 29 subtests across 119 test files**;
+one redundant repository scan was deselected and the provider-bootstrap gate
+ran separately. The final CLI numerical-dependency binding change also passed
+**37 targeted CLI/engine tests**. All changed Python files passed Ruff and
+compilation, and the architecture, construction, capability-interface,
+state-topology, masterplan, file-tree, continuation, training/learning execution,
+closure-evidence, resume, pipeline and provider-bootstrap gates passed locally.
+The earlier 291-test count describes the first wave. Remote CI must repeat
+verification on the submitted head.
+
+Distributed collectives, independently authenticated production evaluation,
+production model-routing migration and independent masterplan closure remain
+outside this bounded implementation. No queued volume, completion checkbox or
+signature is removed or fabricated.

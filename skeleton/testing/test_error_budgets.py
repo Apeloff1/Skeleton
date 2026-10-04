@@ -144,7 +144,6 @@ def test_budget_exhaustion_is_reported_even_when_independent_gates_pass() -> Non
         burn_rate=rate,
         safety_gate_passed=True,
         reliability_gate_passed=True,
-        budget_exhausted=False,
     )
 
     assert decision.status == "exhausted"
@@ -213,14 +212,15 @@ def test_burn_rate_rejects_ambiguous_unbounded_representation() -> None:
 
 
 def test_budget_decision_cannot_claim_override_or_authority() -> None:
-    common = dict(
-        budget_digest="a" * 64,
-        burn_rate_digest="b" * 64,
-        status="healthy",
-        blocking_reasons=(),
-        safety_gate_passed=True,
-        reliability_gate_passed=True,
-    )
+    common = {
+        "budget_digest": "a" * 64,
+        "burn_rate_digest": "b" * 64,
+        "status": "healthy",
+        "blocking_reasons": (),
+        "safety_gate_passed": True,
+        "reliability_gate_passed": True,
+        "budget_exhausted": False,
+    }
 
     with pytest.raises(ErrorBudgetPolicyError, match="override safety"):
         BudgetDecision(**common, safety_override=True)
@@ -231,13 +231,13 @@ def test_budget_decision_cannot_claim_override_or_authority() -> None:
 
 
 def test_budget_decision_rejects_forged_status_or_reasons() -> None:
-    common = dict(
-        budget_digest="a" * 64,
-        burn_rate_digest="b" * 64,
-        safety_gate_passed=True,
-        reliability_gate_passed=True,
-        budget_exhausted=False,
-    )
+    common = {
+        "budget_digest": "a" * 64,
+        "burn_rate_digest": "b" * 64,
+        "safety_gate_passed": True,
+        "reliability_gate_passed": True,
+        "budget_exhausted": False,
+    }
 
     with pytest.raises(
         ErrorBudgetPolicyError,

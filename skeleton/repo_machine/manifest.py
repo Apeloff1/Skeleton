@@ -1,14 +1,14 @@
 """Canonical serialization and drift comparison for repository machine manifests."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
-import tempfile
 import os
 import stat
-from typing import Mapping
+import tempfile
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
 
 from .model import RepositoryModel, canonical_json
 
@@ -116,12 +116,12 @@ def load_manifest(path: str | Path) -> Mapping[str, object]:
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError("machine manifest is invalid JSON") from exc
     if not isinstance(payload, dict):
-        raise ValueError("machine manifest must be an object")
+        raise TypeError("machine manifest must be an object")
     if payload.get("format") != "skeleton-repository-machine-manifest" or payload.get("version") != 1:
         raise ValueError("unsupported machine manifest format")
     state = payload.get("state")
     if not isinstance(state, dict):
-        raise ValueError("machine manifest state missing")
+        raise TypeError("machine manifest state missing")
     if payload.get("checksum") != _checksum(state):
         raise ValueError("machine manifest checksum mismatch")
     return payload
@@ -133,16 +133,16 @@ def validate_manifest(payload: Mapping[str, object]) -> None:
         raise ValueError("unsupported machine manifest format")
     state = payload.get("state")
     if not isinstance(state, dict):
-        raise ValueError("machine manifest state missing")
+        raise TypeError("machine manifest state missing")
     files = state.get("files")
     if not isinstance(files, list):
-        raise ValueError("machine manifest file inventory missing")
+        raise TypeError("machine manifest file inventory missing")
     paths: list[str] = []
     for item in files:
         if not isinstance(item, dict) or not isinstance(item.get("path"), str):
-            raise ValueError("machine manifest contains an invalid file record")
+            raise TypeError("machine manifest contains an invalid file record")
         path = item["path"]
-        if not path or path.startswith("/") or path == ".machine" or path.startswith(".machine/"):
+        if not path or path == ".machine" or path.startswith(("/", ".machine/")):
             raise ValueError("machine manifest contains an invalid generated-artifact path")
         paths.append(path)
     if paths != sorted(paths) or len(paths) != len(set(paths)):

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "contract_id": "p3t2-model-lifecycle-candidate-persistence-v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/ai/runtime/learning_foundation/lifecycle.py",
+  "repository": "skeleton/ai/runtime/learning_foundation/lifecycle_repository.py",
+  "existing_plane": "feedback-learning",
+  "canonical_plane_authority": "skeleton/learning",
+  "authority_scope": "local-model-lifecycle-candidates",
+  "production_routing_authority": false,
+  "promotion_authority": false,
+  "durable_store": "sqlite",
+  "memory_default": "backwards-compatible-run-scoped-candidate-reference",
+  "database": {
+    "application_id": 1296843609,
+    "user_version": 1,
+    "journal_mode": "WAL",
+    "synchronous": "FULL",
+    "transaction": "BEGIN IMMEDIATE",
+    "write_fence": "compare-and-set-monotonic-snapshot-version",
+    "writer_ownership": "repository-serialized-candidate-control",
+    "schema": "single-versioned-canonical-snapshot-row",
+    "read_failure": "fail-closed-no-memory-fallback",
+    "write_failure": "rollback-complete-transaction-and-reload-durable-state"
+  },
+  "snapshot_format": {
+    "version": 1,
+    "encoding": "canonical-utf8-json-no-duplicate-keys-or-nonfinite-values",
+    "integrity": "sha256-canonical-payload",
+    "fields": [
+      "schema_version",
+      "budgets",
+      "mboms",
+      "states",
+      "history",
+      "decisions",
+      "migrations",
+      "rollbacks"
+    ],
+    "restore_validation": [
+      "exact-fields-and-types",
+      "model-mbom-training-dataset-license-and-rights-identity",
+      "immutable-transition-receipt-digests-and-sequence",
+      "independent-verifiers",
+      "legal-ordinary-transition-graph",
+      "migration-and-compensation-pairs-bind-exact-history-prefixes",
+      "parity-derived-from-exact-comparison-cases",
+      "issued-decisions-bind-exact-evaluation-mbom-and-lifecycle-prefix",
+      "state-map-equals-replayed-history",
+      "rollback-reservations-fit-history-budget",
+      "no-orphaned-evidence-or-receipts"
+    ]
+  },
+  "bounds": {
+    "max_snapshot_bytes": 16777216,
+    "max_models": 4096,
+    "max_transitions": 65536,
+    "max_decisions": 8192,
+    "max_parity_cases_per_evaluation": 1024,
+    "max_dataset_digests_per_mbom": 1024,
+    "max_references_per_record": 128,
+    "max_text_characters": 1024
+  },
+  "migration": {
+    "supported_database_versions": [1],
+    "supported_snapshot_versions": [1],
+    "empty_database_initialization": "atomic-schema-and-initial-empty-snapshot",
+    "unknown_or_newer_version": "reject-without-upgrade-or-state-rewrite",
+    "existing_unrelated_database": "reject-without-taking-ownership",
+    "future_breaking_change": "explicit-reviewed-migration-with-last-version-restore-evidence"
+  },
+  "backup_restore": {
+    "backup": "sqlite-online-backup-under-validated-repository-transaction",
+    "restore": "validate-complete-backup-before-atomic-destination-creation",
+    "existing_destination": "reject-to-preserve-current-state",
+    "corruption": "reject-and-preserve-corrupt-evidence-no-silent-repair",
+    "recovery": "restore-known-good-validated-backup-to-new-candidate-database",
+    "receipt": "backup-and-restore-return-validated-snapshot-digest-and-version"
+  },
+  "tests": [
+    "skeleton/testing/test_p3_model_lifecycle.py",
+    "skeleton/testing/test_p3_model_migration.py",
+    "skeleton/testing/test_p3_model_lifecycle_persistence.py"
+  ],
+  "completion_checkbox": false,
+  "implementation_signed": false,
+  "verification_signed": false
+}

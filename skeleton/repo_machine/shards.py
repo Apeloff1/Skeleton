@@ -1,9 +1,9 @@
 """Stable context shards for large-repository machine consumption."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
+from dataclasses import dataclass
 
 from .catalog import build_catalog
 from .contracts import contract_map

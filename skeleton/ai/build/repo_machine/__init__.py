@@ -1,17 +1,32 @@
-"""Machine-native repository organization and topology plane.
+"""Machine-native repository organization and topology plane."""
+from __future__ import annotations
 
-Deterministic standard-library tooling for autonomous repository understanding,
-organization, growth planning, impact analysis and bounded stewardship.
-Repository files are inspected as data and are never imported or executed by
-this package.
-"""
-
-from .atlas import AtlasZone, PathPlacement, RepositoryAtlas, build_repository_atlas, placement_for_path
+from .atlas import (
+    AtlasZone,
+    PathPlacement,
+    RepositoryAtlas,
+    build_repository_atlas,
+    placement_for_path,
+)
 from .budgets import ZoneBudget, derive_zone_budgets
 from .builder import RepositoryModelBuilder, build_repository_model
 from .catalog import CapabilityRecord, RepositoryCatalog, build_catalog
 from .context import context_for_intent
 from .contracts import SubsystemContract, derive_contracts
+from .coordination import (
+    CoordinationDecision,
+    CoordinationPlan,
+    build_coordination_plan,
+    select_next_work,
+)
+from .execution_plan import (
+    ExecutionPlan,
+    ExecutionState,
+    PlanStep,
+    advance_execution,
+    build_execution_plan,
+    replan_execution,
+)
 from .governance import GovernanceViolation, validate_governance
 from .growth import GrowthRecommendation, growth_recommendations
 from .health import HealthReport, repository_health
@@ -45,6 +60,10 @@ __all__ = [
     "AtlasZone",
     "CapabilityRecord",
     "ContextShard",
+    "CoordinationDecision",
+    "CoordinationPlan",
+    "ExecutionPlan",
+    "ExecutionState",
     "FileRecord",
     "Finding",
     "GovernanceViolation",
@@ -56,6 +75,7 @@ __all__ = [
     "NavigationIndex",
     "OwnershipReport",
     "PathPlacement",
+    "PlanStep",
     "PolicyDecision",
     "Relation",
     "ReorganizationProposal",
@@ -78,12 +98,15 @@ __all__ = [
     "WorkNode",
     "ZoneBudget",
     "ZoneRule",
+    "advance_execution",
     "analyze_impact",
     "analyze_ownership",
     "build_catalog",
-    "build_repository_atlas",
     "build_context_shards",
+    "build_coordination_plan",
+    "build_execution_plan",
     "build_relations",
+    "build_repository_atlas",
     "build_repository_model",
     "build_work_graph",
     "compare_manifest_states",
@@ -98,8 +121,10 @@ __all__ = [
     "placement_for_path",
     "propose_reorganization",
     "reachable_files",
+    "replan_execution",
     "repository_health",
     "save_manifest",
+    "select_next_work",
     "select_steward_plan",
     "shard_index",
     "structural_hotspots",

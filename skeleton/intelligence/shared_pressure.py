@@ -9,14 +9,14 @@ lease-expiry, and overload-shedding view.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
 import hashlib
 import math
-from pathlib import Path
 import sqlite3
 import time
-from typing import Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
 
 
 class SharedPressureError(RuntimeError):
@@ -179,12 +179,12 @@ CREATE INDEX IF NOT EXISTS idx_pressure_queue_tenant ON shared_pressure_queue (s
 
 
 def _lease_id(scope: str, operation: str, tenant: str, owner: str) -> str:
-    raw = "\x1f".join((scope, operation, tenant, owner)).encode()
+    raw = f"{scope}\x1f{operation}\x1f{tenant}\x1f{owner}".encode()
     return "prs-" + hashlib.sha256(raw).hexdigest()[:24]
 
 
 def _ticket_id(scope: str, task: str, tenant: str) -> str:
-    raw = "\x1f".join((scope, task, tenant)).encode()
+    raw = f"{scope}\x1f{task}\x1f{tenant}".encode()
     return "prq-" + hashlib.sha256(raw).hexdigest()[:24]
 
 

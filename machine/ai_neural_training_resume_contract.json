@@ -1,0 +1,64 @@
+{
+  "schema_version": "skeleton.ai.neural_training_resume_contract.v1",
+  "status": "implemented_unpromoted",
+  "claim_scope": "bounded_single_worker_numpy_recurrent_neural_training_resume",
+  "production_model_promotion_authorized": false,
+  "distributed_neural_training_supported": false,
+  "canonical_owners": {
+    "control": "skeleton/ai/runtime/training/control.py",
+    "trainer": "skeleton/ai/runtime/training/neural_trainer.py",
+    "model": "skeleton/ai/runtime/inference/neural.py",
+    "data": "skeleton/ai/runtime/training/data.py"
+  },
+  "persistence": {
+    "authority": "existing TrainingRepository SQLite database",
+    "binding_table": "training_execution_binding",
+    "payload_table": "training_checkpoint_payload",
+    "commit_boundary": "one complete SGD document update, full float64 weights, optimizer settings and cumulative cursor/usage in one worker-fenced transaction",
+    "migration": "reuse additive payload/binding tables; distinct neural binding and resume schemas; no new store or runtime service",
+    "rollback": "retain payload-backed neural checkpoints; disable neural trainer without discarding training or dataset authority"
+  },
+  "algorithm": {
+    "id": "numpy-recurrent-byte-sgd-v1",
+    "model_schema": "skeleton.numpy_recurrent_lm.v1",
+    "optimizer": "plain SGD with global gradient norm clipping; no momentum or adaptive slots",
+    "ordering": "epochs in order, documents in registered order, hidden state reset per document",
+    "random_state": "manifest seed initializes parameters once; SGD contains no stochastic draws, shuffling or dropout",
+    "base_identity": "manifest.base_model_digest must equal the initialized model digest, including run-specific model ID and full neural config"
+  },
+  "binding": {
+    "schema_version": "skeleton.neural_training_binding.v1",
+    "immutable_fields": ["manifest_digest", "dataset_digest", "dataset_authority_epoch", "split_name", "split_digest", "corpus_digest", "document_sequence_digest", "document_count", "corpus_bytes", "document_bytes", "targets_per_epoch", "training_config", "initial_model_digest"],
+    "training_config_fields": ["algorithm", "model_id", "hidden_size", "seed", "dtype", "epochs", "learning_rate", "gradient_clip"]
+  },
+  "resume_payload": {
+    "schema_version": "skeleton.neural_training_resume.v1",
+    "fields": ["schema_version", "binding_digest", "cursor", "usage", "optimizer", "model", "initial_loss", "final_loss", "finished"],
+    "cursor_fields": ["epoch", "document_index", "update_count", "step"],
+    "usage_fields": ["steps", "documents", "training_bytes", "epochs"],
+    "optimizer_fields": ["algorithm", "learning_rate", "gradient_clip", "slots"],
+    "step_semantics": "cumulative UTF-8 byte targets plus one EOS target per document per epoch; every completed document is one SGD update",
+    "budgets": "max_steps and max_tokens bound cumulative targets; max_documents and max_updates bound cumulative document updates; max_training_bytes bounds cumulative UTF-8 document bytes across epochs; max_corpus_bytes bounds registered corpus ingress; max_epochs bounds configured epochs",
+    "identity": "TrainingCheckpoint.payload_digest binds full weights, optimizer, cursor, usage and loss evidence; model_digest binds float64 parameter bytes"
+  },
+  "limits": {
+    "max_hidden_size": 128,
+    "max_document_bytes": 4096,
+    "max_corpus_bytes": 1048576,
+    "max_epochs": 1024,
+    "max_training_targets": 16777216,
+    "max_document_updates": 65536,
+    "max_checkpoint_payload_bytes": 16777216
+  },
+  "recovery": [
+    "validate quality-gated dataset, rights, materialized document identity and dataset authority epoch before model work",
+    "persist initialized model and initial corpus loss at cursor zero before the first update",
+    "advance worker epoch before recovering a running or failed run; allow empty recovery only for exactly bound startup work",
+    "restore full parameters and SGD settings after fencing, then continue from the returned authoritative epoch/document cursor",
+    "assert dataset authority before updates; serialize checkpoint and terminal commits against revocation using the existing dataset training_authority SQLite guard",
+    "a finished checkpoint includes actual final corpus loss and reloads idempotently without retraining or state mutation"
+  ],
+  "failures": ["manifest/base/config/corpus mismatch fails before an SGD update", "nonfinite parameters or loss fail closed", "payload/binding corruption prevents resume or artifact loading", "stale worker cannot checkpoint, emit telemetry or terminalize replacement work", "dataset revocation/deletion/authority drift prevents continuation", "budget exhaustion never resets usage on restart"],
+  "tests": ["skeleton/testing/test_p3_neural_training_resume.py", "skeleton/testing/test_native_neural_lm.py"],
+  "scope_limitations": ["portable byte-level recurrent baseline", "single local NumPy worker", "no distributed collectives", "no production candidate promotion", "no general AI masterplan closure or signoff"]
+}

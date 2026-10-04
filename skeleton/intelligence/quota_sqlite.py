@@ -12,12 +12,12 @@ fencing, restart, and race invariants.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
-from pathlib import Path
 import sqlite3
 import time
-from typing import Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 from skeleton.intelligence.admission import UsageEstimate
 from skeleton.intelligence.quota import (
@@ -34,7 +34,6 @@ from skeleton.intelligence.quota import (
     _required_id,
     _reservation_id,
 )
-
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
 _UNKNOWN_USAGE_PREFIX = "unknown:"

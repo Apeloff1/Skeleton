@@ -8,6 +8,8 @@ from .data import (
     DatasetSplit,
     IngestEnvelope,
     LineageReceipt,
+    MaterializedDatasetReceipt,
+    MaterializedTrainingSource,
     SyntheticDataReceipt,
 )
 
@@ -19,6 +21,8 @@ __all__ = [
     "DatasetSplit",
     "IngestEnvelope",
     "LineageReceipt",
+    "MaterializedDatasetReceipt",
+    "MaterializedTrainingSource",
     "SyntheticDataReceipt",
 ]
 
@@ -40,7 +44,6 @@ __all__ += [
     "WorkerLease",
 ]
 
-from .trainer import LocalTrainingArtifact, ReferenceLocalTrainer, corpus_digest
 from .evaluation import (
     CandidateQualification,
     EvaluationCase,
@@ -51,6 +54,7 @@ from .evaluation import (
     TrainingEvaluationGate,
     VerifierReport,
 )
+from .trainer import LocalTrainingArtifact, ReferenceLocalTrainer, corpus_digest
 
 __all__ += [
     "CandidateQualification",
@@ -87,3 +91,39 @@ __all__ += [
     "RLEnvironmentSpec",
     "RLStepReceipt",
 ]
+
+from .learning_pipeline import (
+    ExecutedCurriculumReceipt,
+    ExecutedEpisodeReceipt,
+    ExecutedEvaluationReceipt,
+    LocalPolicyObservation,
+    LocalPostTrainingPolicy,
+    PostTrainingExecutionError,
+    PostTrainingExecutionSpec,
+    PostTrainingQualificationReceipt,
+    PostTrainingRunner,
+)
+
+__all__ += [
+    "ExecutedCurriculumReceipt",
+    "ExecutedEpisodeReceipt",
+    "ExecutedEvaluationReceipt",
+    "LocalPolicyObservation",
+    "LocalPostTrainingPolicy",
+    "NeuralLocalTrainer",
+    "NeuralTrainingArtifact",
+    "PostTrainingExecutionError",
+    "PostTrainingExecutionSpec",
+    "PostTrainingQualificationReceipt",
+    "PostTrainingRunner",
+]
+
+
+def __getattr__(name: str):
+    if name in {"NeuralLocalTrainer", "NeuralTrainingArtifact"}:
+        from . import neural_trainer
+
+        value = getattr(neural_trainer, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

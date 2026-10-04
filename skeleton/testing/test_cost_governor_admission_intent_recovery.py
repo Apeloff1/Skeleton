@@ -17,10 +17,10 @@ from skeleton.intelligence.admission import (
 )
 from skeleton.intelligence.quota import TenantQuota
 from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
     SharedPressurePolicy,
     SqliteSharedPressureLedger,
 )
-
 
 _SCOPE = "admission-intent-recovery"
 _OWNER = "worker-a"
@@ -90,8 +90,9 @@ def _pressure(path) -> SqliteSharedPressureLedger:
                 default_lease_seconds=60.0,
             )
         )
-    except Exception:
-        pass
+    except SharedPressureConflict as exc:
+        if str(exc) != "pressure scope already configured":
+            raise
     return ledger
 
 
@@ -162,9 +163,12 @@ def test_crash_after_decision_before_allocation_retries_cleanly(
         )
 
     assert _intent_count(quota_path) == 1
-    assert first.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 0
+    assert (
+        first.runtime.quota_ledger.reservation_for_operation(
+            request.tenant_id, request.operation_id
+        )
+        is None
+    )
 
     restarted = _governor(quota_path, pressure_path)
     receipt = restarted.reserve(
@@ -175,14 +179,19 @@ def test_crash_after_decision_before_allocation_retries_cleanly(
 
     assert receipt.operation_id == request.operation_id
     assert _intent_count(quota_path) == 0
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=20.5,
-    ).active == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=20.5,
+        )
+        .active
+        == 1
+    )
 
 
 def test_crash_after_shared_pressure_before_quota_releases_orphan_then_retries(
@@ -210,11 +219,16 @@ def test_crash_after_shared_pressure_before_quota_releases_orphan_then_retries(
             now_wall=10.0,
         )
 
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=10.5,
-    ).active == 1
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=10.5,
+        )
+        .active
+        == 1
+    )
     assert _intent_count(quota_path) == 1
 
     restarted = _governor(quota_path, pressure_path)
@@ -225,15 +239,20 @@ def test_crash_after_shared_pressure_before_quota_releases_orphan_then_retries(
     )
 
     assert _intent_count(quota_path) == 0
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
     # The orphan was settled before one fresh lease was acquired.
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=20.5,
-    ).active == 1
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=20.5,
+        )
+        .active
+        == 1
+    )
 
 
 def test_crash_after_quota_before_active_journal_recovers_exact_lease(
@@ -263,14 +282,17 @@ def test_crash_after_quota_before_active_journal_recovers_exact_lease(
         )
 
     assert _intent_count(quota_path) == 1
-    assert first.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=10.5,
-    ).active == 1
+    assert first.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=10.5,
+        )
+        .active
+        == 1
+    )
 
     restarted = _governor(quota_path, pressure_path)
     recovered = restarted.reserve(
@@ -281,17 +303,25 @@ def test_crash_after_quota_before_active_journal_recovers_exact_lease(
 
     assert recovered.operation_id == request.operation_id
     assert _intent_count(quota_path) == 0
-    assert restarted.runtime.telemetry_snapshot()["metrics"]["counters"][
-        "admission.reattached_total"
-    ] == 1
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=20.5,
-    ).active == 1
+    assert (
+        restarted.runtime.telemetry_snapshot()["metrics"]["counters"][
+            "admission.reattached_total"
+        ]
+        == 1
+    )
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=20.5,
+        )
+        .active
+        == 1
+    )
 
 
 def test_crash_after_active_journal_before_intent_clear_is_idempotent(
@@ -337,9 +367,9 @@ def test_crash_after_active_journal_before_intent_clear_is_idempotent(
 
     assert receipt.operation_id == request.operation_id
     assert _intent_count(quota_path) == 0
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
 
 
 def test_recovery_does_not_reevaluate_expired_deadline(
@@ -378,9 +408,12 @@ def test_recovery_does_not_reevaluate_expired_deadline(
     )
 
     assert receipt.operation_id == request.operation_id
-    assert restarted.runtime.telemetry_snapshot()["metrics"]["counters"][
-        "admission.reattached_total"
-    ] == 1
+    assert (
+        restarted.runtime.telemetry_snapshot()["metrics"]["counters"][
+            "admission.reattached_total"
+        ]
+        == 1
+    )
 
 
 def test_fallback_admission_recovers_original_fallback_identity(
@@ -467,9 +500,9 @@ def test_changed_request_cannot_claim_crashed_admission_intent(
     ):
         restarted.reserve(changed, now_wall=20.0)
 
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
 
 
 def test_tampered_admission_decision_intent_fails_closed(
@@ -528,9 +561,9 @@ def test_tampered_admission_decision_intent_fails_closed(
     ):
         restarted.reserve(request, now_wall=20.0)
 
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
 
 
 def test_decision_persistence_failure_allocates_no_authority(
@@ -562,14 +595,22 @@ def test_decision_persistence_failure_allocates_no_authority(
             now_wall=10.0,
         )
 
-    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 0
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=10.5,
-    ).active == 0
+    assert (
+        governor.runtime.quota_ledger.reservation_for_operation(
+            request.tenant_id, request.operation_id
+        )
+        is None
+    )
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=10.5,
+        )
+        .active
+        == 0
+    )
     assert _intent_count(quota_path) == 1
 
 
@@ -589,14 +630,19 @@ def test_successful_reserve_clears_admission_intent(
 
     assert receipt.operation_id == request.operation_id
     assert _intent_count(quota_path) == 0
-    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=10.5,
-    ).active == 1
+    assert (
+        governor.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=10.5,
+        )
+        .active
+        == 1
+    )
 
 
 def test_unjournaled_quota_authority_cannot_be_adopted(
@@ -660,14 +706,20 @@ def test_unjournaled_shared_pressure_authority_cannot_be_adopted(
             now_wall=20.0,
         )
 
-    assert pressure.lease_for_operation(
-        _SCOPE,
-        request.operation_id,
-        now=20.5,
-    ) == lease
-    assert governor.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 0
+    assert (
+        pressure.lease_for_operation(
+            _SCOPE,
+            request.operation_id,
+            now=20.5,
+        )
+        == lease
+    )
+    assert (
+        governor.runtime.quota_ledger.reservation_for_operation(
+            request.tenant_id, request.operation_id
+        )
+        is None
+    )
     assert _intent_count(quota_path) == 0
 
 
@@ -727,9 +779,9 @@ def test_extra_admission_intent_budget_field_is_rejected(
     ):
         restarted.reserve(request, now_wall=20.0)
 
-    assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
-        "active_reservations"
-    ] == 1
+    assert (
+        restarted.runtime.quota_ledger.snapshot("tenant-a")["active_reservations"] == 1
+    )
 
 
 def test_expired_pressure_after_quota_crash_abandons_clean_quota_and_readmits(
@@ -769,11 +821,16 @@ def test_expired_pressure_after_quota_crash_abandons_clean_quota_and_readmits(
     snapshot = restarted.runtime.quota_ledger.snapshot("tenant-a")
     assert snapshot["active_reservations"] == 1
     assert snapshot["usage_events"] == 0
-    assert _pressure(pressure_path).snapshot(
-        _SCOPE,
-        tenant_id="tenant-a",
-        now=80.5,
-    ).active == 1
+    assert (
+        _pressure(pressure_path)
+        .snapshot(
+            _SCOPE,
+            tenant_id="tenant-a",
+            now=80.5,
+        )
+        .active
+        == 1
+    )
 
 
 def test_pressure_loss_cannot_abandon_quota_after_metered_usage(
@@ -833,6 +890,7 @@ def test_pressure_loss_cannot_abandon_quota_after_metered_usage(
     assert snapshot["usage_events"] == 1
     assert _intent_count(quota_path) == 1
 
+
 def test_undecided_admission_intent_is_immutable_across_racing_writers(
     tmp_path,
 ) -> None:
@@ -860,10 +918,7 @@ def test_undecided_admission_intent_is_immutable_across_racing_writers(
 
     first = governor._journal.begin_admission_intent(original_intent)
     assert first == original_intent
-    assert (
-        governor._journal.begin_admission_intent(original_intent)
-        == original_intent
-    )
+    assert governor._journal.begin_admission_intent(original_intent) == original_intent
 
     with pytest.raises(
         CostGovernorConflict,
@@ -876,4 +931,3 @@ def test_undecided_admission_intent_is_immutable_across_racing_writers(
         == original_intent
     )
     assert _intent_count(quota_path) == 1
-

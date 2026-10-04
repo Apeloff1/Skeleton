@@ -12,12 +12,12 @@ fencing, restart, and race invariants.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
-from pathlib import Path
 import sqlite3
 import time
-from typing import Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 from skeleton.intelligence.admission import UsageEstimate
 from skeleton.intelligence.quota import (
@@ -34,7 +34,6 @@ from skeleton.intelligence.quota import (
     _required_id,
     _reservation_id,
 )
-
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
 _UNKNOWN_USAGE_PREFIX = "unknown:"
@@ -1324,6 +1323,64 @@ class SqliteTenantQuotaLedger:
                 ),
             )
         return quota
+
+    def recovery_state_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> tuple[QuotaReservation, tuple[QuotaUsageEvent, ...]] | None:
+        """Read active reservation and unresolved usage in one transaction."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._read() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM quota_reservations
+                WHERE tenant_id = ? AND operation_id = ?
+                """,
+                (tenant, operation),
+            ).fetchone()
+            if row is None:
+                return None
+            reservation = self._reservation(row)
+            unresolved_rows = conn.execute(
+                """
+                SELECT * FROM quota_usage_events
+                WHERE reservation_id = ? AND category LIKE ?
+                ORDER BY event_id
+                """,
+                (
+                    reservation.reservation_id,
+                    _UNKNOWN_USAGE_PREFIX + "%",
+                ),
+            ).fetchall()
+            return (
+                reservation,
+                tuple(
+                    self._usage_event(item)
+                    for item in unresolved_rows
+                ),
+            )
+
+    def reservation_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaReservation | None:
+        """Return the active reservation for an operation without mutation."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._read() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM quota_reservations
+                WHERE tenant_id = ? AND operation_id = ?
+                """,
+                (tenant, operation),
+            ).fetchone()
+            return None if row is None else self._reservation(row)
 
     def completion_for_operation(
         self,

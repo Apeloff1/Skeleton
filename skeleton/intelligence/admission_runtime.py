@@ -12,12 +12,13 @@ and tenant quota are not evaluated against isolated local counters.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 import hashlib
 import math
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from typing import Any
 
 from skeleton.cognition.telemetry import MetricRegistry
 from skeleton.intelligence.admission import (

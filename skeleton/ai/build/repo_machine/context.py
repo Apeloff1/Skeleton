@@ -1,14 +1,17 @@
-"""Purpose-specific bounded machine context slices for autonomous agents."""
+"""Purpose-specific bounded machine context slices using one shared intelligence graph."""
+
 from __future__ import annotations
 
 import json
 from typing import Literal
 
+from .coordination import build_coordination_plan
+from .execution_plan import build_execution_plan
 from .health import repository_health
 from .metrics import structural_metrics
 from .model import RepositoryModel
-from .planner import derive_work_candidates
 from .query import RepositoryQuery
+from .workgraph import build_work_graph
 
 Intent = Literal[
     "overview",
@@ -19,22 +22,93 @@ Intent = Literal[
     "documentation",
     "performance",
 ]
-
 MAX_CONTEXT_BYTES = 48_000
 
 
-def _bounded(payload: dict[str, object], byte_limit: int) -> dict[str, object]:
-    rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    if len(rendered.encode("utf-8")) <= byte_limit:
-        return payload
+def _fits(payload, limit):
+    return (
+        len(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
+        <= limit
+    )
+
+
+def _bounded(payload, limit):
     compact = dict(payload)
+    compact["truncated_for_context"] = False
+    if _fits(compact, limit):
+        return compact
     compact["truncated_for_context"] = True
-    if isinstance(compact.get("files"), list):
-        compact["files"] = compact["files"][:25]
-    if isinstance(compact.get("work"), list):
-        compact["work"] = compact["work"][:12]
-    if isinstance(compact.get("findings"), list):
-        compact["findings"] = compact["findings"][:16]
+    while not _fits(compact, limit):
+        changed = False
+        for key in (
+            "files",
+            "work",
+            "findings",
+            "subsystems",
+            "topology",
+            "coordination",
+            "intelligence",
+        ):
+            value = compact.get(key)
+            replacement = value
+            if isinstance(value, list) and value:
+                replacement = value[: len(value) // 2]
+            elif isinstance(value, dict) and value:
+                if key == "topology":
+                    e = value.get("edges", [])
+                    replacement = {
+                        "edges": e[: len(e) // 2],
+                        "cycles": value.get("cycles", [])[:4],
+                    }
+                elif key == "intelligence":
+                    replacement = {
+                        "graph_fingerprint": value.get("graph_fingerprint"),
+                        "strategic_value": value.get("strategic_value", 0),
+                        "bridge_candidates": value.get("bridge_candidates", [])[:8],
+                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[
+                            :4
+                        ],
+                    }
+                elif key == "coordination":
+                    d = value.get("decisions", [])
+                    replacement = {
+                        "decisions": d[: len(d) // 2],
+                        "bottleneck": value.get("bottleneck"),
+                        "frontier_size": value.get("frontier_size", 0),
+                        "max_parallelism": value.get("max_parallelism", 0),
+                        "coordination_pressure": value.get("coordination_pressure", 0),
+                        "safe_parallel_groups": value.get("safe_parallel_groups", [])[
+                            :4
+                        ],
+                    }
+            # Only a smaller representation is progress; repeating a minimal
+            # summary used to keep this loop alive forever under small limits.
+            if len(
+                json.dumps(replacement, sort_keys=True, separators=(",", ":"))
+            ) < len(json.dumps(value, sort_keys=True, separators=(",", ":"))):
+                compact[key] = replacement
+                changed = True
+            if _fits(compact, limit):
+                return compact
+        if not changed:
+            break
+    if not _fits(compact, limit):
+        keep = {
+            "intent",
+            "fingerprint",
+            "health",
+            "metrics",
+            "coordination",
+            "execution",
+            "intelligence",
+            "truncated_for_context",
+        }
+        compact = {k: compact[k] for k in keep if k in compact}
+        compact["truncated_for_context"] = True
+        for key in ("execution", "coordination", "intelligence", "health", "metrics"):
+            if _fits(compact, limit):
+                break
+            compact.pop(key, None)
     return compact
 
 
@@ -43,49 +117,60 @@ def context_for_intent(
     intent: Intent = "overview",
     *,
     byte_limit: int = MAX_CONTEXT_BYTES,
-) -> dict[str, object]:
-    if isinstance(byte_limit, bool) or not isinstance(byte_limit, int) or not 4_096 <= byte_limit <= 256_000:
+):
+    if (
+        isinstance(byte_limit, bool)
+        or not isinstance(byte_limit, int)
+        or not 4096 <= byte_limit <= 256000
+    ):
         raise ValueError("byte_limit must be in [4096,256000]")
     query = RepositoryQuery(model)
-    health = repository_health(model)
-    metrics = structural_metrics(model)
-    work = [item.as_dict() for item in derive_work_candidates(model, limit=32)]
-    base: dict[str, object] = {
+    graph = build_work_graph(model, limit=32)
+    coordination = build_coordination_plan(model, limit=8, graph=graph)
+    execution = build_execution_plan(model, limit=8, graph=graph)
+    intelligence = {
+        "graph_fingerprint": graph.fingerprint,
+        "strategic_value": graph.strategic_value(),
+        "coordination_pressure": graph.pressure(),
+        "critical_path_depth": graph.critical_depth,
+        "bottleneck": graph.bottleneck(),
+        "safe_parallel_groups": [list(x) for x in graph.safe_parallel_groups(limit=4)],
+        "bridge_candidates": list(graph.bridge_candidates(limit=12)),
+    }
+    base = {
         "intent": intent,
         "fingerprint": model.fingerprint,
-        "health": health.as_dict(),
-        "metrics": metrics.as_dict(),
-        "subsystems": [item.as_dict() for item in model.subsystems],
-        "work": work,
-        "findings": [item.as_dict() for item in model.findings[:40]],
+        "health": repository_health(model).as_dict(),
+        "metrics": structural_metrics(model).as_dict(),
+        "subsystems": [x.as_dict() for x in model.subsystems],
+        "work": [x.as_dict() for x in graph.ordered_nodes],
+        "coordination": coordination,
+        "execution": execution.as_dict(),
+        "intelligence": intelligence,
+        "findings": [x.as_dict() for x in model.findings[:40]],
     }
-
     if intent == "architecture":
         base["topology"] = {
-            "edges": [item.as_dict() for item in model.edges],
-            "cycles": [list(item) for item in model.cycles],
+            "edges": [x.as_dict() for x in model.edges],
+            "cycles": [list(x) for x in model.cycles],
         }
-        base["files"] = [
-            item.as_dict()
-            for item in query.largest_files(limit=40).files
-        ]
+        base["files"] = [x.as_dict() for x in query.largest_files(limit=40).files]
     elif intent == "testing":
         base["files"] = [
-            item.as_dict()
-            for item in query.files(kinds=["test"], limit=100).files
+            x.as_dict()
+            for x in query.verification_files(
+                tuple(x.name for x in model.subsystems), limit=100
+            ).files
         ]
     elif intent == "repair":
         base["files"] = [
-            item.as_dict()
-            for item in query.files(
-                kinds=["source", "workflow", "config"],
-                limit=80,
-            ).files
+            x.as_dict()
+            for x in query.files(kinds=["source", "workflow", "config"], limit=80).files
         ]
     elif intent == "security":
         base["files"] = [
-            item.as_dict()
-            for item in query.files(
+            x.as_dict()
+            for x in query.files(
                 zones=["automation", "github", "backend", "core"],
                 kinds=["source", "workflow", "config", "script"],
                 limit=80,
@@ -93,18 +178,10 @@ def context_for_intent(
         ]
     elif intent == "documentation":
         base["files"] = [
-            item.as_dict()
-            for item in query.files(kinds=["docs"], limit=100).files
+            x.as_dict() for x in query.files(kinds=["docs"], limit=100).files
         ]
     elif intent == "performance":
-        base["files"] = [
-            item.as_dict()
-            for item in query.largest_files(limit=60).files
-        ]
+        base["files"] = [x.as_dict() for x in query.largest_files(limit=60).files]
     else:
-        base["entrypoints"] = [
-            item.as_dict()
-            for item in query.entrypoints(limit=50).files
-        ]
-
+        base["entrypoints"] = [x.as_dict() for x in query.entrypoints(limit=50).files]
     return _bounded(base, byte_limit)
