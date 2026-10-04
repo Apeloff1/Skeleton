@@ -22,6 +22,11 @@ from .contracts import (
     canonical_json,
     sha256_json,
 )
+from .journal import (
+    DeferredExecutionJournal,
+    DeferredJournalConflict,
+    DeferredJournalRecord,
+)
 
 _VOLUME_RE = re.compile(r"^VOL-\d{3}$")
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -119,19 +124,20 @@ class DeferredInvocation:
             _units(self.latency_ms, "latency_ms"),
         )
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "operation_id": self.operation_id,
+            "volume_id": self.volume_id,
+            "spec_digest": self.spec_digest,
+            "authority_digest": self.authority_digest,
+            "payload_digest": self.payload_digest,
+            "cost_units": self.cost_units,
+            "latency_ms": self.latency_ms,
+        }
+
     @property
     def fingerprint(self) -> str:
-        return sha256_json(
-            {
-                "operation_id": self.operation_id,
-                "volume_id": self.volume_id,
-                "spec_digest": self.spec_digest,
-                "authority_digest": self.authority_digest,
-                "payload_digest": self.payload_digest,
-                "cost_units": self.cost_units,
-                "latency_ms": self.latency_ms,
-            }
-        )
+        return sha256_json(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +259,21 @@ class DeferredExecutionError(RuntimeError):
         self.receipt = receipt
 
 
+class DeferredExecutionPendingError(RuntimeError):
+    """A durable start exists, so retrying could duplicate an unknown effect."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        operation_id: str,
+        record_digest: str,
+    ) -> None:
+        super().__init__(message)
+        self.operation_id = _text(operation_id, "operation_id")
+        self.record_digest = _sha256(record_digest, "record_digest")
+
+
 @dataclass(frozen=True, slots=True)
 class _Handler:
     identity: str
@@ -267,10 +288,16 @@ class _Handler:
 class DeferredExecutor:
     """Execute enabled deferred-volume operations with fail-closed receipts."""
 
-    def __init__(self, registry: CapabilityRegistry) -> None:
+    def __init__(
+        self,
+        registry: CapabilityRegistry,
+        *,
+        journal: DeferredExecutionJournal | None = None,
+    ) -> None:
         if not isinstance(registry, CapabilityRegistry):
             raise TypeError("registry must be CapabilityRegistry")
         self.registry = registry
+        self.journal = journal
         self._handlers: dict[str, _Handler] = {}
         self._budgets: dict[str, Budget] = {}
         self._payload_limits: dict[str, int] = {}
@@ -443,6 +470,190 @@ class DeferredExecutor:
         isolated = json.loads(payload_json)
         return handler, ledger, isolated
 
+    def _journal_invocation(
+        self,
+        record: DeferredJournalRecord,
+    ) -> DeferredInvocation:
+        try:
+            invocation = DeferredInvocation(**record.invocation)
+        except (TypeError, ValueError) as exc:
+            raise DeferredJournalConflict(
+                "durable deferred invocation is invalid"
+            ) from exc
+        if (
+            invocation.operation_id != record.operation_id
+            or invocation.fingerprint != record.fingerprint
+        ):
+            raise DeferredJournalConflict(
+                "durable deferred invocation identity mismatch"
+            )
+        capability = self.registry.get(invocation.volume_id)
+        if capability.spec.digest != invocation.spec_digest:
+            raise DeferredJournalConflict(
+                "durable deferred invocation spec no longer matches registry"
+            )
+        if capability.spec.handler != record.handler_identity:
+            raise DeferredJournalConflict(
+                "durable deferred handler identity no longer matches registry"
+            )
+        return invocation
+
+    @staticmethod
+    def _journal_terminal_payload(
+        receipt: ExecutionReceipt | FailureReceipt,
+        *,
+        result_json: str | None = None,
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "receipt": receipt.as_dict(),
+            "receipt_digest": receipt.digest,
+        }
+        if isinstance(receipt, ExecutionReceipt):
+            if result_json is None:
+                raise ValueError("success journal payload requires result")
+            payload["result"] = json.loads(result_json)
+        elif result_json is not None:
+            raise ValueError("failure journal payload cannot contain result")
+        return payload
+
+    def _parse_journal_terminal(
+        self,
+        record: DeferredJournalRecord,
+    ) -> tuple[ExecutionReceipt | FailureReceipt, str | None]:
+        if record.state == "started" or record.terminal is None:
+            raise DeferredJournalConflict(
+                "deferred journal record is not terminal"
+            )
+        invocation = self._journal_invocation(record)
+        terminal = record.terminal
+        receipt_data = terminal.get("receipt")
+        if not isinstance(receipt_data, Mapping):
+            raise DeferredJournalConflict(
+                "durable terminal receipt payload is invalid"
+            )
+        receipt_fields = dict(receipt_data)
+        try:
+            if record.state == "succeeded":
+                receipt: ExecutionReceipt | FailureReceipt = ExecutionReceipt(
+                    **receipt_fields
+                )
+            elif record.state == "failed":
+                receipt = FailureReceipt(**receipt_fields)
+            else:
+                raise DeferredJournalConflict(
+                    "unsupported deferred journal terminal state"
+                )
+        except (TypeError, ValueError) as exc:
+            raise DeferredJournalConflict(
+                "durable terminal receipt is invalid"
+            ) from exc
+
+        digest = terminal.get("receipt_digest")
+        if not isinstance(digest, str) or receipt.digest != digest:
+            raise DeferredJournalConflict(
+                "durable terminal receipt digest mismatch"
+            )
+        if self._receipt_fingerprint(receipt) != invocation.fingerprint:
+            raise DeferredJournalConflict(
+                "durable terminal receipt fingerprint mismatch"
+            )
+        if receipt.handler_identity != record.handler_identity:
+            raise DeferredJournalConflict(
+                "durable terminal receipt handler mismatch"
+            )
+
+        if isinstance(receipt, ExecutionReceipt):
+            if "result" not in terminal:
+                raise DeferredJournalConflict(
+                    "durable successful operation is missing result"
+                )
+            result_json = _strict_json(terminal["result"])
+            result_digest = hashlib.sha256(
+                result_json.encode("utf-8")
+            ).hexdigest()
+            if result_digest != receipt.result_digest:
+                raise DeferredJournalConflict(
+                    "durable successful result digest mismatch"
+                )
+            return receipt, result_json
+
+        if "result" in terminal:
+            raise DeferredJournalConflict(
+                "durable failure must not contain result"
+            )
+        return receipt, None
+
+    def _adopt_journal_terminal(
+        self,
+        record: DeferredJournalRecord,
+    ) -> ExecutionReceipt | FailureReceipt:
+        receipt, result_json = self._parse_journal_terminal(record)
+        with self._lock:
+            prior = self._fingerprints.get(receipt.operation_id)
+            if prior is not None and prior != record.fingerprint:
+                raise DeferredJournalConflict(
+                    "in-memory operation identity conflicts with journal"
+                )
+            self._fingerprints[receipt.operation_id] = record.fingerprint
+            if isinstance(receipt, ExecutionReceipt):
+                existing = self._success.get(receipt.operation_id)
+                if existing is not None and existing != receipt:
+                    raise DeferredJournalConflict(
+                        "in-memory success conflicts with journal"
+                    )
+                self._success[receipt.operation_id] = receipt
+                assert result_json is not None
+                self._success_result_json[receipt.operation_id] = result_json
+            else:
+                existing_failure = self._failure.get(receipt.operation_id)
+                if (
+                    existing_failure is not None
+                    and existing_failure != receipt
+                ):
+                    raise DeferredJournalConflict(
+                        "in-memory failure conflicts with journal"
+                    )
+                self._failure[receipt.operation_id] = receipt
+            self._in_flight.discard(receipt.operation_id)
+        return receipt
+
+    def _replay_journal_record(
+        self,
+        invocation: DeferredInvocation,
+        payload: Mapping[str, Any],
+        record: DeferredJournalRecord,
+    ) -> ExecutionOutcome:
+        durable_invocation = self._journal_invocation(record)
+        if (
+            record.fingerprint != invocation.fingerprint
+            or durable_invocation.as_dict() != invocation.as_dict()
+        ):
+            raise ValueError("operation identity collision")
+        if self.digest_payload(payload) != invocation.payload_digest:
+            raise ValueError("payload digest mismatch")
+        self._assert_current_authority(invocation)
+
+        if record.state == "started":
+            raise DeferredExecutionPendingError(
+                "operation has durable started state; retry is blocked until "
+                "the incomplete outcome is explicitly reconciled",
+                operation_id=record.operation_id,
+                record_digest=record.record_digest,
+            )
+
+        receipt = self._adopt_journal_terminal(record)
+        if isinstance(receipt, FailureReceipt):
+            raise DeferredExecutionError(
+                "operation previously failed and is terminal",
+                receipt,
+            )
+        return ExecutionOutcome(
+            receipt=receipt,
+            result=json.loads(
+                self._success_result_json[receipt.operation_id]
+            ),
+        )
+
     def _record_terminal_failure(
         self,
         invocation: DeferredInvocation,
@@ -471,6 +682,20 @@ class DeferredExecutor:
             error_type=type(exc).__name__,
             error_digest=sha256_json(error_material),
         )
+        if self.journal is not None:
+            try:
+                self.journal.record_terminal(
+                    operation_id=invocation.operation_id,
+                    fingerprint=invocation.fingerprint,
+                    state="failed",
+                    terminal=self._journal_terminal_payload(failure),
+                )
+            except Exception:
+                # A durable "started" row is safer than losing the fence. The
+                # original handler failure remains authoritative in this
+                # process, while restart recovery will refuse to repeat the
+                # unresolved operation.
+                pass
         with self._lock:
             self._failure[invocation.operation_id] = failure
             self._in_flight.discard(invocation.operation_id)
@@ -498,9 +723,43 @@ class DeferredExecutor:
                         self._success_result_json[invocation.operation_id]
                     ),
                 )
+            prior_failure = self._failure.get(invocation.operation_id)
+            if prior_failure is not None:
+                if self._fingerprints.get(invocation.operation_id) != invocation.fingerprint:
+                    raise ValueError("operation identity collision")
+                if self.digest_payload(payload) != invocation.payload_digest:
+                    raise ValueError("payload digest mismatch")
+                self._assert_current_authority(invocation)
+                raise DeferredExecutionError(
+                    "operation previously failed and is terminal",
+                    prior_failure,
+                )
             if invocation.operation_id in self._in_flight:
                 raise RuntimeError("operation is already in flight")
+
+            if self.journal is not None:
+                durable = self.journal.load(invocation.operation_id)
+                if durable is not None:
+                    return self._replay_journal_record(
+                        invocation,
+                        payload,
+                        durable,
+                    )
+
             handler, ledger, isolated = self._admit(invocation, payload)
+            if self.journal is not None:
+                durable, created = self.journal.record_started(
+                    operation_id=invocation.operation_id,
+                    fingerprint=invocation.fingerprint,
+                    invocation=invocation.as_dict(),
+                    handler_identity=handler.identity,
+                )
+                if not created:
+                    return self._replay_journal_record(
+                        invocation,
+                        payload,
+                        durable,
+                    )
             self._fingerprints[invocation.operation_id] = invocation.fingerprint
             self._in_flight.add(invocation.operation_id)
 
@@ -523,12 +782,6 @@ class DeferredExecutor:
                 failure,
             ) from exc
         except BaseException as exc:
-            # The handler may already have produced an external effect before an
-            # interpreter-level abort (KeyboardInterrupt/SystemExit/custom
-            # BaseException). Reusing the operation id would therefore risk
-            # duplicating an effect whose outcome is unknown. Preserve the
-            # original abort for the caller, but fence the operation as a
-            # terminal failure first.
             self._record_terminal_failure(
                 invocation,
                 handler=handler,
@@ -549,6 +802,48 @@ class DeferredExecutor:
             cost_units=ledger.cost_units,
             latency_ms=ledger.latency_ms,
         )
+
+        if self.journal is not None:
+            try:
+                self.journal.record_terminal(
+                    operation_id=invocation.operation_id,
+                    fingerprint=invocation.fingerprint,
+                    state="succeeded",
+                    terminal=self._journal_terminal_payload(
+                        receipt,
+                        result_json=result_json,
+                    ),
+                )
+            except Exception as exc:
+                failure = FailureReceipt(
+                    operation_id=invocation.operation_id,
+                    volume_id=invocation.volume_id,
+                    spec_digest=invocation.spec_digest,
+                    authority_digest=invocation.authority_digest,
+                    payload_digest=invocation.payload_digest,
+                    handler_identity=handler.identity,
+                    attempt=ledger.attempts,
+                    cost_units=ledger.cost_units,
+                    latency_ms=ledger.latency_ms,
+                    error_type="DeferredJournalCommitError",
+                    error_digest=sha256_json(
+                        {
+                            "type": type(exc).__name__,
+                            "message_digest": hashlib.sha256(
+                                str(exc).encode("utf-8")
+                            ).hexdigest(),
+                        }
+                    ),
+                )
+                with self._lock:
+                    self._failure[invocation.operation_id] = failure
+                    self._in_flight.discard(invocation.operation_id)
+                raise DeferredExecutionError(
+                    "handler result could not be durably committed; "
+                    "operation is fenced",
+                    failure,
+                ) from exc
+
         with self._lock:
             self._success[invocation.operation_id] = receipt
             self._success_result_json[invocation.operation_id] = result_json
@@ -568,7 +863,103 @@ class DeferredExecutor:
                 return self._success[operation_id]
             if operation_id in self._failure:
                 return self._failure[operation_id]
+
+        if self.journal is not None:
+            durable = self.journal.load(operation_id)
+            if durable is not None:
+                if durable.state == "started":
+                    raise DeferredExecutionPendingError(
+                        "operation has durable started state without terminal receipt",
+                        operation_id=durable.operation_id,
+                        record_digest=durable.record_digest,
+                    )
+                return self._adopt_journal_terminal(durable)
         raise KeyError("unknown operation id")
+
+    def fence_incomplete(self, operation_id: str) -> FailureReceipt:
+        """Terminally fence one unresolved durable start.
+
+        Callers must establish that no live executor still owns the operation.
+        This method never guesses liveness: normal execute/retry paths only
+        report the durable start and refuse to run it again.
+        """
+        if self.journal is None:
+            raise RuntimeError("no durable deferred execution journal configured")
+        operation_id = _text(operation_id, "operation_id")
+        record = self.journal.load(operation_id)
+        if record is None:
+            raise KeyError("unknown durable operation id")
+        if record.state != "started":
+            receipt = self._adopt_journal_terminal(record)
+            if isinstance(receipt, FailureReceipt):
+                return receipt
+            raise RuntimeError("cannot fence an operation that already succeeded")
+
+        invocation = self._journal_invocation(record)
+        failure = FailureReceipt(
+            operation_id=invocation.operation_id,
+            volume_id=invocation.volume_id,
+            spec_digest=invocation.spec_digest,
+            authority_digest=invocation.authority_digest,
+            payload_digest=invocation.payload_digest,
+            handler_identity=record.handler_identity,
+            attempt=1,
+            cost_units=invocation.cost_units,
+            latency_ms=invocation.latency_ms,
+            error_type="DeferredOutcomeUnknown",
+            error_digest=sha256_json(
+                {
+                    "reason": "durable_started_without_terminal_receipt",
+                    "record_digest": record.record_digest,
+                }
+            ),
+        )
+        terminal = self.journal.record_terminal(
+            operation_id=operation_id,
+            fingerprint=record.fingerprint,
+            state="failed",
+            terminal=self._journal_terminal_payload(failure),
+        )
+        adopted = self._adopt_journal_terminal(terminal)
+        assert isinstance(adopted, FailureReceipt)
+        return adopted
+
+    def recover_journal(
+        self,
+        *,
+        fence_incomplete: bool = False,
+    ) -> tuple[str, ...]:
+        """Hydrate terminal journal state and report unresolved starts.
+
+        Setting fence_incomplete=True is an explicit recovery decision and
+        should only be used after exclusive ownership of the journal has been
+        established.
+        """
+        if self.journal is None:
+            raise RuntimeError("no durable deferred execution journal configured")
+        with self._lock:
+            if (
+                self._fingerprints
+                or self._in_flight
+                or self._success
+                or self._success_result_json
+                or self._failure
+            ):
+                raise RuntimeError(
+                    "recover_journal requires a fresh executor"
+                )
+
+        pending: list[str] = []
+        for record in self.journal.records():
+            if record.state == "started":
+                self._journal_invocation(record)
+                if fence_incomplete:
+                    self.fence_incomplete(record.operation_id)
+                else:
+                    pending.append(record.operation_id)
+                continue
+            self._adopt_journal_terminal(record)
+        return tuple(pending)
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:
