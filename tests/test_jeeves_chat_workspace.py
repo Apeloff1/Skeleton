@@ -260,18 +260,37 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
     class RecordingChat:
         def __init__(self, *args, **kwargs):
             seen["init"] = {"args": args, **kwargs}
+            seen["history"] = []
+            seen["evidence"] = []
 
         def with_max_tokens(self, value):
             seen["max_tokens"] = value
+            return self
+
+        def add_history_message(self, role, content):
+            seen["history"].append((role, content))
+            return self
+
+        def add_evidence(self, source_id, content, *, kind="retrieval_evidence"):
+            seen["evidence"].append((source_id, content, kind))
             return self
 
         async def send_message(self, message):
             seen["message"] = message
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation-jeeves-1",
                 execution_id="engine-exec-jeeves-1",
+                context_id="engine-context-jeeves-1",
+                context_digest="a" * 64,
+                context_source_snapshot=(("source", "b" * 64),),
+                context_compiler_version="test-compiler",
                 verification="verification:jeeves",
                 evidence_refs=("evidence:jeeves",),
+                provider_receipts=("provider:test:jeeves",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
@@ -286,7 +305,11 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
         )
     )
 
-    assert "PROJECT_CONTEXT_SENTINEL" in seen["message"].text
+    assert seen["message"].text == "follow-up"
+    assert any(
+        kind == "artifact" and "PROJECT_CONTEXT_SENTINEL" in content
+        for _source_id, content, kind in seen["evidence"]
+    )
     policy = seen["init"]["instruction_policy"]
     assert "PROJECT_CONTEXT_SENTINEL" not in policy.instructions
     assert policy.policy_id == "backend.jeeves.chat"
