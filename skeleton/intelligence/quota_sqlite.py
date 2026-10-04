@@ -1325,6 +1325,25 @@ class SqliteTenantQuotaLedger:
             )
         return quota
 
+    def reservation_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaReservation | None:
+        """Return the active reservation for an operation without mutation."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._read() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM quota_reservations
+                WHERE tenant_id = ? AND operation_id = ?
+                """,
+                (tenant, operation),
+            ).fetchone()
+            return None if row is None else self._reservation(row)
+
     def completion_for_operation(
         self,
         tenant_id: str,
