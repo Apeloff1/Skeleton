@@ -16,7 +16,7 @@
     "p0": 26,
     "p1": 164,
     "p2": 10,
-    "implementation_pr_open": 13,
+    "implementation_pr_open": 19,
     "verified_closed": 0
   },
   "gaps": [
@@ -112,8 +112,10 @@
       "id": "G009",
       "severity": "P0",
       "title": "Authoritative storage consistency contract",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2722"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
@@ -121,8 +123,10 @@
       "id": "G010",
       "severity": "P0",
       "title": "Distributed time, leases, fencing and ordering",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2723"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
@@ -130,8 +134,10 @@
       "id": "G011",
       "severity": "P0",
       "title": "Secret lifecycle and secret-taint propagation",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2724"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
@@ -139,8 +145,10 @@
       "id": "G012",
       "severity": "P0",
       "title": "Disaster recovery contract",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2725"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
@@ -148,8 +156,10 @@
       "id": "G013",
       "severity": "P0",
       "title": "Control-plane / data-plane isolation",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2727"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
@@ -157,8 +167,10 @@
       "id": "G014",
       "severity": "P0",
       "title": "Configuration authority and immutable config snapshots",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2726"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
