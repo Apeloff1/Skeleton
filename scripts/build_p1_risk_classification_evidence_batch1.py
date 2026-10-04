@@ -213,7 +213,7 @@ COVERAGE: dict[tuple[str, str], dict[str, Any]] = {
         "markers": {
             "skeleton/testing/test_ai_master_plan.py": [
                 "test_promoted_volume_without_required_depth_fails_validation",
-                "test_closed_gaps_require_hardened_implementation_status",
+                "test_unverified_depth_pass_still_requires_gap_inventory",
             ],
             "tests/test_p1_maturity_reconciliation.py": [
                 "test_unsigned_records_never_reach_their_lane_floor",
