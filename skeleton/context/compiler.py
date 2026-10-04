@@ -277,9 +277,21 @@ class ContextCompiler:
 
         # Deduplicate only within the same trust/kind class. Identical text at a
         # weaker trust level must never erase a stronger canonical segment.
+        #
+        # Canonical conversation turns are identity-bearing sequence entries,
+        # not interchangeable evidence blobs. A user may legitimately repeat
+        # the exact same text in a later turn; collapsing that segment would
+        # erase causal history and can leave an assistant message without its
+        # preceding user turn in the provider projection.
         dedupe_seen: set[tuple[str, str, str]] = set()
         deduped: list[ContextSegment] = []
         for segment in sorted(admitted, key=_rank_key):
+            if segment.kind in {
+                ContextKind.USER_MESSAGE,
+                ContextKind.ASSISTANT_MESSAGE,
+            }:
+                deduped.append(segment)
+                continue
             key = (
                 segment.content_digest,
                 segment.kind.value,
