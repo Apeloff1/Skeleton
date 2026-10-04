@@ -41,8 +41,8 @@ jobs:
         with:
           python-version: "3.11.16"
 
-      - name: Install focused test dependency
-        run: python -m pip install --disable-pip-version-check "pytest>=7.0.0"
+      - name: Install focused test environment
+        run: python -m pip install --disable-pip-version-check ".[dev]"
 
       - name: Enforce canonical capsec authority boundary
         run: |
