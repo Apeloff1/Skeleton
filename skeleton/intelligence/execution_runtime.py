@@ -1204,6 +1204,13 @@ class CognitiveExecutionRuntime:
             deadline=deadline,
         )
         cooperative_cancellation = True
+        provider_supports_cooperative_cancellation = bool(
+            getattr(
+                self.provider,
+                "supports_cooperative_cancellation",
+                False,
+            )
+        )
         if deadline is None and not cooperative_cancellation:
             response = await self.provider.generate(provider_request)
         else:
@@ -1284,11 +1291,35 @@ class CognitiveExecutionRuntime:
                             execution.execution_id
                         )
                         if durable_poll.cancellation_requested:
+                            if provider_supports_cooperative_cancellation:
+                                # Cooperative providers have an explicit
+                                # cancellation bridge (for example the local
+                                # inference thread event). Signal it immediately
+                                # once the durable request is visible instead of
+                                # spending the late-result grace interval first.
+                                provider_task.cancel()
+                                try:
+                                    await provider_task
+                                except asyncio.CancelledError:
+                                    pass
+                                cancel_payload = self._checkpoint_payload(
+                                    execution.execution_id
+                                )
+                                return self._finalize_non_success(
+                                    durable_poll,
+                                    cancel_payload,
+                                    status="cancelled",
+                                    error_code="cancellation_requested",
+                                    now=now,
+                                )
+
                             # Cancellation is already durable. Give provider I/O
                             # one bounded poll interval to finish so its receipt
                             # can be checkpointed and explicitly fenced from
-                            # user-visible success. Uncooperative providers are
-                            # still force-cancelled after the grace bound.
+                            # user-visible success. Providers without a
+                            # cooperative cancellation contract are then
+                            # interrupted, but their eventual response remains
+                            # auditable if they cannot be recalled after dispatch.
                             done, _ = await asyncio.wait(
                                 {provider_task},
                                 timeout=0.05,
