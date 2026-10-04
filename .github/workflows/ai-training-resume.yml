@@ -1,0 +1,114 @@
+name: AI Training Resume and Evidence Integrity
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/learning/model_program.py"
+      - "skeleton/ai/learning/model_program.py"
+      - "skeleton/testing/test_p3_*.py"
+      - "machine/ai_training_resume_contract.json"
+      - "scripts/check_ai_training_resume.py"
+      - "tests/test_ai_training_resume_contract.py"
+      - ".github/workflows/ai-training-resume.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/ai/runtime/training/**"
+      - "skeleton/ai/runtime/learning_foundation/**"
+      - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/learning/model_program.py"
+      - "skeleton/ai/learning/model_program.py"
+      - "skeleton/testing/test_p3_*.py"
+      - "machine/ai_training_resume_contract.json"
+      - "scripts/check_ai_training_resume.py"
+      - "tests/test_ai_training_resume_contract.py"
+      - ".github/workflows/ai-training-resume.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-training-resume-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  resume-and-evidence:
+    name: Bounded resume and independent evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.24,<1"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+      - name: Compile canonical runtime
+        run: python -m compileall -q skeleton/ai/runtime/training skeleton/ai/runtime/learning_foundation
+      - name: Validate bounded contract on exact checked-out head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python scripts/check_ai_training_resume.py --head "$EXPECTED_HEAD" --json
+      - name: Run resume and evidence regressions
+        run: >-
+          python -m pytest -p pytest_asyncio.plugin -q --noconftest
+          tests/test_ai_training_resume_contract.py
+          skeleton/testing/test_p3_training_resume.py
+          skeleton/testing/test_p3_training_evidence_integrity.py
+          skeleton/testing/test_p3_training_lifecycle_acceptance.py
+          skeleton/testing/test_p3_training_data.py
+          skeleton/testing/test_p3_training_control.py
+          skeleton/testing/test_p3_local_training_evaluation.py
+          skeleton/testing/test_p3_post_training.py
+          skeleton/testing/test_p3_data_foundation.py
+          skeleton/testing/test_p3_learning_programs.py
+          skeleton/testing/test_p3_multimodal_foundation.py
+          skeleton/testing/test_p3_multimodal_integrity.py
+          skeleton/testing/test_p3_model_foundation.py
+          skeleton/testing/test_p3_model_lifecycle.py
+          skeleton/testing/test_p3_model_migration.py
+          skeleton/testing/test_p3_learning_foundation_acceptance.py
+
+  architecture:
+    name: Canonical construction contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python scripts/check_architecture_map.py
+      - run: python scripts/check_ai_app_construction.py
+      - run: python scripts/check_capability_interfaces.py
+      - run: python scripts/check_state_topology.py
+      - run: python scripts/check_provider_bootstrap.py

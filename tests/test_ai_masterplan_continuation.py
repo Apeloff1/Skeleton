@@ -46,18 +46,18 @@ def test_rejects_storage_candidate_promotion_authority(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_masterplan_continuation_frontier.json"; p=_load(path)
     owner=next(x for x in p["next_tranche"]["planned_task_owners"] if x["task_id"]=="P3T2-STORAGE-01")
     owner["implementation_candidate"]["promotion_authority"]=True; _store(path,p)
-    with pytest.raises(MasterplanContinuationError,match="storage candidate metadata drift: promotion_authority"): validate(root)
+    with pytest.raises(MasterplanContinuationError,match="P3T2-STORAGE-01 candidate metadata drift: promotion_authority"): validate(root)
 
 def test_rejects_storage_candidate_false_exact_head_claim(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_masterplan_continuation_frontier.json"; p=_load(path)
     owner=next(x for x in p["next_tranche"]["planned_task_owners"] if x["task_id"]=="P3T2-STORAGE-01")
     owner["implementation_candidate"]["exact_head_validation_status"]="passed"; _store(path,p)
-    with pytest.raises(MasterplanContinuationError,match="storage candidate metadata drift: exact_head_validation_status"): validate(root)
+    with pytest.raises(MasterplanContinuationError,match="P3T2-STORAGE-01 candidate metadata drift: exact_head_validation_status"): validate(root)
 
 def test_rejects_storage_candidate_contract_self_promotion(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_p3t2_storage_candidate.json"; p=_load(path)
     p["promotion_state"]["completion_checkbox"]=True; _store(path,p)
-    with pytest.raises(MasterplanContinuationError,match="storage candidate contract illegally promoted completion_checkbox"): validate(root)
+    with pytest.raises(MasterplanContinuationError,match="P3T2-STORAGE-01 candidate contract illegally promoted completion_checkbox"): validate(root)
 
 def test_rejects_missing_landed_data_candidate_metadata(tmp_path:Path):
     root=_fixture(tmp_path)
@@ -87,4 +87,3 @@ def test_rejects_illegal_data_candidate_self_promotion(tmp_path:Path):
         match="P3T2-DATA-01 candidate contract illegally promoted verification_signed",
     ):
         validate(root)
-
