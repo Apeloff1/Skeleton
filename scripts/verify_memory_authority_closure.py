@@ -123,9 +123,16 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     if evidence is None:
         errors.append("durable-memory closure evidence is missing")
     else:
-        for field in ("gap_status", "implementation_state", "closure_decision"):
-            if evidence.get(field) != "closed":
-                errors.append(f"durable-memory {field} is not closed")
+        expected_states = {
+            "gap_status": "closed",
+            "implementation_state": "complete",
+            "closure_decision": "closed",
+        }
+        for field, expected in expected_states.items():
+            if evidence.get(field) != expected:
+                errors.append(
+                    f"durable-memory {field} is not {expected}"
+                )
         if evidence.get("outstanding_evidence") not in ([], None):
             errors.append("durable-memory evidence is still outstanding")
         if evidence.get("blockers") not in ([], None):
