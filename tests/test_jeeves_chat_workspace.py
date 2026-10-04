@@ -118,6 +118,15 @@ def test_client_history_is_ignored_but_project_context_is_used(
         return []
 
     async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["prompt"] = conversation_context
         captured["query"] = query
         return {"text": "Follow-up answer", "tier": "free", "model": "test"}
@@ -406,6 +415,15 @@ def test_server_transcript_overrides_conflicting_client_history(route, monkeypat
     captured = {}
 
     async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["context"] = conversation_context
         return {"text": "next answer", "tier": "free", "model": "test"}
 
@@ -493,6 +511,15 @@ def test_legacy_history_is_never_model_visible_or_persisted(
     contexts = []
 
     async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         contexts.append(conversation_context)
         return {
             "text": f"answer-{len(contexts)}",
@@ -550,6 +577,15 @@ def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
         raise OSError("legacy storage unavailable")
 
     async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["context"] = conversation_context
         return {"text": "canonical", "tier": "free", "model": "test"}
 
@@ -805,6 +841,15 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
         **kwargs,
     ):
         calls["count"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         assert "legacy question" in conversation_context
         assert "legacy answer" in conversation_context
         return {
@@ -977,6 +1022,15 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["contexts"].append(conversation_context)
         assert query == "resume question"
         return {
@@ -1223,6 +1277,15 @@ def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
+        conversation_context = "\n".join(
+            [
+                str(kwargs.get("project_context") or ""),
+                *[
+                    f"{item.role}: {item.content}"
+                    for item in (kwargs.get("conversation_history") or ())
+                ],
+            ]
+        ).strip()
         captured["contexts"].append(conversation_context)
         assert query == "resume without client id"
         return {
