@@ -3,20 +3,27 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
+import sys
 
 import pytest
 
-from skeleton.jeeves.evidence_response import (
-    JeevesEvidenceAuthority,
-    JeevesEvidenceError,
-    JeevesEvidenceKind,
-    JeevesEvidenceRecord,
-    JeevesFreshnessPolicy,
-)
-
 ROOT = Path(__file__).resolve().parents[2]
+MODULE_PATH = ROOT / "skeleton/jeeves/evidence_response.py"
+SPEC = importlib.util.spec_from_file_location("vol072_evidence_response_test", MODULE_PATH)
+assert SPEC and SPEC.loader
+MODULE = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = MODULE
+SPEC.loader.exec_module(MODULE)
+
+JeevesEvidenceAuthority = MODULE.JeevesEvidenceAuthority
+JeevesEvidenceError = MODULE.JeevesEvidenceError
+JeevesEvidenceKind = MODULE.JeevesEvidenceKind
+JeevesEvidenceRecord = MODULE.JeevesEvidenceRecord
+JeevesFreshnessPolicy = MODULE.JeevesFreshnessPolicy
+
 NOW = datetime(2026, 10, 5, 0, 0, tzinfo=timezone.utc)
 
 
