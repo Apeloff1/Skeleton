@@ -309,28 +309,44 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
 
 
 
-def test_closed_gaps_require_hardened_implementation_status() -> None:
+@pytest.mark.parametrize(
+    "implementation_status",
+    (
+        "evidence_pending",
+        "implemented",
+        "integrated",
+        "verified",
+        "hardened",
+        "production",
+    ),
+)
+def test_closed_gaps_are_allowed_after_implementation_materializes(
+    implementation_status: str,
+) -> None:
     data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    volume = mutated["volumes"][13]
+    volume["implementation_status"] = implementation_status
+    volume["gaps"] = []
 
-    hardened = json.loads(json.dumps(data))
-    hardened_volume = hardened["volumes"][13]
-    hardened_volume["implementation_status"] = "hardened"
-    hardened_volume["gaps"] = []
-    hardened_errors = checker.validate(hardened)
+    errors = checker.validate(mutated)
+
     assert not any(
         error == "VOL-013: depth pass requires non-empty gaps"
-        for error in hardened_errors
+        for error in errors
     )
 
-    integrated = json.loads(json.dumps(data))
-    integrated_volume = integrated["volumes"][13]
-    integrated_volume["implementation_status"] = "integrated"
-    integrated_volume["gaps"] = []
-    integrated_errors = checker.validate(integrated)
-    assert (
-        "VOL-013: depth pass requires non-empty gaps"
-        in integrated_errors
-    )
+
+def test_unverified_depth_pass_still_requires_gap_inventory() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    volume = mutated["volumes"][13]
+    volume["implementation_status"] = "unverified"
+    volume["gaps"] = []
+
+    errors = checker.validate(mutated)
+
+    assert "VOL-013: depth pass requires non-empty gaps" in errors
 
 def test_master_plan_rejects_stale_execution_frontier_snapshot() -> None:
     data = checker.load_plan()
