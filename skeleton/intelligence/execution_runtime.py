@@ -1329,19 +1329,26 @@ class CognitiveExecutionRuntime:
                                 break
                             provider_task.cancel()
                             try:
-                                await provider_task
+                                response = await provider_task
                             except asyncio.CancelledError:
-                                pass
-                            cancel_payload = self._checkpoint_payload(
-                                execution.execution_id
-                            )
-                            return self._finalize_non_success(
-                                durable_poll,
-                                cancel_payload,
-                                status="cancelled",
-                                error_code="cancellation_requested",
-                                now=now,
-                            )
+                                cancel_payload = self._checkpoint_payload(
+                                    execution.execution_id
+                                )
+                                return self._finalize_non_success(
+                                    durable_poll,
+                                    cancel_payload,
+                                    status="cancelled",
+                                    error_code="cancellation_requested",
+                                    now=now,
+                                )
+                            else:
+                                # A provider without a cooperative cancellation
+                                # contract may swallow task cancellation because
+                                # the upstream dispatch cannot be recalled.  Its
+                                # eventual response must continue through the
+                                # common late-result fence below so usage and the
+                                # provider receipt remain auditable.
+                                break
             except asyncio.CancelledError:
                 provider_task.cancel()
                 try:
