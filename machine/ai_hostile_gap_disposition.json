@@ -16,7 +16,7 @@
     "p0": 26,
     "p1": 164,
     "p2": 10,
-    "implementation_pr_open": 14,
+    "implementation_pr_open": 13,
     "verified_closed": 0
   },
   "gaps": [
@@ -166,10 +166,8 @@
       "id": "G015",
       "severity": "P0",
       "title": "Non-idempotent side-effect compensation",
-      "status": "implementation_pr_open",
-      "implementation_refs": [
-        "github:pr#2730"
-      ],
+      "status": "open",
+      "implementation_refs": [],
       "evidence_refs": [],
       "closure_note": null
     },
