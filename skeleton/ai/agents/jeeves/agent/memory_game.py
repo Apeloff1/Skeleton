@@ -13,11 +13,12 @@ of the existing memory/context evidence policies.
 
 from __future__ import annotations
 
+import heapq
 import math
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
@@ -248,6 +249,7 @@ class IndexCardStore:
     def __init__(self, *, max_cards: int = 100_000) -> None:
         self.max_cards = positive_int("max_cards", max_cards, maximum=10_000_000)
         self._cards: dict[str, InteractionCard] = {}
+        self._namespace_to_cards: dict[str, set[str]] = defaultdict(set)
         self._fingerprints: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
@@ -263,8 +265,10 @@ class IndexCardStore:
                 self._evict_one()
             previous = self._cards.get(card.card_id)
             if previous is not None:
+                self._namespace_to_cards[previous.namespace.key].discard(previous.card_id)
                 self._fingerprints.pop((previous.namespace.key, previous.content_fingerprint), None)
             self._cards[card.card_id] = card
+            self._namespace_to_cards[card.namespace.key].add(card.card_id)
             self._fingerprints[key] = card.card_id
             return card
 
@@ -272,13 +276,40 @@ class IndexCardStore:
         with self._lock:
             return self._cards.get(require_id("card_id", card_id))
 
-    def namespace_cards(self, namespace: MemoryNamespace, *, include_parent: bool = True) -> tuple[InteractionCard, ...]:
+    def scan_namespace(
+        self,
+        namespace: MemoryNamespace,
+        *,
+        include_parent: bool = True,
+    ) -> tuple[InteractionCard, ...]:
+        """Return namespace cards without imposing presentation ordering."""
         keys = {namespace.key}
         if include_parent and namespace.session_id is not None:
             keys.add(namespace.parent().key)
         with self._lock:
-            cards = [card for card in self._cards.values() if card.namespace.key in keys]
-        return tuple(sorted(cards, key=lambda card: (card.updated_at, card.card_id), reverse=True))
+            card_ids: set[str] = set()
+            for key in keys:
+                card_ids.update(self._namespace_to_cards.get(key, ()))
+            return tuple(
+                self._cards[card_id]
+                for card_id in card_ids
+                if card_id in self._cards
+            )
+
+    def namespace_cards(
+        self,
+        namespace: MemoryNamespace,
+        *,
+        include_parent: bool = True,
+    ) -> tuple[InteractionCard, ...]:
+        cards = self.scan_namespace(namespace, include_parent=include_parent)
+        return tuple(
+            sorted(
+                cards,
+                key=lambda card: (card.updated_at, card.card_id),
+                reverse=True,
+            )
+        )
 
     def count(self) -> int:
         with self._lock:
@@ -300,6 +331,7 @@ class IndexCardStore:
             ),
         )
         self._cards.pop(victim.card_id, None)
+        self._namespace_to_cards[victim.namespace.key].discard(victim.card_id)
         self._fingerprints.pop((victim.namespace.key, victim.content_fingerprint), None)
 
 
@@ -323,14 +355,34 @@ class MemoryGameIndex:
         return Counter(token.casefold() for token in _TOKEN_RE.findall(text or ""))
 
     @staticmethod
-    def _cosine(left: Counter[str], right: Counter[str]) -> float:
+    def _counter_norm(tokens: Counter[str]) -> float:
+        return (
+            math.sqrt(sum(value * value for value in tokens.values()))
+            if tokens
+            else 0.0
+        )
+
+    @staticmethod
+    def _cue_cosine(
+        query: Counter[str],
+        query_norm: float,
+        cue_tokens: Sequence[str],
+    ) -> float:
+        if not query_norm or not cue_tokens:
+            return 0.0
+        dot = sum(query.get(token, 0) for token in cue_tokens)
+        cue_norm = math.sqrt(len(cue_tokens))
+        return max(0.0, min(1.0, dot / (query_norm * cue_norm)))
+
+    @classmethod
+    def _cosine(cls, left: Counter[str], right: Counter[str]) -> float:
         if not left or not right:
             return 0.0
-        dot = sum(count * right.get(token, 0) for token, count in left.items())
-        left_norm = math.sqrt(sum(value * value for value in left.values()))
-        right_norm = math.sqrt(sum(value * value for value in right.values()))
+        left_norm = cls._counter_norm(left)
+        right_norm = cls._counter_norm(right)
         if not left_norm or not right_norm:
             return 0.0
+        dot = sum(count * right.get(token, 0) for token, count in left.items())
         return max(0.0, min(1.0, dot / (left_norm * right_norm)))
 
     def capture_interaction(
@@ -397,17 +449,30 @@ class MemoryGameIndex:
 
     def activation(self, card: InteractionCard, *, now: float | None = None) -> float:
         current = self._clock() if now is None else finite_number("now", now)
-        traces = [max(1.0, current - timestamp) for timestamp in card.exposure_times]
-        base = math.log(sum(age ** (-self.policy.activation_decay) for age in traces))
+        activation_mass = sum(
+            max(1.0, current - timestamp) ** (-self.policy.activation_decay)
+            for timestamp in card.exposure_times
+        )
+        base = math.log(activation_mass)
         practice = math.log1p(card.recall_successes) * 0.18
         storage = math.log1p(card.storage_strength) * 0.22
         difficulty_penalty = card.difficulty * 0.45
         return base + practice + storage - difficulty_penalty
 
-    def predicted_retrieval(self, card: InteractionCard, *, now: float | None = None) -> float:
-        activation = self.activation(card, now=now)
+    def predicted_retrieval(
+        self,
+        card: InteractionCard,
+        *,
+        now: float | None = None,
+        activation: float | None = None,
+    ) -> float:
+        activation_value = (
+            self.activation(card, now=now)
+            if activation is None
+            else finite_number("activation", activation)
+        )
         assessment = memory_retrieval_probability(
-            activation,
+            activation_value,
             threshold=self.policy.activation_threshold,
             noise_scale=self.policy.activation_noise,
             storage_strength=card.storage_strength,
@@ -429,20 +494,31 @@ class MemoryGameIndex:
         limit_value = self.policy.max_hits if limit is None else positive_int("limit", limit, maximum=1000)
         floor = self.policy.minimum_score if minimum_score is None else probability("minimum_score", minimum_score)
         query_tokens = self._tokens(query)
-        requested_tags = {str(tag).strip().casefold() for tag in context_tags if str(tag).strip()}
+        query_norm = self._counter_norm(query_tokens)
+        requested_tags = {
+            str(tag).strip().casefold()
+            for tag in context_tags
+            if str(tag).strip()
+        }
         now = self._clock()
         hits: list[CardHit] = []
-        for card in self.store.namespace_cards(namespace, include_parent=include_parent):
-            card_tokens = Counter({token: 1 for token in card.cue_tokens})
-            lexical = self._cosine(query_tokens, card_tokens)
-            card_tags = set(card.context_tags)
+        for card in self.store.scan_namespace(
+            namespace,
+            include_parent=include_parent,
+        ):
+            lexical = self._cue_cosine(query_tokens, query_norm, card.cue_tokens)
             context_match = (
-                len(requested_tags & card_tags) / len(requested_tags)
+                len(requested_tags.intersection(card.context_tags))
+                / len(requested_tags)
                 if requested_tags
                 else 0.5
             )
             activation = self.activation(card, now=now)
-            retrieval = self.predicted_retrieval(card, now=now)
+            retrieval = self.predicted_retrieval(
+                card,
+                now=now,
+                activation=activation,
+            )
             age = max(0.0, now - card.updated_at)
             recency = math.exp(-math.log(2.0) * age / (7.0 * 24.0 * 3600.0))
             surprise_signal = min(1.0, 0.65 * card.surprise_ema + 0.35 * card.prediction_error_ema)
@@ -458,8 +534,18 @@ class MemoryGameIndex:
             score = max(0.0, min(1.0, score))
             if score >= floor:
                 hits.append(CardHit(card, score, lexical, context_match, activation, retrieval, recency))
-        hits.sort(key=lambda hit: (hit.score, hit.retrieval_probability, hit.card.updated_at, hit.card.card_id), reverse=True)
-        return tuple(hits[:limit_value])
+        return tuple(
+            heapq.nlargest(
+                limit_value,
+                hits,
+                key=lambda hit: (
+                    hit.score,
+                    hit.retrieval_probability,
+                    hit.card.updated_at,
+                    hit.card.card_id,
+                ),
+            )
+        )
 
     def coverage(self, query: str, hits: Sequence[CardHit]) -> float:
         query_tokens = set(self._tokens(query))
@@ -469,7 +555,9 @@ class MemoryGameIndex:
         for hit in hits:
             if hit.score < self.policy.minimum_score:
                 continue
-            covered.update(query_tokens & set(hit.card.cue_tokens))
+            covered.update(
+                token for token in hit.card.cue_tokens if token in query_tokens
+            )
         return len(covered) / len(query_tokens)
 
     def fast_path_ready(self, query: str, hits: Sequence[CardHit]) -> bool:
