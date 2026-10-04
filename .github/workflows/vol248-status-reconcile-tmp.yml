@@ -1,0 +1,61 @@
+name: Temporary VOL-248 governed status reconciliation
+
+on:
+  push:
+    branches:
+      - "fix/p1-vol248-implemented-state-20261004"
+    paths:
+      - ".github/workflows/vol248-status-reconcile-tmp.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vol248-governed-status-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out reconciliation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Apply governed lifecycle transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ai_accountability.py set-status ACC-VOL-248 \
+            --actor-id chatgpt:gpt-5.6-sol \
+            --actor-type agent \
+            --role implementation-agent \
+            --statement "Normalize post-implementation lifecycle state after the implementation sign-off; independent verification remains unsigned and completion remains open." \
+            --signature-method github_identity \
+            --git-sha "$(git rev-parse HEAD)" \
+            --to-status implemented
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_build_accountability.py
+
+      - name: Commit generated canonical state and remove materializer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm ".github/workflows/vol248-status-reconcile-tmp.yml"
+          git add machine/ai_build_accountability.json machine/ai_master_plan.json \
+            machine/ai_build_queue.json machine/ai_p1_task_backlog.json \
+            machine/ai_edge_case_catalog.json machine/ai_edge_case_priority_queue.json \
+            docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md
+          git diff --cached --quiet && { echo "no governed changes"; exit 1; }
+          git commit -m "fix(p1): normalize VOL-248 implemented lifecycle state"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
