@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "skeleton/tools/integrations/adapters/**"
+      - "skeleton/ai/runtime/tools/integrations/adapters/**"
       - "skeleton/integrations/adapters/**"
       - ".github/workflows/provider-adapters-offline.yml"
   push:
@@ -11,6 +12,7 @@ on:
       - main
     paths:
       - "skeleton/tools/integrations/adapters/**"
+      - "skeleton/ai/runtime/tools/integrations/adapters/**"
       - "skeleton/integrations/adapters/**"
       - ".github/workflows/provider-adapters-offline.yml"
   workflow_dispatch:
@@ -81,10 +83,44 @@ jobs:
               raise SystemExit("compatibility namespace must not own adapter tests")
           PY
 
+      - name: Enforce AI-tree adapter parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          canonical = Path("skeleton/tools/integrations/adapters")
+          mirror = Path("skeleton/ai/runtime/tools/integrations/adapters")
+
+          source_files = {
+              path.relative_to(canonical).as_posix(): path
+              for path in canonical.rglob("*")
+              if path.is_file() and "__pycache__" not in path.parts
+          }
+          mirror_files = {
+              path.relative_to(mirror).as_posix(): path
+              for path in mirror.rglob("*")
+              if path.is_file() and "__pycache__" not in path.parts
+          }
+          if source_files.keys() != mirror_files.keys():
+              missing = sorted(source_files.keys() - mirror_files.keys())
+              extra = sorted(mirror_files.keys() - source_files.keys())
+              raise SystemExit(
+                  f"adapter AI-tree membership drift: missing={missing} extra={extra}"
+              )
+          drift = [
+              relative
+              for relative, source in source_files.items()
+              if source.read_bytes() != mirror_files[relative].read_bytes()
+          ]
+          if drift:
+              raise SystemExit(f"adapter AI-tree content drift: {drift}")
+          PY
+
       - name: Compile provider runtime
         run: >-
           python -m compileall -q
           skeleton/tools/integrations/adapters
+          skeleton/ai/runtime/tools/integrations/adapters
           skeleton/integrations/adapters
 
       - name: Run provider adapter acceptance
