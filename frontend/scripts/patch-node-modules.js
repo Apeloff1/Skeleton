@@ -107,8 +107,16 @@ function patchImageSizeDoS() {
   }
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Current locked version. If this changes, force a review so a future package
-  // layout cannot silently bypass the compensating control.
+  // image-size 2.0.3 is the first reviewed upstream release that includes
+  // the ICNS and JXL/HEIF/JP2 forward-progress fixes. Keep the allow-list
+  // exact so future dependency drift still requires explicit review.
+  if (version === '2.0.3') {
+    skipped++;
+    console.log('[patch-node-modules] ✓ image-size 2.0.3 includes upstream DoS fixes');
+    return;
+  }
+
+  // The Metro-compatible 1.x line still needs the compensating patch below.
   if (version !== '1.2.1') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
