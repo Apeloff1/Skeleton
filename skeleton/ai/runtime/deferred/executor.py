@@ -593,3 +593,168 @@ class DeferredExecutor:
             **payload,
             "snapshot_digest": sha256_json(payload),
         }
+
+    @staticmethod
+    def _receipt_fingerprint(
+        receipt: ExecutionReceipt | FailureReceipt,
+    ) -> str:
+        return sha256_json(
+            {
+                "operation_id": receipt.operation_id,
+                "volume_id": receipt.volume_id,
+                "spec_digest": receipt.spec_digest,
+                "authority_digest": receipt.authority_digest,
+                "payload_digest": receipt.payload_digest,
+                "cost_units": receipt.cost_units,
+                "latency_ms": receipt.latency_ms,
+            }
+        )
+
+    def export_state(self) -> dict[str, object]:
+        """Export terminal operation state for exact restart recovery.
+
+        In-flight operations are deliberately excluded: callers must only persist
+        this state as a terminal replay checkpoint. The payload is content-bound
+        at both receipt and whole-state levels.
+        """
+        with self._lock:
+            operation_ids = sorted(set(self._success) | set(self._failure))
+            rows: list[dict[str, object]] = []
+            for operation_id in operation_ids:
+                receipt = (
+                    self._success.get(operation_id)
+                    or self._failure[operation_id]
+                )
+                expected_fingerprint = self._receipt_fingerprint(receipt)
+                fingerprint = self._fingerprints.get(operation_id)
+                if fingerprint != expected_fingerprint:
+                    raise RuntimeError(
+                        "operation fingerprint state mismatch"
+                    )
+                row: dict[str, object] = {
+                    "fingerprint": fingerprint,
+                    "receipt": receipt.as_dict(),
+                    "receipt_digest": receipt.digest,
+                }
+                if isinstance(receipt, ExecutionReceipt):
+                    row["result"] = json.loads(
+                        self._success_result_json[operation_id]
+                    )
+                rows.append(row)
+
+        payload = {
+            "schema_version": 1,
+            "operations": rows,
+        }
+        return {
+            **payload,
+            "state_digest": sha256_json(payload),
+        }
+
+    def restore_state(self, state: Mapping[str, Any]) -> None:
+        """Restore a verified terminal replay checkpoint into a fresh executor."""
+        if not isinstance(state, Mapping):
+            raise TypeError("state must be a mapping")
+
+        state_dict = dict(state)
+        if state_dict.get("schema_version") != 1:
+            raise ValueError("unsupported deferred executor state schema")
+        operations = state_dict.get("operations")
+        if not isinstance(operations, list):
+            raise TypeError("state operations must be a list")
+        state_digest = _sha256(
+            state_dict.get("state_digest"),
+            "state_digest",
+        )
+        payload = {
+            "schema_version": 1,
+            "operations": operations,
+        }
+        if sha256_json(payload) != state_digest:
+            raise ValueError("deferred executor state digest mismatch")
+
+        restored_fingerprints: dict[str, str] = {}
+        restored_success: dict[str, ExecutionReceipt] = {}
+        restored_success_json: dict[str, str] = {}
+        restored_failure: dict[str, FailureReceipt] = {}
+
+        for raw_row in operations:
+            if not isinstance(raw_row, Mapping):
+                raise TypeError("state operation row must be a mapping")
+            row = dict(raw_row)
+            receipt_data = row.get("receipt")
+            if not isinstance(receipt_data, Mapping):
+                raise TypeError("state receipt must be a mapping")
+            receipt_fields = dict(receipt_data)
+            status = receipt_fields.get("status")
+            if status == "succeeded":
+                try:
+                    receipt = ExecutionReceipt(**receipt_fields)
+                except TypeError as exc:
+                    raise ValueError("invalid success receipt fields") from exc
+            elif status == "failed":
+                try:
+                    receipt = FailureReceipt(**receipt_fields)
+                except TypeError as exc:
+                    raise ValueError("invalid failure receipt fields") from exc
+            else:
+                raise ValueError("unsupported terminal receipt status")
+
+            receipt_digest = _sha256(
+                row.get("receipt_digest"),
+                "receipt_digest",
+            )
+            if receipt.digest != receipt_digest:
+                raise ValueError("terminal receipt digest mismatch")
+
+            fingerprint = _sha256(
+                row.get("fingerprint"),
+                "fingerprint",
+            )
+            if fingerprint != self._receipt_fingerprint(receipt):
+                raise ValueError("terminal operation fingerprint mismatch")
+
+            if receipt.operation_id in restored_fingerprints:
+                raise ValueError("duplicate terminal operation id")
+
+            record = self.registry.get(receipt.volume_id)
+            if record.spec.digest != receipt.spec_digest:
+                raise ValueError("terminal receipt spec digest mismatch")
+            if record.spec.handler != receipt.handler_identity:
+                raise ValueError("terminal receipt handler identity mismatch")
+
+            restored_fingerprints[receipt.operation_id] = fingerprint
+            if isinstance(receipt, ExecutionReceipt):
+                if "result" not in row:
+                    raise ValueError("success checkpoint is missing result")
+                result_json = _strict_json(row["result"])
+                result_digest = hashlib.sha256(
+                    result_json.encode("utf-8")
+                ).hexdigest()
+                if result_digest != receipt.result_digest:
+                    raise ValueError("success checkpoint result digest mismatch")
+                restored_success[receipt.operation_id] = receipt
+                restored_success_json[receipt.operation_id] = result_json
+            else:
+                if "result" in row:
+                    raise ValueError(
+                        "failure checkpoint must not contain result"
+                    )
+                restored_failure[receipt.operation_id] = receipt
+
+        with self._lock:
+            if (
+                self._fingerprints
+                or self._in_flight
+                or self._success
+                or self._success_result_json
+                or self._failure
+            ):
+                raise RuntimeError(
+                    "restore_state requires a fresh executor"
+                )
+            self._fingerprints.update(restored_fingerprints)
+            self._success.update(restored_success)
+            self._success_result_json.update(restored_success_json)
+            self._failure.update(restored_failure)
+
