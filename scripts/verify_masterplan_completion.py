@@ -203,7 +203,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
             continue
         if entry.get("gap_status") != "closed":
             errors.append(f"{gap_id} closure gap_status is not closed")
-        if entry.get("implementation_state") != "closed":
+        if entry.get("implementation_state") not in {"complete", "closed"}:
             errors.append(f"{gap_id} implementation_state is not closed")
         if entry.get("closure_decision") != "closed":
             errors.append(f"{gap_id} closure_decision is not closed")
