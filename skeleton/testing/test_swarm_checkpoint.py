@@ -37,7 +37,7 @@ def test_checkpoint_discard_restores_provisionally_evicted_history() -> None:
     store = CheckpointStore(max_checkpoints=2)
     store.capture(runtime)
     store.capture(runtime)
-    third = store.capture(runtime)
+    third = store.capture(runtime, provisional=True)
 
     assert store.sequences() == (2, 3)
     assert store.discard(third.sequence) is True
@@ -49,7 +49,7 @@ def test_checkpoint_commit_finalizes_bounded_eviction() -> None:
     store = CheckpointStore(max_checkpoints=2)
     store.capture(runtime)
     store.capture(runtime)
-    third = store.capture(runtime)
+    third = store.capture(runtime, provisional=True)
 
     store.commit(third.sequence)
     assert store.discard(third.sequence) is True
