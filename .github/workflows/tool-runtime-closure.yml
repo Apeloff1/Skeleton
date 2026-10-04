@@ -14,6 +14,7 @@ on:
       - "backend/tests/test_tool_registry_canonical_delegate.py"
       - "backend/tests/test_tool_registry_scoped_adapters.py"
       - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_saga.py"
       - "skeleton/testing/test_tool_receipt_store.py"
       - "skeleton/testing/test_execution_runtime.py"
       - "scripts/check_tool_runtime_boundary.py"
@@ -74,6 +75,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_saga.py
           skeleton/testing/test_tool_receipt_store.py
 
       - name: Run backend compatibility delegation contracts
@@ -148,9 +150,9 @@ jobs:
               raise SystemExit("unexpected independent tool-runtime verifier identity")
           if receipt.get("valid") is not True or receipt.get("errors"):
               raise SystemExit("independent tool-runtime verification failed")
-          if len(receipt.get("boundary_digests") or {}) < 6:
+          if len(receipt.get("boundary_digests") or {}) < 7:
               raise SystemExit("independent tool-runtime boundary coverage is incomplete")
-          if len(receipt.get("mirror_pairs") or []) < 5:
+          if len(receipt.get("mirror_pairs") or []) < 6:
               raise SystemExit("independent tool-runtime mirror coverage is incomplete")
           dependencies = set(receipt.get("dependency_graph") or [])
           expected_dependencies = {
