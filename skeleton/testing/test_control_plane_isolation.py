@@ -173,6 +173,30 @@ class ControlDataPlaneIsolationTests(unittest.TestCase):
         ))
         self.assertEqual(permit.plane, "control")
 
+    def test_isolation_fences_already_issued_data_permits(self) -> None:
+        isolator = ControlDataPlaneIsolator(policy(), signing_key=b"k" * 32)
+        data = isolator.admit(request(
+            request_id="d1",
+            operation="data.generate",
+            plane="data",
+            capability="data:generate",
+        ))
+        control = isolator.admit(request(
+            request_id="c1",
+            operation="control.health",
+            plane="control",
+            capability="control:health",
+        ))
+        self.assertEqual(isolator.authorize(data), data)
+        isolator.set_data_plane_open(
+            False, capabilities=("control:isolation_admin",)
+        )
+        with self.assertRaises(DataPlaneUnavailable):
+            isolator.authorize(data)
+        self.assertEqual(isolator.authorize(control), control)
+        isolator.complete(data)
+        isolator.complete(control)
+
     def test_isolation_switch_requires_admin_capability(self) -> None:
         isolator = ControlDataPlaneIsolator(policy(), signing_key=b"k" * 32)
         with self.assertRaises(CapabilityDenied):
