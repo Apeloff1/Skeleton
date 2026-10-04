@@ -374,7 +374,7 @@ def _chat_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Conversation operation failed")
 
 
-def _provider_history(messages, *, exclude_message_id: str | None = None) -> List[Dict[str, str]]:
+def _provider_history(messages, *, before_sequence: int | None = None) -> List[Dict[str, str]]:
     # Failed/cancelled turns are closed by a system-derived terminal marker.
     # Their user prompt must not leak forward as an unanswered provider-history
     # turn, otherwise a later model sees work that canonical execution rejected.
@@ -390,7 +390,7 @@ def _provider_history(messages, *, exclude_message_id: str | None = None) -> Lis
     }
     history: List[Dict[str, str]] = []
     for message in messages:
-        if exclude_message_id is not None and message.message_id == exclude_message_id:
+        if before_sequence is not None and message.sequence >= before_sequence:
             continue
         if message.message_id in abandoned_user_ids:
             continue
@@ -1093,7 +1093,7 @@ async def ai_chat(
     user_prompt = "\n\n".join(sections)
     history = _provider_history(
         transcript,
-        exclude_message_id=user_message.message_id,
+        before_sequence=user_message.sequence,
     )
     operation_id, execution_id = _chat_turn_ids(
         thread.thread_id,
