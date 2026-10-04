@@ -20,6 +20,7 @@ No model output can directly mutate durable context.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 import threading
@@ -45,6 +46,7 @@ from .types import (
 )
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_'-]+")
+_PRIVACY_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ContextRepositoryError(RuntimeError):
@@ -462,6 +464,7 @@ class ContextRepository:
         self._snapshots: dict[str, ContextSnapshot] = {}
         self._patches: dict[str, ContextPatch] = {}
         self._branches: dict[str, str | None] = {"main": None}
+        self._privacy_deletion_receipt: str | None = None
         self._sequence = 0
         self._lock = threading.RLock()
         self._lexical_cache_limit = 8_192
@@ -523,6 +526,89 @@ class ContextRepository:
             return snapshot
         return replace(snapshot, entries=tuple(entry for entry in snapshot.entries if not entry.tombstoned))
 
+    def privacy_delete_all(
+        self,
+        *,
+        authority_receipt_digest: str,
+    ) -> str:
+        """Scrub all historical context content and seal against resurrection.
+
+        Commit and snapshot identities remain as non-content audit references,
+        while content-bearing entries, patch bodies, commit messages, evidence,
+        tags, and metadata are removed.
+        """
+
+        receipt = str(authority_receipt_digest).strip().lower()
+        if _PRIVACY_DIGEST_RE.fullmatch(receipt) is None:
+            raise ContextPolicyViolation(
+                "authority_receipt_digest must be lowercase sha256"
+            )
+        with self._lock:
+            prior = self._privacy_deletion_receipt
+            if prior is not None:
+                if prior != receipt:
+                    raise ContextConflict(
+                        "privacy deletion replay changed authority receipt"
+                    )
+                return prior
+
+            def scrub(entry: ContextEntry) -> ContextEntry:
+                key_digest = hashlib.sha256(
+                    entry.key.encode("utf-8")
+                ).hexdigest()
+                entry_digest = hashlib.sha256(
+                    entry.entry_id.encode("utf-8")
+                ).hexdigest()
+                return replace(
+                    entry,
+                    entry_id=f"privacy-{entry_digest[:32]}",
+                    key=f"privacy-{key_digest[:32]}",
+                    content="",
+                    source="privacy-deletion",
+                    evidence=(),
+                    tags=("privacy-tombstone",),
+                    promoted=False,
+                    tombstoned=True,
+                    metadata={
+                        "privacy_deletion_receipt_digest": receipt,
+                        "original_content_fingerprint": entry.content_fingerprint,
+                    },
+                )
+
+            rewritten_snapshots: dict[str, ContextSnapshot] = {}
+            for commit_id, snapshot in self._snapshots.items():
+                entries = tuple(
+                    sorted(
+                        (scrub(entry) for entry in snapshot.entries),
+                        key=lambda entry: entry.key,
+                    )
+                )
+                rewritten_snapshots[commit_id] = replace(
+                    snapshot,
+                    entries=entries,
+                )
+            self._snapshots = rewritten_snapshots
+
+            self._commits = {
+                commit_id: replace(
+                    commit,
+                    author="privacy-redacted",
+                    message="privacy-redacted",
+                    metadata={
+                        "privacy_deletion_receipt_digest": receipt,
+                    },
+                )
+                for commit_id, commit in self._commits.items()
+            }
+            self._patches.clear()
+            self._privacy_deletion_receipt = receipt
+            self._lexical_cache.clear()
+            return receipt
+
+    def privacy_deletion_receipt(self) -> str | None:
+        with self._lock:
+            return self._privacy_deletion_receipt
+
     def commit(
         self,
         branch: str,
@@ -533,6 +619,10 @@ class ContextRepository:
         second_parent: str | None = None,
     ) -> ContextCommit:
         branch = require_id("branch", branch)
+        if self._privacy_deletion_receipt is not None:
+            raise ContextPolicyViolation(
+                "privacy-deleted context repository is sealed"
+            )
         if not isinstance(patch, ContextPatch):
             raise TypeError("patch must be ContextPatch")
         if patch.namespace != self.namespace:
