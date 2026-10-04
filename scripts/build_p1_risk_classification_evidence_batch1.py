@@ -29,6 +29,7 @@ from reconcile_p1_risk_evidence import (  # noqa: E402
     ROOT,
     RiskKind,
     derive_obligations,
+    retired_gap_owner_from_id,
 )
 
 
@@ -399,6 +400,7 @@ def build_risk_classification_evidence(
     if not isinstance(raw_records, list):
         raise RiskClassificationEvidenceError("risk registry records must be a list")
     bound_ids: set[str] = set()
+    bound_rows: dict[str, dict[str, Any]] = {}
     for index, row in enumerate(raw_records):
         if not isinstance(row, dict):
             raise RiskClassificationEvidenceError(
@@ -414,12 +416,28 @@ def build_risk_classification_evidence(
                 f"duplicate governed binding identity: {obligation_id}"
             )
         bound_ids.add(obligation_id)
+        bound_rows[obligation_id] = row
 
     known_ids = {item.obligation_id for item in obligations}
     unknown = sorted(bound_ids - known_ids)
-    if unknown:
+    unexpected: list[str] = []
+    for obligation_id in unknown:
+        row = bound_rows[obligation_id]
+        expected_owner = retired_gap_owner_from_id(obligation_id)
+        evidence = row.get("evidence")
+        if (
+            expected_owner is None
+            or row.get("owner_id") != expected_owner
+            or row.get("disposition") != "evidence"
+            or not isinstance(evidence, list)
+            or not evidence
+            or row.get("accepted_risk") is not None
+        ):
+            unexpected.append(obligation_id)
+    if unexpected:
         raise RiskClassificationEvidenceError(
-            "risk registry references unknown obligations: " + ",".join(unknown)
+            "risk registry references unknown obligations: "
+            + ",".join(unexpected)
         )
 
     records: list[dict[str, Any]] = []
