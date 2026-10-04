@@ -50,7 +50,7 @@ def test_current_p1_execution_map_is_valid() -> None:
         "deferred_volume_count": 314,
         "canonical_p1_gap_count": 3,
         "task_count": 44,
-        "ready_task_count": 1,
+        "ready_task_count": 0,
         "terminal_lane": "P1-L7",
         "terminal_task": "P1-PROM-03",
     }
