@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from threading import RLock
 from time import monotonic
 from typing import Callable, TypeVar
 
@@ -221,6 +222,7 @@ class DurableAgentSupervisor:
         self.policy = policy or SwarmSupervisor()
         self._runtime = runtime
         self._last_commit: AgentSupervisorCommit | None = None
+        self._lock = RLock()
 
     @classmethod
     def open(
@@ -311,7 +313,8 @@ class DurableAgentSupervisor:
     def runtime(self) -> SwarmRuntime:
         """Return a detached runtime image, never the mutable authority object."""
 
-        return self._clone_runtime()
+        with self._lock:
+            return self._clone_runtime()
 
     @property
     def resource_scope(self) -> str:
@@ -333,21 +336,24 @@ class DurableAgentSupervisor:
     def dispatch(self, task: SwarmTask) -> DispatchDecision:
         """Evaluate load/circuit/quarantine policy against authoritative state."""
 
-        return self.policy.dispatch(self._runtime, task)
+        with self._lock:
+            return self.policy.dispatch(self._runtime, task)
 
     def status(self) -> AgentSupervisorStatus:
-        return AgentSupervisorStatus(
-            run=self.store.get_run(self.run_id),
-            resources=self.accountant.accounted,
-            runtime=self._runtime.snapshot(),
-            recovery=self.recovery.status(),
-        )
+        with self._lock:
+            return AgentSupervisorStatus(
+                run=self.store.get_run(self.run_id),
+                resources=self.accountant.accounted,
+                runtime=self._runtime.snapshot(),
+                recovery=self.recovery.status(),
+            )
 
     def checkpoint(self) -> AgentSupervisorCommit:
         """Persist an explicit no-semantic-change checkpoint."""
 
-        candidate = self._clone_runtime()
-        return self._commit(candidate)
+        with self._lock:
+            candidate = self._clone_runtime()
+            return self._commit(candidate)
 
     def _clone_runtime(self) -> SwarmRuntime:
         return type(self._runtime).from_state(
@@ -388,10 +394,11 @@ class DurableAgentSupervisor:
         return commit
 
     def _mutate(self, mutation: Callable[[SwarmRuntime], _T]) -> _T:
-        candidate = self._clone_runtime()
-        result = mutation(candidate)
-        self._commit(candidate)
-        return result
+        with self._lock:
+            candidate = self._clone_runtime()
+            result = mutation(candidate)
+            self._commit(candidate)
+            return result
 
     def register_worker(
         self,
