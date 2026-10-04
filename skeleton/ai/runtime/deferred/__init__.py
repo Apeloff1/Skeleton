@@ -8,6 +8,7 @@ from .catalog import DEFERRED_165_SPECS, build_registry, volume_ids
 from .contracts import CapabilityRegistry, CapabilitySpec, EvidenceReceipt
 from .executor import (
     DeferredExecutionError,
+    DeferredExecutionPendingError,
     DeferredExecutor,
     DeferredInvocation,
     ExecutionOutcome,
@@ -20,12 +21,18 @@ __all__ = [
     "CapabilitySpec",
     "DEFERRED_165_SPECS",
     "DeferredExecutionError",
+    "DeferredExecutionJournal",
+    "DeferredExecutionPendingError",
     "DeferredExecutor",
+    "DeferredJournalConflict",
+    "DeferredJournalError",
+    "DeferredJournalRecord",
     "DeferredInvocation",
     "EvidenceReceipt",
     "ExecutionOutcome",
     "ExecutionReceipt",
     "FailureReceipt",
+    "SqliteDeferredExecutionJournal",
     "build_registry",
     "volume_ids",
 ]
