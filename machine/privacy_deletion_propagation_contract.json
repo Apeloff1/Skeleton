@@ -1,0 +1,36 @@
+{
+  "schema_version": "skeleton.privacy_deletion_propagation.contract.v1",
+  "gap_id": "G016",
+  "title": "Privacy deletion / tombstone propagation",
+  "canonical_owner": "skeleton/security/deletion_propagation.py",
+  "ai_mirror": "skeleton/ai/runtime/security/deletion_propagation.py",
+  "upstream_contracts": [
+    "skeleton/security/data_deletion.py",
+    "skeleton/vault/data_lifecycle.py"
+  ],
+  "required_surfaces_examples": [
+    "memory",
+    "retrieval-index",
+    "artifact-cache",
+    "backup-catalog"
+  ],
+  "invariants": [
+    "deletion generation is monotonic per tenant and target",
+    "tombstone declares every required propagation surface",
+    "acknowledgement binds exact tenant, target, generation, surface, tombstone and evidence",
+    "stale or future acknowledgement fails closed",
+    "latest tombstone survives restart",
+    "source generations at or before tombstone are denied as resurrection attempts",
+    "newer generations require explicit creation authority",
+    "completion requires acknowledgement from every declared surface",
+    "authority persists metadata only and never deleted payloads"
+  ],
+  "validation": [
+    "skeleton/testing/test_deletion_propagation.py",
+    "skeleton/testing/test_data_deletion.py",
+    "skeleton/testing/test_data_lifecycle.py",
+    "skeleton/testing/test_p0_data_lifecycle_erasure.py",
+    ".github/workflows/privacy-deletion-propagation.yml"
+  ],
+  "claim_limit": "Implementation evidence only; independent exact-head evidence is required before verified_closed."
+}

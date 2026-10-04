@@ -1,0 +1,78 @@
+name: Privacy Deletion Tombstone Propagation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/security/data_deletion.py"
+      - "skeleton/vault/data_lifecycle.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "skeleton/testing/test_data_deletion.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_p0_data_lifecycle_erasure.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - ".github/workflows/privacy-deletion-propagation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/security/deletion_propagation.py"
+      - "skeleton/ai/runtime/security/deletion_propagation.py"
+      - "skeleton/security/data_deletion.py"
+      - "skeleton/vault/data_lifecycle.py"
+      - "skeleton/testing/test_deletion_propagation.py"
+      - "skeleton/testing/test_data_deletion.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_p0_data_lifecycle_erasure.py"
+      - "machine/ai_hostile_gap_disposition.json"
+      - "machine/privacy_deletion_propagation_contract.json"
+      - ".github/workflows/privacy-deletion-propagation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g016-privacy-deletion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deletion-propagation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Compile deletion propagation boundary
+        run: >-
+          python -m compileall -q
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
+          skeleton/testing/test_deletion_propagation.py
+      - name: Run deletion propagation regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_deletion_propagation.py
+          skeleton/testing/test_data_deletion.py
+          skeleton/testing/test_data_lifecycle.py
+          skeleton/testing/test_p0_data_lifecycle_erasure.py
+      - name: Verify canonical AI mirror
+        run: >-
+          cmp
+          skeleton/security/deletion_propagation.py
+          skeleton/ai/runtime/security/deletion_propagation.py
+      - name: Verify hostile-gap ledger
+        run: python scripts/verify_ai_hostile_gap_disposition.py
