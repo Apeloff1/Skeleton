@@ -22,6 +22,7 @@ from skeleton.ai.runtime.multimodal.intake import (
     MultimodalAsset,
     MultimodalIntake,
     MultimodalSanitizationError,
+    VerifiedMultimodalAsset,
 )
 
 
@@ -420,12 +421,14 @@ class MultimodalCorpus:
         self.store = store or ContentAddressedStore(max_object_bytes=512 * 1024 * 1024)
         self._records: dict[str, MultimodalRecord] = {}
         self._record_digests: dict[str, str] = {}
+        self._asset_validation_digests: dict[str, str | None] = {}
         self._text: dict[str, str] = {}
         self._speech_tail: dict[str, SpeechChunkReceipt] = {}
         self._speech_chunks: dict[tuple[str, int], SpeechChunkReceipt] = {}
         self._speech_chain_digests: dict[tuple[str, int], str] = {}
         self._speech_tail_sequences: dict[str, int] = {}
         self._speech_record_keys: dict[str, tuple[str, int]] = {}
+        self._speech_source_lineages: dict[tuple[str, int], tuple[str, ...]] = {}
         self._training_exports: dict[str, tuple[MultimodalTrainingManifest, tuple[str, ...]]] = {}
         self._training_export_digests: dict[str, str] = {}
         self._lock = RLock()
@@ -605,6 +608,7 @@ class MultimodalCorpus:
         extractor_ref: str | None = None,
         language: str = "und",
         simulated: bool = False,
+        verified: bool = False,
     ) -> MultimodalRecord:
         with self._lock:
             return self._ingest(
@@ -620,6 +624,7 @@ class MultimodalCorpus:
                 extractor_ref=extractor_ref,
                 language=language,
                 simulated=simulated,
+                verified=verified,
             )
 
     def _ingest(
@@ -637,12 +642,15 @@ class MultimodalCorpus:
         extractor_ref: str | None,
         language: str,
         simulated: bool,
+        verified: bool,
     ) -> MultimodalRecord:
         rid = _text("record_id", record_id)
         if not isinstance(modality, LearningModality):
             raise MultimodalFoundationError("modality must be a LearningModality")
         if not isinstance(simulated, bool):
             raise MultimodalFoundationError("simulated must be a boolean")
+        if not isinstance(verified, bool):
+            raise MultimodalFoundationError("verified must be a boolean")
         mime = _text("media_type", media_type, maximum=255)
         prior = self._records.get(rid)
         if prior is not None:
@@ -653,7 +661,8 @@ class MultimodalCorpus:
         staged_intake = copy(self.intake)
         staged_intake._assets = dict(self.intake._assets)
         try:
-            asset = staged_intake.sanitize(
+            admission = staged_intake.sanitize_verified if verified else staged_intake.sanitize
+            asset = admission(
                 asset_id=rid,
                 modality=_BASE_MODALITY[modality],
                 mime_type=mime,
@@ -713,11 +722,13 @@ class MultimodalCorpus:
             raise MultimodalFoundationError("intake/store content identity drift")
 
         record_digest = record.digest
+        validation_digest = asset.validation.digest if isinstance(asset, VerifiedMultimodalAsset) else None
         self.intake._assets[rid] = asset
         self.store._objects[stored.digest] = staged_store._objects[stored.digest]
         self.store._types[stored.digest] = staged_store._types[stored.digest]
         self._records[rid] = record
         self._record_digests[rid] = record_digest
+        self._asset_validation_digests[rid] = validation_digest
         if text is not None:
             self._text[rid] = text
         return record
@@ -733,6 +744,8 @@ class MultimodalCorpus:
         rights_refs: Sequence[str],
         transcript: str | None = None,
         extractor_ref: str | None = None,
+        verified: bool = False,
+        lineage_refs: Sequence[str] = (),
     ) -> tuple[MultimodalRecord, SpeechChunkReceipt]:
         with self._lock:
             return self._ingest_speech_chunk(
@@ -744,6 +757,8 @@ class MultimodalCorpus:
                 rights_refs=rights_refs,
                 transcript=transcript,
                 extractor_ref=extractor_ref,
+                verified=verified,
+                lineage_refs=lineage_refs,
             )
 
     def _ingest_speech_chunk(
@@ -757,8 +772,11 @@ class MultimodalCorpus:
         rights_refs: Sequence[str],
         transcript: str | None,
         extractor_ref: str | None,
+        verified: bool,
+        lineage_refs: Sequence[str],
     ) -> tuple[MultimodalRecord, SpeechChunkReceipt]:
         sid = _text("stream_id", stream_id)
+        additional_lineage = _ordered_refs("speech_source_lineage", lineage_refs, minimum=0)
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
             raise MultimodalFoundationError("speech sequence must be non-negative")
         tail = self._speech_tail.get(sid)
@@ -788,11 +806,15 @@ class MultimodalCorpus:
             payload=payload,
             source_refs=source_refs,
             rights_refs=rights_refs,
-            lineage_refs=(() if previous_receipt is None else (previous_receipt.record_digest,)),
+            lineage_refs=(
+                *(() if previous_receipt is None else (previous_receipt.record_digest,)),
+                *additional_lineage,
+            ),
             metadata={"source_id": sid},
             extracted_text=transcript,
             extractor_ref=extractor_ref,
             language="und",
+            verified=verified,
         )
         if prior_receipt is not None:
             return record, prior_receipt
@@ -815,6 +837,7 @@ class MultimodalCorpus:
         self._speech_chain_digests[(sid, sequence)] = receipt.chain_digest
         self._speech_tail_sequences[sid] = sequence
         self._speech_record_keys[record.record_id] = (sid, sequence)
+        self._speech_source_lineages[(sid, sequence)] = additional_lineage
         self._speech_tail[sid] = receipt
         return record, receipt
 
@@ -863,6 +886,18 @@ class MultimodalCorpus:
             or dict(asset.sanitized_metadata) != dict(record.metadata)
         ):
             raise MultimodalFoundationError("multimodal source provenance drift")
+        if isinstance(asset, VerifiedMultimodalAsset):
+            if self._asset_validation_digests.get(record_id) != asset.validation.digest:
+                raise MultimodalFoundationError("issued verified media receipt identity drift")
+            try:
+                self.intake.verify_verified_asset(asset, source)
+            except MultimodalSanitizationError as exc:
+                raise MultimodalFoundationError("verified multimodal media integrity failed") from exc
+        elif (
+            record_id not in self._asset_validation_digests
+            or self._asset_validation_digests[record_id] is not None
+        ):
+            raise MultimodalFoundationError("issued media validation evidence is missing")
         text = self._text.get(record_id)
         if record.text_projection is None:
             if text is not None or record_id in self._text:
@@ -907,7 +942,12 @@ class MultimodalCorpus:
             if (
                 receipt.record_digest != record.digest
                 or receipt.previous_chunk_digest != (None if previous is None else previous.chain_digest)
-                or record.lineage_refs != (() if previous is None else (previous.record_digest,))
+                or record.lineage_refs
+                != (
+                    *(() if previous is None else (previous.record_digest,)),
+                    *self._speech_source_lineages.get(key, ()),
+                )
+                or key not in self._speech_source_lineages
                 or self._speech_record_keys.get(record.record_id) != key
             ):
                 raise MultimodalFoundationError("speech receipt provenance drift")

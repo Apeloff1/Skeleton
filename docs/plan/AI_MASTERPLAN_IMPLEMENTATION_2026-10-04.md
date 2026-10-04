@@ -21,6 +21,12 @@ reviewable candidate; local tests do not establish landed or production evidence
 | `P3T2-LIFECYCLE-01` | SQLite persists and validates the complete lifecycle evidence graph, reconstructs issued decisions after restart, serializes independent connections and supports validated backup/restore. | `test_p3_model_lifecycle_persistence.py` |
 | Existing provider owner | Derived artifacts activate through an explicitly declared local provider with architecture acknowledgement, conservative governance, admission, actual usage and cancellation. | `test_local_provider_activation.py`, `test_local_provider_runtime_guards.py` |
 | Existing engine API owner | Authenticated inventory exposes provider availability; durable handoff recovery reconstructs the original accepted lineage under current read authority. Cancellation waits for the actual local worker to exit before terminalization. | `test_engine_routes.py`, `test_engine_handoff_recovery.py`, `test_local_inference_cancellation.py` |
+| `P3T2-TRAINING-01` | Two to four actual spawned local NumPy ranks commit deterministic complete synchronous barriers with full averaged weights and rank receipts. Worker death/timeout leaves the previous checkpoint intact; recovery matches uninterrupted execution of this algorithm. | `test_p3_local_data_parallel_training.py`, `test_governed_training_cli.py` |
+| `P3T2-TRAINING-01` | Tenant/trust-bound CAS archives full native checkpoints and original operator admission. Restore fences workers and checks source authority; protected retention preserves latest/recovery references. A fresh training database can republish all three trained model variants without updates. | `test_training_checkpoint_archive.py`, `test_governed_checkpoint_recovery.py` |
+| `P3T2-LEARNING-01` | The existing evaluation ledger persists actual independent verifier decisions per case and derives calibration/error rates and baseline regressions. Issued measured qualification rejects fabricated scalar metrics and reuses completed case records after restart. | `test_measured_local_verifier.py` |
+| `P3T2-MULTIMODAL-01` | Verified intake decodes actual bounded PNG/JPEG/WebP pixels and PCM WAV samples, replacing caller geometry/timing with measured evidence and rejecting corrupt/oversized/forged inputs before publication. | `test_multimodal_media_validation.py` |
+| `P3T2-MULTIMODAL-01` | Existing speech session contracts execute ordered verified audio and final transcript commits with isolated durable recovery; timed video evidence fuses deterministic modality scores after rights/time/simulation filtering. | `test_p3_live_speech_execution.py`, `test_p3_video_evidence_fusion.py` |
+| Existing engine API owner | The checkpoint pins the exact local artifact and inference seed before first dispatch; unfinished restart rejects model/configuration substitution while preserving committed usage and completed-result replay. | `test_engine_local_provider_binding.py` |
 
 The [operator guide](GOVERNED_LOCAL_MODEL_DEVELOPMENT.md) documents the new
 `skeleton-train-governed-model` command and the concrete restart/deletion/rollback
@@ -129,7 +135,18 @@ closure-evidence, resume, pipeline and provider-bootstrap gates passed locally.
 The earlier 291-test count describes the first wave. Remote CI must repeat
 verification on the submitted head.
 
-Distributed collectives, independently authenticated production evaluation,
+The third wave passed **1,844 broad regressions and 164 final focused tests**.
+Four assembled lifecycle cases were repeated after replacing their opaque image
+fixture with actual verified PNGs: the combined result is **2,004 distinct tests
+plus 29 subtests across 129 test files**. One redundant repository scan remained
+deselected, and the mandatory provider-bootstrap scan passed separately. All
+37 changed Python files passed Ruff, compilation and Python 3.11 syntax checks.
+The assembled contract now validates 15 contracts, 14 API owners and 29 executable
+test files, including explicit local-parallel, archive and measured-verifier
+acceptance. Canonical architecture, construction, interfaces, state, masterplan,
+file-tree, continuation, execution, closure-evidence and resume gates also passed.
+
+Remote distributed collectives, independently authenticated production evaluation,
 production model-routing migration and independent masterplan closure remain
 outside this bounded implementation. No queued volume, completion checkbox or
 signature is removed or fabricated.

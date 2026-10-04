@@ -1,0 +1,76 @@
+{
+  "schema_version": "skeleton.ai.local_data_parallel_training.v1",
+  "status": "implemented_unpromoted",
+  "claim_scope": "bounded_synchronous_local_data_parallel_numpy_training",
+  "local_parallel_training_supported": true,
+  "remote_cluster_training_supported": false,
+  "elastic_membership_supported": false,
+  "production_model_promotion_authorized": false,
+  "canonical_owner": "skeleton/ai/runtime/training/distributed_trainer.py",
+  "canonical_owners": {
+    "trainer": "skeleton/ai/runtime/training/distributed_trainer.py",
+    "control": "skeleton/ai/runtime/training/control.py",
+    "model": "skeleton/ai/runtime/inference/neural.py",
+    "data": "skeleton/ai/runtime/training/data.py"
+  },
+  "execution": {
+    "strategy": "local_spawned_processes",
+    "world_size_bounds": [2, 4],
+    "manifest_parallelism": "data_parallel",
+    "algorithm": "numpy-recurrent-byte-synchronous-mean-sgd-v1",
+    "operator_algorithm": "the governed CLI manifest algorithm enum data_parallel names this exact numerical algorithm; other operator algorithm values are rejected",
+    "rank_assignment": "each barrier assigns consecutive registered documents to ranks in ascending order; each active rank executes exactly one clipped SGD document update from the same pinned weights; excess tail ranks acknowledge idle membership",
+    "aggregation": "float64 parameter arithmetic mean of active-rank updated parameters, reduced in ascending rank order; idle ranks do not dilute the mean",
+    "equivalence": "exact weights across uninterrupted and resumed executions of the same synchronous averaging algorithm; sequential per-document SGD is a different algorithm",
+    "randomness": "manifest seed initializes parameters once; no stochastic gradient draws or document shuffling",
+    "transport": "bounded local multiprocessing Pipe messages; no sockets, remote worker address, credentials, new service or runtime root"
+  },
+  "persistence": {
+    "authority": "existing TrainingRepository SQLite database",
+    "binding_table": "training_execution_binding",
+    "payload_table": "training_checkpoint_payload",
+    "commit_boundary": "all rank receipts for one complete barrier, full averaged weights, optimizer configuration, next epoch/document cursor and cumulative usage in one existing worker-fenced checkpoint transaction",
+    "history": "each committed checkpoint contains the complete current barrier and all rank receipts; prior snapshots remain under the same SQLite owner until existing governed checkpoint archive retention verifies their exact CAS backups before pruning",
+    "rollback": "an uncommitted failed barrier changes no persisted weights or cursor; disabling this optional trainer retains existing reference and single-worker neural paths"
+  },
+  "binding": {
+    "schema_version": "skeleton.local_parallel_training_binding.v1",
+    "immutable_fields": ["manifest_digest", "dataset_digest", "dataset_authority_epoch", "split_name", "split_digest", "corpus_digest", "document_sequence_digest", "document_count", "document_digests", "document_sizes", "corpus_bytes", "document_bytes", "targets_per_epoch", "training_config", "initial_model_digest"],
+    "training_config_fields": ["algorithm", "model_id", "hidden_size", "seed", "dtype", "epochs", "learning_rate", "gradient_clip", "world_size", "collective_timeout_seconds", "strategy", "aggregation", "runtime"],
+    "runtime_fields": ["python", "numpy", "platform", "machine"]
+  },
+  "resume_payload": {
+    "schema_version": "skeleton.local_parallel_training_resume.v1",
+    "fields": ["schema_version", "binding_digest", "cursor", "usage", "optimizer", "model", "initial_loss", "final_loss", "finished", "barrier"],
+    "cursor_fields": ["epoch", "document_index", "update_count", "step", "barrier_count"],
+    "usage_fields": ["steps", "documents", "training_bytes", "epochs", "barriers"],
+    "optimizer_fields": ["algorithm", "learning_rate", "gradient_clip", "slots", "aggregation"],
+    "barrier_fields": ["barrier_index", "source_epoch", "source_document_index", "input_model_digest", "output_model_digest", "world_size", "worker_epoch", "ranks"],
+    "rank_receipt_fields": ["rank", "worker_pid", "worker_epoch", "barrier_index", "input_model_digest", "document_index", "document_digest", "targets", "training_bytes", "updated_model_digest", "status"],
+    "step_semantics": "actual cumulative UTF-8 byte plus EOS training targets across all active ranks, counted once per document update; one barrier is one averaged optimizer update",
+    "budgets": "existing neural max_steps/max_tokens/max_documents/max_updates/max_training_bytes/max_epochs/max_corpus_bytes remain cumulative; max_barriers bounds completed averaging barriers; max_processes bounds fixed local rank membership"
+  },
+  "limits": {
+    "max_processes": 4,
+    "max_hidden_size": 128,
+    "max_document_bytes": 4096,
+    "max_corpus_bytes": 1048576,
+    "max_epochs": 1024,
+    "max_training_targets": 16777216,
+    "max_document_updates": 65536,
+    "max_collective_timeout_seconds": 120,
+    "max_worker_message_bytes": 16777216,
+    "max_checkpoint_payload_bytes": 16777216
+  },
+  "recovery": [
+    "require exact dataset rights, current quality and materialized corpus identity before spawning workers",
+    "persist full initial weights and cursor zero before the first barrier; recover exactly bound empty startup windows using existing worker epoch fencing",
+    "restore the authoritative checkpoint returned after worker recovery fencing before spawning replacement ranks",
+    "all rank acknowledgements must match current worker epoch, barrier, pinned weights, assigned document and target count before aggregation",
+    "assert current worker and dataset authority before dispatch and serialize durable checkpoint/completion commits against dataset revocation",
+    "a crash or failed rank after previous barriers resumes at the first uncommitted barrier; terminal reload does not spawn workers or perform SGD"
+  ],
+  "failures": ["rank process exit, timeout, malformed receipt, parameter identity mismatch or duplicate rank/PID fails the entire uncommitted barrier", "all rank processes and Pipe descriptors are stopped and joined on normal completion or any exception", "stale parent worker cannot checkpoint, emit telemetry or terminalize replacement work", "conflicting corpus/configuration/process count/budget rejects before worker allocation", "payload and receipt tamper fails resume and completed artifact reload", "revocation or quality failure denies continuation and artifact admission"],
+  "tests": ["skeleton/testing/test_p3_local_data_parallel_training.py"],
+  "scope_limitations": ["single machine, fixed 2-4 processes", "portable NumPy byte-level recurrent baseline", "no remote cluster, elastic ranks, GPU collectives or neural quality claim", "no masterplan closure or signoff"]
+}

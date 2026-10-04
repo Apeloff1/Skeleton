@@ -105,21 +105,65 @@ from .learning_pipeline import (
 )
 
 __all__ += [
+    "CheckpointArchiveContents",
+    "CheckpointArchiveError",
+    "CheckpointArchiveReceipt",
+    "EvaluationModelSource",
     "ExecutedCurriculumReceipt",
     "ExecutedEpisodeReceipt",
     "ExecutedEvaluationReceipt",
+    "LocalDataParallelArtifact",
+    "LocalDataParallelTrainer",
     "LocalPolicyObservation",
     "LocalPostTrainingPolicy",
+    "LocalVerifier",
+    "MeasuredVerifierError",
+    "MeasuredVerifierQualification",
+    "MeasuredVerifierReceipt",
+    "MeasuredVerifierRunner",
     "NeuralLocalTrainer",
     "NeuralTrainingArtifact",
     "PostTrainingExecutionError",
     "PostTrainingExecutionSpec",
     "PostTrainingQualificationReceipt",
     "PostTrainingRunner",
+    "TrainingCheckpointArchive",
+    "VerifierGatePolicy",
 ]
 
 
 def __getattr__(name: str):
+    if name in {
+        "TrainingCheckpointArchive",
+        "CheckpointArchiveReceipt",
+        "CheckpointArchiveError",
+        "CheckpointArchiveContents",
+    }:
+        from . import checkpoint_archive
+
+        value = getattr(checkpoint_archive, name)
+        globals()[name] = value
+        return value
+    if name in {
+        "EvaluationModelSource",
+        "LocalVerifier",
+        "MeasuredVerifierRunner",
+        "MeasuredVerifierReceipt",
+        "MeasuredVerifierQualification",
+        "MeasuredVerifierError",
+        "VerifierGatePolicy",
+    }:
+        from . import verifier
+
+        value = getattr(verifier, name)
+        globals()[name] = value
+        return value
+    if name in {"LocalDataParallelTrainer", "LocalDataParallelArtifact"}:
+        from . import distributed_trainer
+
+        value = getattr(distributed_trainer, name)
+        globals()[name] = value
+        return value
     if name in {"NeuralLocalTrainer", "NeuralTrainingArtifact"}:
         from . import neural_trainer
 

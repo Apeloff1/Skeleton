@@ -16,7 +16,13 @@ from functools import wraps
 
 from skeleton.ai.runtime.inference import LocalModelBackend
 
-from .evaluation import EvaluationHarness, EvaluationResult, EvaluationSuite
+from .evaluation import (
+    EvaluationCase,
+    EvaluationHarness,
+    EvaluationResult,
+    EvaluationSuite,
+    evaluation_case_passes,
+)
 from .post_training import (
     CurriculumDecision,
     CurriculumEngine,
@@ -847,7 +853,7 @@ class PostTrainingRunner:
             passed = {
                 key
                 for key, case in cases.items()
-                if case["expected_substring"].casefold() in result.outputs[key].casefold()
+                if evaluation_case_passes(EvaluationCase(**case), result.outputs[key])
             }
             if (
                 claimed_suite != payload["suite_digest"]

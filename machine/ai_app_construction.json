@@ -897,7 +897,8 @@
         "idempotent service command",
         "operation event replay",
         "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
+        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
       ],
       "construction": [
         "keep engine ownership separate from product routes",
@@ -909,7 +910,8 @@
         "support idempotent submit/query/cancel and resumable operation events",
         "keep provider credentials and model transport in the engine process after cutover",
         "publish capability-scoped readiness from declared manifests and dependency probes",
-        "read GET /api/v1/engine/executions/{execution_id}/handoff only from the original accepted durable command under existing engine:read service authority; verify acknowledgement, canonical execution and checkpoint identity and expose non-content lineage only"
+        "read GET /api/v1/engine/executions/{execution_id}/handoff only from the original accepted durable command under existing engine:read service authority; verify acknowledgement, canonical execution and checkpoint identity and expose non-content lineage only",
+        "pin local artifact identity in the canonical execution checkpoint before dispatch and reject mismatched unfinished execution recovery"
       ],
       "acceptance": [
         "route collision gate",
@@ -923,7 +925,8 @@
         "engine outage degraded-readiness test",
         "process credential ownership test",
         "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "failure_mode": "typed unavailable/denied/conflict response with no local backend provider fallback"
     },

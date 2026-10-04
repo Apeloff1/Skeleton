@@ -90,7 +90,8 @@
         "idempotent service command",
         "operation event replay",
         "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
+        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -116,7 +117,8 @@
         "engine outage degraded-readiness test",
         "process credential ownership test",
         "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "status": "present"
     },
@@ -925,7 +927,8 @@
         "idempotent service command",
         "operation event replay",
         "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
+        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -951,7 +954,8 @@
         "engine outage degraded-readiness test",
         "process credential ownership test",
         "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "status": "present"
     },
@@ -1163,12 +1167,15 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -1213,12 +1220,15 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -1264,12 +1274,15 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "target_acceptance": [
         "trace continuity tests",
@@ -1318,12 +1331,15 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "target_acceptance": [
         "resume tests",
@@ -1371,12 +1387,15 @@
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
+        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests"
+        "capability readiness contract tests",
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -2757,7 +2776,8 @@
         "idempotent service command",
         "operation event replay",
         "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
+        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -2789,7 +2809,8 @@
         "engine outage degraded-readiness test",
         "process credential ownership test",
         "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "status": "present"
     },
@@ -3698,7 +3719,8 @@
         "idempotent service command",
         "operation event replay",
         "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json"
+        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
+        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -3718,7 +3740,8 @@
         "engine outage degraded-readiness test",
         "process credential ownership test",
         "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json"
+        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
+        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
       ],
       "status": "present"
     },

@@ -2868,6 +2868,41 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
         ):
             raise ProviderUnavailableError("activated local model artifact identity drift")
 
+    def execution_identity(self) -> dict[str, Any]:
+        """Project validated artifact content identity for durable execution pins."""
+
+        self._ensure_architecture()
+        self._assert_model_identity()
+        fields = ("schema", "model_id", "model_digest", "artifact_sha256", "artifact_bytes", "reference")
+        try:
+            default_seed = self._local_adapter.default_seed
+            if type(default_seed) is not int or not 0 <= default_seed <= (1 << 63) - 1:
+                raise ValueError("invalid local inference seed")
+            artifact = {key: self._artifact[key] for key in fields}
+            if (
+                artifact["schema"] not in {"reference_ngram", "skeleton.numpy_recurrent_lm.v1"}
+                or artifact["model_id"] != self.model
+                or any(
+                    not isinstance(artifact[key], str)
+                    or len(artifact[key]) != 64
+                    or any(character not in "0123456789abcdef" for character in artifact[key])
+                    for key in ("model_digest", "artifact_sha256")
+                )
+                or type(artifact["artifact_bytes"]) is not int
+                or not 1 <= artifact["artifact_bytes"] <= 128 * 1024 * 1024
+                or artifact["reference"] != "local-model-artifact:" + artifact["artifact_sha256"]
+            ):
+                raise ValueError("invalid artifact descriptor")
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ProviderUnavailableError("local model artifact execution identity is invalid") from exc
+        return {
+            "schema_version": "skeleton.local_provider_execution_identity.v1",
+            "provider_id": self.provider_id,
+            "model_id": self.model,
+            "artifact": artifact,
+            "inference": {"default_seed": default_seed},
+        }
+
     @property
     def available(self) -> bool:
         try:

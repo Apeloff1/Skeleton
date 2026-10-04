@@ -83,13 +83,13 @@ def _offline(monkeypatch):
     monkeypatch.setattr(socket, "socket", socket_without_internet)
 
 
-@pytest.fixture(params=("reference", "neural"))
+@pytest.fixture(params=("reference", "neural", "data_parallel"))
 def governed_artifact(request, tmp_path, monkeypatch):
     algorithm = request.param
-    if algorithm == "neural":
+    if algorithm != "reference":
         pytest.importorskip("numpy")
     _offline(monkeypatch)
-    corpus = "a" * 16 if algorithm == "neural" else "local engine answer complete"
+    corpus = "a" * 16 if algorithm != "reference" else "local engine answer complete"
     source = tmp_path / "licensed-corpus.txt"
     source.write_text(corpus, encoding="utf-8")
     arguments = {
@@ -137,13 +137,13 @@ def governed_artifact(request, tmp_path, monkeypatch):
     arguments["output_path"].unlink()
     update = (
         "skeleton.ai.runtime.inference.neural.NumpyRecurrentLM.train_document"
-        if algorithm == "neural"
+        if algorithm != "reference"
         else "skeleton.ai.runtime.training.trainer.ReferenceNGramModel.train"
     )
     with patch(update, side_effect=AssertionError("committed training was replayed")):
         assert build_governed_artifact(**arguments) == receipt
     assert load_local_model_artifact(arguments["output_path"]).receipt == artifact.receipt
-    if algorithm == "neural":
+    if algorithm != "reference":
         assert receipt["final_loss"] < receipt["initial_loss"]
         assert receipt["update_count"] == 8
 
@@ -189,7 +189,7 @@ def _command(algorithm):
         source_snapshot=((str(uuid4()), "b" * 64),),
         data_class="internal",
         instructions="Complete the prompt from the activated local model.",
-        prompt="a" if algorithm == "neural" else "local engine",
+        prompt="a" if algorithm != "reference" else "local engine",
         purpose="model-inference",
         history=(),
     )
@@ -216,7 +216,7 @@ def _command(algorithm):
         resource_budget={
             "max_model_turns": 2,
             "max_tool_calls": 1,
-            "max_output_tokens": 1 if algorithm == "neural" else 8,
+            "max_output_tokens": 1 if algorithm != "reference" else 8,
         },
         stop_policy={
             "deadline": operation.deadline.isoformat(),

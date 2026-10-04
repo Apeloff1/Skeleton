@@ -13,6 +13,7 @@ from skeleton.ai.runtime.training.evaluation import (
     EvaluationHarness,
     EvaluationResult,
     EvaluationSuite,
+    evaluation_case_passes,
 )
 from skeleton.learning.model_program import TrainingReceipt
 
@@ -596,9 +597,7 @@ class LearningProgram:
         ):
             raise LearningProgramError("benchmark result identity or case coverage mismatch")
         passed = {
-            case.case_id
-            for case in suite.cases
-            if case.expected_substring.casefold() in result.outputs[case.case_id].casefold()
+            case.case_id for case in suite.cases if evaluation_case_passes(case, result.outputs[case.case_id])
         }
         if set(result.passed_case_ids) != passed or set(result.failed_case_ids) != case_ids - passed:
             raise LearningProgramError("benchmark result classification mismatch")

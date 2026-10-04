@@ -27,6 +27,24 @@ The existing `local-inference` optional dependency group declares the project's
 preferred local runtime. `--algorithm reference --order 2` selects the reference
 n-gram estimator and can run without NumPy.
 
+Select fixed local data-parallel execution explicitly:
+
+```sh
+python -m skeleton.ai.runtime.training.cli ./licensed-a.txt ./licensed-b.txt \
+  --state-directory ./local-training-state --output ./parallel-model.json \
+  --run-id local-parallel-v1 --dataset-id licensed-parallel \
+  --rights-ref license:owned-corpus --algorithm data_parallel \
+  --world-size 2 --collective-timeout-seconds 30 --hidden-size 24 --epochs 8
+```
+
+Two to four spawned NumPy processes train consecutive documents from identical
+pinned weights. The coordinator validates every rank receipt and averages
+active-rank updates in rank order, then commits a complete barrier. Tail ranks
+acknowledge idle membership. Recovery matches the uninterrupted synchronous
+averaging algorithm; sequential document SGD uses a different update order.
+Worker exit, timeout or malformed evidence commits no partial barrier and stops
+all ranks. Fixed local membership has no remote cluster or elastic-rank support.
+
 Run the same command after interruption. The immutable operator request, source
 bytes, dataset identity, model settings, code/environment identity and budgets
 must match. The trainer reloads full committed state and continues after the last
@@ -144,3 +162,71 @@ code version. Restore lifecycle backups to a new destination only after complete
 validation. Preserve full learned checkpoints and issued evidence; never recover
 by inventing corpus bytes, restoring withdrawn rights, resetting usage or deleting
 transition history.
+
+## Archive checkpoints and recover operator state
+
+`TrainingCheckpointArchive` writes a full manifest, exact execution binding,
+learned payload and optional original governed CLI request into the existing
+tenant/trust-bound `GovernedContentStore`. Backup records a durable training
+receipt before publishing the corresponding CAS commit proof. A retry completes
+an interrupted proof; uncommitted CAS bytes confer no recovery authority.
+
+Preserve the backup receipt, dataset database and compatible code/environment.
+`verify_backup(receipt, datasets, corpus)` reopens and validates the independent
+CAS snapshot, returning its exact manifest, binding, checkpoint and learned state
+without changing the destination. Register that manifest and binding in the
+destination `TrainingRepository`, then call
+`archive.restore(receipt, datasets, datasets.training_corpus(dataset_digest))`.
+The archive rechecks source authority, CAS bytes, schemas and complete model/cursor
+identity before atomically importing state and fencing prior workers. The original
+CLI request is restored when it existed, including acquisition time and dataset
+version, so the same operator command can republish a completed artifact without
+repeating learned updates or spawning workers.
+
+`pin` protects explicit active/recovery references. `retain` prunes only verified
+CAS-backed database checkpoints while preserving the latest checkpoint and every
+protected reference. It never deletes CAS objects or rewinds newer progress.
+CAS write authority remains trusted; commit proofs are durable issuance evidence,
+not independently signed attestations.
+
+## Execute measured verifier qualification
+
+`EvaluationModelSource.from_training` reloads an actual completed native model and
+pins its training receipt, source sequence and current dataset authority.
+`MeasuredVerifierRunner` uses the existing `EvaluationLedger` to execute a
+candidate generator, pinned baseline and distinct local verifier on a held-out
+`EvaluationSuite`. The verifier receives the prompt and generated answer; gold
+expectations remain outside its input. Its bounded JSON decision/confidence output
+is parsed strictly.
+
+Qualification recomputes calibration, false accepts/rejects, candidate/baseline
+accuracy and correlated wrong accepts from persisted actual observations. Both
+positive and negative coverage are required by default. Completed case records
+survive database reopen without inference replay; expired/stale workers cannot
+publish replacement evidence. Caller-reported rates cannot issue this measured
+qualification. Exact normalized samples and shared training-document fingerprints
+support bounded contamination checks; they do not establish semantic disjointness
+or correctness of an operator's gold labels.
+
+## Verified media and temporal evidence
+
+`MultimodalIntake.sanitize_verified` decodes bounded PNG/JPEG/WebP pixels and integer
+PCM WAV samples, checks caller metadata against measured geometry/sample timing,
+and emits a content-bound validation receipt. Opaque `sanitize` remains a separate
+compatibility API. Verified image intake requires Pillow; decoded text and media
+retain untrusted instruction status.
+
+`LiveSpeechExecution` reuses existing `SpeechSession` and `TranscriptSegment`
+contracts. It commits contiguous measured WAV frames and ordered final transcript
+declarations to the corpus; provisional text stays outside retrieval/training.
+Reconnect, interruption and terminal transitions are explicit. Optional durable
+snapshots use the existing dataset registry with isolated `speech_recovery` rights
+and cannot be consumed as training data. Recovery validates original copied frame
+sources, transcript chains and snapshot versions before reconstructing state.
+Transcripts remain operator/extractor declarations, without automatic recognition.
+
+`VideoEvidenceIndex` binds timed verified image/audio fragments to a declared video
+parent, preserving rights, lineage and simulation identity. Lexical scores fuse
+the best evidence per modality with fixed weights; rights, simulation and time
+filters run before ranking. Repeated frames cannot inflate a modality's score.
+Video container timing and extraction lineage remain explicit declarations.

@@ -39,9 +39,10 @@ def _change(root, path, modify):
 
 def test_actual_pipeline_declares_executable_local_candidate_contracts():
     result = validate()
-    assert result["contract_count"] == 9
-    assert result["api_owner_count"] == 8
+    assert result["contract_count"] == len(CONTRACTS)
+    assert result["api_owner_count"] == len(APIS)
     assert result["production_model_promotion_authorized"] is False
+    assert result["local_parallel_training_supported"] is True
 
 
 @pytest.mark.parametrize(
@@ -122,7 +123,16 @@ def test_boolean_cannot_substitute_for_numeric_schema(candidate):
         validate(candidate)
 
 
-@pytest.mark.parametrize("field", ["restart_acceptance", "operator_acceptance", "engine_acceptance"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "restart_acceptance",
+        "operator_acceptance",
+        "engine_acceptance",
+        "archive_acceptance",
+        "verification_acceptance",
+    ],
+)
 def test_missing_assembly_acceptance_raises_typed_failure(candidate, field):
     _change(candidate, ASSEMBLY, lambda value: value.pop(field))
     with pytest.raises(TrainingPipelineContractError, match="acceptance"):
@@ -160,4 +170,50 @@ def test_local_provider_contract_cannot_gain_credentials(candidate):
         lambda value: value.update({"credentials": ["REMOTE_KEY"]}),
     )
     with pytest.raises(TrainingPipelineContractError, match="external authority"):
+        validate(candidate)
+
+
+def test_local_parallel_cannot_expand_to_remote_workers(candidate):
+    _change(
+        candidate,
+        "machine/ai_local_data_parallel_training.json",
+        lambda value: value.update({"remote_cluster_training_supported": True}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="authority"):
+        validate(candidate)
+
+
+def test_local_parallel_process_bound_is_enforced(candidate):
+    _change(
+        candidate,
+        "machine/ai_local_data_parallel_training.json",
+        lambda value: value["execution"].update({"world_size_bounds": [2, 1024]}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="topology"):
+        validate(candidate)
+
+
+def test_local_parallel_requires_an_explicit_capability(candidate):
+    _change(candidate, ASSEMBLY, lambda value: value.update({"local_parallel_training_supported": 1}))
+    with pytest.raises(TrainingPipelineContractError, match="capability"):
+        validate(candidate)
+
+
+def test_local_parallel_malformed_topology_raises_typed_failure(candidate):
+    _change(
+        candidate,
+        "machine/ai_local_data_parallel_training.json",
+        lambda value: value.update({"execution": []}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="topology"):
+        validate(candidate)
+
+
+def test_local_parallel_process_counts_cannot_be_float_values(candidate):
+    _change(
+        candidate,
+        "machine/ai_local_data_parallel_training.json",
+        lambda value: value["execution"].update({"world_size_bounds": [2.0, 4.0]}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="topology"):
         validate(candidate)

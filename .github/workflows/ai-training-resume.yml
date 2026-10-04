@@ -7,6 +7,8 @@ on:
       - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "skeleton/storage/cas/**"
       - "skeleton/learning/model_program.py"
       - "skeleton/ai/learning/model_program.py"
       - "skeleton/testing/test_p3_*.py"
@@ -34,6 +36,18 @@ on:
       - "machine/ai_multimodal_training_projection.json"
       - "machine/ai_post_training_execution.json"
       - "machine/ai_training_pipeline.json"
+      - "machine/ai_local_data_parallel_training.json"
+      - "machine/ai_training_checkpoint_archive.json"
+      - "machine/ai_multimodal_media_validation.json"
+      - "machine/ai_multimodal_temporal_execution.json"
+      - "machine/ai_engine_local_provider_binding.json"
+      - "machine/ai_measured_local_verifier.json"
+      - "skeleton/testing/test_measured_local_verifier.py"
+      - "skeleton/testing/test_measured_verifier_fences.py"
+      - "skeleton/testing/test_measured_verifier_runtime_identity.py"
+      - "skeleton/testing/test_training_checkpoint_archive.py"
+      - "skeleton/testing/test_multimodal_media_validation.py"
+      - "skeleton/testing/test_engine_local_provider_binding.py"
       - "skeleton/testing/test_governed_*.py"
       - "skeleton/testing/test_local_model_artifact_intake.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -50,6 +64,8 @@ on:
       - "skeleton/ai/runtime/learning_foundation/**"
       - "skeleton/ai/runtime/inference/**"
       - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/ai/runtime/extensions/multimodal.py"
+      - "skeleton/storage/cas/**"
       - "skeleton/learning/model_program.py"
       - "skeleton/ai/learning/model_program.py"
       - "skeleton/testing/test_p3_*.py"
@@ -77,6 +93,18 @@ on:
       - "machine/ai_multimodal_training_projection.json"
       - "machine/ai_post_training_execution.json"
       - "machine/ai_training_pipeline.json"
+      - "machine/ai_local_data_parallel_training.json"
+      - "machine/ai_training_checkpoint_archive.json"
+      - "machine/ai_multimodal_media_validation.json"
+      - "machine/ai_multimodal_temporal_execution.json"
+      - "machine/ai_engine_local_provider_binding.json"
+      - "machine/ai_measured_local_verifier.json"
+      - "skeleton/testing/test_measured_local_verifier.py"
+      - "skeleton/testing/test_measured_verifier_fences.py"
+      - "skeleton/testing/test_measured_verifier_runtime_identity.py"
+      - "skeleton/testing/test_training_checkpoint_archive.py"
+      - "skeleton/testing/test_multimodal_media_validation.py"
+      - "skeleton/testing/test_engine_local_provider_binding.py"
       - "skeleton/testing/test_governed_*.py"
       - "skeleton/testing/test_local_model_artifact_intake.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -126,6 +154,7 @@ jobs:
           "pydantic-settings==2.15.0"
           "fastapi==0.136.1"
           "numpy==2.3.5"
+          "Pillow==12.3.0"
           "httpx>=0.27,<1"
       - name: Compile canonical runtime
         run: python -m compileall -q skeleton/ai/runtime/training skeleton/ai/runtime/learning_foundation
@@ -153,6 +182,16 @@ jobs:
           skeleton/testing/test_engine_cross_service_boundary.py
           skeleton/testing/test_engine_routes.py
           skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_engine_local_provider_binding.py
+          skeleton/testing/test_p3_local_data_parallel_training.py
+          skeleton/testing/test_training_checkpoint_archive.py
+          skeleton/testing/test_governed_checkpoint_recovery.py
+          skeleton/testing/test_multimodal_media_validation.py
+          skeleton/testing/test_p3_live_speech_execution.py
+          skeleton/testing/test_p3_video_evidence_fusion.py
+          skeleton/testing/test_measured_local_verifier.py
+          skeleton/testing/test_measured_verifier_fences.py
+          skeleton/testing/test_measured_verifier_runtime_identity.py
           skeleton/testing/test_native_neural_lm.py
           skeleton/testing/test_p3_neural_training_resume.py
           skeleton/testing/test_p3_multimodal_training_projection.py

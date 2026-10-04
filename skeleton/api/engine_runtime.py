@@ -10,7 +10,11 @@ from skeleton.api.engine_service import (
     EngineExecutionService,
     EngineServiceError,
 )
-from skeleton.contracts.ai_execution import AIExecutionResult
+from skeleton.contracts.ai_execution import (
+    AIExecutionResult,
+    ExecutionState,
+    execution_payload_digest,
+)
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
@@ -45,6 +49,10 @@ def build_engine_tool_runtime(
 
 class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
+
+
+class _LocalProviderBindingError(EngineExecutionCoordinatorError):
+    """A local recovery identity cannot authorize further model dispatch."""
 
 
 class EngineExecutionCoordinator:
@@ -254,6 +262,7 @@ class EngineExecutionCoordinator:
 
         try:
             checkpoint = self.service.repository.latest_checkpoint(execution_id)
+            checkpoint = self._pin_local_provider(command, runtime, provider, checkpoint, history)
             approval_refs = self.service.active_approval_refs(
                 execution_id,
             )
@@ -275,11 +284,72 @@ class EngineExecutionCoordinator:
                 self.service.complete_execution_admission(execution_id)
         except asyncio.CancelledError:
             raise
+        except _LocalProviderBindingError as exc:
+            await self._finalize_failure(execution_id, str(exc))
         except Exception:  # noqa: BLE001 - Finalize any driver or hook failure.
             await self._finalize_failure(
                 execution_id,
                 "engine_execution_exception",
             )
+
+    def _pin_local_provider(self, command, runtime, provider, checkpoint, history):
+        """Commit or verify a local pin before the canonical runtime dispatches."""
+
+        field = "local_provider_binding"
+        prior = None if checkpoint is None else checkpoint.payload.get(field)
+        is_local = getattr(provider, "provider_id", None) == "local"
+        if not is_local and prior is None:
+            return checkpoint
+        descriptor = getattr(provider, "execution_identity", None)
+        if not is_local or not callable(descriptor):
+            raise _LocalProviderBindingError("local_provider_binding_mismatch")
+        try:
+            identity = descriptor()
+            if (
+                not isinstance(identity, dict)
+                or identity.get("schema_version") != "skeleton.local_provider_execution_identity.v1"
+                or identity.get("provider_id") != "local"
+                or identity.get("model_id") != getattr(provider, "model", None)
+            ):
+                raise ValueError("invalid local execution identity")
+            binding = {"identity": identity, "binding_digest": execution_payload_digest(identity)}
+            if prior is not None:
+                if (
+                    not isinstance(prior, dict)
+                    or set(prior) != {"identity", "binding_digest"}
+                    or execution_payload_digest(prior["identity"]) != prior["binding_digest"]
+                    or prior != binding
+                ):
+                    raise ValueError("local binding drift")
+                return checkpoint
+        except (ValueError, TypeError, KeyError, ProviderUnavailableError) as exc:
+            raise _LocalProviderBindingError("local_provider_binding_mismatch") from exc
+        handoff = command.compiled_context
+        initial = runtime._initial_payload(
+            command.execution_request,
+            instructions=handoff.instructions,
+            prompt=handoff.prompt,
+            context_digest=handoff.context_digest,
+            history=history,
+        )
+        current = self.service.repository.get(command.execution_request.execution_id)
+        observed_checkpoint_version = 0 if checkpoint is None else checkpoint.checkpoint_version
+        if current.checkpoint_version != observed_checkpoint_version:
+            authoritative = self.service.repository.latest_checkpoint(current.execution_id)
+            if authoritative is None:
+                raise _LocalProviderBindingError("local_provider_binding_missing")
+            return self._pin_local_provider(command, runtime, provider, authoritative, history)
+        if current.state is not ExecutionState.CREATED:
+            raise _LocalProviderBindingError("local_provider_binding_missing")
+        if checkpoint is not None and (checkpoint.payload != initial):
+            raise _LocalProviderBindingError("local_provider_binding_missing")
+        initial[field] = binding
+        return self.service.repository.checkpoint(
+            current.execution_id,
+            initial,
+            expected_execution_version=current.version,
+            expected_checkpoint_version=current.checkpoint_version,
+        )
 
     async def _finalize_failure(
         self,
@@ -297,15 +367,39 @@ class EngineExecutionCoordinator:
         if current.terminal:
             return
         now = datetime.now(UTC)
+        payload = {}
+        try:
+            checkpoint = repository.latest_checkpoint(execution_id)
+            if checkpoint is not None:
+                payload = dict(checkpoint.payload)
+            if any(
+                type(payload.get(key, 0)) is not int or payload.get(key, 0) < 0
+                for key in ("model_turns", "tool_calls")
+            ) or any(
+                not isinstance(payload.get(key, []), list)
+                or any(not isinstance(item, str) or not item.strip() for item in payload.get(key, []))
+                for key in ("provider_receipts", "tool_receipts")
+            ):
+                raise ValueError("checkpoint usage identity is malformed")
+            if not isinstance(payload.get("usage_events", []), list) or any(
+                not isinstance(item, dict) for item in payload.get("usage_events", [])
+            ):
+                raise ValueError("checkpoint usage events are malformed")
+        except Exception:  # noqa: BLE001 - Corrupt checkpoints cannot supply usage evidence.
+            payload = {"usage_evidence_unavailable": True}
         result = AIExecutionResult(
             operation_id=current.operation_id,
             execution_id=current.execution_id,
             status="failed",
             usage={
                 "error_code": str(error_code),
-                "model_turns": 0,
-                "tool_calls": 0,
+                "model_turns": int(payload.get("model_turns", 0)),
+                "tool_calls": int(payload.get("tool_calls", 0)),
+                "provider_usage": list(payload.get("usage_events", [])),
+                **({"usage_evidence_unavailable": True} if payload.get("usage_evidence_unavailable") else {}),
             },
+            provider_receipts=tuple(payload.get("provider_receipts", ())),
+            tool_receipts=tuple(payload.get("tool_receipts", ())),
             stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
             completed_at=now,
         )

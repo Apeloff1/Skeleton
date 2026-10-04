@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import sqlite3
 from datetime import UTC, datetime
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from skeleton.ai.runtime.learning_foundation.lifecycle import (
     MigrationParityCase,
@@ -45,17 +47,24 @@ def _digest(value):
 
 
 def _media(corpus, record_id, text, *, image=False):
+    payload = text.encode("utf-8")
+    if image:
+        output = io.BytesIO()
+        color = tuple(hashlib.sha256(record_id.encode()).digest()[:3])
+        Image.new("RGB", (2, 2), color).save(output, format="PNG")
+        payload = output.getvalue()
     return corpus.ingest(
         record_id=record_id,
         modality=LearningModality.IMAGE if image else LearningModality.DOCUMENT,
         media_type="image/png" if image else "text/plain",
-        payload=(b"image-original:" if image else b"document-original:") + record_id.encode(),
+        payload=payload,
         source_refs=(f"source:{record_id}",),
         rights_refs=("rights:licensed-model-development",),
         lineage_refs=(f"lineage:acquisition:{record_id}",),
         extracted_text=text,
         extractor_ref="extractor:ocr-v1" if image else "extractor:text-v1",
         language="en",
+        verified=image,
     )
 
 

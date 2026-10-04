@@ -105,8 +105,10 @@ def _code_digest(algorithm: str) -> str:
     root = Path(__file__).parent
     paths = [root / name for name in ("cli.py", "control.py", "data.py", "trainer.py")]
     paths.append(root.parent / "inference" / "local.py")
-    if algorithm == "neural":
+    if algorithm in {"neural", "data_parallel"}:
         paths += [root / "neural_trainer.py", root.parent / "inference" / "neural.py"]
+    if algorithm == "data_parallel":
+        paths.append(root / "distributed_trainer.py")
     return _digest(
         {str(path.relative_to(root.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
     )
@@ -178,10 +180,29 @@ def build_governed_artifact(
     max_steps: int = 100_000,
     max_updates: int = 4096,
     max_training_bytes: int = 64 * 1024 * 1024,
+    world_size: int | None = None,
+    collective_timeout_seconds: float | None = None,
 ) -> dict[str, object]:
     """Materialize licensed files, resume training, and atomically export weights."""
-    if algorithm not in {"reference", "neural"}:
-        raise GovernedTrainingBuildError("algorithm must be reference or neural")
+    if algorithm not in {"reference", "neural", "data_parallel"}:
+        raise GovernedTrainingBuildError("algorithm must be reference, neural or data_parallel")
+    neural = algorithm in {"neural", "data_parallel"}
+    if algorithm == "data_parallel":
+        world_size = 2 if world_size is None else world_size
+        collective_timeout_seconds = (
+            60.0 if collective_timeout_seconds is None else collective_timeout_seconds
+        )
+        if type(world_size) is not int or not 2 <= world_size <= 4:
+            raise GovernedTrainingBuildError("local parallel world_size must be between 2 and 4")
+        if (
+            isinstance(collective_timeout_seconds, bool)
+            or not isinstance(collective_timeout_seconds, (int, float))
+            or not math.isfinite(collective_timeout_seconds)
+            or not 0 < collective_timeout_seconds <= 120
+        ):
+            raise GovernedTrainingBuildError("collective timeout must be finite and within 120 seconds")
+    elif world_size is not None or collective_timeout_seconds is not None:
+        raise GovernedTrainingBuildError("parallel process configuration requires data_parallel")
     if any(not isinstance(value, str) or not value.strip() for value in (run_id, dataset_id, classification)):
         raise GovernedTrainingBuildError("run, dataset and classification identities must be non-empty")
     if classification not in {"public", "internal", "confidential", "restricted"}:
@@ -219,10 +240,10 @@ def build_governed_artifact(
             raise GovernedTrainingBuildError(f"{name} must be positive and finite")
     if not 4 <= hidden_size <= 128 or not 1 <= epochs <= 1024 or not 1 <= order <= 8:
         raise GovernedTrainingBuildError("model configuration exceeds bounded execution policy")
-    if algorithm == "neural" and seed < 0:
+    if neural and seed < 0:
         raise GovernedTrainingBuildError("neural initialization seed must be non-negative")
-    sources = _read_sources(corpus_paths, neural=algorithm == "neural")
-    if algorithm == "neural" and (
+    sources = _read_sources(corpus_paths, neural=neural)
+    if neural and (
         sum(len(payload) + 1 for _, payload in sources) * epochs > min(max_steps, 16_777_216)
         or len(sources) * epochs > min(max_updates, 65_536)
         or sum(len(payload) for _, payload in sources) * epochs > max_training_bytes
@@ -268,12 +289,16 @@ def build_governed_artifact(
         "machine": platform.machine(),
         "python_compiler": platform.python_compiler(),
     }
-    if algorithm == "neural":
+    if neural:
         import numpy
 
         from .neural_trainer import NeuralLocalTrainer
 
         environment["numpy"] = numpy.__version__
+    if algorithm == "data_parallel":
+        from .distributed_trainer import LocalDataParallelTrainer
+
+        environment["worker_strategy"] = "local_spawned_processes"
     budget = {"max_steps": max_steps, "max_documents": max_updates, "max_training_bytes": max_training_bytes}
     if algorithm == "reference":
         budget["max_corpus_bytes"] = max_training_bytes
@@ -285,6 +310,12 @@ def build_governed_artifact(
         "gradient_clip": float(gradient_clip),
         "order": order,
     }
+    if algorithm == "data_parallel":
+        parameters.update(
+            {"world_size": world_size, "collective_timeout_seconds": float(collective_timeout_seconds)}
+        )
+        budget["max_processes"] = world_size
+        budget["max_barriers"] = ((len(sources) + world_size - 1) // world_size) * epochs
     code_digest, environment_digest = _code_digest(algorithm), _digest(environment)
     request = {
         "schema_version": "skeleton.governed_cli_request.v1",
@@ -358,11 +389,15 @@ def build_governed_artifact(
             retention_class="model-development",
         )
         corpus = datasets.training_corpus(materialized.dataset_digest)
-        if algorithm == "neural":
+        if neural:
             base_digest = NeuralLocalTrainer.initialize_model(
                 run_id, hidden_size=hidden_size, seed=seed
             ).model_digest
-            trainer = NeuralLocalTrainer(datasets, runs)
+            trainer = (
+                LocalDataParallelTrainer(datasets, runs)
+                if algorithm == "data_parallel"
+                else NeuralLocalTrainer(datasets, runs)
+            )
         else:
             base_digest = _digest({"kind": "untrained_reference_ngram", "order": order})
             trainer = ReferenceLocalTrainer(datasets, runs)
@@ -375,8 +410,13 @@ def build_governed_artifact(
             hyperparameters=parameters,
             seed=seed,
             resource_budget=budget,
+            world_size=world_size if algorithm == "data_parallel" else 1,
+            parallelism="data_parallel" if algorithm == "data_parallel" else "single",
+            collective_timeout_seconds=(
+                float(collective_timeout_seconds) if algorithm == "data_parallel" else 60.0
+            ),
         )
-        if algorithm == "neural":
+        if neural:
             model, training = trainer.train(
                 manifest,
                 corpus,
@@ -408,7 +448,7 @@ def build_governed_artifact(
             "output_path": str(output),
             "credential_free": True,
         }
-        if algorithm == "neural":
+        if neural:
             receipt.update(
                 {
                     "initial_loss": training.initial_loss,
@@ -416,6 +456,8 @@ def build_governed_artifact(
                     "update_count": training.update_count,
                 }
             )
+        if algorithm == "data_parallel":
+            receipt.update({"world_size": world_size, "barrier_count": training.barrier_count})
         receipt["receipt_digest"] = _digest(receipt)
         return receipt
     finally:
@@ -433,7 +475,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset-id", required=True)
     parser.add_argument("--rights-ref", required=True, action="append", dest="rights_refs")
     parser.add_argument("--classification", default="internal")
-    parser.add_argument("--algorithm", choices=("reference", "neural"), default="neural")
+    parser.add_argument("--algorithm", choices=("reference", "neural", "data_parallel"), default="neural")
+    parser.add_argument("--world-size", type=int)
+    parser.add_argument("--collective-timeout-seconds", type=float)
     parser.add_argument("--hidden-size", type=int, default=24)
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=0.05)

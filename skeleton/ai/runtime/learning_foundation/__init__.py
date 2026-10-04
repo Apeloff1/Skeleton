@@ -81,6 +81,7 @@ __all__ = [
     "LearningProgramError",
     "LifecycleBackupReceipt",
     "LifecycleTransitionReceipt",
+    "LiveSpeechExecution",
     "LocalTrainingControlPlane",
     "MetricGate",
     "MigrationParityCase",
@@ -104,7 +105,10 @@ __all__ = [
     "RetrievalHit",
     "SQLiteModelLifecycleRepository",
     "SpeechChunkReceipt",
+    "SpeechExecutionReceipt",
+    "SpeechFrameEvidence",
     "TextProjection",
+    "TimedMediaFragment",
     "TrainingCheckpoint",
     "TrainingControlError",
     "TrainingEvaluationDecision",
@@ -114,4 +118,27 @@ __all__ = [
     "VerifierCandidate",
     "VerifierDecision",
     "VerifierEvaluationReceipt",
+    "VideoEvidenceIndex",
+    "VideoFragmentEvidence",
+    "VideoFusionHit",
+    "VideoTimelineReceipt",
 ]
+
+
+def __getattr__(name: str):
+    if name in {
+        "LiveSpeechExecution",
+        "SpeechFrameEvidence",
+        "SpeechExecutionReceipt",
+        "VideoEvidenceIndex",
+        "TimedMediaFragment",
+        "VideoFragmentEvidence",
+        "VideoTimelineReceipt",
+        "VideoFusionHit",
+    }:
+        from . import temporal
+
+        value = getattr(temporal, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

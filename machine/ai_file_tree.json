@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "8b3f12f72da1d92b692dee266c93c19a9a94f9eb",
+      "source_git_object_sha": "e97aca55f91fd5cdb4495339b916503398bc7fec",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -352,7 +352,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "8a3d9a230da9181c02171dbd8aad77ffeb10b22f",
+      "source_git_object_sha": "da517989de22eb15fd912df734ca24c96ed450b5",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -6087,8 +6087,8 @@
         "AIFT-ENGINE-API"
       ],
       "source_object_shas": {
-        "AIFT-PROVIDER-RUNTIME": "8b3f12f72da1d92b692dee266c93c19a9a94f9eb",
-        "AIFT-ENGINE-API": "8a3d9a230da9181c02171dbd8aad77ffeb10b22f"
+        "AIFT-PROVIDER-RUNTIME": "e97aca55f91fd5cdb4495339b916503398bc7fec",
+        "AIFT-ENGINE-API": "da517989de22eb15fd912df734ca24c96ed450b5"
       },
       "promotion_authority": false,
       "policy": "Bind the existing canonical provider owner to explicit optional local artifact activation with mandatory architecture receipt, conservative governance, exact bounded local input admission, actual-usage reconciliation and cooperative cancellation. Preserve the provider facades and legacy byte mirror. Bind the existing engine API source tree to cancellation drain with the same governed mirror. These content identities grant no owner cutover, model promotion, closure or implementation/verification signatures."

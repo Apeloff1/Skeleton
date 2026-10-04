@@ -577,6 +577,31 @@ class TrainingRepository:
             raise TrainingStateError("stored checkpoint identity mismatch")
         return checkpoint
 
+    def checkpoints(self, run_id: str) -> tuple[TrainingCheckpoint, ...]:
+        """Read complete checkpoint identities, newest first, without trusting SQL keys."""
+        with self._lock:
+            self.manifest(run_id)
+            rows = self._db.execute(
+                "SELECT checkpoint_digest,run_id,step,checkpoint_json "
+                "FROM training_checkpoint WHERE run_id=? ORDER BY step DESC",
+                (run_id,),
+            ).fetchall()
+            checkpoints = []
+            for digest, stored_run, step, encoded in rows:
+                try:
+                    checkpoint = TrainingCheckpoint.from_dict(json.loads(encoded))
+                    if (
+                        checkpoint.digest != digest
+                        or checkpoint.run_id != stored_run
+                        or checkpoint.run_id != run_id
+                        or checkpoint.step != step
+                    ):
+                        raise ValueError("checkpoint identity mismatch")
+                except (ValueError, TypeError, KeyError) as exc:
+                    raise TrainingStateError("stored checkpoint identity mismatch") from exc
+                checkpoints.append(checkpoint)
+            return tuple(checkpoints)
+
     def record_telemetry(self, event: TrainingTelemetry, lease: WorkerLease | None = None) -> str:
         with self._write():
             if self.state(event.run_id) != "running":

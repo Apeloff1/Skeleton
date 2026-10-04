@@ -68,10 +68,73 @@ CONTRACTS = {
         "skeleton/api/engine_routes.py",
         "acceptance",
     ),
+    "machine/ai_local_data_parallel_training.json": (
+        "skeleton.ai.local_data_parallel_training.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/training/distributed_trainer.py",
+        "tests",
+    ),
+    "machine/ai_training_checkpoint_archive.json": (
+        "skeleton.ai.training_checkpoint_archive.v1",
+        None,
+        "skeleton/ai/runtime/training/checkpoint_archive.py",
+        "tests",
+    ),
+    "machine/ai_multimodal_media_validation.json": (
+        "skeleton.ai.multimodal_media_validation.v1",
+        "owner",
+        "skeleton/ai/runtime/multimodal/intake.py",
+        "verification",
+    ),
+    "machine/ai_multimodal_temporal_execution.json": (
+        "skeleton.ai.multimodal_temporal_execution.v1",
+        "owner",
+        "skeleton/ai/runtime/learning_foundation/temporal.py",
+        "verification",
+    ),
+    "machine/ai_engine_local_provider_binding.json": (
+        "skeleton.ai.engine_local_provider_binding.v1",
+        "canonical_owner",
+        "skeleton/api/engine_runtime.py",
+        "acceptance",
+    ),
+    "machine/ai_measured_local_verifier.json": (
+        "skeleton.ai.measured_local_verifier.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/training/evaluation.py:EvaluationLedger",
+        "tests",
+    ),
 }
 APIS = {
     "skeleton/api/engine_routes.py": {None: ("provider_inventory", "execution_handoff")},
-    "skeleton/provider_runtime.py": {"LocalArtifactProviderAdapter": ("generate", "available")},
+    "skeleton/provider_runtime.py": {
+        "LocalArtifactProviderAdapter": ("generate", "available", "execution_identity")
+    },
+    "skeleton/api/engine_runtime.py": {"EngineExecutionCoordinator": ("recover",)},
+    "skeleton/ai/runtime/training/distributed_trainer.py": {
+        "LocalDataParallelTrainer": ("train", "load_artifact")
+    },
+    "skeleton/ai/runtime/training/checkpoint_archive.py": {
+        "TrainingCheckpointArchive": ("backup", "verify_backup", "restore", "pin", "unpin", "retain")
+    },
+    "skeleton/ai/runtime/training/verifier.py": {
+        "EvaluationModelSource": ("from_training", "from_model_program", "assert_current"),
+        "LocalVerifier": ("judge",),
+        "MeasuredVerifierRunner": ("evaluate", "receipt", "qualify", "qualified_verifier"),
+    },
+    "skeleton/ai/runtime/multimodal/intake.py": {
+        "MultimodalIntake": ("sanitize_verified", "verify_verified_asset")
+    },
+    "skeleton/ai/runtime/learning_foundation/temporal.py": {
+        "LiveSpeechExecution": (
+            "transition",
+            "append_frame",
+            "submit_transcript",
+            "restore",
+            "export_final_text",
+        ),
+        "VideoEvidenceIndex": ("bind", "search"),
+    },
     "skeleton/ai/runtime/training/data.py": {
         "DatasetRegistry": (
             "ingest_materialized",
@@ -120,9 +183,12 @@ FORBIDDEN_AUTHORITIES = {
     "masterplan_completion_authorized",
     "distributed_execution_supported",
     "distributed_neural_training_supported",
+    "remote_cluster_training_supported",
+    "elastic_membership_supported",
     "completion_checkbox",
     "implementation_signed",
     "verification_signed",
+    "signoffs_granted",
     "may_self_close",
     "promotion_authority",
     "production_routing_authority",
@@ -209,6 +275,8 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
         if assembly.get(key) is not False:
             raise TrainingPipelineContractError("unsupported pipeline authority: " + key)
     _authority(assembly, ASSEMBLY)
+    if assembly.get("local_parallel_training_supported") is not True:
+        raise TrainingPipelineContractError("local parallel capability declaration drift")
     construction = _read(root, "machine/ai_app_construction.json")
     providers = construction.get("runtime_model_providers")
     if not isinstance(providers, list):
@@ -239,6 +307,8 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
         assembly.get("restart_acceptance"),
         assembly.get("operator_acceptance"),
         assembly.get("engine_acceptance"),
+        assembly.get("archive_acceptance"),
+        assembly.get("verification_acceptance"),
     )
     if any(not isinstance(path, str) or not path for path in acceptance):
         raise TrainingPipelineContractError("missing required executable acceptance path")
@@ -262,6 +332,18 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
             if not isinstance(owners, dict) or owner not in owners.values():
                 raise TrainingPipelineContractError("canonical owner drift: " + path)
         _authority(value, path)
+        if path == "machine/ai_local_data_parallel_training.json":
+            execution = value.get("execution")
+            if (
+                not isinstance(execution, dict)
+                or value.get("local_parallel_training_supported") is not True
+                or execution.get("world_size_bounds") != [2, 4]
+                or any(type(rank) is not int for rank in execution.get("world_size_bounds", []))
+                or execution.get("strategy") != "local_spawned_processes"
+                or value.get("remote_cluster_training_supported") is not False
+                or value.get("elastic_membership_supported") is not False
+            ):
+                raise TrainingPipelineContractError("local parallel topology or scope drift")
         if path == "machine/ai_local_provider_activation.json" and (
             value.get("provider_id") != "local"
             or value.get("network_policy") != "none"
@@ -321,6 +403,7 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
         "test_file_count": len(tests),
         "production_model_promotion_authorized": False,
         "masterplan_completion_authorized": False,
+        "local_parallel_training_supported": True,
         "reported_head": head,
     }
 

@@ -14,7 +14,13 @@
     "machine/ai_governed_training_cli.json",
     "machine/ai_local_provider_activation.json",
     "machine/ai_engine_provider_inventory.json",
-    "machine/ai_engine_handoff_recovery.json"
+    "machine/ai_engine_handoff_recovery.json",
+    "machine/ai_local_data_parallel_training.json",
+    "machine/ai_training_checkpoint_archive.json",
+    "machine/ai_multimodal_media_validation.json",
+    "machine/ai_multimodal_temporal_execution.json",
+    "machine/ai_engine_local_provider_binding.json",
+    "machine/ai_measured_local_verifier.json"
   ],
   "composition": [
     "Observed source bytes or verified multimodal projections enter the existing DatasetRegistry with explicit rights and lineage",
@@ -23,11 +29,19 @@
     "EvaluationHarness executes declared local suites against the reloaded learned model",
     "PostTrainingLedger commits local episode execution and derives curriculum and qualification evidence from issued receipts",
     "ModelLifecycleRegistry persists candidate evidence, measured parity, exact transition lineage and compensating rollback",
-    "Explicit local ProviderRegistry activation loads the derived model artifact through the existing governed provider owner with mandatory architecture acknowledgement, admission and cancellation"
+    "Explicit local ProviderRegistry activation loads the derived model artifact through the existing governed provider owner with mandatory architecture acknowledgement, admission and cancellation",
+    "Fixed local spawned ranks compute synchronous NumPy updates, verify ordered barrier receipts and resume complete averaged checkpoints",
+    "Existing governed CAS archives full checkpoints and execution bindings; protected retention and validated restore preserve authoritative recovery",
+    "Verified actual image/WAV decoding feeds ordered speech sessions and rights-bound timed video evidence; isolated durable snapshots preserve final/provisional separation",
+    "Unfinished engine recovery matches the durable local artifact identity pinned before the first dispatch",
+    "The existing EvaluationLedger records executed independent verifier decisions and casewise recovery, then rederives empirical calibration, error rates and baseline comparison from issued evidence"
   ],
   "restart_acceptance": "skeleton/testing/test_governed_multimodal_model_lifecycle.py",
   "operator_acceptance": "skeleton/testing/test_governed_training_cli.py",
   "engine_acceptance": "skeleton/testing/test_governed_model_engine_acceptance.py",
   "validator": "scripts/check_ai_training_pipeline.py",
-  "rollback": "Withdraw CLI and new execution adapters while retaining immutable datasets, full learned checkpoints, issued learning evidence and lifecycle backups; never restore deleted content or revoked rights"
+  "rollback": "Withdraw CLI and new execution adapters while retaining immutable datasets, full learned checkpoints, issued learning evidence and lifecycle backups; never restore deleted content or revoked rights",
+  "local_parallel_training_supported": true,
+  "verification_acceptance": "skeleton/testing/test_measured_local_verifier.py",
+  "archive_acceptance": "skeleton/testing/test_governed_checkpoint_recovery.py"
 }

@@ -29,7 +29,8 @@
       "evidence"
     ],
     "formats": ["utf8_text", "json_documents", "multimodal_projection"],
-    "permitted_uses": ["training", "evaluation", "simulation_training", "simulation_evaluation"],
+    "permitted_uses": ["training", "evaluation", "simulation_training", "simulation_evaluation", "speech_recovery"],
+    "speech_recovery": "An explicitly consented, isolated single-purpose snapshot of observed speech bytes and provenance may use the existing SQLite authority. speech_recovery cannot mix with training/evaluation uses, enter training admission or normal multimodal projection export, or claim authority over an unregistered external source. Snapshot rights withdrawal and deletion block further snapshot recovery.",
     "identity": "SHA256 of original immutable bytes; exact ordered document sequence additionally binds SHA256 of canonical UTF-8 JSON string array",
     "legacy_split_identity": "SHA256 of newline-joined documents is retained for declared legacy trainer compatibility and cannot substitute for materialized document-sequence identity",
     "receipt": "MaterializedDatasetReceipt",

@@ -1,0 +1,98 @@
+{
+  "schema_version": "skeleton.ai.training_checkpoint_archive.v1",
+  "status": "implemented_unpromoted",
+  "claim_scope": "bounded_native_training_checkpoint_cas_backup_retention_and_reimport",
+  "masterplan_refs": [
+    "VOL-145"
+  ],
+  "production_model_promotion_authorized": false,
+  "masterplan_closure_authorized": false,
+  "canonical_owners": {
+    "training_authority": "skeleton/ai/runtime/training/control.py",
+    "archive_helper": "skeleton/ai/runtime/training/checkpoint_archive.py",
+    "content_authority": "skeleton/storage/cas/__init__.py",
+    "dataset_authority": "skeleton/ai/runtime/training/data.py"
+  },
+  "persistence": {
+    "archive_bytes": "existing GovernedContentStore immutable tenant/logical/version objects",
+    "receipts_and_references": "additive tables in existing TrainingRepository SQLite database",
+    "backup_commit": "canonical bounded envelope is put and read-verified in CAS, training receipt commits, then a separate immutable CAS commit proof is published from the exact committed receipt",
+    "crash_boundary": "failed training receipt commit leaves only unauthoritative CAS envelope bytes; a committed receipt with missing commit proof can publish its exact proof on backup retry",
+    "retention_commit": "verify every candidate backup before atomically pruning checkpoint metadata and payload rows",
+    "restore_commit": "validate all bytes, schemas, model state, exact manifest and execution binding plus current dataset authority before atomically inserting a checkpoint/payload and advancing the worker fence"
+  },
+  "envelope": {
+    "schema_version": "skeleton.training_checkpoint_archive.v1",
+    "fields": [
+      "schema_version",
+      "manifest",
+      "binding",
+      "checkpoint",
+      "payload",
+      "operator_request"
+    ],
+    "full_state": "manifest, code/environment/base/dataset identities, exact execution binding, full model and optimizer state, cumulative cursor/usage, seed state and immutable checkpoint metadata",
+    "encoding": "canonical UTF-8 JSON, sorted keys, compact separators, finite numbers, no raw corpus copy",
+    "logical_identity": "training-checkpoint:<checkpoint SHA256>, version 1",
+    "integrity": "verify canonical bytes, receipt SHA256, current CAS digest algorithm/address, tenant, trust context, logical ID and version on every read",
+    "operator_request": "null when absent; otherwise exact existing governed_cli_request admission, canonical request/digest, UTC acquisition and expected dataset CAS version; same target table restored atomically without inventing missing rows",
+    "commit_proof": "restore and retention require exact skeleton.training_checkpoint_backup_commit.v1 CAS proof at training-checkpoint-commit:<checkpoint SHA256>, version 1"
+  },
+  "supported_resume_schemas": [
+    "skeleton.reference_training_resume.v1",
+    "skeleton.neural_training_resume.v1",
+    "skeleton.local_parallel_training_resume.v1"
+  ],
+  "compatibility": {
+    "target": "already registered run with exact manifest and exact execution binding; no automatic dataset registration or identity substitution",
+    "corpus": "caller supplies the exact registered materialized split for semantic cursor validation",
+    "schemas": "exact supported payload/binding pairs; existing trainer restore validators validate full model, optimizer and cursor state",
+    "rollback": "reject an archived checkpoint older than the latest durable target checkpoint",
+    "fencing": "clear all worker leases, advance epoch beyond current and archived epochs, set recovering, and pin the imported recovery checkpoint",
+    "rights": "dataset quality, training rights and exact dataset authority epoch remain mandatory",
+    "registration_inputs": "verify_backup reads complete validated manifest/binding from committed CAS backup without registering or changing training state"
+  },
+  "retention": {
+    "policy": "keep newest requested checkpoint count and all pinned active/recovery references; prune only verified backed-up checkpoints",
+    "unbacked_checkpoints": "preserved",
+    "backup_receipts": "preserved after training checkpoint pruning for exact re-import",
+    "cas_deletion": "unsupported; immutable storage authority is not bypassed by training retention",
+    "reference_authority": "running reference mutations require the current worker lease"
+  },
+  "limits": {
+    "max_checkpoint_payload_bytes": 16777216,
+    "max_archive_bytes": 18874368,
+    "max_retained_count": 1024,
+    "max_reference_id_bytes": 256,
+    "max_operator_request_bytes": 1048576
+  },
+  "failure_rules": [
+    "missing, modified or unsupported CAS bytes fail before retention or restore writes",
+    "cross-tenant, trust-context, code, environment, dataset, base-model or execution binding substitution fails closed",
+    "partial backup/import/retention commits never leave authoritative partial state",
+    "stale workers cannot mutate protected references or continue imported work",
+    "re-import is idempotent and never rewinds a newer target checkpoint",
+    "retention never deletes the latest checkpoint or a pinned active/recovery checkpoint"
+  ],
+  "tests": [
+    "skeleton/testing/test_training_checkpoint_archive.py",
+    "skeleton/testing/test_governed_checkpoint_recovery.py"
+  ],
+  "scope_limitations": [
+    "bounded native ngram, single-worker NumPy neural, and fixed 2-4 local process rank checkpoint formats",
+    "no new runtime owner or service",
+    "no CAS garbage collection",
+    "no production promotion",
+    "no masterplan closure or signoff",
+    "operational CAS commit proofs rely on trusted governed CAS writer authority; no cryptographic signature or resistance to an attacker controlling CAS publication is claimed"
+  ],
+  "public_api": [
+    "TrainingCheckpointArchive.backup",
+    "TrainingCheckpointArchive.verify_backup",
+    "TrainingCheckpointArchive.restore",
+    "TrainingCheckpointArchive.receipts",
+    "TrainingCheckpointArchive.pin",
+    "TrainingCheckpointArchive.unpin",
+    "TrainingCheckpointArchive.retain"
+  ]
+}

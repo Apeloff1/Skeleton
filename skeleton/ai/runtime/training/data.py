@@ -303,6 +303,8 @@ class DatasetManifest:
         uses = tuple(dict.fromkeys(item.strip().lower() for item in self.permitted_uses if item.strip()))
         if not uses:
             raise ValueError("dataset permitted_uses must be explicit")
+        if "speech_recovery" in uses and uses != ("speech_recovery",):
+            raise ValueError("speech_recovery must remain an isolated dataset purpose")
         object.__setattr__(self, "permitted_uses", uses)
         parsers = tuple(dict.fromkeys(item.strip() for item in self.parser_versions if item.strip()))
         if not parsers:
@@ -1416,9 +1418,12 @@ class DatasetRegistry:
         if (
             not uses
             or classification not in _CLASSIFICATION_RANK
-            or set(uses) - {"training", "evaluation", "simulation_training", "simulation_evaluation"}
+            or set(uses)
+            - {"training", "evaluation", "simulation_training", "simulation_evaluation", "speech_recovery"}
         ):
             raise ValueError("permitted uses and classification must be explicit")
+        if "speech_recovery" in uses and uses != ("speech_recovery",):
+            raise ValueError("speech_recovery must remain an isolated dataset purpose")
         if not isinstance(sources, Mapping) or not 1 <= len(sources) <= 64:
             raise ValueError("materialized sources require a bounded split mapping")
         retention = _text(retention_class, field="retention_class")

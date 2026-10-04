@@ -679,3 +679,60 @@ def test_publication_guard_blocks_a_late_failed_quality_report_even_without_epoc
         registry.training_authority(receipt.dataset_digest, epoch),
     ):
         pytest.fail("publication must never be admitted")
+
+
+def test_speech_recovery_snapshot_is_durable_but_cannot_enter_training(tmp_path):
+    path = tmp_path / "speech.sqlite3"
+    registry = DatasetRegistry(path)
+    source = _source(("explicitly consented bounded speech snapshot",), rights=("speech_recovery",))
+    receipt = _ingest(
+        registry, source, sources={"speech_snapshot": (source,)}, permitted_uses=("speech_recovery",)
+    )
+    assert registry.materialized_sources(receipt.dataset_digest) == (source,)
+    registry.close()
+    registry = DatasetRegistry(path)
+    assert registry.materialized_ingestion(receipt.ingestion_id) == receipt
+    assert registry.materialized_sources(receipt.dataset_digest) == (source,)
+    epoch = registry.dataset_authority_epoch(receipt.dataset_digest)
+    for operation in (
+        lambda: registry.training_corpus(receipt.dataset_digest, split_name="speech_snapshot"),
+        lambda: registry.validate_training_corpus(
+            receipt.dataset_digest, source.documents(), split_name="speech_snapshot"
+        ),
+        lambda: registry.assert_dataset_authority(receipt.dataset_digest, epoch),
+    ):
+        with pytest.raises(PermissionError, match="training"):
+            operation()
+    runs = TrainingRepository()
+    with pytest.raises(PermissionError, match="training"):
+        runs.register_run(_run_manifest(receipt.manifest), registry)
+    registry.revoke_source_rights(
+        source.envelope.content_digest,
+        uses=("speech_recovery",),
+        reason="consent withdrawn",
+        command_id="withdraw",
+    )
+    with pytest.raises(PermissionError, match="revoked"):
+        registry.materialized_sources(receipt.dataset_digest)
+
+
+@pytest.mark.parametrize("uses", (("speech_recovery", "training"), ("evaluation", "speech_recovery")))
+def test_speech_recovery_cannot_mix_with_model_data_purposes_or_publish_partial_state(uses):
+    registry = DatasetRegistry()
+    before = _counts(registry)
+    with pytest.raises(ValueError, match="isolated"):
+        _ingest(registry, _source(rights=uses), permitted_uses=uses)
+    assert _counts(registry) == before
+
+
+def test_speech_recovery_rights_cannot_be_widened_into_training_or_projection_export():
+    registry = DatasetRegistry()
+    before = _counts(registry)
+    with pytest.raises(PermissionError, match="rights"):
+        _ingest(registry, _source(rights=("speech_recovery",)))
+    assert _counts(registry) == before
+    corpus = MultimodalCorpus()
+    with pytest.raises(RuntimeError, match="purpose"):
+        corpus.export_text_training(
+            ("snapshot",), export_id="recovery-as-training", purpose="speech_recovery", rights_policy={}
+        )

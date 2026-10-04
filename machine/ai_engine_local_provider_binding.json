@@ -1,0 +1,16 @@
+{
+  "schema_version": "skeleton.ai.engine_local_provider_binding.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/api/engine_runtime.py",
+  "descriptor_owner": "skeleton/provider_runtime.py:LocalArtifactProviderAdapter.execution_identity",
+  "authority": "existing SQLiteExecutionRepository checkpoint and accepted engine execution; no additional database or provider owner",
+  "checkpoint_field": "local_provider_binding",
+  "identity": "canonical content-only provider ID, model ID, exact validated loaded artifact receipt and local inference default seed, with a SHA-256 binding digest; no artifact paths, credentials or caller assertions",
+  "admission": "commit the complete existing initial execution payload plus local artifact binding before first local model dispatch",
+  "recovery": "unfinished execution requires exact original artifact descriptor, inference seed and valid binding digest before any resumed dispatch; changed weights under the same model/provider names, changed local inference seed, descriptor corruption and local-to-hosted substitution fail closed",
+  "compatibility": "completed executions replay their existing result without loading or comparing a new provider; hosted executions retain existing behavior; only an exact pristine CREATED initial checkpoint may acquire a missing local pin, otherwise unfinished legacy local checkpoints fail closed",
+  "accounting": "binding failures preserve already committed provider/tool receipts and actual usage when the canonical checkpoint remains readable",
+  "failure": "durable explicit local_provider_binding_missing or local_provider_binding_mismatch terminal failure before another provider dispatch",
+  "acceptance": ["skeleton/testing/test_engine_local_provider_binding.py"],
+  "scope_limitations": ["local exact-artifact recovery identity only", "no serving migration, source-rights propagation, new provider grant or production promotion", "no signed gap closure authority"]
+}

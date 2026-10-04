@@ -85,6 +85,68 @@ def test_native_neural_cli_produces_real_loss_and_reloadable_weights(tmp_path):
         assert build_governed_artifact(**request) == receipt
 
 
+def test_parallel_cli_trains_two_actual_ranks_and_reloads_without_spawning(tmp_path):
+    pytest.importorskip("numpy")
+    from skeleton.ai.runtime.training.distributed_trainer import (
+        LocalDataParallelTrainer,
+    )
+
+    request = _request(tmp_path, algorithm="data_parallel")
+    first = request["corpus_paths"][0]
+    first.write_text("ababab", encoding="utf-8")
+    second = tmp_path / "second.txt"
+    second.write_text("bababa", encoding="utf-8")
+    request.update({"corpus_paths": (first, second), "world_size": 2})
+    receipt = build_governed_artifact(**request)
+    assert receipt["world_size"] == 2
+    assert receipt["barrier_count"] == 2
+    assert receipt["update_count"] == 4
+    assert receipt["final_loss"] < receipt["initial_loss"]
+    assert load_local_model_artifact(request["output_path"]).model.model_digest == receipt["model_digest"]
+    datasets = DatasetRegistry(Path(request["state_directory"]) / "datasets.sqlite3")
+    runs = TrainingRepository(Path(request["state_directory"]) / "training.sqlite3")
+    try:
+        manifest = runs.manifest(request["run_id"])
+        assert manifest.world_size == 2
+        assert manifest.parallelism == "data_parallel"
+        payload = runs.checkpoint_payload(runs.latest_checkpoint(request["run_id"]))
+        ranks = payload["barrier"]["ranks"]
+        assert len({rank["worker_pid"] for rank in ranks}) == 2
+        assert {rank["status"] for rank in ranks} == {"updated"}
+        model, training = LocalDataParallelTrainer(datasets, runs).load_artifact(request["run_id"])
+        assert model.model_digest == receipt["model_digest"]
+        assert training.barrier_count == 2
+    finally:
+        runs.close()
+        datasets.close()
+    request["output_path"].unlink()
+    with patch(
+        "multiprocessing.process.BaseProcess.start", side_effect=AssertionError("replayed parallel work")
+    ):
+        assert build_governed_artifact(**request) == receipt
+
+
+@pytest.mark.parametrize(
+    "algorithm,override",
+    [
+        ("reference", {"world_size": 2}),
+        ("neural", {"collective_timeout_seconds": 5}),
+        ("data_parallel", {"world_size": 1}),
+        ("data_parallel", {"world_size": 5}),
+        ("data_parallel", {"world_size": True}),
+        ("data_parallel", {"collective_timeout_seconds": float("nan")}),
+        ("data_parallel", {"collective_timeout_seconds": 121}),
+        ("data_parallel", {"collective_timeout_seconds": True}),
+    ],
+)
+def test_parallel_cli_configuration_rejects_before_admission(tmp_path, algorithm, override):
+    request = _request(tmp_path, algorithm=algorithm)
+    request.update(override)
+    with pytest.raises(GovernedTrainingBuildError):
+        build_governed_artifact(**request)
+    assert not Path(request["state_directory"]).exists()
+
+
 def test_output_publication_failure_retries_completed_checkpoint(tmp_path):
     request = _request(tmp_path)
     with (
