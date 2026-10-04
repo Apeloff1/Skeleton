@@ -184,6 +184,7 @@
   },
   "cross_role_policy": {
     "raw_payload_into_control_forbidden": true,
+    "cross_role_reference_only": true,
     "data_to_control_operations": [
       "admission.request",
       "evidence.report",
