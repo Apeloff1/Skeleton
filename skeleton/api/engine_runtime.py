@@ -163,8 +163,14 @@ class EngineExecutionCoordinator:
             await self.ensure_execution(execution_id)
             async with self._lock:
                 task = self._tasks.get(execution_id)
+        # Cancellation acknowledgement must not wait for the entire
+        # execution driver. The caller may own resources that the in-flight
+        # provider needs in order to finish and produce auditable late-result
+        # evidence. Persisting the cancellation bit plus ensuring an active
+        # driver is sufficient: the canonical runtime polls that durable bit,
+        # fences any provider response, and terminalizes independently.
         if task is not None:
-            await asyncio.shield(task)
+            await asyncio.sleep(0)
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
