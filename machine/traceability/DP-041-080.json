@@ -6704,7 +6704,7 @@
       "volume_ref": "VOL-041",
       "title": "API Architecture",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6713,7 +6713,7 @@
       "volume_ref": "VOL-042",
       "title": "Product Shell",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6722,7 +6722,7 @@
       "volume_ref": "VOL-043",
       "title": "Desktop Application",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6731,7 +6731,7 @@
       "volume_ref": "VOL-044",
       "title": "Web Application",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6740,7 +6740,7 @@
       "volume_ref": "VOL-045",
       "title": "UX for Long-Running AI",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6749,7 +6749,7 @@
       "volume_ref": "VOL-046",
       "title": "Multi-Tenancy",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6758,7 +6758,7 @@
       "volume_ref": "VOL-047",
       "title": "Installer",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6767,7 +6767,7 @@
       "volume_ref": "VOL-048",
       "title": "Updater",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6776,7 +6776,7 @@
       "volume_ref": "VOL-049",
       "title": "Repair System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6785,7 +6785,7 @@
       "volume_ref": "VOL-050",
       "title": "Uninstaller",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6839,7 +6839,7 @@
       "volume_ref": "VOL-056",
       "title": "Gap Ledger",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6848,7 +6848,7 @@
       "volume_ref": "VOL-057",
       "title": "Risk Register",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6866,7 +6866,7 @@
       "volume_ref": "VOL-059",
       "title": "CI",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6875,7 +6875,7 @@
       "volume_ref": "VOL-060",
       "title": "Release Engineering",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6884,7 +6884,7 @@
       "volume_ref": "VOL-061",
       "title": "Deployment",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6893,7 +6893,7 @@
       "volume_ref": "VOL-062",
       "title": "Environment Management",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6902,7 +6902,7 @@
       "volume_ref": "VOL-063",
       "title": "Configuration",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6911,7 +6911,7 @@
       "volume_ref": "VOL-064",
       "title": "Backup",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6920,7 +6920,7 @@
       "volume_ref": "VOL-065",
       "title": "Disaster Recovery",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6929,7 +6929,7 @@
       "volume_ref": "VOL-066",
       "title": "Incident Response",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6938,7 +6938,7 @@
       "volume_ref": "VOL-067",
       "title": "Performance Program",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6947,7 +6947,7 @@
       "volume_ref": "VOL-068",
       "title": "Capacity Planning",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -6956,7 +6956,7 @@
       "volume_ref": "VOL-069",
       "title": "Cost Engineering",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7010,7 +7010,7 @@
       "volume_ref": "VOL-075",
       "title": "Artifact System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7019,7 +7019,7 @@
       "volume_ref": "VOL-076",
       "title": "Content-Addressed Storage",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7028,7 +7028,7 @@
       "volume_ref": "VOL-077",
       "title": "Experiment Platform",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7037,7 +7037,7 @@
       "volume_ref": "VOL-078",
       "title": "Reproducibility",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7046,7 +7046,7 @@
       "volume_ref": "VOL-079",
       "title": "Software Quality",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     },
     {
@@ -7055,7 +7055,7 @@
       "volume_ref": "VOL-080",
       "title": "Test Architecture",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-041-080"
     }
   ],
