@@ -54,6 +54,25 @@ def test_memory_verifier_rejects_reopened_gap(tmp_path: Path) -> None:
     assert "durable-memory construction gap is not closed" in receipt["errors"]
 
 
+def test_memory_verifier_rejects_nonterminal_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    next(
+        item
+        for item in payload["entries"]
+        if item["gap"] == "gap-memory-durable-authority"
+    )["implementation_state"] = "evidence_pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "durable-memory implementation_state is not complete" in receipt["errors"]
+
+
 def test_memory_verifier_rejects_lost_mongo_authority(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     path = root / "skeleton/persistence/memory_repository.py"
