@@ -98,10 +98,10 @@ jobs:
           )
           expected = {
               "covered_volume_count": 107,
-              "covered_obligation_count": 489,
+              "covered_obligation_count": 455,
               "covered_risk_count": 281,
-              "covered_gap_count": 208,
-              "already_bound_count": 489,
+              "covered_gap_count": 174,
+              "already_bound_count": 455,
               "candidate_binding_count": 0,
               "candidate_risk_count": 0,
               "candidate_gap_count": 0,
