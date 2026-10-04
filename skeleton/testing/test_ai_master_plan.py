@@ -309,8 +309,18 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
 
 
 
-def test_closed_gaps_require_hardened_implementation_status() -> None:
+def test_closed_gaps_allow_evidence_pending_or_hardened_status() -> None:
     data = checker.load_plan()
+
+    evidence_pending = json.loads(json.dumps(data))
+    pending_volume = evidence_pending["volumes"][13]
+    pending_volume["implementation_status"] = "evidence_pending"
+    pending_volume["gaps"] = []
+    pending_errors = checker.validate(evidence_pending)
+    assert not any(
+        error == "VOL-013: depth pass requires non-empty gaps"
+        for error in pending_errors
+    )
 
     hardened = json.loads(json.dumps(data))
     hardened_volume = hardened["volumes"][13]
