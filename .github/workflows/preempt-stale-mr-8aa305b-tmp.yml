@@ -1,0 +1,21 @@
+name: Temporary preempt stale Merge Readiness 8aa305b
+
+on:
+  push:
+    branches:
+      - "chore/retro-sign-p1-terminal-20261004"
+    paths:
+      - ".github/workflows/preempt-stale-mr-8aa305b-tmp.yml"
+
+permissions: {}
+
+concurrency:
+  group: merge-readiness-8aa305b4a015fe1b492bcdb70251f5b9dda56dc5
+  cancel-in-progress: true
+
+jobs:
+  preempt:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preempted
