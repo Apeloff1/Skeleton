@@ -502,7 +502,7 @@ class CounterfactualRolloutEngine:
     def _verify_transition(
         self,
         *,
-        index: int,
+        expected_adapter_step: int,
         prior_state: Mapping[str, object],
         action: Mapping[str, object],
         transition: EnvironmentTransition,
@@ -520,7 +520,7 @@ class CounterfactualRolloutEngine:
             raise WorldModelError("simulation_id drift in transition evidence")
         if evidence.seed != self.seed:
             raise WorldModelError("seed drift in transition evidence")
-        if evidence.step_index != index:
+        if evidence.step_index != expected_adapter_step:
             raise WorldModelError("step index drift in transition evidence")
         expected_prior = _mapping_digest(prior_state, "prior state")
         expected_action = _mapping_digest(action, "action")
@@ -570,6 +570,7 @@ class CounterfactualRolloutEngine:
         cumulative = self.assumptions.aggregate_uncertainty
         steps: list[SimulationStep] = []
         terminal = False
+        expected_adapter_step: int | None = 0 if reset else None
 
         for index, raw_action in enumerate(actions):
             if terminal:
@@ -579,12 +580,15 @@ class CounterfactualRolloutEngine:
             action = dict(raw_action)
             _mapping_digest(action, "action")
             transition = self.adapter.step(action)
+            if expected_adapter_step is None:
+                expected_adapter_step = transition.evidence.step_index
             self._verify_transition(
-                index=index,
+                expected_adapter_step=expected_adapter_step,
                 prior_state=prior_state,
                 action=action,
                 transition=transition,
             )
+            expected_adapter_step += 1
             local = float(transition.evidence.uncertainty)
             cumulative = self.uncertainty_policy.combine(
                 cumulative,
