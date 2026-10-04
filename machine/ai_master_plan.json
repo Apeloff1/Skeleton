@@ -13367,7 +13367,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "evidence_pending",
       "requirements": [
         "Distinguish probability/confidence/unknown/ambiguous evidence types.",
         "Do not convert missing evidence into numeric confidence by default."
@@ -13389,7 +13389,8 @@
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/uncertainty.py",
         "skeleton/intelligence/cognition.py",
-        ".github/workflows/p1-reasoning-search-stop-policy.yml"
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
+        "skeleton/ai/runtime/intelligence/uncertainty.py"
       ],
       "tests": [
         "skeleton/testing/test_reasoning_strategy_registry.py",
@@ -13400,20 +13401,23 @@
         ".github/workflows/p1-reasoning-search-stop-policy.yml"
       ],
       "evidence": [
+        ".github/workflows/p1-reasoning-search-stop-policy.yml",
         "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "github-actions-job:108726229944",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
+        "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
-        "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+        "https://github.com/Apeloff1/Skeleton/pull/2645",
+        "skeleton/ai/runtime/intelligence/uncertainty.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/testing/test_reasoning_strategy_registry.py"
       ],
       "risks": [
         "false precision",
         "uncertainty dropped in summaries"
       ],
-      "gaps": [
-        "define uncertainty taxonomy",
-        "bind UI/explanations"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-248",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
