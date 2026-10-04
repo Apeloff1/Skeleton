@@ -46,6 +46,25 @@ def main() -> int:
     elif canonical.read_bytes() != mirror.read_bytes():
         errors.append("G021 canonical/governed AI runtime drift")
 
+    swarm = ROOT / "skeleton/automation/agents/scheduler.py"
+    swarm_mirror = ROOT / "skeleton/ai/agents/core/scheduler.py"
+    if not swarm.is_file() or not swarm_mirror.is_file():
+        errors.append("G021 swarm integration surface is missing")
+    elif swarm.read_bytes() != swarm_mirror.read_bytes():
+        errors.append("G021 swarm canonical/governed AI mirror drift")
+    else:
+        swarm_source = swarm.read_text(encoding="utf-8")
+        for bridge_marker in (
+            "global_resources",
+            "ResourceRequest",
+            "_resource_request_id",
+            "resource_epoch",
+        ):
+            if bridge_marker not in swarm_source:
+                errors.append(
+                    f"G021 swarm integration missing marker: {bridge_marker}"
+                )
+
     if canonical.is_file():
         source = canonical.read_text(encoding="utf-8")
         for marker in (
