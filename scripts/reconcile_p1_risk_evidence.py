@@ -40,20 +40,28 @@ CLOSURE = Path("machine/ai_closure_evidence.json")
 POLICY = Path("machine/p1_risk_evidence_policy.json")
 REGISTRY = Path("machine/p1_risk_evidence_bindings.json")
 
-# Historical bindings for implementation gaps explicitly closed by VOL-248.
-# They remain governed audit evidence but are no longer live obligations.
-RETIRED_OBLIGATION_IDS = frozenset({
-    "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143",
-    "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910",
-})
-RETIRED_GAP_STATEMENTS = {
-    "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143": "bind UI/explanations",
-    "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910": "define uncertainty taxonomy",
-}
-
-
 class RiskReconciliationError(RuntimeError):
     """Repository risk reconciliation inputs are malformed."""
+
+
+def retired_gap_owner_from_id(obligation_id: str) -> str | None:
+    """Return the canonical owner for a historical volume-gap binding ID."""
+    prefix = "P1-GAP-"
+    if not isinstance(obligation_id, str) or not obligation_id.startswith(prefix):
+        return None
+    body = obligation_id[len(prefix):]
+    source_ref, separator, suffix = body.rpartition("-")
+    if not separator or len(suffix) != 16:
+        return None
+    volume_key, separator, source_suffix = source_ref.partition(":gap:")
+    if (
+        not separator
+        or not volume_key.startswith("VOL-")
+        or len(source_suffix) != 10
+        or not all(ch in "0123456789abcdef" for ch in source_suffix + suffix)
+    ):
+        return None
+    return "ACC-" + volume_key
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -210,31 +218,6 @@ def derive_obligations(
                     rule=gap_rule,
                 )
             )
-
-    retired_volume = volume_by_key.get("VOL-248")
-    if retired_volume is not None:
-        current_gaps = set(retired_volume.get("gaps") or [])
-        for obligation_id, statement in sorted(RETIRED_GAP_STATEMENTS.items()):
-            if statement in current_gaps:
-                continue
-            suffix = canonical_digest(statement)[:10]
-            source_ref = f"VOL-248:gap:{suffix}"
-            retired = _obligation(
-                kind=RiskKind.GAP,
-                source_ref=source_ref,
-                statement=statement,
-                source_payload={
-                    "volume": "VOL-248",
-                    "kind": "gap",
-                    "statement": statement,
-                },
-                rule=gap_rule,
-            )
-            if retired.obligation_id != obligation_id:
-                raise RiskReconciliationError(
-                    "retired VOL-248 obligation identity drift: " + obligation_id
-                )
-            obligations.append(retired)
 
     for axis in axes:
         if not isinstance(axis, dict):
@@ -443,14 +426,7 @@ def reconcile_repository(
             "baseline closure evidence entries must be non-empty"
         )
 
-    historical_obligations = derive_obligations(
-        master, p1_map, adversarial, policy
-    )
-    obligations = tuple(
-        item
-        for item in historical_obligations
-        if item.obligation_id not in RETIRED_OBLIGATION_IDS
-    )
+    obligations = derive_obligations(master, p1_map, adversarial, policy)
     expectations = policy.get("inventory_expectations")
     if not isinstance(expectations, dict):
         raise RiskReconciliationError("inventory_expectations must be an object")
@@ -462,21 +438,6 @@ def reconcile_repository(
             for ref in lane.get("primary_volume_refs", [])
         }
     )
-    counts = {
-        "p1_primary_volume_count": primary_count,
-        "volume_risk_count": sum(
-            1 for item in historical_obligations if item.kind is RiskKind.RISK
-        ),
-        "volume_gap_count": sum(
-            1 for item in historical_obligations if item.kind is RiskKind.GAP
-        ),
-        "applicable_adversarial_axis_count": sum(
-            1
-            for item in historical_obligations
-            if item.kind is RiskKind.ADVERSARIAL
-        ),
-        "total_obligation_count": len(historical_obligations),
-    }
     live_counts = {
         "p1_primary_volume_count": primary_count,
         "volume_risk_count": sum(
@@ -490,6 +451,31 @@ def reconcile_repository(
         ),
         "total_obligation_count": len(obligations),
     }
+    for key in (
+        "p1_primary_volume_count",
+        "volume_risk_count",
+        "applicable_adversarial_axis_count",
+    ):
+        if expectations.get(key) != live_counts[key]:
+            raise RiskReconciliationError(
+                f"risk obligation inventory drift for {key}: "
+                f"expected={expectations.get(key)!r} actual={live_counts[key]}"
+            )
+    expected_gap_count = expectations.get("volume_gap_count")
+    expected_total_count = expectations.get("total_obligation_count")
+    if not isinstance(expected_gap_count, int) or not isinstance(
+        expected_total_count, int
+    ):
+        raise RiskReconciliationError("risk obligation inventory expectations are malformed")
+    retired_expected_count = expected_gap_count - live_counts["volume_gap_count"]
+    total_delta = expected_total_count - live_counts["total_obligation_count"]
+    if retired_expected_count < 0 or total_delta != retired_expected_count:
+        raise RiskReconciliationError(
+            "historical retired-gap inventory does not reconcile with live obligations"
+        )
+    counts = dict(live_counts)
+    counts["volume_gap_count"] += retired_expected_count
+    counts["total_obligation_count"] += retired_expected_count
     for key, actual in counts.items():
         if expectations.get(key) != actual:
             raise RiskReconciliationError(
@@ -507,25 +493,37 @@ def reconcile_repository(
         bindings[binding.obligation_id] = binding
 
     obligation_by_id = {item.obligation_id: item for item in obligations}
-    unknown = set(bindings) - set(obligation_by_id)
-    unexpected = sorted(unknown - RETIRED_OBLIGATION_IDS)
+    unknown = sorted(set(bindings) - set(obligation_by_id))
+    retired_present: list[str] = []
+    unexpected: list[str] = []
+    for obligation_id in unknown:
+        binding = bindings[obligation_id]
+        expected_owner = retired_gap_owner_from_id(obligation_id)
+        if (
+            expected_owner is None
+            or binding.owner_id != expected_owner
+            or binding.disposition.value != "evidence"
+            or not binding.evidence
+            or binding.accepted_risk is not None
+        ):
+            unexpected.append(obligation_id)
+            continue
+        retired_present.append(obligation_id)
     if unexpected:
         raise RiskReconciliationError(
             "bindings reference unknown obligations: " + ",".join(unexpected)
         )
-    retired_present = sorted(unknown & RETIRED_OBLIGATION_IDS)
-    for obligation_id in retired_present:
-        binding = bindings[obligation_id]
-        if (
-            binding.owner_id != "ACC-VOL-248"
-            or binding.disposition != "evidence"
-            or not binding.evidence
-            or binding.accepted_risk is not None
-        ):
-            raise RiskReconciliationError(
-                "retired VOL-248 binding is not evidence-closed: "
-                + obligation_id
-            )
+    if len(retired_present) > retired_expected_count:
+        raise RiskReconciliationError(
+            "retired gap bindings exceed governed historical inventory"
+        )
+    if (
+        len(bindings) == counts["total_obligation_count"]
+        and len(retired_present) != retired_expected_count
+    ):
+        raise RiskReconciliationError(
+            "complete binding registry does not cover governed retired gap inventory"
+        )
 
     rows: list[dict[str, Any]] = []
     for obligation in obligations:
@@ -593,6 +591,7 @@ def reconcile_repository(
         "live_binding_count": len(set(bindings) & set(obligation_by_id)),
         "historical_binding_count": len(bindings),
         "retired_binding_count": len(retired_present),
+        "retired_expected_count": retired_expected_count,
         "resolved_count": len(resolved) + len(retired_present),
         "live_resolved_count": len(resolved),
         "historical_resolved_count": len(resolved) + len(retired_present),
