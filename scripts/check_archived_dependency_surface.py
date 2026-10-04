@@ -278,29 +278,37 @@ def validate_archive_map(
                     )
 
     vendor_files: set[str] = set()
+    observed_snapshot_files: set[str] = set()
     archive_root_fs = repo_root / ARCHIVE_ROOT
     if archive_root_fs.is_dir():
         for path in archive_root_fs.rglob("*"):
             relative_text = path.relative_to(repo_root).as_posix()
-            if "vendor/dependency-manifests" not in relative_text:
-                continue
             if path.is_symlink():
-                errors.append(
-                    "quarantined dependency evidence must not be a symlink: "
-                    f"{relative_text}"
-                )
+                observed_snapshot_files.add(relative_text)
+                if "vendor/dependency-manifests" in relative_text:
+                    errors.append(
+                        "quarantined dependency evidence must not be a symlink: "
+                        f"{relative_text}"
+                    )
                 continue
             if not path.is_file():
                 continue
-            vendor_files.add(relative_text)
-
+            observed_snapshot_files.add(relative_text)
+            if "vendor/dependency-manifests" in relative_text:
+                vendor_files.add(relative_text)
     unmapped = sorted(vendor_files - seen_archives)
     missing_from_tree = sorted(seen_archives - vendor_files)
     for path in unmapped:
         errors.append(f"unmapped quarantined dependency evidence: {path}")
     for path in missing_from_tree:
         errors.append(f"mapped archive evidence missing from quarantine tree: {path}")
-
+    allowed_snapshot_files = {
+        ARCHIVE_MAP.as_posix(),
+        (ARCHIVE_ROOT / "README.md").as_posix(),
+        *seen_archives,
+    }
+    for path in sorted(observed_snapshot_files - allowed_snapshot_files):
+        errors.append(f"unmapped archival snapshot payload: {path}")
     return errors
 
 
