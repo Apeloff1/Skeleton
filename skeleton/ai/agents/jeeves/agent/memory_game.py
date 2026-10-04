@@ -18,7 +18,7 @@ import math
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
@@ -249,6 +249,7 @@ class IndexCardStore:
     def __init__(self, *, max_cards: int = 100_000) -> None:
         self.max_cards = positive_int("max_cards", max_cards, maximum=10_000_000)
         self._cards: dict[str, InteractionCard] = {}
+        self._namespace_to_cards: dict[str, set[str]] = defaultdict(set)
         self._fingerprints: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
@@ -264,8 +265,10 @@ class IndexCardStore:
                 self._evict_one()
             previous = self._cards.get(card.card_id)
             if previous is not None:
+                self._namespace_to_cards[previous.namespace.key].discard(previous.card_id)
                 self._fingerprints.pop((previous.namespace.key, previous.content_fingerprint), None)
             self._cards[card.card_id] = card
+            self._namespace_to_cards[card.namespace.key].add(card.card_id)
             self._fingerprints[key] = card.card_id
             return card
 
@@ -284,8 +287,13 @@ class IndexCardStore:
         if include_parent and namespace.session_id is not None:
             keys.add(namespace.parent().key)
         with self._lock:
+            card_ids: set[str] = set()
+            for key in keys:
+                card_ids.update(self._namespace_to_cards.get(key, ()))
             return tuple(
-                card for card in self._cards.values() if card.namespace.key in keys
+                self._cards[card_id]
+                for card_id in card_ids
+                if card_id in self._cards
             )
 
     def namespace_cards(
@@ -323,6 +331,7 @@ class IndexCardStore:
             ),
         )
         self._cards.pop(victim.card_id, None)
+        self._namespace_to_cards[victim.namespace.key].discard(victim.card_id)
         self._fingerprints.pop((victim.namespace.key, victim.content_fingerprint), None)
 
 
@@ -499,7 +508,7 @@ class MemoryGameIndex:
         ):
             lexical = self._cue_cosine(query_tokens, query_norm, card.cue_tokens)
             context_match = (
-                sum(tag in card.context_tags for tag in requested_tags)
+                len(requested_tags.intersection(card.context_tags))
                 / len(requested_tags)
                 if requested_tags
                 else 0.5

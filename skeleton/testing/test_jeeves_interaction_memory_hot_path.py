@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from skeleton.jeeves.agent.memory import MemoryNamespace
 from skeleton.jeeves.agent.memory_game import (
     IndexCardStore,
@@ -87,4 +89,26 @@ def test_weighted_counter_cosine_contract_is_unchanged() -> None:
     right = MemoryGameIndex._tokens("alpha beta beta beta")
     expected = 5.0 / ((5.0 ** 0.5) * (10.0 ** 0.5))
 
-    assert MemoryGameIndex._cosine(left, right) == expected
+    assert math.isclose(MemoryGameIndex._cosine(left, right), expected)
+
+
+def test_search_namespace_scan_never_walks_global_card_values() -> None:
+    namespace, index = _fixture(8)
+    other = MemoryNamespace("tenant", "other", "workspace", "session")
+    for number in range(20):
+        index.capture_interaction(
+            other,
+            f"other tenant memory {number}",
+            trust=0.9,
+            salience=0.8,
+        )
+
+    class _NoGlobalValues(dict):
+        def values(self):
+            raise AssertionError("interaction-memory search scanned global cards")
+
+    index.store._cards = _NoGlobalValues(index.store._cards)
+    hits = index.search(namespace, "compiler evidence", limit=3)
+
+    assert len(hits) == 3
+    assert all(hit.card.namespace.key == namespace.key for hit in hits)
