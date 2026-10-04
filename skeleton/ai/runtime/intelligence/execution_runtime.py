@@ -1203,13 +1203,7 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        cooperative_cancellation = bool(
-            getattr(
-                self.provider,
-                "supports_cooperative_cancellation",
-                False,
-            )
-        )
+        cooperative_cancellation = True
         if deadline is None and not cooperative_cancellation:
             response = await self.provider.generate(provider_request)
         else:
