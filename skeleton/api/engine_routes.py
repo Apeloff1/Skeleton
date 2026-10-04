@@ -543,21 +543,31 @@ def execution_handoff_binding(
 
 
 @router.post("/executions/{execution_id}/cancel")
-def cancel_execution(
+async def cancel_execution(
     execution_id: str,
     body: EngineCancelBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
     service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request, service_token)
     try:
-        return service.cancel(
+        cancelled = service.cancel(
             execution_id,
             verified_service_principal=principal,
             actor_id=body.actor_id,
             tenant_id=body.tenant_id,
-        ).as_dict()
+        )
+        if coordinator is not None and not cancelled.execution.terminal:
+            await coordinator.interrupt_cancelled_execution(execution_id)
+            cancelled = service.status(
+                execution_id,
+                verified_service_principal=principal,
+                actor_id=body.actor_id,
+                tenant_id=body.tenant_id,
+            )
+        return cancelled.as_dict()
     except Exception as exc:
         _raise_engine_error(exc)
         raise
