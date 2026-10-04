@@ -31,6 +31,7 @@ from .types import (
 )
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_'-]+")
+_PRIVACY_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class MemoryError(RuntimeError):
@@ -233,13 +234,19 @@ class InMemoryStore:
         self._clock = clock
         self._records: dict[str, MemoryRecord] = {}
         self._fingerprints: dict[tuple[str, str], str] = {}
+        self._privacy_tombstones: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
     def put(self, record: MemoryRecord) -> MemoryRecord:
         if not isinstance(record, MemoryRecord):
             raise TypeError("record must be MemoryRecord")
         key = (record.namespace.key, record.fingerprint)
+        subject = (record.namespace.tenant_id, record.namespace.user_id)
         with self._lock:
+            if subject in self._privacy_tombstones:
+                raise MemoryError(
+                    "privacy-deleted subject cannot be materialized"
+                )
             duplicate_id = self._fingerprints.get(key)
             if duplicate_id is not None and duplicate_id != record.memory_id:
                 return self._records[duplicate_id]
@@ -264,6 +271,56 @@ class InMemoryStore:
                 return False
             self._fingerprints.pop((record.namespace.key, record.fingerprint), None)
             return True
+
+    def privacy_delete_subject(
+        self,
+        tenant_id: str,
+        user_id: str,
+        *,
+        authority_receipt_digest: str,
+    ) -> tuple[str, ...]:
+        """Delete every memory for a subject and permanently fence reinsertion."""
+
+        tenant = require_id("tenant_id", tenant_id)
+        user = require_id("user_id", user_id)
+        receipt = str(authority_receipt_digest).strip().lower()
+        if _PRIVACY_DIGEST_RE.fullmatch(receipt) is None:
+            raise MemoryError(
+                "authority_receipt_digest must be lowercase sha256"
+            )
+        subject = (tenant, user)
+        with self._lock:
+            prior = self._privacy_tombstones.get(subject)
+            if prior is not None and prior != receipt:
+                raise MemoryError(
+                    "privacy tombstone replay changed authority receipt"
+                )
+            self._privacy_tombstones[subject] = receipt
+            deleted = tuple(
+                sorted(
+                    memory_id
+                    for memory_id, record in self._records.items()
+                    if record.namespace.tenant_id == tenant
+                    and record.namespace.user_id == user
+                )
+            )
+            for memory_id in deleted:
+                record = self._records.pop(memory_id)
+                self._fingerprints.pop(
+                    (record.namespace.key, record.fingerprint),
+                    None,
+                )
+            return deleted
+
+    def privacy_tombstone_receipt(
+        self,
+        tenant_id: str,
+        user_id: str,
+    ) -> str | None:
+        tenant = require_id("tenant_id", tenant_id)
+        user = require_id("user_id", user_id)
+        with self._lock:
+            return self._privacy_tombstones.get((tenant, user))
 
     def list_namespace(
         self,
