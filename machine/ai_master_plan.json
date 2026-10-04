@@ -290,7 +290,9 @@
         "skeleton/testing/test_ai_master_plan.py",
         "skeleton/testing/test_architecture_scope_freeze.py",
         "skeleton/testing/test_maturity_reconciliation.py",
-        "tests/test_p1_maturity_reconciliation.py"
+        "tests/test_p1_maturity_reconciliation.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "human/machine plan divergence",
@@ -2439,7 +2441,9 @@
         "tests/test_model_routing.py",
         "tests/test_orchestration_error_redaction.py",
         "tests/test_p1_accountability_materialization.py",
-        "tests/test_p1_promotion_evidence_emitter.py"
+        "tests/test_p1_promotion_evidence_emitter.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "secret leakage in telemetry",
@@ -2539,7 +2543,9 @@
         "skeleton/testing/test_benchmark_registry.py",
         "skeleton/testing/test_reproducibility.py",
         "tests/test_p1_benchmark_registry.py",
-        "tests/test_p1_reproducibility_bundle.py"
+        "tests/test_p1_reproducibility_bundle.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "benchmark cherry-picking",
@@ -2627,7 +2633,9 @@
         "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-036:gap:fe359f931a-fac27573138bfdcb:dfeaadc5da74c0205785adf2387c607603d9cdb4",
         "skeleton/testing/test_risk_evidence.py",
         "tests/test_adversarial_judge_isolation.py",
-        "tests/test_p1_risk_evidence_reconciliation.py"
+        "tests/test_p1_risk_evidence_reconciliation.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "evaluator leakage",
@@ -2709,7 +2717,9 @@
         "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-037:gap:08cc015c46-d8eb57a3c0d83a9b:dfeaadc5da74c0205785adf2387c607603d9cdb4",
         "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-037:gap:d2c62f063b-2eda9d5457589854:dfeaadc5da74c0205785adf2387c607603d9cdb4",
         "skeleton/testing/test_promotion_gates.py",
-        "tests/test_p1_required_gate_authority.py"
+        "tests/test_p1_required_gate_authority.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "self-confidence treated as proof",
@@ -2814,7 +2824,9 @@
         "skeleton/testing/test_reproducibility.py",
         "tests/test_p1_accountability_materialization.py",
         "tests/test_p1_promotion_evidence_emitter.py",
-        "tests/test_p1_reproducibility_bundle.py"
+        "tests/test_p1_reproducibility_bundle.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "canonicalization mismatch",
@@ -3933,7 +3945,9 @@
         "machine/p1_risk_evidence_bindings.json",
         "machine/p1_risk_evidence_policy.json",
         "p1:control-plane-gap-batch2:P1-GAP-VOL-056:gap:97327e13f0-fb312c2b30523b6c:82cc895b21128a24c19e7214e15e1c8823267c25",
-        "p1:control-plane-gap-batch2:P1-GAP-VOL-056:gap:b8d1c37349-27b01a16de3b9f60:82cc895b21128a24c19e7214e15e1c8823267c25"
+        "p1:control-plane-gap-batch2:P1-GAP-VOL-056:gap:b8d1c37349-27b01a16de3b9f60:82cc895b21128a24c19e7214e15e1c8823267c25",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "orphan gaps",
@@ -4016,7 +4030,9 @@
         "machine/p1_risk_evidence_bindings.json",
         "machine/p1_risk_evidence_policy.json",
         "p1:control-plane-gap-batch2:P1-GAP-VOL-057:gap:19c223f2c1-5031e0af7967855e:82cc895b21128a24c19e7214e15e1c8823267c25",
-        "p1:control-plane-gap-batch2:P1-GAP-VOL-057:gap:a471b17add-04fc6e13a9b6e800:82cc895b21128a24c19e7214e15e1c8823267c25"
+        "p1:control-plane-gap-batch2:P1-GAP-VOL-057:gap:a471b17add-04fc6e13a9b6e800:82cc895b21128a24c19e7214e15e1c8823267c25",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "critical risk hidden by aggregate status",
@@ -4155,7 +4171,9 @@
         "p1:control-plane-gap-batch2:P1-GAP-VOL-059:gap:c8f3cbba24-b73a3187a7f12551:82cc895b21128a24c19e7214e15e1c8823267c25",
         "scripts/check_p1_required_gate_authority.py",
         "skeleton/contracts/promotion_gates.py",
-        "tests/test_p1_required_gate_authority.py"
+        "tests/test_p1_required_gate_authority.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "false green aggregation",
@@ -5270,7 +5288,9 @@
         "skeleton/testing/test_reproducibility.py",
         "tests/test_p1_accountability_materialization.py",
         "tests/test_p1_promotion_evidence_emitter.py",
-        "tests/test_p1_reproducibility_bundle.py"
+        "tests/test_p1_reproducibility_bundle.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "hidden dependency",
@@ -5355,7 +5375,9 @@
         "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-079:gap:695e0e1870-84a5636eda9efa33:dfeaadc5da74c0205785adf2387c607603d9cdb4",
         "p1:bulk-volume-obligation-evidence:P1-GAP-VOL-079:gap:e306c1eccc-3273792a3ef19be0:dfeaadc5da74c0205785adf2387c607603d9cdb4",
         "skeleton/testing/test_reproducibility.py",
-        "tests/test_p1_reproducibility_bundle.py"
+        "tests/test_p1_reproducibility_bundle.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "false confidence from static gates",
@@ -5451,7 +5473,9 @@
         "scripts/check_ai_master_plan.py",
         "skeleton/testing/test_ai_master_plan.py",
         "skeleton/testing/test_maturity_reconciliation.py",
-        "tests/test_p1_maturity_reconciliation.py"
+        "tests/test_p1_maturity_reconciliation.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "implementation-coupled tests",
@@ -22426,7 +22450,9 @@
         "p1:control-plane-gap-batch2:P1-GAP-VOL-420:gap:7777365012-f77a419f1e16f459:82cc895b21128a24c19e7214e15e1c8823267c25",
         "scripts/check_ai_master_plan.py",
         "skeleton/testing/test_ai_master_plan.py",
-        "skeleton/testing/test_architecture_scope_freeze.py"
+        "skeleton/testing/test_architecture_scope_freeze.py",
+        "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
       ],
       "risks": [
         "breadth inflation",
