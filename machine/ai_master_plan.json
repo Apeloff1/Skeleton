@@ -13367,7 +13367,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "evidence_pending",
+      "implementation_status": "hardened",
       "requirements": [
         "Distinguish probability/confidence/unknown/ambiguous evidence types.",
         "Do not convert missing evidence into numeric confidence by default."
@@ -13423,7 +13423,9 @@
         "https://github.com/Apeloff1/Skeleton/pull/2679",
         "skeleton/ai/runtime/intelligence/uncertainty.py",
         "skeleton/intelligence/uncertainty.py",
-        "skeleton/testing/test_reasoning_strategy_registry.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "machine/ai_p1_terminal_closure.json",
+        "https://github.com/Apeloff1/Skeleton/commit/30b49c289ccdec43bda819ccddba0a5909139b2c"
       ],
       "risks": [
         "false precision",
@@ -13431,8 +13433,8 @@
       ],
       "gaps": [],
       "accountability_id": "ACC-VOL-248",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
       "depth_pass": "DP-241-280"
     },
