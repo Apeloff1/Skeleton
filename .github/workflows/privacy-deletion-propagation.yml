@@ -6,9 +6,15 @@ on:
       - main
     paths:
       - "machine/privacy_deletion_contract.json"
+      - "scripts/verify_privacy_deletion_contract.py"
       - "skeleton/persistence/privacy_deletion.py"
       - "skeleton/ai/runtime/persistence/privacy_deletion.py"
+      - "skeleton/jeeves/agent/memory.py"
+      - "skeleton/ai/agents/jeeves/agent/memory.py"
+      - "skeleton/jeeves/agent/context_repository.py"
+      - "skeleton/ai/agents/jeeves/agent/context_repository.py"
       - "skeleton/testing/test_privacy_deletion_authority.py"
+      - "skeleton/testing/test_privacy_deletion_jeeves_integration.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/privacy-deletion-propagation.yml"
   push:
@@ -16,9 +22,15 @@ on:
       - main
     paths:
       - "machine/privacy_deletion_contract.json"
+      - "scripts/verify_privacy_deletion_contract.py"
       - "skeleton/persistence/privacy_deletion.py"
       - "skeleton/ai/runtime/persistence/privacy_deletion.py"
+      - "skeleton/jeeves/agent/memory.py"
+      - "skeleton/ai/agents/jeeves/agent/memory.py"
+      - "skeleton/jeeves/agent/context_repository.py"
+      - "skeleton/ai/agents/jeeves/agent/context_repository.py"
       - "skeleton/testing/test_privacy_deletion_authority.py"
+      - "skeleton/testing/test_privacy_deletion_jeeves_integration.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/privacy-deletion-propagation.yml"
   workflow_dispatch:
@@ -33,7 +45,7 @@ concurrency:
 jobs:
   privacy-deletion-propagation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -47,14 +59,30 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
-      - name: Compile privacy deletion authority
+      - name: Compile privacy deletion surfaces
         run: >-
           python -m compileall -q
           skeleton/persistence/privacy_deletion.py
           skeleton/ai/runtime/persistence/privacy_deletion.py
+          skeleton/jeeves/agent/memory.py
+          skeleton/ai/agents/jeeves/agent/memory.py
+          skeleton/jeeves/agent/context_repository.py
+          skeleton/ai/agents/jeeves/agent/context_repository.py
+          scripts/verify_privacy_deletion_contract.py
           skeleton/testing/test_privacy_deletion_authority.py
+          skeleton/testing/test_privacy_deletion_jeeves_integration.py
+      - name: Verify G016 contract
+        run: python scripts/verify_privacy_deletion_contract.py --json
       - name: Run privacy deletion regressions
-        run: python -m unittest -q skeleton.testing.test_privacy_deletion_authority
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_privacy_deletion_authority
+          skeleton.testing.test_privacy_deletion_jeeves_integration
+      - name: Run Jeeves regression coverage
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_jeeves_context_repository_hot_path
+          skeleton.testing.test_jeeves_memory_hot_path
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
