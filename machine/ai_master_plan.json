@@ -1167,7 +1167,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "evidence_pending",
       "requirements": [
         "Treat every tool as a privileged execution surface with independent authorization.",
         "Validate input/output schemas, classification, risk, budget and idempotency before execution.",
@@ -1194,7 +1194,14 @@
         "skeleton/skills/tool_runtime.py",
         "skeleton/skills/tool_receipt_store.py",
         "skeleton/shells/isolation.py",
-        ".github/workflows/p1-privileged-tool-transaction.yml"
+        ".github/workflows/p1-privileged-tool-transaction.yml",
+        "skeleton/tools/integrations/adapters",
+        "skeleton/ai/runtime/tools/integrations/adapters",
+        "skeleton/skills/tool_saga.py",
+        "skeleton/ai/runtime/skills/tool_saga.py",
+        "scripts/verify_tool_runtime_closure.py",
+        ".github/workflows/provider-adapters-offline.yml",
+        ".github/workflows/tool-runtime-closure.yml"
       ],
       "tests": [
         "skeleton/testing/test_shell_*.py",
@@ -1203,26 +1210,37 @@
         "skeleton/testing/test_tool_receipt_store.py",
         "skeleton/testing/test_shell_ai_isolation_sandbox.py",
         "tests/test_governed_tool_journey.py",
-        "tests/test_tool_runtime_independent_verifier.py"
+        "tests/test_tool_runtime_independent_verifier.py",
+        "skeleton/testing/test_tool_saga.py"
       ],
       "evaluations": [
-        ".github/workflows/p1-privileged-tool-transaction.yml"
+        ".github/workflows/p1-privileged-tool-transaction.yml",
+        ".github/workflows/tool-runtime-closure.yml",
+        ".github/workflows/provider-adapters-offline.yml"
       ],
       "evidence": [
         "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
         "github-actions-job:109064005732",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36462412958",
-        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "https://github.com/Apeloff1/Skeleton/commit/c54893c64047ecb2b6ac72086eff51b814ca257a",
+        "https://github.com/Apeloff1/Skeleton/commit/57ad4a7db7789e23e9adb0066da8d7df3b56a89b",
+        "https://github.com/Apeloff1/Skeleton/pull/2653",
+        "https://github.com/Apeloff1/Skeleton/pull/2688",
+        "skeleton/skills/tool_saga.py",
+        "skeleton/ai/runtime/skills/tool_saga.py",
+        "skeleton/testing/test_tool_saga.py",
+        "scripts/verify_tool_runtime_closure.py",
+        "tests/test_tool_runtime_independent_verifier.py",
+        ".github/workflows/tool-runtime-closure.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
       ],
       "risks": [
         "tool description prompt injection",
         "shell/path/network injection",
         "duplicate side effects"
       ],
-      "gaps": [
-        "normalize all connectors onto one invocation contract",
-        "complete compensation/saga integration"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-015",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -1236,7 +1254,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "evidence_pending",
       "requirements": [
         "Define agent identity, role, objective scope, authority, capability set, memory policy and resource limits.",
         "Require delegated authority to be a mechanical subset of parent authority.",
@@ -1259,32 +1277,47 @@
         "skeleton/ai/agents/core/delegation_qualification.py",
         "skeleton/agents/__init__.py",
         "skeleton/ai/agents/core/__init__.py",
-        ".github/workflows/p1-agent-delegation-qualification.yml"
+        ".github/workflows/p1-agent-delegation-qualification.yml",
+        "skeleton/automation/agents/agent_runtime.py",
+        "skeleton/ai/agents/core/agent_runtime.py",
+        "skeleton/agents/agent_runtime.py",
+        "scripts/verify_agent_runtime_closure.py",
+        ".github/workflows/agent-runtime-closure.yml"
       ],
       "tests": [
         "skeleton/testing/test_agent_delegation_qualification.py",
         "skeleton/testing/test_swarm_exact_lease_atomicity.py",
         "skeleton/testing/test_swarm_fencing.py",
-        "skeleton/testing/test_swarm_fencing_concurrency.py"
+        "skeleton/testing/test_swarm_fencing_concurrency.py",
+        "skeleton/testing/test_agent_runtime_durable.py",
+        "tests/test_agent_runtime_independent_verifier.py"
       ],
       "evaluations": [
-        ".github/workflows/p1-agent-delegation-qualification.yml"
+        ".github/workflows/p1-agent-delegation-qualification.yml",
+        ".github/workflows/agent-runtime-closure.yml"
       ],
       "evidence": [
         "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
         "github-actions-job:109064006805",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "https://github.com/Apeloff1/Skeleton/commit/663cefe36111f05a69563619712f85464a043d06",
+        "https://github.com/Apeloff1/Skeleton/pull/2687",
+        "skeleton/automation/agents/agent_runtime.py",
+        "skeleton/ai/agents/core/agent_runtime.py",
+        "skeleton/agents/agent_runtime.py",
+        "skeleton/testing/test_agent_runtime_durable.py",
+        "scripts/verify_agent_runtime_closure.py",
+        "tests/test_agent_runtime_independent_verifier.py",
+        ".github/workflows/agent-runtime-closure.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
       ],
       "risks": [
         "authority creep",
         "orphan agents",
         "role prompt confused with permission"
       ],
-      "gaps": [
-        "durable agent supervisor needs implementation",
-        "agent resource accounting needs convergence"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-016",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
@@ -1298,7 +1331,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "evidence_pending",
       "requirements": [
         "Coordinate multiple agents with explicit handoff packets, leases/fencing, conflict domains and bounded fan-out.",
         "Resolve disagreement by evidence/verification policy rather than majority text alone.",
@@ -1321,22 +1354,36 @@
         "skeleton/ai/agents/core/delegation_qualification.py",
         "skeleton/agents/__init__.py",
         "skeleton/ai/agents/core/__init__.py",
-        ".github/workflows/p1-agent-delegation-qualification.yml"
+        ".github/workflows/p1-agent-delegation-qualification.yml",
+        "skeleton/automation/swarm/multi_agent_orchestration.py",
+        "skeleton/ai/agents/swarm/multi_agent_orchestration.py",
+        "skeleton/swarm/multi_agent_orchestration.py",
+        ".github/workflows/p1-multi-agent-orchestration.yml"
       ],
       "tests": [
         "skeleton/testing/test_agent_delegation_qualification.py",
         "skeleton/testing/test_swarm_exact_lease_atomicity.py",
         "skeleton/testing/test_swarm_fencing.py",
-        "skeleton/testing/test_swarm_fencing_concurrency.py"
+        "skeleton/testing/test_swarm_fencing_concurrency.py",
+        "skeleton/testing/test_multi_agent_orchestration.py"
       ],
       "evaluations": [
-        ".github/workflows/p1-agent-delegation-qualification.yml"
+        ".github/workflows/p1-agent-delegation-qualification.yml",
+        ".github/workflows/p1-multi-agent-orchestration.yml"
       ],
       "evidence": [
         "git-head:57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
         "github-actions-job:109064006805",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36462413037",
-        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e"
+        "https://github.com/Apeloff1/Skeleton/commit/57b1819f4ed78abe5ff7fb86e8653d593e57e18e",
+        "https://github.com/Apeloff1/Skeleton/commit/4965ccf2857d40506673e860faccce6f15d9f241",
+        "https://github.com/Apeloff1/Skeleton/pull/2680",
+        "skeleton/automation/swarm/multi_agent_orchestration.py",
+        "skeleton/ai/agents/swarm/multi_agent_orchestration.py",
+        "skeleton/swarm/multi_agent_orchestration.py",
+        "skeleton/testing/test_multi_agent_orchestration.py",
+        ".github/workflows/p1-multi-agent-orchestration.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/176ba68996218a6b846143810bb9f7c8694c31f2"
       ],
       "risks": [
         "false consensus",
@@ -1344,10 +1391,7 @@
         "stale lease holder writes",
         "fan-out explosion"
       ],
-      "gaps": [
-        "formalize conflict-domain registry",
-        "implement bounded consensus/arbitration policies"
-      ],
+      "gaps": [],
       "accountability_id": "ACC-VOL-017",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
