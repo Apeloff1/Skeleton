@@ -1,0 +1,59 @@
+{
+  "schema_version": "skeleton.ai.hostile_p0_control_integrity.v1",
+  "contract_version": "1.0.0",
+  "status": "implementation",
+  "purpose": "Bind the G013-G016 hostile-P0 implementation tranche to canonical runtime surfaces, governed AI mirrors, focused regressions, and an exact-head gate without self-promoting closure.",
+  "authority": {
+    "hostile_gap_disposition": "machine/ai_hostile_gap_disposition.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "workflow": ".github/workflows/hostile-p0-control-integrity.yml",
+    "verifier": "scripts/verify_hostile_p0_control_integrity.py"
+  },
+  "closure_policy": {
+    "implementation_is_not_closure": true,
+    "required_before_disposition_promotion": [
+      "merged implementation",
+      "independent exact-head verifier evidence",
+      "explicit hostile-gap disposition update"
+    ],
+    "forbid_self_signing": true
+  },
+  "gap_bindings": [
+    {
+      "gap_id": "G013",
+      "title": "Control-plane / data-plane isolation",
+      "canonical_path": "skeleton/kernel/plane_isolation.py",
+      "ai_mirror_path": "skeleton/ai/runtime/kernel/plane_isolation.py",
+      "test_path": "skeleton/testing/test_plane_isolation.py"
+    },
+    {
+      "gap_id": "G014",
+      "title": "Configuration authority and immutable config snapshots",
+      "canonical_path": "skeleton/config/authority.py",
+      "ai_mirror_path": "skeleton/ai/runtime/config/authority.py",
+      "test_path": "skeleton/testing/test_configuration_authority.py"
+    },
+    {
+      "gap_id": "G015",
+      "title": "Non-idempotent side-effect compensation",
+      "canonical_path": "skeleton/skills/effect_compensation.py",
+      "ai_mirror_path": "skeleton/ai/runtime/skills/effect_compensation.py",
+      "test_path": "skeleton/testing/test_effect_compensation.py"
+    },
+    {
+      "gap_id": "G016",
+      "title": "Privacy deletion / tombstone propagation",
+      "canonical_path": "skeleton/persistence/deletion_tombstones.py",
+      "ai_mirror_path": "skeleton/ai/runtime/persistence/deletion_tombstones.py",
+      "test_path": "skeleton/testing/test_deletion_tombstones.py"
+    }
+  ],
+  "invariants": [
+    "Every bound gap exists exactly once in the canonical hostile-gap disposition ledger.",
+    "Gap titles match canonical hostile-gap authority exactly.",
+    "Every canonical runtime surface, governed AI mirror, and focused test exists.",
+    "Every canonical runtime surface is byte-identical to its governed AI mirror.",
+    "The tranche workflow and verifier exist at their declared authority paths.",
+    "This contract records implementation binding only and cannot mark a hostile gap verified_closed."
+  ]
+}

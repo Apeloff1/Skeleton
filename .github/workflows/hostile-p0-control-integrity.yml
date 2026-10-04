@@ -19,6 +19,9 @@ on:
       - "skeleton/testing/test_effect_compensation.py"
       - "skeleton/testing/test_deletion_tombstones.py"
       - ".github/workflows/hostile-p0-control-integrity.yml"
+      - "machine/hostile_p0_control_integrity.json"
+      - "scripts/verify_hostile_p0_control_integrity.py"
+      - "skeleton/testing/test_hostile_p0_control_integrity_contract.py"
   push:
     branches:
       - main
@@ -37,6 +40,9 @@ on:
       - "skeleton/testing/test_effect_compensation.py"
       - "skeleton/testing/test_deletion_tombstones.py"
       - ".github/workflows/hostile-p0-control-integrity.yml"
+      - "machine/hostile_p0_control_integrity.json"
+      - "scripts/verify_hostile_p0_control_integrity.py"
+      - "skeleton/testing/test_hostile_p0_control_integrity_contract.py"
   workflow_dispatch:
 
 permissions:
@@ -77,6 +83,10 @@ jobs:
           skeleton/ai/runtime/skills/effect_compensation.py
           skeleton/persistence/deletion_tombstones.py
           skeleton/ai/runtime/persistence/deletion_tombstones.py
+          scripts/verify_hostile_p0_control_integrity.py
+
+      - name: Verify masterplan binding
+        run: python scripts/verify_hostile_p0_control_integrity.py --repo-root . --json
 
       - name: Verify governed AI mirror parity
         shell: bash
@@ -94,3 +104,4 @@ jobs:
           skeleton.testing.test_configuration_authority
           skeleton.testing.test_effect_compensation
           skeleton.testing.test_deletion_tombstones
+          skeleton.testing.test_hostile_p0_control_integrity_contract
