@@ -54,6 +54,16 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "CREATE TABLE",
         "ALTER TABLE",
     ),
+    "skeleton/skills/tool_saga.py": (
+        "AsyncToolSagaRuntime",
+        "SQLiteToolSagaStore",
+        "ToolSagaInDoubt",
+        "ToolIdempotencyMode.COMPENSATABLE",
+        "ToolEffect.IRREVERSIBLE",
+        "recover_orphaned",
+        "owner_token",
+        "receipt_store",
+    ),
     "skeleton/skills/tool_adapters/owners.py": (
         "AsyncSandboxCompileAdapter",
         "AsyncDatabaseQueryAdapter",
@@ -112,6 +122,10 @@ MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
     (
         "skeleton/skills/tool_receipt_store.py",
         "skeleton/ai/runtime/skills/tool_receipt_store.py",
+    ),
+    (
+        "skeleton/skills/tool_saga.py",
+        "skeleton/ai/runtime/skills/tool_saga.py",
     ),
     (
         "skeleton/skills/tool_adapters/owners.py",
