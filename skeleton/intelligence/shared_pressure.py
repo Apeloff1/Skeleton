@@ -423,6 +423,11 @@ class SqliteSharedPressureLedger:
             lease = self._lease(row)
             if lease.owner_id != owner:
                 raise SharedPressureConflict("pressure lease owner mismatch")
+            # Expiry is a hard fencing boundary. A stale worker must never be
+            # able to resurrect authority after its durable lease elapsed,
+            # even if no other reader has reaped the expired row yet.
+            if timestamp >= lease.expires_at:
+                raise SharedPressureConflict("pressure lease expired")
             policy = self._policy(self._policy_row(conn, lease.scope))
             duration = policy.default_lease_seconds if lease_seconds is None else float(lease_seconds)
             if not math.isfinite(duration) or duration <= 0:

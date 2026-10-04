@@ -19,6 +19,7 @@ from skeleton.intelligence.admission import (
 )
 from skeleton.intelligence.quota import TenantQuota
 from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
     SharedPressurePolicy,
     SqliteSharedPressureLedger,
 )
@@ -406,6 +407,81 @@ def test_tampered_shared_pressure_owner_is_rejected(
     assert restarted.runtime.quota_ledger.snapshot("tenant-a")[
         "active_reservations"
     ] == 1
+
+
+def test_expired_shared_pressure_lease_cannot_be_renewed(
+    tmp_path,
+) -> None:
+    pressure = _configure_pressure(tmp_path / "pressure.sqlite3")
+    lease = pressure.acquire(
+        _SCOPE,
+        "tenant-a",
+        "op-renew-expired",
+        _OWNER,
+        priority=20,
+        lease_seconds=5.0,
+        now=10.0,
+    )
+
+    with pytest.raises(
+        SharedPressureConflict,
+        match="pressure lease expired",
+    ):
+        pressure.renew(
+            lease.lease_id,
+            lease.owner_id,
+            lease_seconds=30.0,
+            now=15.0,
+        )
+
+    # The failed renewal cannot move the durable expiry boundary.
+    assert (
+        pressure.lease_for_operation(
+            _SCOPE,
+            lease.operation_id,
+            now=15.0,
+        )
+        is None
+    )
+    assert pressure.snapshot(
+        _SCOPE,
+        tenant_id="tenant-a",
+        now=15.0,
+    ).active == 0
+
+
+def test_live_shared_pressure_lease_can_renew_before_expiry(
+    tmp_path,
+) -> None:
+    pressure = _configure_pressure(tmp_path / "pressure.sqlite3")
+    lease = pressure.acquire(
+        _SCOPE,
+        "tenant-a",
+        "op-renew-live",
+        _OWNER,
+        priority=20,
+        lease_seconds=5.0,
+        now=10.0,
+    )
+
+    renewed = pressure.renew(
+        lease.lease_id,
+        lease.owner_id,
+        lease_seconds=30.0,
+        now=14.999,
+    )
+
+    assert renewed.lease_id == lease.lease_id
+    assert renewed.acquired_at == lease.acquired_at
+    assert renewed.expires_at == pytest.approx(44.999)
+    assert (
+        pressure.lease_for_operation(
+            _SCOPE,
+            lease.operation_id,
+            now=15.0,
+        )
+        == renewed
+    )
 
 
 def test_live_shared_pressure_lookup_reaps_expired_lease(tmp_path) -> None:
