@@ -99,6 +99,36 @@ def test_swarm_checkpoint_composes_with_outer_step_replay_boundary(tmp_path):
     assert [step.step_id for step in loaded.resume.replay_steps] == ["outer-step-2"]
 
 
+def test_failed_durable_commit_preserves_evicted_bounded_history(
+    tmp_path, monkeypatch
+):
+    _store, bridge = make_bridge(tmp_path)
+    manager = SwarmRecoveryManager(max_checkpoints=2)
+    runtime = SwarmRuntime()
+
+    runtime.submit(SwarmTask("task-1", {"wave": 1}))
+    bridge.capture("run-1", "outer-worker", manager, runtime)
+    runtime.submit(SwarmTask("task-2", {"wave": 2}))
+    bridge.capture("run-1", "outer-worker", manager, runtime)
+    before = manager.store.sequences()
+
+    runtime.submit(SwarmTask("task-3", {"wave": 3}))
+
+    def fail_persist(*args, **kwargs):
+        raise RuntimeError("simulated durable write failure")
+
+    monkeypatch.setattr(bridge, "persist", fail_persist)
+
+    with pytest.raises(RuntimeError, match="durable write failure"):
+        bridge.capture("run-1", "outer-worker", manager, runtime)
+
+    assert before == (1, 2)
+    assert manager.store.sequences() == before
+    assert manager.store.get(1) is not None
+    assert manager.store.get(2) is not None
+    assert manager.store.get(3) is None
+
+
 def test_failed_durable_commit_rolls_back_new_swarm_checkpoint(tmp_path):
     store, bridge = make_bridge(tmp_path, max_payload_bytes=64)
     manager = SwarmRecoveryManager()
