@@ -16,7 +16,7 @@
     "p0": 26,
     "p1": 164,
     "p2": 10,
-    "implementation_pr_open": 13,
+    "implementation_pr_open": 14,
     "verified_closed": 0
   },
   "gaps": [
@@ -175,8 +175,10 @@
       "id": "G016",
       "severity": "P0",
       "title": "Privacy deletion / tombstone propagation",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2732"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
