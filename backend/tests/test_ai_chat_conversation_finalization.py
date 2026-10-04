@@ -70,12 +70,15 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
     thread, user_message = _thread_and_user_message()
     commit_calls = []
     captured_commands = []
+    transcript_reads = 0
 
     async def append_user_message(*_args, **_kwargs):
         return thread, user_message
 
     async def active_transcript(*_args, **_kwargs):
-        return (user_message,)
+        nonlocal transcript_reads
+        transcript_reads += 1
+        return () if transcript_reads == 1 else (user_message,)
 
     async def commit_assistant_message(thread_id, **kwargs):
         commit_calls.append({"thread_id": thread_id, **kwargs})
@@ -168,12 +171,15 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
 
     thread, user_message = _thread_and_user_message()
     commit_calls = []
+    transcript_reads = 0
 
     async def append_user_message(*_args, **_kwargs):
         return thread, user_message
 
     async def active_transcript(*_args, **_kwargs):
-        return (user_message,)
+        nonlocal transcript_reads
+        transcript_reads += 1
+        return () if transcript_reads == 1 else (user_message,)
 
     async def forbidden_commit(*args, **kwargs):
         commit_calls.append((args, kwargs))
@@ -218,6 +224,9 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
     thread, user_message = _thread_and_user_message()
     captured_commands = []
     commit_attempts = 0
+    transcript_reads = 0
+    terminal_result = None
+    terminal_waits = []
 
     async def append_user_message(*_args, **_kwargs):
         # Models repository idempotent replay of the already-committed user
@@ -225,7 +234,9 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         return thread, user_message
 
     async def active_transcript(*_args, **_kwargs):
-        return (user_message,)
+        nonlocal transcript_reads
+        transcript_reads += 1
+        return () if transcript_reads == 1 else (user_message,)
 
     async def commit_assistant_message(thread_id, **kwargs):
         nonlocal commit_attempts
@@ -281,8 +292,9 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
     )
 
     async def execute(command):
+        nonlocal terminal_result
         captured_commands.append(command)
-        return SimpleNamespace(
+        terminal_result = SimpleNamespace(
             final_output="Verified terminal answer.",
             execution_id=command.execution_request.execution_id,
             verification="verification:terminal",
@@ -291,8 +303,15 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
             memory_refs=(),
             artifact_refs=(),
         )
+        return terminal_result
+
+    async def wait_for_terminal(**kwargs):
+        terminal_waits.append(kwargs)
+        assert terminal_result is not None
+        return terminal_result
 
     fake_client.execute = execute
+    fake_client.wait_for_terminal = wait_for_terminal
     monkeypatch.setattr(route, "conversation_authority", fake_authority)
     monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
 
@@ -316,25 +335,16 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
     assert response["success"] is True
     assert response["response"] == "Verified terminal answer."
     assert commit_attempts == 2
-    assert len(captured_commands) == 2
+    assert len(captured_commands) == 1
+    assert len(terminal_waits) == 1
 
-    first, second = captured_commands
-    assert first.operation.operation_id == second.operation.operation_id
-    assert (
+    first = captured_commands[0]
+    assert terminal_waits[0]["execution_id"] == (
         first.execution_request.execution_id
-        == second.execution_request.execution_id
     )
-    assert first.compiled_context.context_digest == (
-        second.compiled_context.context_digest
-    )
-    assert first.compiled_context.handoff_digest == (
-        second.compiled_context.handoff_digest
-    )
-    assert first.submission_digest == second.submission_digest
     assert first.resource_budget["max_elapsed_seconds"] == 30.0
-    assert second.resource_budget["max_elapsed_seconds"] == 30.0
     assert response["ai_result_id"] == (
-        "engine-result:" + second.execution_request.execution_id
+        "engine-result:" + first.execution_request.execution_id
     )
 
 
