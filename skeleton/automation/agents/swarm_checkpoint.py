@@ -73,7 +73,7 @@ class CheckpointStore:
             raise ValueError("checkpoint checksum mismatch")
         return Checkpoint(checkpoint.sequence, created_at, checkpoint.checksum, state)
 
-    def capture(self, runtime: SwarmRuntime) -> Checkpoint:
+    def capture(self, runtime: SwarmRuntime, *, provisional: bool = False) -> Checkpoint:
         state = normalize_snapshot(runtime.export_state())
         created_at = self._clock()
         if isinstance(created_at, bool) or not isinstance(created_at, (int, float)) or not isfinite(float(created_at)) or float(created_at) < 0:
@@ -92,7 +92,7 @@ class CheckpointStore:
                 else None
             )
             self._items.append(checkpoint)
-            if evicted is not None:
+            if provisional and evicted is not None:
                 self._rollback_evicted[checkpoint.sequence] = evicted
             return self._clone(checkpoint)
 
