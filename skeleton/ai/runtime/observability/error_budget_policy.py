@@ -10,7 +10,7 @@ from decimal import Decimal, ROUND_FLOOR
 import hashlib
 import json
 
-from skeleton.ai.runtime.observability.slo import SLI, SLO, assess_slo
+from skeleton.observability.slo import SLI, SLO, assess_slo
 
 
 _PPM = 1_000_000
