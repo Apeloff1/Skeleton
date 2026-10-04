@@ -19,12 +19,7 @@ from scripts.build_p1_bulk_volume_obligation_evidence import (
     BulkVolumeEvidenceError,
     build_bulk_volume_evidence,
 )
-from scripts.reconcile_p1_risk_evidence import (
-    MASTER,
-    REGISTRY,
-    RETIRED_OBLIGATION_IDS,
-    ROOT,
-)
+from scripts.reconcile_p1_risk_evidence import MASTER, REGISTRY, ROOT
 
 TEST_HEAD = "a" * 40
 
@@ -41,8 +36,6 @@ def test_bulk_volume_inventory_covers_the_full_primary_frontier() -> None:
     assert report["covered_obligation_count"] == EXPECTED_VOLUME_OBLIGATIONS == 489
     assert report["covered_risk_count"] == EXPECTED_VOLUME_RISKS == 281
     assert report["covered_gap_count"] == EXPECTED_VOLUME_GAPS == 208
-    assert report["live_obligation_count"] == 487
-    assert report["retired_obligation_count"] == 2
     assert report["already_bound_count"] == EXPECTED_EXISTING_BINDINGS == 489
     assert report["candidate_binding_count"] == EXPECTED_CANDIDATES == 0
     assert report["candidate_risk_count"] == EXPECTED_CANDIDATE_RISKS == 0
@@ -118,11 +111,7 @@ def test_bulk_records_remain_bound_to_canonical_source_statements() -> None:
     for record in report["records"]:
         volume = by_key[record["volume_key"]]
         source = volume["risks"] if record["kind"] == "risk" else volume["gaps"]
-        if record["retired"]:
-            assert record["obligation_id"] in RETIRED_OBLIGATION_IDS
-            assert record["statement"] not in source
-        else:
-            assert record["statement"] in source
+        assert record["statement"] in source
         assert record["owner_id"] == "ACC-" + record["volume_key"]
         assert len(record["obligation_digest"]) == 64
 
