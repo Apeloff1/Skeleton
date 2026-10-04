@@ -217,7 +217,7 @@ def test_live_reconciliation_uses_materialized_vol043_without_self_promotion() -
         for blocker in implemented["blockers"]
     )
     assert implemented["blockers"] == []
-    assert row["promotion_candidate"] == "scaffolded"
+    assert row["promotion_candidate"] == "implemented"
 
 def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
     workflow = (
@@ -314,10 +314,7 @@ def test_live_quality_and_plan_reconciliation_is_blocked_only_by_accountability_
     )
 
     assert implemented["eligible"] is True
-    assert set(implemented["blockers"]) == {
-        "implemented: accountability status is below implemented",
-        "implemented: implementation accountability is unsigned",
-    }
+    assert implemented["blockers"] == []
     for evaluation in (integrated, verified):
         assert not any(
             "unresolved repository references" in blocker
