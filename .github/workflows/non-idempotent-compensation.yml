@@ -71,9 +71,8 @@ jobs:
       - name: Verify canonical G015 compensation contract
         run: python scripts/verify_non_idempotent_compensation_contract.py --json
       - name: Run durable saga regressions
-        env:
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "0"
         run: >-
+          env -u PYTEST_DISABLE_PLUGIN_AUTOLOAD
           python -m pytest -q --noconftest
           skeleton/testing/test_tool_saga.py
           skeleton/testing/test_distributed_transactions.py
