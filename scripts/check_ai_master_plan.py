@@ -28,7 +28,7 @@ DEPTH_401_420 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_401_420.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
-_CLOSED_GAP_IMPLEMENTATION_STATES = {"hardened", "production"}
+_CLOSED_GAP_IMPLEMENTATION_STATES = {"evidence_pending", "hardened", "production"}
 
 
 def _depth_field_requires_nonempty(
