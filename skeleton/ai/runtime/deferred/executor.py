@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 import threading
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
 
 from .contracts import (
     Budget,
@@ -274,15 +274,25 @@ class DeferredExecutionPendingError(RuntimeError):
         self.record_digest = _sha256(record_digest, "record_digest")
 
 
+class DeferredEffectAuthority(Protocol):
+    """Live authority required immediately before an external handler effect."""
+
+    def require_effect_authority(self, operation_id: str) -> Any:
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class _Handler:
     identity: str
     fn: Callable[[Mapping[str, Any]], Any]
+    requires_effect_authority: bool = False
 
     def __post_init__(self) -> None:
         _text(self.identity, "handler identity")
         if not callable(self.fn):
             raise TypeError("handler must be callable")
+        if not isinstance(self.requires_effect_authority, bool):
+            raise TypeError("requires_effect_authority must be bool")
 
 
 class DeferredExecutor:
@@ -293,11 +303,22 @@ class DeferredExecutor:
         registry: CapabilityRegistry,
         *,
         journal: DeferredExecutionJournal | None = None,
+        effect_authority: DeferredEffectAuthority | None = None,
     ) -> None:
         if not isinstance(registry, CapabilityRegistry):
             raise TypeError("registry must be CapabilityRegistry")
+        if (
+            effect_authority is not None
+            and not callable(
+                getattr(effect_authority, "require_effect_authority", None)
+            )
+        ):
+            raise TypeError(
+                "effect_authority must expose require_effect_authority(operation_id)"
+            )
         self.registry = registry
         self.journal = journal
+        self.effect_authority = effect_authority
         self._handlers: dict[str, _Handler] = {}
         self._budgets: dict[str, Budget] = {}
         self._payload_limits: dict[str, int] = {}
@@ -315,6 +336,7 @@ class DeferredExecutor:
         handler: Callable[[Mapping[str, Any]], Any],
         *,
         handler_identity: str,
+        requires_effect_authority: bool = False,
     ) -> None:
         record = self.registry.get(volume_id)
         identity = _text(handler_identity, "handler_identity")
@@ -322,11 +344,20 @@ class DeferredExecutor:
             raise ValueError(
                 "handler identity must match canonical capability handler"
             )
-        candidate = _Handler(identity=identity, fn=handler)
+        candidate = _Handler(
+            identity=identity,
+            fn=handler,
+            requires_effect_authority=requires_effect_authority,
+        )
         with self._lock:
             prior = self._handlers.get(volume_id)
             if prior is not None:
-                if prior.identity != candidate.identity or prior.fn is not handler:
+                if (
+                    prior.identity != candidate.identity
+                    or prior.fn is not handler
+                    or prior.requires_effect_authority
+                    != candidate.requires_effect_authority
+                ):
                     raise ValueError("volume handler is already registered")
                 return
             self._handlers[volume_id] = candidate
@@ -438,6 +469,13 @@ class DeferredExecutor:
             raise PermissionError("no host-registered handler")
         if handler.identity != record.spec.handler:
             raise PermissionError("registered handler identity drift")
+        if (
+            handler.requires_effect_authority
+            and self.effect_authority is None
+        ):
+            raise PermissionError(
+                "live effect authority is required for this handler"
+            )
 
         budget = self._budgets.get(invocation.volume_id)
         if budget is None:
@@ -469,6 +507,22 @@ class DeferredExecutor:
         )
         isolated = json.loads(payload_json)
         return handler, ledger, isolated
+
+    def _require_live_effect_authority(
+        self,
+        invocation: DeferredInvocation,
+        handler: _Handler,
+    ) -> None:
+        """Revalidate capability + resource authority at the last safe point."""
+        self._assert_current_authority(invocation)
+        if not handler.requires_effect_authority:
+            return
+        authority = self.effect_authority
+        if authority is None:
+            raise PermissionError(
+                "live effect authority is required for this handler"
+            )
+        authority.require_effect_authority(invocation.operation_id)
 
     def _journal_invocation(
         self,
@@ -782,6 +836,11 @@ class DeferredExecutor:
             self._in_flight.add(invocation.operation_id)
 
         try:
+            # This is the final pre-effect fence. The durable start already
+            # exists, so a process loss after this point cannot cause a blind
+            # replay; capability and resource authority are rechecked as close
+            # to dispatch as possible.
+            self._require_live_effect_authority(invocation, handler)
             result = handler.fn(isolated)
             result_json = _strict_json(result)
             result_bytes = result_json.encode("utf-8")
