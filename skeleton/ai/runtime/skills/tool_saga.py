@@ -346,7 +346,7 @@ class SQLiteToolSagaStore:
 
     @staticmethod
     def _snapshot(row: sqlite3.Row) -> ToolSagaReceipt:
-        def ids(field: str) -> tuple[str, ...]:
+        def strings(field: str) -> tuple[str, ...]:
             value = json.loads(row[field])
             if not isinstance(value, list) or any(
                 not isinstance(item, str) for item in value
@@ -362,9 +362,9 @@ class SQLiteToolSagaStore:
             status=ToolSagaStatus(row["state"]),
             next_forward=int(row["next_forward"]),
             next_compensation=int(row["next_compensation"]),
-            forward_receipt_ids=ids("forward_receipts_json"),
-            compensation_receipt_ids=ids("compensation_receipts_json"),
-            compensation_failures=ids("compensation_failures_json"),
+            forward_receipt_ids=strings("forward_receipts_json"),
+            compensation_receipt_ids=strings("compensation_receipts_json"),
+            compensation_failures=strings("compensation_failures_json"),
             failed_step_index=(
                 None
                 if row["failed_step_index"] is None
@@ -787,6 +787,18 @@ class AsyncToolSagaRuntime:
                 compensation_manifest.input_schema,
                 step.compensation.arguments,
             )
+            if compensation_manifest.effect is ToolEffect.IRREVERSIBLE:
+                raise ToolSagaDenied(
+                    f"step {index} compensation tool cannot be irreversible"
+                )
+            if compensation_manifest.side_effect_class not in {
+                ToolSideEffectClass.NONE,
+                ToolSideEffectClass.LOCAL_REVERSIBLE,
+                ToolSideEffectClass.EXTERNAL_REVERSIBLE,
+            }:
+                raise ToolSagaDenied(
+                    f"step {index} compensation side-effect class is unsafe"
+                )
             if not _approval_is_bound(
                 compensation_manifest,
                 step.compensation,
