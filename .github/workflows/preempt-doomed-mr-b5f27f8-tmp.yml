@@ -1,0 +1,21 @@
+name: Preempt doomed Merge Readiness b5f27f8
+
+on:
+  push:
+    branches:
+      - "ci/preempt-doomed-main-mr-20261004-2"
+    paths:
+      - ".github/workflows/preempt-doomed-mr-b5f27f8-tmp.yml"
+
+permissions: {}
+
+concurrency:
+  group: merge-readiness-b5f27f80815ddf00e5ef2cc93049ea790d788708
+  cancel-in-progress: true
+
+jobs:
+  preempt:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preempted
