@@ -128,19 +128,26 @@ class SwarmRecoveryManager:
     ) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
         with self._lock:
-            checkpoint = self.store.capture(runtime, provisional=provisional)
+            paired = tenant_broker is not None
+            staged = provisional or paired
+            checkpoint = self.store.capture(runtime, provisional=staged)
             if tenant_broker is None:
+                if not provisional:
+                    self.store.commit(checkpoint.sequence)
                 return checkpoint.sequence
             try:
                 self.tenant_store.capture(
                     checkpoint.sequence,
                     tenant_broker,
-                    provisional=provisional,
+                    provisional=True,
                 )
             except Exception:
                 self.store.discard(checkpoint.sequence)
                 self.tenant_store.discard(checkpoint.sequence)
                 raise
+            if not provisional:
+                self.store.commit(checkpoint.sequence)
+                self.tenant_store.commit(checkpoint.sequence)
             return checkpoint.sequence
 
     def export_archive(self) -> dict[str, object]:
