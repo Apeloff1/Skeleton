@@ -522,7 +522,7 @@ def build_control_plane_gap_evidence(
                 path: list(markers)
                 for path, markers in sorted(spec["markers"].items())
             },
-            "binding_present": obligation.obligation_id in bound_ids,
+            "binding_present": obligation_id in bound_ids,
             "non_authoritative": True,
             "creates_binding": False,
             "clears_masterplan_gap": False,
@@ -533,7 +533,7 @@ def build_control_plane_gap_evidence(
         packet["candidate_evidence_ref"] = {
             "source": (
                 f"p1:control-plane-gap-batch2:"
-                f"{obligation.obligation_id}:{expected_head}"
+                f"{obligation_id}:{expected_head}"
             ),
             "digest": packet["packet_digest"],
             "category": CATEGORY,
