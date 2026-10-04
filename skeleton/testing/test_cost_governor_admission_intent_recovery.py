@@ -832,3 +832,48 @@ def test_pressure_loss_cannot_abandon_quota_after_metered_usage(
     assert snapshot["active_reservations"] == 1
     assert snapshot["usage_events"] == 1
     assert _intent_count(quota_path) == 1
+
+def test_undecided_admission_intent_is_immutable_across_racing_writers(
+    tmp_path,
+) -> None:
+    quota_path = tmp_path / "quota.sqlite3"
+    governor = _governor(quota_path)
+    assert governor._journal is not None
+
+    original = _request("op-intent-race")
+    changed = _request(
+        original.operation_id,
+        cost_usd=0.6,
+    )
+    original_intent = governor._admission_intent(
+        requested=original,
+        selected=original,
+        fallback=None,
+        fallback_reason=None,
+    )
+    changed_intent = governor._admission_intent(
+        requested=changed,
+        selected=changed,
+        fallback=None,
+        fallback_reason=None,
+    )
+
+    first = governor._journal.begin_admission_intent(original_intent)
+    assert first == original_intent
+    assert (
+        governor._journal.begin_admission_intent(original_intent)
+        == original_intent
+    )
+
+    with pytest.raises(
+        CostGovernorConflict,
+        match="admission intent replayed with different inputs",
+    ):
+        governor._journal.begin_admission_intent(changed_intent)
+
+    assert (
+        governor._journal.load_admission_intent(original.operation_id)
+        == original_intent
+    )
+    assert _intent_count(quota_path) == 1
+
