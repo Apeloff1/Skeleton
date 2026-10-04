@@ -16843,9 +16843,9 @@
       "id": "ACC-VOL-248",
       "type": "volume",
       "title": "VOL-248 Uncertainty Representation",
-      "status": "evidence_pending",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "hardened",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-10-04T01:05:31Z",
       "implementation_signoff": {
@@ -16868,20 +16868,33 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:P1 Reasoning Search Stop Policy Gate",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-10-04T04:16:00Z",
+        "git_sha": "31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+        "evidence_refs": [
+          "git-head:31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+          "github-actions-job:111334677962",
+          "github-actions-job:111334676216",
+          "github-actions-job:111334676231",
+          "github-actions-job:111334676388",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37167919351",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37167919282",
+          "https://github.com/Apeloff1/Skeleton/actions/runs/37167919357",
+          ".github/workflows/p1-reasoning-search-stop-policy.yml",
+          "skeleton/testing/test_reasoning_strategy_registry.py",
+          "https://github.com/Apeloff1/Skeleton/commit/69f2f2916e4ae3d06ae5b9c818322f56b6541841"
+        ],
+        "statement": "Independent exact-head P1 reasoning, evidence-identity, required-gate-authority, and reproducibility gates all passed on the same VOL-248 evidence head, validating uncertainty semantics, parity, evidence identity, gate authority, and deterministic replay.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-10-04T03:47:46Z",
+      "completed_at_utc": "2026-10-04T04:16:01Z",
+      "last_event_at_utc": "2026-10-04T04:16:01Z",
       "history": [
         {
           "sequence": 1,
@@ -16949,6 +16962,64 @@
             "https://github.com/Apeloff1/Skeleton/commit/69f2f2916e4ae3d06ae5b9c818322f56b6541841",
             "https://github.com/Apeloff1/Skeleton/pull/2679"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:P1 Reasoning Search Stop Policy Gate",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-10-04T04:16:00Z",
+          "git_sha": "31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+          "statement": "Independent exact-head P1 reasoning, evidence-identity, required-gate-authority, and reproducibility gates all passed on the same VOL-248 evidence head.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250",
+          "from_status": "evidence_pending",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "git-head:31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+            "github-actions-job:111334677962",
+            "github-actions-job:111334676216",
+            "github-actions-job:111334676231",
+            "github-actions-job:111334676388",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919351",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919282",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919357",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml",
+            "skeleton/testing/test_reasoning_strategy_registry.py",
+            "https://github.com/Apeloff1/Skeleton/commit/69f2f2916e4ae3d06ae5b9c818322f56b6541841"
+          ]
+        },
+        {
+          "sequence": 5,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "completion-steward",
+          "at_utc": "2026-10-04T04:16:01Z",
+          "git_sha": "30b49c289ccdec43bda819ccddba0a5909139b2c",
+          "statement": "Close VOL-248 after implementation signoff, zero remaining gaps, successful independent exact-head verification, evidence identity/authority validation, and reproducible replay evidence.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/30b49c289ccdec43bda819ccddba0a5909139b2c",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "machine/ai_p1_terminal_closure.json",
+            "https://github.com/Apeloff1/Skeleton/commit/30b49c289ccdec43bda819ccddba0a5909139b2c",
+            "git-head:31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+            "github-actions-job:111334677962",
+            "github-actions-job:111334676216",
+            "github-actions-job:111334676231",
+            "github-actions-job:111334676388",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919351",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919282",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/37167919357",
+            ".github/workflows/p1-reasoning-search-stop-policy.yml",
+            "skeleton/testing/test_reasoning_strategy_registry.py",
+            "https://github.com/Apeloff1/Skeleton/commit/69f2f2916e4ae3d06ae5b9c818322f56b6541841"
+          ]
         }
       ],
       "evidence": [
@@ -16969,7 +17040,9 @@
         "https://github.com/Apeloff1/Skeleton/pull/2679",
         "skeleton/ai/runtime/intelligence/uncertainty.py",
         "skeleton/intelligence/uncertainty.py",
-        "skeleton/testing/test_reasoning_strategy_registry.py"
+        "skeleton/testing/test_reasoning_strategy_registry.py",
+        "machine/ai_p1_terminal_closure.json",
+        "https://github.com/Apeloff1/Skeleton/commit/30b49c289ccdec43bda819ccddba0a5909139b2c"
       ],
       "baseline_status": "unverified"
     },
