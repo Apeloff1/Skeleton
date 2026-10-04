@@ -5255,7 +5255,7 @@
       "volume_ref": "VOL-082",
       "title": "Benchmark Lab",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-081-120"
     },
     {
@@ -5264,7 +5264,7 @@
       "volume_ref": "VOL-083",
       "title": "Red Team",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-081-120"
     },
     {
@@ -5273,7 +5273,7 @@
       "volume_ref": "VOL-084",
       "title": "Human Control",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-081-120"
     },
     {
