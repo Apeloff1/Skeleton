@@ -13417,7 +13417,10 @@
         "false precision",
         "uncertainty dropped in summaries"
       ],
-      "gaps": [],
+      "gaps": [
+        "define uncertainty taxonomy",
+        "bind UI/explanations"
+      ],
       "accountability_id": "ACC-VOL-248",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
