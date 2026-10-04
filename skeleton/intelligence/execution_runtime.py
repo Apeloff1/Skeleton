@@ -1203,8 +1203,7 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        cooperative_cancellation = True
-        provider_supports_cooperative_cancellation = bool(
+        cooperative_cancellation = bool(
             getattr(
                 self.provider,
                 "supports_cooperative_cancellation",
@@ -1291,7 +1290,7 @@ class CognitiveExecutionRuntime:
                             execution.execution_id
                         )
                         if durable_poll.cancellation_requested:
-                            if provider_supports_cooperative_cancellation:
+                            if cooperative_cancellation:
                                 # Cooperative providers have an explicit
                                 # cancellation bridge (for example the local
                                 # inference thread event). Signal it immediately
