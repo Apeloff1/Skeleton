@@ -150,7 +150,7 @@ def test_tenant_checkpoint_discard_restores_provisionally_evicted_history() -> N
     store = TenantCheckpointStore(max_checkpoints=2)
     store.capture(1, broker)
     store.capture(2, broker)
-    third = store.capture(3, broker)
+    third = store.capture(3, broker, provisional=True)
 
     assert store.sequences() == (2, 3)
     assert store.discard(third.sequence) is True
@@ -163,7 +163,7 @@ def test_tenant_checkpoint_commit_finalizes_bounded_eviction() -> None:
     store = TenantCheckpointStore(max_checkpoints=2)
     store.capture(1, broker)
     store.capture(2, broker)
-    third = store.capture(3, broker)
+    third = store.capture(3, broker, provisional=True)
 
     store.commit(third.sequence)
     assert store.discard(third.sequence) is True
