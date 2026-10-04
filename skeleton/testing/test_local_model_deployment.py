@@ -210,7 +210,7 @@ def test_deployment_rejects_model_symlink(tmp_path: Path) -> None:
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload["model_path"] = "models/linked.gguf"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(LocalModelDeploymentError, match="model_path symlink is forbidden"):
+    with pytest.raises(LocalModelDeploymentError, match="model_path symlinked path component is forbidden"):
         LocalModelDeployment.load(manifest)
 
 
