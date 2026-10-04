@@ -2868,12 +2868,15 @@ class EngineExecutionService:
             )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
-            # Cancellation is a terminal safety control over an execution
-            # already admitted under delegated authority. The verified service
-            # grant and actor/tenant ownership above remain authoritative even
-            # if the short-lived delegation expires while a provider is
-            # blocked; requiring lease freshness here can make an admitted
-            # execution impossible to stop.
+            # First cancellation mutates durable state and therefore requires
+            # a live delegated cancel lease. A later retry of an already
+            # accepted cancellation is only an idempotent acknowledgement.
+            self._validate(
+                stored.command,
+                verified_service_principal=verified_service_principal,
+                required_scope="engine:cancel",
+                now=now,
+            )
             self.repository.request_cancel(
                 execution_id,
                 expected_version=current.version,
