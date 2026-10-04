@@ -1,0 +1,120 @@
+name: Temporary stale merge-readiness rescue
+
+on:
+  push:
+    branches:
+      - "chore/retro-sign-p1-terminal-20261004"
+    paths:
+      - ".github/workflows/retro-sign-queue-rescue-tmp.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: retro-sign-queue-rescue
+  cancel-in-progress: false
+
+jobs:
+  rescue:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Reclaim only provably obsolete merge-readiness capacity
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $headers = @{
+            "Accept" = "application/vnd.github+json"
+            "Authorization" = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "User-Agent" = "skeleton-retro-sign-queue-rescue"
+          }
+          $api = "https://api.github.com"
+          function Get-Gh([string]$path) {
+            Invoke-RestMethod -Method Get -Uri ($api + $path) -Headers $headers
+          }
+          function Post-Gh([string]$path) {
+            try {
+              Invoke-WebRequest -Method Post -Uri ($api + $path) -Headers $headers -UseBasicParsing | Out-Null
+              return 202
+            } catch {
+              $status = [int]$_.Exception.Response.StatusCode
+              if ($status -in 409,422) {
+                try {
+                  Invoke-WebRequest -Method Post -Uri ($api + ($path -replace "/cancel$","/force-cancel")) -Headers $headers -UseBasicParsing | Out-Null
+                  return 202
+                } catch {
+                  return [int]$_.Exception.Response.StatusCode
+                }
+              }
+              return $status
+            }
+          }
+
+          $main = Get-Gh "/repos/$env:REPO/branches/main"
+          $mainSha = [string]$main.commit.sha
+          if (-not $mainSha) { throw "cannot resolve current main" }
+
+          $headRuns = Get-Gh "/repos/$env:REPO/actions/runs?head_sha=$mainSha&per_page=100"
+          $replacement = @($headRuns.workflow_runs | Where-Object {
+            $_.name -eq "Merge Readiness" -and $_.head_branch -eq "main"
+          })
+          if ($replacement.Count -lt 1) {
+            throw "no current-main Merge Readiness replacement; fail closed"
+          }
+
+          $requiredJobs = @(
+            "Quarantine Policy",
+            "Unit",
+            "Integration Smoke",
+            "Lint Type Security",
+            "PR Automation Tests"
+          )
+          $badConclusions = @("failure","cancelled","timed_out","action_required","startup_failure")
+          $targets = @()
+
+          foreach ($status in @("queued","in_progress","pending")) {
+            $page = Get-Gh "/repos/$env:REPO/actions/runs?status=$status&per_page=100"
+            foreach ($run in @($page.workflow_runs)) {
+              if (
+                $run.name -ne "Merge Readiness" -or
+                $run.head_branch -ne "main" -or
+                [string]$run.head_sha -eq $mainSha
+              ) { continue }
+
+              if ($status -in @("queued","pending")) {
+                $targets += [pscustomobject]@{
+                  id = [int64]$run.id
+                  reason = "obsolete-unstarted-main"
+                  sha = [string]$run.head_sha
+                }
+                continue
+              }
+
+              $jobs = Get-Gh "/repos/$env:REPO/actions/runs/$($run.id)/jobs?per_page=100"
+              $terminalFailure = @($jobs.jobs | Where-Object {
+                $_.name -in $requiredJobs -and $_.conclusion -in $badConclusions
+              })
+              if ($terminalFailure.Count -gt 0) {
+                $targets += [pscustomobject]@{
+                  id = [int64]$run.id
+                  reason = "obsolete-main-already-failed"
+                  sha = [string]$run.head_sha
+                }
+              }
+            }
+          }
+
+          $targets = @($targets | Sort-Object id -Unique)
+          "current_main=$mainSha replacement_count=$($replacement.Count) target_count=$($targets.Count)"
+          $failed = 0
+          foreach ($target in $targets) {
+            $status = Post-Gh "/repos/$env:REPO/actions/runs/$($target.id)/cancel"
+            "cancel id=$($target.id) sha=$($target.sha) reason=$($target.reason) http=$status"
+            if ($status -notin 200,202,404,409,422) { $failed += 1 }
+          }
+          if ($failed -gt 0) { throw "$failed cancellation request(s) failed" }
