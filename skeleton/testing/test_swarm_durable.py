@@ -99,6 +99,28 @@ def test_swarm_checkpoint_composes_with_outer_step_replay_boundary(tmp_path):
     assert [step.step_id for step in loaded.resume.replay_steps] == ["outer-step-2"]
 
 
+def test_paired_recovery_capture_restores_history_when_tenant_sidecar_fails(
+    monkeypatch,
+):
+    manager = SwarmRecoveryManager(max_checkpoints=2)
+    runtime = SwarmRuntime()
+    manager.checkpoint(runtime)
+    manager.checkpoint(runtime)
+    before = manager.store.sequences()
+
+    def fail_tenant_capture(*args, **kwargs):
+        raise RuntimeError("simulated tenant sidecar failure")
+
+    monkeypatch.setattr(manager.tenant_store, "capture", fail_tenant_capture)
+
+    with pytest.raises(RuntimeError, match="tenant sidecar failure"):
+        manager.checkpoint(runtime, object())  # type: ignore[arg-type]
+
+    assert before == (1, 2)
+    assert manager.store.sequences() == before
+    assert manager.tenant_store.sequences() == ()
+
+
 def test_failed_durable_commit_preserves_evicted_bounded_history(
     tmp_path, monkeypatch
 ):
