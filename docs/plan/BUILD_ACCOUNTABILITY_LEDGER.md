@@ -45,8 +45,8 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-010` — VOL-010 Memory System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-011` — VOL-011 Retrieval System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-012` — VOL-012 Knowledge System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-013` — VOL-013 Cognitive Core — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `—`
-- [ ] `ACC-VOL-014` — VOL-014 Planning Engine — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Plan Verification Gate** — completed_at_utc: `—`
+- [x] `ACC-VOL-013` — VOL-013 Cognitive Core — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T00:49:25Z`
+- [x] `ACC-VOL-014` — VOL-014 Planning Engine — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Plan Verification Gate** — completed_at_utc: `2026-10-04T00:49:25Z`
 - [ ] `ACC-VOL-015` — VOL-015 Tool & Action System — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-016` — VOL-016 Agent Runtime — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-017` — VOL-017 Multi-Agent Orchestration — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -285,7 +285,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-250` — VOL-250 Causal Knowledge — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-251` — VOL-251 Search Strategy Engine — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-252` — VOL-252 Value of Information — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-253` — VOL-253 Stopping Policies — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `—`
+- [x] `ACC-VOL-253` — VOL-253 Stopping Policies — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T00:49:25Z`
 - [ ] `ACC-VOL-254` — VOL-254 Answer Quality Pipeline — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-255` — VOL-255 Artifact Quality Pipeline — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-256` — VOL-256 Human-in-the-Loop Gates — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`

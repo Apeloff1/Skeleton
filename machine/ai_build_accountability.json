@@ -605,8 +605,8 @@
       "type": "volume",
       "title": "VOL-013 Cognitive Core",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-27T22:54:07Z",
       "implementation_signoff": {
@@ -648,8 +648,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-27T22:57:02Z",
+      "completed_at_utc": "2026-10-04T00:49:25Z",
+      "last_event_at_utc": "2026-10-04T00:49:25Z",
       "history": [
         {
           "sequence": 1,
@@ -711,6 +711,25 @@
             "skeleton/testing/test_reasoning_strategy_registry.py",
             "skeleton/testing/test_core_intelligence_bundle.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-completion-agent",
+          "at_utc": "2026-10-04T00:49:25Z",
+          "git_sha": "3ae6a924f2c00868bf52040126042fdbda3700de",
+          "statement": "Finalize the evidence-backed completion checkbox after implementation and independent CI verification signoffs; preserve existing hardened maturity and grant no broader masterplan authority.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+            "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de"
+          ]
         }
       ],
       "evidence": [
@@ -719,6 +738,8 @@
         "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
         "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5",
+        "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
+        "https://github.com/Apeloff1/Skeleton/commit/58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/core_intelligence.py",
@@ -733,8 +754,8 @@
       "type": "volume",
       "title": "VOL-014 Planning Engine",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-28T01:17:23Z",
       "implementation_signoff": {
@@ -781,8 +802,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-28T01:22:42Z",
+      "completed_at_utc": "2026-10-04T00:49:25Z",
+      "last_event_at_utc": "2026-10-04T00:49:25Z",
       "history": [
         {
           "sequence": 1,
@@ -849,13 +870,34 @@
             "skeleton/testing/test_plan_simulation.py",
             "skeleton/testing/test_plan_qualification.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-completion-agent",
+          "at_utc": "2026-10-04T00:49:25Z",
+          "git_sha": "3ae6a924f2c00868bf52040126042fdbda3700de",
+          "statement": "Finalize the evidence-backed completion checkbox after implementation and independent CI verification signoffs; preserve existing hardened maturity and grant no broader masterplan authority.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
+            "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de"
+          ]
         }
       ],
       "evidence": [
         ".github/workflows/p1-plan-verification.yml",
         "git-head:8dc9e313566284c83b2401783015fb5638536f6e",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36365420651",
+        "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
         "https://github.com/Apeloff1/Skeleton/commit/54bc9871f5516ab5593754786ddb1d327fed1088",
+        "https://github.com/Apeloff1/Skeleton/commit/58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
         "https://github.com/Apeloff1/Skeleton/commit/8dc9e313566284c83b2401783015fb5638536f6e",
         "skeleton/ai/runtime/intelligence/plan_verifier.py",
         "skeleton/intelligence/plan_verifier.py",
@@ -10392,8 +10434,8 @@
       "type": "volume",
       "title": "VOL-253 Stopping Policies",
       "status": "hardened",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-27T22:54:07Z",
       "implementation_signoff": {
@@ -10431,8 +10473,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-27T22:57:02Z",
+      "completed_at_utc": "2026-10-04T00:49:25Z",
+      "last_event_at_utc": "2026-10-04T00:49:25Z",
       "history": [
         {
           "sequence": 1,
@@ -10490,12 +10532,33 @@
             ".github/workflows/p1-reasoning-search-stop-policy.yml",
             "skeleton/testing/test_reasoning_strategy_registry.py"
           ]
+        },
+        {
+          "sequence": 4,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-completion-agent",
+          "at_utc": "2026-10-04T00:49:25Z",
+          "git_sha": "3ae6a924f2c00868bf52040126042fdbda3700de",
+          "statement": "Finalize the evidence-backed completion checkbox after implementation and independent CI verification signoffs; preserve existing hardened maturity and grant no broader masterplan authority.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
+          "from_status": "hardened",
+          "to_status": "hardened",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/bfb445014777773c9a2e829f3a0fc84b422cd1af",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+            "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de"
+          ]
         }
       ],
       "evidence": [
         ".github/workflows/p1-reasoning-search-stop-policy.yml",
         "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896",
+        "https://github.com/Apeloff1/Skeleton/commit/3ae6a924f2c00868bf52040126042fdbda3700de",
+        "https://github.com/Apeloff1/Skeleton/commit/bfb445014777773c9a2e829f3a0fc84b422cd1af",
         "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961",
         "skeleton/ai/runtime/intelligence/strategy_registry.py",
         "skeleton/intelligence/strategy_registry.py",
