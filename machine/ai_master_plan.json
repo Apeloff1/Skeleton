@@ -208,7 +208,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define authoritative precedence among runtime truth, construction authority, target plan and evidence.",
         "Freeze top-level breadth at VOL-420 unless an ADR proves existing domains are insufficient.",
@@ -664,7 +664,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Route by capability, policy, privacy/data boundary, reliability, latency and cost constraints.",
         "Make fallback an explicit decision that cannot silently weaken residency/privacy/security requirements.",
@@ -729,7 +729,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Compile immutable policy, user objective, durable state, authorized memory/retrieval, tools and model constraints into typed context.",
         "Preserve trust classification and provenance through truncation, compression and reordering.",
@@ -794,7 +794,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate working, conversation, episodic, semantic, procedural, project and artifact memory classes.",
         "Gate durable memory writes through privacy, deduplication, contradiction and promotion rules.",
@@ -875,7 +875,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Support lexical, dense, hybrid, metadata, temporal, graph, code-symbol and multi-hop retrieval behind common evidence contracts.",
         "Apply authorization/data-scope filters at query time before ranking.",
@@ -964,7 +964,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent entity, relation, claim, evidence, scope, time and source separately.",
         "Allow contradictory claims to coexist with explicit provenance rather than destructive overwrite.",
@@ -1167,7 +1167,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Treat every tool as a privileged execution surface with independent authorization.",
         "Validate input/output schemas, classification, risk, budget and idempotency before execution.",
@@ -1236,7 +1236,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define agent identity, role, objective scope, authority, capability set, memory policy and resource limits.",
         "Require delegated authority to be a mechanical subset of parent authority.",
@@ -1298,7 +1298,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Coordinate multiple agents with explicit handoff packets, leases/fencing, conflict domains and bounded fan-out.",
         "Resolve disagreement by evidence/verification policy rather than majority text alone.",
@@ -1361,7 +1361,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Support long-running operations with durable checkpoints, resumable plans, deadline/budget enforcement and human override.",
         "Make pause/wait/retry states explicit and recoverable after process/node restarts.",
@@ -1630,7 +1630,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Generate code/policy/prompt/config/artifact candidates only inside bounded experiment scopes.",
         "Compare candidates against champion baselines using explicit acceptance metrics.",
@@ -1689,7 +1689,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Collect learning signals with source, scope, confidence and outcome provenance.",
         "Turn signals into versioned candidates rather than direct production mutation.",
@@ -1748,7 +1748,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Maintain explicit hazard/risk taxonomy and safe default behavior for high-impact operations.",
         "Separate safety policy from model preference/confidence.",
@@ -1924,7 +1924,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent identities, roles, grants, approvals and delegation as explicit versioned authority objects.",
         "Require child/delegated authority to be a subset with expiry and revocation semantics.",
@@ -1994,7 +1994,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use bounded retry/backoff/jitter, circuit breakers, bulkheads, queues, DLQ and load shedding as explicit policies.",
         "Treat timeout as unknown outcome unless a postcondition proves failure/success.",
@@ -2055,7 +2055,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Model partitions, ordering, leases/fencing, clocks, idempotency and consistency choices explicitly.",
         "Ensure stale workers cannot commit after lease loss.",
@@ -2112,7 +2112,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Inventory CPU/GPU/RAM/VRAM/storage/network/NUMA/interconnect resources with freshness.",
         "Admit/place work using hard resource constraints before optimization preferences.",
@@ -2275,7 +2275,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Correlate logs, metrics, traces, model/tool usage and durable receipts by operation identity.",
         "Redact secrets/sensitive data before emission.",
@@ -2360,7 +2360,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Version every benchmark/eval with dataset, config, environment, model, inference budget and statistical method.",
         "Track contamination and baseline provenance.",
@@ -2436,7 +2436,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Maintain adversarial cases mapped to threat/edge obligations and capability owners.",
         "Keep adversarial judge/verifier independence measurable.",
@@ -2499,7 +2499,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent verification separately from generator confidence and acceptance policy.",
         "Support structural, evidence, postcondition, execution, mathematical, independent-model and human verification modes.",
@@ -2559,7 +2559,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Track end-to-end lineage from source/user input through context/model/tool/agent/artifact/output.",
         "Canonicalize before hashing/signing and version the canonicalization algorithm.",
@@ -2692,7 +2692,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define resumable streaming with stable event IDs, sequence semantics, cursors and terminal finality.",
         "Bound server/client buffering with backpressure and resync behavior.",
@@ -2756,7 +2756,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define API contracts independently from UI/provider internals.",
         "Require explicit versioning, authentication/authorization context, idempotency and pagination/stream semantics.",
@@ -2819,7 +2819,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep navigation/workspace/operation state as projections of canonical runtime truth.",
         "Expose capability availability, degraded state and authority limits explicitly.",
@@ -2892,7 +2892,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Isolate desktop host privileges from model/tool authority.",
         "Persist only approved local state and secrets through OS-appropriate facilities.",
@@ -2951,7 +2951,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Rehydrate workspace and operation state from authoritative APIs after refresh/reconnect.",
         "Protect browser persistence by data class and tenant boundary.",
@@ -3024,7 +3024,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Represent queued/running/waiting/blocked/cancelled/failed/succeeded states distinctly.",
         "Expose progress as evidence-backed milestones rather than fabricated percentages.",
@@ -3102,7 +3102,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Attach tenant identity to every durable object and privileged operation.",
         "Enforce isolation before retrieval/ranking/cache lookup/tool dispatch.",
@@ -3164,7 +3164,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verify package provenance and integrity before mutation.",
         "Detect prerequisites/resources and fail before irreversible partial install.",
@@ -3220,7 +3220,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preflight compatibility, disk/resource requirements and migration path before activation.",
         "Use staged/dual-slot activation where practical with executable rollback.",
@@ -3284,7 +3284,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Diagnose before repair and preserve evidence of detected faults.",
         "Repair from trusted manifests/artifacts and reconcile durable state afterward.",
@@ -3341,7 +3341,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Classify every installed artifact as removable, shared, retained or user-owned.",
         "Require explicit policy for user data, secrets, caches, services and scheduled tasks.",
@@ -3656,7 +3656,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Assign stable IDs, owner, severity, dependency and status to gaps.",
         "Link each gap to requirements, volumes, work packages and closure evidence.",
@@ -3736,7 +3736,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give risks stable identity, scope, severity, owner and review cadence.",
         "Map controls to executable evidence and residual risk.",
@@ -3850,7 +3850,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Separate required gates by contract while avoiding redundant uncontrolled fan-out.",
         "Treat skipped/cancelled/inconclusive states explicitly in merge readiness.",
@@ -3911,7 +3911,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Bind artifacts to exact source/config/dependency/build identities.",
         "Generate SBOM/provenance/signatures and preserve verification instructions.",
@@ -3968,7 +3968,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Model deployment as explicit staged state transitions.",
         "Check health/SLOs and compatibility before expanding rollout.",
@@ -4026,7 +4026,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Version environment declarations and dependency locks.",
         "Keep secrets and credentials external to reproducible config while validating required presence.",
@@ -4084,7 +4084,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define explicit precedence across defaults/file/env/remote/user scopes.",
         "Reject unknown or invalid security-relevant keys by default.",
@@ -4142,7 +4142,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Back up authoritative state and required metadata, not just files opportunistically.",
         "Encrypt and classify backup contents with retention/deletion policy.",
@@ -4199,7 +4199,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Declare recovery dependencies, priorities, RPO/RTO and authority sources.",
         "Reconcile restored state with tombstones, revoked grants, leases and external side effects.",
@@ -4261,7 +4261,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define incident severity, roles, escalation and communication paths.",
         "Preserve forensic evidence while containing impact.",
@@ -4319,7 +4319,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define representative workloads and percentile/resource metrics.",
         "Profile end-to-end and component hot paths with repeatable environments.",
@@ -4376,7 +4376,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Model CPU/GPU/RAM/VRAM/storage/network and concurrency limits explicitly.",
         "Set admission/backpressure thresholds before saturation.",
@@ -4433,7 +4433,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record cost units with operation/tenant/capability provenance.",
         "Enforce hard and soft budgets independently from model preferences.",
@@ -4750,7 +4750,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Give every artifact stable identity, version, media type, provenance and producer operation.",
         "Separate draft, validated, published and retired lifecycle states.",
@@ -4806,7 +4806,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use explicit digest algorithm/version and canonical byte semantics.",
         "Verify content on write/read and separate logical identity from physical location.",
@@ -4861,7 +4861,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Require hypothesis, baseline/control, metrics and stop criteria before execution.",
         "Isolate experiment side effects and budgets from production authority.",
@@ -4920,7 +4920,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Capture all material identities and random seeds where controllable.",
         "Declare irreducible nondeterminism and acceptable tolerance.",
@@ -5000,7 +5000,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Define code quality gates with stable ownership and severity.",
         "Track defects/regressions to root cause and prevention action.",
@@ -5063,7 +5063,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Map test layers to explicit requirements/invariants and ownership.",
         "Favor deterministic unit/contract/property tests before expensive E2E while retaining cross-boundary proof.",
@@ -5186,7 +5186,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Version benchmark datasets, prompts, scoring, models and environments.",
         "Require credible baselines and statistical uncertainty for comparative claims.",
@@ -5246,7 +5246,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Map campaigns to explicit threat models and system owners.",
         "Contain harmful side effects with sandbox, synthetic targets and kill switches.",
@@ -5307,7 +5307,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Provide pause, cancel, deny, approve, revoke and break-glass controls at explicit control points.",
         "Make authority changes durable, attributable and immediately visible to active work.",
@@ -9272,7 +9272,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Default deny undeclared capabilities and egress.",
         "Destroy/reconcile sandbox state after terminal execution."
@@ -9336,7 +9336,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Policy evaluation must be deterministic for identical inputs/version.",
         "Unknown values and parse failures fail closed for privileged actions."
@@ -9494,7 +9494,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Treat untrusted model/context/tool outputs as data, never authority.",
         "Map each AI threat to prevention, detection, recovery and eval evidence."
@@ -9604,7 +9604,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use workload/service identity and least-privilege grants internally.",
         "Continuously revalidate authority for long-running operations where risk warrants."
@@ -11077,7 +11077,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Authenticate sender/role and preserve task/correlation identity.",
         "Specify ordering, retry, duplicate and expiration behavior."
@@ -11137,7 +11137,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Handoff authority must be subset of delegator authority.",
         "Receiver must acknowledge assumptions, dependencies and custody."
@@ -11291,7 +11291,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every child inherits stricter-or-equal authority and explicit budget.",
         "Stop/reconcile outstanding child work when parent budget/cancellation terminates."
@@ -11398,7 +11398,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Reviewer cannot mutate target artifact while reviewing.",
         "Require concrete findings/evidence rather than generic criticism."
@@ -11461,7 +11461,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verifier must consume artifact-bound evidence and declared acceptance criteria.",
         "Conflict-of-interest/identity rules must be machine-checkable where required."
@@ -13525,7 +13525,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Strategy selection obeys source/authority/privacy constraints.",
         "Search fanout/depth is bounded and observable."
@@ -13585,7 +13585,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use explicit cost/risk/time and uncertainty inputs.",
         "VOI cannot authorize otherwise-disallowed actions."
@@ -13703,7 +13703,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use independent evidence/checks for high-impact outputs.",
         "Preserve blocked/qualified/abstained outcomes distinctly."
@@ -13766,7 +13766,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Quality gates vary by artifact type/change impact.",
         "Artifact version under test must match published artifact."
@@ -13829,7 +13829,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Human approval records exact proposed action/evidence/version.",
         "Material action changes invalidate prior approval."
@@ -13890,7 +13890,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Classification influences approval/test/rollback requirements.",
         "Unknown reversibility defaults conservatively."
@@ -13953,7 +13953,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Use topology/dependency/tenant scope rather than textual guess only.",
         "Cap or require approval above declared thresholds."
@@ -14016,7 +14016,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Budget is evaluated before and during mutation.",
         "Exceeding budget pauses/escalates rather than silently expanding scope."
@@ -16805,7 +16805,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Level changes are policy decisions, not model self-assessment.",
         "Each level maps to mandatory human controls/evidence."
@@ -16911,7 +16911,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "De-escalation propagates to active child work/tool grants promptly.",
         "Preserve recoverable checkpoints/evidence while stopping effects."
@@ -16970,7 +16970,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Override commands use authenticated high-priority control paths.",
         "Revocation propagates to delegated agents/tools and produces durable receipts."
@@ -17031,7 +17031,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Critical sections define safe interruption points/checkpoints.",
         "Interrupt outcomes distinguish cancelled, rolled-back, partially external and unknown."
@@ -17091,7 +17091,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Compare active task/plan state against immutable objective baseline.",
         "Escalate meaningful drift before privileged or irreversible action."
@@ -17154,7 +17154,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Include adversarial tasks with exploitable metrics/reward gaps.",
         "Convert discovered gaming patterns into permanent acceptance tests."
@@ -17228,7 +17228,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Every consequential action maps to an authorized plan node or explicit deviation record.",
         "Unexpected deviations pause/escalate according to risk."
@@ -18936,7 +18936,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "GC uses reachability/retention/trust policy rather than age alone.",
         "Deletion candidates preserve legal/audit/tombstone requirements."
@@ -19002,7 +19002,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Evaluate memory against source/current truth where possible.",
         "Quality scores cannot bypass trust/authorization rules."
@@ -19085,7 +19085,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Include conflicting, stale and poisoned memories in evaluation.",
         "Scope violations are hard failures regardless of task success."
@@ -19399,7 +19399,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Keep task fixtures/versioned scorers stable enough for comparisons.",
         "Evaluate correctness, robustness and cost rather than style."
@@ -19481,7 +19481,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Verifier is independent of planner for high-risk plans.",
         "Invalid or under-specified plans cannot execute privileged steps."
@@ -20032,7 +20032,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Control state is fenced/versioned to avoid split-brain scheduling.",
         "Data/control planes remain separate."
@@ -20087,7 +20087,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Placement validates compatibility before load.",
         "Anti-affinity/failure-domain rules prevent correlated loss where needed."
@@ -20235,7 +20235,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Warmup obeys resource/cost budgets.",
         "Warm readiness is validated before routing traffic."
@@ -20289,7 +20289,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Batching respects model/config/privacy/tenant compatibility.",
         "Cancellation/deadline can remove or mask requests safely."
@@ -20485,7 +20485,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Scaling respects warmup time/resource quotas.",
         "Prevent oscillation and admission beyond cluster capacity."
@@ -20540,7 +20540,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Measure throughput, p95/p99 latency, memory, errors and quality degradation.",
         "Use release-like hardware/config identity."
@@ -20594,7 +20594,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Topology is versioned/discovered with validation.",
         "Scheduling uses canonical topology rather than host-name heuristics."
@@ -20836,7 +20836,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Topology updates invalidate stale placement assumptions.",
         "Routing/scheduling distinguish control and bulk data traffic."
@@ -20890,7 +20890,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Worker executes only signed/authorized task envelope and declared inputs.",
         "Results bind to worker/task/environment identity."
@@ -20945,7 +20945,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Attestation policy is scoped by workload risk.",
         "Failure/revocation drains worker and invalidates future assignments."
@@ -21140,7 +21140,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Enforce per-tenant/project/team/workload compute limits across CPU/GPU/time/storage.",
         "Quota reservations and usage reconcile durably after failure/cancellation."
@@ -21194,7 +21194,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Record monetary/token/compute/storage budgets, reservations, charges, refunds and adjustments immutably.",
         "Ledger entries are attributable to objective/task/tenant/provider."
@@ -21249,7 +21249,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Forecast demand, capacity, queue, spend and resource pressure with uncertainty bands.",
         "Forecasts inform planning but never bypass hard quotas/capacity/security."
@@ -21305,7 +21305,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Detect unexpected spend/token/compute/storage patterns against workload-normalized baselines.",
         "Anomalies link to concrete operations/providers/tenants before action."
@@ -21455,7 +21455,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Generate traceable attribution for code/data/models/research/artifacts from provenance and license obligations.",
         "Attribution references exact contributing versions where feasible."
@@ -21699,7 +21699,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Replay or mirror eligible requests to candidate systems without affecting authoritative user outcomes.",
         "Shadow path strips/limits sensitive side effects and records comparability metadata."
@@ -21754,7 +21754,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Track incumbent and candidate models/strategies/providers with evaluation lineage and promotion state.",
         "Promotion compares predeclared metrics, robustness, safety, cost and rollback evidence."
@@ -21953,7 +21953,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Preserve incidents, failed experiments, rejected designs and counterexamples as searchable structured engineering knowledge.",
         "Failure records distinguish context-specific lessons from universal rules."
@@ -22011,7 +22011,7 @@
       "status": "specified",
       "scope": "breadth-freeze",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "requirements": [
         "Freeze top-level volume breadth at VOL-420 and route new requirements into existing volumes/subchapters by default.",
         "A new top-level volume requires explicit ADR proving existing domains cannot represent the requirement."
