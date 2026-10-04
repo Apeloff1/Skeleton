@@ -10,7 +10,6 @@ from scripts.reconcile_p1_risk_evidence import (
     P1_MAP,
     POLICY,
     REGISTRY,
-    RETIRED_OBLIGATION_IDS,
     ROOT,
     RiskKind,
     derive_obligations,
@@ -130,6 +129,4 @@ def test_bulk_binding_does_not_mutate_masterplan_source_obligations() -> None:
                 for item in _obligations()
                 if item.kind is RiskKind.GAP
             )
-            if not volume["gaps"]:
-                assert volume_key == "VOL-248"
-                assert row["obligation_id"] in RETIRED_OBLIGATION_IDS
+            assert volume["gaps"]
