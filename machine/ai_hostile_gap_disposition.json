@@ -178,8 +178,10 @@
       "id": "G015",
       "severity": "P0",
       "title": "Non-idempotent side-effect compensation",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2748"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
