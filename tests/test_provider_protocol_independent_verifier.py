@@ -70,3 +70,22 @@ def test_provider_protocol_verifier_rejects_unoffered_tool_guard_loss(
         "test_sync_openai_rejects_unoffered_tool_call" in error
         for error in receipt["errors"]
     )
+
+
+def test_provider_protocol_verifier_rejects_nonterminal_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(
+        item for item in payload["entries"]
+        if item["gap"] == "gap-provider-interaction-protocol"
+    )
+    entry["implementation_state"] = "pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "provider protocol implementation_state is not closed" in receipt["errors"]
