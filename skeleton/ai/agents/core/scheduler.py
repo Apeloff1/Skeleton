@@ -103,6 +103,7 @@ class SwarmScheduler:
         self._clock = clock
         # Heap of (priority, sequence, task); sequence gives FIFO within a class.
         self._queue: list[tuple[int, int, Task]] = []
+        self._delayed: list[tuple[float, int, int, Task]] = []
         self._sequence = itertools.count()
         self._tasks: dict[str, Task] = {}
         self._in_flight: set[str] = set()
@@ -152,6 +153,13 @@ class SwarmScheduler:
         if task.state is TaskState.QUEUED:
             task.state = TaskState.CANCELLED
             task.finished_at = self._clock()
+            if self._delayed:
+                retained = [
+                    item for item in self._delayed if item[3].task_id != task.task_id
+                ]
+                if len(retained) != len(self._delayed):
+                    self._delayed[:] = retained
+                    heapq.heapify(self._delayed)
             self._bus.emit("agent.scheduler.cancelled", task.to_dict())
         return task
 
@@ -197,23 +205,21 @@ class SwarmScheduler:
             ran.append(task)
         return ran
 
-    def _next_runnable(self) -> Task | None:
-        now = self._clock()
-        skipped: list[tuple[int, int, Task]] = []
-        chosen: Task | None = None
-        while self._queue:
-            item = heapq.heappop(self._queue)
-            task = item[2]
+    def _promote_due(self, now: float) -> None:
+        while self._delayed and self._delayed[0][0] <= now:
+            _not_before, priority, sequence, task = heapq.heappop(self._delayed)
             if task.state is TaskState.CANCELLED:
                 continue
-            if task.not_before > now:
-                skipped.append(item)
+            heapq.heappush(self._queue, (priority, sequence, task))
+
+    def _next_runnable(self) -> Task | None:
+        self._promote_due(self._clock())
+        while self._queue:
+            _priority, _sequence, task = heapq.heappop(self._queue)
+            if task.state is TaskState.CANCELLED:
                 continue
-            chosen = task
-            break
-        for item in skipped:
-            heapq.heappush(self._queue, item)
-        return chosen
+            return task
+        return None
 
     def _handle_failure(self, task: Task, exc: Exception) -> None:
         task.error = f"{type(exc).__name__}: {exc}"
@@ -221,7 +227,10 @@ class SwarmScheduler:
             delay = min(self._backoff_base * (2 ** (task.attempts - 1)), self._backoff_cap)
             task.state = TaskState.QUEUED
             task.not_before = self._clock() + delay
-            heapq.heappush(self._queue, (task.priority, next(self._sequence), task))
+            heapq.heappush(
+                self._delayed,
+                (task.not_before, task.priority, next(self._sequence), task),
+            )
             self._bus.emit(
                 "agent.scheduler.retry_scheduled",
                 {**task.to_dict(), "retry_in_seconds": delay},
@@ -288,8 +297,15 @@ class SwarmScheduler:
 
     def pending(self) -> list[Task]:
         return sorted(
-            (t for _, _, t in self._queue if t.state is TaskState.QUEUED),
-            key=lambda t: (t.priority, t.submitted_at),
+            (
+                task
+                for task in itertools.chain(
+                    (task for _, _, task in self._queue),
+                    (task for _, _, _, task in self._delayed),
+                )
+                if task.state is TaskState.QUEUED
+            ),
+            key=lambda task: (task.priority, task.submitted_at),
         )
 
     def stats(self) -> dict[str, Any]:
@@ -298,7 +314,9 @@ class SwarmScheduler:
             states[task.state.value] = states.get(task.state.value, 0) + 1
         return {
             "accepting": self._accepting,
-            "queued": len(self._queue),
+            "queued": len(self._queue) + len(self._delayed),
+            "ready": len(self._queue),
+            "delayed": len(self._delayed),
             "in_flight": len(self._in_flight),
             "max_in_flight": self._max_in_flight,
             "dead_letters": len(self._dead_letters),
