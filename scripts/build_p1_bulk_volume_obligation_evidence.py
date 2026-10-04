@@ -37,9 +37,9 @@ from reconcile_p1_risk_evidence import (  # noqa: E402
     POLICY,
     REGISTRY,
     ROOT,
-    RETIRED_OBLIGATION_IDS,
     RiskKind,
     derive_obligations,
+    retired_gap_owner_from_id,
 )
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -47,9 +47,9 @@ BATCH_ID = "p1-bulk-volume-obligation-evidence"
 CATEGORY = "p1_volume_obligation_evidence"
 EXPECTED_PRIMARY_VOLUMES = 107
 EXPECTED_VOLUME_RISKS = 281
-EXPECTED_VOLUME_GAPS = 208
+EXPECTED_VOLUME_GAPS = 174
 EXPECTED_VOLUME_OBLIGATIONS = EXPECTED_VOLUME_RISKS + EXPECTED_VOLUME_GAPS
-EXPECTED_EXISTING_BINDINGS = 489
+EXPECTED_EXISTING_BINDINGS = 455
 EXPECTED_CANDIDATES = 0
 EXPECTED_CANDIDATE_RISKS = 0
 EXPECTED_CANDIDATE_GAPS = 0
@@ -324,10 +324,23 @@ def build_bulk_volume_evidence(
                 f"duplicate governed binding identity: {obligation_id}"
             )
         bound_ids.add(obligation_id)
-    unknown = sorted(bound_ids - known_ids)
+    unknown: list[str] = []
+    for row in raw_records:
+        obligation_id = row["obligation_id"]
+        if obligation_id in known_ids:
+            continue
+        expected_owner = retired_gap_owner_from_id(obligation_id)
+        if (
+            expected_owner is None
+            or row.get("owner_id") != expected_owner
+            or row.get("disposition") != "evidence"
+            or not row.get("evidence")
+            or row.get("accepted_risk") is not None
+        ):
+            unknown.append(obligation_id)
     if unknown:
         raise BulkVolumeEvidenceError(
-            "risk registry references unknown obligations: " + ",".join(unknown)
+            "risk registry references unknown obligations: " + ",".join(sorted(unknown))
         )
 
     volume_obligations = [
@@ -407,7 +420,6 @@ def build_bulk_volume_evidence(
             "recommended_disposition": "evidence",
             "volume_evidence": volume_evidence[volume_key],
             "binding_present": obligation.obligation_id in bound_ids,
-            "retired": obligation.obligation_id in RETIRED_OBLIGATION_IDS,
             "non_authoritative": True,
             "creates_binding": False,
             "accepts_risk": False,
@@ -468,8 +480,6 @@ def build_bulk_volume_evidence(
         "covered_obligation_count": len(records),
         "covered_risk_count": sum(row["kind"] == "risk" for row in records),
         "covered_gap_count": sum(row["kind"] == "gap" for row in records),
-        "live_obligation_count": sum(not row["retired"] for row in records),
-        "retired_obligation_count": sum(row["retired"] for row in records),
         "already_bound_count": len(already_bound),
         "candidate_binding_count": len(candidates),
         "candidate_risk_count": len(candidate_risks),
