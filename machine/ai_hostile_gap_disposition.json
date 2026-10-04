@@ -242,8 +242,10 @@
       "id": "G021",
       "severity": "P1",
       "title": "Global resource scheduler",
-      "status": "open",
-      "implementation_refs": [],
+      "status": "implementation_pr_open",
+      "implementation_refs": [
+        "github:pr#2752"
+      ],
       "evidence_refs": [],
       "closure_note": null
     },
