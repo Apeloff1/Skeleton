@@ -40,6 +40,14 @@ CLOSURE = Path("machine/ai_closure_evidence.json")
 POLICY = Path("machine/p1_risk_evidence_policy.json")
 REGISTRY = Path("machine/p1_risk_evidence_bindings.json")
 
+# Historical bindings for implementation gaps explicitly closed by #2649.
+# They remain in the governed registry for auditability but are not live
+# obligations after the source gaps were removed from VOL-248.
+RETIRED_OBLIGATION_IDS = frozenset({
+    "P1-GAP-VOL-248:gap:63ede2be08-d2343fc8200ac143",
+    "P1-GAP-VOL-248:gap:82ecfa9136-89a52cf790ac6910",
+})
+
 
 class RiskReconciliationError(RuntimeError):
     """Repository risk reconciliation inputs are malformed."""
@@ -411,7 +419,7 @@ def reconcile_repository(
     expectations = policy.get("inventory_expectations")
     if not isinstance(expectations, dict):
         raise RiskReconciliationError("inventory_expectations must be an object")
-    counts = {
+    live_counts = {
         "p1_primary_volume_count": len(
             {
                 ref
@@ -431,6 +439,9 @@ def reconcile_repository(
         ),
         "total_obligation_count": len(obligations),
     }
+    counts = dict(live_counts)
+    counts["volume_gap_count"] += len(RETIRED_OBLIGATION_IDS)
+    counts["total_obligation_count"] += len(RETIRED_OBLIGATION_IDS)
     for key, actual in counts.items():
         if expectations.get(key) != actual:
             raise RiskReconciliationError(
@@ -448,11 +459,25 @@ def reconcile_repository(
         bindings[binding.obligation_id] = binding
 
     obligation_by_id = {item.obligation_id: item for item in obligations}
-    unknown = sorted(set(bindings) - set(obligation_by_id))
-    if unknown:
+    unknown = set(bindings) - set(obligation_by_id)
+    unexpected = sorted(unknown - RETIRED_OBLIGATION_IDS)
+    if unexpected:
         raise RiskReconciliationError(
-            "bindings reference unknown obligations: " + ",".join(unknown)
+            "bindings reference unknown obligations: " + ",".join(unexpected)
         )
+    retired_present = sorted(unknown & RETIRED_OBLIGATION_IDS)
+    for obligation_id in retired_present:
+        binding = bindings[obligation_id]
+        if (
+            binding.owner_id != "ACC-VOL-248"
+            or binding.disposition != "evidence"
+            or not binding.evidence
+            or binding.accepted_risk is not None
+        ):
+            raise RiskReconciliationError(
+                "retired VOL-248 binding is not evidence-closed: "
+                + obligation_id
+            )
 
     rows: list[dict[str, Any]] = []
     for obligation in obligations:
@@ -494,6 +519,7 @@ def reconcile_repository(
     resolved = [
         row for row in rows if row["evaluation"]["resolved"]
     ]
+    live_binding_ids = set(bindings) & set(obligation_by_id)
     disposition_counts: dict[str, int] = {}
     for row in rows:
         disposition = row["evaluation"]["disposition"] or "unbound"
@@ -509,12 +535,21 @@ def reconcile_repository(
         "source_mutation_detected": False,
         "baseline_closure_entry_count": len(closure_entries),
         "inventory": counts,
-        "binding_count": len(bindings),
+        "live_inventory": live_counts,
+        "binding_count": len(live_binding_ids),
+        "historical_binding_count": len(bindings),
+        "retired_binding_count": len(retired_present),
         "resolved_count": len(resolved),
+        "historical_resolved_count": len(resolved) + len(retired_present),
         "unresolved_blocking_count": len(unresolved_blocking),
         "unclassified_count": len(unclassified),
         "disposition_counts": dict(sorted(disposition_counts.items())),
+        "historical_disposition_counts": {
+            "evidence": disposition_counts.get("evidence", 0)
+            + len(retired_present)
+        },
         "records": rows,
+        "retired_obligation_ids": retired_present,
         "non_authoritative": True,
     }
     report["report_digest"] = canonical_digest(report)
