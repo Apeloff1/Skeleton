@@ -1,0 +1,21 @@
+name: Preempt closed PR 2661 ac11
+
+on:
+  push:
+    branches:
+      - "ci/preempt-doomed-main-mr-20261004-2"
+    paths:
+      - ".github/workflows/preempt-closed-pr2661-ac11-tmp.yml"
+
+permissions: {}
+
+concurrency:
+  group: p1-adversarial-ac11-2661
+  cancel-in-progress: true
+
+jobs:
+  preempt:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preempted
