@@ -386,6 +386,21 @@ class AdmissionRuntime:
                 "tenant_quota_unavailable"
             ) from exc
 
+    def ensure_tenant_quota(self, tenant_id: str) -> None:
+        """Materialize default quota configuration without allocating authority.
+
+        Durable recovery/preflight may need to inspect a tenant before a fresh
+        reservation exists. Creating the tenant's configured quota is metadata
+        initialization only: it does not reserve concurrency, tokens, cost,
+        tool calls, artifact bytes, or storage bytes.
+        """
+
+        tenant = str(tenant_id).strip()
+        if not tenant:
+            raise AdmissionRuntimeError("tenant_id is required")
+        with self._lock:
+            self._ensure_tenant_quota(tenant)
+
     def admit(
         self,
         request: AdmissionRequest,
