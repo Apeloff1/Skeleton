@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from skeleton.contracts.canonical import EvidenceRef
 
-from .contracts import MirrorRoomError, _digest, _non_negative_int, _token, _tokens
+from .contracts import MirrorRoomError, ScenarioSplit, _digest, _non_negative_int, _sha256, _token, _tokens
 from .engine import MirrorRunReceipt
 
 
@@ -53,19 +53,22 @@ class MirrorPromotionEvidence:
             "split_integrity_digest",
             "rollback_candidate_digest",
         ):
-            value = getattr(self, field)
-            if not isinstance(value, str) or len(value) != 64:
-                raise MirrorRoomError(f"{field} must be sha256")
+            object.__setattr__(self, field, _sha256(field, getattr(self, field)))
+        validation_report_digests = tuple(
+            _sha256("validation_report_digest", value)
+            for value in self.validation_report_digests
+        )
+        if not validation_report_digests:
+            raise MirrorRoomError(
+                "validation report digests must be non-empty sha256 values"
+            )
+        if len(validation_report_digests) != len(set(validation_report_digests)):
+            raise MirrorRoomError("validation report digests must be unique")
         object.__setattr__(
             self,
             "validation_report_digests",
-            tuple(self.validation_report_digests),
+            validation_report_digests,
         )
-        if not self.validation_report_digests or any(
-            not isinstance(value, str) or len(value) != 64
-            for value in self.validation_report_digests
-        ):
-            raise MirrorRoomError("validation report digests must be non-empty sha256 values")
         object.__setattr__(self, "generator_id", _token("generator_id", self.generator_id))
         object.__setattr__(self, "executor_id", _token("executor_id", self.executor_id))
         if self.generator_id == self.executor_id:
@@ -91,6 +94,13 @@ class MirrorPromotionEvidence:
             "rollback_candidate_id",
         ):
             object.__setattr__(self, field, _token(field, getattr(self, field)))
+        if self.baseline_candidate_id == self.candidate_id:
+            raise MirrorRoomError("promotion candidate must differ from production baseline")
+        if (
+            self.rollback_candidate_id != self.baseline_candidate_id
+            or self.rollback_candidate_digest != self.baseline_candidate_digest
+        ):
+            raise MirrorRoomError("rollback candidate must match production baseline")
         if self.production_authority is not False:
             raise MirrorRoomError("Mirror promotion evidence cannot grant production authority")
         if self.direct_self_modify is not False:
@@ -155,19 +165,35 @@ def qualify_for_external_promotion(
             "promotion verifier must be independent of generator and executor"
         )
 
+    baseline = run.production_baseline
     validation_digests = []
     selected_ids = set()
     for generation in run.generations:
         for evaluation in generation.evaluations:
-            if evaluation.selected:
-                validation_digests.append(evaluation.validation_report.digest)
-                selected_ids.add(evaluation.candidate.candidate_id)
+            if not evaluation.selected:
+                continue
+            report = evaluation.validation_report
+            if report.split is not ScenarioSplit.VALIDATION:
+                raise MirrorRoomError("selected promotion lineage must use validation evidence")
+            if not report.passed:
+                raise MirrorRoomError("selected promotion lineage contains failed validation")
+            if (
+                report.baseline_candidate_id != baseline.candidate_id
+                or report.baseline_candidate_digest != baseline.digest
+            ):
+                raise MirrorRoomError("selected validation baseline identity mismatch")
+            if (
+                report.candidate_id != evaluation.candidate.candidate_id
+                or report.candidate_digest != evaluation.candidate.digest
+            ):
+                raise MirrorRoomError("selected validation candidate identity mismatch")
+            validation_digests.append(report.digest)
+            selected_ids.add(evaluation.candidate.candidate_id)
     if candidate.candidate_id not in selected_ids:
         raise MirrorRoomError("final candidate lacks selected validation lineage")
     if not validation_digests:
         raise MirrorRoomError("promotion handoff requires validation lineage")
 
-    baseline = run.production_baseline
     return MirrorPromotionEvidence(
         experiment_id=run.experiment_id,
         run_id=run.run_id,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -394,3 +395,153 @@ def test_core_source_and_ai_mirror_are_byte_identical() -> None:
         (source / name).read_bytes() == (mirror / name).read_bytes()
         for name in names
     )
+
+
+def test_run_receipt_rejects_forged_holdout_candidate_identity() -> None:
+    _, _, _, receipt = _run(generations=1)
+    assert receipt.holdout_report is not None
+    forged_report = replace(
+        receipt.holdout_report,
+        candidate_id=receipt.production_baseline.candidate_id,
+        candidate_digest=receipt.production_baseline.digest,
+    )
+    with pytest.raises(MirrorRoomError, match="holdout report candidate identity mismatch"):
+        replace(receipt, holdout_report=forged_report)
+
+
+def test_run_receipt_rejects_forged_holdout_baseline_identity() -> None:
+    _, _, _, receipt = _run(generations=1)
+    assert receipt.holdout_report is not None
+    forged_report = replace(
+        receipt.holdout_report,
+        baseline_candidate_id=receipt.final_sandbox_champion.candidate_id,
+        baseline_candidate_digest=receipt.final_sandbox_champion.digest,
+    )
+    with pytest.raises(MirrorRoomError, match="holdout report baseline identity mismatch"):
+        replace(receipt, holdout_report=forged_report)
+
+
+def test_run_receipt_rejects_holdout_from_another_run() -> None:
+    _, _, _, receipt = _run(generations=1)
+    assert receipt.holdout_report is not None
+    forged_report = replace(receipt.holdout_report, run_id="other-run")
+    with pytest.raises(MirrorRoomError, match="holdout report run identity mismatch"):
+        replace(receipt, holdout_report=forged_report)
+
+
+def test_promotion_rejects_forged_selected_validation_candidate() -> None:
+    _, _, _, receipt = _run(generations=1)
+    generation = receipt.generations[0]
+    selected = next(item for item in generation.evaluations if item.selected)
+    forged_validation = replace(
+        selected.validation_report,
+        candidate_id=receipt.production_baseline.candidate_id,
+        candidate_digest=receipt.production_baseline.digest,
+    )
+    forged_evaluation = replace(
+        selected,
+        validation_report=forged_validation,
+    )
+    forged_generation = replace(
+        generation,
+        evaluations=tuple(
+            forged_evaluation if item is selected else item
+            for item in generation.evaluations
+        ),
+    )
+    forged_receipt = replace(receipt, generations=(forged_generation,))
+
+    with pytest.raises(
+        MirrorRoomError,
+        match="selected validation candidate identity mismatch",
+    ):
+        qualify_for_external_promotion(
+            forged_receipt,
+            verifier_id="independent-promotion-verifier",
+            evaluation_refs=("eval:quality", "eval:safety"),
+            verified_at=10,
+        )
+
+
+def test_promotion_evidence_rejects_noncanonical_digest_and_rollback_drift() -> None:
+    _, _, _, receipt = _run(generations=1)
+    evidence = qualify_for_external_promotion(
+        receipt,
+        verifier_id="independent-promotion-verifier",
+        evaluation_refs=("eval:quality", "eval:safety"),
+        verified_at=10,
+    )
+
+    with pytest.raises(MirrorRoomError, match="candidate_digest"):
+        replace(evidence, candidate_digest="g" * 64)
+
+    with pytest.raises(MirrorRoomError, match="rollback candidate"):
+        replace(
+            evidence,
+            rollback_candidate_id=evidence.candidate_id,
+            rollback_candidate_digest=evidence.candidate_digest,
+        )
+
+
+def test_episode_replay_rejects_candidate_metadata_substitution() -> None:
+    spec = _spec()
+    sandbox = MirrorSandbox(spec, Executor())
+    scenario = _scenarios()[0]
+    receipt = sandbox.run_episode(
+        run_id="episode-binding",
+        candidate=spec.production_baseline,
+        scenario=scenario,
+    )
+    forged = replace(receipt, candidate_id="forged-candidate")
+    with pytest.raises(MirrorRoomError, match="replay candidate identity changed"):
+        sandbox.verify_replay(
+            forged,
+            candidate=spec.production_baseline,
+            scenario=scenario,
+        )
+
+
+def test_episode_replay_rejects_scenario_metadata_and_split_substitution() -> None:
+    spec = _spec()
+    scenario = _scenarios()[0]
+
+    sandbox = MirrorSandbox(spec, Executor())
+    receipt = sandbox.run_episode(
+        run_id="episode-binding",
+        candidate=spec.production_baseline,
+        scenario=scenario,
+    )
+    forged_scenario = replace(receipt, scenario_id="forged-scenario")
+    with pytest.raises(MirrorRoomError, match="replay scenario identity changed"):
+        sandbox.verify_replay(
+            forged_scenario,
+            candidate=spec.production_baseline,
+            scenario=scenario,
+        )
+
+    split_sandbox = MirrorSandbox(spec, Executor())
+    split_receipt = split_sandbox.run_episode(
+        run_id="episode-binding-split",
+        candidate=spec.production_baseline,
+        scenario=scenario,
+    )
+    forged_split = replace(split_receipt, split=ScenarioSplit.VALIDATION.value)
+    with pytest.raises(MirrorRoomError, match="replay scenario split changed"):
+        split_sandbox.verify_replay(
+            forged_split,
+            candidate=spec.production_baseline,
+            scenario=scenario,
+        )
+
+
+def test_episode_receipt_rejects_noncanonical_digest_metadata() -> None:
+    spec = _spec()
+    sandbox = MirrorSandbox(spec, Executor())
+    scenario = _scenarios()[0]
+    receipt = sandbox.run_episode(
+        run_id="episode-binding",
+        candidate=spec.production_baseline,
+        scenario=scenario,
+    )
+    with pytest.raises(MirrorRoomError, match="candidate_digest"):
+        replace(receipt, candidate_digest="G" * 64)
