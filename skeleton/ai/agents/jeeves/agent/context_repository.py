@@ -24,7 +24,7 @@ import math
 import re
 import threading
 import time
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
@@ -464,6 +464,16 @@ class ContextRepository:
         self._branches: dict[str, str | None] = {"main": None}
         self._sequence = 0
         self._lock = threading.RLock()
+        self._lexical_cache_limit = 8_192
+        self._lexical_cache: OrderedDict[
+            tuple[str, tuple[str, ...]], tuple[Counter[str], float]
+        ] = OrderedDict()
+        self._retrieval_stats = {
+            "retrievals": 0,
+            "lexical_cache_hits": 0,
+            "lexical_cache_misses": 0,
+            "lexical_cache_evictions": 0,
+        }
 
     def branches(self) -> Mapping[str, str | None]:
         with self._lock:
@@ -800,10 +810,13 @@ class ContextRepository:
         kind_set = None if kinds is None else {kind if isinstance(kind, ContextKind) else ContextKind(str(kind)) for kind in kinds}
         tag_set = {str(tag).strip().casefold() for tag in tags if str(tag).strip()}
         query_tokens = self._tokens(query)
+        query_norm = self._counter_norm(query_tokens)
         now = self._clock()
+        with self._lock:
+            self._retrieval_stats["retrievals"] += 1
         candidates: list[RetrievalHit] = []
-        for entry in self.checkout(branch, include_tombstones=False).entries:
-            if entry.expired(now) or entry.trust < minimum_trust:
+        for entry in self.checkout(branch).entries:
+            if entry.tombstoned or entry.expired(now) or entry.trust < minimum_trust:
                 continue
             if kind_set is not None and entry.kind not in kind_set:
                 continue
@@ -811,7 +824,13 @@ class ContextRepository:
                 continue
             if not include_unpromoted and not entry.promoted:
                 continue
-            lexical = self._cosine(query_tokens, self._tokens(entry.content + " " + " ".join(entry.tags)))
+            entry_tokens, entry_norm = self._entry_lexical(entry)
+            lexical = self._cosine_precomputed(
+                query_tokens,
+                query_norm,
+                entry_tokens,
+                entry_norm,
+            )
             age = max(0.0, now - entry.updated_at)
             recency = math.exp(-math.log(2) * age / (14 * 24 * 3600))
             promotion = 1.0 if entry.promoted else 0.0
@@ -858,13 +877,61 @@ class ContextRepository:
         return Counter(token.casefold() for token in _TOKEN_RE.findall(text or ""))
 
     @staticmethod
-    def _cosine(left: Counter[str], right: Counter[str]) -> float:
-        if not left or not right:
+    def _counter_norm(tokens: Counter[str]) -> float:
+        return math.sqrt(sum(value * value for value in tokens.values())) if tokens else 0.0
+
+    def _entry_lexical(self, entry: ContextEntry) -> tuple[Counter[str], float]:
+        cache_key = (entry.content, entry.tags)
+        with self._lock:
+            cached = self._lexical_cache.get(cache_key)
+            if cached is not None:
+                self._lexical_cache.move_to_end(cache_key)
+                self._retrieval_stats["lexical_cache_hits"] += 1
+                return cached
+
+        tokens = self._tokens(entry.content + " " + " ".join(entry.tags))
+        prepared = (tokens, self._counter_norm(tokens))
+        with self._lock:
+            cached = self._lexical_cache.get(cache_key)
+            if cached is not None:
+                self._lexical_cache.move_to_end(cache_key)
+                self._retrieval_stats["lexical_cache_hits"] += 1
+                return cached
+            self._lexical_cache[cache_key] = prepared
+            self._retrieval_stats["lexical_cache_misses"] += 1
+            while len(self._lexical_cache) > self._lexical_cache_limit:
+                self._lexical_cache.popitem(last=False)
+                self._retrieval_stats["lexical_cache_evictions"] += 1
+        return prepared
+
+    @staticmethod
+    def _cosine_precomputed(
+        left: Counter[str],
+        left_norm: float,
+        right: Counter[str],
+        right_norm: float,
+    ) -> float:
+        if not left or not right or not left_norm or not right_norm:
             return 0.0
         dot = sum(count * right.get(token, 0) for token, count in left.items())
-        ln = math.sqrt(sum(value * value for value in left.values()))
-        rn = math.sqrt(sum(value * value for value in right.values()))
-        return max(0.0, min(1.0, dot / (ln * rn))) if ln and rn else 0.0
+        return max(0.0, min(1.0, dot / (left_norm * right_norm)))
+
+    @classmethod
+    def _cosine(cls, left: Counter[str], right: Counter[str]) -> float:
+        return cls._cosine_precomputed(
+            left,
+            cls._counter_norm(left),
+            right,
+            cls._counter_norm(right),
+        )
+
+    def retrieval_stats(self) -> Mapping[str, int]:
+        with self._lock:
+            return {
+                **self._retrieval_stats,
+                "lexical_cache_entries": len(self._lexical_cache),
+                "lexical_cache_limit": self._lexical_cache_limit,
+            }
 
     def audit_compaction(self, before: ContextSnapshot, after_entries: Sequence[ContextEntry], *, minimum_retention: float = 0.90) -> CompactionAudit:
         minimum_retention = probability("minimum_retention", minimum_retention)

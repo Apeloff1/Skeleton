@@ -16,7 +16,7 @@ import json
 import threading
 import time
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -138,8 +138,6 @@ class IntelligenceOrchestrator:
             raise ValueError("max_cache_entries must be >= 1")
 
         self._bus = bus
-        self._tasks: Dict[str, ReasoningTask] = {}
-        self._results: Dict[str, ReasoningResult] = {}
         self._handlers: Dict[str, Callable[[ReasoningTask], ReasoningResult]] = {}
         self._policies: Dict[str, HandlerPolicy] = {}
         self._telemetry: Dict[str, HandlerTelemetry] = {}
@@ -287,7 +285,6 @@ class IntelligenceOrchestrator:
             deadline=deadline,
         )
         with self._lock:
-            self._tasks[task.task_id] = task
             self._stats["submitted"] += 1
 
         effective_min_confidence = self._min_confidence if min_confidence is None else min_confidence
@@ -419,7 +416,6 @@ class IntelligenceOrchestrator:
             total_latency_ms = (time.perf_counter() - started) * 1000.0
             result.latency_ms = total_latency_ms
             with self._lock:
-                self._results[task.task_id] = result
                 self._stats["completed"] += 1
                 chosen_index = next(
                     (
@@ -748,9 +744,10 @@ class AdaptiveLearner:
     def __init__(self, grid: MetaGrid, bus: Optional[EventBus] = None):
         self.grid = grid
         self._bus = bus
-        self._experience: List[Dict[str, Any]] = []
+        self._experience: deque[Dict[str, Any]] = deque()
         self._capability_scores: Dict[str, float] = {}
-        self._stats = {"updates": 0, "experiences": 0}
+        self._stats = {"updates": 0, "experiences": 0, "evicted_experiences": 0}
+        self._memory_window()
 
     def record_experience(
         self,
@@ -770,6 +767,7 @@ class AdaptiveLearner:
             }
         )
         self._stats["experiences"] += 1
+        self._trim_experience()
 
         alpha = self.grid.learning_rate
         current = self._capability_scores.get(capability, 0.5)
@@ -785,13 +783,22 @@ class AdaptiveLearner:
                 },
             )
 
+    def _memory_window(self) -> int:
+        value = self.grid.memory_window
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError("memory_window must be a positive integer")
+        return value
+
+    def _trim_experience(self) -> None:
+        limit = self._memory_window()
+        while len(self._experience) > limit:
+            self._experience.popleft()
+            self._stats["evicted_experiences"] += 1
+
     def adapt(self, capability: str) -> Dict[str, Any]:
         """Adapt learning parameters based on recent performance."""
-        recent = [
-            e
-            for e in self._experience[-self.grid.memory_window :]
-            if e["capability"] == capability
-        ]
+        self._trim_experience()
+        recent = [e for e in self._experience if e["capability"] == capability]
         if not recent:
             return {"status": "no_data", "capability": capability}
 
@@ -820,6 +827,36 @@ class AdaptiveLearner:
             "experiences": len(recent),
         }
 
+    def rank_capabilities(self, *, limit: int = 5) -> List[Dict[str, Any]]:
+        """Rank learned capabilities using bounded recent outcomes plus EMA score."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        self._trim_experience()
+        outcomes: Dict[str, List[float]] = {}
+        for experience in self._experience:
+            outcomes.setdefault(experience["capability"], []).append(float(experience["outcome"]))
+        rows = []
+        for capability, score in self._capability_scores.items():
+            values = outcomes.get(capability, [])
+            recent_average = sum(values) / len(values) if values else 0.0
+            rows.append(
+                {
+                    "capability": capability,
+                    "score": score,
+                    "recent_average": recent_average,
+                    "retained_experiences": len(values),
+                }
+            )
+        rows.sort(
+            key=lambda row: (
+                -row["score"],
+                -row["recent_average"],
+                -row["retained_experiences"],
+                row["capability"],
+            )
+        )
+        return rows[:limit]
+
     def best_capability(self) -> Optional[str]:
         """Return the highest-scoring capability."""
         if not self._capability_scores:
@@ -827,8 +864,11 @@ class AdaptiveLearner:
         return max(self._capability_scores.items(), key=lambda x: x[1])[0]
 
     def stats(self) -> Dict[str, Any]:
+        self._trim_experience()
         return {
             **self._stats,
             "capabilities": len(self._capability_scores),
             "scores": dict(self._capability_scores),
+            "retained_experiences": len(self._experience),
+            "memory_window": self._memory_window(),
         }
