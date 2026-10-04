@@ -119,14 +119,24 @@ class SwarmRecoveryManager:
             raise ValueError("checkpoint sequence must be a positive integer")
         return sequence
 
-    def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
+    def checkpoint(
+        self,
+        runtime: SwarmRuntime,
+        tenant_broker: TenantSwarmBroker | None = None,
+        *,
+        provisional: bool = False,
+    ) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
         with self._lock:
-            checkpoint = self.store.capture(runtime)
+            checkpoint = self.store.capture(runtime, provisional=provisional)
             if tenant_broker is None:
                 return checkpoint.sequence
             try:
-                self.tenant_store.capture(checkpoint.sequence, tenant_broker)
+                self.tenant_store.capture(
+                    checkpoint.sequence,
+                    tenant_broker,
+                    provisional=provisional,
+                )
             except Exception:
                 self.store.discard(checkpoint.sequence)
                 self.tenant_store.discard(checkpoint.sequence)
