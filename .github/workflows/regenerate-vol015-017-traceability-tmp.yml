@@ -9,7 +9,7 @@ on:
       - ".github/workflows/regenerate-vol015-017-traceability-tmp.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: regenerate-vol015-017-traceability
@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   regenerate:
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
