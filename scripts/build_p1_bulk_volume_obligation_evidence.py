@@ -339,6 +339,7 @@ def build_bulk_volume_evidence(
         for item in obligations
         if item.kind in {RiskKind.RISK, RiskKind.GAP}
         and item.source_ref.split(":", 1)[0] in owners
+        and item.obligation_id not in RETIRED_OBLIGATION_IDS
     ]
     expected_live_volume_obligations = (
         EXPECTED_VOLUME_OBLIGATIONS - len(RETIRED_OBLIGATION_IDS)
