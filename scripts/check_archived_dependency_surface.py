@@ -286,7 +286,10 @@ def validate_archive_map(
             if path.is_symlink():
                 observed_snapshot_files.add(relative_text)
                 if "vendor/dependency-manifests" in relative_text:
-                    errors.append("quarantined dependency evidence must not be a symlink: " f"{relative_text}")
+                    errors.append(
+                        "quarantined dependency evidence must not be a symlink: "
+                        f"{relative_text}"
+                    )
                 continue
             if not path.is_file():
                 continue
@@ -299,7 +302,11 @@ def validate_archive_map(
         errors.append(f"unmapped quarantined dependency evidence: {path}")
     for path in missing_from_tree:
         errors.append(f"mapped archive evidence missing from quarantine tree: {path}")
-    allowed_snapshot_files = {ARCHIVE_MAP.as_posix(), (ARCHIVE_ROOT / "README.md").as_posix(), *seen_archives}
+    allowed_snapshot_files = {
+        ARCHIVE_MAP.as_posix(),
+        (ARCHIVE_ROOT / "README.md").as_posix(),
+        *seen_archives,
+    }
     for path in sorted(observed_snapshot_files - allowed_snapshot_files):
         errors.append(f"unmapped archival snapshot payload: {path}")
     return errors

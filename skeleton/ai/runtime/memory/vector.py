@@ -217,8 +217,14 @@ class VectorStore:
         limit = min(top_k, len(candidates))
         ranked = heapq.nlargest(
             limit,
-            ((cls._cosine_similarity(query_vector, query_norm, entry), -index, entry)
-             for index, entry in enumerate(candidates)),
+            (
+                (
+                    cls._cosine_similarity(query_vector, query_norm, entry),
+                    -index,
+                    entry,
+                )
+                for index, entry in enumerate(candidates)
+            ),
             key=lambda item: (item[0], item[1]),
         )
         return [(similarity, entry) for similarity, _stable_index, entry in ranked]
@@ -401,10 +407,21 @@ class VectorStore:
 
         output: List[List[ScoredChunk]] = []
         for query_vector, query_norm in embedded:
-            scored = self._python_top_k(query_vector, query_norm, candidates, top_k)
+            scored = self._python_top_k(
+                query_vector,
+                query_norm,
+                candidates,
+                top_k,
+            )
             output.append(
-                [ScoredChunk(chunk=entry.chunk, score=(similarity + 1.0) / 2.0, plane="rag")
-                 for similarity, entry in scored]
+                [
+                    ScoredChunk(
+                        chunk=entry.chunk,
+                        score=(similarity + 1.0) / 2.0,
+                        plane="rag",
+                    )
+                    for similarity, entry in scored
+                ]
             )
         return output
 
@@ -419,34 +436,57 @@ class VectorStore:
     ) -> List[ScoredChunk]:
         """Retrieve relevant but non-redundant context with bounded MMR."""
         self._validate_top_k(top_k)
-        if (isinstance(candidate_multiplier, bool) or not isinstance(candidate_multiplier, int)
-                or candidate_multiplier < 1 or candidate_multiplier > 64):
+        if (
+            isinstance(candidate_multiplier, bool)
+            or not isinstance(candidate_multiplier, int)
+            or candidate_multiplier < 1
+            or candidate_multiplier > 64
+        ):
             raise ValueError("candidate_multiplier must be an integer within [1, 64]")
-        if (isinstance(diversity, bool) or not isinstance(diversity, (int, float))
-                or not math.isfinite(float(diversity)) or not 0.0 <= float(diversity) <= 1.0):
+        if (
+            isinstance(diversity, bool)
+            or not isinstance(diversity, (int, float))
+            or not math.isfinite(float(diversity))
+            or not 0.0 <= float(diversity) <= 1.0
+        ):
             raise ValueError("diversity must be finite and within [0, 1]")
         if top_k == 0 or not self._entries:
             return []
-        candidate_limit = min(len(self._entries), max(top_k, top_k * candidate_multiplier))
-        ranked = self.query(text, top_k=candidate_limit, metadata_filter=metadata_filter)
+        candidate_limit = min(
+            len(self._entries),
+            max(top_k, top_k * candidate_multiplier),
+        )
+        ranked = self.query(
+            text,
+            top_k=candidate_limit,
+            metadata_filter=metadata_filter,
+        )
         if len(ranked) <= 1 or float(diversity) == 0.0:
             return ranked[:top_k]
         selected: List[int] = [0]
         remaining = list(range(1, len(ranked)))
+        redundancy = [0.0] * len(ranked)
         weight = float(diversity)
         while remaining and len(selected) < top_k:
-            best_index = remaining[0]
-            best_key: Tuple[float, int] | None = None
+            selected_entry = self._entries[ranked[selected[-1]].chunk.chunk_id]
             for index in remaining:
                 candidate_entry = self._entries[ranked[index].chunk.chunk_id]
-                redundancy = 0.0
-                for selected_index in selected:
-                    selected_entry = self._entries[ranked[selected_index].chunk.chunk_id]
-                    cosine = self._cosine_similarity(candidate_entry.vector, candidate_entry.norm, selected_entry)
-                    redundancy = max(redundancy, max(0.0, min(1.0, (cosine + 1.0) / 2.0)))
-                key = ((1.0 - weight) * ranked[index].score - weight * redundancy, -index)
-                if best_key is None or key > best_key:
-                    best_key, best_index = key, index
+                cosine = self._cosine_similarity(
+                    candidate_entry.vector,
+                    candidate_entry.norm,
+                    selected_entry,
+                )
+                normalized = max(0.0, min(1.0, (cosine + 1.0) / 2.0))
+                redundancy[index] = max(redundancy[index], normalized)
+
+            best_index = max(
+                remaining,
+                key=lambda index: (
+                    (1.0 - weight) * ranked[index].score
+                    - weight * redundancy[index],
+                    -index,
+                ),
+            )
             selected.append(best_index)
             remaining.remove(best_index)
         return [ranked[index] for index in selected]
