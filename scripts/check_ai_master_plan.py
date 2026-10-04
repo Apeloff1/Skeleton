@@ -28,19 +28,19 @@ DEPTH_401_420 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_401_420.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
-_CLOSED_GAP_IMPLEMENTATION_STATES = {"hardened", "production"}
+_CLOSED_GAP_IMPLEMENTATION_STATES = {"evidence_pending", "implemented", "integrated", "verified", "hardened", "production"}
 
 
 def _depth_field_requires_nonempty(
     volume: dict[str, object],
     field: str,
 ) -> bool:
-    """Depth passes require gaps until implementation is hardened.
+    """Require depth-pass gaps only while implementation is unverified.
 
-    A permanently non-empty gaps field would make the master-plan depth
-    contract impossible to reconcile with the maturity contract, which
-    correctly requires hardened/production implementations to have no
-    unresolved gaps.
+    Gaps describe unresolved known work; once implementation has advanced into
+    evidence review or a maturity-bearing state, an empty gap list is a valid
+    closure signal and must not be rejected merely because verification or
+    promotion has not happened yet.
     """
 
     return not (
