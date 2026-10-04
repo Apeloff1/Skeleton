@@ -443,6 +443,39 @@ class DeferredExecutor:
         isolated = json.loads(payload_json)
         return handler, ledger, isolated
 
+    def _record_terminal_failure(
+        self,
+        invocation: DeferredInvocation,
+        *,
+        handler: _Handler,
+        ledger: BudgetLedger,
+        exc: BaseException,
+    ) -> FailureReceipt:
+        """Record a content-bound terminal fence before propagating a failure."""
+        error_material = {
+            "type": type(exc).__name__,
+            "message_digest": hashlib.sha256(
+                str(exc).encode("utf-8")
+            ).hexdigest(),
+        }
+        failure = FailureReceipt(
+            operation_id=invocation.operation_id,
+            volume_id=invocation.volume_id,
+            spec_digest=invocation.spec_digest,
+            authority_digest=invocation.authority_digest,
+            payload_digest=invocation.payload_digest,
+            handler_identity=handler.identity,
+            attempt=ledger.attempts,
+            cost_units=ledger.cost_units,
+            latency_ms=ledger.latency_ms,
+            error_type=type(exc).__name__,
+            error_digest=sha256_json(error_material),
+        )
+        with self._lock:
+            self._failure[invocation.operation_id] = failure
+            self._in_flight.discard(invocation.operation_id)
+        return failure
+
     def execute(
         self,
         invocation: DeferredInvocation,
@@ -479,35 +512,29 @@ class DeferredExecutor:
                 raise RuntimeError("result byte limit exceeded")
             result_digest = hashlib.sha256(result_bytes).hexdigest()
         except Exception as exc:
-            error_material = {
-                "type": type(exc).__name__,
-                "message_digest": hashlib.sha256(
-                    str(exc).encode("utf-8")
-                ).hexdigest(),
-            }
-            failure = FailureReceipt(
-                operation_id=invocation.operation_id,
-                volume_id=invocation.volume_id,
-                spec_digest=invocation.spec_digest,
-                authority_digest=invocation.authority_digest,
-                payload_digest=invocation.payload_digest,
-                handler_identity=handler.identity,
-                attempt=ledger.attempts,
-                cost_units=ledger.cost_units,
-                latency_ms=ledger.latency_ms,
-                error_type=type(exc).__name__,
-                error_digest=sha256_json(error_material),
+            failure = self._record_terminal_failure(
+                invocation,
+                handler=handler,
+                ledger=ledger,
+                exc=exc,
             )
-            with self._lock:
-                self._failure[invocation.operation_id] = failure
-                self._in_flight.discard(invocation.operation_id)
             raise DeferredExecutionError(
                 "deferred capability execution failed",
                 failure,
             ) from exc
-        except BaseException:
-            with self._lock:
-                self._in_flight.discard(invocation.operation_id)
+        except BaseException as exc:
+            # The handler may already have produced an external effect before an
+            # interpreter-level abort (KeyboardInterrupt/SystemExit/custom
+            # BaseException). Reusing the operation id would therefore risk
+            # duplicating an effect whose outcome is unknown. Preserve the
+            # original abort for the caller, but fence the operation as a
+            # terminal failure first.
+            self._record_terminal_failure(
+                invocation,
+                handler=handler,
+                ledger=ledger,
+                exc=exc,
+            )
             raise
 
         receipt = ExecutionReceipt(
