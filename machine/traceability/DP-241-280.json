@@ -1740,31 +1740,151 @@
       "id": "EVID:VOL-248:001",
       "type": "evidence",
       "volume_ref": "VOL-248",
-      "value": "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961"
+      "value": ".github/workflows/p1-reasoning-search-stop-policy.yml"
     },
     {
       "id": "EVID:VOL-248:002",
       "type": "evidence",
       "volume_ref": "VOL-248",
-      "value": "github-actions-job:108726229944"
+      "value": "git-head:31d7ea22706a83a4c46e9aa95e5700a68a69f902"
     },
     {
       "id": "EVID:VOL-248:003",
       "type": "evidence",
       "volume_ref": "VOL-248",
-      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
+      "value": "git-head:ff7d3e764d81c7f80bbc698516b03bd872c04961"
     },
     {
       "id": "EVID:VOL-248:004",
       "type": "evidence",
       "volume_ref": "VOL-248",
-      "value": "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961"
+      "value": "github-actions-job:108726229944"
     },
     {
       "id": "EVID:VOL-248:005",
       "type": "evidence",
       "volume_ref": "VOL-248",
+      "value": "github-actions-job:111334676216"
+    },
+    {
+      "id": "EVID:VOL-248:006",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "github-actions-job:111334676231"
+    },
+    {
+      "id": "EVID:VOL-248:007",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "github-actions-job:111334676388"
+    },
+    {
+      "id": "EVID:VOL-248:008",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "github-actions-job:111334677962"
+    },
+    {
+      "id": "EVID:VOL-248:009",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/36356867896"
+    },
+    {
+      "id": "EVID:VOL-248:010",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919250"
+    },
+    {
+      "id": "EVID:VOL-248:011",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919282"
+    },
+    {
+      "id": "EVID:VOL-248:012",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919351"
+    },
+    {
+      "id": "EVID:VOL-248:013",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/actions/runs/37167919357"
+    },
+    {
+      "id": "EVID:VOL-248:014",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
       "value": "https://github.com/Apeloff1/Skeleton/commit/209a2fc39b00dc00789e274772dc5724051db2c5"
+    },
+    {
+      "id": "EVID:VOL-248:015",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/30b49c289ccdec43bda819ccddba0a5909139b2c"
+    },
+    {
+      "id": "EVID:VOL-248:016",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/31d7ea22706a83a4c46e9aa95e5700a68a69f902"
+    },
+    {
+      "id": "EVID:VOL-248:017",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/69f2f2916e4ae3d06ae5b9c818322f56b6541841"
+    },
+    {
+      "id": "EVID:VOL-248:018",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/fbbb2444b3d642c005e07b10ea9704ebcdda7687"
+    },
+    {
+      "id": "EVID:VOL-248:019",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/commit/ff7d3e764d81c7f80bbc698516b03bd872c04961"
+    },
+    {
+      "id": "EVID:VOL-248:020",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/pull/2645"
+    },
+    {
+      "id": "EVID:VOL-248:021",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "https://github.com/Apeloff1/Skeleton/pull/2679"
+    },
+    {
+      "id": "EVID:VOL-248:022",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "machine/ai_p1_terminal_closure.json"
+    },
+    {
+      "id": "EVID:VOL-248:023",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "skeleton/ai/runtime/intelligence/uncertainty.py"
+    },
+    {
+      "id": "EVID:VOL-248:024",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "skeleton/intelligence/uncertainty.py"
+    },
+    {
+      "id": "EVID:VOL-248:025",
+      "type": "evidence",
+      "volume_ref": "VOL-248",
+      "value": "skeleton/testing/test_reasoning_strategy_registry.py"
     },
     {
       "id": "EVID:VOL-251:001",
@@ -2185,18 +2305,6 @@
       "type": "gap",
       "volume_ref": "VOL-247",
       "value": "bind retrieval freshness"
-    },
-    {
-      "id": "GAP:VOL-248:001",
-      "type": "gap",
-      "volume_ref": "VOL-248",
-      "value": "define uncertainty taxonomy"
-    },
-    {
-      "id": "GAP:VOL-248:002",
-      "type": "gap",
-      "volume_ref": "VOL-248",
-      "value": "bind UI/explanations"
     },
     {
       "id": "GAP:VOL-249:001",
@@ -2695,6 +2803,12 @@
       "type": "implementation_path",
       "volume_ref": "VOL-248",
       "value": ".github/workflows/p1-reasoning-search-stop-policy.yml"
+    },
+    {
+      "id": "PATH:VOL-248:008",
+      "type": "implementation_path",
+      "volume_ref": "VOL-248",
+      "value": "skeleton/ai/runtime/intelligence/uncertainty.py"
     },
     {
       "id": "PATH:VOL-249:001",
@@ -4763,7 +4877,7 @@
       "volume_ref": "VOL-248",
       "title": "Uncertainty Representation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "hardened",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4790,7 +4904,7 @@
       "volume_ref": "VOL-251",
       "title": "Search Strategy Engine",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4799,7 +4913,7 @@
       "volume_ref": "VOL-252",
       "title": "Value of Information",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4817,7 +4931,7 @@
       "volume_ref": "VOL-254",
       "title": "Answer Quality Pipeline",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4826,7 +4940,7 @@
       "volume_ref": "VOL-255",
       "title": "Artifact Quality Pipeline",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4835,7 +4949,7 @@
       "volume_ref": "VOL-256",
       "title": "Human-in-the-Loop Gates",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4844,7 +4958,7 @@
       "volume_ref": "VOL-257",
       "title": "Reversibility Classification",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4853,7 +4967,7 @@
       "volume_ref": "VOL-258",
       "title": "Blast-Radius Model",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -4862,7 +4976,7 @@
       "volume_ref": "VOL-259",
       "title": "Changeset Budgeting",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-241-280"
     },
     {
@@ -7102,6 +7216,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-248:001",
+      "to": "PATH:VOL-248:008",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-248:002",
       "to": "PATH:VOL-248:001",
       "type": "contract_materialized_at"
@@ -7137,6 +7256,11 @@
       "type": "contract_materialized_at"
     },
     {
+      "from": "CON:VOL-248:002",
+      "to": "PATH:VOL-248:008",
+      "type": "contract_materialized_at"
+    },
+    {
       "from": "CON:VOL-248:003",
       "to": "PATH:VOL-248:001",
       "type": "contract_materialized_at"
@@ -7169,6 +7293,11 @@
     {
       "from": "CON:VOL-248:003",
       "to": "PATH:VOL-248:007",
+      "type": "contract_materialized_at"
+    },
+    {
+      "from": "CON:VOL-248:003",
+      "to": "PATH:VOL-248:008",
       "type": "contract_materialized_at"
     },
     {
@@ -9027,6 +9156,21 @@
       "type": "implementation_validated_by_test"
     },
     {
+      "from": "PATH:VOL-248:008",
+      "to": "TEST:VOL-248:001",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-248:008",
+      "to": "TEST:VOL-248:002",
+      "type": "implementation_validated_by_test"
+    },
+    {
+      "from": "PATH:VOL-248:008",
+      "to": "TEST:VOL-248:003",
+      "type": "implementation_validated_by_test"
+    },
+    {
       "from": "PATH:VOL-249:001",
       "to": "TEST:VOL-249:001",
       "type": "implementation_validated_by_test"
@@ -10467,6 +10611,106 @@
       "type": "requirement_supported_by_evidence"
     },
     {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:006",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:007",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:008",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:009",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:010",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:011",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:012",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:013",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:014",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:015",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:016",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:017",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:018",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:019",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:020",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:021",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:022",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:023",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:024",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:001",
+      "to": "EVID:VOL-248:025",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
       "from": "REQ:VOL-248:002",
       "to": "TEST:VOL-248:001",
       "type": "requirement_accepted_by_test"
@@ -10504,6 +10748,106 @@
     {
       "from": "REQ:VOL-248:002",
       "to": "EVID:VOL-248:005",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:006",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:007",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:008",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:009",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:010",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:011",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:012",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:013",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:014",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:015",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:016",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:017",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:018",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:019",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:020",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:021",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:022",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:023",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:024",
+      "type": "requirement_supported_by_evidence"
+    },
+    {
+      "from": "REQ:VOL-248:002",
+      "to": "EVID:VOL-248:025",
       "type": "requirement_supported_by_evidence"
     },
     {
@@ -12198,13 +12542,103 @@
     },
     {
       "from": "VOL:VOL-248",
-      "to": "GAP:VOL-248:001",
-      "type": "volume_gap"
+      "to": "EVID:VOL-248:006",
+      "type": "volume_evidence"
     },
     {
       "from": "VOL:VOL-248",
-      "to": "GAP:VOL-248:002",
-      "type": "volume_gap"
+      "to": "EVID:VOL-248:007",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:008",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:009",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:010",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:011",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:012",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:013",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:014",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:015",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:016",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:017",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:018",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:019",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:020",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:021",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:022",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:023",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:024",
+      "type": "volume_evidence"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "EVID:VOL-248:025",
+      "type": "volume_evidence"
     },
     {
       "from": "VOL:VOL-248",
@@ -12239,6 +12673,11 @@
     {
       "from": "VOL:VOL-248",
       "to": "PATH:VOL-248:007",
+      "type": "volume_implementation_path"
+    },
+    {
+      "from": "VOL:VOL-248",
+      "to": "PATH:VOL-248:008",
       "type": "volume_implementation_path"
     },
     {
