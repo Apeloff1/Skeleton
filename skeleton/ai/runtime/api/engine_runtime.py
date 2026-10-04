@@ -163,14 +163,21 @@ class EngineExecutionCoordinator:
             await self.ensure_execution(execution_id)
             async with self._lock:
                 task = self._tasks.get(execution_id)
-        # Cancellation acknowledgement must not wait for the entire
-        # execution driver. The caller may own resources that the in-flight
-        # provider needs in order to finish and produce auditable late-result
-        # evidence. Persisting the cancellation bit plus ensuring an active
-        # driver is sufficient: the canonical runtime polls that durable bit,
-        # fences any provider response, and terminalizes independently.
+        # Cooperative local providers can acknowledge the durable cancellation
+        # promptly, but cancellation must never wait indefinitely for provider I/O.
+        # Give only adapters that explicitly advertise cooperative cancellation a
+        # bounded window to observe the repository bit and terminalize. Hosted or
+        # otherwise non-cooperative providers keep running behind the late-result
+        # fence and the caller returns immediately.
         if task is not None:
-            await asyncio.sleep(0)
+            adapter = self.provider_registry.active
+            cooperative = bool(
+                getattr(adapter, "supports_cooperative_cancellation", False)
+            )
+            if cooperative:
+                await asyncio.wait({task}, timeout=0.25)
+            else:
+                await asyncio.sleep(0)
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
