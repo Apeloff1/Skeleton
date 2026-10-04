@@ -8,6 +8,7 @@ on:
       - "skeleton/kernel/control_plane_isolation.py"
       - "skeleton/ai/runtime/kernel/control_plane_isolation.py"
       - "skeleton/testing/test_control_plane_isolation.py"
+      - "machine/control_data_plane_contract.json"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/control-data-plane-isolation.yml"
   push:
@@ -17,6 +18,7 @@ on:
       - "skeleton/kernel/control_plane_isolation.py"
       - "skeleton/ai/runtime/kernel/control_plane_isolation.py"
       - "skeleton/testing/test_control_plane_isolation.py"
+      - "machine/control_data_plane_contract.json"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/control-data-plane-isolation.yml"
   workflow_dispatch:
