@@ -559,7 +559,11 @@ async def cancel_execution(
             actor_id=body.actor_id,
             tenant_id=body.tenant_id,
         )
-        if coordinator is not None and not cancelled.execution.terminal:
+        if (
+            coordinator is not None
+            and cancelled.execution_state
+            not in {"completed", "failed", "cancelled"}
+        ):
             await coordinator.interrupt_cancelled_execution(execution_id)
             cancelled = service.status(
                 execution_id,
