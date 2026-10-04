@@ -8,6 +8,7 @@ validation.
 
 from __future__ import annotations
 
+import json
 from math import isfinite
 from threading import RLock
 from time import monotonic
@@ -36,6 +37,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         max_workers: int = 10_000,
         default_lease_seconds: float = 30.0,
         max_lease_seconds: float = 86_400.0,
+        checkpoint_extensions: Mapping[str, object] | None = None,
         clock: Callable[[], float] = monotonic,
     ) -> None:
         max_tasks = self._positive_int(max_tasks, "max_tasks")
@@ -64,7 +66,62 @@ class HardenedSwarmRuntime(SwarmRuntime):
         )
         self.max_workers = max_workers
         self.max_lease_seconds = max_lease_seconds
+        self._checkpoint_extensions = self._normalize_extensions(
+            checkpoint_extensions
+        )
         self._lock = RLock()
+
+    @staticmethod
+    def _normalize_extensions(
+        value: Mapping[str, object] | None,
+    ) -> dict[str, object]:
+        if value is None:
+            return {}
+        if not isinstance(value, Mapping):
+            raise ValueError("checkpoint_extensions must be a mapping")
+        normalized: dict[str, object] = {}
+        for raw_key, raw_value in value.items():
+            if not isinstance(raw_key, str) or not raw_key.strip():
+                raise ValueError("checkpoint extension key must be normalized text")
+            key = raw_key.strip()
+            if key != raw_key or len(key) > 128:
+                raise ValueError("checkpoint extension key must be normalized text")
+            try:
+                encoded = json.dumps(
+                    raw_value,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                )
+                decoded = json.loads(encoded)
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    f"checkpoint extension {key!r} must be deterministic JSON"
+                ) from exc
+            normalized[key] = decoded
+        return normalized
+
+    def checkpoint_extension(self, key: str) -> object | None:
+        key = key.strip()
+        with self._lock:
+            value = self._checkpoint_extensions.get(key)
+            if value is None:
+                return None
+            return json.loads(
+                json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False)
+            )
+
+    def set_checkpoint_extension(self, key: str, value: object | None) -> None:
+        key = key.strip()
+        if not key or len(key) > 128:
+            raise ValueError("checkpoint extension key must be normalized text")
+        with self._lock:
+            if value is None:
+                self._checkpoint_extensions.pop(key, None)
+                return
+            normalized = self._normalize_extensions({key: value})
+            self._checkpoint_extensions[key] = normalized[key]
 
     @staticmethod
     def _positive_int(value: int, label: str) -> int:
@@ -301,6 +358,9 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 {
                     "max_workers": self.max_workers,
                     "max_lease_seconds": self.max_lease_seconds,
+                    "checkpoint_extensions": self._normalize_extensions(
+                        self._checkpoint_extensions
+                    ),
                 }
             )
             state["config"] = config
@@ -323,6 +383,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             max_workers=int(config.get("max_workers", 10_000)),
             default_lease_seconds=float(config.get("default_lease_seconds", 30.0)),
             max_lease_seconds=float(config.get("max_lease_seconds", 86_400.0)),
+            checkpoint_extensions=config.get("checkpoint_extensions", {}),
             clock=clock,
         )
         base = SwarmRuntime.from_state(
