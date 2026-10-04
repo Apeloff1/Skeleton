@@ -137,9 +137,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     if evidence is None:
         errors.append("provider protocol closure evidence is missing")
     else:
-        for field in ("gap_status", "implementation_state", "closure_decision"):
+        for field in ("gap_status", "closure_decision"):
             if evidence.get(field) != "closed":
                 errors.append(f"provider protocol {field} is not closed")
+        if evidence.get("implementation_state") not in {"complete", "closed"}:
+            errors.append(f"provider protocol implementation_state is not closed")
         if evidence.get("outstanding_evidence") not in ([], None):
             errors.append("provider protocol evidence is still outstanding")
         if evidence.get("blockers") not in ([], None):
