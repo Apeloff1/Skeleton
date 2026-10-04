@@ -354,11 +354,19 @@ def _checkpoint(
         "previous_digest": _digest(previous_digest, "previous_digest"),
     }
     return AgentCheckpoint(
-        **identity,
+        tenant_id=str(identity["tenant_id"]),
+        agent_id=str(identity["agent_id"]),
+        sequence=int(identity["sequence"]),
+        state=AgentLifecycleState(str(identity["state"])),
+        descriptor_digest=str(identity["descriptor_digest"]),
+        authority_digest=str(identity["authority_digest"]),
         usage=usage,
         active_task_ids=tuple(identity["active_task_ids"]),
-        state=AgentLifecycleState(identity["state"]),
+        reason=identity["reason"],
+        created_at=float(identity["created_at"]),
+        previous_digest=str(identity["previous_digest"]),
         checkpoint_digest=_canonical_digest(identity),
+        schema_version=AGENT_RUNTIME_SCHEMA_VERSION,
     )
 
 
