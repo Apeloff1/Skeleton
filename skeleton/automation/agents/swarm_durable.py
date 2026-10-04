@@ -126,6 +126,8 @@ class SwarmDurableBridge:
             manager.store.discard(sequence)
             manager.tenant_store.discard(sequence)
             raise
+        manager.store.commit(sequence)
+        manager.tenant_store.commit(sequence)
         return DurableSwarmCapture(sequence, checkpoint)
 
     def load(self, run_id: str) -> DurableSwarmRecovery | None:
