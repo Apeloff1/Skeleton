@@ -309,17 +309,27 @@ def test_master_plan_rejects_scope_freeze_policy_weakening() -> None:
 
 
 
-def test_closed_gaps_require_hardened_implementation_status() -> None:
+def test_closed_gaps_require_implementation_to_advance_beyond_unverified() -> None:
     data = checker.load_plan()
 
-    hardened = json.loads(json.dumps(data))
-    hardened_volume = hardened["volumes"][13]
-    hardened_volume["implementation_status"] = "hardened"
-    hardened_volume["gaps"] = []
-    hardened_errors = checker.validate(hardened)
+    unverified = json.loads(json.dumps(data))
+    unverified_volume = unverified["volumes"][0]
+    unverified_volume["implementation_status"] = "unverified"
+    unverified_volume["gaps"] = []
+    unverified_errors = checker.validate(unverified)
+    assert (
+        "VOL-000: depth pass requires non-empty gaps"
+        in unverified_errors
+    )
+
+    evidence_pending = json.loads(json.dumps(data))
+    evidence_volume = evidence_pending["volumes"][248]
+    evidence_volume["implementation_status"] = "evidence_pending"
+    evidence_volume["gaps"] = []
+    evidence_errors = checker.validate(evidence_pending)
     assert not any(
-        error == "VOL-013: depth pass requires non-empty gaps"
-        for error in hardened_errors
+        error == "VOL-248: depth pass requires non-empty gaps"
+        for error in evidence_errors
     )
 
     integrated = json.loads(json.dumps(data))
@@ -327,9 +337,9 @@ def test_closed_gaps_require_hardened_implementation_status() -> None:
     integrated_volume["implementation_status"] = "integrated"
     integrated_volume["gaps"] = []
     integrated_errors = checker.validate(integrated)
-    assert (
-        "VOL-013: depth pass requires non-empty gaps"
-        in integrated_errors
+    assert not any(
+        error == "VOL-013: depth pass requires non-empty gaps"
+        for error in integrated_errors
     )
 
 def test_master_plan_rejects_stale_execution_frontier_snapshot() -> None:
