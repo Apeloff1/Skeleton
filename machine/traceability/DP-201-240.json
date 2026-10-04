@@ -4346,7 +4346,7 @@
       "volume_ref": "VOL-201",
       "title": "Agent Communication Protocol",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-201-240"
     },
     {
@@ -4355,7 +4355,7 @@
       "volume_ref": "VOL-202",
       "title": "Agent Handoff",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-201-240"
     },
     {
@@ -4382,7 +4382,7 @@
       "volume_ref": "VOL-205",
       "title": "Delegation Budgets",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-201-240"
     },
     {
@@ -4400,7 +4400,7 @@
       "volume_ref": "VOL-207",
       "title": "Adversarial Reviewer",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-201-240"
     },
     {
@@ -4409,7 +4409,7 @@
       "volume_ref": "VOL-208",
       "title": "Independent Verifier",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-201-240"
     },
     {
