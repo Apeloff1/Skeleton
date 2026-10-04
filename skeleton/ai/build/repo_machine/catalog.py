@@ -34,12 +34,15 @@ class CapabilityRecord:
 @dataclass(frozen=True, slots=True)
 class RepositoryCatalog:
     capabilities: tuple[CapabilityRecord, ...]
+    _by_zone: dict[str, tuple[CapabilityRecord, ...]] | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {"capabilities": [item.as_dict() for item in self.capabilities]}
 
     def by_zone(self, zone: str) -> tuple[CapabilityRecord, ...]:
-        return tuple(item for item in self.capabilities if item.zone == zone)
+        if self._by_zone is None:
+            return tuple(item for item in self.capabilities if item.zone == zone)
+        return self._by_zone.get(zone, ())
 
     def workflows(self) -> tuple[CapabilityRecord, ...]:
         return tuple(item for item in self.capabilities if item.kind == "workflow")
@@ -60,7 +63,20 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
         for subsystem in model.subsystems
         for path in subsystem.entrypoints
     }
-    tests = [item for item in model.files if item.kind == "test"]
+    tests_by_zone: dict[str, list[object]] = {}
+    test_stems: dict[str, list[object]] = {}
+    for test in model.files:
+        if test.kind != "test":
+            continue
+        tests_by_zone.setdefault(test.zone, []).append(test)
+        stem = PurePosixPath(test.path).stem.casefold()
+        if stem:
+            test_stems.setdefault(stem, []).append(test)
+
+    # Cache the existing substring semantics per capability stem. A large
+    # repository often has many capabilities sharing the same basename.
+    stem_matches: dict[str, tuple[object, ...]] = {}
+
     capabilities: list[CapabilityRecord] = []
     for item in model.files:
         kind = ""
@@ -79,11 +95,19 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
             continue
 
         stem = PurePosixPath(item.path).stem.casefold()
-        related = tuple(sorted(
-            test.path for test in tests
-            if test.zone == item.zone
-            or (stem and stem in PurePosixPath(test.path).stem.casefold())
-        )[:32])
+        related_paths = {test.path for test in tests_by_zone.get(item.zone, ())}
+        if stem:
+            matches = stem_matches.get(stem)
+            if matches is None:
+                matches = tuple(
+                    test
+                    for test_stem, tests in test_stems.items()
+                    if stem in test_stem
+                    for test in tests
+                )
+                stem_matches[stem] = matches
+            related_paths.update(test.path for test in matches)
+        related = tuple(sorted(related_paths)[:32])
         subsystem = subsystem_by_name.get(item.zone)
         dependencies = subsystem.dependencies if subsystem else ()
         capabilities.append(CapabilityRecord(
@@ -97,7 +121,14 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
             dependencies=dependencies,
         ))
 
-    return RepositoryCatalog(tuple(sorted(
+    ordered = tuple(sorted(
         capabilities,
         key=lambda item: (item.zone, item.kind, item.path),
-    )))
+    ))
+    by_zone: dict[str, list[CapabilityRecord]] = {}
+    for item in ordered:
+        by_zone.setdefault(item.zone, []).append(item)
+    return RepositoryCatalog(
+        ordered,
+        {zone: tuple(items) for zone, items in by_zone.items()},
+    )
