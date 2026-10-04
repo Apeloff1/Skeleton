@@ -2480,6 +2480,13 @@ class CostGovernor:
         admission_intent: _AdmissionIntentJournal | None = None
 
         with self._lock:
+            try:
+                self.runtime.ensure_tenant_quota(request.tenant_id)
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(
+                    "tenant_quota_unavailable"
+                ) from exc
+
             current = self._active.get(request.operation_id)
             if current is not None:
                 if current.requested_request_digest != requested_digest:
