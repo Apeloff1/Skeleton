@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.5",
+  "tree_version": "1.6.6",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -4838,6 +4838,27 @@
       "source_disposition": "canonical_namespace_entrypoint_with_independently_governed_children"
     },
     {
+      "id": "AIFT-RESEARCH-SOURCE-LINEAGE",
+      "source": "skeleton/research/source_lineage.py",
+      "destination": "skeleton/ai/research/source_lineage.py",
+      "kind": "file",
+      "source_git_object_sha": "0381d20152001d413ab63be3c5e9541aa26e1ca5",
+      "role": "Canonical research source-lineage and evidence tracking surface mirrored exactly into governed AI research quarantine.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "research_lineage_quarantine_mirror_pending_independent_cutover_validation"
+    },
+    {
       "id": "AIFT-ECS-ADAPTER",
       "source": "skeleton/ecs",
       "destination": "skeleton/ai/runtime/ecs",
@@ -5970,14 +5991,14 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 163,
+    "governed_mapping_count": 164,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 86,
     "batch_counts": {
       "B3-owner-sensitive": 8,
       "B1-core-runtime": 60,
       "B2-domain-build": 13,
-      "B4-research-quarantine": 54,
+      "B4-research-quarantine": 55,
       "B3-compat-convergence": 28
     },
     "fresh_object_audit_required": true,
