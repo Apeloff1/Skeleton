@@ -1,3 +1,4 @@
+# Regeneration trigger: exact-head VOL-015-017 closure state.
 name: Temporary regenerate master traceability for VOL-015-017 closure
 
 on:
