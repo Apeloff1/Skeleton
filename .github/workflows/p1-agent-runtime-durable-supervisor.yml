@@ -1,0 +1,93 @@
+name: P1 Agent Runtime Durable Supervisor
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/automation/agents/durable_supervisor.py"
+      - "skeleton/automation/agents/swarm_checkpoint.py"
+      - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
+      - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_durable.py"
+      - "skeleton/agents/durable_supervisor.py"
+      - "skeleton/ai/agents/core/durable_supervisor.py"
+      - "skeleton/automation/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_durable_agent_supervisor.py"
+      - "skeleton/testing/test_swarm_durable.py"
+      - "skeleton/testing/test_swarm_checkpoint.py"
+      - "skeleton/testing/test_swarm_tenant_checkpoint.py"
+      - "skeleton/testing/test_swarm_supervisor.py"
+      - "machine/ai_file_tree.json"
+      - ".github/workflows/p1-agent-runtime-durable-supervisor.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/automation/agents/durable_supervisor.py"
+      - "skeleton/automation/agents/swarm_checkpoint.py"
+      - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
+      - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
+      - "skeleton/ai/agents/core/swarm_durable.py"
+      - "skeleton/agents/durable_supervisor.py"
+      - "skeleton/ai/agents/core/durable_supervisor.py"
+      - "skeleton/automation/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_durable_agent_supervisor.py"
+      - "skeleton/testing/test_swarm_durable.py"
+      - "skeleton/testing/test_swarm_checkpoint.py"
+      - "skeleton/testing/test_swarm_tenant_checkpoint.py"
+      - "skeleton/testing/test_swarm_supervisor.py"
+      - "machine/ai_file_tree.json"
+      - ".github/workflows/p1-agent-runtime-durable-supervisor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-agent-runtime-durable-supervisor-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  durable-supervisor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install project test runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Verify canonical AI mirror and legacy facade
+        run: |
+          cmp skeleton/automation/agents/durable_supervisor.py skeleton/ai/agents/core/durable_supervisor.py
+          grep -q "from skeleton.automation.agents.durable_supervisor import" skeleton/agents/durable_supervisor.py
+
+      - name: Run durable supervisor closure contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_durable_agent_supervisor.py
+          skeleton/testing/test_swarm_durable.py
+          skeleton/testing/test_swarm_checkpoint.py
+          skeleton/testing/test_swarm_tenant_checkpoint.py
+          skeleton/testing/test_swarm_supervisor.py

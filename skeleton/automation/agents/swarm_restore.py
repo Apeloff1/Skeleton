@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from math import isfinite
 from typing import Mapping
 
@@ -44,6 +45,34 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
         raise ValueError("lease configuration must be finite")
     if default_lease <= 0 or max_lease <= 0 or default_lease > max_lease:
         raise ValueError("invalid lease configuration")
+    extensions = config_raw.get("checkpoint_extensions", {})
+    if not isinstance(extensions, Mapping):
+        raise ValueError("checkpoint_extensions must be a mapping")
+    if len(extensions) > 32:
+        raise ValueError("checkpoint_extensions exceeds maximum count")
+    normalized_extensions: dict[str, object] = {}
+    for raw_key, raw_value in extensions.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise ValueError("checkpoint extension key must be normalized text")
+        key = raw_key.strip()
+        if key != raw_key or len(key) > 128:
+            raise ValueError("checkpoint extension key must be normalized text")
+        try:
+            encoded = json.dumps(
+                raw_value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            if len(encoded.encode("utf-8")) > 256 * 1024:
+                raise ValueError("checkpoint extension payload is too large")
+            normalized_extensions[key] = json.loads(encoded)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError(
+                f"checkpoint extension {key!r} must be deterministic JSON"
+            ) from exc
+
     config = dict(config_raw)
     config.update(
         {
@@ -51,6 +80,7 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
             "max_workers": max_workers,
             "default_lease_seconds": default_lease,
             "max_lease_seconds": max_lease,
+            "checkpoint_extensions": normalized_extensions,
         }
     )
 

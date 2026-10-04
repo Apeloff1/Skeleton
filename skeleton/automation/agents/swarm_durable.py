@@ -114,7 +114,7 @@ class SwarmDurableBridge:
         if tenant_broker is not None and not isinstance(tenant_broker, TenantSwarmBroker):
             raise TypeError("tenant_broker must be a TenantSwarmBroker or None")
 
-        sequence = manager.checkpoint(runtime, tenant_broker)
+        sequence = manager.checkpoint(runtime, tenant_broker, provisional=True)
         try:
             checkpoint = self.persist(
                 run_id,
@@ -126,6 +126,8 @@ class SwarmDurableBridge:
             manager.store.discard(sequence)
             manager.tenant_store.discard(sequence)
             raise
+        manager.store.commit(sequence)
+        manager.tenant_store.commit(sequence)
         return DurableSwarmCapture(sequence, checkpoint)
 
     def load(self, run_id: str) -> DurableSwarmRecovery | None:

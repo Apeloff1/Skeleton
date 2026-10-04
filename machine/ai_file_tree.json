@@ -421,7 +421,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "dadbb23a9eee8b7a172761409ef18765ab4bf718",
+      "source_git_object_sha": "7927a6048b8240e9969a83dd0e77c5ecca46a7fd",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",

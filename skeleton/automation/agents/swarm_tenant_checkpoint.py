@@ -37,6 +37,7 @@ class TenantCheckpointStore:
         self.max_checkpoints = max_checkpoints
         self._clock = clock
         self._items: Deque[TenantMetadataCheckpoint] = deque(maxlen=max_checkpoints)
+        self._rollback_evicted: dict[int, TenantMetadataCheckpoint] = {}
         self._lock = RLock()
 
     @staticmethod
@@ -90,7 +91,13 @@ class TenantCheckpointStore:
             tuple(checkpoint.terminal),
         )
 
-    def capture(self, sequence: int, broker: TenantSwarmBroker) -> TenantMetadataCheckpoint:
+    def capture(
+        self,
+        sequence: int,
+        broker: TenantSwarmBroker,
+        *,
+        provisional: bool = False,
+    ) -> TenantMetadataCheckpoint:
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
             raise ValueError("sequence must be positive")
         status = broker.status()
@@ -116,7 +123,14 @@ class TenantCheckpointStore:
                 return existing
             if self._items and checkpoint.sequence <= self._items[-1].sequence:
                 raise ValueError("tenant checkpoint history must be strictly increasing")
+            evicted = (
+                self._items[0]
+                if len(self._items) == self.max_checkpoints
+                else None
+            )
             self._items.append(checkpoint)
+            if provisional and evicted is not None:
+                self._rollback_evicted[checkpoint.sequence] = evicted
         return checkpoint
 
     def load_verified(self, checkpoint: TenantMetadataCheckpoint) -> TenantMetadataCheckpoint:
@@ -146,12 +160,20 @@ class TenantCheckpointStore:
         with self._lock:
             return tuple(self._items)
 
+    def commit(self, sequence: int) -> None:
+        """Finalize one provisional sidecar capture after outer persistence."""
+        with self._lock:
+            self._rollback_evicted.pop(sequence, None)
+
     def discard(self, sequence: int) -> bool:
-        """Discard one sidecar checkpoint, used to roll back paired capture failures."""
+        """Rollback one provisional sidecar capture and restore prior history."""
         with self._lock:
             retained = [item for item in self._items if item.sequence != sequence]
             if len(retained) == len(self._items):
                 return False
+            evicted = self._rollback_evicted.pop(sequence, None)
+            if evicted is not None:
+                retained.insert(0, evicted)
             self._items = deque(retained, maxlen=self.max_checkpoints)
             return True
 
