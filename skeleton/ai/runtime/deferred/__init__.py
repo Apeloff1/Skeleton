@@ -15,6 +15,13 @@ from .executor import (
     ExecutionReceipt,
     FailureReceipt,
 )
+from .journal import (
+    DeferredExecutionJournal,
+    DeferredJournalConflict,
+    DeferredJournalError,
+    DeferredJournalRecord,
+    SqliteDeferredExecutionJournal,
+)
 
 __all__ = [
     "CapabilityRegistry",
