@@ -24,7 +24,7 @@ def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise LocalModelArtifactError(f"duplicate artifact key: {key}")
+            raise LocalModelArtifactError(f"duplicate JSON key: {key}")
         result[key] = value
     return result
 
@@ -105,7 +105,7 @@ def _payload_model(payload: Mapping[str, Any]) -> tuple[object, str]:
             )
         except (TypeError, ValueError) as exc:
             raise LocalModelArtifactError(
-                "reference model artifact failed identity validation"
+                "reference model artifact is invalid"
             ) from exc
 
     raise LocalModelArtifactError("unsupported local model artifact schema")
