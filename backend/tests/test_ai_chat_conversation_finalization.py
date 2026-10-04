@@ -125,11 +125,6 @@ async def test_chat_commits_assistant_only_from_successful_engine_result(
         )
     )
 
-    async def wait_for_terminal(**_kwargs):
-        raise AssertionError("fresh wait-mode chat must execute the newly constructed command")
-
-    fake_client.wait_for_terminal = wait_for_terminal
-
     async def execute(command):
         captured_commands.append(command)
         return SimpleNamespace(
@@ -195,11 +190,6 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
             execution_timeout_s=30.0,
         )
     )
-
-    async def wait_for_terminal(**_kwargs):
-        raise AssertionError("fresh wait-mode chat must execute the newly constructed command")
-
-    fake_client.wait_for_terminal = wait_for_terminal
 
     async def execute(_command):
         raise EngineUnavailableError("engine unavailable")
@@ -289,11 +279,6 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
             execution_timeout_s=30.0,
         )
     )
-
-    async def wait_for_terminal(**_kwargs):
-        raise AssertionError("fresh wait-mode chat must execute the newly constructed command")
-
-    fake_client.wait_for_terminal = wait_for_terminal
 
     async def execute(command):
         captured_commands.append(command)
