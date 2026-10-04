@@ -7,6 +7,8 @@ on:
     paths:
       - "machine/ai_master_plan.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "machine/ai_scope_freeze_adrs.json"
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_scope_freeze.py"
@@ -21,6 +23,8 @@ on:
     paths:
       - "machine/ai_master_plan.json"
       - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
       - "machine/ai_scope_freeze_adrs.json"
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_scope_freeze.py"
