@@ -1131,9 +1131,14 @@ class SQLitePrivacyDeletionAuthority:
                 raise PrivacyDeletionError("unknown persisted resolution")
             receipt = row["resolution_receipt_digest"]
             order = row["resolution_order"]
-            if (resolution is None) != (receipt is None or order is None):
+            if resolution is None:
+                if receipt is not None or order is not None:
+                    raise PrivacyDeletionError(
+                        "unresolved copy carries resolution evidence"
+                    )
+            elif receipt is None or order is None:
                 raise PrivacyDeletionError(
-                    "copy resolution evidence is partially populated"
+                    "resolved copy lacks complete resolution evidence"
                 )
             return MaterializedCopy(
                 namespace=self.namespace,
