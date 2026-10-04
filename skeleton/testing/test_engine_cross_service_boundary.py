@@ -44,7 +44,14 @@ class _Provider:
         self.requests.append(request)
         self.started.set()
         if self.gate is not None:
-            await self.gate.wait()
+            try:
+                await self.gate.wait()
+            except asyncio.CancelledError:
+                # This fixture models an upstream provider request that cannot
+                # be cancelled once dispatched. The runtime must still account
+                # for its eventual receipt while fencing the late result from
+                # becoming final output.
+                await self.gate.wait()
         return ProviderResponse(
             text=self.text,
             provider=self.provider_id,
