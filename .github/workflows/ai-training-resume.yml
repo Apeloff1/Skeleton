@@ -23,6 +23,12 @@ on:
       - "skeleton/api/engine_*.py"
       - "skeleton/ai/runtime/api/engine_*.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "skeleton/testing/test_engine_handoff_recovery.py"
+      - "skeleton/testing/test_engine_cross_service_boundary.py"
+      - "skeleton/testing/test_engine_routes.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_local_inference_cancellation.py"
       - "skeleton/testing/test_local_provider*.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_multimodal_training_projection.json"
@@ -60,6 +66,12 @@ on:
       - "skeleton/api/engine_*.py"
       - "skeleton/ai/runtime/api/engine_*.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "skeleton/testing/test_engine_handoff_recovery.py"
+      - "skeleton/testing/test_engine_cross_service_boundary.py"
+      - "skeleton/testing/test_engine_routes.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_local_inference_cancellation.py"
       - "skeleton/testing/test_local_provider*.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_multimodal_training_projection.json"
@@ -139,6 +151,8 @@ jobs:
           skeleton/testing/test_local_inference_cancellation.py
           skeleton/testing/test_engine_handoff_recovery.py
           skeleton/testing/test_engine_cross_service_boundary.py
+          skeleton/testing/test_engine_routes.py
+          skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_native_neural_lm.py
           skeleton/testing/test_p3_neural_training_resume.py
           skeleton/testing/test_p3_multimodal_training_projection.py

@@ -66,18 +66,23 @@ finally:
 `DatasetRegistry.ingest_materialized` computes splits and quality from stored
 original bytes. `MultimodalCorpus.export_text_training` supplies an immutable
 manifest and exact projected documents; `DatasetRegistry.ingest_export` verifies
-the original asset/record/projection/rights/lineage sequence before materializing
-it. Binary media without verified text is not silently treated as a corpus.
-Simulation remains an explicitly isolated purpose.
+the declared asset/record/projection/rights/lineage bindings and exact projected
+document sequence before materializing it. Original acquisition proof is
+supplied by the exporter/operator. Binary media without verified text is not
+silently treated as a corpus. Simulation remains an explicitly isolated purpose.
 
 Source revocation and deletion are durable operations:
 
 ```python
-datasets.revoke_source_rights(
-    sources[0].envelope.content_digest,
-    reason="Training consent withdrawn",
-    command_id="withdraw-consent-001",
-)
+datasets = DatasetRegistry("local-training-state/datasets.sqlite3")
+try:
+    datasets.revoke_source_rights(
+        sources[0].envelope.content_digest,
+        reason="Training consent withdrawn",
+        command_id="withdraw-consent-001",
+    )
+finally:
+    datasets.close()
 ```
 
 `delete_source` and `delete_dataset` likewise require a reason and command ID.
