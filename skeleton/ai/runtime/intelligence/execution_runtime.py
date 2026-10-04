@@ -349,6 +349,60 @@ def _tool_batch_signature(calls: tuple[ProviderToolCall, ...]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _provider_response_binding(
+    response,
+    turn_id: str,
+) -> tuple[str, str]:
+    provider=str(response.provider).strip()
+    if not provider:
+        raise CognitiveExecutionError("provider response identity is empty")
+    external_id=str(
+        response.response_id
+        or response.request_id
+        or turn_id
+    ).strip()
+    if not external_id:
+        raise CognitiveExecutionError("provider response external identity is empty")
+    payload={
+        "provider":provider,
+        "model":response.model,
+        "request_id":response.request_id,
+        "response_id":response.response_id,
+        "text":response.text,
+        "structured_output":(
+            None
+            if response.structured_output is None
+            else dict(response.structured_output)
+        ),
+        "tool_calls":[call.as_dict() for call in response.tool_calls],
+        "finish_reason":response.finish_reason.value,
+        "usage":response.usage.as_dict(),
+        "governance_decision_id":response.governance_decision_id,
+        "admission_decision_id":response.admission_decision_id,
+        "data_class":response.data_class,
+        "context_id":response.context_id,
+        "context_digest":response.context_digest,
+        "context_source_snapshot":list(response.context_source_snapshot),
+        "context_compiler_version":response.context_compiler_version,
+    }
+    try:
+        encoded=json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",",":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError,ValueError) as exc:
+        raise CognitiveExecutionError(
+            "provider response is not deterministic JSON"
+        ) from exc
+    return (
+        f"provider:{provider}:{external_id}",
+        hashlib.sha256(encoded).hexdigest(),
+    )
+
+
 def _verification_ref(receipt: ExecutionVerificationDecision) -> str:
     encoded = json.dumps(
         receipt.as_dict(),
@@ -399,6 +453,50 @@ class CognitiveExecutionRuntime:
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
         self._verification_runtime = VerificationRuntime()
+
+    def _bind_provider_response(
+        self,
+        payload: dict[str, object],
+        response,
+        turn_id: str,
+    ) -> str:
+        expected_provider=getattr(self.provider,"provider_id",None)
+        if (
+            isinstance(expected_provider,str)
+            and expected_provider.strip()
+            and response.provider!=expected_provider
+        ):
+            raise CognitiveExecutionError(
+                "provider response identity does not match bound adapter"
+            )
+        expected_context=payload.get("context_digest")
+        if (
+            response.context_digest is not None
+            and response.context_digest!=expected_context
+        ):
+            raise CognitiveExecutionError(
+                "provider response context digest drift"
+            )
+
+        provider_ref,fingerprint=_provider_response_binding(response,turn_id)
+        raw=payload.get("provider_response_bindings",{})
+        if not isinstance(raw,Mapping):
+            raise CognitiveExecutionError(
+                "provider response binding checkpoint is corrupt"
+            )
+        bindings=dict(raw)
+        prior=bindings.get(provider_ref)
+        if prior is not None:
+            if prior!=fingerprint:
+                raise CognitiveExecutionError(
+                    "provider response identity reused with different payload"
+                )
+            raise CognitiveExecutionError(
+                "provider response identity replayed"
+            )
+        bindings[provider_ref]=fingerprint
+        payload["provider_response_bindings"]=bindings
+        return provider_ref
 
     def _meter_storage(
         self,
@@ -543,6 +641,7 @@ class CognitiveExecutionRuntime:
             "model_turns": 0,
             "tool_calls": 0,
             "provider_receipts": [],
+            "provider_response_bindings": {},
             "tool_receipts": [],
             "tool_verification_evidence": [],
             "usage_events": [],
@@ -1226,15 +1325,10 @@ class CognitiveExecutionRuntime:
             durable_after_provider.cancellation_requested
             or self._deadline_expired(payload, now=now)
         ):
-            late_provider_ref = (
-                "provider:"
-                + response.provider
-                + ":"
-                + str(
-                    response.response_id
-                    or response.request_id
-                    or turn_id
-                )
+            late_provider_ref = self._bind_provider_response(
+                payload,
+                response,
+                turn_id,
             )
             late_receipts = list(
                 payload.get("provider_receipts", [])
@@ -1314,15 +1408,10 @@ class CognitiveExecutionRuntime:
                 }
             )
 
-        provider_ref = (
-            "provider:"
-            + response.provider
-            + ":"
-            + str(
-                response.response_id
-                or response.request_id
-                or turn_id
-            )
+        provider_ref = self._bind_provider_response(
+            payload,
+            response,
+            turn_id,
         )
         provider_receipts = list(payload.get("provider_receipts", []))
         provider_receipts.append(provider_ref)

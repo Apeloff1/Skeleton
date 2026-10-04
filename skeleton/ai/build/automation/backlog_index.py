@@ -69,12 +69,27 @@ class RepositoryIndex:
     references: tuple[ReferenceRecord, ...] = field(default_factory=tuple)
     workflows: tuple[str, ...] = field(default_factory=tuple)
     tests: tuple[str, ...] = field(default_factory=tuple)
+    _files_by_path: dict[str, Document] = field(default_factory=dict, repr=False, compare=False)
+    _symbols_by_name: dict[str, tuple[SymbolRecord, ...]] = field(default_factory=dict, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not self._files_by_path:
+            object.__setattr__(self, "_files_by_path", {doc.path: doc for doc in self.files})
+        if not self._symbols_by_name:
+            grouped: dict[str, list[SymbolRecord]] = {}
+            for symbol in self.symbols:
+                grouped.setdefault(symbol.name, []).append(symbol)
+            object.__setattr__(
+                self,
+                "_symbols_by_name",
+                {name: tuple(values) for name, values in grouped.items()},
+            )
 
     def find_path(self, path: str) -> Document | None:
-        return next((doc for doc in self.files if doc.path == path), None)
+        return self._files_by_path.get(path)
 
     def find_symbol(self, name: str) -> tuple[SymbolRecord, ...]:
-        return tuple(symbol for symbol in self.symbols if symbol.name == name)
+        return self._symbols_by_name.get(name, ())
 
     def references_to(self, target: str) -> tuple[ReferenceRecord, ...]:
         return tuple(reference for reference in self.references if reference.target == target)
