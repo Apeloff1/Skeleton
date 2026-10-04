@@ -91,7 +91,13 @@ class TenantCheckpointStore:
             tuple(checkpoint.terminal),
         )
 
-    def capture(self, sequence: int, broker: TenantSwarmBroker) -> TenantMetadataCheckpoint:
+    def capture(
+        self,
+        sequence: int,
+        broker: TenantSwarmBroker,
+        *,
+        provisional: bool = False,
+    ) -> TenantMetadataCheckpoint:
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
             raise ValueError("sequence must be positive")
         status = broker.status()
@@ -123,7 +129,7 @@ class TenantCheckpointStore:
                 else None
             )
             self._items.append(checkpoint)
-            if evicted is not None:
+            if provisional and evicted is not None:
                 self._rollback_evicted[checkpoint.sequence] = evicted
         return checkpoint
 
