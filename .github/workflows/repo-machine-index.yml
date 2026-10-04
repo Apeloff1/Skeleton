@@ -36,7 +36,7 @@ jobs:
 
       - name: Build machine index
         run: |
-          python -m pip install --no-deps .
+          python -m pip install .
           mkdir -p .machine
           skeleton-repo-machine --root . --output .machine/repository-machine.json
           python - <<'PY'
