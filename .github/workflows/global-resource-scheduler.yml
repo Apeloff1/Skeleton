@@ -55,6 +55,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check pytest
       - name: Compile global scheduler surfaces
         run: >-
           python -m compileall -q
@@ -69,10 +71,10 @@ jobs:
         run: python scripts/verify_global_resource_scheduler_contract.py --json
       - name: Run global scheduler regressions
         run: >-
-          python -m unittest -q
-          skeleton.testing.test_global_resource_scheduler
-          skeleton.testing.test_global_resource_swarm_integration
-          tests.test_scheduler
+          python -m pytest -q
+          skeleton/testing/test_global_resource_scheduler.py
+          skeleton/testing/test_global_resource_swarm_integration.py
+          tests/test_scheduler.py
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
