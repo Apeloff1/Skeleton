@@ -742,9 +742,18 @@ async def test_explicit_orphan_recovery_requires_same_plan(tmp_path) -> None:
             now=_now(),
         )
 
+    with pytest.raises(ToolSagaInDoubt, match="owner changed before orphan recovery"):
+        await saga.recover_orphaned(
+            saga_id,
+            steps,
+            expected_owner_token=_uid(999),
+            now=_now(),
+        )
+
     recovered = await saga.recover_orphaned(
         saga_id,
         steps,
+        expected_owner_token=_uid(103),
         now=_now(),
     )
     assert recovered.status is ToolSagaStatus.RUNNING
