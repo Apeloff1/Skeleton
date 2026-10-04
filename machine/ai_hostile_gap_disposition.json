@@ -169,7 +169,7 @@
       "title": "Configuration authority and immutable config snapshots",
       "status": "implementation_pr_open",
       "implementation_refs": [
-        "github:pr#2726"
+        "github:pr#2747"
       ],
       "evidence_refs": [],
       "closure_note": null
