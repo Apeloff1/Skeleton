@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from core.engine_client import EngineClientConfig, EngineUnavailableError
+from core.engine_client import EngineClientConfig, EngineNotFoundError, EngineUnavailableError
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -171,6 +171,9 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
             execution_timeout_s=5,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
         async def execute(self, command):
             captured["command"] = command
             return SimpleNamespace(
@@ -318,6 +321,9 @@ def test_configured_engine_outage_never_falls_back_to_backend_provider(
             execution_timeout_s=5,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
         async def execute(self, command):
             raise EngineUnavailableError("offline")
 
@@ -435,6 +441,9 @@ def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
             service_principal="codedock-backend",
             execution_timeout_s=5,
         )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
 
         async def execute(self, command):
             captured["command"] = command

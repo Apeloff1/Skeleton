@@ -57,7 +57,7 @@ def _valid_repo(tmp_path: Path) -> Path:
             {
                 "gap": gap_id,
                 "gap_status": "closed",
-                "implementation_state": "closed",
+                "implementation_state": "complete",
                 "closure_decision": "closed",
                 "outstanding_evidence": [],
                 "blockers": [],

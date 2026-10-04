@@ -291,7 +291,7 @@ def test_llama_cpp_rejects_model_symlink_by_default(tmp_path: Path) -> None:
     runtime, model = _artifacts(tmp_path)
     linked = tmp_path / "linked.gguf"
     linked.symlink_to(model)
-    with pytest.raises(LlamaCppRuntimeError, match="symlink rejected"):
+    with pytest.raises(LlamaCppRuntimeError, match="symlinked path component rejected"):
         LlamaCppModel(LlamaCppConfig(executable=str(runtime), model_path=str(linked)))
 
 

@@ -7,6 +7,18 @@ from .environment import (
     SimulationBoundaryError,
     SimulationEvidence,
 )
+from .world_model import (
+    Assumption,
+    AssumptionSet,
+    CounterfactualResult,
+    CounterfactualRolloutEngine,
+    EnvironmentAdapter,
+    SimulationResult,
+    SimulationStep,
+    UncertaintyPropagationPolicy,
+    WorldModelError,
+    WorldState,
+)
 
 __all__ = [
     "ecs",
@@ -15,4 +27,14 @@ __all__ = [
     "EnvironmentTransition",
     "SimulationBoundaryError",
     "SimulationEvidence",
+    "Assumption",
+    "AssumptionSet",
+    "CounterfactualResult",
+    "CounterfactualRolloutEngine",
+    "EnvironmentAdapter",
+    "SimulationResult",
+    "SimulationStep",
+    "UncertaintyPropagationPolicy",
+    "WorldModelError",
+    "WorldState",
 ]

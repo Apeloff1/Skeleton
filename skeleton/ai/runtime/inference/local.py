@@ -727,10 +727,19 @@ class LocalModelAdapter(ProviderAdapter):
 
     provider_id = "local"
 
-    def __init__(self, engine: LocalInferenceEngine, *, default_seed: int = 0) -> None:
+    def __init__(
+        self,
+        engine: LocalInferenceEngine,
+        *,
+        default_seed: int = 0,
+        artifact_status: Mapping[str, object] | None = None,
+    ) -> None:
         self.engine = engine
         self.model = engine.model.model_id
         self.default_seed = default_seed
+        self._artifact_status = (
+            None if artifact_status is None else dict(artifact_status)
+        )
 
     @property
     def available(self) -> bool:
@@ -739,6 +748,18 @@ class LocalModelAdapter(ProviderAdapter):
     @property
     def supports_cooperative_cancellation(self) -> bool:
         return True
+
+    def status(self) -> dict[str, Any]:
+        status = super().status()
+        status["network_policy"] = "none"
+        status["model_digest"] = self.engine.model.model_digest
+        status["runtime_digest"] = self.runtime_digest
+        status["artifact"] = (
+            None
+            if self._artifact_status is None
+            else dict(self._artifact_status)
+        )
+        return status
 
     @property
     def runtime_digest(self) -> str | None:

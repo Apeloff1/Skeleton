@@ -1,4 +1,4 @@
-# Evidence refresh trigger: VOL-016 current-main independent verification.
+# Evidence refresh trigger: VOL-016 current-head closure verification.
 name: Agent Runtime Closure Gate
 
 on:

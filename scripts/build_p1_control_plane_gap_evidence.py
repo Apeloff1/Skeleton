@@ -31,7 +31,10 @@ from reconcile_p1_risk_evidence import (  # noqa: E402
     ROOT,
     RiskKind,
     derive_obligations,
+    retired_gap_owner_from_id,
 )
+
+from skeleton.contracts.risk_evidence import canonical_digest, make_obligation_id
 
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -421,6 +424,7 @@ def build_control_plane_gap_evidence(
     if not isinstance(registry_rows, list):
         raise ControlPlaneGapEvidenceError("risk registry records must be a list")
     bound_ids: set[str] = set()
+    bound_rows: dict[str, dict[str, Any]] = {}
     for index, row in enumerate(registry_rows):
         if not isinstance(row, dict):
             raise ControlPlaneGapEvidenceError(
@@ -436,23 +440,63 @@ def build_control_plane_gap_evidence(
                 f"duplicate governed binding identity: {obligation_id}"
             )
         bound_ids.add(obligation_id)
+        bound_rows[obligation_id] = row
 
     known_ids = {item.obligation_id for item in obligations}
     unknown_ids = sorted(bound_ids - known_ids)
-    if unknown_ids:
+    unexpected: list[str] = []
+    for obligation_id in unknown_ids:
+        row = bound_rows[obligation_id]
+        evidence = row.get("evidence")
+        expected_owner = retired_gap_owner_from_id(obligation_id)
+        if (
+            expected_owner is None
+            or row.get("owner_id") != expected_owner
+            or row.get("disposition") != "evidence"
+            or not isinstance(evidence, list)
+            or not evidence
+            or row.get("accepted_risk") is not None
+        ):
+            unexpected.append(obligation_id)
+    if unexpected:
         raise ControlPlaneGapEvidenceError(
             "risk registry references unknown obligations: "
-            + ",".join(unknown_ids)
+            + ",".join(unexpected)
         )
 
     records: list[dict[str, Any]] = []
     for identity in sorted(COVERAGE):
         volume_key, statement = identity
         obligation = gap_by_identity.get(identity)
-        if obligation is None:
-            raise ControlPlaneGapEvidenceError(
-                f"missing canonical gap obligation: {volume_key}: {statement}"
+        retired_historical = obligation is None
+        if retired_historical:
+            source_ref = (
+                f"{volume_key}:gap:{canonical_digest(statement)[:10]}"
             )
+            obligation_id = make_obligation_id(
+                RiskKind.GAP,
+                source_ref,
+                statement,
+            )
+            governed = bound_rows.get(obligation_id)
+            if governed is None:
+                raise ControlPlaneGapEvidenceError(
+                    "missing governed retired gap binding: "
+                    f"{volume_key}: {statement}"
+                )
+            obligation_digest = governed.get("obligation_digest")
+            if (
+                not isinstance(obligation_digest, str)
+                or re.fullmatch(r"[0-9a-f]{64}", obligation_digest) is None
+            ):
+                raise ControlPlaneGapEvidenceError(
+                    f"{volume_key}: retired obligation digest is invalid"
+                )
+        else:
+            obligation_id = obligation.obligation_id
+            obligation_digest = obligation.obligation_digest
+            source_ref = obligation.source_ref
+
         spec = COVERAGE[identity]
         source_paths, test_paths = _validate_spec_paths(root, spec)
         _validate_markers(root, spec, volume_key)
@@ -461,9 +505,10 @@ def build_control_plane_gap_evidence(
             "batch_id": BATCH_ID,
             "volume_key": volume_key,
             "statement": statement,
-            "obligation_id": obligation.obligation_id,
-            "obligation_digest": obligation.obligation_digest,
-            "source_ref": obligation.source_ref,
+            "obligation_id": obligation_id,
+            "obligation_digest": obligation_digest,
+            "source_ref": source_ref,
+            "retired_historical": retired_historical,
             "expected_head": expected_head,
             "source_digests": {
                 str(path.relative_to(root)): _digest_file(path)
@@ -477,7 +522,7 @@ def build_control_plane_gap_evidence(
                 path: list(markers)
                 for path, markers in sorted(spec["markers"].items())
             },
-            "binding_present": obligation.obligation_id in bound_ids,
+            "binding_present": obligation_id in bound_ids,
             "non_authoritative": True,
             "creates_binding": False,
             "clears_masterplan_gap": False,
@@ -488,7 +533,7 @@ def build_control_plane_gap_evidence(
         packet["candidate_evidence_ref"] = {
             "source": (
                 f"p1:control-plane-gap-batch2:"
-                f"{obligation.obligation_id}:{expected_head}"
+                f"{obligation_id}:{expected_head}"
             ),
             "digest": packet["packet_digest"],
             "category": CATEGORY,
@@ -519,6 +564,9 @@ def build_control_plane_gap_evidence(
         "expected_head": expected_head,
         "category": CATEGORY,
         "covered_gap_count": len(records),
+        "covered_retired_gap_count": sum(
+            1 for row in records if row["retired_historical"]
+        ),
         "covered_volume_count": len(
             {row["volume_key"] for row in records}
         ),

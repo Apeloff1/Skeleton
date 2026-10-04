@@ -97,8 +97,24 @@ jobs:
               raise SystemExit("not all materialized volumes are implementation-review ready")
           if report["verification_evidence_ready_count"] != 107:
               raise SystemExit("verification evidence readiness drift")
-          if report["target_floor_eligible_count"] != 3:
-              raise SystemExit("candidate report changed maturity eligibility")
+          governed_eligible = {
+              row["volume_key"]
+              for row in report["records"]
+              if row["implementation_signed"] is True
+              and row["verification_signed"] is True
+              and row["required_review_actions"] == []
+          }
+          reported_eligible = {
+              row["volume_key"]
+              for row in report["records"]
+              if row["target_floor_eligible"] is True
+          }
+          if reported_eligible != governed_eligible:
+              raise SystemExit(
+                  "candidate report maturity eligibility drifted from governed signatures"
+              )
+          if report["target_floor_eligible_count"] != len(governed_eligible):
+              raise SystemExit("candidate report maturity eligibility count drift")
           if report["creates_signatures"] is not False:
               raise SystemExit("candidate report must never create signatures")
           if report["mutates_accountability"] is not False:

@@ -22,6 +22,7 @@ def test_complete_ai_construction_contract_is_valid() -> None:
     assert summary["runtime_providers"] == [
         "openai",
         "openai-compatible-secondary",
+        "local",
     ]
     assert summary["automation_providers"] == ["repository-automation"]
     assert summary["provider_surfaces"] >= 6
