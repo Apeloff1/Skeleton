@@ -7575,7 +7575,7 @@
       "volume_ref": "VOL-000",
       "title": "Plan Constitution",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7647,7 +7647,7 @@
       "volume_ref": "VOL-008",
       "title": "Model Routing",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7656,7 +7656,7 @@
       "volume_ref": "VOL-009",
       "title": "Context Engineering",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7665,7 +7665,7 @@
       "volume_ref": "VOL-010",
       "title": "Memory System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7674,7 +7674,7 @@
       "volume_ref": "VOL-011",
       "title": "Retrieval System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7683,7 +7683,7 @@
       "volume_ref": "VOL-012",
       "title": "Knowledge System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7710,7 +7710,7 @@
       "volume_ref": "VOL-015",
       "title": "Tool & Action System",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7719,7 +7719,7 @@
       "volume_ref": "VOL-016",
       "title": "Agent Runtime",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7728,7 +7728,7 @@
       "volume_ref": "VOL-017",
       "title": "Multi-Agent Orchestration",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7737,7 +7737,7 @@
       "volume_ref": "VOL-018",
       "title": "Long-Horizon Autonomy",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7782,7 +7782,7 @@
       "volume_ref": "VOL-023",
       "title": "Forge",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7791,7 +7791,7 @@
       "volume_ref": "VOL-024",
       "title": "Learning & Evolution",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7800,7 +7800,7 @@
       "volume_ref": "VOL-025",
       "title": "Safety Architecture",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7827,7 +7827,7 @@
       "volume_ref": "VOL-028",
       "title": "Governance & Authority",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7836,7 +7836,7 @@
       "volume_ref": "VOL-029",
       "title": "Reliability",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7845,7 +7845,7 @@
       "volume_ref": "VOL-030",
       "title": "Distributed Systems",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7854,7 +7854,7 @@
       "volume_ref": "VOL-031",
       "title": "Compute & Hardware",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7881,7 +7881,7 @@
       "volume_ref": "VOL-034",
       "title": "Observability",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7890,7 +7890,7 @@
       "volume_ref": "VOL-035",
       "title": "Evaluation Program",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7899,7 +7899,7 @@
       "volume_ref": "VOL-036",
       "title": "Adversarial Evaluation",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7908,7 +7908,7 @@
       "volume_ref": "VOL-037",
       "title": "Verification Plane",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7917,7 +7917,7 @@
       "volume_ref": "VOL-038",
       "title": "Provenance",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     },
     {
@@ -7935,7 +7935,7 @@
       "volume_ref": "VOL-040",
       "title": "Streaming",
       "status": "specified",
-      "implementation_status": "unverified",
+      "implementation_status": "implemented",
       "depth_pass": "DP-000-040"
     }
   ],
