@@ -177,6 +177,7 @@ jobs:
           "matplotlib>=3.8,<4"
           "networkx>=3.2,<4"
           "bcrypt>=4,<6"
+          "PyJWT==2.15.0"
       - name: Compile canonical product and compatibility runtimes
         run: >-
           python -m compileall -q

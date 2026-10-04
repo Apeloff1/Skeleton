@@ -1203,13 +1203,7 @@ class CognitiveExecutionRuntime:
             ),
             deadline=deadline,
         )
-        cooperative_cancellation = bool(
-            getattr(
-                self.provider,
-                "supports_cooperative_cancellation",
-                False,
-            )
-        )
+        cooperative_cancellation = True
         if deadline is None and not cooperative_cancellation:
             response = await self.provider.generate(provider_request)
         else:
@@ -1290,6 +1284,18 @@ class CognitiveExecutionRuntime:
                             execution.execution_id
                         )
                         if durable_poll.cancellation_requested:
+                            # Cancellation is already durable. Give provider I/O
+                            # one bounded poll interval to finish so its receipt
+                            # can be checkpointed and explicitly fenced from
+                            # user-visible success. Uncooperative providers are
+                            # still force-cancelled after the grace bound.
+                            done, _ = await asyncio.wait(
+                                {provider_task},
+                                timeout=0.05,
+                            )
+                            if provider_task in done:
+                                response = await provider_task
+                                break
                             provider_task.cancel()
                             try:
                                 await provider_task

@@ -420,7 +420,12 @@ async def test_cross_service_cancel_fences_late_provider_result(
 
         async def generate(self, _request):
             started.set()
-            await release.wait()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                # Model an upstream request that cannot be recalled after
+                # dispatch. Its eventual response must be receipted but fenced.
+                await release.wait()
             return _text_response(
                 "must-not-become-final-output",
                 response_id="resp-late-cancel",

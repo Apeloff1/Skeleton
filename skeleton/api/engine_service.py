@@ -2856,7 +2856,6 @@ class EngineExecutionService:
             verified_service_principal=verified_service_principal,
             scope="engine:cancel",
             now=now,
-            require_live_delegation=True,
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
@@ -2869,6 +2868,12 @@ class EngineExecutionService:
             )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
+            self._validate(
+                stored.command,
+                verified_service_principal=verified_service_principal,
+                required_scope="engine:cancel",
+                now=now,
+            )
             self.repository.request_cancel(
                 execution_id,
                 expected_version=current.version,
