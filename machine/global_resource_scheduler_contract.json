@@ -12,6 +12,15 @@
     "memory_mb",
     "provider_tokens"
   ],
+  "integration_surfaces": [
+    "skeleton/ai/agents/core/scheduler.py",
+    "skeleton/automation/agents/scheduler.py"
+  ],
+  "acceptance_tests": [
+    "skeleton/testing/test_global_resource_scheduler.py",
+    "skeleton/testing/test_global_resource_swarm_integration.py",
+    "tests/test_scheduler.py"
+  ],
   "invariants": [
     "all planes share one physical capacity ledger",
     "sum of reserved floors cannot exceed physical capacity",
@@ -23,8 +32,11 @@
     "request identities are content-bound and replay mutation fails closed",
     "preemption only targets eligible lower-priority or borrowed grants",
     "revoking work continues consuming capacity until executor acknowledgement",
+    "swarm execution attempts acquire and release global grants",
+    "cancelled swarm work cancels pending global admission",
+    "dead-letter requeue advances resource identity epoch",
     "implementation state cannot self-grant verification or completion"
   ],
   "exact_head_workflow": ".github/workflows/global-resource-scheduler.yml",
   "completion_authority": false
-}\n
+}
