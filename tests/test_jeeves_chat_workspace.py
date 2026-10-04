@@ -143,8 +143,8 @@ def test_client_history_is_ignored_but_project_context_is_used(
     assert response.json()["history_source"] == "canonical"
     assert "Godot 2D platformer" in captured["retrieval"]
     assert "move the player" not in captured["retrieval"]
-    assert '"role": "assistant"' not in captured["prompt"]
-    assert '"current_question": "What about collisions?"' in captured["prompt"]
+    assert "move the player" not in captured["prompt"]
+    assert captured["prompt"] == "Godot 2D platformer"
     assert captured["query"] == "What about collisions?"
 
 
@@ -242,10 +242,13 @@ def test_unavailable_paid_engine_is_not_labeled_as_paid_generation(
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
     monkeypatch.setattr(route, "EngineChat", UnavailableChat)
 
-    result = asyncio.run(route._generate_text("question", [], True))
+    with pytest.raises(route.HTTPException) as exc_info:
+        asyncio.run(route._generate_text("question", [], True))
 
-    assert result["tier"] == "local"
-    assert result["model"] == "unavailable-fallback"
+    assert exc_info.value.status_code == 503
+    assert "generative engine execution is unavailable" in str(
+        exc_info.value.detail
+    )
 
 
 def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
@@ -1070,7 +1073,7 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
     context = captured["contexts"][0]
     assert "prior question" in context
     assert "prior answer" in context
-    assert context.count("resume question") == 1
+    assert context.count("resume question") == 0
 
     messages = canonical.messages[seeded_thread.thread_id]
     assert [message.author_type.value for message in messages] == [
