@@ -42,7 +42,7 @@ permissions:
 concurrency:
   # Evidence-critical: exact-head signing verification must survive unrelated main churn.
   group: p1-reproducibility-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

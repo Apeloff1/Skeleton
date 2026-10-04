@@ -23,7 +23,7 @@ permissions:
 
 concurrency:
   group: ai-closure-evidence-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
