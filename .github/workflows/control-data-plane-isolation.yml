@@ -5,20 +5,24 @@ on:
     branches:
       - main
     paths:
-      - "skeleton/kernel/control_plane_isolation.py"
-      - "skeleton/ai/runtime/kernel/control_plane_isolation.py"
-      - "skeleton/testing/test_control_plane_isolation.py"
+      - "machine/architecture.json"
       - "machine/control_data_plane_contract.json"
+      - "skeleton/security/control_data_isolation.py"
+      - "skeleton/ai/runtime/security/control_data_isolation.py"
+      - "skeleton/testing/test_control_data_plane_isolation.py"
+      - "scripts/verify_control_data_plane_contract.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/control-data-plane-isolation.yml"
   push:
     branches:
       - main
     paths:
-      - "skeleton/kernel/control_plane_isolation.py"
-      - "skeleton/ai/runtime/kernel/control_plane_isolation.py"
-      - "skeleton/testing/test_control_plane_isolation.py"
+      - "machine/architecture.json"
       - "machine/control_data_plane_contract.json"
+      - "skeleton/security/control_data_isolation.py"
+      - "skeleton/ai/runtime/security/control_data_isolation.py"
+      - "skeleton/testing/test_control_data_plane_isolation.py"
+      - "scripts/verify_control_data_plane_contract.py"
       - "machine/ai_hostile_gap_disposition.json"
       - ".github/workflows/control-data-plane-isolation.yml"
   workflow_dispatch:
@@ -33,7 +37,7 @@ concurrency:
 jobs:
   control-data-plane-isolation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -47,8 +51,22 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.11.16"
-      - name: Run control/data-plane isolation regressions
-        run: python -m unittest -q skeleton.testing.test_control_plane_isolation
+      - name: Compile isolation contract
+        run: >-
+          python -m compileall -q
+          skeleton/security/control_data_isolation.py
+          skeleton/ai/runtime/security/control_data_isolation.py
+          scripts/verify_control_data_plane_contract.py
+          skeleton/testing/test_control_data_plane_isolation.py
+      - name: Verify architecture-derived plane roles
+        run: python scripts/verify_control_data_plane_contract.py --json
+      - name: Run isolation regressions
+        run: python -m unittest -q skeleton.testing.test_control_data_plane_isolation
+      - name: Verify architecture construction interfaces
+        run: >-
+          python scripts/check_architecture_map.py
+          && python scripts/check_ai_app_construction.py
+          && python scripts/check_capability_interfaces.py
       - name: Verify governed AI file-tree parity
         run: python scripts/check_ai_file_tree.py
       - name: Verify hostile-gap disposition
