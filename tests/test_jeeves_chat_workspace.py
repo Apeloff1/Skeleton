@@ -117,7 +117,7 @@ def test_client_history_is_ignored_but_project_context_is_used(
         captured["retrieval"] = query
         return []
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         captured["prompt"] = conversation_context
         captured["query"] = query
         return {"text": "Follow-up answer", "tier": "free", "model": "test"}
@@ -405,7 +405,7 @@ def test_server_transcript_overrides_conflicting_client_history(route, monkeypat
     ])
     captured = {}
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         captured["context"] = conversation_context
         return {"text": "next answer", "tier": "free", "model": "test"}
 
@@ -436,7 +436,7 @@ def test_stable_client_message_id_replays_without_second_generation(route, monke
     collection = _MemoryChatCollection()
     calls = {"count": 0}
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         calls["count"] += 1
         return {"text": "stable answer", "tier": "free", "model": "test"}
 
@@ -460,7 +460,7 @@ def test_stable_client_message_id_replays_without_second_generation(route, monke
 def test_client_message_id_conflict_is_rejected(route, monkeypatch):
     collection = _MemoryChatCollection()
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         return {"text": "stable answer", "tier": "free", "model": "test"}
 
     with _chat_client(route, monkeypatch, collection, generate) as transport:
@@ -492,7 +492,7 @@ def test_legacy_history_is_never_model_visible_or_persisted(
     collection = _MemoryChatCollection()
     contexts = []
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         contexts.append(conversation_context)
         return {
             "text": f"answer-{len(contexts)}",
@@ -549,7 +549,7 @@ def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
     def unavailable_collection():
         raise OSError("legacy storage unavailable")
 
-    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+    async def generate(query, recalled, needs_reasoning, conversation_context="", **kwargs):
         captured["context"] = conversation_context
         return {"text": "canonical", "tier": "free", "model": "test"}
 
@@ -802,6 +802,7 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         calls["count"] += 1
         assert "legacy question" in conversation_context
@@ -972,6 +973,7 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
@@ -1217,6 +1219,7 @@ def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
         recalled,
         needs_reasoning,
         conversation_context="",
+        **kwargs,
     ):
         del recalled, needs_reasoning
         captured["calls"] += 1
