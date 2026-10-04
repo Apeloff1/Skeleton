@@ -14,7 +14,7 @@
   "sources": [
     {
       "path": "skeleton/automation/backlog_index.py",
-      "git_blob_sha": "797dc9d3071789aad467a295b4ae2323c6be7fa9",
+      "git_blob_sha": "c0eeb9e32ecba9659157bec71a3ccb22eb5b8910",
       "role": "bounded static file/symbol/import/dependency/test/workflow index"
     },
     {
