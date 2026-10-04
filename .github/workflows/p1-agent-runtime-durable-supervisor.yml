@@ -8,6 +8,8 @@ on:
       - "skeleton/automation/agents/swarm_checkpoint.py"
       - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
       - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
       - "skeleton/ai/agents/core/swarm_checkpoint.py"
       - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
       - "skeleton/ai/agents/core/swarm_durable.py"
@@ -20,6 +22,7 @@ on:
       - "skeleton/testing/test_swarm_checkpoint.py"
       - "skeleton/testing/test_swarm_tenant_checkpoint.py"
       - "skeleton/testing/test_swarm_supervisor.py"
+      - "machine/ai_file_tree.json"
       - ".github/workflows/p1-agent-runtime-durable-supervisor.yml"
   push:
     branches: [main]
@@ -28,6 +31,8 @@ on:
       - "skeleton/automation/agents/swarm_checkpoint.py"
       - "skeleton/automation/agents/swarm_tenant_checkpoint.py"
       - "skeleton/automation/agents/swarm_durable.py"
+      - "skeleton/automation/agents/swarm_recovery.py"
+      - "skeleton/ai/agents/core/swarm_recovery.py"
       - "skeleton/ai/agents/core/swarm_checkpoint.py"
       - "skeleton/ai/agents/core/swarm_tenant_checkpoint.py"
       - "skeleton/ai/agents/core/swarm_durable.py"
@@ -40,6 +45,7 @@ on:
       - "skeleton/testing/test_swarm_checkpoint.py"
       - "skeleton/testing/test_swarm_tenant_checkpoint.py"
       - "skeleton/testing/test_swarm_supervisor.py"
+      - "machine/ai_file_tree.json"
       - ".github/workflows/p1-agent-runtime-durable-supervisor.yml"
   workflow_dispatch:
 
