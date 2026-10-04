@@ -47,9 +47,9 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-VOL-012` — VOL-012 Knowledge System — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [x] `ACC-VOL-013` — VOL-013 Cognitive Core — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Reasoning Search Stop Policy Gate** — completed_at_utc: `2026-10-04T00:48:31Z`
 - [x] `ACC-VOL-014` — VOL-014 Planning Engine — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Plan Verification Gate** — completed_at_utc: `2026-10-04T00:48:31Z`
-- [ ] `ACC-VOL-015` — VOL-015 Tool & Action System — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-016` — VOL-016 Agent Runtime — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-VOL-017` — VOL-017 Multi-Agent Orchestration — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [x] `ACC-VOL-015` — VOL-015 Tool & Action System — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Tool Runtime Closure Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
+- [x] `ACC-VOL-016` — VOL-016 Agent Runtime — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:Agent Runtime Closure Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
+- [x] `ACC-VOL-017` — VOL-017 Multi-Agent Orchestration — status: `hardened` — builder: **chatgpt:gpt-5.6-sol** — verifier: **github-actions:P1 Multi-Agent Orchestration Gate** — completed_at_utc: `2026-10-04T15:47:01Z`
 - [ ] `ACC-VOL-018` — VOL-018 Long-Horizon Autonomy — status: `implemented` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-019` — VOL-019 World Models & Simulation — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VOL-020` — VOL-020 Multimodal Intelligence — status: `unverified` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
