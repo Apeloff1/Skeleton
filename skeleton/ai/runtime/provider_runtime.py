@@ -3150,6 +3150,66 @@ class ProviderRegistry:
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
+        secondary_values = {
+            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
+            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
+            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
+        }
+        verification_model = os.getenv(
+            "AI_VERIFICATION_MODEL",
+            "",
+        ).strip()
+
+        if active == "local":
+            if any(secondary_values.values()):
+                raise ProviderUnavailableError(
+                    "local provider mode forbids secondary external provider configuration"
+                )
+            if verification_model:
+                raise ProviderUnavailableError(
+                    "local provider mode forbids semantic verifier configuration"
+                )
+            model_path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
+            if not model_path:
+                raise ProviderUnavailableError(
+                    "local provider model artifact is not configured"
+                )
+            try:
+                from skeleton.ai.runtime.inference import (
+                    LocalInferenceEngine,
+                    LocalModelAdapter,
+                    LocalModelArtifactError,
+                    load_local_model_artifact,
+                )
+
+                loaded = load_local_model_artifact(model_path)
+                cache_size = _env_int(
+                    "AI_LOCAL_MODEL_CACHE_SIZE",
+                    128,
+                    minimum=0,
+                )
+                default_seed = _env_int(
+                    "AI_LOCAL_MODEL_SEED",
+                    0,
+                    minimum=0,
+                )
+                local_adapter = LocalModelAdapter(
+                    LocalInferenceEngine(
+                        loaded.model,
+                        cache_size=cache_size,
+                    ),
+                    default_seed=default_seed,
+                    artifact_status=loaded.receipt.as_dict(),
+                )
+            except (LocalModelArtifactError, TypeError, ValueError) as exc:
+                raise ProviderUnavailableError(
+                    "local provider model artifact failed activation"
+                ) from exc
+            return cls(
+                [local_adapter],
+                active="local",
+            )
+
         adapter = OpenAIProviderAdapter(
             timeout_seconds=timeout,
             max_retries=retries,
@@ -3158,11 +3218,6 @@ class ProviderRegistry:
         adapters: list[ProviderAdapter] = [adapter]
         fallback_ids: tuple[str, ...] = ()
 
-        secondary_values = {
-            "api_key": os.getenv("AI_SECONDARY_API_KEY", "").strip(),
-            "base_url": os.getenv("AI_SECONDARY_BASE_URL", "").strip(),
-            "model": os.getenv("AI_SECONDARY_MODEL", "").strip(),
-        }
         configured_secondary = any(secondary_values.values())
         if configured_secondary:
             missing = [
@@ -3201,10 +3256,6 @@ class ProviderRegistry:
             else:
                 fallback_ids = (secondary.provider_id,)
 
-        verification_model = os.getenv(
-            "AI_VERIFICATION_MODEL",
-            "",
-        ).strip()
         verification_adapter = None
         if verification_model and verification_model != adapter.model:
             verification_adapter = OpenAIProviderAdapter(
