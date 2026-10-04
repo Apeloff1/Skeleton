@@ -1224,12 +1224,28 @@ def test_jeeves_engine_identity_is_scoped_to_canonical_turn(
         def with_max_tokens(self, *_args, **_kwargs):
             return self
 
+        def add_history_message(self, _role, _content):
+            return self
+
+        def add_evidence(self, _source_id, _content, *, kind="retrieval_evidence"):
+            del kind
+            return self
+
         async def send_message(self, _message):
             return SimpleNamespace(
                 text="engine answer",
+                operation_id="engine-operation",
                 execution_id="engine-execution",
+                context_id="engine-context",
+                context_digest="c" * 64,
+                context_source_snapshot=(),
+                context_compiler_version="test-compiler",
                 verification="verified",
                 evidence_refs=(),
+                provider_receipts=(),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
             )
 
     monkeypatch.setattr(route, "EngineChat", CaptureChat)
