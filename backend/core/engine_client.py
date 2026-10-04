@@ -839,13 +839,11 @@ def command_from_context(
             )
 
     normalized_history: list[tuple[str, str]] = []
-    # Explicit caller history is already canonicalized by the owning
-    # conversation authority. Context projection is only the fallback.
-    projected_history = (
-        tuple(history)
-        if history
-        else projection.history
-    )
+    # The immutable compiled context is the sole authority for provider
+    # history. Caller-supplied legacy history must never override that
+    # projection: accepting it would create an unsigned second context path
+    # after compilation and digest binding.
+    projected_history = projection.history
     for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
             raise EngineProtocolError(
