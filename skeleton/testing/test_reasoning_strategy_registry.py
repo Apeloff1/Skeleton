@@ -4,6 +4,16 @@ from dataclasses import replace
 
 import pytest
 
+from skeleton.intelligence.uncertainty import (
+    Candidate as UncertaintyCandidate,
+    GateDecision,
+    GateVerdict,
+    UncertaintyEvidenceKind,
+    UncertaintyError,
+    UncertaintyGate,
+    explain_decision,
+)
+
 from skeleton.intelligence.strategy_registry import (
     ReasoningPolicy,
     ReasoningPolicyError,
@@ -500,3 +510,101 @@ def test_high_risk_verification_cannot_be_disabled() -> None:
         match="high-risk verification cannot be disabled",
     ):
         _policy(require_verification_for_high_risk=False)
+
+
+def test_uncertainty_explanation_is_typed_deterministic_and_ui_safe() -> None:
+    gate = UncertaintyGate()
+    decision = gate.decide(
+        (
+            UncertaintyCandidate("sensitive candidate text", 0.95),
+            UncertaintyCandidate("sensitive candidate text", 0.90),
+        )
+    )
+
+    first = explain_decision(decision).to_dict()
+    second = explain_decision(decision).to_dict()
+
+    assert first == second
+    assert first["verdict"] == GateVerdict.ANSWER.value
+    assert first["evidence_kind"] == UncertaintyEvidenceKind.CONFIDENCE.value
+    assert first["message_key"] == "uncertainty.confident_agreement"
+    assert first["probability_semantics"] is False
+    assert "sensitive candidate text" not in repr(first)
+
+
+def test_uncertainty_explanation_distinguishes_unknown_and_ambiguous() -> None:
+    gate = UncertaintyGate()
+
+    unknown = explain_decision(gate.decide(())).to_dict()
+    ambiguous = explain_decision(
+        gate.decide(
+            (
+                UncertaintyCandidate("alpha", 0.60),
+                UncertaintyCandidate("beta", 0.60),
+            )
+        )
+    ).to_dict()
+
+    assert unknown["evidence_kind"] == UncertaintyEvidenceKind.UNKNOWN.value
+    assert unknown["message_key"] == "uncertainty.no_candidates"
+    assert ambiguous["evidence_kind"] == UncertaintyEvidenceKind.AMBIGUOUS.value
+    assert ambiguous["message_key"] == "uncertainty.ambiguous_evidence"
+
+
+def test_uncertainty_explanation_fails_closed_for_unknown_reason() -> None:
+    decision = GateDecision(
+        verdict=GateVerdict.ABSTAIN,
+        best=None,
+        mean_confidence=0.5,
+        agreement=0.5,
+        entropy=0.5,
+        reason="unmapped_reason",
+    )
+
+    with pytest.raises(UncertaintyError, match="unknown gate reason"):
+        explain_decision(decision)
+
+
+
+def test_uncertainty_explanation_mirror_parity() -> None:
+    from skeleton.ai.runtime.intelligence.uncertainty import (
+        Candidate as RuntimeCandidate,
+        UncertaintyGate as RuntimeUncertaintyGate,
+        explain_decision as runtime_explain_decision,
+    )
+
+    cases = (
+        (),
+        (
+            ("same answer", 0.95),
+            ("same answer", 0.90),
+        ),
+        (
+            ("alpha", 0.60),
+            ("beta", 0.60),
+        ),
+        (
+            ("low", 0.15),
+            ("low", 0.20),
+        ),
+    )
+
+    for raw in cases:
+        canonical_candidates = tuple(
+            UncertaintyCandidate(text, confidence)
+            for text, confidence in raw
+        )
+        runtime_candidates = tuple(
+            RuntimeCandidate(text, confidence)
+            for text, confidence in raw
+        )
+
+        canonical = explain_decision(
+            UncertaintyGate().decide(canonical_candidates)
+        ).to_dict()
+        runtime = runtime_explain_decision(
+            RuntimeUncertaintyGate().decide(runtime_candidates)
+        ).to_dict()
+
+        assert runtime == canonical
+        assert runtime["probability_semantics"] is False

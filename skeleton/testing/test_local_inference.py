@@ -307,3 +307,74 @@ async def test_scheduler_close_during_batch_window_does_not_deadlock():
     result=await asyncio.wait_for(pending,timeout=1.0)
     assert result.model_id=="skeleton-reference-ngram-v1"
 
+def test_reference_model_artifact_rejects_boolean_numeric_coercion() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    payload["order"]=True
+
+    with pytest.raises(ValueError,match="order must be an integer"):
+        ReferenceNGramModel.from_dict(payload)
+
+    payload=model.to_dict()
+    payload["transitions"][0]["counts"][
+        next(iter(payload["transitions"][0]["counts"]))
+    ]=True
+    with pytest.raises(ValueError,match="counts must be positive integers"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+def test_reference_model_artifact_rejects_fractional_count_coercion() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    token=next(iter(payload["transitions"][0]["counts"]))
+    payload["transitions"][0]["counts"][token]=1.9
+
+    with pytest.raises(ValueError,match="counts must be positive integers"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+def test_reference_model_artifact_rejects_duplicate_context_rows() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    payload["transitions"].append(dict(payload["transitions"][0]))
+
+    with pytest.raises(ValueError,match="duplicate transition context"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+def test_reference_model_artifact_requires_schema_version() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    payload["schema_version"]=2
+
+    with pytest.raises(ValueError,match="schema_version"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+def test_reference_model_artifact_rejects_non_string_context_token() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    row=next(item for item in payload["transitions"] if item["context"])
+    row["context"][0]=7
+
+    with pytest.raises(ValueError,match="context must contain only strings"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+
+def test_reference_model_artifact_rejects_unknown_top_level_fields() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    payload["download_url"]="https://example.invalid/model.bin"
+
+    with pytest.raises(ValueError,match="unsupported local model artifact key"):
+        ReferenceNGramModel.from_dict(payload)
+
+
+def test_reference_model_artifact_rejects_unknown_transition_row_fields() -> None:
+    model=ReferenceNGramModel.train(("alpha beta",),order=2)
+    payload=model.to_dict()
+    payload["transitions"][0]["weight"]=1
+
+    with pytest.raises(ValueError,match="contains unsupported key"):
+        ReferenceNGramModel.from_dict(payload)

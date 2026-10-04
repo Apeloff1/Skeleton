@@ -139,8 +139,15 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/api/engine_service.py"
       - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/ai/runtime/observability/cost_governor.py"
+      - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/quota.py"
       - "skeleton/intelligence/quota_sqlite.py"
       - "skeleton/intelligence/shared_pressure.py"
+      - "skeleton/testing/test_cost_governor_reattach.py"
+      - "skeleton/testing/test_cost_governor_unknown_usage_reattach.py"
+      - "skeleton/testing/test_cost_governor_shared_pressure_reattach.py"
+      - "skeleton/testing/test_cost_governor_admission_intent_recovery.py"
       - "skeleton/config/settings.py"
       - "machine/state_topology.json"
       - "machine/ai_app_construction.json"
@@ -202,6 +209,16 @@ jobs:
           python -m pytest -q --noconftest
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_state_backup_bundle.py
+
+      - name: Verify durable AI admission recovery contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_cost_governor_reattach.py
+          skeleton/testing/test_cost_governor_unknown_usage_reattach.py
+          skeleton/testing/test_cost_governor_shared_pressure_reattach.py
+          skeleton/testing/test_cost_governor_admission_intent_recovery.py
 
       - name: Verify P2 bind recovery checkpoint contracts
         env:

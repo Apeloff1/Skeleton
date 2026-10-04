@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
 from pathlib import Path
 import sqlite3
 import threading
@@ -24,10 +25,14 @@ from skeleton.ai.runtime.observability.budget_accounting import (
 )
 from skeleton.contracts.canonical import EvidenceRef
 from skeleton.intelligence.admission import (
+    AdmissionDecision,
     AdmissionError,
     AdmissionRequest,
+    AdmissionStatus,
     ResourceBudget,
+    RuntimePressure,
     UsageEstimate,
+    admission_decision_id,
 )
 from skeleton.intelligence.admission_runtime import (
     AdmissionCompletion,
@@ -36,6 +41,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeConflict,
     AdmissionRuntimeError,
     UnknownUsageMarker,
+    admission_lease_id,
 )
 from skeleton.intelligence.quota import (
     QuotaCompletion,
@@ -47,6 +53,11 @@ from skeleton.intelligence.quota import (
     TenantQuota,
 )
 from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureError,
+    SharedPressureLease,
+    SqliteSharedPressureLedger,
+)
 
 
 _SAFE_FALLBACK_REASON_PREFIXES = (
@@ -696,6 +707,370 @@ def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
     )
 
 
+def _shared_pressure_lease_payload(
+    lease: SharedPressureLease | None,
+) -> dict[str, Any] | None:
+    if lease is None:
+        return None
+    if not isinstance(lease, SharedPressureLease):
+        raise TypeError(
+            "shared_pressure_lease must be SharedPressureLease"
+        )
+    return {
+        "lease_id": lease.lease_id,
+        "scope": lease.scope,
+        "operation_id": lease.operation_id,
+        "tenant_id": lease.tenant_id,
+        "owner_id": lease.owner_id,
+        "priority": lease.priority,
+        "acquired_at": lease.acquired_at,
+        "expires_at": lease.expires_at,
+    }
+
+
+def _shared_pressure_lease_from_payload(
+    value: object,
+) -> SharedPressureLease | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    try:
+        raw_priority = value["priority"]
+        raw_acquired_at = value["acquired_at"]
+        raw_expires_at = value["expires_at"]
+        lease_id = _token("shared_pressure_lease_id", value["lease_id"])
+        scope = _token("shared_pressure_scope", value["scope"])
+        operation_id = _token(
+            "shared_pressure_operation_id",
+            value["operation_id"],
+        )
+        tenant_id = _token(
+            "shared_pressure_tenant_id",
+            value["tenant_id"],
+        )
+        owner_id = _token(
+            "shared_pressure_owner_id",
+            value["owner_id"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        ) from exc
+    if (
+        isinstance(raw_priority, bool)
+        or not isinstance(raw_priority, int)
+        or not 0 <= raw_priority <= 1000
+        or isinstance(raw_acquired_at, bool)
+        or not isinstance(raw_acquired_at, (int, float))
+        or isinstance(raw_expires_at, bool)
+        or not isinstance(raw_expires_at, (int, float))
+    ):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    priority = raw_priority
+    acquired_at = float(raw_acquired_at)
+    expires_at = float(raw_expires_at)
+    if (
+        not math.isfinite(acquired_at)
+        or acquired_at < 0
+        or not math.isfinite(expires_at)
+        or expires_at <= acquired_at
+    ):
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
+    return SharedPressureLease(
+        lease_id=lease_id,
+        scope=scope,
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+        priority=priority,
+        acquired_at=acquired_at,
+        expires_at=expires_at,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _RuntimeLeaseJournal:
+    lease_id: str
+    decision_id: str
+    reason_code: str
+    remaining: tuple[tuple[str, int | float], ...]
+    admitted_at: float
+    shared_pressure_lease: SharedPressureLease | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "lease_id": self.lease_id,
+            "decision_id": self.decision_id,
+            "reason_code": self.reason_code,
+            "remaining": dict(self.remaining),
+            "admitted_at": self.admitted_at,
+            "shared_pressure_lease": _shared_pressure_lease_payload(
+                self.shared_pressure_lease
+            ),
+        }
+
+
+def _runtime_lease_journal(
+    lease: AdmissionLease,
+    shared_pressure_lease: SharedPressureLease | None,
+) -> _RuntimeLeaseJournal:
+    if not isinstance(lease, AdmissionLease):
+        raise TypeError("runtime_lease must be AdmissionLease")
+    remaining: list[tuple[str, int | float]] = []
+    for key, value in sorted(lease.decision.remaining.items()):
+        clean_key = _token("remaining key", key)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) < 0
+        ):
+            raise CostGovernorError(
+                "runtime lease remaining budget is invalid"
+            )
+        remaining.append((clean_key, value))
+    admitted_at = float(lease.admitted_at)
+    if not math.isfinite(admitted_at) or admitted_at < 0:
+        raise CostGovernorError("runtime lease admitted_at is invalid")
+    return _RuntimeLeaseJournal(
+        lease_id=_token("lease_id", lease.lease_id),
+        decision_id=_token(
+            "admission_decision_id",
+            lease.decision.decision_id,
+        ),
+        reason_code=_token(
+            "admission_reason_code",
+            lease.decision.reason_code,
+        ),
+        remaining=tuple(remaining),
+        admitted_at=admitted_at,
+        shared_pressure_lease=shared_pressure_lease,
+    )
+
+
+def _runtime_lease_journal_from_payload(
+    value: object,
+) -> _RuntimeLeaseJournal:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        )
+    remaining_raw = value.get("remaining")
+    if not isinstance(remaining_raw, dict):
+        raise CostGovernorError(
+            "runtime lease remaining payload is invalid"
+        )
+    remaining: list[tuple[str, int | float]] = []
+    for key, item in sorted(remaining_raw.items()):
+        clean_key = _token("remaining key", key)
+        if (
+            isinstance(item, bool)
+            or not isinstance(item, (int, float))
+            or not math.isfinite(float(item))
+            or float(item) < 0
+        ):
+            raise CostGovernorError(
+                "runtime lease remaining payload is invalid"
+            )
+        remaining.append((clean_key, item))
+    try:
+        admitted_at = float(value["admitted_at"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        ) from exc
+    if not math.isfinite(admitted_at) or admitted_at < 0:
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        )
+    try:
+        lease_id = value["lease_id"]
+        decision_id = value["decision_id"]
+        reason_code = value["reason_code"]
+    except KeyError as exc:
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        ) from exc
+    return _RuntimeLeaseJournal(
+        lease_id=_token("lease_id", lease_id),
+        decision_id=_token("admission_decision_id", decision_id),
+        reason_code=_token("admission_reason_code", reason_code),
+        remaining=tuple(remaining),
+        admitted_at=admitted_at,
+        shared_pressure_lease=_shared_pressure_lease_from_payload(
+            value.get("shared_pressure_lease")
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _AdmissionIntentJournal:
+    operation_id: str
+    tenant_id: str
+    requested_request_digest: str
+    selected_request_digest: str
+    selected_capability: str
+    fallback_used: bool
+    fallback_id: str | None
+    fallback_reason: str | None
+    decision_id: str | None = None
+    reason_code: str | None = None
+    remaining: tuple[tuple[str, int | float], ...] | None = None
+    admitted_at: float | None = None
+
+    @property
+    def has_decision(self) -> bool:
+        return self.decision_id is not None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "requested_request_digest": self.requested_request_digest,
+            "selected_request_digest": self.selected_request_digest,
+            "selected_capability": self.selected_capability,
+            "fallback_used": self.fallback_used,
+            "fallback_id": self.fallback_id,
+            "fallback_reason": self.fallback_reason,
+            "decision_id": self.decision_id,
+            "reason_code": self.reason_code,
+            "remaining": (
+                None if self.remaining is None else dict(self.remaining)
+            ),
+            "admitted_at": self.admitted_at,
+        }
+
+
+def _admission_intent_from_payload(
+    value: object,
+) -> _AdmissionIntentJournal:
+    if not isinstance(value, dict):
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        )
+    try:
+        operation_id = _token("operation_id", value["operation_id"])
+        tenant_id = _token("tenant_id", value["tenant_id"])
+        requested_digest = _sha256(
+            "requested_request_digest",
+            value["requested_request_digest"],
+        )
+        selected_digest = _sha256(
+            "selected_request_digest",
+            value["selected_request_digest"],
+        )
+        selected_capability = _token(
+            "selected_capability",
+            value["selected_capability"],
+        )
+        fallback_used = value["fallback_used"]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        ) from exc
+    if not isinstance(fallback_used, bool):
+        raise CostGovernorError(
+            "admission intent fallback_used must be boolean"
+        )
+
+    fallback_id_raw = value.get("fallback_id")
+    fallback_reason_raw = value.get("fallback_reason")
+    if fallback_used:
+        fallback_id = _token("fallback_id", fallback_id_raw)
+        fallback_reason = _token(
+            "fallback_reason",
+            fallback_reason_raw,
+        )
+    else:
+        if fallback_id_raw is not None or fallback_reason_raw is not None:
+            raise CostGovernorError(
+                "non-fallback admission intent carries fallback metadata"
+            )
+        fallback_id = None
+        fallback_reason = None
+
+    decision_id_raw = value.get("decision_id")
+    reason_code_raw = value.get("reason_code")
+    remaining_raw = value.get("remaining")
+    admitted_at_raw = value.get("admitted_at")
+    decision_fields = (
+        decision_id_raw,
+        reason_code_raw,
+        remaining_raw,
+        admitted_at_raw,
+    )
+    if all(item is None for item in decision_fields):
+        decision_id = None
+        reason_code = None
+        remaining = None
+        admitted_at = None
+    elif any(item is None for item in decision_fields):
+        raise CostGovernorError(
+            "admission intent decision payload is incomplete"
+        )
+    else:
+        decision_id = _token(
+            "admission_decision_id",
+            decision_id_raw,
+        )
+        reason_code = _token(
+            "admission_reason_code",
+            reason_code_raw,
+        )
+        if not isinstance(remaining_raw, dict):
+            raise CostGovernorError(
+                "admission intent remaining payload is invalid"
+            )
+        remaining_items: list[tuple[str, int | float]] = []
+        for key, item in sorted(remaining_raw.items()):
+            clean_key = _token("remaining key", key)
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isfinite(float(item))
+                or float(item) < 0
+            ):
+                raise CostGovernorError(
+                    "admission intent remaining payload is invalid"
+                )
+            remaining_items.append((clean_key, item))
+        if (
+            isinstance(admitted_at_raw, bool)
+            or not isinstance(admitted_at_raw, (int, float))
+        ):
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
+        admitted_at = float(admitted_at_raw)
+        if not math.isfinite(admitted_at) or admitted_at < 0:
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
+        remaining = tuple(remaining_items)
+
+    return _AdmissionIntentJournal(
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        requested_request_digest=requested_digest,
+        selected_request_digest=selected_digest,
+        selected_capability=selected_capability,
+        fallback_used=fallback_used,
+        fallback_id=fallback_id,
+        fallback_reason=fallback_reason,
+        decision_id=decision_id,
+        reason_code=reason_code,
+        remaining=remaining,
+        admitted_at=admitted_at,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _CostCompletionIntent:
     actual: UsageEstimate
@@ -737,10 +1112,18 @@ class _CostJournalRecord:
     terminal: CostDecision | None
     evidence_digest: str | None
     completion_intent: _CostCompletionIntent | None
+    runtime_lease: _RuntimeLeaseJournal | None
 
 
 class _SqliteCostGovernorJournal:
     """Durable metadata journal; spend authority stays in quota tables."""
+
+    _INTENT_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS cost_governor_admission_intent (
+        operation_id TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL
+    );
+    """
 
     _SCHEMA = """
     CREATE TABLE IF NOT EXISTS cost_governor_journal (
@@ -753,6 +1136,7 @@ class _SqliteCostGovernorJournal:
         terminal_json TEXT,
         evidence_digest TEXT,
         completion_intent_json TEXT,
+        runtime_lease_json TEXT,
         CHECK (
             state IN (
                 'active',
@@ -768,6 +1152,7 @@ class _SqliteCostGovernorJournal:
         self.path = Path(path)
         with self._connect() as conn:
             conn.execute(self._SCHEMA)
+            conn.execute(self._INTENT_SCHEMA)
             columns = {
                 str(row["name"])
                 for row in conn.execute(
@@ -779,6 +1164,13 @@ class _SqliteCostGovernorJournal:
                     """
                     ALTER TABLE cost_governor_journal
                     ADD COLUMN completion_intent_json TEXT
+                    """
+                )
+            if "runtime_lease_json" not in columns:
+                conn.execute(
+                    """
+                    ALTER TABLE cost_governor_journal
+                    ADD COLUMN runtime_lease_json TEXT
                     """
                 )
 
@@ -843,7 +1235,202 @@ class _SqliteCostGovernorJournal:
                     )
                 )
             ),
+            runtime_lease=(
+                None
+                if row["runtime_lease_json"] is None
+                else _runtime_lease_journal_from_payload(
+                    cls._decode_json(
+                        row["runtime_lease_json"],
+                        "runtime_lease",
+                    )
+                )
+            ),
         )
+
+    def load_admission_intent(
+        self,
+        operation_id: str,
+    ) -> _AdmissionIntentJournal | None:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT payload_json
+                FROM cost_governor_admission_intent
+                WHERE operation_id = ?
+                """,
+                (operation,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _admission_intent_from_payload(
+            self._decode_json(
+                row["payload_json"],
+                "admission_intent",
+            )
+        )
+
+    def begin_admission_intent(
+        self,
+        intent: _AdmissionIntentJournal,
+    ) -> _AdmissionIntentJournal:
+        if not isinstance(intent, _AdmissionIntentJournal):
+            raise TypeError(
+                "intent must be _AdmissionIntentJournal"
+            )
+        payload = _canonical_json_text(intent.as_dict())
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT payload_json
+                    FROM cost_governor_admission_intent
+                    WHERE operation_id = ?
+                    """,
+                    (intent.operation_id,),
+                ).fetchone()
+                if row is None:
+                    conn.execute(
+                        """
+                        INSERT INTO cost_governor_admission_intent (
+                            operation_id, payload_json
+                        ) VALUES (?, ?)
+                        """,
+                        (intent.operation_id, payload),
+                    )
+                else:
+                    existing = _admission_intent_from_payload(
+                        self._decode_json(
+                            row["payload_json"],
+                            "admission_intent",
+                        )
+                    )
+                    if existing != intent:
+                        # The first durable intent owns this operation id.
+                        # Never rebind it, even before a decision exists:
+                        # another process may have observed the intent and
+                        # may be about to persist authority derived from it.
+                        raise CostGovernorConflict(
+                            "admission intent replayed with different inputs"
+                        )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load_admission_intent(intent.operation_id)
+        if loaded is None:
+            raise CostGovernorError("admission intent write was lost")
+        return loaded
+
+    def record_admission_decision(
+        self,
+        operation_id: str,
+        decision: AdmissionDecision,
+        admitted_at: float,
+    ) -> _AdmissionIntentJournal:
+        operation = _token("operation_id", operation_id)
+        if not isinstance(decision, AdmissionDecision):
+            raise TypeError("decision must be AdmissionDecision")
+        if not decision.admitted:
+            raise CostGovernorConflict(
+                "admission intent can only persist admitted decisions"
+            )
+        if (
+            isinstance(admitted_at, bool)
+            or not isinstance(admitted_at, (int, float))
+            or not math.isfinite(float(admitted_at))
+            or float(admitted_at) < 0
+        ):
+            raise CostGovernorError("admitted_at is invalid")
+
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT payload_json
+                    FROM cost_governor_admission_intent
+                    WHERE operation_id = ?
+                    """,
+                    (operation,),
+                ).fetchone()
+                if row is None:
+                    raise CostGovernorError(
+                        "admission decision requires durable intent"
+                    )
+                existing = _admission_intent_from_payload(
+                    self._decode_json(
+                        row["payload_json"],
+                        "admission_intent",
+                    )
+                )
+                if (
+                    decision.operation_id != existing.operation_id
+                    or decision.tenant_id != existing.tenant_id
+                    or decision.capability
+                    != existing.selected_capability
+                ):
+                    raise CostGovernorConflict(
+                        "admission decision does not match intent identity"
+                    )
+                remaining = tuple(
+                    sorted(decision.remaining.items())
+                )
+                updated = replace(
+                    existing,
+                    decision_id=decision.decision_id,
+                    reason_code=decision.reason_code,
+                    remaining=remaining,
+                    admitted_at=float(admitted_at),
+                )
+                # Validate the exact serialized form before it becomes durable.
+                validated = _admission_intent_from_payload(
+                    updated.as_dict()
+                )
+                if validated != updated:
+                    raise CostGovernorConflict(
+                        "admission decision intent changed during normalization"
+                    )
+                if existing.has_decision and existing != updated:
+                    raise CostGovernorConflict(
+                        "admission decision replayed with different inputs"
+                    )
+                conn.execute(
+                    """
+                    UPDATE cost_governor_admission_intent
+                    SET payload_json = ?
+                    WHERE operation_id = ?
+                    """,
+                    (
+                        _canonical_json_text(updated.as_dict()),
+                        operation,
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        loaded = self.load_admission_intent(operation)
+        if loaded is None:
+            raise CostGovernorError(
+                "admission decision journal write was lost"
+            )
+        return loaded
+
+    def clear_admission_intent(
+        self,
+        operation_id: str,
+    ) -> None:
+        operation = _token("operation_id", operation_id)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM cost_governor_admission_intent
+                WHERE operation_id = ?
+                """,
+                (operation,),
+            )
 
     def load(self, operation_id: str) -> _CostJournalRecord | None:
         operation = _token("operation_id", operation_id)
@@ -972,6 +1559,8 @@ class _SqliteCostGovernorJournal:
         requested_request_digest: str,
         reservation: CostReservation,
         quota_reservation: QuotaReservation,
+        runtime_lease: AdmissionLease,
+        shared_pressure_lease: SharedPressureLease | None,
     ) -> _CostJournalRecord:
         requested = _sha256(
             "requested_request_digest",
@@ -979,6 +1568,13 @@ class _SqliteCostGovernorJournal:
         )
         reservation_json = _canonical_json_text(reservation.as_dict())
         quota_json = _canonical_json_text(quota_reservation.as_dict())
+        runtime_lease_record = _runtime_lease_journal(
+            runtime_lease,
+            shared_pressure_lease,
+        )
+        runtime_lease_json = _canonical_json_text(
+            runtime_lease_record.as_dict()
+        )
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -996,8 +1592,9 @@ class _SqliteCostGovernorJournal:
                             operation_id, tenant_id,
                             requested_request_digest,
                             reservation_json, quota_reservation_json,
-                            state, terminal_json, evidence_digest
-                        ) VALUES (?, ?, ?, ?, ?, 'active', NULL, NULL)
+                            state, terminal_json, evidence_digest,
+                            runtime_lease_json
+                        ) VALUES (?, ?, ?, ?, ?, 'active', NULL, NULL, ?)
                         """,
                         (
                             reservation.operation_id,
@@ -1005,6 +1602,7 @@ class _SqliteCostGovernorJournal:
                             requested,
                             reservation_json,
                             quota_json,
+                            runtime_lease_json,
                         ),
                     )
                 else:
@@ -1017,6 +1615,7 @@ class _SqliteCostGovernorJournal:
                         existing.requested_request_digest != requested
                         or existing.reservation != reservation
                         or existing.quota_reservation != quota_reservation
+                        or existing.runtime_lease != runtime_lease_record
                     ):
                         raise CostGovernorConflict(
                             "active cost journal replayed with different inputs"
@@ -1239,6 +1838,9 @@ class CostGovernor:
         path: str | Path,
         *,
         default_tenant_quota: TenantQuota,
+        shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
+        shared_pressure_scope: str | None = None,
+        shared_pressure_owner_id: str | None = None,
     ) -> "CostGovernor":
         if not isinstance(default_tenant_quota, TenantQuota):
             raise TypeError(
@@ -1248,6 +1850,9 @@ class CostGovernor:
         runtime = AdmissionRuntime(
             quota_ledger=ledger,
             default_tenant_quota=default_tenant_quota,
+            shared_pressure_ledger=shared_pressure_ledger,
+            shared_pressure_scope=shared_pressure_scope,
+            shared_pressure_owner_id=shared_pressure_owner_id,
         )
         return cls(
             runtime,
@@ -1304,6 +1909,557 @@ class CostGovernor:
             estimate=fallback.estimate,
         )
 
+    @staticmethod
+    def _selected_request_for_replay(
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        record: _CostJournalRecord,
+    ) -> AdmissionRequest:
+        receipt = record.reservation
+        if receipt.fallback_used:
+            if fallback is None:
+                raise CostGovernorConflict(
+                    "durable fallback reservation requires original fallback"
+                )
+            if fallback.fallback_id != receipt.fallback_id:
+                raise CostGovernorConflict(
+                    "durable fallback identity does not match replay"
+                )
+            selected = CostGovernor._fallback_request(
+                request,
+                fallback,
+            )
+        else:
+            selected = request
+
+        if (
+            selected.capability != receipt.selected_capability
+            or _request_digest(selected)
+            != receipt.selected_request_digest
+        ):
+            raise CostGovernorConflict(
+                "durable selected request does not match replay"
+            )
+        return selected
+
+    @staticmethod
+    def _lease_from_journal(
+        selected: AdmissionRequest,
+        record: _CostJournalRecord,
+    ) -> AdmissionLease:
+        metadata = record.runtime_lease
+        if metadata is None:
+            raise CostGovernorError(
+                "legacy active cost journal lacks runtime lease recovery metadata"
+            )
+        receipt = record.reservation
+        if (
+            metadata.lease_id != receipt.lease_id
+            or metadata.decision_id != receipt.admission_decision_id
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal identity does not match reservation receipt"
+            )
+        if metadata.reason_code != "within_budget":
+            raise CostGovernorConflict(
+                "runtime lease journal admission reason is invalid"
+            )
+
+        remaining = dict(metadata.remaining)
+        required_remaining = {
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "wall_seconds",
+            "provider_attempts",
+            "tool_calls",
+            "artifact_bytes",
+            "storage_bytes",
+            "concurrency",
+            "queue_depth",
+        }
+        if set(remaining) != required_remaining:
+            raise CostGovernorError(
+                "runtime lease journal remaining-budget fields are invalid"
+            )
+
+        concurrency_remaining = remaining["concurrency"]
+        queue_remaining = remaining["queue_depth"]
+        if (
+            isinstance(concurrency_remaining, bool)
+            or not isinstance(concurrency_remaining, int)
+            or concurrency_remaining < 1
+            or concurrency_remaining > selected.budget.max_concurrency
+            or isinstance(queue_remaining, bool)
+            or not isinstance(queue_remaining, int)
+            or queue_remaining < 1
+            or queue_remaining > selected.budget.max_queue_depth
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal pressure remainder is invalid"
+            )
+        original_pressure = RuntimePressure(
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
+        )
+        evaluated_request = replace(
+            selected,
+            pressure=original_pressure,
+        )
+        expected_decision_id = admission_decision_id(
+            evaluated_request,
+            AdmissionStatus.ADMIT,
+            "within_budget",
+        )
+        if metadata.decision_id != expected_decision_id:
+            raise CostGovernorConflict(
+                "runtime lease journal decision identity is invalid"
+            )
+
+        decision = AdmissionDecision(
+            decision_id=metadata.decision_id,
+            status=AdmissionStatus.ADMIT,
+            operation_id=selected.operation_id,
+            tenant_id=selected.tenant_id,
+            capability=selected.capability,
+            reason_code=metadata.reason_code,
+            estimated=selected.estimate,
+            remaining=remaining,
+        )
+        return AdmissionLease(
+            lease_id=metadata.lease_id,
+            decision=decision,
+            quota_reservation=record.quota_reservation,
+            admitted_at=metadata.admitted_at,
+        )
+
+    @staticmethod
+    def _admission_intent(
+        *,
+        requested: AdmissionRequest,
+        selected: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        fallback_reason: str | None,
+    ) -> _AdmissionIntentJournal:
+        fallback_used = fallback is not None
+        return _AdmissionIntentJournal(
+            operation_id=requested.operation_id,
+            tenant_id=requested.tenant_id,
+            requested_request_digest=_request_digest(requested),
+            selected_request_digest=_request_digest(selected),
+            selected_capability=selected.capability,
+            fallback_used=fallback_used,
+            fallback_id=(
+                None if fallback is None else fallback.fallback_id
+            ),
+            fallback_reason=(
+                None if fallback is None else _token(
+                    "fallback_reason",
+                    fallback_reason,
+                )
+            ),
+        )
+
+    @staticmethod
+    def _selected_request_for_intent(
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        intent: _AdmissionIntentJournal,
+    ) -> AdmissionRequest:
+        if _request_digest(request) != intent.requested_request_digest:
+            raise CostGovernorConflict(
+                "admission intent requested inputs do not match replay"
+            )
+        if intent.fallback_used:
+            if fallback is None:
+                raise CostGovernorConflict(
+                    "admission intent requires original fallback"
+                )
+            if fallback.fallback_id != intent.fallback_id:
+                raise CostGovernorConflict(
+                    "admission intent fallback identity does not match replay"
+                )
+            selected = CostGovernor._fallback_request(
+                request,
+                fallback,
+            )
+        else:
+            selected = request
+        if (
+            selected.capability != intent.selected_capability
+            or _request_digest(selected)
+            != intent.selected_request_digest
+        ):
+            raise CostGovernorConflict(
+                "admission intent selected request does not match replay"
+            )
+        return selected
+
+    @staticmethod
+    def _decision_from_admission_intent(
+        selected: AdmissionRequest,
+        intent: _AdmissionIntentJournal,
+    ) -> AdmissionDecision:
+        if (
+            not intent.has_decision
+            or intent.reason_code is None
+            or intent.remaining is None
+            or intent.admitted_at is None
+        ):
+            raise CostGovernorError(
+                "durable admission intent lacks admitted decision"
+            )
+        if intent.reason_code != "within_budget":
+            raise CostGovernorConflict(
+                "durable admission intent reason is invalid"
+            )
+        remaining = dict(intent.remaining)
+        required_remaining = {
+            "input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "wall_seconds",
+            "provider_attempts",
+            "tool_calls",
+            "artifact_bytes",
+            "storage_bytes",
+            "concurrency",
+            "queue_depth",
+        }
+        if set(remaining) != required_remaining:
+            raise CostGovernorError(
+                "durable admission intent remaining-budget fields are invalid"
+            )
+        concurrency_remaining = remaining["concurrency"]
+        queue_remaining = remaining["queue_depth"]
+        if (
+            isinstance(concurrency_remaining, bool)
+            or not isinstance(concurrency_remaining, int)
+            or concurrency_remaining < 1
+            or concurrency_remaining > selected.budget.max_concurrency
+            or isinstance(queue_remaining, bool)
+            or not isinstance(queue_remaining, int)
+            or queue_remaining < 1
+            or queue_remaining > selected.budget.max_queue_depth
+        ):
+            raise CostGovernorConflict(
+                "durable admission intent pressure remainder is invalid"
+            )
+        original_pressure = RuntimePressure(
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
+        )
+        evaluated = replace(
+            selected,
+            pressure=original_pressure,
+        )
+        expected = admission_decision_id(
+            evaluated,
+            AdmissionStatus.ADMIT,
+            "within_budget",
+        )
+        if intent.decision_id != expected:
+            raise CostGovernorConflict(
+                "durable admission intent decision identity is invalid"
+            )
+        return AdmissionDecision(
+            decision_id=intent.decision_id,
+            status=AdmissionStatus.ADMIT,
+            operation_id=selected.operation_id,
+            tenant_id=selected.tenant_id,
+            capability=selected.capability,
+            reason_code=intent.reason_code,
+            estimated=selected.estimate,
+            remaining=remaining,
+        )
+
+    def _shared_pressure_for_recovery(
+        self,
+        selected: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> SharedPressureLease | None:
+        ledger = self.runtime.shared_pressure_ledger
+        scope = self.runtime.shared_pressure_scope
+        owner = self.runtime.shared_pressure_owner_id
+        if ledger is None:
+            return None
+        if scope is None or owner is None:
+            raise CostGovernorError(
+                "shared pressure recovery runtime is incomplete"
+            )
+        finder = getattr(ledger, "lease_for_operation", None)
+        if not callable(finder):
+            raise CostGovernorError(
+                "shared pressure ledger does not support admission recovery"
+            )
+        try:
+            lease = finder(
+                scope,
+                selected.operation_id,
+                now=now_wall,
+            )
+        except SharedPressureError as exc:
+            raise CostGovernorError(
+                "shared pressure admission recovery lookup failed"
+            ) from exc
+        if lease is None:
+            return None
+        if (
+            lease.scope != scope
+            or lease.operation_id != selected.operation_id
+            or lease.tenant_id != selected.tenant_id
+            or lease.owner_id != owner
+            or lease.priority != selected.priority
+        ):
+            raise CostGovernorConflict(
+                "shared pressure admission recovery identity mismatch"
+            )
+        return lease
+
+    def _clear_failed_admission_intent(
+        self,
+        request: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> None:
+        journal = self._journal
+        if journal is None:
+            return
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
+        try:
+            quota_state = reader(
+                request.tenant_id,
+                request.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
+        if quota_state is not None:
+            raise CostGovernorConflict(
+                "failed admission retained durable quota authority"
+            )
+
+        pressure = self._shared_pressure_for_recovery(
+            request,
+            now_wall=now_wall,
+        )
+        if pressure is not None:
+            try:
+                self.runtime.settle_shared_pressure_recovery(
+                    pressure,
+                    now_wall=now_wall,
+                )
+            except AdmissionRuntimeConflict as exc:
+                raise CostGovernorConflict(str(exc)) from exc
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(str(exc)) from exc
+        journal.clear_admission_intent(request.operation_id)
+
+    def _assert_no_unjournaled_authority(
+        self,
+        request: AdmissionRequest,
+        *,
+        now_wall: float | None,
+    ) -> None:
+        """Refuse to adopt durable authority without Cost Governor evidence."""
+
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "authority preflight requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support authority preflight"
+            )
+        try:
+            quota_state = reader(
+                request.tenant_id,
+                request.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "authority preflight quota lookup failed"
+            ) from exc
+        if quota_state is not None:
+            raise CostGovernorConflict(
+                "unjournaled durable quota authority already exists"
+            )
+
+        pressure = self._shared_pressure_for_recovery(
+            request,
+            now_wall=now_wall,
+        )
+        if pressure is not None:
+            raise CostGovernorConflict(
+                "unjournaled shared pressure authority already exists"
+            )
+
+    def _recover_admission_intent(
+        self,
+        request: AdmissionRequest,
+        fallback: SafeCostFallback | None,
+        intent: _AdmissionIntentJournal,
+        *,
+        now_wall: float | None,
+    ) -> CostReservation | None:
+        journal = self._journal
+        if journal is None:
+            raise CostGovernorError(
+                "admission intent recovery requires durable journal"
+            )
+        selected = self._selected_request_for_intent(
+            request,
+            fallback,
+            intent,
+        )
+        ledger = self.runtime.quota_ledger
+        if ledger is None:
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
+        reader = getattr(ledger, "recovery_state_for_operation", None)
+        if not callable(reader):
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
+        try:
+            quota_state = reader(
+                selected.tenant_id,
+                selected.operation_id,
+            )
+        except QuotaError as exc:
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
+
+        pressure = self._shared_pressure_for_recovery(
+            selected,
+            now_wall=now_wall,
+        )
+        if quota_state is None:
+            if pressure is not None:
+                try:
+                    self.runtime.settle_shared_pressure_recovery(
+                        pressure,
+                        now_wall=now_wall,
+                    )
+                except AdmissionRuntimeConflict as exc:
+                    raise CostGovernorConflict(str(exc)) from exc
+                except AdmissionRuntimeError as exc:
+                    raise CostGovernorError(str(exc)) from exc
+            journal.clear_admission_intent(request.operation_id)
+            return None
+
+        if not intent.has_decision:
+            raise CostGovernorConflict(
+                "durable quota authority exists without admitted decision intent"
+            )
+        reservation, _unresolved = quota_state
+        decision = self._decision_from_admission_intent(
+            selected,
+            intent,
+        )
+
+        if (
+            self.runtime.shared_pressure_ledger is not None
+            and pressure is None
+        ):
+            # The admission never reached the active Cost Governor journal, so
+            # callers never received authority to begin work. If the global
+            # pressure lease has expired/disappeared, abandon the untouched
+            # quota reservation rather than inventing replacement authority.
+            # The quota ledger itself refuses release after any metered or
+            # unresolved usage, which keeps ambiguous spend fail-closed.
+            try:
+                ledger.release(reservation.reservation_id)
+            except QuotaConflict as exc:
+                raise CostGovernorConflict(
+                    "orphan admission quota cannot be safely abandoned"
+                ) from exc
+            except QuotaError as exc:
+                raise CostGovernorError(
+                    "orphan admission quota abandonment failed"
+                ) from exc
+            journal.clear_admission_intent(
+                request.operation_id
+            )
+            return None
+
+        lease = AdmissionLease(
+            lease_id=admission_lease_id(
+                decision,
+                reservation,
+            ),
+            decision=decision,
+            quota_reservation=reservation,
+            admitted_at=(
+                intent.admitted_at
+                if intent.admitted_at is not None
+                else reservation.reserved_at
+            ),
+        )
+        try:
+            self.runtime.reattach(
+                selected,
+                lease,
+                shared_pressure_lease=pressure,
+                now_wall=now_wall,
+            )
+        except AdmissionRuntimeConflict as exc:
+            raise CostGovernorConflict(str(exc)) from exc
+        except AdmissionRuntimeError as exc:
+            raise CostGovernorError(str(exc)) from exc
+
+        active_fallback = (
+            fallback if intent.fallback_used else None
+        )
+        receipt = self._receipt(
+            requested=request,
+            selected=selected,
+            lease=lease,
+            fallback=active_fallback,
+            fallback_reason=intent.fallback_reason,
+        )
+        journal.record_active(
+            requested_request_digest=intent.requested_request_digest,
+            reservation=receipt,
+            quota_reservation=reservation,
+            runtime_lease=lease,
+            shared_pressure_lease=pressure,
+        )
+        journal.clear_admission_intent(request.operation_id)
+        self._active[request.operation_id] = _ActiveCostReservation(
+            requested_request_digest=intent.requested_request_digest,
+            receipt=receipt,
+            budget=request.budget,
+        )
+        return receipt
+
     def reserve(
         self,
         request: AdmissionRequest,
@@ -1321,6 +2477,7 @@ class CostGovernor:
             raise TypeError("fallback must be SafeCostFallback")
         requested_digest = _request_digest(request)
         persisted: _CostJournalRecord | None = None
+        admission_intent: _AdmissionIntentJournal | None = None
 
         with self._lock:
             current = self._active.get(request.operation_id)
@@ -1333,6 +2490,9 @@ class CostGovernor:
 
             if self._journal is not None:
                 persisted = self._journal.load(request.operation_id)
+                admission_intent = self._journal.load_admission_intent(
+                    request.operation_id
+                )
                 if persisted is not None:
                     if persisted.requested_request_digest != requested_digest:
                         raise CostGovernorConflict(
@@ -1350,11 +2510,92 @@ class CostGovernor:
                             "operation already has terminal cost journal state"
                         )
 
+                    selected = self._selected_request_for_replay(
+                        request,
+                        fallback,
+                        persisted,
+                    )
+                    lease = self._lease_from_journal(
+                        selected,
+                        persisted,
+                    )
+                    metadata = persisted.runtime_lease
+                    if metadata is None:
+                        raise CostGovernorError(
+                            "legacy active cost journal lacks runtime lease recovery metadata"
+                        )
+                    try:
+                        self.runtime.reattach(
+                            selected,
+                            lease,
+                            shared_pressure_lease=(
+                                metadata.shared_pressure_lease
+                            ),
+                            now_wall=now_wall,
+                        )
+                    except AdmissionRuntimeConflict as exc:
+                        raise CostGovernorConflict(str(exc)) from exc
+                    except AdmissionRuntimeError as exc:
+                        raise CostGovernorError(str(exc)) from exc
+                    receipt = persisted.reservation
+                    self._active[request.operation_id] = (
+                        _ActiveCostReservation(
+                            requested_request_digest=requested_digest,
+                            receipt=receipt,
+                            budget=request.budget,
+                        )
+                    )
+                    if admission_intent is not None:
+                        self._journal.clear_admission_intent(
+                            request.operation_id
+                        )
+                    return receipt
+
+                if admission_intent is not None:
+                    recovered = self._recover_admission_intent(
+                        request,
+                        fallback,
+                        admission_intent,
+                        now_wall=now_wall,
+                    )
+                    if recovered is not None:
+                        return recovered
+                    admission_intent = None
+
+                self._assert_no_unjournaled_authority(
+                    request,
+                    now_wall=now_wall,
+                )
+
+            decision_sink = None
+            if self._journal is not None:
+                direct_intent = self._admission_intent(
+                    requested=request,
+                    selected=request,
+                    fallback=None,
+                    fallback_reason=None,
+                )
+                self._journal.begin_admission_intent(
+                    direct_intent
+                )
+
+                def decision_sink(
+                    decision: AdmissionDecision,
+                    admitted_at: float,
+                ) -> None:
+                    assert self._journal is not None
+                    self._journal.record_admission_decision(
+                        request.operation_id,
+                        decision,
+                        admitted_at,
+                    )
+
             try:
                 lease = self.runtime.admit(
                     request,
                     now_monotonic=now_monotonic,
                     now_wall=now_wall,
+                    decision_sink=decision_sink,
                 )
                 receipt = self._receipt(
                     requested=request,
@@ -1365,6 +2606,11 @@ class CostGovernor:
                 )
             except AdmissionError as original_exc:
                 reason = str(original_exc)
+                if self._journal is not None:
+                    self._clear_failed_admission_intent(
+                        request,
+                        now_wall=now_wall,
+                    )
                 if fallback is None:
                     raise CostGovernorDenied(reason) from original_exc
                 if not _fallback_reason_allowed(
@@ -1376,13 +2622,41 @@ class CostGovernor:
                     request,
                     fallback,
                 )
+                fallback_sink = None
+                if self._journal is not None:
+                    fallback_intent = self._admission_intent(
+                        requested=request,
+                        selected=selected,
+                        fallback=fallback,
+                        fallback_reason=reason,
+                    )
+                    self._journal.begin_admission_intent(
+                        fallback_intent
+                    )
+
+                    def fallback_sink(
+                        decision: AdmissionDecision,
+                        admitted_at: float,
+                    ) -> None:
+                        assert self._journal is not None
+                        self._journal.record_admission_decision(
+                            request.operation_id,
+                            decision,
+                            admitted_at,
+                        )
                 try:
                     lease = self.runtime.admit(
                         selected,
                         now_monotonic=now_monotonic,
                         now_wall=now_wall,
+                        decision_sink=fallback_sink,
                     )
                 except AdmissionError as fallback_exc:
+                    if self._journal is not None:
+                        self._clear_failed_admission_intent(
+                            selected,
+                            now_wall=now_wall,
+                        )
                     raise CostGovernorDenied(
                         f"declared_cost_fallback_denied:{fallback_exc}"
                     ) from fallback_exc
@@ -1421,6 +2695,12 @@ class CostGovernor:
                         requested_request_digest=requested_digest,
                         reservation=receipt,
                         quota_reservation=quota_reservation,
+                        runtime_lease=lease,
+                        shared_pressure_lease=(
+                            self.runtime.shared_pressure_lease_for_operation(
+                                lease.operation_id
+                            )
+                        ),
                     )
                 except Exception:
                     if persisted is None:
@@ -1429,6 +2709,9 @@ class CostGovernor:
                         except Exception:
                             pass
                     raise
+                self._journal.clear_admission_intent(
+                    request.operation_id
+                )
 
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
@@ -1610,11 +2893,39 @@ class CostGovernor:
             reasons=normalized,
         )
 
+    def _settle_recovered_shared_pressure(
+        self,
+        record: _CostJournalRecord,
+        *,
+        now_wall: float | None = None,
+    ) -> None:
+        metadata = record.runtime_lease
+        pressure = (
+            None
+            if metadata is None
+            else metadata.shared_pressure_lease
+        )
+        if (
+            pressure is None
+            and self.runtime.shared_pressure_ledger is None
+        ):
+            return
+        try:
+            self.runtime.settle_shared_pressure_recovery(
+                pressure,
+                now_wall=now_wall,
+            )
+        except AdmissionRuntimeConflict as exc:
+            raise CostGovernorConflict(str(exc)) from exc
+        except AdmissionRuntimeError as exc:
+            raise CostGovernorError(str(exc)) from exc
+
     def recover_completed(
         self,
         operation_id: str,
         *,
         evidence_refs: Iterable[EvidenceRef],
+        now_wall: float | None = None,
     ) -> CostDecision:
         """Recover terminal qualification after a post-completion process loss."""
 
@@ -1706,6 +3017,11 @@ class CostGovernor:
                     effective_actual,
                 )
                 recovery_reasons = ()
+
+            self._settle_recovered_shared_pressure(
+                record,
+                now_wall=now_wall,
+            )
 
             decision = self._completed_decision(
                 operation_id=operation,
@@ -1805,6 +3121,8 @@ class CostGovernor:
     def recover_released(
         self,
         operation_id: str,
+        *,
+        now_wall: float | None = None,
     ) -> CostDecision:
         """Finish an unspent release interrupted by process loss."""
 
@@ -1860,6 +3178,11 @@ class CostGovernor:
                     raise CostGovernorError(
                         "durable release recovery failed"
                     ) from exc
+
+            self._settle_recovered_shared_pressure(
+                record,
+                now_wall=now_wall,
+            )
 
             decision = CostDecision(
                 operation_id=operation,
