@@ -162,6 +162,35 @@ class GlobalResourceSchedulerTests(unittest.TestCase):
         assert urgent is not None
         self.assertEqual(urgent.state, ACTIVE)
 
+    def test_cancelling_preemption_target_restores_revoking_work(self) -> None:
+        scheduler = GlobalResourceScheduler(policy())
+        scheduler.submit(
+            request("low", "background", cpu=90, priority=9, preemptible=True)
+        )
+        low = scheduler.admit_next()
+        self.assertIsNotNone(low)
+        assert low is not None
+        scheduler.submit(
+            request("urgent", "control", cpu=20, priority=0)
+        )
+        plan = scheduler.begin_preemption("urgent")
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0].state, REVOKING)
+        self.assertEqual(
+            plan[0].revoking_for_request_id,
+            "urgent",
+        )
+
+        scheduler.cancel("urgent")
+        active = scheduler.active_grants()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0].state, ACTIVE)
+        self.assertIsNone(active[0].revoking_for_request_id)
+        self.assertEqual(
+            scheduler.usage("background").cpu_millis,
+            90,
+        )
+
     def test_nonpreemptible_lower_priority_work_is_not_falsely_released(self) -> None:
         scheduler = GlobalResourceScheduler(policy())
         scheduler.submit(
