@@ -271,7 +271,7 @@
       "source": "skeleton/skills",
       "destination": "skeleton/ai/runtime/skills",
       "kind": "tree",
-      "source_git_object_sha": "781c4da70da7fd39141c7cd8e76f19d0036f1782",
+      "source_git_object_sha": "0a67f045f59a79897eee058a969e81a6c3c41e95",
       "role": "tool and skill runtime",
       "work_package_refs": [
         "WP-W13",
