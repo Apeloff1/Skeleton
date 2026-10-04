@@ -57,5 +57,9 @@
     "skeleton/testing/test_tool_saga.py",
     ".github/workflows/non-idempotent-effect-reconciliation.yml"
   ],
-  "claim_limit": "Implementation evidence only; independent exact-head evidence is required before verified_closed."
+  "claim_limit": "Implementation evidence only; independent exact-head evidence is required before verified_closed.",
+  "exact_head": {
+    "base_sha": "be408977891328b78522074c1fe693267b01ce5b",
+    "mode": "pull_request_exact_head"
+  }
 }
