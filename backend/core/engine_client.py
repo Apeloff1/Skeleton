@@ -839,10 +839,13 @@ def command_from_context(
             )
 
     normalized_history: list[tuple[str, str]] = []
+    # Explicit caller history is already canonicalized by the owning
+    # conversation authority. Context projection is only a fallback for
+    # callers that do not provide authoritative conversation history.
     projected_history = (
-        projection.history
-        if projection.history
-        else tuple(history)
+        tuple(history)
+        if history
+        else projection.history
     )
     for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
