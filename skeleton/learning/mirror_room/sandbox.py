@@ -14,6 +14,10 @@ from .contracts import (
     MirrorRoomSpec,
     MirrorScenario,
     SandboxPolicy,
+    ScenarioSplit,
+    _sha256,
+    _text,
+    _token,
 )
 
 
@@ -70,10 +74,42 @@ class EpisodeReceipt:
     outcome: EpisodeOutcome
 
     def __post_init__(self) -> None:
-        if not self.run_id or not isinstance(self.run_id, str):
-            raise MirrorRoomError("run_id must be non-empty text")
-        if not self.executor_id or not isinstance(self.executor_id, str):
-            raise MirrorRoomError("executor_id must be non-empty text")
+        object.__setattr__(self, "run_id", _text("run_id", self.run_id))
+        object.__setattr__(
+            self,
+            "executor_id",
+            _text("executor_id", self.executor_id),
+        )
+        object.__setattr__(
+            self,
+            "candidate_id",
+            _token("candidate_id", self.candidate_id),
+        )
+        object.__setattr__(
+            self,
+            "candidate_digest",
+            _sha256("candidate_digest", self.candidate_digest),
+        )
+        object.__setattr__(
+            self,
+            "scenario_id",
+            _token("scenario_id", self.scenario_id),
+        )
+        object.__setattr__(
+            self,
+            "scenario_digest",
+            _sha256("scenario_digest", self.scenario_digest),
+        )
+        try:
+            split = ScenarioSplit(self.split)
+        except (TypeError, ValueError) as exc:
+            raise MirrorRoomError("episode split must be a Mirror Room split") from exc
+        object.__setattr__(self, "split", split.value)
+        object.__setattr__(
+            self,
+            "spec_digest",
+            _sha256("spec_digest", self.spec_digest),
+        )
         if not isinstance(self.seed, int) or isinstance(self.seed, bool) or self.seed < 0:
             raise MirrorRoomError("seed must be a non-negative integer")
         if not isinstance(self.policy, SandboxPolicy):
@@ -259,10 +295,18 @@ class MirrorSandbox:
             raise MirrorRoomError("replay receipt belongs to another Mirror Room spec")
         if receipt.executor_id != self.executor.executor_id:
             raise MirrorRoomError("replay executor identity changed")
-        if receipt.candidate_digest != candidate.digest:
-            raise MirrorRoomError("replay candidate digest changed")
-        if receipt.scenario_digest != scenario.digest:
-            raise MirrorRoomError("replay scenario digest changed")
+        if (
+            receipt.candidate_id != candidate.candidate_id
+            or receipt.candidate_digest != candidate.digest
+        ):
+            raise MirrorRoomError("replay candidate identity changed")
+        if (
+            receipt.scenario_id != scenario.scenario_id
+            or receipt.scenario_digest != scenario.digest
+        ):
+            raise MirrorRoomError("replay scenario identity changed")
+        if receipt.split != scenario.split.value:
+            raise MirrorRoomError("replay scenario split changed")
 
         current = self._effective_policy()
         policy = receipt.policy
