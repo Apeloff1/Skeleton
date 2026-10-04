@@ -214,3 +214,14 @@ def test_custody_manifest_exactly_classifies_all_jeeves_lineages() -> None:
         for mapping_id, entry in entries.items()
         if "BACKEND-CORE" in mapping_id
     )
+
+
+def test_response_group_tampering_is_detected() -> None:
+    response = authority().assemble([fact(), analysis(), prediction()], now=NOW)
+    forged = replace(
+        response,
+        facts=response.facts + response.analyses,
+        analyses=(),
+    )
+    with pytest.raises(JeevesEvidenceError, match="canonical grouping"):
+        authority().verify(forged)
