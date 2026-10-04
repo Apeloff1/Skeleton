@@ -1,0 +1,21 @@
+name: Temporary preempt stale Merge Readiness ccff72f
+
+on:
+  push:
+    branches:
+      - "chore/retro-sign-p1-terminal-20261004"
+    paths:
+      - ".github/workflows/preempt-stale-mr-ccff72f-tmp.yml"
+
+permissions: {}
+
+concurrency:
+  group: merge-readiness-ccff72fb2fa3866d4f8fd19866d1436ccdd5de10
+  cancel-in-progress: true
+
+jobs:
+  preempt:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo preempted
