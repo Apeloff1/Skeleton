@@ -158,7 +158,7 @@
       "title": "Control-plane / data-plane isolation",
       "status": "implementation_pr_open",
       "implementation_refs": [
-        "github:pr#2727"
+        "github:pr#2749"
       ],
       "evidence_refs": [],
       "closure_note": null
