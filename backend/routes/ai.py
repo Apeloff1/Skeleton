@@ -1931,12 +1931,10 @@ async def cancel_ai_chat_turn(
 
     return {
         "success": True,
-        "changed": bool(status_payload.get("cancellation_requested")),
+        "changed": cancellation_requested,
         "terminal": state in {"completed", "failed", "cancelled"},
         "state": state,
-        "cancellation_requested": bool(
-            status_payload.get("cancellation_requested")
-        ),
+        "cancellation_requested": cancellation_requested,
         "operation_id": operation_id,
         "engine_execution_id": execution_id,
         "timestamp": _utcnow(),
