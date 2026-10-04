@@ -42,6 +42,7 @@ permissions:
   contents: read
 
 concurrency:
+  # Evidence-critical: exact-head signing verification must survive unrelated main churn.
   group: p1-required-gate-authority-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
