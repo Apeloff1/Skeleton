@@ -1,5 +1,12 @@
 """Provider-independent local model execution for the Skeleton AI runtime."""
 
+from .artifact import (
+    LoadedLocalModel,
+    LocalModelArtifactError,
+    LocalModelArtifactReceipt,
+    load_local_model_artifact,
+    write_local_model_artifact,
+)
 from .deployment import (
     LocalModelDeployment,
     LocalModelDeploymentError,
@@ -32,6 +39,11 @@ from .local import (
 )
 
 __all__ = [
+    "LoadedLocalModel",
+    "LocalModelArtifactError",
+    "LocalModelArtifactReceipt",
+    "load_local_model_artifact",
+    "write_local_model_artifact",
     "LocalModelDeployment",
     "LocalModelDeploymentError",
     "LOCAL_MODEL_DEPLOYMENT_SCHEMA",
