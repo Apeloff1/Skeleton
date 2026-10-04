@@ -97,6 +97,17 @@ def test_restart_requeues_persisted_agent_lease_and_reconciles_resources(tmp_pat
     assert recovered.status().recovery.latest_sequence > first.status().recovery.latest_sequence
 
 
+def test_runtime_property_is_detached_from_authoritative_state(tmp_path) -> None:
+    store = make_store(tmp_path)
+    supervisor = DurableAgentSupervisor.open(store, "agent-run", "supervisor-a")
+    detached = supervisor.runtime
+    detached.submit(SwarmTask("bypass", {"unsafe": True}))
+
+    assert detached.task("bypass") is not None
+    assert supervisor.runtime.task("bypass") is None
+    assert supervisor.status().resources == Usage()
+
+
 def test_queue_quota_rejection_does_not_mutate_authoritative_runtime(tmp_path) -> None:
     store = make_store(tmp_path)
     supervisor = DurableAgentSupervisor.open(
