@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 import unittest
 
@@ -309,6 +310,34 @@ class ControlDataPlaneIsolationTests(unittest.TestCase):
                 cost_units=1,
                 capabilities=("data:generate", "data:generate"),
             )
+
+    def test_machine_contract_covers_every_construction_plane(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads(
+            (root / "machine/control_data_plane_contract.json").read_text()
+        )
+        construction = json.loads(
+            (root / "machine/ai_app_construction.json").read_text()
+        )
+        expected = contract["plane_expectations"]
+        planes = {item["id"]: item for item in construction["planes"]}
+        self.assertEqual(set(expected), set(planes))
+        control_profiles = set(contract["control_profiles"])
+        data_profiles = set(contract["data_profiles"])
+        self.assertFalse(control_profiles & data_profiles)
+        for plane_id, declaration in expected.items():
+            self.assertEqual(declaration["owner"], planes[plane_id]["owner"])
+            profile = declaration["profile"]
+            role = declaration["role"]
+            self.assertIn(profile, control_profiles | data_profiles)
+            self.assertEqual(
+                role,
+                "control" if profile in control_profiles else "data",
+            )
+        policy = contract["cross_role_policy"]
+        self.assertTrue(policy["raw_payload_into_control_forbidden"])
+        self.assertTrue(policy["control_to_data_requires_authority_receipt"])
+        self.assertTrue(policy["unknown_plane_fails_closed"])
 
     def test_canonical_and_governed_ai_files_are_byte_identical(self) -> None:
         root = Path(__file__).resolve().parents[2]
