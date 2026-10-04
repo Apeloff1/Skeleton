@@ -19,7 +19,7 @@ import sqlite3
 import threading
 from typing import Any, Iterable
 
-from skeleton.ai.runtime.observability.budget_accounting import (
+from skeleton.observability.budget_accounting import (
     BudgetAccountingDecision,
     qualify_budget_accounting,
 )
