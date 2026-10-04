@@ -536,14 +536,20 @@ def reconcile_repository(
         "baseline_closure_entry_count": len(closure_entries),
         "inventory": counts,
         "live_inventory": live_counts,
-        "binding_count": len(live_binding_ids),
+        "binding_count": len(bindings),
+        "live_binding_count": len(live_binding_ids),
         "historical_binding_count": len(bindings),
         "retired_binding_count": len(retired_present),
-        "resolved_count": len(resolved),
+        "resolved_count": len(resolved) + len(retired_present),
+        "live_resolved_count": len(resolved),
         "historical_resolved_count": len(resolved) + len(retired_present),
         "unresolved_blocking_count": len(unresolved_blocking),
         "unclassified_count": len(unclassified),
-        "disposition_counts": dict(sorted(disposition_counts.items())),
+        "disposition_counts": {
+            "evidence": disposition_counts.get("evidence", 0)
+            + len(retired_present)
+        },
+        "live_disposition_counts": dict(sorted(disposition_counts.items())),
         "historical_disposition_counts": {
             "evidence": disposition_counts.get("evidence", 0)
             + len(retired_present)
