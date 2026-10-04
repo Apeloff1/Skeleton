@@ -60,3 +60,20 @@ def test_closure_implementation_state_tracks_blueprint() -> None:
     errors = checker.validate(mutated, construction)
 
     assert any("implementation_state disagrees with blueprint status" in error for error in errors)
+
+
+def test_terminal_implementation_state_is_complete_not_closed() -> None:
+    ledger, _ = _payloads()
+
+    assert "complete" in checker.EXPECTED_IMPLEMENTATION_STATES
+    assert "closed" not in checker.EXPECTED_IMPLEMENTATION_STATES
+    terminal = [
+        entry
+        for entry in ledger["entries"]
+        if entry["closure_decision"] == "closed"
+    ]
+    assert terminal
+    assert all(
+        entry["implementation_state"] == "complete"
+        for entry in terminal
+    )
