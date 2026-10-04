@@ -13,7 +13,7 @@ import math
 import re
 from typing import Mapping
 
-from skeleton.ai.runtime.observability.distributed_tracing import Span
+from skeleton.observability.distributed_tracing import Span
 
 
 _HEX_RE = re.compile(r"^[0-9a-f]{16,64}$")
