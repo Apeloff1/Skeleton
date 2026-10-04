@@ -134,7 +134,7 @@ class VectorStore:
         }
 
     def _embed(self, text: str) -> List[float]:
-        raw = self._embed(text)
+        raw = self._embedder_fn(text)
         if not isinstance(raw, list):
             raise TypeError("embedder must return list[float]")
         _unit_norm(raw)
