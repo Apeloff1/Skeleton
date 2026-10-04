@@ -17,6 +17,7 @@ def _write_machine(root: Path, *, closed: bool = True) -> None:
     gap_status = "closed" if closed else "open"
     handoff_status = "closed" if closed else "implemented_pending_closure"
     closure_status = "closed" if closed else "open"
+    implementation_state = "complete" if closed else "open"
     blueprint_status = "complete" if closed else "implemented-pending-closure"
 
     gap_register = [
@@ -44,7 +45,7 @@ def _write_machine(root: Path, *, closed: bool = True) -> None:
             {
                 "gap": "gap-streaming-protocol",
                 "closure_decision": closure_status,
-                "implementation_state": closure_status,
+                "implementation_state": implementation_state,
                 "outstanding_evidence": [] if closed else ["exact-head gate"],
                 "blockers": [] if closed else ["exact-head gate"],
                 "evidence_present": [
@@ -170,3 +171,18 @@ def test_streaming_verifier_rejects_closed_gap_with_open_closure_record(
         "closed Stage-6 gap requires closed closure decision" in error
         for error in receipt["errors"]
     )
+
+
+def test_streaming_verifier_rejects_nonterminal_implementation_state(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    path = root / "machine/ai_closure_evidence.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["entries"][0]["implementation_state"] = "pending"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "closed Stage-6 gap requires closed implementation state" in receipt["errors"]
